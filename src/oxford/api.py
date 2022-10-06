@@ -5,7 +5,7 @@ import time
 import urllib.request
 from typing import *
 
-from src.utils import file_components, sanitize_string
+from src.utils import sanitize_string
 
 API_ID = os.environ.get("OXFORD_API_ID")
 API_KEY = os.environ.get("OXFORD_API_KEY")
