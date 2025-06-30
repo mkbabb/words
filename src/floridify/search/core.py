@@ -62,6 +62,7 @@ class SearchEngine:
         languages: list[Language] | None = None,
         min_score: float = 0.6,
         enable_semantic: bool = True,
+        force_rebuild_embeddings: bool = False,
     ) -> None:
         """
         Initialize the search engine.
@@ -71,11 +72,13 @@ class SearchEngine:
             languages: Languages to load (defaults to English)
             min_score: Minimum relevance score for results
             enable_semantic: Whether to load semantic search capabilities
+            force_rebuild_embeddings: Force rebuild of embeddings cache
         """
         self.cache_dir = cache_dir or Path("data/search")
         self.languages = languages or [Language.ENGLISH]
         self.min_score = min_score
         self.enable_semantic = enable_semantic
+        self.force_rebuild_embeddings = force_rebuild_embeddings
 
         # Core components
         self.phrase_normalizer = PhraseNormalizer()
@@ -104,7 +107,9 @@ class SearchEngine:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Load lexicons
-        self.lexicon_loader = LexiconLoader(self.cache_dir)
+        self.lexicon_loader = LexiconLoader(
+            self.cache_dir, force_rebuild=self.force_rebuild_embeddings
+        )
         await self.lexicon_loader.load_languages(self.languages)
 
         # Initialize search components
@@ -117,7 +122,9 @@ class SearchEngine:
         self.fuzzy_search = FuzzySearch(min_score=self.min_score)
 
         if self.enable_semantic:
-            self.semantic_search = SemanticSearch(self.cache_dir)
+            self.semantic_search = SemanticSearch(
+                self.cache_dir, force_rebuild=self.force_rebuild_embeddings
+            )
             await self.semantic_search.initialize(words + phrases)
 
         self._initialized = True

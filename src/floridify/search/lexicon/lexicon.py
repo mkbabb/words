@@ -7,91 +7,17 @@ Implements caching and modular architecture for easy language extension.
 
 from __future__ import annotations
 
+import datetime
 import json
 import pickle
-from enum import Enum
 from pathlib import Path
 from typing import Any
-import datetime
 
 import httpx
 from pydantic import BaseModel, Field
 
-from .phrase import MultiWordExpression, PhraseNormalizer
-
-
-class Language(Enum):
-    """Supported languages with ISO codes."""
-
-    ENGLISH = "en"
-    FRENCH = "fr"
-    # Easily extensible for future languages
-    SPANISH = "es"
-    GERMAN = "de"
-    ITALIAN = "it"
-
-
-class LexiconSource(Enum):
-    """Available lexicon sources with quality ratings."""
-
-    # English - Primary Dictionaries
-    DWYL_ENGLISH_WORDS = "dwyl_english_words"  # 479k words
-    ENGLISH_WORDS_HUGE = "english_words_huge"  # 466k+ words
-    MOBY_WORDS = "moby_words"  # 354k+ Moby project words
-    SCOWL_WORDS = "scowl_words"  # SCOWL word lists
-    WORDNET_WORDS = "wordnet_words"  # WordNet lemmas
-
-    # English - Frequency Lists
-    GOOGLE_10K_ENGLISH = "google_10k_english"  # 10k most common
-    GOOGLE_20K_ENGLISH = "google_20k_english"  # 20k most common
-    COCA_FREQUENCY = "coca_frequency"  # Corpus of Contemporary American English
-    BNC_FREQUENCY = "bnc_frequency"  # British National Corpus
-    SUBTLEX_FREQUENCY = "subtlex_frequency"  # Subtitle-based frequency
-
-    # English - Specialized
-    ENGLISH_IDIOMS = "english_idioms"  # 22k+ idioms
-    ENGLISH_PHRASES = "english_phrases"  # Common phrases
-    ENGLISH_COLLOCATIONS = "english_collocations"  # Word combinations
-    ENGLISH_CONTRACTIONS = "english_contractions"  # Contractions list
-    ENGLISH_ABBREVIATIONS = "english_abbreviations"  # Abbreviations
-    ENGLISH_SLANG = "english_slang"  # Slang dictionary
-
-    # English - Technical/Academic
-    ACADEMIC_VOCABULARY = "academic_vocabulary"  # Academic word list
-    TECHNICAL_TERMS = "technical_terms"  # Technical vocabulary
-    MEDICAL_TERMS = "medical_terms"  # Medical terminology
-    LEGAL_TERMS = "legal_terms"  # Legal terminology
-
-    # French - Primary
-    FRENCH_LEXIQUE = "french_lexique"  # Lexique.org database
-    FRENCH_LEFFF = "french_lefff"  # LEFFF morphological lexicon
-    FRENCH_DELA = "french_dela"  # DELA dictionary
-    COFINLEY_FRENCH_FREQ = "cofinley_french_freq"  # 5k most common
-
-    # French - Specialized
-    FRENCH_IDIOMS = "french_idioms"  # French idioms
-    FRENCH_PHRASES = "french_phrases"  # Common French phrases
-    FRENCH_VERBS = "french_verbs"  # French verb forms
-
-    # Spanish
-    SPANISH_FREQUENCY = "spanish_frequency"  # Spanish frequency list
-    SPANISH_WORDS = "spanish_words"  # Spanish dictionary
-    SPANISH_IDIOMS = "spanish_idioms"  # Spanish idioms
-
-    # German
-    GERMAN_FREQUENCY = "german_frequency"  # German frequency list
-    GERMAN_WORDS = "german_words"  # German dictionary
-    GERMAN_COMPOUND = "german_compound"  # German compound words
-
-    # Italian
-    ITALIAN_FREQUENCY = "italian_frequency"  # Italian frequency list
-    ITALIAN_WORDS = "italian_words"  # Italian dictionary
-
-    # Multi-language
-    WIKTIONARY_MULTILANG = "wiktionary_multilang"  # Wiktionary dumps
-    UNICODE_CLDR = "unicode_cldr"  # Unicode CLDR data
-    PHRASE_MACHINE = "phrase_machine"  # Multi-word expressions
-    POLYGLOT_IDIOMS = "polyglot_idioms"  # Multilingual idioms
+from ..phrase import MultiWordExpression, PhraseNormalizer
+from .sources import LEXICON_SOURCES, Language, LexiconSourceConfig
 
 
 class LexiconData(BaseModel):
@@ -103,7 +29,7 @@ class LexiconData(BaseModel):
     )
     metadata: dict[str, Any] = Field(..., description="Source metadata")
     language: Language = Field(..., description="Language of the lexicon")
-    source: LexiconSource = Field(..., description="Source of the data")
+    sources: list[str] = Field(default_factory=list, description="Names of loaded sources")
     total_entries: int = Field(default=0, ge=0, description="Total number of entries")
     last_updated: str = Field(default="", description="Last update timestamp")
 
@@ -122,16 +48,18 @@ class LexiconLoader:
     - Extensible architecture for new languages/sources
     """
 
-    def __init__(self, cache_dir: Path) -> None:
+    def __init__(self, cache_dir: Path, force_rebuild: bool = False) -> None:
         """
         Initialize the lexicon loader.
 
         Args:
             cache_dir: Directory for caching lexicon data
+            force_rebuild: If True, rebuild lexicons even if cache exists
         """
         self.cache_dir = cache_dir
         self.lexicon_dir = cache_dir / "lexicons"
         self.index_dir = cache_dir / "index"
+        self.force_rebuild = force_rebuild
 
         # Ensure directories exist
         self.lexicon_dir.mkdir(parents=True, exist_ok=True)
@@ -148,100 +76,8 @@ class LexiconLoader:
         # HTTP client for downloads
         self._http_client: httpx.AsyncClient | None = None
 
-        # Comprehensive source URLs mapping
-        self._source_urls = {
-            # English - Primary Dictionaries
-            LexiconSource.DWYL_ENGLISH_WORDS: {
-                "url": "https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt",
-                "format": "text_lines",
-            },
-            LexiconSource.ENGLISH_WORDS_HUGE: {
-                "url": "https://raw.githubusercontent.com/powerlanguage/word-lists/master/english-words-huge.txt",
-                "format": "text_lines",
-            },
-            LexiconSource.MOBY_WORDS: {
-                "url": "https://raw.githubusercontent.com/titusowuor30/moby-english-words/master/moby-english-words.txt",
-                "format": "text_lines",
-            },
-            LexiconSource.SCOWL_WORDS: {
-                "url": "https://raw.githubusercontent.com/en-wl/wordlist/master/alt12dicts/2of12inf.txt",
-                "format": "text_lines",
-            },
-            # English - Frequency Lists
-            LexiconSource.GOOGLE_10K_ENGLISH: {
-                "url": "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-no-swears.txt",
-                "format": "text_lines",
-            },
-            LexiconSource.GOOGLE_20K_ENGLISH: {
-                "url": "https://raw.githubusercontent.com/first20hours/google-10000-english/master/20k.txt",
-                "format": "text_lines",
-            },
-            LexiconSource.COCA_FREQUENCY: {
-                "url": "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/en/en_50k.txt",
-                "format": "frequency_list",
-            },
-            LexiconSource.SUBTLEX_FREQUENCY: {
-                "url": "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/en/en_full.txt",
-                "format": "frequency_list",
-            },
-            # English - Specialized
-            LexiconSource.ENGLISH_IDIOMS: {
-                "url": "https://raw.githubusercontent.com/english-words/english-idioms/master/idioms.json",
-                "format": "json_idioms",
-            },
-            LexiconSource.ENGLISH_PHRASES: {
-                "url": "https://raw.githubusercontent.com/english-words/english-phrases/master/phrases.txt",
-                "format": "text_lines",
-            },
-            LexiconSource.ENGLISH_CONTRACTIONS: {
-                "url": "https://raw.githubusercontent.com/kootenpv/contractions/master/contractions/data/contractions_dict.json",
-                "format": "json_dict",
-            },
-            LexiconSource.ENGLISH_SLANG: {
-                "url": "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en",
-                "format": "text_lines",
-            },
-            # French
-            LexiconSource.FRENCH_LEXIQUE: {
-                "url": "https://raw.githubusercontent.com/hbenbel/French-Dictionary/master/dictionary/francais.txt",
-                "format": "text_lines",
-            },
-            LexiconSource.COFINLEY_FRENCH_FREQ: {
-                "url": "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/fr/fr_50k.txt",
-                "format": "frequency_list",
-            },
-            LexiconSource.FRENCH_LEXIQUE: {
-                "url": "https://raw.githubusercontent.com/chrplr/openlexicon/master/datasets-info/French-Lexique382/README.md",
-                "format": "text_lines",
-            },
-            # Spanish
-            LexiconSource.SPANISH_FREQUENCY: {
-                "url": "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/es/es_50k.txt",
-                "format": "frequency_list",
-            },
-            LexiconSource.SPANISH_WORDS: {
-                "url": "https://raw.githubusercontent.com/JorgeDuenasLerin/diccionario-espanol-txt/master/0_palabras_todas.txt",
-                "format": "text_lines",
-            },
-            # German
-            LexiconSource.GERMAN_FREQUENCY: {
-                "url": "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/de/de_50k.txt",
-                "format": "frequency_list",
-            },
-            LexiconSource.GERMAN_WORDS: {
-                "url": "https://raw.githubusercontent.com/davidak/wortliste/master/wortliste",
-                "format": "text_lines",
-            },
-            # Italian
-            LexiconSource.ITALIAN_FREQUENCY: {
-                "url": "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2016/it/it_50k.txt",
-                "format": "frequency_list",
-            },
-            LexiconSource.ITALIAN_WORDS: {
-                "url": "https://raw.githubusercontent.com/napolux/paroleitaliane/master/paroleitaliane/280000_parole_italiane.txt",
-                "format": "text_lines",
-            },
-        }
+        # Use lexicon sources from sources.py
+        self.lexicon_sources = LEXICON_SOURCES
 
     async def load_languages(self, languages: list[Language]) -> None:
         """
@@ -265,8 +101,8 @@ class LexiconLoader:
         """Load lexicon data for a specific language."""
         cache_file = self.index_dir / f"{language.value}_lexicon.pkl"
 
-        # Try to load from cache first
-        if cache_file.exists():
+        # Try to load from cache first (unless force rebuild)
+        if not self.force_rebuild and cache_file.exists():
             try:
                 with cache_file.open("rb") as f:
                     self.lexicons[language] = pickle.load(f)
@@ -294,11 +130,11 @@ class LexiconLoader:
         # Load each source
         for source in sources:
             try:
-                source_words, source_phrases = await self._load_source(source, language)
+                source_words, source_phrases = await self._load_source(source)
                 words.extend(source_words)
                 phrases.extend(source_phrases)
             except Exception as e:
-                print(f"Warning: Failed to load {source.value}: {e}")
+                print(f"Warning: Failed to load {source.name}: {e}")
                 continue
 
         # Remove duplicates and normalize
@@ -312,98 +148,53 @@ class LexiconLoader:
         return LexiconData(
             words=words,
             phrases=phrases,
-            metadata={"loaded_sources": [s.value for s in sources]},
+            metadata={"loaded_sources": [s.name for s in sources]},
             language=language,
-            source=sources[0] if sources else LexiconSource.DWYL_ENGLISH_WORDS,
+            sources=[s.name for s in sources],
             total_entries=len(words) + len(phrases),
         )
 
-    def _get_sources_for_language(self, language: Language) -> list[LexiconSource]:
+    def _get_sources_for_language(self, language: Language) -> list[LexiconSourceConfig]:
         """Get appropriate sources for a language."""
-        if language == Language.ENGLISH:
-            return [
-                # Primary dictionaries
-                LexiconSource.DWYL_ENGLISH_WORDS,
-                LexiconSource.ENGLISH_WORDS_HUGE,
-                LexiconSource.MOBY_WORDS,
-                # Frequency lists
-                LexiconSource.GOOGLE_10K_ENGLISH,
-                LexiconSource.GOOGLE_20K_ENGLISH,
-                LexiconSource.COCA_FREQUENCY,
-                # Specialized
-                LexiconSource.ENGLISH_IDIOMS,
-                LexiconSource.ENGLISH_PHRASES,
-                LexiconSource.ENGLISH_CONTRACTIONS,
-            ]
-        elif language == Language.FRENCH:
-            return [
-                LexiconSource.FRENCH_LEXIQUE,
-                LexiconSource.COFINLEY_FRENCH_FREQ,
-                LexiconSource.FRENCH_LEFFF,
-            ]
-        elif language == Language.SPANISH:
-            return [
-                LexiconSource.SPANISH_FREQUENCY,
-                LexiconSource.SPANISH_WORDS,
-            ]
-        elif language == Language.GERMAN:
-            return [
-                LexiconSource.GERMAN_FREQUENCY,
-                LexiconSource.GERMAN_WORDS,
-            ]
-        elif language == Language.ITALIAN:
-            return [
-                LexiconSource.ITALIAN_FREQUENCY,
-                LexiconSource.ITALIAN_WORDS,
-            ]
-        else:
-            # Default fallback (empty for unsupported languages)
-            return []
+        return [source for source in self.lexicon_sources if source.language == language]
 
-    def get_lexicon_ext(self, source: LexiconSource) -> str:
+    def get_lexicon_ext(self, source: LexiconSourceConfig) -> str:
         """Get the file extension for a lexicon source."""
-        if source in self._source_urls:
-            format_type = self._source_urls[source]["format"]
-            return ".json" if format_type.startswith("json") else ".txt"
-
-        return ".txt"
+        return ".json" if source.format.startswith("json") else ".txt"
 
     async def _load_source(
-        self, source: LexiconSource, language: Language
+        self, source: LexiconSourceConfig
     ) -> tuple[list[str], list[MultiWordExpression]]:
         """Load data from a specific source."""
-        if source not in self._source_urls:
-            return [], []
-
-        source_config = self._source_urls[source]
-        url = source_config["url"]
-        format_type = source_config["format"]
-
         # Download data
         if not self._http_client:
             self._http_client = httpx.AsyncClient(timeout=30.0)
 
-        response = await self._http_client.get(url)
+        response = await self._http_client.get(source.url)
         response.raise_for_status()
 
         ext = self.get_lexicon_ext(source)
 
         # Save to cache
-        cache_filepath = self.lexicon_dir / f"{source.value}"
+        cache_filepath = self.lexicon_dir / f"{source.name}"
         cache_filepath = cache_filepath.with_suffix(ext)
 
         with cache_filepath.open("w", encoding="utf-8") as f:
             f.write(response.text)
 
         # Parse based on format
-        if format_type == "text_lines":
-            return self._parse_text_lines(response.text, language)
-        elif format_type == "json_idioms":
-            return self._parse_json_idioms(response.text, language)
-        elif format_type == "frequency_list":
-            return self._parse_frequency_list(response.text, language)
-        elif format_type == "json_dict":
-            return self._parse_json_dict(response.text, language)
+        if source.format == "text_lines":
+            return self._parse_text_lines(response.text, source.language)
+        elif source.format == "json_idioms":
+            return self._parse_json_idioms(response.text, source.language)
+        elif source.format == "frequency_list":
+            return self._parse_frequency_list(response.text, source.language)
+        elif source.format == "json_dict":
+            return self._parse_json_dict(response.text, source.language)
+        elif source.format == "json_array":
+            return self._parse_json_array(response.text, source.language)
+        elif source.format == "json_github_api":
+            return self._parse_github_api_response(response.text, source.language)
         else:
             return [], []
 
@@ -561,6 +352,50 @@ class LexiconLoader:
                     words.append(normalized)
 
         return words, phrases
+
+    def _parse_json_array(
+        self, text: str, language: Language
+    ) -> tuple[list[str], list[MultiWordExpression]]:
+        """Parse JSON array format."""
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            return [], []
+
+        words = []
+        phrases = []
+
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, str):
+                    normalized = self.phrase_normalizer.normalize(item)
+                    if normalized and self.phrase_normalizer.is_phrase(normalized):
+                        phrase = MultiWordExpression(
+                            text=item,
+                            normalized=normalized,
+                            word_count=len(normalized.split()),
+                            language=language.value,
+                        )
+                        phrases.append(phrase)
+                    elif normalized:
+                        words.append(normalized)
+
+        return words, phrases
+
+    def _parse_github_api_response(
+        self, text: str, language: Language
+    ) -> tuple[list[str], list[MultiWordExpression]]:
+        """Parse GitHub API response for file content."""
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict) and "content" in data:
+                # Decode base64 content
+                import base64
+                content = base64.b64decode(data["content"]).decode("utf-8")
+                return self._parse_json_array(content, language)
+        except Exception:
+            pass
+        return [], []
 
     async def generate_master_index(
         self, output_path: Path | None = None

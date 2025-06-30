@@ -385,7 +385,7 @@ def _display_semantic_stats(stats: dict[str, Any]) -> None:
     "-l",
     multiple=True,
     type=click.Choice(["en", "fr", "es", "de", "it"]),
-    default=["en"],
+    default=["en", "fr"],
     help="Languages to initialize",
 )
 @click.option("--enable-semantic/--no-semantic", default=True, help="Enable semantic search")
