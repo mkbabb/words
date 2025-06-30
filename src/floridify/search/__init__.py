@@ -1,21 +1,30 @@
-"""Advanced search infrastructure for Floridify.
+"""
+Floridify Search Engine
 
-This module provides hyper-efficient fuzzy search capabilities using:
-1. Traditional data structures (Trie, BK-Tree) for exact and approximate matching
-2. Vectorized approaches using embeddings and approximate nearest neighbors
-3. Comprehensive lexicon support for English, French, and other languages
+A unified, high-performance search system for dictionary and vocabulary lookup.
+Supports exact, fuzzy, and semantic search with first-class phrase/idiom support.
 """
 
-from .fuzzy_traditional import TraditionalFuzzySearch
-from .fuzzy_vectorized import VectorizedFuzzySearch
-from .index import WordIndex
-from .lexicon_loader import LexiconLoader
-from .search_manager import SearchManager
+from __future__ import annotations
+
+from .core import SearchEngine, SearchMethod, SearchResult
+from .fuzzy import FuzzySearch, FuzzySearchMethod
+from .lexicon import Language, LexiconLoader, LexiconSource
+from .phrase import MultiWordExpression, PhraseNormalizer
+from .semantic import SemanticSearch
+from .trie import TrieSearch
 
 __all__ = [
-    "WordIndex",
-    "TraditionalFuzzySearch",
-    "VectorizedFuzzySearch",
+    "SearchEngine",
+    "SearchResult",
+    "SearchMethod",
     "LexiconLoader",
-    "SearchManager",
+    "Language",
+    "LexiconSource",
+    "TrieSearch",
+    "FuzzySearch",
+    "FuzzySearchMethod",
+    "SemanticSearch",
+    "PhraseNormalizer",
+    "MultiWordExpression",
 ]

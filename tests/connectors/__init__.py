@@ -1,0 +1,1 @@
+"""Dictionary connector tests."""

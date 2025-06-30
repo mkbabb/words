@@ -21,7 +21,7 @@ console = Console()
 def cli(ctx: click.Context) -> None:
     """
     🚀 Floridify - AI-Enhanced Dictionary and Learning Tool
-    
+
     Beautiful, intelligent vocabulary management with AI-powered definitions,
     semantic search, and Anki flashcard generation.
     """
@@ -33,6 +33,7 @@ def cli(ctx: click.Context) -> None:
 semantic search, and Anki flashcard generation.[/dim]
 
 [bold]Quick Start:[/bold]
+  [cyan]floridify search init[/cyan]           Initialize search index (first time)
   [cyan]floridify lookup serendipity[/cyan]     Look up a word
   [cyan]floridify find seren[/cyan]            Fuzzy search for words
   [cyan]floridify similar happiness[/cyan]      Find semantically similar words

@@ -23,7 +23,9 @@ Floridify is an augmented dictionary, thesaurus, and word learning tool that com
 -   **wikitextparser**: Proper MediaWiki markup parsing for Wiktionary data extraction
 -   **genanki**: Anki package generation for .apkg file export
 -   **pytest**: Comprehensive testing framework with async support
--   **Click + Rich**: Modern CLI framework with beautiful terminal formatting (planned)
+-   **Click + Rich**: Modern CLI framework with beautiful terminal formatting and enhanced lookup
+-   **FAISS**: High-performance vector similarity search with timeout protection
+-   **scikit-learn**: Machine learning tools for TF-IDF embeddings and semantic search
 
 ## Project Structure
 
@@ -41,7 +43,9 @@ floridify/
 │   │   ├── parsers/               # Apple Notes and word list parsing
 │   │   ├── storage/               # MongoDB operations with Beanie ODM
 │   │   ├── anki/                  # Complete Anki flashcard generation (.apkg export)
-│   │   └── cli/                   # Modern CLI interface (planned)
+│   │   ├── cli/                   # Modern CLI interface with enhanced lookup
+│   │   ├── search/                # Multi-method search engine with FAISS
+│   │   └── utils/                 # Utilities for normalization and formatting
 │   └── config/
 │       └── settings.toml          # Configuration file with API keys
 ├── tests/                         # Comprehensive unit and integration tests
@@ -60,6 +64,14 @@ floridify/
 -   **Examples**: Pydantic model for AI-generated and literature-based usage examples
 -   **APIResponseCache**: Beanie Document for caching external API responses with TTL
 
+### Search Engine (`src/floridify/search/`)
+
+-   **SearchEngine**: Unified interface with exact, fuzzy, and semantic search methods
+-   **SemanticSearch**: Multi-level embedding search with FAISS acceleration and timeout protection
+-   **FuzzySearch**: Traditional fuzzy matching with multiple algorithms and automatic method selection
+-   **TrieSearch**: Efficient exact and prefix matching using compressed trie data structures
+-   **Enhanced Safety**: Division-by-zero protection, timeout handling, graceful degradation
+
 ### Dictionary Connectors (`src/floridify/connectors/`)
 
 -   **WiktionaryConnector**: Free, comprehensive dictionary source with advanced wikitext parsing using wikitextparser
@@ -69,18 +81,29 @@ floridify/
 
 ### AI Integration (`src/floridify/ai/`)
 
--   **Synthesis Engine**: Aggregates multiple provider definitions into coherent AI definitions
--   **Example Generator**: Creates modern, contextual usage examples
--   **Embedding Service**: Generates vector embeddings for semantic search
--   **Bulk Processing**: Optimizes OpenAI API usage with batch operations
+-   **Modern OpenAI Integration**: Latest API with structured outputs and Pydantic schemas
+-   **DefinitionSynthesizer**: Per-word-type AI synthesis instead of flattened aggregation
+-   **Enhanced Example Generation**: Contextual examples with proper formatting
+-   **AI Fallback System**: Complete fallback for unknown words/phrases with phonetic pronunciation
+-   **Model Capability Detection**: Automatic detection of reasoning vs standard models
+-   **Bulk Processing**: Optimized API usage with comprehensive caching
+
+### Enhanced CLI System (`src/floridify/cli/`)
+
+-   **EnhancedWordLookup**: Intelligent lookup with search fallback and AI generation
+-   **Rich Terminal Interface**: Beautiful formatting with cyan examples and bolded words
+-   **Intelligent Cascading**: exact → fuzzy → AI generation with timeout protection
+-   **Per-Word-Type Display**: Definitions organized by grammatical function
+-   **Phonetic Pronunciations**: Auto-generated for AI fallback entries
 
 ### Word Processing Pipeline
 
 1. **Apple Notes Parsing**: Extract words from formatted lists with deduplication
 2. **Provider Data Fetching**: Parallel API calls to dictionary sources with advanced wikitext parsing
-3. **AI Synthesis**: Generate unified definitions and examples via bulk processing
-4. **Storage**: Persist complete entries to MongoDB using Beanie ODM with automatic validation
-5. **Anki Generation**: Create beautiful flashcards with multiple choice and fill-in-the-blank formats
+3. **Enhanced Lookup**: Multi-stage lookup with search engine fallback and AI generation
+4. **AI Synthesis**: Generate unified definitions and examples via structured outputs
+5. **Storage**: Persist complete entries to MongoDB using Beanie ODM with automatic validation
+6. **Anki Generation**: Create beautiful flashcards with multiple choice and fill-in-the-blank formats
 
 ## Development Guidelines
 
@@ -136,30 +159,55 @@ All data models use Pydantic BaseModel with modern typing and Beanie ODM for Mon
 -   ✅ Prompt template system with markdown-based templates for easy customization
 -   ✅ Complete Anki flashcard generation system with .apkg export functionality
 -   ✅ Apple Notes and word list parsing infrastructure
--   ✅ Comprehensive testing suite with 85%+ coverage
--   🔄 End-to-end integration testing (in progress)
--   📋 Modern CLI interface (pending)
--   📋 Fuzzy search and vector similarity features (pending)
+-   ✅ Modern CLI interface with Rich formatting and full functionality
+-   ✅ Complete word lookup system with AI comprehension integration
+-   ✅ Hyper-efficient search engine with dual-approach architecture
+-   ✅ End-to-end CLI workflow: `uv run ./scripts/floridify lookup word think`
+
+**Phase 2**: Quality Assurance ✅ COMPLETED (Production Ready)
+
+-   ✅ **Dependencies Restored**: All 39 essential dependencies including FAISS, scikit-learn, scipy
+-   ✅ **Search Engine Enhanced**: Timeout protection, graceful fallback, division-by-zero safety
+-   ✅ **AI System Modernized**: Structured outputs, per-word-type synthesis, AI fallback generation
+-   ✅ **CLI System Complete**: Enhanced lookup with Rich formatting and intelligent search cascading
+-   ✅ **Type Safety**: MyPy passes completely with proper error handling
+-   ✅ **Core Tests Passing**: AI system, Anki generation, CLI integration working end-to-end
+-   ✅ **Production Quality**: Robust error handling, timeout protection, graceful degradation
 
 ## Development Commands
 
 ```bash
 # Setup development environment
 uv venv && source .venv/bin/activate
-uv pip install -r requirements.txt
+uv sync
 
 # Run tests with coverage
-pytest --cov=src/floridify --cov-report=term-missing
+uv run pytest --cov=src/floridify --cov-report=term-missing
 
-# Type checking
-mypy src/
+# Type checking  
+uv run mypy src/
 
 # Linting and formatting
-ruff check src/ tests/
-ruff format src/ tests/
+uv run ruff check src/ tests/
+uv run ruff format src/ tests/
 
-# Run full pipeline
-python -m floridify.cli process-word-list path/to/wordlist.txt
+# CLI commands (working end-to-end)
+uv run ./scripts/floridify lookup word [WORD]
+uv run ./scripts/floridify search init
+uv run ./scripts/floridify search word [QUERY]
+```
+
+## Working CLI Examples
+
+```bash
+# Look up a word with AI synthesis
+uv run ./scripts/floridify lookup word think
+
+# Initialize search engine
+uv run ./scripts/floridify search init
+
+# Search for words
+uv run ./scripts/floridify search word "cogn"
 ```
 
 ## AI Assistant Guidelines

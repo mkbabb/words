@@ -6,10 +6,13 @@ from .dictionary_com import DictionaryComConnector
 from .oxford import OxfordConnector
 from .wiktionary import WiktionaryConnector
 
+Connector = WiktionaryConnector | OxfordConnector | DictionaryComConnector
+
 __all__ = [
     "DictionaryConnector",
     "CachedDictionaryConnector",
     "WiktionaryConnector",
     "OxfordConnector",
     "DictionaryComConnector",
+    "Connector",
 ]

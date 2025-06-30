@@ -6,6 +6,7 @@ from typing import Any
 
 from ..models import DictionaryEntry, ProviderData, Word
 from ..storage.mongodb import MongoDBStorage
+from ..utils.logging import vprint
 from .openai_connector import OpenAIConnector
 
 
@@ -26,10 +27,14 @@ class DefinitionSynthesizer:
         self.openai_connector = openai_connector
         self.storage = storage
 
+        # Ensure the OpenAI connector has storage for caching
+        if not self.openai_connector.storage:
+            self.openai_connector.storage = storage
+
     async def synthesize_word_entry(
         self, word_text: str, provider_data: dict[str, ProviderData]
     ) -> DictionaryEntry | None:
-        """Synthesize a complete dictionary entry from provider data.
+        """Synthesize a complete dictionary entry from provider data with caching.
 
         Args:
             word_text: The word to synthesize
@@ -42,22 +47,33 @@ class DefinitionSynthesizer:
             return None
 
         try:
+            # Check if we already have a complete cached entry
+            existing_entry = await self.storage.get_entry(word_text)
+            if existing_entry and "ai_synthesis" in existing_entry.providers:
+                vprint(f"Using existing complete entry for '{word_text}' with AI synthesis")
+                # Update with any new provider data and return
+                existing_entry.providers.update(provider_data)
+                await self.storage.save_entry(existing_entry)
+                return existing_entry
+
             # Create word object with embedding
             word = Word(text=word_text)
-            print(f"Created word object for '{word_text}'")
-            
+            vprint(f"Created word object for '{word_text}'")
+
             word = await self.openai_connector.generate_word_embedding(word)
-            print(f"Generated embedding for '{word_text}'")
+            vprint(f"Generated embedding for '{word_text}'")
 
             # Generate AI synthesis
             ai_synthesis = await self.openai_connector.generate_comprehensive_definition(
                 word_text, provider_data
             )
-            print(f"Generated AI synthesis for '{word_text}': {len(ai_synthesis.definitions) if ai_synthesis else 0} definitions")
+            vprint(
+                f"Generated AI synthesis for '{word_text}': {len(ai_synthesis.definitions) if ai_synthesis else 0} definitions"
+            )
 
             # Get pronunciation from first available provider
             pronunciation = self._extract_best_pronunciation(provider_data)
-            print(f"Extracted pronunciation for '{word_text}': {pronunciation.phonetic}")
+            vprint(f"Extracted pronunciation for '{word_text}': {pronunciation.phonetic}")
 
             # Create dictionary entry
             entry = DictionaryEntry(
@@ -65,25 +81,28 @@ class DefinitionSynthesizer:
                 pronunciation=pronunciation,
                 providers=provider_data,
             )
-            print(f"Created dictionary entry for '{word_text}' with {len(provider_data)} providers")
+            vprint(
+                f"Created dictionary entry for '{word_text}' with {len(provider_data)} providers"
+            )
 
             # Add AI synthesis as a provider
             if ai_synthesis:
                 entry.add_provider_data(ai_synthesis)
-                print(f"Added AI synthesis to entry for '{word_text}'")
+                vprint(f"Added AI synthesis to entry for '{word_text}'")
             else:
-                print(f"No AI synthesis generated for '{word_text}'")
+                vprint(f"No AI synthesis generated for '{word_text}'")
 
             # Save to database
             save_result = await self.storage.save_entry(entry)
-            print(f"Saved entry for '{word_text}': {save_result}")
+            vprint(f"Saved entry for '{word_text}': {save_result}")
 
             return entry
 
         except Exception as e:
             import traceback
-            print(f"Error synthesizing entry for '{word_text}': {e}")
-            print(f"Traceback: {traceback.format_exc()}")
+
+            vprint(f"Error synthesizing entry for '{word_text}': {e}")
+            vprint(f"Traceback: {traceback.format_exc()}")
             return None
 
     async def regenerate_ai_synthesis(self, entry: DictionaryEntry) -> bool:
@@ -98,9 +117,7 @@ class DefinitionSynthesizer:
         try:
             # Get non-AI provider data
             provider_data = {
-                name: data
-                for name, data in entry.providers.items()
-                if not data.is_synthetic
+                name: data for name, data in entry.providers.items() if not data.is_synthetic
             }
 
             if not provider_data:
@@ -158,7 +175,7 @@ class DefinitionSynthesizer:
 
         # TODO: Extract pronunciation from provider raw_metadata if available
         # For example, from Wiktionary IPA data or Oxford pronunciation data
-        
+
         return Pronunciation(phonetic="", ipa=None)
 
     async def get_cached_synthesis(self, word: str) -> DictionaryEntry | None:

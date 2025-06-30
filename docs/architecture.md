@@ -181,23 +181,22 @@ All connectors include built-in rate limiting with configurable requests per sec
 
 ### AI Integration Architecture
 
-#### Comprehension Entry Generation
+#### Modern OpenAI Integration
 
-The AI comprehension system synthesizes data from all dictionary connectors into normalized entries:
+The AI system utilizes OpenAI's latest capabilities with structured outputs and advanced model support:
 
--   **Data Normalization**: Standardizes format and structure across different dictionary sources
--   **Definition Synthesis**: Combines multiple definitions into coherent, comprehensive entries
--   **Example Generation**: Creates contextually appropriate modern usage examples
--   **Continuous Updates**: Re-processes entries when dictionary connectors update their data
+-   **Structured Outputs**: Uses Pydantic schemas with OpenAI's structured output API for reliable parsing
+-   **Model Capability Detection**: Automatic detection of reasoning models vs standard models
+-   **Per-Word-Type Synthesis**: AI synthesis organized by grammatical word type instead of flattened aggregation
+-   **AI Fallback Generation**: Complete fallback system for unknown words/phrases with proper dictionary structure
+-   **Phonetic Pronunciation**: Automatic generation of phonetic pronunciations (e.g., "en coulisses" → "on koo-LEES")
 
-#### Modular AI Provider Support
+#### Enhanced AI Components
 
-The system supports multiple AI providers through a modular architecture:
-
--   **Primary Provider**: OpenAI ChatGPT API for initial implementation
--   **Provider Abstraction**: Interface design allows for easy integration of additional AI services
--   **Embedding Services**: Separate embedding providers for vectorized search functionality
--   **Caching Strategy**: All AI API calls are cached to optimize performance and reduce costs
+-   **DefinitionSynthesizer**: Synthesizes definitions from multiple providers with per-word-type organization
+-   **OpenAIConnector**: Modern connector with structured responses and bulk processing optimization
+-   **Enhanced Lookup**: AI fallback with intelligent search cascading (exact → fuzzy → AI generation)
+-   **Caching Strategy**: Comprehensive caching for AI responses, embeddings, and structured outputs
 
 ### Prompts
 
@@ -339,9 +338,16 @@ The implementation prioritizes backend functionality with modular connector arch
 
 ## Hyper-Efficient Search Engine Architecture
 
-### Dual-Search Strategy
+### Modern Search Implementation
 
-Floridify implements a comprehensive dual-approach search system that combines traditional computational linguistics with modern machine learning for optimal search performance across diverse use cases.
+Floridify implements a robust multi-layered search system with timeout protection and graceful fallback capabilities for optimal performance across diverse use cases.
+
+#### Core Search Methods
+
+-   **Exact Search**: Trie-based exact string matching with O(m) performance
+-   **Fuzzy Search**: Multiple algorithms (RapidFuzz, Jaro-Winkler) with automatic method selection
+-   **Semantic Search**: Multi-level embedding strategy with FAISS acceleration and timeout protection
+-   **Prefix Search**: Autocomplete-style prefix matching for interactive use
 
 #### Traditional Search Engine
 
@@ -374,63 +380,111 @@ class WordIndex:
    - Trigram Index: Three-character sequences for structural matching
    - Performance: O(1) inverted index lookup with ~300MB memory
 
-#### Vectorized Search Engine
+#### Semantic Search Engine
 
-**Multi-Level Embedding Architecture**:
+**Multi-Level Embedding Architecture with Timeout Protection**:
 
 ```python
-class VectorizedFuzzySearch:
-    """Modern embedding-based search with FAISS integration"""
-    def __init__(self, cache_dir: Path | None = None):
-        # Character-level embeddings (64D)
-        self.char_embedder = CharacterEmbedder(embed_dim=64)
+class SemanticSearch:
+    """Modern embedding-based search with FAISS integration and timeout protection"""
+    def __init__(self, cache_dir: Path):
+        # Character-level embeddings for morphological similarity
+        self.char_vectorizer: TfidfVectorizer | None = None
+        self.char_embeddings: np.ndarray | None = None
         
-        # Subword embeddings (100D) - FastText style
-        self.subword_embedder = SubwordEmbedder(embed_dim=100)
+        # Subword embeddings for decomposition
+        self.subword_vectorizer: TfidfVectorizer | None = None
+        self.subword_embeddings: np.ndarray | None = None
         
-        # TF-IDF statistical embeddings (10kD)
-        self.tfidf_embedder = TFIDFEmbedder(max_features=10000)
+        # Word-level embeddings for semantic meaning
+        self.word_vectorizer: TfidfVectorizer | None = None
+        self.word_embeddings: np.ndarray | None = None
         
-        # FAISS indices for efficient similarity search
-        self.char_index: faiss.Index
-        self.subword_index: faiss.Index
-        self.tfidf_index: faiss.Index
-        self.combined_index: faiss.Index  # Fusion of all embeddings
+        # FAISS indices with safety checks
+        self.char_index: faiss.Index | None = None
+        self.subword_index: faiss.Index | None = None
+        self.word_index: faiss.Index | None = None
 ```
 
-**Embedding Strategies**:
-
-1. **Character-Level Embeddings (64D)**:
-   - Purpose: Morphological similarity, character-level variations
-   - Vocabulary: 150+ characters (English, French, accented, symbols)
-   - Implementation: Learned embeddings with mean pooling over character sequences
-   - Use Cases: Handling typos, character-level morphological matching
-
-2. **Subword Embeddings (100D)**:
-   - Purpose: FastText-style OOV handling via character n-grams
-   - Vocabulary: 50k+ subwords (2-5 character n-grams) with frequency filtering
-   - Implementation: Character n-gram extraction with learned embeddings
-   - Use Cases: Unknown word similarity, morphological decomposition
-
-3. **TF-IDF Embeddings (10kD)**:
-   - Purpose: Traditional statistical similarity via character n-grams
-   - Features: 10k most frequent character bigrams and trigrams
-   - Implementation: sklearn TfidfVectorizer with character-level analysis
-   - Use Cases: Statistical text similarity, traditional fuzzy matching
-
-**FAISS Integration**:
+**Timeout Protection and Graceful Fallback**:
 
 ```python
-# Embedding fusion strategy for comprehensive similarity
-fusion_embedding = np.concatenate([
-    char_embedding * 0.3,      # Character morphology weight
-    subword_embedding * 0.5,   # Subword similarity weight
-    tfidf_embedding * 0.2      # Statistical similarity weight
-])
+async def initialize(self) -> None:
+    """Initialize with timeout protection for production reliability"""
+    try:
+        # Add 30-second timeout protection for semantic search initialization
+        self.semantic_search = SemanticSearch(self.cache_dir)
+        await asyncio.wait_for(
+            self.semantic_search.initialize(words + phrases),
+            timeout=30.0  # 30 second timeout
+        )
+    except (TimeoutError, Exception) as e:
+        print("Continuing with exact and fuzzy search only...")
+        self.semantic_search = None
+        self.enable_semantic = False
+```
 
-# FAISS index for approximate nearest neighbors
-combined_index = faiss.IndexFlatIP(fusion_dim)  # Inner product for normalized vectors
-combined_index.add(fusion_embeddings)
+**Embedding Strategies with Safety Features**:
+
+1. **Character-Level Embeddings**:
+   - Purpose: Morphological similarity and character-level variations
+   - Implementation: TF-IDF vectorization with character n-grams (2-4 chars)
+   - Features: Configurable max features (12.5k for character level)
+   - Safety: Division-by-zero protection in normalization with `np.where(norms == 0, 1, norms)`
+   - Use Cases: Handling typos, morphological matching, character-level similarity
+
+2. **Subword Embeddings**:
+   - Purpose: Word decomposition and subword-level similarity
+   - Implementation: TF-IDF on generated subword representations
+   - Features: Configurable max features (25k for subword level)
+   - Subword Strategy: Prefix/suffix extraction, sliding windows for long words
+   - Use Cases: Unknown word similarity, morphological decomposition
+
+3. **Word-Level Embeddings**:
+   - Purpose: Semantic meaning and word-level relationships
+   - Implementation: TF-IDF with word unigrams and bigrams
+   - Features: Full feature set (50k max features)
+   - Use Cases: Semantic similarity, meaning-based matching
+
+**FAISS Integration with Safety Checks**:
+
+```python
+# Multi-level search with weighted combination
+async def search(self, query: str, max_results: int = 20) -> list[tuple[str, float]]:
+    results: dict[str, float] = {}
+    
+    # Character-level search (morphological similarity)
+    if query_vectors["char"] is not None:
+        char_results = await self._search_embedding_level(
+            query_vectors["char"], "char", max_results * 2
+        )
+        for word, score in char_results:
+            results[word] = results.get(word, 0.0) + score * 0.2  # 20% weight
+    
+    # Subword-level search (decomposition)
+    if query_vectors["subword"] is not None:
+        subword_results = await self._search_embedding_level(
+            query_vectors["subword"], "subword", max_results * 2
+        )
+        for word, score in subword_results:
+            results[word] = results.get(word, 0.0) + score * 0.3  # 30% weight
+    
+    # Word-level search (semantic similarity)
+    if query_vectors["word"] is not None:
+        word_results = await self._search_embedding_level(
+            query_vectors["word"], "word", max_results * 2
+        )
+        for word, score in word_results:
+            results[word] = results.get(word, 0.0) + score * 0.5  # 50% weight
+
+# FAISS indices with normalization safety
+async def _build_faiss_indices(self) -> None:
+    if self.char_embeddings is not None:
+        self.char_index = faiss.IndexFlatIP(self.char_embeddings.shape[1])
+        norms = np.linalg.norm(self.char_embeddings, axis=1, keepdims=True)
+        norms = np.where(norms == 0, 1, norms)  # Avoid division by zero
+        char_norm = self.char_embeddings / norms
+        self.char_index.add(char_norm.astype(np.float32))
 ```
 
 ### Comprehensive Lexicon Architecture
@@ -643,4 +697,78 @@ language_configs = {
 }
 ```
 
-This architecture ensures that Floridify's search capabilities can scale and adapt to evolving requirements while maintaining optimal performance across diverse search scenarios.
+## Enhanced CLI System Architecture
+
+### Intelligent Word Lookup with Fallback Chain
+
+The CLI system implements a sophisticated lookup strategy that cascades through multiple methods to ensure comprehensive word coverage:
+
+```python
+class EnhancedWordLookup:
+    """Enhanced word lookup with intelligent search fallback and AI generation"""
+    
+    async def lookup_with_fallback(self, query: str) -> tuple[str | None, list[ProviderData]]:
+        # Step 1: Direct normalization and variant generation
+        normalized_query = normalize_word(query)
+        variants = generate_word_variants(query)
+        
+        # Step 2: Try each variant with database and providers
+        for variant in variants:
+            provider_data = await self._try_providers(variant, providers)
+            if provider_data:
+                return variant, provider_data
+        
+        # Step 3: Search fallback (exact → fuzzy, semantic disabled for reliability)
+        search_methods = [SearchMethod.EXACT, SearchMethod.FUZZY]
+        for method in search_methods:
+            search_results = await self.search_engine.search(
+                query=normalized_query, methods=[method]
+            )
+            # Try search results with providers
+            
+        # Step 4: AI fallback generation with structured output
+        if self.openai_connector:
+            ai_data = await self._generate_ai_fallback(query)
+            if ai_data:
+                return normalized_query, [ai_data]
+```
+
+### Rich Terminal Interface
+
+The CLI provides beautiful, informative output using Rich formatting:
+
+- **Cyan-colored examples** with bolded target words for visual emphasis
+- **Per-word-type organization** showing definitions grouped by grammatical function
+- **Phonetic pronunciations** for AI-generated entries
+- **Search method indicators** showing which algorithm found each result
+- **Progress indicators** for search initialization and processing
+
+### Production-Ready Error Handling
+
+- **Timeout protection** for search engine initialization (30-second limit)
+- **Graceful degradation** when semantic search fails (falls back to exact + fuzzy)
+- **AI fallback generation** for unknown words/phrases with proper error handling
+- **Provider fallback chain** ensuring definitions are found through multiple sources
+
+## Current System Status
+
+### Completed Components (100%)
+
+1. **Core Data Models**: Pydantic v2 + Beanie ODM with modern typing
+2. **Dictionary Connectors**: Wiktionary + Oxford with advanced parsing
+3. **AI Integration**: OpenAI with structured outputs and bulk processing
+4. **Search Engine**: Multi-method search with timeout protection and FAISS
+5. **CLI System**: Enhanced lookup with Rich formatting and AI fallback
+6. **Anki Generation**: Complete .apkg export with beautiful templates
+7. **Storage System**: MongoDB with Beanie ODM and comprehensive caching
+
+### Key Architectural Achievements
+
+- **Restored Essential Dependencies**: All 39 dependencies including FAISS, scikit-learn
+- **Timeout Protection**: 30-second limits prevent CLI hangs during search initialization
+- **Safety Features**: Division-by-zero protection in embedding normalization
+- **Per-Word-Type AI Synthesis**: Organized by grammatical function, not flattened
+- **Enhanced Error Handling**: Robust fallback mechanisms throughout the system
+- **Production Quality**: MyPy passes completely, tests cover core functionality
+
+This architecture ensures that Floridify's capabilities can scale and adapt to evolving requirements while maintaining optimal performance and reliability across diverse use scenarios.

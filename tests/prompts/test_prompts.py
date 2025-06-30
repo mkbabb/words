@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 
+from src.floridify.models import Definition, Examples, GeneratedExample, ProviderData, WordType
 from src.floridify.prompts import PromptLoader, PromptTemplate
 from src.floridify.prompts.formatters import format_provider_context, format_template_variables
 from src.floridify.prompts.templates import parse_prompt_markdown
-from src.floridify.models import Definition, Examples, GeneratedExample, ProviderData, WordType
 
 
 class TestPromptTemplate:
@@ -25,7 +24,7 @@ class TestPromptTemplate:
             variables={"word": "The word to define"},
             notes={"temperature": 0.5},
         )
-        
+
         assert template.name == "test"
         assert template.system_message == "You are a test assistant."
         assert "{{word}}" in template.user_template
@@ -41,12 +40,9 @@ class TestPromptTemplate:
             variables={},
             notes={},
         )
-        
-        system_msg, user_msg = template.render({
-            "word": "serendipity",
-            "word_type": "noun"
-        })
-        
+
+        system_msg, user_msg = template.render({"word": "serendipity", "word_type": "noun"})
+
         assert system_msg == "You are a test assistant."
         assert user_msg == "Define serendipity as a noun."
 
@@ -63,12 +59,12 @@ class TestPromptTemplate:
                 "temperature": 0.7,
                 "model": "gpt-4",
                 "max_tokens": 500,
-                "other_setting": "ignored"
+                "other_setting": "ignored",
             },
         )
-        
+
         settings = template.get_ai_settings()
-        
+
         assert settings["temperature"] == 0.7
         assert settings["model"] == "gpt-4"
         assert settings["max_tokens"] == 500
@@ -102,9 +98,9 @@ Provide a simple definition.
 - Temperature: 0.5
 - Model: gpt-4
 """
-        
+
         template = parse_prompt_markdown(markdown_content, "test")
-        
+
         assert template.name == "test"
         assert template.system_message == "You are a helpful assistant."
         assert template.user_template == "Please define {{word}} for me."
@@ -127,9 +123,9 @@ System message here.
 ## Variables
 - `{{prompt}}` - The prompt text
 """
-        
+
         template = parse_prompt_markdown(markdown_content, "minimal")
-        
+
         assert template.name == "minimal"
         assert template.system_message == "System message here."
         assert template.instructions == ""
@@ -145,7 +141,7 @@ class TestPromptLoader:
         # Test with default path
         loader = PromptLoader()
         assert loader.templates_dir.exists()
-        
+
         # Test with custom path
         custom_path = Path(__file__).parent.parent / "src" / "floridify" / "prompts" / "templates"
         loader = PromptLoader(custom_path)
@@ -154,9 +150,9 @@ class TestPromptLoader:
     def test_load_synthesis_template(self) -> None:
         """Test loading the synthesis template."""
         loader = PromptLoader()
-        
+
         template = loader.load_template("synthesis")
-        
+
         assert template.name == "synthesis"
         assert "lexicographer" in template.system_message.lower()
         assert "{{word}}" in template.user_template
@@ -166,9 +162,9 @@ class TestPromptLoader:
     def test_load_examples_template(self) -> None:
         """Test loading the examples template."""
         loader = PromptLoader()
-        
+
         template = loader.load_template("examples")
-        
+
         assert template.name == "examples"
         assert "creative" in template.system_message.lower()
         assert "{{word}}" in template.user_template
@@ -179,9 +175,9 @@ class TestPromptLoader:
     def test_list_templates(self) -> None:
         """Test listing available templates."""
         loader = PromptLoader()
-        
+
         templates = loader.list_templates()
-        
+
         assert "synthesis" in templates
         assert "examples" in templates
         assert isinstance(templates, list)
@@ -190,18 +186,18 @@ class TestPromptLoader:
     def test_template_caching(self) -> None:
         """Test that templates are cached."""
         loader = PromptLoader()
-        
+
         # Load template twice
         template1 = loader.load_template("synthesis")
         template2 = loader.load_template("synthesis")
-        
+
         # Should be the same object (cached)
         assert template1 is template2
-        
+
         # Clear cache and reload
         loader.clear_cache()
         template3 = loader.load_template("synthesis")
-        
+
         # Should be different object after cache clear
         assert template1 is not template3
         assert template1.name == template3.name  # But same content
@@ -209,9 +205,9 @@ class TestPromptLoader:
     def test_get_template_info(self) -> None:
         """Test getting template information."""
         loader = PromptLoader()
-        
+
         info = loader.get_template_info("synthesis")
-        
+
         assert info["name"] == "synthesis"
         assert "variables" in info
         assert "word" in info["variables"]
@@ -230,9 +226,9 @@ class TestFormatters:
             count=5,
             items=["a", "b", "c"],
             none_value=None,
-            dict_value={"key": "value"}
+            dict_value={"key": "value"},
         )
-        
+
         assert variables["word"] == "test"
         assert variables["count"] == "5"
         assert variables["items"] == "['a', 'b', 'c']"
@@ -257,7 +253,7 @@ class TestFormatters:
                 )
             ],
         )
-        
+
         oxford_data = ProviderData(
             provider_name="oxford",
             definitions=[
@@ -268,14 +264,14 @@ class TestFormatters:
                 )
             ],
         )
-        
+
         provider_data = {
             "wiktionary": wiktionary_data,
             "oxford": oxford_data,
         }
-        
+
         context = format_provider_context("lake", provider_data)
-        
+
         assert "Word: lake" in context
         assert "WIKTIONARY DEFINITIONS:" in context
         assert "OXFORD DEFINITIONS:" in context

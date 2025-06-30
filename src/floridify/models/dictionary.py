@@ -21,6 +21,9 @@ class WordType(Enum):
     PREPOSITION = "preposition"
     CONJUNCTION = "conjunction"
     INTERJECTION = "interjection"
+    DETERMINER = "determiner"
+    PHRASE = "phrase"
+    OTHER = "other"
 
 
 class LiteratureSourceType(Enum):

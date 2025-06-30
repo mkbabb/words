@@ -13,7 +13,7 @@ class OpenAIConfig:
     """OpenAI API configuration."""
 
     api_key: str
-    model: str = "gpt-4"
+    model: str = "gpt-4o"
     reasoning_effort: str = "high"
     embedding_model: str = "text-embedding-3-large"
 
@@ -51,6 +51,7 @@ class ProcessingConfig:
     batch_size: int = 50
     retry_attempts: int = 3
     cache_ttl_hours: int = 24
+    verbose: bool = False
 
 
 @dataclass
@@ -83,7 +84,7 @@ class Config:
         # Load configurations with defaults
         openai_config = OpenAIConfig(
             api_key=data.get("openai", {}).get("api_key", ""),
-            model=data.get("models", {}).get("openai_model", "gpt-4"),
+            model=data.get("models", {}).get("openai_model", "gpt-4o"),
             reasoning_effort=data.get("models", {}).get("reasoning_effort", "high"),
             embedding_model=data.get("models", {}).get("embedding_model", "text-embedding-3-large"),
         )
@@ -111,6 +112,7 @@ class Config:
             batch_size=data.get("processing", {}).get("batch_size", 50),
             retry_attempts=data.get("processing", {}).get("retry_attempts", 3),
             cache_ttl_hours=data.get("processing", {}).get("cache_ttl_hours", 24),
+            verbose=data.get("processing", {}).get("verbose", False),
         )
 
         return cls(

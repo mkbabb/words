@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, Field
 
 
 class CardType(Enum):
     """Types of flashcards that can be generated."""
-    
+
     MULTIPLE_CHOICE = "multiple_choice"
     FILL_IN_BLANK = "fill_in_blank"
     DEFINITION_TO_WORD = "definition_to_word"
@@ -19,14 +18,14 @@ class CardType(Enum):
 
 class AnkiCardTemplate(BaseModel):
     """Template for generating Anki flashcards."""
-    
+
     card_type: CardType
     front_template: str
     back_template: str
     css_styles: str
     javascript: str = ""
     fields: list[str] = Field(default_factory=list)
-    
+
     @classmethod
     def get_multiple_choice_template(cls) -> AnkiCardTemplate:
         """Get template for multiple choice cards."""
@@ -65,7 +64,7 @@ class AnkiCardTemplate(BaseModel):
             </div>
         </div>
         """
-        
+
         back_template = """
         <div class="card">
             <div class="word-header">
@@ -92,7 +91,7 @@ class AnkiCardTemplate(BaseModel):
             </div>
         </div>
         """
-        
+
         css_styles = """
         .card {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -247,7 +246,7 @@ class AnkiCardTemplate(BaseModel):
             font-size: 0.9em;
         }
         """
-        
+
         javascript = """
         function selectChoice(element, choice) {
             // Remove previous selections
@@ -275,17 +274,27 @@ class AnkiCardTemplate(BaseModel):
             document.querySelector('.reveal-button').style.display = 'none';
         }
         """
-        
+
         return cls(
             card_type=CardType.MULTIPLE_CHOICE,
             front_template=front_template,
             back_template=back_template,
             css_styles=css_styles,
             javascript=javascript,
-            fields=["Word", "Pronunciation", "ChoiceA", "ChoiceB", "ChoiceC", "ChoiceD", 
-                   "CorrectChoice", "Definition", "Examples", "Synonyms"]
+            fields=[
+                "Word",
+                "Pronunciation",
+                "ChoiceA",
+                "ChoiceB",
+                "ChoiceC",
+                "ChoiceD",
+                "CorrectChoice",
+                "Definition",
+                "Examples",
+                "Synonyms",
+            ],
         )
-    
+
     @classmethod
     def get_fill_in_blank_template(cls) -> AnkiCardTemplate:
         """Get template for fill-in-the-blank cards."""
@@ -314,7 +323,7 @@ class AnkiCardTemplate(BaseModel):
             </div>
         </div>
         """
-        
+
         back_template = """
         <div class="card">
             <div class="word-header">
@@ -339,7 +348,7 @@ class AnkiCardTemplate(BaseModel):
             </div>
         </div>
         """
-        
+
         css_styles = """
         .card {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -467,12 +476,20 @@ class AnkiCardTemplate(BaseModel):
             font-style: italic;
         }
         """
-        
+
         return cls(
             card_type=CardType.FILL_IN_BLANK,
             front_template=front_template,
             back_template=back_template,
             css_styles=css_styles,
-            fields=["Word", "Pronunciation", "SentenceWithBlank", "WordType", "Hint",
-                   "CompleteSentence", "Definition", "AdditionalExamples"]
+            fields=[
+                "Word",
+                "Pronunciation",
+                "SentenceWithBlank",
+                "WordType",
+                "Hint",
+                "CompleteSentence",
+                "Definition",
+                "AdditionalExamples",
+            ],
         )

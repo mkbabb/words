@@ -4,14 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from src.floridify.ai import OpenAIConnector, DefinitionSynthesizer, WordProcessingPipeline
+from src.floridify.ai import DefinitionSynthesizer, OpenAIConnector, WordProcessingPipeline
 from src.floridify.config import Config, OpenAIConfig
 from src.floridify.models import (
-    Definition,
-    Examples,
-    GeneratedExample,
     ProviderData,
-    Word,
     WordType,
 )
 
@@ -23,82 +19,77 @@ class TestOpenAIConnector:
         """Test OpenAI connector can be initialized."""
         config = OpenAIConfig(api_key="test-key")
         connector = OpenAIConnector(config)
-        
-        assert connector.config.api_key == "test-key"
-        assert connector.config.model == "gpt-4"  # default
-        assert connector.client is not None
-        assert connector.prompt_loader is not None
 
-    def test_parse_ai_definitions(self) -> None:
-        """Test parsing AI response into definitions."""
+        assert connector.config.api_key == "test-key"
+        assert connector.config.model == "gpt-4o"  # default
+        assert connector.client is not None
+        assert connector.capabilities is not None
+
+    def test_convert_ai_definitions(self) -> None:
+        """Test converting AI definitions to internal format."""
+        from src.floridify.ai.schemas import AIDefinition, WordTypeEnum
         config = OpenAIConfig(api_key="test-key")
         connector = OpenAIConnector(config)
-        
-        ai_response = """
-        NOUN: A large body of water completely surrounded by land.
-        VERB: To form a lake or collect in a lake-like manner.
-        """
-        
-        definitions = connector._parse_ai_definitions(ai_response)
-        
+
+        ai_definitions = [
+            AIDefinition(word_type=WordTypeEnum.NOUN, definition="A large body of water completely surrounded by land."),
+            AIDefinition(word_type=WordTypeEnum.VERB, definition="To form a lake or collect in a lake-like manner."),
+        ]
+
+        definitions = connector._convert_ai_definitions(ai_definitions)
+
         assert len(definitions) == 2
         assert definitions[0].word_type == WordType.NOUN
         assert "large body of water" in definitions[0].definition
         assert definitions[1].word_type == WordType.VERB
         assert "form a lake" in definitions[1].definition
 
-    def test_parse_example_sentences(self) -> None:
-        """Test parsing AI response into example sentences."""
+    def test_map_word_type(self) -> None:
+        """Test mapping AI word types to internal WordType enum."""
+        from src.floridify.ai.schemas import WordTypeEnum
         config = OpenAIConfig(api_key="test-key")
         connector = OpenAIConnector(config)
-        
-        ai_response = """
-        1. The serene lake reflected the mountain peaks perfectly.
-        2. We decided to lake our afternoon by the peaceful shoreline.
-        """
-        
-        sentences = connector._parse_example_sentences(ai_response)
-        
-        assert len(sentences) == 2
-        assert "serene lake reflected" in sentences[0]
-        assert "lake our afternoon" in sentences[1]
 
-    def test_map_pos_to_word_type(self) -> None:
-        """Test mapping part of speech strings to WordType enum."""
-        config = OpenAIConfig(api_key="test-key")
-        connector = OpenAIConnector(config)
-        
-        assert connector._map_pos_to_word_type("NOUN") == WordType.NOUN
-        assert connector._map_pos_to_word_type("VERB") == WordType.VERB
-        assert connector._map_pos_to_word_type("ADJECTIVE") == WordType.ADJECTIVE
-        assert connector._map_pos_to_word_type("UNKNOWN") is None
+        # Test various word type mappings
+        assert connector._map_word_type(WordTypeEnum.NOUN) == WordType.NOUN
+        assert connector._map_word_type(WordTypeEnum.VERB) == WordType.VERB
+        assert connector._map_word_type(WordTypeEnum.ADJECTIVE) == WordType.ADJECTIVE
+        assert connector._map_word_type(WordTypeEnum.ADVERB) == WordType.ADVERB
 
-    def test_prepare_synthesis_context(self) -> None:
-        """Test preparing context from provider data."""
+    def test_build_request_params(self) -> None:
+        """Test building OpenAI API request parameters."""
+        from src.floridify.ai.schemas import DefinitionSynthesisResponse
         config = OpenAIConfig(api_key="test-key")
         connector = OpenAIConnector(config)
+
+        system_message = "You are a helpful assistant."
+        user_prompt = "Define the word 'test'."
         
-        # Create sample provider data
-        wiktionary_data = ProviderData(
-            provider_name="wiktionary",
-            definitions=[
-                Definition(
-                    word_type=WordType.NOUN,
-                    definition="A body of water",
-                    examples=Examples(
-                        generated=[GeneratedExample(sentence="The lake was calm.")]
-                    ),
-                )
-            ],
+        params = connector._build_request_params(
+            system_message=system_message,
+            user_prompt=user_prompt,
+            response_schema=DefinitionSynthesisResponse
         )
+
+        assert params["model"] == "gpt-4o"
+        assert "messages" in params
+        assert len(params["messages"]) == 2
+        assert params["messages"][0]["role"] == "system"
+        assert params["messages"][1]["role"] == "user"
+
+    def test_model_capabilities(self) -> None:
+        """Test model capability detection."""
+        from src.floridify.ai.schemas import get_model_capabilities, is_reasoning_model
         
-        provider_data = {"wiktionary": wiktionary_data}
-        context = connector._prepare_synthesis_context("lake", provider_data)
+        # Test reasoning model
+        o3_caps = get_model_capabilities("o3")
+        assert o3_caps["supports_structured_outputs"] == True
+        assert is_reasoning_model("o3") == True
         
-        assert "Word: lake" in context
-        assert "WIKTIONARY DEFINITIONS:" in context
-        assert "A body of water" in context
-        assert "The lake was calm." in context
+        # Test standard model
+        gpt4_caps = get_model_capabilities("gpt-4o")
+        assert gpt4_caps["supports_structured_outputs"] == True
+        assert is_reasoning_model("gpt-4o") == False
 
 
 class TestDefinitionSynthesizer:
@@ -120,7 +111,7 @@ class TestDefinitionSynthesizer:
     ) -> None:
         """Test synthesizer can be initialized."""
         synthesizer = DefinitionSynthesizer(mock_openai_connector, mock_storage)
-        
+
         assert synthesizer.openai_connector == mock_openai_connector
         assert synthesizer.storage == mock_storage
 
@@ -129,14 +120,12 @@ class TestDefinitionSynthesizer:
     ) -> None:
         """Test extracting best pronunciation from provider data."""
         synthesizer = DefinitionSynthesizer(mock_openai_connector, mock_storage)
-        
+
         # Create sample provider data without pronunciation
-        provider_data = {
-            "wiktionary": ProviderData(provider_name="wiktionary", definitions=[])
-        }
-        
+        provider_data = {"wiktionary": ProviderData(provider_name="wiktionary", definitions=[])}
+
         pronunciation = synthesizer._extract_best_pronunciation(provider_data)
-        
+
         # Should return default pronunciation
         assert pronunciation.phonetic == ""
         assert pronunciation.ipa is None
@@ -171,7 +160,7 @@ class TestWordProcessingPipeline:
 
         storage = MongoDBStorage()
         pipeline = WordProcessingPipeline(mock_config, storage)
-        
+
         assert pipeline.config == mock_config
         assert pipeline.storage == storage
         assert len(pipeline.connectors) == 3  # wiktionary, oxford, dictionary_com
@@ -185,9 +174,9 @@ class TestWordProcessingPipeline:
 
         storage = MongoDBStorage()
         pipeline = WordProcessingPipeline(mock_config, storage)
-        
+
         stats = pipeline.get_processing_stats()
-        
+
         assert "providers_configured" in stats
         assert stats["providers_configured"] == 3
         assert "storage_connected" in stats

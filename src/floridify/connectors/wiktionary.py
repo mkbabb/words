@@ -4,13 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import re
-
 from typing import Any
 
 import httpx
 import wikitextparser as wtp  # type: ignore[import-untyped]
 
-from ..models import Definition, Examples, GeneratedExample, Pronunciation, ProviderData, WordType
+from ..models import (
+    Definition,
+    Examples,
+    GeneratedExample,
+    Pronunciation,
+    ProviderData,
+    SynonymReference,
+    Word,
+    WordType,
+)
 from .base import DictionaryConnector
 
 
@@ -138,7 +146,6 @@ class WiktionaryConnector(DictionaryConnector):
                 "pronoun": WordType.PRONOUN,
                 "preposition": WordType.PREPOSITION,
                 "conjunction": WordType.CONJUNCTION,
-
                 "interjection": WordType.INTERJECTION,
             }
 
@@ -166,6 +173,9 @@ class WiktionaryConnector(DictionaryConnector):
                         # Extract examples if present
                         examples = self._extract_examples_from_definition(def_text)
 
+                        # Extract synonyms if present
+                        synonyms = self._extract_synonyms_from_definition(def_text, word_type)
+
                         # Clean the definition text
                         clean_def = self._clean_definition_text(def_text)
 
@@ -175,6 +185,7 @@ class WiktionaryConnector(DictionaryConnector):
                                     word_type=word_type,
                                     definition=clean_def,
                                     examples=examples,
+                                    synonyms=synonyms,
                                 )
                             )
 
@@ -371,6 +382,98 @@ class WiktionaryConnector(DictionaryConnector):
             phonetic = phonetic.replace(ipa_char, simple_char)
 
         return phonetic.strip() or "unknown"
+
+    def _extract_synonyms_from_definition(
+        self, def_text: str, word_type: WordType
+    ) -> list[SynonymReference]:
+        """Extract synonyms from Wiktionary definition text.
+
+        Args:
+            def_text: Definition text that may contain synonym templates
+            word_type: Word type for the definition
+
+        Returns:
+            List of synonym references
+        """
+        synonyms = []
+
+        try:
+            # Parse the definition text for synonym templates
+            parsed = wtp.parse(def_text)
+
+            for template in parsed.templates:
+                template_name = template.name.strip().lower()
+
+                if template_name in ["syn", "synonym", "synonyms"]:
+                    # Extract synonym words from template arguments
+                    for arg in template.arguments:
+                        arg_value = str(arg.value).strip()
+
+                        # Skip language codes and empty arguments
+                        if arg_value and len(arg_value) > 1 and arg_value not in ["en", "lang"]:
+                            # Clean up the synonym text
+                            clean_synonym = self._clean_synonym_text(arg_value)
+                            if clean_synonym:
+                                synonyms.append(
+                                    SynonymReference(
+                                        word=Word(text=clean_synonym), word_type=word_type
+                                    )
+                                )
+
+            # Also look for inline synonym patterns like "syn: word1, word2"
+            syn_patterns = [
+                r"syn:\s*([^;|}\n]+)",
+                r"synonym[s]?:\s*([^;|}\n]+)",
+                r"see also:\s*([^;|}\n]+)",
+            ]
+
+            for pattern in syn_patterns:
+                matches = re.findall(pattern, def_text, re.IGNORECASE)
+                for match in matches:
+                    # Split on commas and extract individual synonyms
+                    syn_words = [word.strip() for word in match.split(",")]
+                    for syn_word in syn_words:
+                        clean_synonym = self._clean_synonym_text(syn_word)
+                        if clean_synonym:
+                            synonyms.append(
+                                SynonymReference(word=Word(text=clean_synonym), word_type=word_type)
+                            )
+
+        except Exception as e:
+            print(f"Error extracting synonyms: {e}")
+
+        return synonyms[:10]  # Limit to 10 synonyms per definition
+
+    def _clean_synonym_text(self, synonym_text: str) -> str:
+        """Clean and normalize synonym text.
+
+        Args:
+            synonym_text: Raw synonym text
+
+        Returns:
+            Cleaned synonym text or empty string if invalid
+        """
+        if not synonym_text:
+            return ""
+
+        # Remove wikitext markup
+        cleaned = re.sub(r"\[\[([^|\]]+)(\|[^\]]+)?\]\]", r"\1", synonym_text)
+        cleaned = re.sub(r"\{\{[^}]+\}\}", "", cleaned)
+        cleaned = re.sub(r"<[^>]+>", "", cleaned)
+
+        # Remove extra whitespace and punctuation
+        cleaned = re.sub(r"[^\w\s-]", "", cleaned).strip()
+
+        # Basic validation
+        if len(cleaned) < 2 or len(cleaned) > 50:
+            return ""
+
+        # Skip common non-synonym words
+        skip_words = {"thesaurus", "more", "see", "also", "compare", "cf", "etc", "and", "or"}
+        if cleaned.lower() in skip_words:
+            return ""
+
+        return cleaned
 
     async def close(self) -> None:
         """Close the HTTP session."""

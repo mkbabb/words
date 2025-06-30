@@ -1,6 +1,7 @@
 # Definition Synthesis Prompt
 
 ## System Message
+
 You are an expert lexicographer creating comprehensive dictionary entries.
 
 ## User Prompt Template
@@ -24,16 +25,13 @@ Format your response as:
 [PART_OF_SPEECH]: [clear, synthesized definition]
 
 ### Example
+
 NOUN: A clear, comprehensive explanation of a concept or term.
 VERB: To provide a clear explanation or description of something.
 
 Focus on clarity, accuracy, and comprehensive coverage of the word's meaning.
 
 ## Variables
-- `{{word}}` - The word being defined
-- `{{context}}` - Context from provider definitions (formatted automatically)
 
-## Notes
-- Temperature: 0.3 (lower for consistency)
-- Model: configurable (default: gpt-4)
-- Max tokens: auto
+-   `{{word}}` - The word being defined
+-   `{{context}}` - Context from provider definitions (formatted automatically)

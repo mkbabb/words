@@ -8,7 +8,6 @@ from typing import Any
 from ..config import Config
 from ..connectors import DictionaryComConnector, OxfordConnector, WiktionaryConnector
 from ..connectors.base import DictionaryConnector
-from ..connectors.cached_connector import CachedDictionaryConnector
 from ..models import DictionaryEntry, ProviderData
 from ..storage.mongodb import MongoDBStorage
 from .openai_connector import OpenAIConnector
@@ -29,7 +28,7 @@ class WordProcessingPipeline:
         self.storage = storage
 
         # Initialize AI components
-        self.openai_connector = OpenAIConnector(config.openai)
+        self.openai_connector = OpenAIConnector(config.openai, storage)
         self.synthesizer = DefinitionSynthesizer(self.openai_connector, storage)
 
         # Initialize dictionary connectors
@@ -109,9 +108,7 @@ class WordProcessingPipeline:
                 return result
 
         # Process words concurrently
-        tasks = [
-            process_with_semaphore(word, i) for i, word in enumerate(words)
-        ]
+        tasks = [process_with_semaphore(word, i) for i, word in enumerate(words)]
 
         completed_results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -148,9 +145,7 @@ class WordProcessingPipeline:
             tasks.append((provider_name, task))
 
         # Execute all provider calls concurrently
-        results = await asyncio.gather(
-            *[task for _, task in tasks], return_exceptions=True
-        )
+        results = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
 
         # Collect successful results
         for (provider_name, _), result in zip(tasks, results):
@@ -193,11 +188,11 @@ class WordProcessingPipeline:
     async def close(self) -> None:
         """Clean up resources."""
         await self.openai_connector.close()
-        
+
         for connector in self.connectors.values():
             if hasattr(connector, "close"):
                 await connector.close()
-        
+
         await self.storage.disconnect()
 
 

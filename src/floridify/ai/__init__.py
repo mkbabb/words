@@ -6,7 +6,7 @@ from .synthesis import DefinitionSynthesizer
 
 __all__ = [
     "OpenAIConnector",
-    "DefinitionSynthesizer", 
+    "DefinitionSynthesizer",
     "WordProcessingPipeline",
     "simple_progress_callback",
 ]
