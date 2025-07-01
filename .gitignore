@@ -4,15 +4,24 @@
 
 .vscode/
 
-.mypy_cache/
-
 auth/
 my_venv/
 data/
-__pycache__/
 
 .vsls.json
 .venv/
 
 dist/
 .terraform/
+
+# Python cache files
+__pycache__/
+.mypy_cache/
+.claude/
+.pytest_cache/
+*.pyc
+*.pyo
+.ruff_cache/
+
+
+logs/

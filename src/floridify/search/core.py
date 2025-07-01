@@ -9,27 +9,21 @@ from __future__ import annotations
 
 import asyncio
 import time
-from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .fuzzy import FuzzySearch, FuzzySearchMethod
-from .lexicon import Language, LexiconLoader
+from ..constants import Language
+from ..utils.logging import get_logger
+from .constants import FuzzySearchMethod, SearchMethod
+from .fuzzy import FuzzySearch
+from .lexicon import LexiconLoader
 from .phrase import PhraseNormalizer
 from .semantic import SemanticSearch
 from .trie import TrieSearch
 
-
-class SearchMethod(Enum):
-    """Available search methods with performance characteristics."""
-
-    EXACT = "exact"  # Fastest: ~0.001ms - exact string matching
-    PREFIX = "prefix"  # Fast: ~0.001ms - prefix/autocomplete matching
-    FUZZY = "fuzzy"  # Fast: ~0.01ms - typo tolerance, abbreviations
-    SEMANTIC = "semantic"  # Slower: ~0.1ms - meaning-based similarity
-    AUTO = "auto"  # Automatic method selection based on query
+logger = get_logger(__name__)
 
 
 class SearchResult(BaseModel):
@@ -62,7 +56,7 @@ class SearchEngine:
         languages: list[Language] | None = None,
         min_score: float = 0.6,
         enable_semantic: bool = True,
-        force_rebuild_embeddings: bool = False,
+        force_rebuild: bool = False,
     ) -> None:
         """
         Initialize the search engine.
@@ -72,13 +66,13 @@ class SearchEngine:
             languages: Languages to load (defaults to English)
             min_score: Minimum relevance score for results
             enable_semantic: Whether to load semantic search capabilities
-            force_rebuild_embeddings: Force rebuild of embeddings cache
+            force_rebuild: Force rebuild of the cache
         """
         self.cache_dir = cache_dir or Path("data/search")
         self.languages = languages or [Language.ENGLISH]
         self.min_score = min_score
         self.enable_semantic = enable_semantic
-        self.force_rebuild_embeddings = force_rebuild_embeddings
+        self.force_rebuild = force_rebuild
 
         # Core components
         self.phrase_normalizer = PhraseNormalizer()
@@ -103,12 +97,15 @@ class SearchEngine:
         if self._initialized:
             return
 
+        logger.info("Initializing search engine components")
+        start_time = time.time()
+
         # Ensure cache directory exists
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Load lexicons
         self.lexicon_loader = LexiconLoader(
-            self.cache_dir, force_rebuild=self.force_rebuild_embeddings
+            self.cache_dir, force_rebuild=self.force_rebuild
         )
         await self.lexicon_loader.load_languages(self.languages)
 
@@ -123,11 +120,17 @@ class SearchEngine:
 
         if self.enable_semantic:
             self.semantic_search = SemanticSearch(
-                self.cache_dir, force_rebuild=self.force_rebuild_embeddings
+                self.cache_dir, force_rebuild=self.force_rebuild
             )
             await self.semantic_search.initialize(words + phrases)
 
         self._initialized = True
+
+        elapsed = time.time() - start_time
+        logger.success(f"Search engine initialized in {elapsed:.2f}s")
+        logger.info(
+            f"Loaded {len(words)} words, {len(phrases)} phrases, semantic: {self.enable_semantic}"
+        )
 
     async def search(
         self,
@@ -151,8 +154,11 @@ class SearchEngine:
         if not self._initialized:
             await self.initialize()
 
+        logger.debug(f"Search query: '{query}', max_results: {max_results}")
         # Normalize and validate query
         normalized_query = self.phrase_normalizer.normalize(query)
+        if normalized_query != query:
+            logger.debug(f"Normalized query: '{query}' → '{normalized_query}'")
         if not normalized_query.strip():
             return []
 
@@ -191,7 +197,16 @@ class SearchEngine:
 
         # Sort by score (descending) and return top results
         sorted_results = sorted(filtered_results, key=lambda r: r.score, reverse=True)
-        return sorted_results[:max_results]
+        final_results = sorted_results[:max_results]
+
+        logger.debug(f"Search completed: {len(final_results)} results for '{query}'")
+        if final_results:
+            top_score = final_results[0].score
+            logger.debug(
+                f"Top result: '{final_results[0].word}' (score: {top_score:.3f})"
+            )
+
+        return final_results
 
     def _select_optimal_methods(self, query: str) -> list[SearchMethod]:
         """

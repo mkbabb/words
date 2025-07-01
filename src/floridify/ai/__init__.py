@@ -1,12 +1,29 @@
-"""AI comprehension system for dictionary entries."""
+"""AI integration module for Floridify dictionary synthesis and generation."""
 
-from .openai_connector import OpenAIConnector
-from .pipeline import WordProcessingPipeline, simple_progress_callback
-from .synthesis import DefinitionSynthesizer
+from .connector import OpenAIConnector
+from .factory import create_ai_system, create_definition_synthesizer, create_openai_connector
+from .models import (
+    AIGeneratedProviderData,
+    AIProviderConfig,
+    EmbeddingRequest,
+    EmbeddingResponse,
+    ModelCapabilities,
+    SynthesisRequest,
+    SynthesisResponse,
+)
+from .synthesizer import DefinitionSynthesizer
 
 __all__ = [
     "OpenAIConnector",
     "DefinitionSynthesizer",
-    "WordProcessingPipeline",
-    "simple_progress_callback",
+    "create_openai_connector",
+    "create_definition_synthesizer",
+    "create_ai_system",
+    "AIProviderConfig",
+    "ModelCapabilities",
+    "SynthesisRequest",
+    "SynthesisResponse",
+    "EmbeddingRequest",
+    "EmbeddingResponse",
+    "AIGeneratedProviderData",
 ]

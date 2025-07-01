@@ -9,7 +9,8 @@ import click
 from rich.console import Console
 from rich.progress import track
 
-from ...anki.templates import CardType
+from ...anki.constants import CardType
+from ...utils.logging import get_logger
 from ..utils.formatting import (
     format_deck_summary,
     format_error,
@@ -19,6 +20,7 @@ from ..utils.formatting import (
 )
 
 console = Console()
+logger = get_logger(__name__)
 
 
 @click.group()
@@ -71,6 +73,9 @@ async def _create_deck_async(
     overwrite: bool,
 ) -> None:
     """Async implementation of deck creation."""
+    logger.info(f"Starting Anki deck creation: '{deck_name}'")
+    logger.debug(f"Parameters: input_file={input_file}, words={len(words)} items, types={types}")
+    
     try:
         # Determine output path
         if output is None:
@@ -80,6 +85,7 @@ async def _create_deck_async(
 
         # Check for existing file
         if output_path.exists() and not overwrite:
+            logger.warning(f"Output file already exists: {output_path}")
             console.print(
                 format_warning(
                     f"File '{output_path}' already exists",
@@ -166,6 +172,8 @@ async def _create_deck_async(
         file_size = f"{total_cards * 2.5:.1f} KB"  # Rough estimate
 
         # Show deck summary
+        logger.success(f"Anki deck created successfully: {output_path}")
+        logger.info(f"Generated {total_cards} cards with types: {card_type_counts}")
         console.print(
             format_deck_summary(
                 deck_name, total_cards, card_type_counts, file_size, str(output_path)
@@ -173,6 +181,7 @@ async def _create_deck_async(
         )
 
     except Exception as e:
+        logger.error(f"Anki deck creation failed: {e}")
         console.print(format_error(f"Deck creation failed: {str(e)}"))
 
 

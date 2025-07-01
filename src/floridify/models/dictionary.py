@@ -3,49 +3,29 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
 from typing import Any
 
+import numpy as np
 from beanie import Document
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-
-class WordType(Enum):
-    """Enumeration for part of speech types."""
-
-    NOUN = "noun"
-    VERB = "verb"
-    ADJECTIVE = "adjective"
-    ADVERB = "adverb"
-    PRONOUN = "pronoun"
-    PREPOSITION = "preposition"
-    CONJUNCTION = "conjunction"
-    INTERJECTION = "interjection"
-    DETERMINER = "determiner"
-    PHRASE = "phrase"
-    OTHER = "other"
-
-
-class LiteratureSourceType(Enum):
-    """Enumeration for different types of literature sources."""
-
-    BOOK = "book"
-    ARTICLE = "article"
-    DOCUMENT = "document"
+from .constants import WordType
 
 
 class Word(BaseModel):
     """Represents a word with its text and associated embeddings."""
+    
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     text: str
-    embedding: dict[str, list[float]] = Field(default_factory=dict)
+    embedding: dict[str, np.ndarray] = Field(default_factory=dict)
 
 
 class Pronunciation(BaseModel):
     """Pronunciation data in multiple formats."""
 
-    phonetic: str
-    ipa: str | None = None
+    phonetic: str  # e.g. "en coulisses -> on koo-LEES"
+    ipa: str | None = None  # e.g. "/ɑːn kəˈliːs/"
 
 
 class LiteratureSource(BaseModel):
@@ -100,7 +80,6 @@ class ProviderData(BaseModel):
 
     provider_name: str
     definitions: list[Definition] = Field(default_factory=list)
-    is_synthetic: bool = False
     last_updated: datetime = Field(default_factory=datetime.now)
     raw_metadata: dict[str, Any] | None = None
 
@@ -125,6 +104,30 @@ class DictionaryEntry(Document):
         """Add or update provider data."""
         self.providers[provider_data.provider_name] = provider_data
         self.last_updated = datetime.now()
+
+
+class SynthesizedDictionaryEntry(Document):
+    """Finalized dictionary entry with all necessary data for display.
+
+    The definitions herein are synthetic, aggregated at the word-type-meaning level
+    across providers.
+
+    For example, a word like "run" may have multiple definitions across providers,
+    but this entry synthesizes them into a single coherent structure for easy access.
+    """
+
+    word: Word
+    pronunciation: Pronunciation
+    definitions: list[Definition] = Field(default_factory=list)
+    last_updated: datetime = Field(default_factory=datetime.now)
+
+    class Settings:
+        name = "synthesized_dictionary_entries"
+        indexes = [
+            "word.text",
+            [("word.text", "text")],
+            "last_updated",
+        ]
 
 
 class APIResponseCache(Document):

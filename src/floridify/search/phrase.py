@@ -111,7 +111,7 @@ class PhraseNormalizer:
         # Step 5: Expand contractions using modern library
         try:
             normalized = contractions.fix(normalized, slang=False)
-        except:
+        except Exception:
             # Fallback to original if contractions library fails
             pass
 

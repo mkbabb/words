@@ -11,7 +11,9 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from ...search import Language, SearchEngine, SearchMethod, SearchResult
+from ...constants import Language
+from ...search import SearchEngine, SearchResult
+from ...search.constants import SearchMethod
 from ..utils.formatting import format_error
 
 console = Console()
@@ -20,18 +22,21 @@ console = Console()
 _search_engine: SearchEngine | None = None
 
 
-async def get_search_engine() -> SearchEngine:
+async def get_search_engine(languages: list[Language] | None = None) -> SearchEngine:
     """Get or create the global search engine instance."""
     global _search_engine
 
     if _search_engine is None:
-        # Initialize search engine with default settings
+        # Initialize search engine with specified or default languages
+        if languages is None:
+            languages = [Language.ENGLISH]
+
         cache_dir = Path("data/search")
         _search_engine = SearchEngine(
             cache_dir=cache_dir,
-            languages=[Language.ENGLISH],
+            languages=languages,
             min_score=0.6,
-            enable_semantic=True,
+            enable_semantic=False,
         )
         await _search_engine.initialize()
 
@@ -44,70 +49,67 @@ def search_group() -> None:
     pass
 
 
-@search_group.command("find")
+@search_group.command("word")
 @click.argument("query")
 @click.option("--max-results", "-n", default=20, help="Maximum number of results")
-@click.option("--min-score", "-s", default=None, type=float, help="Minimum match score (0.0-1.0)")
+@click.option(
+    "--min-score", "-s", default=None, type=float, help="Minimum match score (0.0-1.0)"
+)
 @click.option(
     "--method",
     "-m",
-    multiple=True,
-    type=click.Choice(["exact", "prefix", "fuzzy", "semantic", "auto"]),
-    help="Search methods to use (can specify multiple)",
+    type=click.Choice(["exact", "prefix", "fuzzy", "semantic", "hybrid"]),
+    default="hybrid",
+    help="Search method to use",
 )
 @click.option(
-    "--languages",
+    "--language",
     "-l",
     multiple=True,
-    type=click.Choice(["en", "fr"]),
-    help="Languages to search (defaults to English)",
+    type=click.Choice([lang.value for lang in Language], case_sensitive=False),
+    default=[Language.ENGLISH.value],
+    help="Languages to search",
 )
-def search_find(
+def search_word(
     query: str,
     max_results: int,
     min_score: float | None,
-    method: tuple[str, ...],
-    languages: tuple[str, ...],
+    method: str,
+    language: tuple[str, ...],
 ) -> None:
-    """Find words and phrases using the unified search engine.
-
-    Supports multiple search methods:
-    - exact: Exact string matching
-    - prefix: Prefix matching for autocomplete
-    - fuzzy: Typo-tolerant fuzzy matching
-    - semantic: Meaning-based similarity search
-    - auto: Automatic method selection (default)
+    """Search for words and phrases in the lexicon.
 
     QUERY: The word or phrase to search for
     """
-    asyncio.run(_search_find_async(query, max_results, min_score, method, languages))
+    asyncio.run(_search_word_async(query, max_results, min_score, method, language))
 
 
-async def _search_find_async(
+async def _search_word_async(
     query: str,
     max_results: int,
     min_score: float | None,
-    methods: tuple[str, ...],
-    languages: tuple[str, ...],
+    method: str,
+    language: tuple[str, ...],
 ) -> None:
-    """Async implementation of unified search."""
+    """Async implementation of word search."""
     try:
-        # Get search engine
-        search_engine = await get_search_engine()
+        # Convert language strings to enum
+        languages = (
+            [Language(lang) for lang in language] if language else [Language.ENGLISH]
+        )
 
-        # Convert string methods to SearchMethod enums
-        search_methods = []
-        if methods:
-            method_map = {
-                "exact": SearchMethod.EXACT,
-                "prefix": SearchMethod.PREFIX,
-                "fuzzy": SearchMethod.FUZZY,
-                "semantic": SearchMethod.SEMANTIC,
-                "auto": SearchMethod.AUTO,
-            }
-            search_methods = [method_map[m] for m in methods if m in method_map]
-        else:
-            search_methods = [SearchMethod.AUTO]
+        # Get search engine
+        search_engine = await get_search_engine(languages)
+
+        # Convert string method to SearchMethod enum
+        method_map = {
+            "exact": SearchMethod.EXACT,
+            "prefix": SearchMethod.PREFIX,
+            "fuzzy": SearchMethod.FUZZY,
+            "semantic": SearchMethod.SEMANTIC,
+            "hybrid": SearchMethod.AUTO,
+        }
+        search_method = method_map.get(method, SearchMethod.AUTO)
 
         # Perform search
         with console.status(f"[bold blue]Searching for '{query}'..."):
@@ -115,7 +117,7 @@ async def _search_find_async(
                 query=query,
                 max_results=max_results,
                 min_score=min_score,
-                methods=search_methods,
+                methods=[search_method],
             )
 
         # Display results
@@ -129,90 +131,8 @@ async def _search_find_async(
             console.print(
                 format_error(
                     f"No results found for '{query}'",
-                    "Try using a different query, lowering the minimum score, or using different search methods.",
-                )
-            )
-
-    except Exception as e:
-        console.print(format_error(f"Search failed: {e}"))
-
-
-@search_group.command("exact")
-@click.argument("query")
-@click.option("--max-results", "-n", default=10, help="Maximum number of results")
-def search_exact(query: str, max_results: int) -> None:
-    """Find exact matches for a word or phrase.
-
-    QUERY: The exact word or phrase to search for
-    """
-    asyncio.run(_search_method_async(query, max_results, [SearchMethod.EXACT]))
-
-
-@search_group.command("prefix")
-@click.argument("prefix")
-@click.option("--max-results", "-n", default=20, help="Maximum number of results")
-def search_prefix(prefix: str, max_results: int) -> None:
-    """Find words that start with the given prefix (autocomplete).
-
-    PREFIX: The prefix to search for
-    """
-    asyncio.run(_search_method_async(prefix, max_results, [SearchMethod.PREFIX]))
-
-
-@search_group.command("fuzzy")
-@click.argument("query")
-@click.option("--max-results", "-n", default=15, help="Maximum number of results")
-@click.option("--min-score", "-s", default=0.6, help="Minimum match score (0.0-1.0)")
-def search_fuzzy(query: str, max_results: int, min_score: float) -> None:
-    """Find words using fuzzy matching (typo tolerance).
-
-    Great for finding words when you have typos or don't know the exact spelling.
-
-    QUERY: The word to search for (typos OK)
-    """
-    asyncio.run(_search_method_async(query, max_results, [SearchMethod.FUZZY], min_score))
-
-
-@search_group.command("semantic")
-@click.argument("query")
-@click.option("--max-results", "-n", default=20, help="Maximum number of results")
-@click.option("--min-score", "-s", default=0.5, help="Minimum similarity score (0.0-1.0)")
-def search_semantic(query: str, max_results: int, min_score: float) -> None:
-    """Find words using semantic similarity (meaning-based).
-
-    Finds words with similar meanings, synonyms, and related concepts.
-
-    QUERY: The word or concept to find similar words for
-    """
-    asyncio.run(_search_method_async(query, max_results, [SearchMethod.SEMANTIC], min_score))
-
-
-async def _search_method_async(
-    query: str,
-    max_results: int,
-    methods: list[SearchMethod],
-    min_score: float | None = None,
-) -> None:
-    """Helper for method-specific searches."""
-    try:
-        search_engine = await get_search_engine()
-
-        with console.status(f"[bold blue]Searching for '{query}'..."):
-            results = await search_engine.search(
-                query=query,
-                max_results=max_results,
-                min_score=min_score,
-                methods=methods,
-            )
-
-        if results:
-            _display_search_results(query, results)
-        else:
-            method_name = methods[0].value if methods else "search"
-            console.print(
-                format_error(
-                    f"No {method_name} results found for '{query}'",
-                    "Try using a different query or search method.",
+                    "Try using a different query, lowering the minimum score, "
+                    "or using a different search method.",
                 )
             )
 
@@ -379,16 +299,20 @@ def _display_semantic_stats(stats: dict[str, Any]) -> None:
 
 
 @search_group.command("init")
-@click.option("--cache-dir", default="./data/search/", help="Cache directory for search index")
+@click.option(
+    "--cache-dir", default="./data/search/", help="Cache directory for search index"
+)
 @click.option(
     "--languages",
     "-l",
     multiple=True,
-    type=click.Choice(["en", "fr", "es", "de", "it"]),
-    default=["en", "fr"],
+    type=click.Choice([lang.value for lang in Language]),
+    default=[Language.ENGLISH.value, Language.FRENCH.value],
     help="Languages to initialize",
 )
-@click.option("--enable-semantic/--no-semantic", default=True, help="Enable semantic search")
+@click.option(
+    "--enable-semantic/--no-semantic", default=False, help="Enable semantic search"
+)
 @click.option("--force", "-f", is_flag=True, help="Force rebuild of existing index")
 def search_init(
     cache_dir: str, languages: tuple[str, ...], enable_semantic: bool, force: bool
@@ -409,20 +333,13 @@ async def _search_init_async(
 
     try:
         # Convert language strings to Language enums
-        lang_map = {
-            "en": Language.ENGLISH,
-            "fr": Language.FRENCH,
-            "es": Language.SPANISH,
-            "de": Language.GERMAN,
-            "it": Language.ITALIAN,
-        }
-
-        selected_languages = [lang_map[lang] for lang in languages if lang in lang_map]
+        selected_languages = [Language(lang) for lang in languages]
 
         console.print("[bold blue]🚀 Initializing search index...[/bold blue]")
         console.print(f"Cache directory: {cache_dir}")
         console.print(f"Languages: {', '.join(languages)}")
-        console.print(f"Semantic search: {'enabled' if enable_semantic else 'disabled'}")
+        semantic_status = 'enabled' if enable_semantic else 'disabled'
+        console.print(f"Semantic search: {semantic_status}")
 
         # Check if index already exists
         cache_path = Path(cache_dir)
@@ -430,7 +347,8 @@ async def _search_init_async(
             existing_files = list(cache_path.glob("*.pkl"))
             if existing_files:
                 console.print(
-                    f"[yellow]⚠️  Index already exists with {len(existing_files)} cache files.[/yellow]"
+                    f"[yellow]⚠️  Index already exists with {len(existing_files)} "
+                    "cache files.[/yellow]"
                 )
                 console.print(
                     "Use --force to rebuild, or run without --force to use existing index."
@@ -442,13 +360,16 @@ async def _search_init_async(
             cache_dir=cache_path,
             languages=selected_languages,
             enable_semantic=enable_semantic,
+            force_rebuild=force,
         )
 
         with console.status("[bold blue]Building search index..."):
             await search_engine.initialize()
 
         # Display statistics
-        console.print("\n[bold green]✅ Search index initialized successfully![/bold green]")
+        console.print(
+            "\n[bold green]✅ Search index initialized successfully![/bold green]"
+        )
 
         # Show index statistics
         if search_engine.lexicon_loader:
@@ -463,102 +384,8 @@ async def _search_init_async(
             semantic_stats = search_engine.semantic_search.get_statistics()
             _display_semantic_stats(semantic_stats)
 
-        # Cleanup
-        await search_engine.close()
-
     except Exception as e:
         console.print(format_error(f"Failed to initialize search index: {e}"))
-
-
-@search_group.command("benchmark")
-@click.option("--queries", "-q", default=10, help="Number of test queries")
-@click.option(
-    "--methods",
-    "-m",
-    multiple=True,
-    type=click.Choice(["exact", "prefix", "fuzzy", "semantic"]),
-    help="Methods to benchmark",
-)
-def search_benchmark(queries: int, methods: tuple[str, ...]) -> None:
-    """Benchmark search performance with test queries."""
-    asyncio.run(_search_benchmark_async(queries, methods))
-
-
-async def _search_benchmark_async(query_count: int, methods: tuple[str, ...]) -> None:
-    """Run search benchmarks."""
-    try:
-        search_engine = await get_search_engine()
-
-        # Default methods if none specified
-        if not methods:
-            methods = ("exact", "prefix", "fuzzy", "semantic")
-
-        # Test queries of different types
-        test_queries = [
-            "hello",
-            "definition",
-            "search",
-            "world",
-            "language",
-            "machine learning",
-            "natural language",
-            "hello world",
-            "helo",
-            "defintion",
-            "machne learing",  # Typos
-            "happy",
-            "joyful",
-            "sad",
-            "angry",
-            "excited",  # For semantic
-        ]
-
-        method_map = {
-            "exact": SearchMethod.EXACT,
-            "prefix": SearchMethod.PREFIX,
-            "fuzzy": SearchMethod.FUZZY,
-            "semantic": SearchMethod.SEMANTIC,
-        }
-
-        console.print(f"[bold blue]Running benchmark with {query_count} queries...[/bold blue]")
-
-        # Run benchmarks for each method
-        for method_name in methods:
-            if method_name not in method_map:
-                continue
-
-            method = method_map[method_name]
-            console.print(f"\n[cyan]Benchmarking {method_name} search...[/cyan]")
-
-            import time
-
-            start_time = time.perf_counter()
-
-            total_results = 0
-            for i in range(query_count):
-                query = test_queries[i % len(test_queries)]
-                results = await search_engine.search(
-                    query=query,
-                    max_results=10,
-                    methods=[method],
-                )
-                total_results += len(results)
-
-            end_time = time.perf_counter()
-            elapsed = end_time - start_time
-
-            console.print(f"  Total time: {elapsed:.3f}s")
-            console.print(f"  Average per query: {elapsed / query_count:.3f}s")
-            console.print(f"  Total results: {total_results}")
-            console.print(f"  Average results per query: {total_results / query_count:.1f}")
-
-        # Show final performance stats
-        console.print("\n[bold green]Final Performance Statistics:[/bold green]")
-        stats = search_engine.get_search_stats()
-        _display_performance_stats(stats)
-
-    except Exception as e:
-        console.print(format_error(f"Benchmark failed: {e}"))
 
 
 # Register with the main CLI

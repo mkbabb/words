@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from ..models import ProviderData
+from ..utils.logging import get_logger
 from .base import DictionaryConnector
+
+logger = get_logger(__name__)
 
 
 class DictionaryComConnector(DictionaryConnector):
@@ -36,5 +39,5 @@ class DictionaryComConnector(DictionaryConnector):
             None (stub implementation)
         """
         # TODO: Implement Dictionary.com API integration
-        print(f"Dictionary.com connector stub called for word: {word}")
+        logger.info(f"Dictionary.com connector stub called for word: {word}")
         return None

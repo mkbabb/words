@@ -7,8 +7,10 @@ phrases, idioms, and expressions with singular meanings.
 
 from __future__ import annotations
 
+from ...constants import Language
+from ..constants import LexiconFormat
 from .lexicon import LexiconData, LexiconLoader
-from .sources import LEXICON_SOURCES, Language, LexiconSourceConfig
+from .sources import LEXICON_SOURCES, LexiconSourceConfig
 
 __all__ = [
     "LexiconLoader",
@@ -16,4 +18,5 @@ __all__ = [
     "LexiconSourceConfig",
     "LEXICON_SOURCES",
     "Language",
+    "LexiconFormat",
 ]

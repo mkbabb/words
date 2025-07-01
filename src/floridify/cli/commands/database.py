@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import click
 from rich.console import Console
 from rich.table import Table
+
+from ...constants import DictionaryProvider
+from ...models.dictionary import (
+    APIResponseCache,
+    DictionaryEntry,
+    SynthesizedDictionaryEntry,
+)
+from ...storage.mongodb import MongoDBStorage
+from ..utils.formatting import format_error
 
 console = Console()
 
@@ -42,47 +53,135 @@ def connect_database(host: str, port: int, database: str) -> None:
 
 @database_group.command("stats")
 @click.option("--detailed", is_flag=True, help="Show detailed statistics")
-def database_stats(detailed: bool) -> None:
+@click.option(
+    "--connection-string",
+    default="mongodb://localhost:27017",
+    help="MongoDB connection string",
+)
+@click.option("--database", default="floridify", help="Database name")
+def database_stats(detailed: bool, connection_string: str, database: str) -> None:
     """Show database statistics and metrics."""
-    console.print("[bold blue]📊 Database Statistics[/bold blue]\n")
+    asyncio.run(_database_stats_async(detailed, connection_string, database))
 
-    # Mock statistics for demonstration
-    console.print("[bold]Overview:[/bold]")
-    stats_table = Table(show_header=False)
-    stats_table.add_column("Metric", style="cyan")
-    stats_table.add_column("Value", style="bold")
 
-    stats_table.add_row("Total Words", "15,847")
-    stats_table.add_row("Definitions", "42,391")
-    stats_table.add_row("AI Syntheses", "15,230")
-    stats_table.add_row("Generated Examples", "31,456")
-    stats_table.add_row("Anki Cards", "8,923")
+async def _database_stats_async(
+    detailed: bool, connection_string: str, database_name: str
+) -> None:
+    """Get real database statistics from MongoDB."""
+    try:
+        console.print("[bold blue]📊 Database Statistics[/bold blue]\n")
 
-    console.print(stats_table)
+        # Connect to MongoDB
+        storage = MongoDBStorage(connection_string, database_name)
+        await storage.connect()
 
-    # Provider coverage
-    console.print("\n[bold]📈 Provider Coverage:[/bold]")
-    provider_table = Table(show_header=True, header_style="bold blue")
-    provider_table.add_column("Source")
-    provider_table.add_column("Coverage", style="green")
-    provider_table.add_column("Count", justify="right")
+        # Get collection counts
+        total_words = await DictionaryEntry.count()
+        total_syntheses = await SynthesizedDictionaryEntry.count()
+        total_cache = await APIResponseCache.count()
 
-    provider_table.add_row("Wiktionary", "89%", "14,104")
-    provider_table.add_row("Oxford", "62%", "9,825")
-    provider_table.add_row("Dictionary.com", "28%", "4,437")
-    provider_table.add_row("AI Synthesis", "100%", "15,230")
+        # Overview statistics
+        console.print("[bold]Overview:[/bold]")
+        stats_table = Table(show_header=False)
+        stats_table.add_column("Metric", style="cyan")
+        stats_table.add_column("Value", style="bold")
 
-    console.print(provider_table)
+        stats_table.add_row("Total Words", f"{total_words:,}")
+        stats_table.add_row("AI Syntheses", f"{total_syntheses:,}")
+        stats_table.add_row("Cached Responses", f"{total_cache:,}")
 
-    if detailed:
-        console.print("\n[bold]📝 Quality Metrics:[/bold]")
-        console.print("• Average definitions per word: 2.7")
-        console.print("• Words with examples: 89%")
-        console.print("• Words with synonyms: 73%")
-        console.print("• AI synthesis quality score: 94.2%")
+        console.print(stats_table)
 
-    console.print("\n💾 Database size: 2.3 GB")
-    console.print("🔄 Last backup: 2 days ago")
+        # Provider coverage analysis
+        provider_stats = await _get_provider_coverage()
+        if provider_stats:
+            console.print("\n[bold]📈 Provider Coverage:[/bold]")
+            provider_table = Table(show_header=True, header_style="bold blue")
+            provider_table.add_column("Source")
+            provider_table.add_column("Count", justify="right")
+
+            for provider, count in provider_stats.items():
+                provider_table.add_row(
+                    DictionaryProvider(provider).display_name, f"{count:,}"
+                )
+
+            console.print(provider_table)
+
+        if detailed and total_words > 0:
+            # Quality metrics (only if we have data)
+            console.print("\n[bold]📝 Quality Metrics:[/bold]")
+            quality_stats = await _get_quality_metrics()
+
+            if quality_stats:
+                for metric, value in quality_stats.items():
+                    console.print(f"• {metric}: {value}")
+
+        # Database size info (approximation)
+        estimated_size_mb = (
+            total_words * 2.5 + total_syntheses * 1.8 + total_cache * 0.5
+        )  # Rough estimate
+        console.print(f"\n💾 Estimated database size: {estimated_size_mb:.1f} MB")
+
+        await storage.disconnect()
+
+    except Exception as e:
+        console.print(
+            format_error(
+                f"Failed to connect to database: {e}",
+                "Make sure MongoDB is running and accessible.",
+            )
+        )
+
+
+async def _get_provider_coverage() -> dict[str, int]:
+    """Get count of entries by provider."""
+    try:
+        # Aggregate provider counts from cache data
+        pipeline = [
+            {"$group": {"_id": "$provider", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+        ]
+
+        results = await APIResponseCache.aggregate(pipeline).to_list()
+        return {item["_id"]: item["count"] for item in results}
+
+    except Exception:
+        return {}
+
+
+async def _get_quality_metrics() -> dict[str, str]:
+    """Get quality metrics for the database."""
+    try:
+        metrics = {}
+
+        # Count entries with multiple providers
+        total_entries = await DictionaryEntry.count()
+        if total_entries > 0:
+            # Sample some entries to estimate coverage
+            sample_entries = await DictionaryEntry.find().limit(100).to_list()
+
+            if sample_entries:
+                # Calculate average providers per word
+                total_providers = sum(len(entry.providers) for entry in sample_entries)
+                avg_providers = total_providers / len(sample_entries)
+                metrics["Average providers per word"] = f"{avg_providers:.1f}"
+
+                # Count entries with definitions
+                entries_with_defs = sum(
+                    1
+                    for entry in sample_entries
+                    if any(
+                        provider_data.definitions
+                        for provider_data in entry.providers.values()
+                    )
+                )
+                coverage_pct = (entries_with_defs / len(sample_entries)) * 100
+                metrics["Words with definitions"] = f"{coverage_pct:.1f}%"
+
+        return metrics
+
+    except Exception:
+        return {}
 
 
 @database_group.command("backup")

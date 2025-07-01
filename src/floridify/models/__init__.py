@@ -1,5 +1,6 @@
 """Data models for Floridify dictionary entries."""
 
+from .constants import LiteratureSourceType, WordType
 from .dictionary import (
     APIResponseCache,
     Definition,
@@ -8,17 +9,17 @@ from .dictionary import (
     GeneratedExample,
     LiteratureExample,
     LiteratureSource,
-    LiteratureSourceType,
     Pronunciation,
     ProviderData,
     SynonymReference,
+    SynthesizedDictionaryEntry,
     Word,
-    WordType,
 )
 
 __all__ = [
     "Word",
     "DictionaryEntry",
+    "SynthesizedDictionaryEntry",
     "ProviderData",
     "Definition",
     "SynonymReference",

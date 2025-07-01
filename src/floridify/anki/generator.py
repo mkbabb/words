@@ -9,11 +9,11 @@ from typing import Any
 
 import genanki  # type: ignore[import-untyped]
 
-from ..ai.openai_connector import OpenAIConnector
 from ..models import Definition, DictionaryEntry
-from ..prompts import PromptLoader
-from ..prompts.formatters import format_template_variables
+from ..utils.logging import get_logger
 from .templates import AnkiCardTemplate, CardType
+
+logger = get_logger(__name__)
 
 
 class AnkiCard:
@@ -126,9 +126,11 @@ class AnkiCardGenerator:
         Returns:
             List of generated Anki cards
         """
+        logger.debug(f"Generating cards for word: {entry.word.text}")
         if card_types is None:
             card_types = [CardType.MULTIPLE_CHOICE, CardType.FILL_IN_BLANK]
-
+        
+        logger.debug(f"Card types: {[ct.value for ct in card_types]}, max per type: {max_cards_per_type}")
         cards: list[Any] = []
 
         # Get AI synthesis provider data (preferred) or fall back to other providers
@@ -161,7 +163,7 @@ class AnkiCardGenerator:
                         type_cards.append(card)
 
                 except Exception as e:
-                    print(f"Error generating {card_type.value} card for {entry.word.text}: {e}")
+                    logger.error(f"Error generating {card_type.value} card for {entry.word.text}: {e}")
                     continue
 
             cards.extend(type_cards)
@@ -238,7 +240,7 @@ class AnkiCardGenerator:
             return AnkiCard(CardType.MULTIPLE_CHOICE, fields, card_template)
 
         except Exception as e:
-            print(f"Error generating multiple choice card: {e}")
+            logger.error(f"Error generating multiple choice card: {e}")
             return None
 
     async def _generate_fill_blank_card(
@@ -317,7 +319,7 @@ class AnkiCardGenerator:
             return AnkiCard(CardType.FILL_IN_BLANK, fields, card_template)
 
         except Exception as e:
-            print(f"Error generating fill-in-the-blank card: {e}")
+            logger.error(f"Error generating fill-in-the-blank card: {e}")
             return None
 
     def _parse_multiple_choice_response(self, content: str) -> tuple[dict[str, str], str]:
@@ -409,12 +411,12 @@ class AnkiCardGenerator:
             with open(output_path.with_suffix(".html"), "w", encoding="utf-8") as f:
                 f.write(html_content)
 
-            print(f"Exported {len(cards)} cards to {output_path.with_suffix('.apkg')}")
-            print(f"HTML preview available at {output_path.with_suffix('.html')}")
+            logger.success(f"Exported {len(cards)} cards to {output_path.with_suffix('.apkg')}")
+            logger.info(f"HTML preview available at {output_path.with_suffix('.html')}")
             return True
 
         except Exception as e:
-            print(f"Error exporting cards: {e}")
+            logger.error(f"Error exporting cards: {e}")
             return False
 
     def _generate_html_preview(self, cards: list[AnkiCard], deck_name: str) -> str:

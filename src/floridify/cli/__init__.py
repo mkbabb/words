@@ -34,9 +34,8 @@ semantic search, and Anki flashcard generation.[/dim]
 
 [bold]Quick Start:[/bold]
   [cyan]floridify search init[/cyan]           Initialize search index (first time)
-  [cyan]floridify lookup serendipity[/cyan]     Look up a word
-  [cyan]floridify find seren[/cyan]            Fuzzy search for words
-  [cyan]floridify similar happiness[/cyan]      Find semantically similar words
+  [cyan]floridify lookup serendipity[/cyan]     Look up a word with AI synthesis
+  [cyan]floridify search word seren[/cyan]      Search for words and phrases
   [cyan]floridify anki create vocab.txt[/cyan] Create Anki deck from word list
 
 [bold]Available Commands:[/bold]
@@ -61,7 +60,6 @@ cli.add_command(database_group, name="database")
 
 # Add aliases
 cli.add_command(lookup_group, name="define")
-cli.add_command(search_group, name="find")
 
 
 if __name__ == "__main__":

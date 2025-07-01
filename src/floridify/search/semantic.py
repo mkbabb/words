@@ -10,26 +10,18 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import pickle
-from enum import Enum
 from pathlib import Path
+from typing import Any
 
 import faiss  # type: ignore[import-untyped]
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import-untyped]
 from sklearn.metrics.pairwise import cosine_similarity  # type: ignore[import-untyped]
 
+from ..utils.logging import get_logger
+from .constants import EmbeddingLevel
 
-class EmbeddingLevel(Enum):
-    """
-    Enum for different embedding levels.
-    - CHAR: Character-level embeddings (64D)
-    - SUBWORD: Subword-level embeddings (128D)
-    - WORD: Word-level embeddings (384D)
-    """
-
-    CHAR = "char"
-    SUBWORD = "subword"
-    WORD = "word"
+logger = get_logger(__name__)
 
 
 class SemanticSearch:
@@ -92,22 +84,26 @@ class SemanticSearch:
         Args:
             vocabulary: List of words and phrases to create embeddings for
         """
+        logger.info(f"Initializing semantic search with {len(vocabulary)} words")
         self.vocabulary = vocabulary
         self.word_to_id = {word: i for i, word in enumerate(vocabulary)}
 
         # Try to load from cache first (unless force rebuild)
         if not self.force_rebuild and await self._load_from_cache():
+            logger.info("Loaded embeddings from cache")
             return
 
         # Build embeddings from scratch
+        logger.info("Building embeddings from scratch")
         await self._build_embeddings()
 
         # Save to cache
         await self._save_to_cache()
+        logger.success("Semantic search initialization complete")
 
     async def _build_embeddings(self) -> None:
         """Build all embedding levels."""
-        print(f"Building embeddings for {len(self.vocabulary)} words...")
+        logger.debug(f"Building embeddings for {len(self.vocabulary)} words")
 
         # Run embedding generation in executor to avoid blocking
         await asyncio.get_event_loop().run_in_executor(
@@ -117,13 +113,13 @@ class SemanticSearch:
         # Build FAISS indices
         await self._build_faiss_indices()
 
-        print("Embeddings and indices built successfully.")
+        logger.debug("Embeddings built successfully")
 
     def _build_embeddings_sync(self) -> None:
         """Build embeddings synchronously (CPU intensive)."""
 
         # Character-level embeddings (morphological patterns)
-        print("Building character-level embeddings...")
+        logger.debug("Building character-level embeddings")
         self.char_vectorizer = TfidfVectorizer(
             analyzer="char",
             ngram_range=self.char_ngram_range,
@@ -136,7 +132,7 @@ class SemanticSearch:
         ).toarray()
 
         # Subword-level embeddings (decomposition)
-        print("Building subword-level embeddings...")
+        logger.debug("Building subword-level embeddings")
         subword_texts = [self._create_subword_text(word) for word in self.vocabulary]
         self.subword_vectorizer = TfidfVectorizer(
             analyzer="word",
@@ -150,7 +146,7 @@ class SemanticSearch:
         ).toarray()
 
         # Word-level embeddings (semantic meaning)
-        print("Building word-level embeddings...")
+        logger.debug("Building word-level embeddings")
         word_texts = [self._create_word_text(word) for word in self.vocabulary]
         self.word_vectorizer = TfidfVectorizer(
             analyzer="word",
@@ -161,7 +157,7 @@ class SemanticSearch:
         )
         self.word_embeddings = self.word_vectorizer.fit_transform(word_texts).toarray()
 
-        print("Embeddings built successfully.")
+        logger.debug("All embedding levels built successfully")
 
     def _create_subword_text(self, word: str) -> str:
         """Create subword representation for a word."""
@@ -206,11 +202,11 @@ class SemanticSearch:
 
     async def _build_faiss_indices(self) -> None:
         """Build FAISS indices for efficient similarity search."""
-        print("Building FAISS indices...")
+        logger.debug("Building FAISS indices for efficient similarity search")
 
         # Build character index
         if self.char_embeddings is not None:
-            print("Building character-level FAISS index...")
+            logger.debug("Building character-level FAISS index")
 
             self.char_index = faiss.IndexFlatIP(
                 self.char_embeddings.shape[1]
@@ -223,7 +219,7 @@ class SemanticSearch:
 
         # Build subword index
         if self.subword_embeddings is not None:
-            print("Building subword-level FAISS index...")
+            logger.debug("Building subword-level FAISS index")
 
             self.subword_index = faiss.IndexFlatIP(self.subword_embeddings.shape[1])
             norms = np.linalg.norm(self.subword_embeddings, axis=1, keepdims=True)
@@ -233,7 +229,7 @@ class SemanticSearch:
 
         # Build word index
         if self.word_embeddings is not None:
-            print("Building word-level FAISS index...")
+            logger.debug("Building word-level FAISS index")
 
             self.word_index = faiss.IndexFlatIP(self.word_embeddings.shape[1])
             norms = np.linalg.norm(self.word_embeddings, axis=1, keepdims=True)
@@ -287,10 +283,10 @@ class SemanticSearch:
             ]
             for file_key in required_files:
                 if not cache_paths[file_key].exists():
-                    print(f"Cache file missing: {cache_paths[file_key].name}")
+                    logger.debug(f"Cache file missing: {cache_paths[file_key].name}")
                     return False
 
-            print("Loading embeddings from cache...")
+            logger.debug("Loading embeddings from cache")
 
             # Load metadata to validate cache compatibility
             with open(cache_paths["metadata"], "rb") as f:
@@ -302,7 +298,7 @@ class SemanticSearch:
                 or metadata.get("subword_ngram_range") != self.subword_ngram_range
                 or metadata.get("max_features") != self.max_features
             ):
-                print("Cache configuration mismatch, rebuilding...")
+                logger.warning("Cache configuration mismatch, rebuilding embeddings")
                 return False
 
             # Load vectorizers
@@ -335,11 +331,11 @@ class SemanticSearch:
             if cache_paths["word_index"].exists():
                 self.word_index = faiss.read_index(str(cache_paths["word_index"]))
 
-            print("Successfully loaded embeddings from cache.")
+            logger.debug("Successfully loaded embeddings from cache")
             return True
 
         except Exception as e:
-            print(f"Failed to load from cache: {e}")
+            logger.warning(f"Failed to load from cache: {e}")
             return False
 
     async def _save_to_cache(self) -> None:
@@ -347,7 +343,7 @@ class SemanticSearch:
         try:
             cache_paths = self._get_cache_paths()
 
-            print("Saving embeddings to cache...")
+            logger.debug("Saving embeddings to cache")
 
             # Save metadata
             metadata = {
@@ -394,10 +390,10 @@ class SemanticSearch:
             if self.word_index:
                 faiss.write_index(self.word_index, str(cache_paths["word_index"]))
 
-            print("Successfully saved embeddings to cache.")
+            logger.debug("Successfully saved embeddings to cache")
 
         except Exception as e:
-            print(f"Failed to save to cache: {e}")
+            logger.error(f"Failed to save to cache: {e}")
 
     async def search(
         self, query: str, max_results: int = 20
@@ -524,6 +520,85 @@ class SemanticSearch:
                 results.append((self.vocabulary[idx], float(score)))
 
         return results
+
+    def get_statistics(self) -> dict[str, Any]:
+        """Get semantic search statistics and metrics."""
+        try:
+            import importlib.util
+            has_faiss = importlib.util.find_spec("faiss") is not None
+        except ImportError:
+            has_faiss = False
+            
+        try:
+            import importlib.util
+            has_sklearn = importlib.util.find_spec("sklearn") is not None
+        except ImportError:
+            has_sklearn = False
+            
+        stats: dict[str, Any] = {
+            "vocabulary_size": len(self.vocabulary),
+            "has_faiss": has_faiss,
+            "has_sklearn": has_sklearn,
+            "embedding_levels": {},
+            "index_size": {},
+            "memory_usage": {},
+        }
+        
+        # Character level stats
+        if self.char_embeddings is not None:
+            stats["embedding_levels"]["character"] = {
+                "features": self.char_embeddings.shape[1],
+                "vocabulary_coverage": self.char_embeddings.shape[0],
+                "ngram_range": self.char_ngram_range,
+            }
+            stats["memory_usage"]["char_embeddings_mb"] = (
+                self.char_embeddings.nbytes / 1024 / 1024
+            )
+            
+        if self.char_index is not None:
+            stats["index_size"]["char_index"] = self.char_index.ntotal
+            
+        # Subword level stats
+        if self.subword_embeddings is not None:
+            stats["embedding_levels"]["subword"] = {
+                "features": self.subword_embeddings.shape[1],
+                "vocabulary_coverage": self.subword_embeddings.shape[0],
+                "ngram_range": self.subword_ngram_range,
+            }
+            stats["memory_usage"]["subword_embeddings_mb"] = (
+                self.subword_embeddings.nbytes / 1024 / 1024
+            )
+            
+        if self.subword_index is not None:
+            stats["index_size"]["subword_index"] = self.subword_index.ntotal
+            
+        # Word level stats
+        if self.word_embeddings is not None:
+            stats["embedding_levels"]["word"] = {
+                "features": self.word_embeddings.shape[1],
+                "vocabulary_coverage": self.word_embeddings.shape[0],
+                "ngram_range": (1, 2),
+            }
+            stats["memory_usage"]["word_embeddings_mb"] = (
+                self.word_embeddings.nbytes / 1024 / 1024
+            )
+            
+        if self.word_index is not None:
+            stats["index_size"]["word_index"] = self.word_index.ntotal
+            
+        # Calculate total memory usage
+        total_memory = sum(stats["memory_usage"].values())
+        stats["memory_usage"]["total_mb"] = total_memory
+        
+        # Configuration info
+        stats["configuration"] = {
+            "max_features": self.max_features,
+            "char_ngram_range": self.char_ngram_range,
+            "subword_ngram_range": self.subword_ngram_range,
+            "cache_dir": str(self.cache_dir),
+        }
+        
+        return stats
 
     async def _search_cosine_similarity(
         self, query_vector: np.ndarray, embeddings: np.ndarray, max_results: int

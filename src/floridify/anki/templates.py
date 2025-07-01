@@ -2,18 +2,11 @@
 
 from __future__ import annotations
 
-from enum import Enum
-
 from pydantic import BaseModel, Field
 
+from .constants import CardType
 
-class CardType(Enum):
-    """Types of flashcards that can be generated."""
-
-    MULTIPLE_CHOICE = "multiple_choice"
-    FILL_IN_BLANK = "fill_in_blank"
-    DEFINITION_TO_WORD = "definition_to_word"
-    WORD_TO_DEFINITION = "word_to_definition"
+__all__ = ["AnkiCardTemplate", "CardType"]
 
 
 class AnkiCardTemplate(BaseModel):

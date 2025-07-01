@@ -8,7 +8,10 @@ from typing import Any
 import httpx
 
 from ..models import Definition, Examples, GeneratedExample, ProviderData, WordType
+from ..utils.logging import get_logger
 from .base import DictionaryConnector
+
+logger = get_logger(__name__)
 
 
 class OxfordConnector(DictionaryConnector):
@@ -27,7 +30,11 @@ class OxfordConnector(DictionaryConnector):
         self.api_key = api_key
         self.base_url = "https://od-api.oxforddictionaries.com/api/v2"
         self.session = httpx.AsyncClient(
-            headers={"app_id": self.app_id, "app_key": self.api_key, "Accept": "application/json"},
+            headers={
+                "app_id": self.app_id,
+                "app_key": self.api_key,
+                "Accept": "application/json",
+            },
             timeout=30.0,
         )
 
@@ -66,7 +73,7 @@ class OxfordConnector(DictionaryConnector):
             return self._parse_oxford_response(word, data)
 
         except Exception as e:
-            print(f"Error fetching {word} from Oxford: {e}")
+            logger.error(f"Error fetching {word} from Oxford: {e}")
             return None
 
     def _parse_oxford_response(self, word: str, data: dict[str, Any]) -> ProviderData:
@@ -91,7 +98,9 @@ class OxfordConnector(DictionaryConnector):
 
                 for lexical_entry in lexical_entries:
                     # Map Oxford part of speech to our enum
-                    oxford_pos = lexical_entry.get("lexicalCategory", {}).get("id", "").lower()
+                    oxford_pos = (
+                        lexical_entry.get("lexicalCategory", {}).get("id", "").lower()
+                    )
                     word_type = self._map_oxford_pos_to_word_type(oxford_pos)
 
                     if not word_type:
@@ -130,7 +139,7 @@ class OxfordConnector(DictionaryConnector):
                                 )
 
         except Exception as e:
-            print(f"Error parsing Oxford response for {word}: {e}")
+            logger.error(f"Error parsing Oxford response for {word}: {e}")
 
         return ProviderData(
             provider_name=self.provider_name, definitions=definitions, raw_metadata=data

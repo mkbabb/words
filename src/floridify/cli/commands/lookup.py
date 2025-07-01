@@ -1,4 +1,4 @@
-"""Word lookup and definition commands with AI comprehension."""
+"""Word lookup command with AI enhancement and beautiful output."""
 
 from __future__ import annotations
 
@@ -7,420 +7,278 @@ from typing import Any
 
 import click
 from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
-from ...ai.openai_connector import OpenAIConnector
-from ...ai.synthesis import DefinitionSynthesizer
-from ...config import Config
-from ...connectors import (
-    Connector,
-    DictionaryComConnector,
-    OxfordConnector,
-    WiktionaryConnector,
-)
-from ...models import DictionaryEntry, ProviderData, Word
-from ...storage.mongodb import MongoDBStorage
-from ..utils.enhanced_lookup import EnhancedWordLookup
-from ..utils.formatting import format_error, format_word_display
+from ...ai import create_definition_synthesizer
+from ...connectors.dictionary_com import DictionaryComConnector
+from ...connectors.wiktionary import WiktionaryConnector
+from ...constants import DictionaryProvider, Language
+from ...models import Word
+from ...search import SearchEngine, SearchResult
+from ...search.constants import SearchMethod
+from ...utils.logging import get_logger
+from ...utils.normalization import normalize_word
+from ..utils.formatting import format_error, format_warning
 
 console = Console()
+logger = get_logger(__name__)
 
 
-# Global connector instances with caching
-_connectors: dict[str, Connector] = {}
-_storage: MongoDBStorage | None = None
-_ai_synthesizer: DefinitionSynthesizer | None = None
-
-
-async def get_storage() -> MongoDBStorage:
-    """Get or create the global storage instance."""
-    global _storage
-    if _storage is None:
-        _storage = MongoDBStorage()
-        await _storage.connect()
-    return _storage
-
-
-async def get_connector(
-    provider: str,
-) -> Connector | None:
-    """Get or create a connector for the specified provider."""
-    global _connectors
-
-    if provider in _connectors:
-        return _connectors[provider]
-
-    # Create the appropriate connector
-    connector: Connector | None = None
-
-    if provider == "wiktionary":
-        connector = WiktionaryConnector()
-    elif provider == "oxford":
-        # connector = OxfordConnector()
-        pass
-    elif provider == "dictionary_com":
-        connector = DictionaryComConnector()
-
-    if connector:
-        _connectors[provider] = connector
-        return connector
-
-    return None
-
-
-async def get_ai_synthesizer() -> DefinitionSynthesizer | None:
-    """Get or create the global AI synthesizer."""
-    global _ai_synthesizer
-
-    if _ai_synthesizer is None:
-        try:
-            # Load configuration
-            config = Config.from_file()
-
-            # Get storage
-            storage = await get_storage()
-
-            # Create OpenAI connector with storage for caching
-            openai_connector = OpenAIConnector(config.openai, storage)
-
-            # Create synthesizer
-            _ai_synthesizer = DefinitionSynthesizer(openai_connector, storage)
-
-        except Exception as e:
-            console.print(f"[red]Failed to initialize AI synthesizer: {e}[/red]")
-            _ai_synthesizer = None
-
-    return _ai_synthesizer
-
-
-@click.group()
-def lookup_group() -> None:
-    """🔍 Look up words and get detailed definitions with AI comprehension."""
-    pass
-
-
-@lookup_group.command("word")
+@click.command()
 @click.argument("word")
 @click.option(
     "--provider",
-    type=click.Choice(["all", "wiktionary", "oxford", "dictionary_com", "ai"]),
-    default="wiktionary",
+    type=click.Choice([p.value for p in DictionaryProvider], case_sensitive=False),
+    default=DictionaryProvider.WIKTIONARY.value,
     help="Dictionary provider to use",
 )
-@click.option("--save/--no-save", default=True, help="Save result to database")
-@click.option("--examples", "-e", is_flag=True, help="Include usage examples")
-@click.option("--synonyms", "-s", is_flag=True, help="Include synonyms")
 @click.option(
-    "--ai-comprehension/--no-ai",
-    default=True,
-    help="Display AI comprehension by default",
+    "--language",
+    type=click.Choice([lang.value for lang in Language], case_sensitive=False),
+    multiple=True,
+    default=[Language.ENGLISH.value, Language.FRENCH.value],
+    help="Lexicon languages to search",
 )
-@click.option("--cache-hours", default=24, help="Maximum cache age in hours")
-@click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
-def lookup_word(
+@click.option(
+    "--semantic",
+    is_flag=True,
+    help="Force semantic search mode",
+)
+@click.option(
+    "--no-ai",
+    is_flag=True,
+    help="Skip AI synthesis",
+)
+def lookup(
     word: str,
     provider: str,
-    save: bool,
-    examples: bool,
-    synonyms: bool,
-    ai_comprehension: bool,
-    cache_hours: int,
-    verbose: bool,
+    language: tuple[str, ...],
+    semantic: bool,
+    no_ai: bool,
 ) -> None:
-    """Look up a word and display its definition with AI comprehension.
+    """Look up word definitions with AI enhancement.
 
     WORD: The word to look up
     """
-    # Set verbose logging based on flag
-    from ...utils.logging import set_verbose
-
-    set_verbose(verbose)
-
-    asyncio.run(
-        _lookup_word_async(
-            word, provider, save, examples, synonyms, ai_comprehension, cache_hours
-        )
-    )
+    asyncio.run(_lookup_async(word, provider, language, semantic, no_ai))
 
 
-async def _lookup_word_async(
+async def _lookup_async(
     word: str,
     provider: str,
-    save: bool,
-    examples: bool,
-    synonyms: bool,
-    ai_comprehension: bool,
-    cache_hours: int,
+    language: tuple[str, ...],
+    semantic: bool,
+    no_ai: bool,
 ) -> None:
-    """Enhanced async word lookup with normalization, search fallback, and AI generation."""
+    """Async implementation of word lookup."""
+    logger.info(f"Looking up word: '{word}' with provider: {provider}")
+
     try:
-        with console.status(f"[bold blue]Looking up '{word}' with enhanced search..."):
-            # Initialize enhanced lookup system
-            config = Config.from_file()
-            storage = await get_storage()
-            enhanced_lookup = EnhancedWordLookup(config, storage)
-            await enhanced_lookup.initialize()
+        # Normalize the query
+        normalized_word = normalize_word(word)
+        if normalized_word != word:
+            logger.debug(f"Normalized: '{word}' � '{normalized_word}'")
+            console.print(f"[dim]Normalized: {word} � {normalized_word}[/dim]")
 
-            # Determine which providers to use
-            providers = []
-            if provider == "all":
-                provider_names = ["wiktionary", "oxford", "dictionary_com"]
-            elif provider != "ai":
-                provider_names = [provider]
-            else:
-                provider_names = []
+        # Convert languages to enum
+        languages = [Language(lang) for lang in language]
+        provider_enum = DictionaryProvider(provider)
 
-            # Get provider connectors
-            for provider_name in provider_names:
-                connector = await get_connector(provider_name)
-                if connector:
-                    providers.append(connector)
+        # Search for the word
+        search_results = await _search_word(
+            word=normalized_word,
+            languages=languages,
+            semantic=semantic,
+        )
 
-            # Use enhanced lookup with fallback pipeline
-            normalized_word, provider_data_list = (
-                await enhanced_lookup.lookup_with_fallback(word, providers)
+        if not search_results:
+            await _handle_no_results(
+                word=normalized_word,
+                provider=provider_enum,
+                no_ai=no_ai,
             )
+            return
 
-            if not normalized_word:
-                console.print(
-                    format_error(
-                        f"No definitions found for '{word}'",
-                        "Word not found in any source including AI fallback.",
-                    )
-                )
-                return
+        # Use the best match
+        best_match = search_results[0].word
+        logger.debug(
+            f"Best match: '{best_match}' (score: {search_results[0].score:.3f})"
+        )
 
-            # Show provider feedback
-            for provider_data in provider_data_list:
-                provider_name = provider_data.provider_name
-                if provider_name == "ai_fallback":
-                    console.print(
-                        f"🤖 [yellow]AI Fallback[/yellow] - Generated {len(provider_data.definitions)} definitions"
-                    )
-                else:
-                    console.print(
-                        f"✓ [green]{provider_name.title()}[/green] - Found {len(provider_data.definitions)} definitions"
-                    )
+        # Get definition from provider
+        definition_data = await _get_provider_definition(best_match, provider_enum)
 
-            # Generate AI synthesis if enabled and we have non-AI data
-            ai_provider_data = None
-            if (
-                ai_comprehension
-                and provider_data_list
-                and not all(
-                    pd.provider_name == "ai_fallback" for pd in provider_data_list
-                )
-            ):
-                try:
-                    synthesizer = await get_ai_synthesizer()
-                    if synthesizer:
-                        # Convert provider_data_list to the format expected by synthesizer
-                        provider_dict = {}
-                        for provider_data in provider_data_list:
-                            provider_dict[provider_data.provider_name] = provider_data
-
-                        # Use the word synthesis method from DefinitionSynthesizer
-                        entry = await synthesizer.synthesize_word_entry(
-                            normalized_word, provider_dict
-                        )
-                        if entry and "ai_synthesis" in entry.providers:
-                            ai_provider_data = entry.providers["ai_synthesis"]
-                            console.print(
-                                "✓ [magenta]AI Synthesis[/magenta] - Generated comprehensive definition"
-                            )
-                except Exception as e:
-                    console.print(f"✗ [red]AI Synthesis[/red] - {str(e)}")
-
-            # Create or update dictionary entry
-            await get_storage()
-
-            # Try to find existing entry
-            existing_entry = await DictionaryEntry.find_one(
-                DictionaryEntry.word.text == normalized_word.lower()
+        # AI synthesis (unless disabled)
+        if not no_ai and definition_data:
+            synthesized_entry = await _synthesize_with_ai(
+                Word(text=best_match), {provider: definition_data}
             )
-
-            if existing_entry:
-                entry = existing_entry
-                # Update with new provider data
-                for provider_data in provider_data_list:
-                    entry.add_provider_data(provider_data)
-            else:
-                # Create new entry
-                entry = DictionaryEntry(
-                    word=Word(text=normalized_word.lower()),
-                    pronunciation=_extract_pronunciation(provider_data_list),
-                    providers={},
-                )
-                # Add all provider data
-                for provider_data in provider_data_list:
-                    entry.add_provider_data(provider_data)
-
-            # Add AI synthesis if available
-            if ai_provider_data:
-                entry.add_provider_data(ai_provider_data)
-
-            # Save to database if requested
-            if save:
-                await entry.save()
-                console.print("💾 [dim]Saved to database[/dim]")
-
-            # Display the comprehensive result
-            console.print()
-            console.print(
-                format_word_display(
-                    entry, show_examples=examples, show_synonyms=synonyms
-                )
-            )
-
-            # Show provider summary
-            provider_names = list(entry.providers.keys())
-            console.print(
-                f"\n✨ Found {len(provider_names)} sources: {', '.join(provider_names)}"
-            )
+            _display_synthesized_entry(synthesized_entry)
+        elif definition_data:
+            _display_provider_data(definition_data, provider_enum)
+        else:
+            await _handle_no_results(best_match, provider_enum, no_ai)
 
     except Exception as e:
-        console.print(format_error(f"Lookup failed: {str(e)}"))
+        logger.error(f"Lookup failed: {e}")
+        console.print(format_error(f"Lookup failed: {e}"))
 
 
-def _extract_pronunciation(provider_data_list: list[ProviderData]) -> Any:
-    """Extract pronunciation from provider data."""
-    from ...models import Pronunciation
-
-    # Try to find pronunciation from any provider
-    for provider_data in provider_data_list:
-        # Check for AI fallback phonetic pronunciation in raw_metadata
-        if provider_data.provider_name == "ai_fallback" and provider_data.raw_metadata:
-            phonetic = provider_data.raw_metadata.get("phonetic_pronunciation")
-            if phonetic:
-                return Pronunciation(phonetic=phonetic, ipa=None)
-
-        # Check for pronunciation in definitions
-        for definition in provider_data.definitions:
-            if hasattr(definition, "pronunciation") and definition.pronunciation:
-                return definition.pronunciation
-
-    # Fallback pronunciation
-    return Pronunciation(phonetic="", ipa=None)
-
-
-@lookup_group.command("batch")
-@click.argument("words", nargs=-1, required=True)
-@click.option(
-    "--provider",
-    type=click.Choice(["all", "wiktionary", "oxford", "dictionary_com", "ai"]),
-    default="all",
-    help="Dictionary provider to use",
-)
-@click.option("--save/--no-save", default=True, help="Save results to database")
-@click.option("--ai-comprehension/--no-ai", default=True, help="Generate AI synthesis")
-def lookup_batch(
-    words: tuple[str, ...], provider: str, save: bool, ai_comprehension: bool
-) -> None:
-    """Look up multiple words at once with AI comprehension.
-
-    WORDS: One or more words to look up
-    """
-    console.print(
-        f"[bold blue]Looking up {len(words)} words with AI comprehension...[/bold blue]"
+async def _search_word(
+    word: str, languages: list[Language], semantic: bool
+) -> list[SearchResult]:
+    """Search for word using the search engine."""
+    logger.debug(
+        f"Searching for '{word}' in languages: {[lang.value for lang in languages]}"
     )
 
-    for i, word in enumerate(words, 1):
-        console.print(f"\n[dim]─── {word.upper()} ({i}/{len(words)}) ───[/dim]")
-        asyncio.run(
-            _lookup_word_async(word, provider, save, False, False, ai_comprehension, 24)
+    # Initialize search engine
+
+    search_engine = SearchEngine(
+        languages=languages,
+        enable_semantic=semantic,
+    )
+
+    await search_engine.initialize()
+
+    # Perform search
+    if semantic:
+        # Force semantic search
+        results = await search_engine.search(
+            word, max_results=10, methods=[SearchMethod.SEMANTIC]
         )
+    else:
+        # Use hybrid approach
+        results = await search_engine.search(word, max_results=10)
+
+    logger.debug(f"Search returned {len(results)} results")
+    return results
 
 
-@lookup_group.command("random")
-@click.option("--count", "-c", default=1, help="Number of random words to display")
-@click.option(
-    "--ai-comprehension/--no-ai", default=True, help="Display AI comprehension"
-)
-def lookup_random(count: int, ai_comprehension: bool) -> None:
-    """Display random words from the database with AI comprehension.
+async def _get_provider_definition(word: str, provider: DictionaryProvider) -> Any:
+    """Get definition from specified provider."""
+    logger.debug(f"Fetching definition from {provider.value}")
 
-    Useful for vocabulary discovery and review.
-    """
-    asyncio.run(_lookup_random_async(count, ai_comprehension))
-
-
-async def _lookup_random_async(count: int, ai_comprehension: bool) -> None:
-    """Async implementation of random word lookup."""
     try:
-        await get_storage()
+        connector: WiktionaryConnector | DictionaryComConnector | None = None
+        if provider == DictionaryProvider.WIKTIONARY:
+            connector = WiktionaryConnector()
+        elif provider == DictionaryProvider.OXFORD:
+            # Would need API credentials from config
+            console.print(format_warning("Oxford provider requires API credentials"))
+            return None
+        elif provider == DictionaryProvider.DICTIONARY_COM:
+            connector = DictionaryComConnector()
+        elif provider == DictionaryProvider.AI_SYNTHETIC:
+            # Skip provider lookup for AI-only mode
+            return None
+        else:
+            raise ValueError(f"Unknown provider: {provider}")
 
-        # Get random entries from database
-        entries = await DictionaryEntry.find().limit(count).to_list()
-
-        if not entries:
-            console.print(
-                "[dim]No words found in database. Try adding some words first.[/dim]"
-            )
-            return
-
-        console.print(
-            f"[bold blue]🎲 {count} random words from your collection:[/bold blue]"
-        )
-
-        for i, entry in enumerate(entries, 1):
-            console.print(f"\n[dim]─── WORD {i}/{len(entries)} ───[/dim]")
-            console.print(
-                format_word_display(entry, show_examples=True, show_synonyms=True)
-            )
+        if connector:
+            return await connector.fetch_definition(word)
+        return None
 
     except Exception as e:
-        console.print(format_error(f"Failed to fetch random words: {str(e)}"))
+        logger.error(f"Provider {provider.value} failed: {e}")
+        console.print(format_warning(f"{provider.value} lookup failed: {e}"))
+        return None
 
 
-@lookup_group.command("history")
-@click.option("--count", "-c", default=10, help="Number of recent lookups to show")
-def lookup_history(count: int) -> None:
-    """Show recent word lookup history."""
-    asyncio.run(_lookup_history_async(count))
+async def _synthesize_with_ai(word: Word, providers: dict[str, Any]) -> Any:
+    """Synthesize definition using AI."""
+    logger.debug(f"AI synthesis for '{word.text}'")
 
-
-async def _lookup_history_async(count: int) -> None:
-    """Show recent word lookup history."""
     try:
-        # Get recent entries sorted by last_updated
-        entries = (
-            await DictionaryEntry.find()
-            .sort(-DictionaryEntry.last_updated)
-            .limit(count)
-            .to_list()
-        )
+        synthesizer = create_definition_synthesizer()
+        return await synthesizer.synthesize_entry(word, providers)
+    except Exception as e:
+        logger.error(f"AI synthesis failed: {e}")
+        console.print(format_warning(f"AI synthesis failed: {e}"))
+        return None
 
-        if not entries:
-            console.print("[dim]No lookup history found.[/dim]")
-            return
 
-        console.print(f"[bold blue]📚 Recent {len(entries)} word lookups:[/bold blue]")
+async def _handle_no_results(
+    word: str, provider: DictionaryProvider, no_ai: bool
+) -> None:
+    """Handle case when no results are found."""
+    logger.warning(f"No results found for '{word}'")
 
-        from rich.table import Table
+    if no_ai or provider == DictionaryProvider.AI_SYNTHETIC:
+        console.print(format_error(f"No definition found for '{word}'"))
+        return
 
-        table = Table(title="Lookup History")
-        table.add_column("Word", style="cyan")
-        table.add_column("Providers", style="green")
-        table.add_column("Last Updated", style="yellow")
+    # Try AI fallback
+    console.print("[yellow]No definition found. Trying AI fallback...[/yellow]")
 
-        for entry in entries:
-            providers = ", ".join(entry.providers.keys())
-            last_updated = entry.last_updated.strftime("%Y-%m-%d %H:%M")
-            table.add_row(entry.word.text.title(), providers, last_updated)
+    try:
+        synthesizer = create_definition_synthesizer()
+        ai_entry = await synthesizer.generate_fallback_entry(Word(text=word))
 
-        console.print(table)
+        if ai_entry and ai_entry.definitions:
+            _display_synthesized_entry(ai_entry)
+        else:
+            console.print(format_error(f"No definition available for '{word}'"))
 
     except Exception as e:
-        console.print(format_error(f"Failed to fetch history: {str(e)}"))
+        logger.error(f"AI fallback failed: {e}")
+        console.print(format_error(f"Definition lookup failed: {e}"))
 
 
-# Add the word command as the default
-@lookup_group.command(hidden=True)
-@click.argument("word")
-@click.pass_context
-def default(ctx: click.Context, word: str) -> None:
-    """Default lookup command."""
-    ctx.invoke(lookup_word, word=word)
+def _display_synthesized_entry(entry: Any) -> None:
+    """Display synthesized dictionary entry with beautiful formatting."""
+    if not entry or not entry.definitions:
+        console.print(format_warning("No definitions available"))
+        return
+
+    # Header
+    header = Text(entry.word.text, style="bold blue")
+    if entry.pronunciation.phonetic:
+        header.append(f" /{entry.pronunciation.phonetic}/", style="dim cyan")
+
+    console.print(Panel(header, title="Definition", border_style="blue"))
+
+    # Definitions by word type
+    for definition in entry.definitions:
+        console.print(f"\n[bold cyan]{definition.word_type.value}[/bold cyan]")
+        console.print(f"  {definition.definition}")
+
+        # Examples
+        if definition.examples.generated:
+            for example in definition.examples.generated:
+                console.print(f"  [dim]Example: {example.sentence}[/dim]")
+
+        # Synonyms
+        if definition.synonyms:
+            synonym_text = ", ".join([syn.word.text for syn in definition.synonyms[:5]])
+            console.print(f"  [dim]Synonyms: {synonym_text}[/dim]")
+
+    console.print()
 
 
-# Make the group callable to support "floridify lookup word"
-lookup_group.callback = lambda: None
+def _display_provider_data(data: Any, provider: DictionaryProvider) -> None:
+    """Display raw provider data."""
+    console.print(
+        Panel(
+            f"Definition from {provider.display_name}",
+            title=data.provider_name.title() if data else "No Data",
+            border_style="yellow",
+        )
+    )
+
+    if not data or not data.definitions:
+        console.print("[yellow]No definitions available[/yellow]")
+        return
+
+    for definition in data.definitions:
+        console.print(f"\n[bold cyan]{definition.word_type.value}[/bold cyan]")
+        console.print(f"  {definition.definition}")
+
+        if definition.examples.generated:
+            for example in definition.examples.generated:
+                console.print(f"  [dim]Example: {example.sentence}[/dim]")
+
+
+# Add to CLI group in __init__.py
+lookup_group = lookup

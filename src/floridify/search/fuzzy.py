@@ -8,24 +8,13 @@ Supports typo tolerance, abbreviations, and phonetic matching.
 from __future__ import annotations
 
 import re
-from enum import Enum
-from typing import Any
 
 import jellyfish
 import polyleven  # type: ignore[import-not-found]
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz, process
 
-
-class FuzzySearchMethod(Enum):
-    """Available fuzzy search methods with characteristics."""
-
-    RAPIDFUZZ = "rapidfuzz"  # General-purpose, C++ optimized
-    LEVENSHTEIN = "levenshtein"  # Classic edit distance
-    JARO_WINKLER = "jaro_winkler"  # Good for names and abbreviations
-    SOUNDEX = "soundex"  # Phonetic matching
-    METAPHONE = "metaphone"  # Advanced phonetic matching
-    AUTO = "auto"  # Automatic method selection
+from .constants import FuzzySearchMethod
 
 
 class FuzzyMatch(BaseModel):

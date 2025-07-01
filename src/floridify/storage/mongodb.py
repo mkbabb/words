@@ -8,7 +8,10 @@ from typing import Any
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from ..models.dictionary import APIResponseCache, DictionaryEntry
+from ..models.dictionary import APIResponseCache, DictionaryEntry, SynthesizedDictionaryEntry
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class MongoDBStorage:
@@ -38,7 +41,7 @@ class MongoDBStorage:
         # Initialize Beanie with our document models
         await init_beanie(
             database=database,
-            document_models=[DictionaryEntry, APIResponseCache],
+            document_models=[DictionaryEntry, APIResponseCache, SynthesizedDictionaryEntry],
         )
 
         self._initialized = True
@@ -79,7 +82,7 @@ class MongoDBStorage:
             return True
 
         except Exception as e:
-            print(f"Error saving entry for {entry.word.text}: {e}")
+            logger.error(f"Error saving entry for {entry.word.text}: {e}")
             return False
 
     async def get_entry(self, word: str) -> DictionaryEntry | None:
@@ -97,7 +100,7 @@ class MongoDBStorage:
         try:
             return await DictionaryEntry.find_one(DictionaryEntry.word.text == word)
         except Exception as e:
-            print(f"Error retrieving entry for {word}: {e}")
+            logger.error(f"Error retrieving entry for {word}: {e}")
             return None
 
     async def entry_exists(self, word: str) -> bool:
@@ -116,7 +119,7 @@ class MongoDBStorage:
             count = await DictionaryEntry.find(DictionaryEntry.word.text == word).count()
             return count > 0
         except Exception as e:
-            print(f"Error checking existence for {word}: {e}")
+            logger.error(f"Error checking existence for {word}: {e}")
             return False
 
     async def cache_api_response(
@@ -156,7 +159,7 @@ class MongoDBStorage:
             return True
 
         except Exception as e:
-            print(f"Error caching response for {word} from {provider}: {e}")
+            logger.error(f"Error caching response for {word} from {provider}: {e}")
             return False
 
     async def get_cached_response(
@@ -187,7 +190,7 @@ class MongoDBStorage:
             return cache_entry.response_data if cache_entry else None
 
         except Exception as e:
-            print(f"Error retrieving cached response for {word} from {provider}: {e}")
+            logger.error(f"Error retrieving cached response for {word} from {provider}: {e}")
             return None
 
     async def cleanup_old_cache(self, max_age_hours: int = 48) -> int:
@@ -210,5 +213,69 @@ class MongoDBStorage:
             return result.deleted_count if result else 0
 
         except Exception as e:
-            print(f"Error cleaning up cache: {e}")
+            logger.error(f"Error cleaning up cache: {e}")
             return 0
+
+
+# Helper functions for AI module
+async def get_cache_entry(provider: str, cache_key: str) -> dict[str, Any] | None:
+    """Get cached AI response by provider and key."""
+    try:
+        cache_entry = await APIResponseCache.find_one(
+            APIResponseCache.provider == provider,
+            APIResponseCache.word == cache_key,
+        )
+        return cache_entry.response_data if cache_entry else None
+    except Exception:
+        return None
+
+
+async def save_cache_entry(provider: str, cache_key: str, data: dict[str, Any]) -> None:
+    """Save AI response to cache."""
+    try:
+        existing = await APIResponseCache.find_one(
+            APIResponseCache.provider == provider,
+            APIResponseCache.word == cache_key,
+        )
+        
+        if existing:
+            existing.response_data = data
+            existing.timestamp = datetime.now()
+            await existing.save()
+        else:
+            cache_entry = APIResponseCache(
+                word=cache_key,
+                provider=provider,
+                response_data=data,
+            )
+            await cache_entry.create()
+    except Exception as e:
+        logger.error(f"Error saving cache entry: {e}")
+
+
+async def get_synthesized_entry(word: str) -> SynthesizedDictionaryEntry | None:
+    """Get synthesized dictionary entry by word."""
+    try:
+        return await SynthesizedDictionaryEntry.find_one(
+            SynthesizedDictionaryEntry.word.text == word
+        )
+    except Exception:
+        return None
+
+
+async def save_synthesized_entry(entry: SynthesizedDictionaryEntry) -> None:
+    """Save synthesized dictionary entry."""
+    try:
+        existing = await SynthesizedDictionaryEntry.find_one(
+            SynthesizedDictionaryEntry.word.text == entry.word.text
+        )
+        
+        if existing:
+            existing.pronunciation = entry.pronunciation
+            existing.definitions = entry.definitions
+            existing.last_updated = entry.last_updated
+            await existing.save()
+        else:
+            await entry.create()
+    except Exception as e:
+        logger.error(f"Error saving synthesized entry: {e}")

@@ -206,6 +206,8 @@ class TrieSearch:
 
         return {
             "word_count": self._word_count,
+            "memory_nodes": len(all_words),  # Approximate node count
+            "average_depth": avg_length,  # Use average word length as depth approximation
             "max_frequency": self._max_frequency,
             "memory_efficiency": "5x better than Python trie",
             "average_word_length": avg_length,

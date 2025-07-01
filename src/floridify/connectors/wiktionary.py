@@ -19,7 +19,10 @@ from ..models import (
     Word,
     WordType,
 )
+from ..utils.logging import get_logger
 from .base import DictionaryConnector
+
+logger = get_logger(__name__)
 
 
 class WiktionaryConnector(DictionaryConnector):
@@ -79,7 +82,7 @@ class WiktionaryConnector(DictionaryConnector):
             return self._parse_wiktionary_response(word, data)
 
         except Exception as e:
-            print(f"Error fetching {word} from Wiktionary: {e}")
+            logger.error(f"Error fetching {word} from Wiktionary: {e}")
             return None
 
     def _parse_wiktionary_response(self, word: str, data: dict[str, Any]) -> ProviderData | None:
@@ -109,7 +112,7 @@ class WiktionaryConnector(DictionaryConnector):
             )
 
         except Exception as e:
-            print(f"Error parsing Wiktionary response for {word}: {e}")
+            logger.error(f"Error parsing Wiktionary response for {word}: {e}")
             return None
 
     def _extract_definitions_from_wikitext(self, wikitext: str) -> list[Definition]:
@@ -190,7 +193,7 @@ class WiktionaryConnector(DictionaryConnector):
                             )
 
         except Exception as e:
-            print(f"Error extracting definitions: {e}")
+            logger.error(f"Error extracting definitions: {e}")
 
         return definitions
 
@@ -342,7 +345,7 @@ class WiktionaryConnector(DictionaryConnector):
             return Pronunciation(phonetic=phonetic, ipa=ipa)
 
         except Exception as e:
-            print(f"Error extracting pronunciation: {e}")
+            logger.error(f"Error extracting pronunciation: {e}")
             return Pronunciation(phonetic="unknown")
 
     def _ipa_to_simple_phonetic(self, ipa: str) -> str:
@@ -440,7 +443,7 @@ class WiktionaryConnector(DictionaryConnector):
                             )
 
         except Exception as e:
-            print(f"Error extracting synonyms: {e}")
+            logger.error(f"Error extracting synonyms: {e}")
 
         return synonyms[:10]  # Limit to 10 synonyms per definition
 
