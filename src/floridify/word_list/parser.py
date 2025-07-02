@@ -57,7 +57,7 @@ def generate_name(words: list[str]) -> str:
     """Generate a human-readable animal phrase name."""
     try:
         # Generate a cool name with adjective + animal format
-        name = coolname.generate_slug(2)  # 2 words: adjective-animal
+        name: str = coolname.generate_slug(2)  # 2 words: adjective-animal
         logger.debug(f"Generated name: {name}")
         return name
     except Exception as e:

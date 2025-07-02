@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from ..utils.logging import get_logger
 from .constants import CardType
+
+logger = get_logger(__name__)
 
 __all__ = ["AnkiCardTemplate", "CardType"]
 
@@ -22,6 +25,7 @@ class AnkiCardTemplate(BaseModel):
     @classmethod
     def get_multiple_choice_template(cls) -> AnkiCardTemplate:
         """Get template for multiple choice cards."""
+        logger.debug("🎯 Creating multiple choice card template")
         front_template = """
         <div class="card">
             <div class="word-header">
@@ -52,9 +56,6 @@ class AnkiCardTemplate(BaseModel):
                 </div>
             </div>
             
-            <div class="reveal-button">
-                <button onclick="revealAnswer()">Show Answer</button>
-            </div>
         </div>
         """
 
@@ -176,26 +177,6 @@ class AnkiCardTemplate(BaseModel):
             font-weight: 400;
         }
         
-        .reveal-button {
-            text-align: center;
-        }
-        
-        .reveal-button button {
-            background: #007aff;
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-size: 1em;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .reveal-button button:hover {
-            background: #0056cc;
-        }
-        
         .correct-answer {
             text-align: center;
             margin-bottom: 20px;
@@ -253,26 +234,8 @@ class AnkiCardTemplate(BaseModel):
             element.classList.add('selected');
             // Store selection for reveal
             window.selectedChoice = choice;
-        }
+        }"""
         
-        function revealAnswer() {
-            const correctChoice = '{{CorrectChoice}}';
-            const choices = document.querySelectorAll('.choice');
-            
-            choices.forEach((choice, index) => {
-                const letter = String.fromCharCode(65 + index); // A, B, C, D
-                if (letter === correctChoice) {
-                    choice.classList.add('correct');
-                } else if (window.selectedChoice === letter) {
-                    choice.classList.add('incorrect');
-                }
-            });
-            
-            // Hide reveal button
-            document.querySelector('.reveal-button').style.display = 'none';
-        }
-        """
-
         return cls(
             card_type=CardType.MULTIPLE_CHOICE,
             front_template=front_template,
@@ -296,6 +259,7 @@ class AnkiCardTemplate(BaseModel):
     @classmethod
     def get_fill_in_blank_template(cls) -> AnkiCardTemplate:
         """Get template for fill-in-the-blank cards."""
+        logger.debug("📝 Creating fill-in-blank card template")
         front_template = """
         <div class="card">
             <div class="word-header">
@@ -338,10 +302,6 @@ class AnkiCardTemplate(BaseModel):
                 {{Definition}}
             </div>
             
-            <div class="additional-examples">
-                <h4>More Examples:</h4>
-                <div class="examples-list">{{AdditionalExamples}}</div>
-            </div>
         </div>
         """
 
@@ -473,13 +433,6 @@ class AnkiCardTemplate(BaseModel):
             color: #1d1d1f;
         }
         
-        .additional-examples h4 {
-            color: #424245;
-            margin-bottom: 8px;
-            font-weight: 600;
-            font-size: 1em;
-        }
-        
         .examples-list {
             background: #f5f5f7;
             padding: 12px;
@@ -503,6 +456,5 @@ class AnkiCardTemplate(BaseModel):
                 "Hint",
                 "CompleteSentence",
                 "Definition",
-                "AdditionalExamples",
             ],
         )

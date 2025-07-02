@@ -11,7 +11,7 @@ import pickle
 from pathlib import Path
 from typing import Any
 
-import marisa_trie  # type: ignore[import-not-found]
+import marisa_trie  # type: ignore[import-untyped]
 
 
 class TrieSearch:

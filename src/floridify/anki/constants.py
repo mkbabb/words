@@ -8,6 +8,10 @@ from __future__ import annotations
 
 from enum import Enum
 
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class CardType(Enum):
     """Types of flashcards that can be generated for Anki."""

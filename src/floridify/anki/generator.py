@@ -13,6 +13,7 @@ from ..ai.connector import OpenAIConnector
 from ..ai.templates import PromptTemplateManager as PromptLoader
 from ..models import Definition, DictionaryEntry, SynthesizedDictionaryEntry
 from ..utils.logging import get_logger
+from .ankiconnect import AnkiDirectIntegration
 from .templates import AnkiCardTemplate, CardType
 
 logger = get_logger(__name__)
@@ -112,12 +113,13 @@ class AnkiCardGenerator:
         """
         self.openai_connector = openai_connector
         self.prompt_loader = prompt_loader or PromptLoader()
+        self.direct_integration = AnkiDirectIntegration()
 
     async def generate_cards(
         self,
         entry: DictionaryEntry | SynthesizedDictionaryEntry,
         card_types: list[CardType] | None = None,
-        max_cards_per_type: int = 2,
+        max_cards_per_type: int = 1,
     ) -> list[AnkiCard]:
         """Generate flashcards for a dictionary entry.
 
@@ -129,7 +131,10 @@ class AnkiCardGenerator:
         Returns:
             List of generated Anki cards
         """
-        logger.debug(f"Generating cards for word: {entry.word.text}")
+        import time
+        start_time = time.time()
+        
+        logger.info(f"🎴 Starting card generation for word: '{entry.word.text}'")
         if card_types is None:
             card_types = [CardType.MULTIPLE_CHOICE, CardType.FILL_IN_BLANK]
         
@@ -154,32 +159,49 @@ class AnkiCardGenerator:
                     definitions.extend(provider_data.definitions)
 
         if not definitions:
+            logger.warning(f"📛 No definitions found for word: '{entry.word.text}'")
             return cards
+
+        logger.debug(f"📖 Found {len(definitions)} definitions for '{entry.word.text}'")
 
         # Generate cards for each requested type
         for card_type in card_types:
+            type_start_time = time.time()
+            logger.info(f"⚡ Generating {card_type.value} cards for '{entry.word.text}'")
             type_cards = []
 
-            for definition in definitions[:max_cards_per_type]:
+            for i, definition in enumerate(definitions[:max_cards_per_type]):
                 try:
+                    def_start_time = time.time()
+                    logger.debug(f"🔨 Creating {card_type.value} card {i+1}/{min(max_cards_per_type, len(definitions))}")
+                    
                     if card_type == CardType.MULTIPLE_CHOICE:
                         card = await self._generate_multiple_choice_card(entry, definition)
                     elif card_type == CardType.FILL_IN_BLANK:
                         card = await self._generate_fill_blank_card(entry, definition)
                     else:
+                        logger.warning(f"⚠️ Unsupported card type: {card_type.value}")
                         continue  # Skip unsupported card types
 
                     if card:
                         type_cards.append(card)
+                        def_elapsed = time.time() - def_start_time
+                        logger.debug(f"✅ Created {card_type.value} card in {def_elapsed:.2f}s")
+                    else:
+                        logger.warning(f"❌ Failed to create {card_type.value} card")
 
                 except Exception as e:
                     logger.error(
-                        f"Error generating {card_type.value} card for {entry.word.text}: {e}"
+                        f"💥 Error generating {card_type.value} card for {entry.word.text}: {e}"
                     )
                     continue
 
+            type_elapsed = time.time() - type_start_time
+            logger.info(f"🎯 Generated {len(type_cards)} {card_type.value} cards in {type_elapsed:.2f}s")
             cards.extend(type_cards)
 
+        total_elapsed = time.time() - start_time
+        logger.info(f"🏁 Generated {len(cards)} total cards for '{entry.word.text}' in {total_elapsed:.2f}s")
         return cards
 
     async def _generate_multiple_choice_card(
@@ -187,19 +209,28 @@ class AnkiCardGenerator:
     ) -> AnkiCard | None:
         """Generate a multiple choice flashcard."""
         try:
+            import time
+            start_time = time.time()
+            
+            logger.debug(f"🧠 Generating multiple choice AI content for '{entry.word.text}'")
+            
             # Prepare examples for the prompt
             examples_text = ""
             if definition.examples.generated:
                 examples_list = [ex.sentence for ex in definition.examples.generated[:3]]
                 examples_text = " | ".join(examples_list)
+                logger.debug(f"📝 Using {len(examples_list)} examples for context")
 
             # Generate multiple choice content using structured output
+            ai_start_time = time.time()
             ai_response = await self.openai_connector.generate_anki_multiple_choice(
                 word=entry.word.text,
                 definition=definition.definition,
                 word_type=definition.word_type.value,
                 examples=examples_text,
             )
+            ai_elapsed = time.time() - ai_start_time
+            logger.debug(f"🤖 OpenAI multiple choice generation took {ai_elapsed:.2f}s")
 
             # Format examples and synonyms as strings
             examples_text = ""
@@ -227,12 +258,17 @@ class AnkiCardGenerator:
             }
 
             # Get card template
+            template_start_time = time.time()
             card_template = AnkiCardTemplate.get_multiple_choice_template()
+            template_elapsed = time.time() - template_start_time
+            
+            total_elapsed = time.time() - start_time
+            logger.debug(f"📋 Multiple choice card creation completed in {total_elapsed:.2f}s (template: {template_elapsed:.3f}s)")
 
             return AnkiCard(CardType.MULTIPLE_CHOICE, fields, card_template)
 
         except Exception as e:
-            logger.error(f"Error generating multiple choice card: {e}")
+            logger.error(f"💥 Error generating multiple choice card for '{entry.word.text}': {e}")
             return None
 
     async def _generate_fill_blank_card(
@@ -240,30 +276,33 @@ class AnkiCardGenerator:
     ) -> AnkiCard | None:
         """Generate a fill-in-the-blank flashcard."""
         try:
+            import time
+            start_time = time.time()
+            
+            logger.debug(f"📝 Generating fill-in-blank AI content for '{entry.word.text}'")
+            
             # Prepare examples for the prompt
             examples_text = ""
             if definition.examples.generated:
                 examples_list = [ex.sentence for ex in definition.examples.generated[:3]]
                 examples_text = " | ".join(examples_list)
+                logger.debug(f"📚 Using {len(examples_list)} examples for context")
 
             # Generate fill-in-the-blank content using structured output
+            ai_start_time = time.time()
             ai_response = await self.openai_connector.generate_anki_fill_blank(
                 word=entry.word.text,
                 definition=definition.definition,
                 word_type=definition.word_type.value,
                 examples=examples_text,
             )
+            ai_elapsed = time.time() - ai_start_time
+            logger.debug(f"🤖 OpenAI fill-in-blank generation took {ai_elapsed:.2f}s")
 
             # Create complete sentence by replacing blank with highlighted word
             complete_sentence = ai_response.sentence.replace(
                 "_____", f'<span class="word-highlight">{entry.word.text}</span>'
             )
-
-            # Get additional examples (not used in the blank)
-            additional_examples_text = ""
-            if definition.examples.generated and len(definition.examples.generated) > 1:
-                additional_examples_list = [ex.sentence for ex in definition.examples.generated[1:4]]
-                additional_examples_text = " • ".join(additional_examples_list)
 
             # Prepare card fields
             fields = {
@@ -274,16 +313,20 @@ class AnkiCardGenerator:
                 "Hint": ai_response.hint or "",
                 "CompleteSentence": complete_sentence,
                 "Definition": definition.definition,
-                "AdditionalExamples": additional_examples_text,
             }
 
             # Get card template
+            template_start_time = time.time()
             card_template = AnkiCardTemplate.get_fill_in_blank_template()
+            template_elapsed = time.time() - template_start_time
+            
+            total_elapsed = time.time() - start_time
+            logger.debug(f"📋 Fill-in-blank card creation completed in {total_elapsed:.2f}s (template: {template_elapsed:.3f}s)")
 
             return AnkiCard(CardType.FILL_IN_BLANK, fields, card_template)
 
         except Exception as e:
-            logger.error(f"Error generating fill-in-the-blank card: {e}")
+            logger.error(f"💥 Error generating fill-in-blank card for '{entry.word.text}': {e}")
             return None
 
 
@@ -301,41 +344,137 @@ class AnkiCardGenerator:
             True if export successful, False otherwise
         """
         try:
+            import time
+            start_time = time.time()
+            
+            logger.info(f"📦 Starting .apkg export: {len(cards)} cards to '{deck_name}'")
+            
             output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
+            logger.debug(f"💾 Output path: {output_path.with_suffix('.apkg')}")
 
             # Create deck and models for different card types
+            deck_creation_start = time.time()
             deck_id = self._generate_deck_id(deck_name)
             deck = genanki.Deck(deck_id, deck_name)
+            deck_creation_elapsed = time.time() - deck_creation_start
+            logger.debug(f"🏗️ Created deck in {deck_creation_elapsed:.3f}s")
 
             # Create models for each card type
+            model_creation_start = time.time()
             models = {}
+            card_type_counts = {}
             for card in cards:
                 card_type = card.card_type
+                card_type_counts[card_type.value] = card_type_counts.get(card_type.value, 0) + 1
                 if card_type not in models:
                     models[card_type] = self._create_genanki_model(card_type, card.template)
+            
+            model_creation_elapsed = time.time() - model_creation_start
+            logger.debug(f"🔧 Created {len(models)} models in {model_creation_elapsed:.3f}s")
+            logger.debug(f"📊 Card distribution: {card_type_counts}")
 
             # Add notes to deck
-            for card in cards:
+            note_creation_start = time.time()
+            for i, card in enumerate(cards):
                 note = self._create_genanki_note(card, models[card.card_type])
                 deck.add_note(note)
+                if (i + 1) % 10 == 0:
+                    logger.debug(f"📝 Added {i + 1}/{len(cards)} notes to deck")
+            
+            note_creation_elapsed = time.time() - note_creation_start
+            logger.debug(f"📋 Added {len(cards)} notes in {note_creation_elapsed:.3f}s")
 
             # Create package and write to file
+            package_start = time.time()
             package = genanki.Package(deck)
             package.write_to_file(str(output_path.with_suffix(".apkg")))
+            package_elapsed = time.time() - package_start
+            logger.debug(f"📦 Created .apkg package in {package_elapsed:.3f}s")
 
             # Also create HTML preview
+            html_start = time.time()
             html_content = self._generate_html_preview(cards, deck_name)
             with open(output_path.with_suffix(".html"), "w", encoding="utf-8") as f:
                 f.write(html_content)
+            html_elapsed = time.time() - html_start
+            logger.debug(f"🌐 Created HTML preview in {html_elapsed:.3f}s")
 
-            logger.success(f"Exported {len(cards)} cards to {output_path.with_suffix('.apkg')}")
-            logger.info(f"HTML preview available at {output_path.with_suffix('.html')}")
-            return True
+            total_elapsed = time.time() - start_time
+            logger.success(f"✅ Exported {len(cards)} cards to {output_path.with_suffix('.apkg')} in {total_elapsed:.2f}s")
+            logger.info(f"📄 HTML preview available at {output_path.with_suffix('.html')}")
+            return output_path.with_suffix('.apkg')
 
         except Exception as e:
-            logger.error(f"Error exporting cards: {e}")
-            return False
+            logger.error(f"💥 Error exporting cards to .apkg: {e}")
+            return None
+
+    def export_directly_to_anki(
+        self,
+        cards: list[AnkiCard],
+        deck_name: str,
+        fallback_to_apkg: bool = True,
+        output_path: Path | None = None,
+    ) -> tuple[bool, Path | None]:
+        """Export cards directly to Anki via AnkiConnect, with .apkg fallback.
+        
+        Args:
+            cards: List of AnkiCard objects to export
+            deck_name: Name of the target Anki deck
+            fallback_to_apkg: Whether to create .apkg file if direct export fails
+            output_path: Optional path for .apkg fallback (auto-generated if None)
+            
+        Returns:
+            Tuple of (success, apkg_path). Success is True if cards were added to Anki
+            directly, apkg_path is provided if .apkg was created as fallback.
+        """
+        import time
+        start_time = time.time()
+        
+        logger.info(f"🚀 Attempting direct export of {len(cards)} cards to Anki deck '{deck_name}'")
+        
+        # Try direct export first
+        if self.direct_integration.is_available():
+            success = self.direct_integration.export_cards_directly(cards, deck_name)
+            
+            if success:
+                total_time = time.time() - start_time
+                logger.success(f"✅ Cards exported directly to Anki in {total_time:.2f}s")
+                return True, None
+            else:
+                logger.warning("⚠️ Direct export failed, falling back to .apkg")
+        else:
+            logger.info("📦 AnkiConnect not available, using .apkg export")
+        
+        # Fallback to .apkg export
+        if fallback_to_apkg:
+            if output_path is None:
+                output_path = Path.cwd() / f"{deck_name.replace(' ', '_')}"
+            
+            apkg_path = self.export_to_apkg(cards, output_path)
+            
+            if apkg_path is None:
+                logger.error("💥 .apkg export also failed")
+                return False, None
+            
+            # If AnkiConnect is available, try to import the .apkg directly
+            if self.direct_integration.is_available():
+                logger.info("🔄 Attempting to import .apkg directly into Anki")
+                import_success = self.direct_integration.import_apkg_directly(apkg_path)
+                
+                if import_success:
+                    total_time = time.time() - start_time
+                    logger.success(f"✅ .apkg imported directly to Anki in {total_time:.2f}s")
+                    return True, apkg_path
+                else:
+                    logger.warning("⚠️ Direct .apkg import failed")
+            
+            total_time = time.time() - start_time
+            logger.info(f"📦 Created .apkg file in {total_time:.2f}s: {apkg_path}")
+            return False, apkg_path
+        
+        logger.error("💥 All export methods failed")
+        return False, None
 
     def _generate_html_preview(self, cards: list[AnkiCard], deck_name: str) -> str:
         """Generate HTML preview of the cards."""

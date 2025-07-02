@@ -323,8 +323,8 @@ async def _lookup_word(
     try:
         result = await lookup_word_pipeline(
             word=word,
-            provider=provider,
-            language=language,
+            provider=DictionaryProvider(provider),
+            language=Language(language),
             semantic=semantic,
             no_ai=no_ai
         )

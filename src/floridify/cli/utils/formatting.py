@@ -551,7 +551,8 @@ def format_meaning_based_definition(
             source_text = Text()
             source_text.append("✨ Sources: ", style="dim")
             source_text.append(", ".join(sources), style="dim")
-            panels.append(source_text)
+            source_panel = Panel(source_text, style="dim", border_style="dim")
+            panels.append(source_panel)
         
         # Group all panels
         content_group = Group(*panels)
@@ -634,7 +635,7 @@ def format_meaning_based_definition(
             content.append("✨ Sources: ", style="dim")
             content.append(", ".join(sources), style="dim")
         
-        content_group = content
+        content_group = Group(content)
     
     # Wrap everything in outer panel
     outer_panel = Panel(
