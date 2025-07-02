@@ -11,16 +11,12 @@ import genanki  # type: ignore[import-untyped]
 
 from ..ai.connector import OpenAIConnector
 from ..ai.templates import PromptTemplateManager as PromptLoader
-from ..models import Definition, DictionaryEntry
+from ..models import Definition, DictionaryEntry, SynthesizedDictionaryEntry
 from ..utils.logging import get_logger
 from .templates import AnkiCardTemplate, CardType
 
 logger = get_logger(__name__)
 
-
-def format_template_variables(**kwargs: Any) -> dict[str, Any]:
-    """Format template variables for prompt rendering."""
-    return kwargs
 
 
 class AnkiCard:
@@ -119,7 +115,7 @@ class AnkiCardGenerator:
 
     async def generate_cards(
         self,
-        entry: DictionaryEntry,
+        entry: DictionaryEntry | SynthesizedDictionaryEntry,
         card_types: list[CardType] | None = None,
         max_cards_per_type: int = 2,
     ) -> list[AnkiCard]:
@@ -142,15 +138,20 @@ class AnkiCardGenerator:
         )
         cards: list[Any] = []
 
-        # Get AI synthesis provider data (preferred) or fall back to other providers
-        ai_provider = entry.providers.get("ai_synthesis")
-        if ai_provider and ai_provider.definitions:
-            definitions = ai_provider.definitions
+        # Get definitions based on entry type
+        if isinstance(entry, SynthesizedDictionaryEntry):
+            # SynthesizedDictionaryEntry has definitions directly
+            definitions = entry.definitions
         else:
-            # Collect definitions from all providers
-            definitions = []
-            for provider_data in entry.providers.values():
-                definitions.extend(provider_data.definitions)
+            # DictionaryEntry has providers with definitions
+            ai_provider = entry.providers.get("ai_synthesis")
+            if ai_provider and ai_provider.definitions:
+                definitions = ai_provider.definitions
+            else:
+                # Collect definitions from all providers
+                definitions = []
+                for provider_data in entry.providers.values():
+                    definitions.extend(provider_data.definitions)
 
         if not definitions:
             return cards
@@ -182,63 +183,47 @@ class AnkiCardGenerator:
         return cards
 
     async def _generate_multiple_choice_card(
-        self, entry: DictionaryEntry, definition: Definition
+        self, entry: DictionaryEntry | SynthesizedDictionaryEntry, definition: Definition
     ) -> AnkiCard | None:
         """Generate a multiple choice flashcard."""
         try:
-            # Load prompt template  
-            template_content = self.prompt_loader.render_template("anki_multiple_choice")
-
             # Prepare examples for the prompt
             examples_text = ""
             if definition.examples.generated:
                 examples_list = [ex.sentence for ex in definition.examples.generated[:3]]
                 examples_text = " | ".join(examples_list)
 
-            # Prepare template variables
-            variables = format_template_variables(
+            # Generate multiple choice content using structured output
+            ai_response = await self.openai_connector.generate_anki_multiple_choice(
                 word=entry.word.text,
                 definition=definition.definition,
                 word_type=definition.word_type.value,
                 examples=examples_text,
             )
 
-            # Generate multiple choice content using template
-            prompt = template_content.format(**variables)
-
-            # Make API call
-            response = await self.openai_connector.client.chat.completions.create(
-                model=self.openai_connector.model_name,
-                messages=[
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=self.openai_connector.temperature or 0.6,
-                max_tokens=self.openai_connector.max_tokens,
-            )
-
-            content = response.choices[0].message.content
-            if not content:
-                return None
-
-            # Parse the response
-            choices, correct_choice = self._parse_multiple_choice_response(content)
-            if not choices or not correct_choice:
-                return None
-
+            # Format examples and synonyms as strings
+            examples_text = ""
+            if definition.examples.generated:
+                examples_list = [ex.sentence for ex in definition.examples.generated[:3]]
+                examples_text = " • ".join(examples_list)
+            
+            synonyms_text = ""
+            if definition.synonyms:
+                synonyms_list = [syn.word.text for syn in definition.synonyms[:5]]
+                synonyms_text = ", ".join(synonyms_list)
+            
             # Prepare card fields
             fields = {
                 "Word": entry.word.text,
                 "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word.text}/",
-                "ChoiceA": choices.get("A", ""),
-                "ChoiceB": choices.get("B", ""),
-                "ChoiceC": choices.get("C", ""),
-                "ChoiceD": choices.get("D", ""),
-                "CorrectChoice": correct_choice,
+                "ChoiceA": ai_response.choice_a,
+                "ChoiceB": ai_response.choice_b,
+                "ChoiceC": ai_response.choice_c,
+                "ChoiceD": ai_response.choice_d,
+                "CorrectChoice": ai_response.correct_choice,
                 "Definition": definition.definition,
-                "Examples": [ex.sentence for ex in definition.examples.generated[:3]],
-                "Synonyms": [syn.word.text for syn in definition.synonyms[:5]]
-                if definition.synonyms
-                else [],
+                "Examples": examples_text,
+                "Synonyms": synonyms_text,
             }
 
             # Get card template
@@ -251,69 +236,45 @@ class AnkiCardGenerator:
             return None
 
     async def _generate_fill_blank_card(
-        self, entry: DictionaryEntry, definition: Definition
+        self, entry: DictionaryEntry | SynthesizedDictionaryEntry, definition: Definition
     ) -> AnkiCard | None:
         """Generate a fill-in-the-blank flashcard."""
         try:
-            # Load prompt template
-            template_content = self.prompt_loader.render_template("anki_fill_blank")
-
             # Prepare examples for the prompt
             examples_text = ""
             if definition.examples.generated:
                 examples_list = [ex.sentence for ex in definition.examples.generated[:3]]
                 examples_text = " | ".join(examples_list)
 
-            # Prepare template variables
-            variables = format_template_variables(
+            # Generate fill-in-the-blank content using structured output
+            ai_response = await self.openai_connector.generate_anki_fill_blank(
                 word=entry.word.text,
                 definition=definition.definition,
                 word_type=definition.word_type.value,
                 examples=examples_text,
             )
 
-            # Generate fill-in-the-blank content using template
-            prompt = template_content.format(**variables)
-
-            # Make API call
-            response = await self.openai_connector.client.chat.completions.create(
-                model=self.openai_connector.model_name,
-                messages=[
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=self.openai_connector.temperature or 0.7,
-                max_tokens=self.openai_connector.max_tokens,
-            )
-
-            content = response.choices[0].message.content
-            if not content:
-                return None
-
-            # Parse the response
-            sentence_with_blank, hint = self._parse_fill_blank_response(content)
-            if not sentence_with_blank:
-                return None
-
             # Create complete sentence by replacing blank with highlighted word
-            complete_sentence = sentence_with_blank.replace(
+            complete_sentence = ai_response.sentence.replace(
                 "_____", f'<span class="word-highlight">{entry.word.text}</span>'
             )
 
             # Get additional examples (not used in the blank)
-            additional_examples = []
-            if definition.examples.generated:
-                additional_examples = [ex.sentence for ex in definition.examples.generated[1:4]]
+            additional_examples_text = ""
+            if definition.examples.generated and len(definition.examples.generated) > 1:
+                additional_examples_list = [ex.sentence for ex in definition.examples.generated[1:4]]
+                additional_examples_text = " • ".join(additional_examples_list)
 
             # Prepare card fields
             fields = {
                 "Word": entry.word.text,
                 "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word.text}/",
-                "SentenceWithBlank": sentence_with_blank,
+                "SentenceWithBlank": ai_response.sentence,
                 "WordType": definition.word_type.value,
-                "Hint": hint or "",
+                "Hint": ai_response.hint or "",
                 "CompleteSentence": complete_sentence,
                 "Definition": definition.definition,
-                "AdditionalExamples": additional_examples,
+                "AdditionalExamples": additional_examples_text,
             }
 
             # Get card template
@@ -325,52 +286,6 @@ class AnkiCardGenerator:
             logger.error(f"Error generating fill-in-the-blank card: {e}")
             return None
 
-    def _parse_multiple_choice_response(self, content: str) -> tuple[dict[str, str], str]:
-        """Parse AI response for multiple choice content.
-
-        Returns:
-            Tuple of (choices dict, correct_choice_letter)
-        """
-        choices = {}
-        correct_choice = ""
-
-        lines = content.strip().split("\n")
-
-        for line in lines:
-            line = line.strip()
-
-            # Parse choices: A) choice text
-            if re.match(r"^[A-D]\)", line):
-                letter = line[0]
-                choice_text = line[3:].strip()
-                choices[letter] = choice_text
-
-            # Parse correct answer: CORRECT: A
-            elif line.startswith("CORRECT:"):
-                correct_choice = line.split(":", 1)[1].strip()
-
-        return choices, correct_choice
-
-    def _parse_fill_blank_response(self, content: str) -> tuple[str, str]:
-        """Parse AI response for fill-in-the-blank content.
-
-        Returns:
-            Tuple of (sentence_with_blank, hint)
-        """
-        sentence = ""
-        hint = ""
-
-        lines = content.strip().split("\n")
-
-        for line in lines:
-            line = line.strip()
-
-            if line.startswith("SENTENCE:"):
-                sentence = line.split(":", 1)[1].strip()
-            elif line.startswith("HINT:"):
-                hint = line.split(":", 1)[1].strip()
-
-        return sentence, hint
 
     def export_to_apkg(
         self, cards: list[AnkiCard], deck_name: str, output_path: str | Path

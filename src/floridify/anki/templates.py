@@ -72,15 +72,11 @@ class AnkiCardTemplate(BaseModel):
             
             <div class="examples">
                 <h4>Examples:</h4>
-                {{#Examples}}
-                <div class="example">{{.}}</div>
-                {{/Examples}}
+                <div class="examples-list">{{Examples}}</div>
             </div>
             
             <div class="synonyms">
-                {{#Synonyms}}
-                <span class="synonym">{{.}}</span>
-                {{/Synonyms}}
+                <div class="synonyms-list">{{Synonyms}}</div>
             </div>
         </div>
         """
@@ -88,87 +84,96 @@ class AnkiCardTemplate(BaseModel):
         css_styles = """
         .card {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 600px;
+            max-width: 500px;
             margin: 0 auto;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            color: white;
+            padding: 32px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            color: #1d1d1f;
+            border: 1px solid #e8e8ed;
         }
         
         .word-header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #e8e8ed;
+            padding-bottom: 16px;
         }
         
         .word {
-            font-size: 2.5em;
-            font-weight: 700;
+            font-size: 2em;
+            font-weight: 600;
             margin: 0;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            color: #1d1d1f;
+            letter-spacing: -0.01em;
         }
         
         .pronunciation {
-            font-size: 1.2em;
-            opacity: 0.9;
-            margin-top: 10px;
-            font-style: italic;
+            font-size: 1em;
+            color: #86868b;
+            margin-top: 4px;
+            font-weight: 400;
         }
         
         .question {
-            font-size: 1.3em;
+            font-size: 1.1em;
             text-align: center;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             font-weight: 500;
+            color: #424245;
         }
         
         .choices {
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            margin-bottom: 25px;
+            gap: 8px;
+            margin-bottom: 20px;
         }
         
         .choice {
-            background: rgba(255,255,255,0.1);
-            border: 2px solid rgba(255,255,255,0.2);
-            border-radius: 10px;
-            padding: 15px;
+            background: #f5f5f7;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            padding: 12px 16px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
         }
         
         .choice:hover {
-            background: rgba(255,255,255,0.2);
-            transform: translateY(-2px);
+            background: #e8e8ed;
+            border-color: #a1a1a6;
         }
         
         .choice.selected {
-            background: rgba(255,255,255,0.3);
-            border-color: #FFD700;
+            background: #007aff;
+            border-color: #007aff;
+            color: white;
         }
         
         .choice.correct {
-            background: rgba(76, 175, 80, 0.3);
-            border-color: #4CAF50;
+            background: #30d158;
+            border-color: #30d158;
+            color: white;
         }
         
         .choice.incorrect {
-            background: rgba(244, 67, 54, 0.3);
-            border-color: #F44336;
+            background: #ff3b30;
+            border-color: #ff3b30;
+            color: white;
         }
         
         .choice-letter {
-            font-weight: bold;
+            font-weight: 600;
             margin-right: 12px;
-            min-width: 25px;
+            min-width: 20px;
         }
         
         .choice-text {
             flex: 1;
+            font-weight: 400;
         }
         
         .reveal-button {
@@ -176,66 +181,66 @@ class AnkiCardTemplate(BaseModel):
         }
         
         .reveal-button button {
-            background: rgba(255,255,255,0.2);
-            border: 2px solid rgba(255,255,255,0.4);
+            background: #007aff;
+            border: none;
             color: white;
-            padding: 12px 24px;
-            border-radius: 25px;
-            font-size: 1.1em;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 1em;
+            font-weight: 500;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
         }
         
         .reveal-button button:hover {
-            background: rgba(255,255,255,0.3);
-            transform: translateY(-2px);
+            background: #0056cc;
         }
         
         .correct-answer {
             text-align: center;
-            margin-bottom: 25px;
-        }
-        
-        .correct-answer h3 {
-            color: #FFD700;
-            margin-bottom: 15px;
-        }
-        
-        .definition {
-            font-size: 1.2em;
-            line-height: 1.5;
-            background: rgba(255,255,255,0.1);
-            padding: 15px;
-            border-radius: 10px;
-        }
-        
-        .examples {
             margin-bottom: 20px;
         }
         
-        .examples h4 {
-            margin-bottom: 10px;
-            color: #FFD700;
+        .correct-answer h3 {
+            color: #30d158;
+            margin-bottom: 12px;
+            font-weight: 600;
         }
         
-        .example {
-            background: rgba(255,255,255,0.1);
-            padding: 10px;
+        .definition {
+            font-size: 1.1em;
+            line-height: 1.4;
+            background: #f5f5f7;
+            padding: 16px;
             border-radius: 8px;
+            color: #1d1d1f;
+        }
+        
+        .examples {
+            margin-bottom: 16px;
+        }
+        
+        .examples h4 {
             margin-bottom: 8px;
+            color: #424245;
+            font-weight: 600;
+            font-size: 1em;
+        }
+        
+        .examples-list {
+            background: #f5f5f7;
+            padding: 12px;
+            border-radius: 8px;
             font-style: italic;
+            color: #424245;
+            line-height: 1.4;
         }
         
-        .synonyms {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        
-        .synonym {
-            background: rgba(255,255,255,0.2);
-            padding: 5px 12px;
-            border-radius: 15px;
+        .synonyms-list {
+            background: #f5f5f7;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: #424245;
             font-size: 0.9em;
         }
         """
@@ -335,9 +340,7 @@ class AnkiCardTemplate(BaseModel):
             
             <div class="additional-examples">
                 <h4>More Examples:</h4>
-                {{#AdditionalExamples}}
-                <div class="example">{{.}}</div>
-                {{/AdditionalExamples}}
+                <div class="examples-list">{{AdditionalExamples}}</div>
             </div>
         </div>
         """
@@ -345,128 +348,145 @@ class AnkiCardTemplate(BaseModel):
         css_styles = """
         .card {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 600px;
+            max-width: 500px;
             margin: 0 auto;
-            padding: 20px;
-            background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            color: white;
+            padding: 32px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            color: #1d1d1f;
+            border: 1px solid #e8e8ed;
         }
         
         .word-header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #e8e8ed;
+            padding-bottom: 16px;
         }
         
         .word {
-            font-size: 2.5em;
-            font-weight: 700;
+            font-size: 2em;
+            font-weight: 600;
             margin: 0;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            color: #1d1d1f;
+            letter-spacing: -0.01em;
         }
         
         .pronunciation {
-            font-size: 1.2em;
-            opacity: 0.9;
-            margin-top: 10px;
-            font-style: italic;
+            font-size: 1em;
+            color: #86868b;
+            margin-top: 4px;
+            font-weight: 400;
         }
         
         .question {
-            font-size: 1.3em;
+            font-size: 1.1em;
             text-align: center;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             font-weight: 500;
+            color: #424245;
         }
         
         .sentence {
-            font-size: 1.4em;
+            font-size: 1.2em;
             text-align: center;
-            background: rgba(255,255,255,0.1);
+            background: #f5f5f7;
             padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            line-height: 1.6;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            line-height: 1.5;
+            color: #1d1d1f;
         }
         
         .blank {
-            background: rgba(255,255,255,0.3);
-            padding: 5px 15px;
-            border-radius: 5px;
-            border: 2px dashed rgba(255,255,255,0.5);
-            min-width: 100px;
+            background: #007aff;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-weight: 500;
             display: inline-block;
+            min-width: 80px;
             text-align: center;
         }
         
         .word-type {
             text-align: center;
-            margin-bottom: 20px;
-            font-size: 1.1em;
+            margin-bottom: 16px;
+            font-size: 1em;
+            color: #86868b;
         }
         
         .label {
-            font-weight: bold;
-            opacity: 0.8;
+            font-weight: 500;
         }
         
         .hint {
             text-align: center;
-            margin-top: 15px;
+            margin-top: 12px;
         }
         
         .hint-text {
-            background: rgba(255,255,255,0.1);
-            padding: 10px;
-            border-radius: 8px;
-            font-style: italic;
+            background: #fff2cc;
+            color: #8b7800;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            display: inline-block;
         }
         
         .completed-sentence {
-            font-size: 1.4em;
+            font-size: 1.2em;
             text-align: center;
-            background: rgba(255,255,255,0.1);
+            background: #f5f5f7;
             padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 25px;
-            line-height: 1.6;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            line-height: 1.5;
+            color: #1d1d1f;
         }
         
         .word-highlight {
-            background: rgba(255,215,0,0.3);
-            padding: 3px 8px;
+            background: #30d158;
+            color: white;
+            padding: 2px 6px;
             border-radius: 4px;
-            font-weight: bold;
+            font-weight: 600;
         }
         
         .definition {
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
         
         .definition h4 {
-            color: #FFD700;
-            margin-bottom: 10px;
+            color: #424245;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 1em;
         }
         
         .definition div {
-            background: rgba(255,255,255,0.1);
-            padding: 15px;
-            border-radius: 10px;
-            line-height: 1.5;
+            background: #f5f5f7;
+            padding: 16px;
+            border-radius: 8px;
+            line-height: 1.4;
+            color: #1d1d1f;
         }
         
         .additional-examples h4 {
-            color: #FFD700;
-            margin-bottom: 10px;
+            color: #424245;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 1em;
         }
         
-        .example {
-            background: rgba(255,255,255,0.1);
+        .examples-list {
+            background: #f5f5f7;
             padding: 12px;
             border-radius: 8px;
-            margin-bottom: 8px;
             font-style: italic;
+            color: #424245;
+            line-height: 1.4;
         }
         """
 

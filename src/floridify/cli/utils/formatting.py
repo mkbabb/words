@@ -11,6 +11,8 @@ from rich.table import Table
 from rich.text import Text
 
 from ...models import DictionaryEntry
+from ...search import SearchResult
+from ...search.constants import SearchMethod
 
 
 def format_meaning_cluster_name(meaning_id: str) -> str:
@@ -51,9 +53,6 @@ def ensure_sentence_case(text: str) -> str:
     
     return text
 
-
-from ...search import SearchResult
-from ...search.constants import SearchMethod
 
 console = Console()
 

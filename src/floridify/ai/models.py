@@ -149,6 +149,23 @@ class MeaningExtractionResponse(BaseModel):
 
 
 
+class AnkiFillBlankResponse(BaseModel):
+    """Response for fill-in-the-blank flashcard generation."""
+    
+    sentence: str = Field(description="Sentence with _____ where the word belongs")
+    hint: str | None = Field(default=None, description="Optional hint about context or meaning")
+
+
+class AnkiMultipleChoiceResponse(BaseModel):
+    """Response for multiple choice flashcard generation."""
+    
+    choice_a: str = Field(description="First answer choice")
+    choice_b: str = Field(description="Second answer choice") 
+    choice_c: str = Field(description="Third answer choice")
+    choice_d: str = Field(description="Fourth answer choice")
+    correct_choice: str = Field(description="Letter of correct answer (A, B, C, or D)")
+
+
 class AIGeneratedProviderData(ProviderData):
     """AI fallback provider data with quality indicators."""
 

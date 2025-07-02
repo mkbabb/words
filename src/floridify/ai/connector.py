@@ -11,6 +11,8 @@ from pydantic import BaseModel
 from ..storage.mongodb import get_cache_entry, save_cache_entry
 from ..utils.logging import get_logger
 from .models import (
+    AnkiFillBlankResponse,
+    AnkiMultipleChoiceResponse,
     EmbeddingResponse,
     ExampleGenerationResponse,
     FallbackResponse,
@@ -113,7 +115,7 @@ class OpenAIConnector:
         self, word: str, word_type: str, provider_definitions: list[tuple[str, str]]
     ) -> SynthesisResponse:
         """Synthesize definitions from multiple providers."""
-        providers = [provider for provider, _ in provider_definitions]
+        _ = [provider for provider, _ in provider_definitions]  # Keep for potential use
         prompt = self.template_manager.get_synthesis_prompt(
             word, word_type, provider_definitions
         )
@@ -244,6 +246,52 @@ class OpenAIConnector:
 
         except Exception as e:
             logger.error(f"OpenAI embeddings error: {e}")
+            raise
+
+    async def generate_anki_fill_blank(
+        self, word: str, definition: str, word_type: str, examples: str | None = None
+    ) -> AnkiFillBlankResponse:
+        """Generate fill-in-the-blank flashcard using structured output."""
+        prompt = self.template_manager.render_template(
+            "anki_fill_blank",
+            word=word,
+            definition=definition,
+            word_type=word_type,
+            examples=examples or "",
+        )
+        cache_key = f"anki_fill_blank_{word}_{hash(definition)}"
+
+        try:
+            result = await self._make_structured_request(
+                prompt, AnkiFillBlankResponse, cache_key
+            )
+            logger.debug(f"Generated fill-blank card for '{word}'")
+            return result
+        except Exception as e:
+            logger.error(f"❌ Fill-blank generation failed for '{word}': {e}")
+            raise
+
+    async def generate_anki_multiple_choice(
+        self, word: str, definition: str, word_type: str, examples: str | None = None
+    ) -> AnkiMultipleChoiceResponse:
+        """Generate multiple choice flashcard using structured output."""
+        prompt = self.template_manager.render_template(
+            "anki_multiple_choice",
+            word=word,
+            definition=definition,
+            word_type=word_type,
+            examples=examples or "",
+        )
+        cache_key = f"anki_multiple_choice_{word}_{hash(definition)}"
+
+        try:
+            result = await self._make_structured_request(
+                prompt, AnkiMultipleChoiceResponse, cache_key
+            )
+            logger.debug(f"Generated multiple choice card for '{word}'")
+            return result
+        except Exception as e:
+            logger.error(f"❌ Multiple choice generation failed for '{word}': {e}")
             raise
 
     async def batch_process(

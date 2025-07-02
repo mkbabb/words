@@ -1,121 +1,118 @@
-# Floridify CLI
+# CLI Interface
 
 ## Core Commands
 
-### lookup
-**Purpose**: Word definition lookup with AI enhancement
-**Usage**: `floridify lookup <word> [options]`
+### lookup word [WORD]
+**Primary interface for word definitions with AI synthesis**
+
+```bash
+uv run ./scripts/floridify lookup word bank
+uv run ./scripts/floridify lookup word "en coulisse"  
+```
 
 **Features**:
-- Query normalization and search across lexicon languages
-- Provider selection: Wiktionary, Oxford, Dictionary.com, AI-only
-- Semantic vs hybrid search modes  
-- AI synthesis with examples and pronunciation
-- Graceful fallback for unknown words
+- Meaning-based hierarchical display with superscripts
+- Intelligent search cascade: exact → fuzzy → semantic → AI fallback
+- Beautiful Rich formatting with separate panels for multiple meanings
+- Proper multi-word phrase handling and bolding
 
 **Options**:
-- `--provider`: Dictionary provider (enum: wiktionary, oxford, dictionary_com, ai)
-- `--language`: Lexicon languages (enum: english, french, spanish, etc.)
-- `--semantic`: Force semantic search mode
+- `--provider`: wiktionary (default), oxford, dictionary_com
+- `--semantic`: Force semantic search only
 - `--no-ai`: Skip AI synthesis
 
-**Output**: Structured display isomorphic to SynthesizedDictionaryEntry
-
 ### search
-**Purpose**: Vocabulary search and discovery
-**Usage**: `floridify search <subcommand>`
+**Multi-method search engine**
 
-**Subcommands**:
-- `init`: Initialize search indices
-- `word <query>`: Search for words/phrases
-- `stats`: Display search statistics
+```bash
+uv run ./scripts/floridify search init      # Initialize indices
+uv run ./scripts/floridify search word cogn # Search for matches
+```
+
+**Methods**: Exact, fuzzy, semantic with FAISS acceleration
+
+### word-list
+**Batch word list processing with dictionary lookup**
+
+```bash
+uv run ./scripts/floridify word-list create vocab.txt --name my-vocab
+uv run ./scripts/floridify word-list list
+uv run ./scripts/floridify word-list show my-vocab
+uv run ./scripts/floridify word-list update my-vocab new-words.txt
+uv run ./scripts/floridify word-list delete my-vocab
+```
+
+**Features**:
+- Robust parsing: numbered lists, CSV, tab-separated, plain text
+- Auto-generated animal phrase names (e.g., "ochre-guan", "ebony-tanuki")
+- Frequency tracking with heat map visualization
+- Batch dictionary lookup processing (10 words at a time)
+- Beautiful Rich table display with frequency bars
+- MongoDB storage with full CRUD operations
 
 **Options**:
-- `--language`: Target languages (consistent enum usage)
-- `--method`: Search method (exact, fuzzy, semantic, hybrid)
-- `--max-results`: Result limit
+- `--name`: Custom name (auto-generated if not provided)
+- `--provider`: Dictionary provider (default: wiktionary)
+- `--language`: Language (default: en)
+- `--semantic`: Enable semantic search
+- `--no-ai`: Skip AI synthesis
 
-### anki  
-**Purpose**: Flashcard generation and export
-**Usage**: `floridify anki <subcommand>`
+**Supported Formats**:
+```
+# Numbered lists
+1. word
+2. another
 
-**Subcommands**:
-- `create <deck>`: Generate Anki deck from word lists
-- `export`: Export to .apkg format
+# Comma-separated
+word, another, third
 
-### config
-**Purpose**: Configuration management
-**Usage**: `floridify config <subcommand>`
+# Tab-separated
+word	another	third
 
-**Subcommands**:
-- `show`: Display current settings
-- `set <key> <value>`: Update configuration
-
-## Design Principles
-
-**KISS**: Simple, intuitive command structure
-**Rich Output**: Colored formatting with clear hierarchy  
-**Performance**: Async operations with progress indicators
-**Consistency**: Unified enum usage across all commands
-**Graceful Errors**: Clear messages with suggested fixes
+# Plain text
+word
+another
+third
+```
 
 ## Output Formatting
 
-### Casing and Typography Standards
+### Display Format
 
-**Core Principle**: Maintain consistent, predictable casing that follows standard dictionary conventions while being visually clear and scannable.
-
-#### Word Display
-- **Word text**: lowercase (`bank`, `simple`)
-- **Pronunciation**: lowercase with standard notation (`/bank/`, `/SIM-pul/`)
-- **Superscripts**: Unicode superscripts for multiple meanings (`bank¹`, `bank²`)
-
-#### Meaning Clusters
-- **Storage format**: snake_case in database (`bank_financial`, `simple_uncomplicated`)
-- **Display format**: Title Case (`Bank Financial`, `Simple Uncomplicated`)
-- **Header format**: `word^n (Meaning Cluster)` → `bank¹ (Bank Financial)`
-
-#### Grammar and Content
-- **Word types**: lowercase (`noun`, `verb`, `adjective`)
-- **Definitions**: Proper sentence case with initial capital
-- **Examples**: Proper sentence case with initial capital, quoted when appropriate
-- **Sources**: lowercase (`wiktionary`, `ai generated`)
-
-#### Special Cases
-- **Pronunciation guides**: Use phonetic notation (`/bank/`, `/SIM-pul/`)
-- **Abbreviations**: Standard dictionary format (`IPA`, `adj.`)
-- **Technical terms**: Maintain source casing (`MongoDB`, `OpenAI`)
-
-### Display Structure Template
-
+**Single Meaning**: Direct content in outer panel, no sub-panels
 ```
-╭─ word /pronunciation/ ────────────────────────────────────────────────────╮
-│ word¹ (Meaning Cluster One)                                              │
-│ word-type                                                                 │
-│   Definition text with proper sentence case and punctuation.             │
-│                                                                           │
-│   Example sentence with proper casing and formatting.                    │
-│                                                                           │
-│ word² (Meaning Cluster Two)                                              │
-│ word-type                                                                 │
-│   Second meaning definition text.                                         │
-│                                                                           │
-│   "Quoted example when appropriate for clarity."                         │
-│                                                                           │
-│ ✨ Sources: source1, source2                                             │
-╰───────────────────────────────────────────────────────────────────────────╯
+╭─ word /pronunciation/ ───────────────────────────────────╮
+│ word-type                                                │
+│   Definition with proper sentence case.                  │
+│                                                          │
+│   Example with word bolded in italic cyan.              │
+│                                                          │
+│ ✨ Sources: provider                                     │
+╰──────────────────────────────────────────────────────────╯
 ```
 
-### Implementation Rules
+**Multiple Meanings**: Separate panels with superscripts
+```
+╭─ word /pronunciation/ ───────────────────────────────────╮
+│ ╭─ word¹ (Meaning One) ──────────────────────────────╮   │
+│ │ word-type                                          │   │
+│ │   Definition for first meaning cluster.           │   │ 
+│ │                                                    │   │
+│ │   Example sentence with proper formatting.        │   │
+│ ╰────────────────────────────────────────────────────╯   │
+│ ╭─ word² (Meaning Two) ──────────────────────────────╮   │
+│ │ word-type                                          │   │
+│ │   Definition for second meaning cluster.          │   │
+│ ╰────────────────────────────────────────────────────╯   │
+│ ✨ Sources: provider                                     │
+╰──────────────────────────────────────────────────────────╯
+```
 
-1. **Meaning cluster formatting**: Convert `meaning_id` from snake_case to Title Case for display
-2. **Sentence consistency**: All definitions and examples start with capital letter, end with period
-3. **Typography**: Use Unicode superscripts (¹²³⁴⁵⁶⁷⁸⁹⁰) for meaning numbering
-4. **Spacing**: Consistent indentation and line breaks for visual hierarchy
-5. **Quoting**: Use quotes for examples when they contain dialogue or need emphasis
+### Typography Rules
 
-### Visual Design
-**Colors**: Cyan examples, green success, yellow warnings, red errors
-**Structure**: Hierarchical with proper spacing and alignment
-**Icons**: Meaningful Unicode symbols for visual clarity
-**Interactive**: Progress bars for long operations
+**Words**: lowercase (`bank`, `en coulisse`)  
+**Pronunciations**: `/phonetic/` notation  
+**Meaning clusters**: Title Case display (`Financial`, `Geographic`)  
+**Word types**: lowercase (`noun`, `verb`)  
+**Definitions**: Sentence case with periods  
+**Examples**: Sentence case, phrase bolding when found

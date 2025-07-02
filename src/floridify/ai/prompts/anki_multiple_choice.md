@@ -1,46 +1,21 @@
-# Anki Multiple Choice Generation Prompt
+# Create Multiple Choice Question for "{{ word }}" ({{ word_type }})
 
-## System Message
-You are an educational content creator specializing in vocabulary flashcards. Create challenging but fair multiple choice questions.
+## Word Information
+**Definition**: {{ definition }}
+{% if examples %}**Examples**: {{ examples }}{% endif %}
 
-## User Prompt Template
-Create a multiple choice question for the word "{{word}}" with the following definition:
+Create a GRE-level multiple choice question that:
+- Tests precise definitional knowledge
+- Uses plausible but incorrect distractors
+- Maintains academic assessment standards
+- Targets conceptual understanding over recognition
 
-**Definition:** {{definition}}
-**Part of Speech:** {{word_type}}
-**Examples:** {{examples}}
+## Guidelines
+- Make distractors semantically related but clearly distinct
+- Avoid trick questions or overly subtle distinctions
+- Use vocabulary appropriate for standardized test preparation
+- One option should be the precise definition, others should be clearly wrong to an informed reader
+- Test meaning comprehension, not word association
+- Create four distinct choices with only one correct answer
 
-Generate 4 answer choices (A, B, C, D) where:
-- One choice is the correct definition (closely match the provided definition)
-- Three choices are plausible but incorrect distractors
-- Distractors should be semantically related but clearly wrong
-- All choices should be of similar length and complexity
-- Use vocabulary appropriate for the word's difficulty level
-
-## Instructions
-1. Make the correct answer closely match the provided definition
-2. Create distractors that are related to the word but clearly incorrect
-3. Ensure distractors are believable and not obviously wrong
-4. Match the style and complexity of the correct definition
-5. Consider common misconceptions or similar words for distractors
-
-## Output Format
-Return your response in this exact format:
-
-A) [first choice]
-B) [second choice]  
-C) [third choice]
-D) [fourth choice]
-
-CORRECT: [letter of correct answer]
-
-## Variables
-- `{{word}}` - The vocabulary word
-- `{{definition}}` - The correct definition
-- `{{word_type}}` - Part of speech (noun, verb, etc.)
-- `{{examples}}` - Example sentences using the word
-
-## Notes
-- Temperature: 0.6
-- Model: configurable (default: gpt-4)
-- Max tokens: 300
+Generate a structured response with four labeled choices and the correct answer.

@@ -10,6 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..models.dictionary import APIResponseCache, DictionaryEntry, SynthesizedDictionaryEntry
 from ..utils.logging import get_logger
+from ..word_list.models import WordList
 
 logger = get_logger(__name__)
 
@@ -44,7 +45,7 @@ class MongoDBStorage:
         # Initialize Beanie with our document models
         await init_beanie(
             database=database,
-            document_models=[DictionaryEntry, APIResponseCache, SynthesizedDictionaryEntry],
+            document_models=[DictionaryEntry, APIResponseCache, SynthesizedDictionaryEntry, WordList],
         )
 
         self._initialized = True

@@ -20,7 +20,6 @@ from ...search.constants import SearchMethod
 from ...utils.logging import get_logger
 from ...utils.normalization import normalize_word
 from ..utils.formatting import (
-    format_ai_definition,
     format_error,
     format_meaning_based_definition,
     format_warning,
@@ -237,7 +236,9 @@ async def _handle_no_results(
         console.print(format_error(f"Definition lookup failed: {error_msg}"))
 
 
-def _display_synthesized_entry(entry: Any, provider_data: dict[str, Any] | None = None) -> None:
+def _display_synthesized_entry(
+    entry: Any, provider_data: dict[str, Any] | None = None
+) -> None:
     """Display synthesized dictionary entry with beautiful formatting."""
     if not entry or not entry.definitions:
         console.print(format_warning("No definitions available"))
@@ -245,20 +246,20 @@ def _display_synthesized_entry(entry: Any, provider_data: dict[str, Any] | None 
 
     # Extract sources for display
     sources = list(provider_data.keys()) if provider_data else ["AI Generated"]
-    
+
     # Group definitions by AI-extracted meaning clusters if available
     meaning_groups = _group_definitions_by_ai_clusters(entry.definitions)
-    
+
     # Always use meaning-based formatter (it handles single meanings properly)
     formatted_panel = format_meaning_based_definition(entry, meaning_groups, sources)
-    
+
     console.print(formatted_panel)
 
 
 def _group_definitions_by_ai_clusters(definitions: list[Any]) -> dict[str, list[Any]]:
     """Group definitions by AI-extracted meaning clusters."""
     groups: dict[str, list[Any]] = {}
-    
+
     for definition in definitions:
         # Use AI-extracted meaning cluster if available
         if hasattr(definition, 'meaning_cluster') and definition.meaning_cluster:
@@ -266,86 +267,35 @@ def _group_definitions_by_ai_clusters(definitions: list[Any]) -> dict[str, list[
         else:
             # Fallback to generic grouping
             meaning_key = "general"
-        
+
         if meaning_key not in groups:
             groups[meaning_key] = []
         groups[meaning_key].append(definition)
-    
-    return groups
 
-
-def _group_definitions_by_meaning(definitions: list[Any], word: str) -> dict[str, list[Any]]:
-    """Group definitions by meaning using simple heuristics (legacy fallback)."""
-    # Simple approach: group consecutive definitions of same type that are likely same meaning
-    groups: dict[str, list[Any]] = {}
-    
-    # Keywords that indicate different core meanings
-    financial_keywords = ['bank', 'money', 'financial', 'institution', 'deposit', 'loan', 'account']
-    geographic_keywords = ['river', 'shore', 'slope', 'earth', 'water', 'edge', 'embankment']
-    arrangement_keywords = ['row', 'series', 'array', 'group', 'panel', 'tier', 'arrangement']
-    
-    for definition in definitions:
-        def_text = definition.definition.lower()
-        
-        # Determine meaning category
-        if any(keyword in def_text for keyword in financial_keywords):
-            meaning_key = f"{word}_financial"
-        elif any(keyword in def_text for keyword in geographic_keywords):
-            meaning_key = f"{word}_geographic"  
-        elif any(keyword in def_text for keyword in arrangement_keywords):
-            meaning_key = f"{word}_arrangement"
-        else:
-            # Default grouping
-            meaning_key = f"{word}_general"
-        
-        if meaning_key not in groups:
-            groups[meaning_key] = []
-        groups[meaning_key].append(definition)
-    
     return groups
 
 
 def _display_multiple_providers(provider_data: dict[str, Any]) -> None:
     """Display data from multiple providers."""
-    console.print(Panel(
-        Text("Multiple Provider Results"),
-        title="Dictionary Lookup",
-        border_style="blue"
-    ))
-    
+    console.print(
+        Panel(
+            Text("Multiple Provider Results"),
+            title="Dictionary Lookup",
+            border_style="blue",
+        )
+    )
+
     for provider_name, data in provider_data.items():
         console.print(f"\n[bold cyan]{provider_name.title()}[/bold cyan]")
         if data and hasattr(data, 'definitions') and data.definitions:
             for definition in data.definitions[:2]:  # Show first 2 definitions
-                console.print(f"  {definition.word_type.value}: {definition.definition}")
+                console.print(
+                    f"  {definition.word_type.value}: {definition.definition}"
+                )
         else:
             console.print("  [dim]No definitions available[/dim]")
-    
+
     console.print("\n[dim]💡 Use AI synthesis for enhanced definitions[/dim]")
 
 
-def _display_provider_data(data: Any, provider: DictionaryProvider) -> None:
-    """Display raw provider data."""
-    console.print(
-        Panel(
-            f"Definition from {provider.display_name}",
-            title=data.provider_name.title() if data else "No Data",
-            border_style="yellow",
-        )
-    )
-
-    if not data or not data.definitions:
-        console.print("[yellow]No definitions available[/yellow]")
-        return
-
-    for definition in data.definitions:
-        console.print(f"\n[bold cyan]{definition.word_type.value}[/bold cyan]")
-        console.print(f"  {definition.definition}")
-
-        if definition.examples.generated:
-            for example in definition.examples.generated:
-                console.print(f"  [dim]Example: {example.sentence}[/dim]")
-
-
-# Add to CLI group in __init__.py
 lookup_group = lookup

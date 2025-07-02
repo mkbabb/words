@@ -51,6 +51,7 @@ dependencies = [
     "loguru>=0.7.0", # Modern logging with colors and formatting
     "regex>=2023.0.0", # More advanced regex engine
     "unicodedata2>=15.0.0", # Fast Unicode normalization
+    "coolname>=2.2.0",
 ]
 
 
@@ -102,7 +103,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP"]
-ignore = ["E203"]
+ignore = ["E203", "E501"]
 
 [tool.coverage.run]
 source = ["src"]

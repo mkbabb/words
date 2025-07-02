@@ -1,77 +1,94 @@
-# Lexicon Architecture
+# Lexicon System
 
-## Current Implementation
+Multi-language word and phrase databases for search operations.
 
-### Source Structure
-- **English Sources**: 4 verified lexicons (479k words, 4.5k phrases)
-- **French Sources**: 3 verified lexicons (336k words)
-- **Format Support**: TEXT_LINES, JSON_ARRAY, FREQUENCY_LIST, CSV_IDIOMS
+## Core Components
 
-### Issues
-- **No normalization**: Raw lexicon data with inconsistent whitespace/casing
-- **Duplication**: Overlapping sources explode word count without value
-- **Limited phrases**: Missing comprehensive phrase lexicons
-- **No diacritic handling**: "à la carte" vs "a la carte" treated as different
+**LexiconLoader** (`search/lexicon/lexicon.py`) provides unified interface for loading and caching lexicon data.
 
-## New Architecture
-
-### Normalization Pipeline
 ```python
-def normalize_lexicon_entry(text: str) -> set[str]:
-    # 1. Trim whitespace, lowercase
-    base = text.strip().lower()
-    
-    # 2. Generate diacritic variants
-    variants = {base}
-    variants.add(remove_diacritics(base))  # "à la carte" → "a la carte"
-    
-    return variants
+class LexiconData(BaseModel):
+    words: list[str]                          # Single word entries
+    phrases: list[MultiWordExpression]        # Multi-word expressions
+    language: Language                        # Target language
+    sources: list[str]                        # Loaded source names
+    total_entries: int                        # Total entry count
 ```
 
-### Deduplication Strategy
-- **Master index**: Single normalized word set per language
-- **Source priority**: Frequency lists > dictionaries > phrase collections
-- **Phrase separation**: Words vs multi-word expressions tracked separately
-
-### Enhanced Sources
-
-#### English
-- **Words**: dwyl-english-words (479k), google-10k-english (10k frequency)
-- **Phrases**: english-idioms-collection (CSV), common-phrases (1k)
-- **Deduped total**: ~450k unique normalized words, ~5k phrases
-
-#### French  
-- **Words**: french-words-array (336k), french-frequency (50k)
-- **Phrases**: french-common-phrases, french-idioms-collection
-- **Deduped total**: ~300k unique normalized words, ~3k phrases
-
-### Diacritic Handling
+**Source Configuration** (`search/lexicon/sources.py`):
 ```python
-def remove_diacritics(text: str) -> str:
-    # NFD normalization + diacritic removal
-    import unicodedata
-    nfd = unicodedata.normalize('NFD', text)
-    return ''.join(c for c in nfd if unicodedata.category(c) != 'Mn')
+class LexiconSourceConfig(BaseModel):
+    name: str                                # Unique identifier
+    url: str                                 # Download URL
+    format: LexiconFormat                    # TEXT_LINES, JSON, CSV
+    language: Language                       # Target language
+    downloader: DownloaderFunc              # Custom download function
 ```
 
-## Implementation Plan
+## Data Sources
 
-### Phase 1: Normalization
-- Add normalization to lexicon loading pipeline
-- Implement diacritic variant generation
-- Update LexiconFormat parsers
+**English**:
+- `sowpods_scrabble_words`: SOWPODS Scrabble dictionary (~267k words)
+- `google_10k_frequency`: Most common 10k English words
+- `english_phrasal_verbs_comprehensive`: Phrasal verb database
 
-### Phase 2: Deduplication  
-- Create master index builder with priority-based deduplication
-- Track source provenance for quality metrics
-- Implement phrase vs word separation
+**French**:
+- `french_scrabble_ods8`: Official French Scrabble dictionary
+- `french_frequency_50k`: Top 50k French words by frequency
+- `french_expressions_in_english`: French phrases used in English
 
-### Phase 3: Enhanced Sources
-- Add comprehensive phrase lexicons for EN/FR
-- Verify all sources for quality and coverage
-- Balance between comprehensiveness and precision
+## Multi-Word Expressions
 
-### Performance Impact
-- **Index size**: Reduced 30-40% through deduplication
-- **Search coverage**: Increased through diacritic variants
-- **Load time**: Minimal impact with efficient normalization
+**MultiWordExpression** model (`search/phrase.py`):
+```python
+class MultiWordExpression(BaseModel):
+    text: str                   # Original phrase text
+    normalized: str             # Normalized form
+    word_count: int            # Number of words
+    language: Language         # Source language
+```
+
+**Normalization**: Whitespace standardization, punctuation handling, case normalization, hyphenation consistency.
+
+## Storage and Caching
+
+**File Structure**:
+```
+data/search/
+├── lexicons/           # Raw lexicon files
+│   ├── sowpods_scrabble_words.txt
+│   └── french_scrabble_ods8.txt
+└── index/             # Cached processed data
+    ├── en_lexicon.pkl # English lexicon cache
+    └── fr_lexicon.pkl # French lexicon cache
+```
+
+**Performance**:
+- Cold start: ~2-3 seconds
+- Warm start: ~10-50ms
+- Memory: ~50MB per language
+
+## Language Support
+
+```python
+class Language(Enum):
+    ENGLISH = "en"
+    FRENCH = "fr"
+    # Extensible
+```
+
+**Adding Languages**:
+1. Add language enum value
+2. Create source configurations
+3. Implement language-specific normalization
+
+## Integration
+
+**Search Engine**: Direct lexicon lookup for word validation, fuzzy candidates, semantic embeddings
+**CLI**: `uv run ./scripts/floridify search init` for initialization
+
+## Error Handling
+
+**Download Failures**: Exponential backoff with cached fallback
+**Data Corruption**: Automatic cache rebuild on validation failure
+**Network Issues**: Graceful degradation with detailed logging
