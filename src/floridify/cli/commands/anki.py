@@ -14,9 +14,9 @@ from ...anki.generator import AnkiCardGenerator
 from ...constants import DictionaryProvider, Language
 from ...storage.mongodb import _ensure_initialized
 from ...utils.logging import get_logger
-from ...word_list import WordList
+from ...list import WordList
 from ..utils.formatting import console
-from ..utils.lookup_core import lookup_word_pipeline, init_batch_search, lookup_word_batch, clear_batch_search
+from ..utils.lookup_core import lookup_word_pipeline
 
 logger = get_logger(__name__)
 
@@ -141,12 +141,6 @@ async def _export_async(
         card_generator = AnkiCardGenerator(openai_connector)
 
         all_cards = []
-        
-        # Initialize search engine once for batch processing
-        search_engine = await init_batch_search(
-            languages=[Language.ENGLISH],
-            semantic=False
-        )
 
         with Progress(
             SpinnerColumn(),
@@ -165,10 +159,11 @@ async def _export_async(
 
                 # Look up word to get dictionary entry using batch lookup
                 try:
-                    entry = await lookup_word_batch(
+                    entry = await lookup_word_pipeline(
                         word=word_text,
-                        search_engine=search_engine,
-                        provider=DictionaryProvider.WIKTIONARY,
+                        providers=[DictionaryProvider.WIKTIONARY],
+                        languages=[Language.ENGLISH],
+                        semantic=False,
                         no_ai=False,
                     )
 
@@ -263,9 +258,6 @@ async def _export_async(
     except Exception as e:
         logger.error(f"Error during Anki export: {e}")
         console.print(f"[red]Error:[/red] {e}")
-    finally:
-        # Clear batch search cache
-        clear_batch_search()
 
 
 @anki_command.command()

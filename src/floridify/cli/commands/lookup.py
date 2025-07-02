@@ -76,15 +76,11 @@ async def _lookup_async(
         languages = [Language(lang) for lang in language]
         providers = [DictionaryProvider(p) for p in provider]
 
-        # Use the first provider and language for now (lookup_word_pipeline handles one at a time)
-        primary_provider = providers[0] if providers else DictionaryProvider.WIKTIONARY
-        primary_language = languages[0] if languages else Language.ENGLISH
-
         # Use the shared lookup pipeline
         result = await lookup_word_pipeline(
             word=word,
-            provider=primary_provider,
-            language=primary_language,
+            providers=providers,
+            languages=languages,
             semantic=semantic,
             no_ai=no_ai,
         )
@@ -92,18 +88,21 @@ async def _lookup_async(
         if result:
             # Group definitions by meaning cluster for display
             meaning_groups: dict[str, list[Any]] = {}
+
             for definition in result.definitions:
                 cluster = getattr(definition, 'meaning_cluster', 'general') or 'general'
                 if cluster not in meaning_groups:
                     meaning_groups[cluster] = []
                 meaning_groups[cluster].append(definition)
-            
+
             # Display the synthesized entry
-            console.print(format_meaning_based_definition(result, meaning_groups))
+            console.print(format_meaning_based_definition(result, languages, providers, meaning_groups))
         else:
             console.print(format_warning(f"No definition found for '{word}'"))
             if not no_ai:
-                console.print("Consider checking the spelling or trying a different word.")
+                console.print(
+                    "Consider checking the spelling or trying a different word."
+                )
 
     except Exception as e:
         logger.error(f"Lookup failed: {e}")

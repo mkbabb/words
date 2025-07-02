@@ -10,7 +10,7 @@ from .commands.config import config_group
 from .commands.database import database_group
 from .commands.lookup import lookup_group
 from .commands.search import search_group
-from .commands.word_list import word_list_command
+from .commands.list import list_command
 
 console = Console()
 
@@ -36,13 +36,13 @@ semantic search, and Anki flashcard generation.[/dim]
   [cyan]floridify search init[/cyan]           Initialize search index (first time)
   [cyan]floridify lookup serendipity[/cyan]     Look up a word with AI synthesis
   [cyan]floridify search word seren[/cyan]      Search for words and phrases
-  [cyan]floridify word-list create vocab.txt[/cyan] Process word list with lookup
+  [cyan]floridify list create vocab.txt[/cyan]     Process word list with lookup
 
 [bold]Available Commands:[/bold]
   [green]lookup[/green]    🔍 Look up words and definitions
   [green]search[/green]    🔎 Fuzzy and semantic word search
   [green]anki[/green]      🎴 Create and manage Anki flashcard decks
-  [green]word-list[/green] 📄 Manage word lists with dictionary lookup
+  [green]list[/green]      📄 Manage word lists with dictionary lookup
   [green]config[/green]    ⚙️  Manage configuration and API keys
   [green]database[/green]  💾 Database operations and statistics
 
@@ -54,7 +54,7 @@ semantic search, and Anki flashcard generation.[/dim]
 cli.add_command(lookup_group, name="lookup")
 cli.add_command(search_group, name="search")
 cli.add_command(anki_command, name="anki")
-cli.add_command(word_list_command, name="word-list")
+cli.add_command(list_command, name="list")
 cli.add_command(config_group, name="config")
 cli.add_command(database_group, name="database")
 
