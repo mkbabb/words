@@ -19,7 +19,12 @@ from ...search import SearchEngine, SearchResult
 from ...search.constants import SearchMethod
 from ...utils.logging import get_logger
 from ...utils.normalization import normalize_word
-from ..utils.formatting import format_error, format_warning
+from ..utils.formatting import (
+    format_ai_definition,
+    format_error,
+    format_meaning_based_definition,
+    format_warning,
+)
 
 console = Console()
 logger = get_logger(__name__)
@@ -30,8 +35,9 @@ logger = get_logger(__name__)
 @click.option(
     "--provider",
     type=click.Choice([p.value for p in DictionaryProvider], case_sensitive=False),
-    default=DictionaryProvider.WIKTIONARY.value,
-    help="Dictionary provider to use",
+    multiple=True,
+    default=[DictionaryProvider.WIKTIONARY.value],
+    help="Dictionary providers to use (can specify multiple)",
 )
 @click.option(
     "--language",
@@ -52,7 +58,7 @@ logger = get_logger(__name__)
 )
 def lookup(
     word: str,
-    provider: str,
+    provider: tuple[str, ...],
     language: tuple[str, ...],
     semantic: bool,
     no_ai: bool,
@@ -66,13 +72,13 @@ def lookup(
 
 async def _lookup_async(
     word: str,
-    provider: str,
+    provider: tuple[str, ...],
     language: tuple[str, ...],
     semantic: bool,
     no_ai: bool,
 ) -> None:
     """Async implementation of word lookup."""
-    logger.info(f"Looking up word: '{word}' with provider: {provider}")
+    logger.info(f"Looking up word: '{word}' with providers: {', '.join(provider)}")
 
     try:
         # Normalize the query
@@ -81,9 +87,9 @@ async def _lookup_async(
             logger.debug(f"Normalized: '{word}' � '{normalized_word}'")
             console.print(f"[dim]Normalized: {word} � {normalized_word}[/dim]")
 
-        # Convert languages to enum
+        # Convert languages and providers to enums
         languages = [Language(lang) for lang in language]
-        provider_enum = DictionaryProvider(provider)
+        providers = [DictionaryProvider(p) for p in provider]
 
         # Search for the word
         search_results = await _search_word(
@@ -95,7 +101,7 @@ async def _lookup_async(
         if not search_results:
             await _handle_no_results(
                 word=normalized_word,
-                provider=provider_enum,
+                providers=providers,
                 no_ai=no_ai,
             )
             return
@@ -106,19 +112,23 @@ async def _lookup_async(
             f"Best match: '{best_match}' (score: {search_results[0].score:.3f})"
         )
 
-        # Get definition from provider
-        definition_data = await _get_provider_definition(best_match, provider_enum)
+        # Get definitions from all providers
+        provider_data = {}
+        for provider_enum in providers:
+            data = await _get_provider_definition(best_match, provider_enum)
+            if data:
+                provider_data[provider_enum.value] = data
 
         # AI synthesis (unless disabled)
-        if not no_ai and definition_data:
+        if not no_ai and provider_data:
             synthesized_entry = await _synthesize_with_ai(
-                Word(text=best_match), {provider: definition_data}
+                Word(text=best_match), provider_data
             )
-            _display_synthesized_entry(synthesized_entry)
-        elif definition_data:
-            _display_provider_data(definition_data, provider_enum)
+            _display_synthesized_entry(synthesized_entry, provider_data)
+        elif provider_data:
+            _display_multiple_providers(provider_data)
         else:
-            await _handle_no_results(best_match, provider_enum, no_ai)
+            await _handle_no_results(best_match, providers, no_ai)
 
     except Exception as e:
         logger.error(f"Lookup failed: {e}")
@@ -200,12 +210,12 @@ async def _synthesize_with_ai(word: Word, providers: dict[str, Any]) -> Any:
 
 
 async def _handle_no_results(
-    word: str, provider: DictionaryProvider, no_ai: bool
+    word: str, providers: list[DictionaryProvider], no_ai: bool
 ) -> None:
     """Handle case when no results are found."""
     logger.warning(f"No results found for '{word}'")
 
-    if no_ai or provider == DictionaryProvider.AI_SYNTHETIC:
+    if no_ai or DictionaryProvider.AI_SYNTHETIC in providers:
         console.print(format_error(f"No definition found for '{word}'"))
         return
 
@@ -222,39 +232,96 @@ async def _handle_no_results(
             console.print(format_error(f"No definition available for '{word}'"))
 
     except Exception as e:
-        logger.error(f"AI fallback failed: {e}")
-        console.print(format_error(f"Definition lookup failed: {e}"))
+        error_msg = str(e) if str(e) else f"{type(e).__name__}: {repr(e)}"
+        logger.error(f"AI fallback failed: {error_msg}")
+        console.print(format_error(f"Definition lookup failed: {error_msg}"))
 
 
-def _display_synthesized_entry(entry: Any) -> None:
+def _display_synthesized_entry(entry: Any, provider_data: dict[str, Any] | None = None) -> None:
     """Display synthesized dictionary entry with beautiful formatting."""
     if not entry or not entry.definitions:
         console.print(format_warning("No definitions available"))
         return
 
-    # Header
-    header = Text(entry.word.text, style="bold blue")
-    if entry.pronunciation.phonetic:
-        header.append(f" /{entry.pronunciation.phonetic}/", style="dim cyan")
+    # Extract sources for display
+    sources = list(provider_data.keys()) if provider_data else ["AI Generated"]
+    
+    # Group definitions by AI-extracted meaning clusters if available
+    meaning_groups = _group_definitions_by_ai_clusters(entry.definitions)
+    
+    # Always use meaning-based formatter (it handles single meanings properly)
+    formatted_panel = format_meaning_based_definition(entry, meaning_groups, sources)
+    
+    console.print(formatted_panel)
 
-    console.print(Panel(header, title="Definition", border_style="blue"))
 
-    # Definitions by word type
-    for definition in entry.definitions:
-        console.print(f"\n[bold cyan]{definition.word_type.value}[/bold cyan]")
-        console.print(f"  {definition.definition}")
+def _group_definitions_by_ai_clusters(definitions: list[Any]) -> dict[str, list[Any]]:
+    """Group definitions by AI-extracted meaning clusters."""
+    groups: dict[str, list[Any]] = {}
+    
+    for definition in definitions:
+        # Use AI-extracted meaning cluster if available
+        if hasattr(definition, 'meaning_cluster') and definition.meaning_cluster:
+            meaning_key = definition.meaning_cluster
+        else:
+            # Fallback to generic grouping
+            meaning_key = "general"
+        
+        if meaning_key not in groups:
+            groups[meaning_key] = []
+        groups[meaning_key].append(definition)
+    
+    return groups
 
-        # Examples
-        if definition.examples.generated:
-            for example in definition.examples.generated:
-                console.print(f"  [dim]Example: {example.sentence}[/dim]")
 
-        # Synonyms
-        if definition.synonyms:
-            synonym_text = ", ".join([syn.word.text for syn in definition.synonyms[:5]])
-            console.print(f"  [dim]Synonyms: {synonym_text}[/dim]")
+def _group_definitions_by_meaning(definitions: list[Any], word: str) -> dict[str, list[Any]]:
+    """Group definitions by meaning using simple heuristics (legacy fallback)."""
+    # Simple approach: group consecutive definitions of same type that are likely same meaning
+    groups: dict[str, list[Any]] = {}
+    
+    # Keywords that indicate different core meanings
+    financial_keywords = ['bank', 'money', 'financial', 'institution', 'deposit', 'loan', 'account']
+    geographic_keywords = ['river', 'shore', 'slope', 'earth', 'water', 'edge', 'embankment']
+    arrangement_keywords = ['row', 'series', 'array', 'group', 'panel', 'tier', 'arrangement']
+    
+    for definition in definitions:
+        def_text = definition.definition.lower()
+        
+        # Determine meaning category
+        if any(keyword in def_text for keyword in financial_keywords):
+            meaning_key = f"{word}_financial"
+        elif any(keyword in def_text for keyword in geographic_keywords):
+            meaning_key = f"{word}_geographic"  
+        elif any(keyword in def_text for keyword in arrangement_keywords):
+            meaning_key = f"{word}_arrangement"
+        else:
+            # Default grouping
+            meaning_key = f"{word}_general"
+        
+        if meaning_key not in groups:
+            groups[meaning_key] = []
+        groups[meaning_key].append(definition)
+    
+    return groups
 
-    console.print()
+
+def _display_multiple_providers(provider_data: dict[str, Any]) -> None:
+    """Display data from multiple providers."""
+    console.print(Panel(
+        Text("Multiple Provider Results"),
+        title="Dictionary Lookup",
+        border_style="blue"
+    ))
+    
+    for provider_name, data in provider_data.items():
+        console.print(f"\n[bold cyan]{provider_name.title()}[/bold cyan]")
+        if data and hasattr(data, 'definitions') and data.definitions:
+            for definition in data.definitions[:2]:  # Show first 2 definitions
+                console.print(f"  {definition.word_type.value}: {definition.definition}")
+        else:
+            console.print("  [dim]No definitions available[/dim]")
+    
+    console.print("\n[dim]💡 Use AI synthesis for enhanced definitions[/dim]")
 
 
 def _display_provider_data(data: Any, provider: DictionaryProvider) -> None:

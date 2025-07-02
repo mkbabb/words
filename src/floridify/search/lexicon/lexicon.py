@@ -17,8 +17,8 @@ import httpx
 from pydantic import BaseModel, Field
 
 from ...constants import Language
-from ...utils.diacritics import normalize_lexicon_entry
 from ...utils.logging import get_logger
+from ...utils.normalization import normalize_lexicon_entry
 from ..constants import LexiconFormat
 from ..phrase import MultiWordExpression, PhraseNormalizer
 from .sources import LEXICON_SOURCES, LexiconSourceConfig
@@ -199,7 +199,9 @@ class LexiconLoader:
             return await self._load_from_cache_file(cache_filepath, source)
         
         # Use the downloader function (handles both regular URLs and custom scraping)
+        logger.info(f"Downloading data for source: {source.name}")
         result = await source.downloader(source.url)
+        logger.debug(f"Downloaded data for {source.name}, type: {type(result).__name__}")
         
         # Handle custom scraper results (returns dict) vs regular HTTP responses
         if isinstance(result, dict):
@@ -214,8 +216,13 @@ class LexiconLoader:
             return [], []
 
         # Save response to cache
-        with cache_filepath.open("w", encoding="utf-8") as f:
-            f.write(response.text)
+        logger.info(f"Saving source data to cache: {cache_filepath.name}")
+        try:
+            with cache_filepath.open("w", encoding="utf-8") as f:
+                f.write(response.text)
+            logger.success(f"Successfully cached source data: {cache_filepath.name}")
+        except Exception as e:
+            logger.error(f"Failed to save source data to cache {cache_filepath.name}: {e}")
 
         # Parse based on format
         if source.format == LexiconFormat.TEXT_LINES:
@@ -713,6 +720,68 @@ class LexiconLoader:
             }
 
         return stats
+    
+    def _get_cache_filepath(self, source: LexiconSourceConfig) -> Path:
+        """Get cache file path for a source."""
+        if source.format == LexiconFormat.CUSTOM_SCRAPER:
+            return self.lexicon_dir / f"{source.name}.json"
+        else:
+            ext = self.get_lexicon_ext(source)
+            return self.lexicon_dir / f"{source.name}{ext}"
+            
+    async def _save_scraper_data_to_cache(self, data: dict[str, Any], cache_filepath: Path) -> None:
+        """Save custom scraper data to cache file."""
+        logger.info(f"Saving scraper data to cache: {cache_filepath.name}")
+        import json
+        try:
+            with cache_filepath.open("w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            logger.success(f"Successfully cached scraper data: {cache_filepath.name}")
+        except Exception as e:
+            logger.error(f"Failed to save scraper data to cache {cache_filepath.name}: {e}")
+        
+    async def _load_from_cache_file(
+        self, cache_filepath: Path, source: LexiconSourceConfig
+    ) -> tuple[list[str], list[MultiWordExpression]]:
+        """Load data from cached file."""
+        logger.info(f"Loading from cache: {cache_filepath.name}")
+        try:
+            if source.format == LexiconFormat.CUSTOM_SCRAPER:
+                # Load JSON data for custom scrapers
+                import json
+                with cache_filepath.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                logger.success(f"Successfully loaded cached scraper data: {cache_filepath.name}")
+                return self._parse_scraped_data(data, source.language)
+            else:
+                # Load text data for regular sources
+                with cache_filepath.open("r", encoding="utf-8") as f:
+                    text_data = f.read()
+                logger.success(f"Successfully loaded cached source data: {cache_filepath.name}")
+                
+                # Parse based on format
+                if source.format == LexiconFormat.TEXT_LINES:
+                    return self._parse_text_lines(text_data, source.language)
+                elif source.format == LexiconFormat.JSON_IDIOMS:
+                    return self._parse_json_idioms(text_data, source.language)
+                elif source.format == LexiconFormat.FREQUENCY_LIST:
+                    return self._parse_frequency_list(text_data, source.language)
+                elif source.format == LexiconFormat.JSON_DICT:
+                    return self._parse_json_dict(text_data, source.language)
+                elif source.format == LexiconFormat.JSON_ARRAY:
+                    return self._parse_json_array(text_data, source.language)
+                elif source.format == LexiconFormat.JSON_GITHUB_API:
+                    return self._parse_github_api_response(text_data, source.language)
+                elif source.format == LexiconFormat.CSV_IDIOMS:
+                    return self._parse_csv_idioms(text_data, source.language)
+                elif source.format == LexiconFormat.JSON_PHRASAL_VERBS:
+                    return self._parse_json_phrasal_verbs(text_data, source.language)
+                else:
+                    logger.warning(f"Unknown format for cached source: {source.format}")
+                    return [], []
+        except Exception as e:
+            logger.error(f"Failed to load from cache {cache_filepath.name}: {e}")
+            return [], []
 
     async def close(self) -> None:
         """Close HTTP client and clean up resources."""

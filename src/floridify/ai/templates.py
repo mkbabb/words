@@ -79,3 +79,13 @@ class PromptTemplateManager:
     def get_fallback_prompt(self, word: str) -> str:
         """Generate fallback provider prompt."""
         return self.render_template("fallback_provider", word=word)
+
+    def get_meaning_extraction_prompt(
+        self, word: str, all_provider_definitions: list[tuple[str, str, str]]
+    ) -> str:
+        """Generate meaning extraction prompt."""
+        return self.render_template(
+            "meaning_extraction",
+            word=word,
+            all_provider_definitions=all_provider_definitions,
+        )

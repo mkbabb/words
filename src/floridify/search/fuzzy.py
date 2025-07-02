@@ -153,17 +153,22 @@ class FuzzySearch:
     def _search_rapidfuzz(
         self, query: str, word_list: list[str], max_results: int
     ) -> list[FuzzyMatch]:
-        """Search using RapidFuzz library (C++ optimized)."""
+        """Search using RapidFuzz library (C++ optimized) with length bias correction."""
+
+        # Increase limit to get more candidates for re-scoring
+        search_limit = min(max_results * 3, len(word_list))
 
         # Use process.extract for efficient top-k search
         results = process.extract(
             query,
             word_list,
-            limit=max_results,
+            limit=search_limit,
             scorer=fuzz.WRatio,  # Weighted ratio for better results
         )
 
         matches = []
+        is_query_phrase = " " in query.strip()
+
         for result in results:
             # RapidFuzz returns (string, score, index) tuples
             if len(result) == 3:
@@ -172,18 +177,25 @@ class FuzzySearch:
                 word, score = result
 
             # Convert 0-100 score to 0.0-1.0
-            normalized_score = score / 100.0
+            base_score = score / 100.0
+
+            # Apply length-aware scoring correction
+            corrected_score = self._apply_length_correction(
+                query, word, base_score, is_query_phrase
+            )
 
             matches.append(
                 FuzzyMatch(
                     word=word,
-                    score=normalized_score,
+                    score=corrected_score,
                     method=FuzzySearchMethod.RAPIDFUZZ,
                     is_phrase=" " in word,
                 )
             )
 
-        return matches
+        # Re-sort by corrected scores and limit results
+        matches.sort(key=lambda m: m.score, reverse=True)
+        return matches[:max_results]
 
     def _search_jaro_winkler(
         self, query: str, word_list: list[str], max_results: int
@@ -308,56 +320,48 @@ class FuzzySearch:
         matches.sort(key=lambda m: m.score, reverse=True)
         return matches[:max_results]
 
-    def _search_levenshtein(
-        self, query: str, word_list: list[str], max_results: int
-    ) -> list[FuzzyMatch]:
-        """Search using basic Levenshtein distance."""
-        matches = []
+    def _apply_length_correction(
+        self, query: str, candidate: str, base_score: float, is_query_phrase: bool
+    ) -> float:
+        """Apply length-aware correction to prevent short fragment bias."""
+        query_len = len(query.strip())
+        candidate_len = len(candidate.strip())
+        is_candidate_phrase = " " in candidate.strip()
 
-        for word in word_list:
-            word_lower = word.lower()
-            distance = self._levenshtein_distance(query, word_lower)
-            max_len = max(len(query), len(word_lower))
+        # No correction needed for perfect matches
+        if base_score >= 0.99:
+            return base_score
 
-            if max_len == 0:
-                score = 1.0
-            else:
-                score = 1.0 - (distance / max_len)
+        # Length ratio penalty for very different lengths
+        length_ratio = min(query_len, candidate_len) / max(query_len, candidate_len)
 
-            if score > 0:
-                matches.append(
-                    FuzzyMatch(
-                        word=word,
-                        score=score,
-                        method=FuzzySearchMethod.LEVENSHTEIN,
-                        edit_distance=distance,
-                        is_phrase=" " in word,
-                    )
-                )
+        # Phrase matching bonus/penalty
+        phrase_penalty = 1.0
+        if is_query_phrase and not is_candidate_phrase:
+            # Query is phrase but candidate is not - significant penalty
+            phrase_penalty = 0.7
+        elif not is_query_phrase and is_candidate_phrase:
+            # Query is word but candidate is phrase - moderate penalty
+            phrase_penalty = 0.85
+        elif is_query_phrase and is_candidate_phrase:
+            # Both phrases - bonus for length similarity
+            phrase_penalty = 1.1 if length_ratio > 0.7 else 1.0
 
-        # Sort and return top results
-        matches.sort(key=lambda m: m.score, reverse=True)
-        return matches[:max_results]
+        # Short fragment penalty (aggressive for very short candidates)
+        if candidate_len <= 3 and query_len > 6:
+            # Very short candidates for longer queries get heavy penalty
+            short_penalty = 0.5
+        elif candidate_len < query_len * 0.5:
+            # Moderately short candidates get moderate penalty
+            short_penalty = 0.75
+        else:
+            short_penalty = 1.0
 
-    def _levenshtein_distance(self, s1: str, s2: str) -> int:
-        """Calculate Levenshtein edit distance between two strings."""
-        if len(s1) < len(s2):
-            return self._levenshtein_distance(s2, s1)
+        # Combined correction
+        corrected_score = base_score * length_ratio * phrase_penalty * short_penalty
 
-        if len(s2) == 0:
-            return len(s1)
-
-        previous_row = list(range(len(s2) + 1))
-        for i, c1 in enumerate(s1):
-            current_row = [i + 1]
-            for j, c2 in enumerate(s2):
-                insertions = previous_row[j + 1] + 1
-                deletions = current_row[j] + 1
-                substitutions = previous_row[j] + (c1 != c2)
-                current_row.append(min(insertions, deletions, substitutions))
-            previous_row = current_row
-
-        return previous_row[-1]
+        # Ensure we don't exceed 1.0 or go below 0.0
+        return max(0.0, min(1.0, corrected_score))
 
     def _calculate_string_similarity(self, s1: str, s2: str) -> float:
         """Calculate basic string similarity for phonetic matches."""
@@ -365,7 +369,8 @@ class FuzzySearch:
             return 1.0
 
         # Use Levenshtein distance for similarity
-        distance = self._levenshtein_distance(s1, s2)
+        distance: float = polyleven.levenshtein(s1.lower(), s2.lower())
+
         max_len = max(len(s1), len(s2))
 
         if max_len == 0:

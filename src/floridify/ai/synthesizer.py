@@ -18,7 +18,7 @@ from ..models import (
 from ..storage.mongodb import get_synthesized_entry, save_synthesized_entry
 from ..utils.logging import get_logger
 from .connector import OpenAIConnector
-from .models import AIGeneratedProviderData
+from .models import AIGeneratedProviderData, MeaningCluster
 
 logger = get_logger(__name__)
 
@@ -32,26 +32,52 @@ class DefinitionSynthesizer:
     async def synthesize_entry(
         self, word: Word, providers: Mapping[str, ProviderData]
     ) -> SynthesizedDictionaryEntry:
-        """Synthesize a complete dictionary entry from provider data."""
+        """Synthesize a complete dictionary entry from provider data using meaning clusters."""
         # Check if we already have a synthesized entry
         existing = await get_synthesized_entry(word.text)
         if existing and self._is_fresh(existing, providers):
+            logger.info(f"📋 Using cached synthesized entry for '{word.text}'")
             return existing
 
         # Generate pronunciation if not available
         pronunciation = await self._synthesize_pronunciation(word, providers)
 
-        # Group definitions by word type
-        definitions_by_type = self._group_definitions_by_type(providers)
+        # Extract all provider definitions for meaning clustering
+        all_definitions = []
+        for provider_name, provider_data in providers.items():
+            for definition in provider_data.definitions:
+                all_definitions.append(
+                    (provider_name, definition.word_type.value, definition.definition)
+                )
 
-        # Synthesize definitions for each word type
-        synthesized_definitions: list[Definition] = []
-        for word_type, definitions in definitions_by_type.items():
-            synthesized_def = await self._synthesize_definition_for_type(
-                word, word_type, definitions
+        if not all_definitions:
+            logger.warning(f"No definitions found for '{word.text}'")
+            return SynthesizedDictionaryEntry(
+                word=word,
+                pronunciation=pronunciation,
+                definitions=[],
+                last_updated=datetime.now(),
             )
-            if synthesized_def:
-                synthesized_definitions.append(synthesized_def)
+
+        # Extract meaning clusters using AI
+        logger.info(
+            f"🔍 Analyzing {len(all_definitions)} definitions for meaning clusters"
+        )
+        meaning_response = await self.ai.extract_meanings(word.text, all_definitions)
+
+        # Synthesize definitions for each meaning cluster
+        synthesized_definitions: list[Definition] = []
+        meaning_groups: dict[str, list[Definition]] = {}
+
+        for cluster in meaning_response.meaning_clusters:
+            cluster_definitions = await self._synthesize_cluster_definitions(
+                word, cluster, providers
+            )
+            synthesized_definitions.extend(cluster_definitions)
+
+            # Group definitions by meaning for display
+            if cluster_definitions:
+                meaning_groups[cluster.meaning_id] = cluster_definitions
 
         # Create synthesized entry
         entry = SynthesizedDictionaryEntry(
@@ -67,10 +93,13 @@ class DefinitionSynthesizer:
 
     async def generate_fallback_entry(self, word: Word) -> SynthesizedDictionaryEntry:
         """Generate a complete fallback entry using AI."""
+        logger.info(f"🔮 Starting AI fallback generation for '{word.text}'")
+
         # Generate fallback provider data
         fallback_response = await self.ai.generate_fallback_entry(word.text)
 
         if fallback_response.is_nonsense or not fallback_response.provider_data:
+            logger.info(f"🚫 No valid definitions generated for '{word.text}'")
             # Return minimal entry for nonsense words
             return SynthesizedDictionaryEntry(
                 word=word,
@@ -79,26 +108,113 @@ class DefinitionSynthesizer:
                 last_updated=datetime.now(),
             )
 
-        # Convert to AI-generated provider data
+        # Convert AI response to full provider data
+        ai_definitions = []
+        for ai_def in fallback_response.provider_data.definitions:
+            full_def = Definition(
+                word_type=ai_def.word_type,
+                definition=ai_def.definition,
+                examples=Examples(
+                    generated=[GeneratedExample(sentence=ex) for ex in ai_def.examples]
+                ),
+                synonyms=[],
+            )
+            ai_definitions.append(full_def)
+
         ai_provider = AIGeneratedProviderData(
-            **fallback_response.provider_data.model_dump(),
+            provider_name=fallback_response.provider_data.provider_name,
+            definitions=ai_definitions,
             confidence_score=fallback_response.confidence,
             model_used=self.ai.model_name,
         )
 
         # Use the AI provider data to create synthesized entry
         providers = {"ai_fallback": ai_provider}
+        logger.success(
+            f"🎉 Successfully created AI fallback entry for '{word.text}' "
+            f"with {len(ai_definitions)} definitions"
+        )
         return await self.synthesize_entry(word, providers)
+
+    async def _synthesize_cluster_definitions(
+        self, word: Word, cluster: MeaningCluster, providers: Mapping[str, ProviderData]
+    ) -> list[Definition]:
+        """Synthesize definitions for a specific meaning cluster."""
+        cluster_name = cluster.meaning_id.replace(f"{word.text}_", "")
+
+        synthesized_definitions = []
+
+        # For each word type in this meaning cluster
+        for cluster_def in cluster.definitions_by_type:
+            word_type = cluster_def.word_type
+            provider_definitions = cluster_def.definitions
+
+            if not provider_definitions:
+                continue
+
+            # Convert to the format expected by synthesis
+            formatted_definitions = []
+            for def_text in provider_definitions:
+                # Create a temporary Definition object for synthesis
+                temp_def = Definition(
+                    word_type=word_type,
+                    definition=def_text,
+                    examples=Examples(),
+                    synonyms=[],
+                )
+                formatted_definitions.append(
+                    (f"cluster_{cluster.meaning_id}", temp_def)
+                )
+
+            # Synthesize this word type within the meaning cluster
+            synthesized_def = await self._synthesize_definition_for_type_with_context(
+                word, word_type, formatted_definitions, cluster_name
+            )
+
+            if synthesized_def:
+                # Set the meaning cluster ID for display grouping
+                synthesized_def.meaning_cluster = cluster.meaning_id
+                synthesized_definitions.append(synthesized_def)
+
+        def_count = len(synthesized_definitions)
+        logger.debug(
+            f"✨ Created {def_count} definitions for '{cluster.meaning_id}' cluster"
+        )
+        return synthesized_definitions
+
+    async def _synthesize_definition_for_type_with_context(
+        self,
+        word: Word,
+        word_type: WordType,
+        definitions: list[tuple[str, Definition]],
+        context: str,
+    ) -> Definition | None:
+        """Synthesize definitions for a specific word type with meaning context."""
+
+        # Use the existing method but with context logging
+        result = await self._synthesize_definition_for_type(
+            word, word_type, definitions
+        )
+
+        if result:
+            logger.success(
+                f"🎯 Synthesized '{word.text}' ({word_type.value}) - {context}"
+            )
+
+        return result
 
     def _is_fresh(
         self, entry: SynthesizedDictionaryEntry, providers: Mapping[str, ProviderData]
     ) -> bool:
-        """Check if synthesized entry is still fresh compared to provider data."""
-        # If any provider data is newer than the synthesized entry, it's stale
-        for provider_data in providers.values():
-            if provider_data.last_updated > entry.last_updated:
-                return False
-        return True
+        """Check if synthesized entry is still fresh (within reasonable time window)."""
+        from datetime import timedelta
+
+        # Consider entry fresh if it's less than 24 hours old
+        # Provider timestamps are meaningless since they're set on each fetch
+        max_age = timedelta(hours=24)
+        age = datetime.now() - entry.last_updated
+
+        return age <= max_age
 
     def _group_definitions_by_type(
         self, providers: Mapping[str, ProviderData]
@@ -152,6 +268,7 @@ class DefinitionSynthesizer:
                         )
                     ]
                 ),
+                meaning_cluster=None,  # Will be set by caller if needed
                 raw_metadata={
                     "synthesis_confidence": synthesis_response.confidence,
                     "example_confidence": example_response.confidence,
@@ -174,7 +291,7 @@ class DefinitionSynthesizer:
         #     # We'd need to add pronunciation to ProviderData in the future
         #     # For now, generate with AI
         #     pass
-        
+
         _ = providers  # Suppress unused warning until we implement provider lookup
 
         try:

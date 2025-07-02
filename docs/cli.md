@@ -61,6 +61,60 @@
 
 ## Output Formatting
 
+### Casing and Typography Standards
+
+**Core Principle**: Maintain consistent, predictable casing that follows standard dictionary conventions while being visually clear and scannable.
+
+#### Word Display
+- **Word text**: lowercase (`bank`, `simple`)
+- **Pronunciation**: lowercase with standard notation (`/bank/`, `/SIM-pul/`)
+- **Superscripts**: Unicode superscripts for multiple meanings (`bank¹`, `bank²`)
+
+#### Meaning Clusters
+- **Storage format**: snake_case in database (`bank_financial`, `simple_uncomplicated`)
+- **Display format**: Title Case (`Bank Financial`, `Simple Uncomplicated`)
+- **Header format**: `word^n (Meaning Cluster)` → `bank¹ (Bank Financial)`
+
+#### Grammar and Content
+- **Word types**: lowercase (`noun`, `verb`, `adjective`)
+- **Definitions**: Proper sentence case with initial capital
+- **Examples**: Proper sentence case with initial capital, quoted when appropriate
+- **Sources**: lowercase (`wiktionary`, `ai generated`)
+
+#### Special Cases
+- **Pronunciation guides**: Use phonetic notation (`/bank/`, `/SIM-pul/`)
+- **Abbreviations**: Standard dictionary format (`IPA`, `adj.`)
+- **Technical terms**: Maintain source casing (`MongoDB`, `OpenAI`)
+
+### Display Structure Template
+
+```
+╭─ word /pronunciation/ ────────────────────────────────────────────────────╮
+│ word¹ (Meaning Cluster One)                                              │
+│ word-type                                                                 │
+│   Definition text with proper sentence case and punctuation.             │
+│                                                                           │
+│   Example sentence with proper casing and formatting.                    │
+│                                                                           │
+│ word² (Meaning Cluster Two)                                              │
+│ word-type                                                                 │
+│   Second meaning definition text.                                         │
+│                                                                           │
+│   "Quoted example when appropriate for clarity."                         │
+│                                                                           │
+│ ✨ Sources: source1, source2                                             │
+╰───────────────────────────────────────────────────────────────────────────╯
+```
+
+### Implementation Rules
+
+1. **Meaning cluster formatting**: Convert `meaning_id` from snake_case to Title Case for display
+2. **Sentence consistency**: All definitions and examples start with capital letter, end with period
+3. **Typography**: Use Unicode superscripts (¹²³⁴⁵⁶⁷⁸⁹⁰) for meaning numbering
+4. **Spacing**: Consistent indentation and line breaks for visual hierarchy
+5. **Quoting**: Use quotes for examples when they contain dialogue or need emphasis
+
+### Visual Design
 **Colors**: Cyan examples, green success, yellow warnings, red errors
 **Structure**: Hierarchical with proper spacing and alignment
 **Icons**: Meaningful Unicode symbols for visual clarity

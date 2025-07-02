@@ -222,8 +222,8 @@ class SearchEngine:
         has_spaces = " " in query.strip()
 
         if has_spaces:
-            # Phrases: prioritize exact and semantic matching
-            return [SearchMethod.EXACT, SearchMethod.SEMANTIC, SearchMethod.FUZZY]
+            # Phrases: prioritize exact and fuzzy (with improved phrase matching)
+            return [SearchMethod.EXACT, SearchMethod.FUZZY, SearchMethod.SEMANTIC]
         elif query_len <= 3:
             # Short queries: focus on prefix matching
             return [SearchMethod.PREFIX, SearchMethod.EXACT]

@@ -14,6 +14,7 @@ from .models import (
     EmbeddingResponse,
     ExampleGenerationResponse,
     FallbackResponse,
+    MeaningExtractionResponse,
     ModelCapabilities,
     PronunciationResponse,
     SynthesisResponse,
@@ -112,25 +113,45 @@ class OpenAIConnector:
         self, word: str, word_type: str, provider_definitions: list[tuple[str, str]]
     ) -> SynthesisResponse:
         """Synthesize definitions from multiple providers."""
+        providers = [provider for provider, _ in provider_definitions]
         prompt = self.template_manager.get_synthesis_prompt(
             word, word_type, provider_definitions
         )
         cache_key = f"synthesis_{word}_{word_type}_{hash(str(provider_definitions))}"
 
-        return await self._make_structured_request(
-            prompt, SynthesisResponse, cache_key
-        )
+        try:
+            result = await self._make_structured_request(
+                prompt, SynthesisResponse, cache_key
+            )
+            # Success logging handled by synthesizer context
+            return result
+        except Exception as e:
+            logger.error(f"❌ Definition synthesis failed for '{word}' ({word_type}): {e}")
+            raise
 
     async def generate_example(
         self, word: str, definition: str, word_type: str
     ) -> ExampleGenerationResponse:
         """Generate modern usage example."""
+        logger.debug(f"📝 Generating example sentence for '{word}' ({word_type})")
+        
         prompt = self.template_manager.get_example_prompt(word, definition, word_type)
         cache_key = f"example_{word}_{word_type}_{hash(definition)}"
 
-        return await self._make_structured_request(
-            prompt, ExampleGenerationResponse, cache_key
-        )
+        try:
+            result = await self._make_structured_request(
+                prompt, ExampleGenerationResponse, cache_key
+            )
+            truncated = (
+                result.example_sentence[:50] + "..."
+                if len(result.example_sentence) > 50
+                else result.example_sentence
+            )
+            logger.debug(f"✏️  Generated example for '{word}': \"{truncated}\"")
+            return result
+        except Exception as e:
+            logger.error(f"❌ Example generation failed for '{word}': {e}")
+            raise
 
     async def generate_pronunciation(self, word: str) -> PronunciationResponse:
         """Generate pronunciation data."""
@@ -143,12 +164,56 @@ class OpenAIConnector:
 
     async def generate_fallback_entry(self, word: str) -> FallbackResponse:
         """Generate AI fallback provider data."""
+        logger.info(f"🤖 Generating AI fallback definition for '{word}'")
+        
         prompt = self.template_manager.get_fallback_prompt(word)
         cache_key = f"fallback_{word}"
 
-        return await self._make_structured_request(
-            prompt, FallbackResponse, cache_key
+        try:
+            result = await self._make_structured_request(
+                prompt, FallbackResponse, cache_key
+            )
+            
+            if result.is_nonsense:
+                logger.info(f"🚫 AI identified '{word}' as nonsense/invalid")
+            elif result.provider_data:
+                def_count = len(result.provider_data.definitions)
+                logger.success(
+                    f"✨ Generated {def_count} definitions for '{word}' "
+                    f"(confidence: {result.confidence:.1%})"
+                )
+            else:
+                logger.warning(f"⚠️  AI generated empty response for '{word}'")
+            
+            return result
+        except Exception as e:
+            logger.error(f"❌ AI fallback generation failed for '{word}': {e}")
+            raise
+
+    async def extract_meanings(
+        self, word: str, all_provider_definitions: list[tuple[str, str, str]]
+    ) -> MeaningExtractionResponse:
+        """Extract distinct meaning clusters from provider definitions."""
+        def_count = len(all_provider_definitions)
+        logger.info(f"🧠 Extracting meaning clusters for '{word}' from {def_count} definitions")
+        
+        prompt = self.template_manager.get_meaning_extraction_prompt(
+            word, all_provider_definitions
         )
+        cache_key = f"meanings_{word}_{hash(str(all_provider_definitions))}"
+
+        try:
+            result = await self._make_structured_request(
+                prompt, MeaningExtractionResponse, cache_key
+            )
+            logger.success(
+                f"🎯 Extracted {result.total_meanings} meaning clusters for '{word}' "
+                f"(confidence: {result.confidence:.1%})"
+            )
+            return result
+        except Exception as e:
+            logger.error(f"❌ Meaning extraction failed for '{word}': {e}")
+            raise
 
     async def generate_embeddings(self, texts: list[str]) -> EmbeddingResponse:
         """Generate embeddings for texts."""

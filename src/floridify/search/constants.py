@@ -60,5 +60,5 @@ class LexiconFormat(Enum):
     JSON_GITHUB_API = "json_github_api"  # GitHub API response format
     CSV_IDIOMS = "csv_idioms"  # CSV format with idiom,definition columns
     DICEWARE = "diceware"  # Diceware format (number:word pairs)
-    JSON_PHRASAL_VERBS = "json_phrasal_verbs"  # JSON format with phrasal verbs, definitions, examples
+    JSON_PHRASAL_VERBS = "json_phrasal_verbs"  # JSON format with phrasal verbs, definitions
     CUSTOM_SCRAPER = "custom_scraper"  # Custom scraper function for dynamic data extraction

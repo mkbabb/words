@@ -32,12 +32,12 @@ class DictionaryProvider(Enum):
     @property
     def display_name(self) -> str:
         """Get human-readable display name for the provider."""
-        display_names = {
-            self.WIKTIONARY: "Wiktionary",
-            self.OXFORD: "Oxford Dictionary",
-            self.DICTIONARY_COM: "Dictionary.com",
-            self.AI_SYNTHETIC: "AI Synthesis",
-            self.SYNTHETIC: "Synthetic",
+        display_names: dict[DictionaryProvider, str] = {
+            DictionaryProvider.WIKTIONARY: "Wiktionary",
+            DictionaryProvider.OXFORD: "Oxford Dictionary",
+            DictionaryProvider.DICTIONARY_COM: "Dictionary.com",
+            DictionaryProvider.AI_SYNTHETIC: "AI Synthesis",
+            DictionaryProvider.SYNTHETIC: "Synthetic",
         }
         return display_names.get(self, self.value.title())
 

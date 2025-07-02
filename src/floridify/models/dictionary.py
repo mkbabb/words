@@ -72,6 +72,7 @@ class Definition(BaseModel):
     definition: str
     synonyms: list[SynonymReference] = Field(default_factory=list)
     examples: Examples = Field(default_factory=Examples)
+    meaning_cluster: str | None = None  # AI-extracted meaning cluster ID
     raw_metadata: dict[str, Any] | None = None
 
 

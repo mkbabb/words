@@ -47,7 +47,9 @@ def create_definition_synthesizer(config_path: str | Path | None = None) -> Defi
     return DefinitionSynthesizer(connector)
 
 
-def create_ai_system(config_path: str | Path | None = None) -> tuple[OpenAIConnector, DefinitionSynthesizer]:
+def create_ai_system(
+    config_path: str | Path | None = None,
+) -> tuple[OpenAIConnector, DefinitionSynthesizer]:
     """Create complete AI system from configuration."""
     connector = create_openai_connector(config_path)
     synthesizer = DefinitionSynthesizer(connector)

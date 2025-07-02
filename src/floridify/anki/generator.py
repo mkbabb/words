@@ -9,11 +9,18 @@ from typing import Any
 
 import genanki  # type: ignore[import-untyped]
 
+from ..ai.connector import OpenAIConnector
+from ..ai.templates import PromptTemplateManager as PromptLoader
 from ..models import Definition, DictionaryEntry
 from ..utils.logging import get_logger
 from .templates import AnkiCardTemplate, CardType
 
 logger = get_logger(__name__)
+
+
+def format_template_variables(**kwargs: Any) -> dict[str, Any]:
+    """Format template variables for prompt rendering."""
+    return kwargs
 
 
 class AnkiCard:
@@ -130,7 +137,9 @@ class AnkiCardGenerator:
         if card_types is None:
             card_types = [CardType.MULTIPLE_CHOICE, CardType.FILL_IN_BLANK]
         
-        logger.debug(f"Card types: {[ct.value for ct in card_types]}, max per type: {max_cards_per_type}")
+        logger.debug(
+            f"Card types: {[ct.value for ct in card_types]}, max per type: {max_cards_per_type}"
+        )
         cards: list[Any] = []
 
         # Get AI synthesis provider data (preferred) or fall back to other providers
@@ -163,7 +172,9 @@ class AnkiCardGenerator:
                         type_cards.append(card)
 
                 except Exception as e:
-                    logger.error(f"Error generating {card_type.value} card for {entry.word.text}: {e}")
+                    logger.error(
+                        f"Error generating {card_type.value} card for {entry.word.text}: {e}"
+                    )
                     continue
 
             cards.extend(type_cards)
@@ -175,8 +186,8 @@ class AnkiCardGenerator:
     ) -> AnkiCard | None:
         """Generate a multiple choice flashcard."""
         try:
-            # Load prompt template
-            template = self.prompt_loader.load_template("anki_multiple_choice")
+            # Load prompt template  
+            template_content = self.prompt_loader.render_template("anki_multiple_choice")
 
             # Prepare examples for the prompt
             examples_text = ""
@@ -192,21 +203,17 @@ class AnkiCardGenerator:
                 examples=examples_text,
             )
 
-            # Generate multiple choice content
-            system_message, user_prompt = template.render(variables)
-
-            # Get AI settings
-            ai_settings = template.get_ai_settings()
+            # Generate multiple choice content using template
+            prompt = template_content.format(**variables)
 
             # Make API call
             response = await self.openai_connector.client.chat.completions.create(
-                model=ai_settings.get("model", self.openai_connector.config.model),
+                model=self.openai_connector.model_name,
                 messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": user_prompt},
+                    {"role": "user", "content": prompt},
                 ],
-                temperature=ai_settings.get("temperature", 0.6),
-                max_tokens=ai_settings.get("max_tokens", 300),
+                temperature=self.openai_connector.temperature or 0.6,
+                max_tokens=self.openai_connector.max_tokens,
             )
 
             content = response.choices[0].message.content
@@ -249,7 +256,7 @@ class AnkiCardGenerator:
         """Generate a fill-in-the-blank flashcard."""
         try:
             # Load prompt template
-            template = self.prompt_loader.load_template("anki_fill_blank")
+            template_content = self.prompt_loader.render_template("anki_fill_blank")
 
             # Prepare examples for the prompt
             examples_text = ""
@@ -265,21 +272,17 @@ class AnkiCardGenerator:
                 examples=examples_text,
             )
 
-            # Generate fill-in-the-blank content
-            system_message, user_prompt = template.render(variables)
-
-            # Get AI settings
-            ai_settings = template.get_ai_settings()
+            # Generate fill-in-the-blank content using template
+            prompt = template_content.format(**variables)
 
             # Make API call
             response = await self.openai_connector.client.chat.completions.create(
-                model=ai_settings.get("model", self.openai_connector.config.model),
+                model=self.openai_connector.model_name,
                 messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": user_prompt},
+                    {"role": "user", "content": prompt},
                 ],
-                temperature=ai_settings.get("temperature", 0.7),
-                max_tokens=ai_settings.get("max_tokens", 200),
+                temperature=self.openai_connector.temperature or 0.7,
+                max_tokens=self.openai_connector.max_tokens,
             )
 
             content = response.choices[0].message.content

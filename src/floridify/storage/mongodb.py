@@ -13,6 +13,9 @@ from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Global storage instance for lazy initialization
+_storage: MongoDBStorage | None = None
+
 
 class MongoDBStorage:
     """MongoDB storage for dictionary entries using Beanie ODM."""
@@ -218,9 +221,21 @@ class MongoDBStorage:
 
 
 # Helper functions for AI module
+async def _ensure_initialized() -> None:
+    """Ensure MongoDB is initialized."""
+    global _storage
+    if _storage is None:
+        _storage = MongoDBStorage()
+        try:
+            await _storage.connect()
+        except Exception as e:
+            logger.warning(f"MongoDB initialization failed: {e}")
+
+
 async def get_cache_entry(provider: str, cache_key: str) -> dict[str, Any] | None:
     """Get cached AI response by provider and key."""
     try:
+        await _ensure_initialized()
         cache_entry = await APIResponseCache.find_one(
             APIResponseCache.provider == provider,
             APIResponseCache.word == cache_key,
@@ -233,6 +248,7 @@ async def get_cache_entry(provider: str, cache_key: str) -> dict[str, Any] | Non
 async def save_cache_entry(provider: str, cache_key: str, data: dict[str, Any]) -> None:
     """Save AI response to cache."""
     try:
+        await _ensure_initialized()
         existing = await APIResponseCache.find_one(
             APIResponseCache.provider == provider,
             APIResponseCache.word == cache_key,
@@ -256,6 +272,7 @@ async def save_cache_entry(provider: str, cache_key: str, data: dict[str, Any]) 
 async def get_synthesized_entry(word: str) -> SynthesizedDictionaryEntry | None:
     """Get synthesized dictionary entry by word."""
     try:
+        await _ensure_initialized()
         return await SynthesizedDictionaryEntry.find_one(
             SynthesizedDictionaryEntry.word.text == word
         )
@@ -266,6 +283,7 @@ async def get_synthesized_entry(word: str) -> SynthesizedDictionaryEntry | None:
 async def save_synthesized_entry(entry: SynthesizedDictionaryEntry) -> None:
     """Save synthesized dictionary entry."""
     try:
+        await _ensure_initialized()
         existing = await SynthesizedDictionaryEntry.find_one(
             SynthesizedDictionaryEntry.word.text == entry.word.text
         )

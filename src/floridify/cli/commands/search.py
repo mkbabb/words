@@ -8,13 +8,16 @@ from typing import Any
 
 import click
 from rich.console import Console
-from rich.table import Table
-from rich.text import Text
 
 from ...constants import Language
 from ...search import SearchEngine, SearchResult
 from ...search.constants import SearchMethod
-from ..utils.formatting import format_error
+from ..utils.formatting import (
+    format_error,
+    format_performance_table,
+    format_search_results_table,
+    format_statistics_table,
+)
 
 console = Console()
 
@@ -175,126 +178,63 @@ async def _search_stats_async() -> None:
 
 def _display_search_results(query: str, results: list[SearchResult]) -> None:
     """Display search results in a formatted table."""
-
-    table = Table(title=f"Search Results for '{query}'")
-    table.add_column("Word/Phrase", style="cyan", no_wrap=False, width=30)
-    table.add_column("Score", style="magenta", justify="right", width=8)
-    table.add_column("Method", style="green", width=12)
-    table.add_column("Type", style="yellow", width=8)
-
-    for result in results:
-        # Format score as percentage
-        score_text = f"{result.score:.1%}"
-
-        # Color-code by score
-        if result.score >= 0.9:
-            score_style = "bright_green"
-        elif result.score >= 0.7:
-            score_style = "green"
-        elif result.score >= 0.5:
-            score_style = "yellow"
-        else:
-            score_style = "red"
-
-        # Determine type
-        type_text = "Phrase" if result.is_phrase else "Word"
-
-        # Add method-specific styling
-        method_text = result.method.value.title()
-        if result.method == SearchMethod.EXACT:
-            method_style = "bright_green"
-        elif result.method == SearchMethod.PREFIX:
-            method_style = "green"
-        elif result.method == SearchMethod.FUZZY:
-            method_style = "blue"
-        elif result.method == SearchMethod.SEMANTIC:
-            method_style = "magenta"
-        else:
-            method_style = "white"
-
-        table.add_row(
-            result.word,
-            Text(score_text, style=score_style),
-            Text(method_text, style=method_style),
-            type_text,
-        )
-
+    table = format_search_results_table(query, results)
     console.print(table)
     console.print(f"\n[dim]Found {len(results)} results[/dim]")
 
 
 def _display_performance_stats(stats: dict[str, dict[str, Any]]) -> None:
     """Display search performance statistics."""
-
-    if not any(data["count"] > 0 for data in stats.values()):
-        return
-
-    table = Table(title="Search Performance")
-    table.add_column("Method", style="cyan")
-    table.add_column("Searches", justify="right", style="magenta")
-    table.add_column("Total Time", justify="right", style="green")
-    table.add_column("Avg Time", justify="right", style="yellow")
-
-    for method, data in stats.items():
-        if data["count"] > 0:
-            table.add_row(
-                method.title(),
-                str(data["count"]),
-                f"{data['total_time']:.3f}s",
-                f"{data['avg_time']:.3f}s",
-            )
-
-    console.print(table)
+    table = format_performance_table(stats)
+    if table:
+        console.print(table)
 
 
 def _display_lexicon_stats(stats: dict[str, Any]) -> None:
     """Display lexicon loading statistics."""
-
-    table = Table(title="Lexicon Statistics")
-    table.add_column("Metric", style="cyan")
-    table.add_column("Value", justify="right", style="magenta")
-
-    table.add_row("Total Words", f"{stats['total_words']:,}")
-    table.add_row("Total Phrases", f"{stats['total_phrases']:,}")
-
-    # Show per-language breakdown
+    # Flatten the stats for general table formatting
+    display_stats = {
+        "Total Words": stats['total_words'],
+        "Total Phrases": stats['total_phrases'],
+    }
+    
+    # Add per-language breakdown
     for lang, lang_stats in stats.get("languages", {}).items():
-        table.add_row(f"Words ({lang.upper()})", f"{lang_stats['words']:,}")
-        table.add_row(f"Phrases ({lang.upper()})", f"{lang_stats['phrases']:,}")
-
+        display_stats[f"Words ({lang.upper()})"] = lang_stats['words']
+        display_stats[f"Phrases ({lang.upper()})"] = lang_stats['phrases']
+    
+    table = format_statistics_table("Lexicon Statistics", display_stats)
     console.print(table)
 
 
 def _display_trie_stats(stats: dict[str, Any]) -> None:
     """Display trie search statistics."""
-
-    table = Table(title="Trie Index Statistics")
-    table.add_column("Metric", style="cyan")
-    table.add_column("Value", justify="right", style="magenta")
-
-    table.add_row("Indexed Words", f"{stats['word_count']:,}")
-    table.add_row("Memory Nodes", f"{stats['memory_nodes']:,}")
-    table.add_row("Average Depth", f"{stats['average_depth']:.1f}")
-    table.add_row("Max Frequency", f"{stats['max_frequency']:,}")
-
+    # Prepare stats for display
+    display_stats = {
+        "Indexed Words": stats['word_count'],
+        "Memory Nodes": stats['memory_nodes'],
+        "Average Depth": f"{stats['average_depth']:.1f}",
+        "Max Frequency": stats['max_frequency'],
+    }
+    
+    table = format_statistics_table("Trie Index Statistics", display_stats)
     console.print(table)
 
 
 def _display_semantic_stats(stats: dict[str, Any]) -> None:
     """Display semantic search statistics."""
-
-    table = Table(title="Semantic Search Statistics")
-    table.add_column("Metric", style="cyan")
-    table.add_column("Value", justify="right", style="magenta")
-
-    table.add_row("Vocabulary Size", f"{stats['vocabulary_size']:,}")
-    table.add_row("FAISS Available", "Yes" if stats["has_faiss"] else "No")
-    table.add_row("Scikit-learn Available", "Yes" if stats["has_sklearn"] else "No")
-
-    # Show embedding levels
+    # Prepare stats for display
+    display_stats = {
+        "Vocabulary Size": stats['vocabulary_size'],
+        "FAISS Available": "Yes" if stats["has_faiss"] else "No",
+        "Scikit-learn Available": "Yes" if stats["has_sklearn"] else "No",
+    }
+    
+    # Add embedding levels
     for level, level_stats in stats.get("embedding_levels", {}).items():
-        table.add_row(f"{level.title()} Embeddings", f"{level_stats['features']}D")
-
+        display_stats[f"{level.title()} Embeddings"] = f"{level_stats['features']}D"
+    
+    table = format_statistics_table("Semantic Search Statistics", display_stats)
     console.print(table)
 
 

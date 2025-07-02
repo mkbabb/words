@@ -1,16 +1,11 @@
-# Task: Generate Fallback Dictionary Entry
+# Generate Dictionary Entry for "{{ word }}"
 
-Create a complete dictionary entry for an unknown word.
+Create a comprehensive dictionary entry with:
+- All applicable word types (noun, verb, adjective, etc.)
+- Clear, concise definitions for each type
+- 1-2 modern usage examples per definition
+- Proper pronunciation guidance
 
-## Input
-Word: {{ word }}
+If the word is nonsense or invalid, set is_nonsense to true.
 
-## Requirements
-- Generate plausible definitions for each applicable word type
-- Include pronunciation data
-- Provide usage examples
-- Handle nonsense input gracefully (return null if appropriate)
-- Match standard provider data structure
-
-## Output
-Complete dictionary entry with all word types and definitions, or null for nonsense input.
+Return a complete provider data structure.

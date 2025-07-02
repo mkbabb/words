@@ -78,10 +78,25 @@ class FallbackRequest(BaseModel):
     word: str
 
 
+class AIDefinition(BaseModel):
+    """Clean definition model for AI responses without numpy arrays."""
+    
+    word_type: WordType
+    definition: str
+    examples: list[str] = Field(default_factory=list)
+
+
+class AIProviderData(BaseModel):
+    """Clean provider data for AI responses without numpy arrays."""
+    
+    provider_name: str = "ai_fallback"
+    definitions: list[AIDefinition] = Field(default_factory=list)
+
+
 class FallbackResponse(BaseModel):
     """Response from AI fallback provider."""
 
-    provider_data: ProviderData | None
+    provider_data: AIProviderData | None
     confidence: float
     is_nonsense: bool = False
 
@@ -98,6 +113,40 @@ class EmbeddingResponse(BaseModel):
 
     embeddings: list[list[float]]
     usage: dict[str, Any]
+
+
+class MeaningClusterDefinition(BaseModel):
+    """Definition within a meaning cluster."""
+    word_type: WordType
+    definitions: list[str]  # Provider definitions for this word type
+
+
+class MeaningCluster(BaseModel):
+    """A distinct meaning/sense of a word with associated word types."""
+    
+    meaning_id: str  # e.g., "bank_financial", "bank_geographic", "bank_arrangement"
+    core_meaning: str  # Brief description of this meaning cluster
+    word_types: list[WordType]  # Word types that apply to this meaning
+    definitions_by_type: list[MeaningClusterDefinition]  # Definitions grouped by type
+    confidence: float = 0.0
+
+
+class MeaningExtractionRequest(BaseModel):
+    """Request for extracting distinct meanings from provider definitions."""
+    
+    word: str
+    all_provider_definitions: list[tuple[str, WordType, str]]  # provider, type, definition
+
+
+class MeaningExtractionResponse(BaseModel):
+    """Response containing distinct meaning clusters for a word."""
+    
+    word: str
+    meaning_clusters: list[MeaningCluster]
+    total_meanings: int
+    confidence: float
+
+
 
 
 class AIGeneratedProviderData(ProviderData):
