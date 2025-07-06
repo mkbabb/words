@@ -11,7 +11,7 @@ import pickle
 from pathlib import Path
 from typing import Any
 
-import marisa_trie  # type: ignore[import-untyped]
+import marisa_trie  # type: ignore
 
 
 class TrieSearch:
@@ -40,7 +40,9 @@ class TrieSearch:
         self._word_count = 0
         self._max_frequency = 0
 
-    def build_index(self, words: list[str], frequencies: dict[str, int] | None = None) -> None:
+    def build_index(
+        self, words: list[str], frequencies: dict[str, int] | None = None
+    ) -> None:
         """
         Build the optimized trie index from a list of words.
 
@@ -63,7 +65,9 @@ class TrieSearch:
             if frequencies is None:
                 frequency = self._calculate_default_frequency(word)
             else:
-                frequency = frequencies.get(word, self._calculate_default_frequency(word))
+                frequency = frequencies.get(
+                    word, self._calculate_default_frequency(word)
+                )
 
             self._word_frequencies[word] = frequency
             self._max_frequency = max(self._max_frequency, frequency)
@@ -146,7 +150,9 @@ class TrieSearch:
         matches = list(self._trie.keys(prefix))
 
         # Sort by frequency (descending) and return top results
-        frequency_matches = [(word, self._word_frequencies.get(word, 0)) for word in matches]
+        frequency_matches = [
+            (word, self._word_frequencies.get(word, 0)) for word in matches
+        ]
         frequency_matches.sort(key=lambda x: x[1], reverse=True)
 
         return [word for word, _ in frequency_matches[:max_results]]
@@ -180,7 +186,9 @@ class TrieSearch:
         all_words = list(self._trie)
 
         # Sort by frequency (descending)
-        frequency_words = [(word, self._word_frequencies.get(word, 0)) for word in all_words]
+        frequency_words = [
+            (word, self._word_frequencies.get(word, 0)) for word in all_words
+        ]
         frequency_words.sort(key=lambda x: x[1], reverse=True)
 
         return [word for word, _ in frequency_words]
@@ -202,7 +210,9 @@ class TrieSearch:
 
         # Calculate average word length
         all_words = list(self._trie)
-        avg_length = sum(len(word) for word in all_words) / len(all_words) if all_words else 0.0
+        avg_length = (
+            sum(len(word) for word in all_words) / len(all_words) if all_words else 0.0
+        )
 
         return {
             "word_count": self._word_count,

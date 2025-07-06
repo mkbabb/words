@@ -15,19 +15,25 @@ class PromptTemplateLoader(BaseLoader):
     def __init__(self, template_dir: str | Path) -> None:
         self.template_dir = Path(template_dir)
 
-    def get_source(self, environment: Environment, template: str) -> tuple[str, str, Any]:
+    def get_source(
+        self, environment: Environment, template: str
+    ) -> tuple[str, str, Any]:
         """Load template source from file."""
         template_path = self.template_dir / f"{template}.md"
-        
+
         if not template_path.exists():
             raise TemplateNotFound(template)
-        
+
         mtime = os.path.getmtime(template_path)
-        
+
         with open(template_path, encoding="utf-8") as f:
             source = f.read()
-        
-        return source, str(template_path), lambda: mtime == os.path.getmtime(template_path)
+
+        return (
+            source,
+            str(template_path),
+            lambda: mtime == os.path.getmtime(template_path),
+        )
 
 
 class PromptTemplateManager:
@@ -38,7 +44,7 @@ class PromptTemplateManager:
             # Default to prompts directory relative to this file
             current_dir = Path(__file__).parent
             template_dir = current_dir / "prompts"
-        
+
         self.template_dir = Path(template_dir)
         self.env = Environment(
             loader=PromptTemplateLoader(self.template_dir),
@@ -53,17 +59,25 @@ class PromptTemplateManager:
         return template.render(**kwargs)
 
     def get_synthesis_prompt(
-        self, word: str, word_type: str, provider_definitions: list[tuple[str, str]]
+        self,
+        word: str,
+        provider_definitions: list[tuple[str, str, str]],
+        meaning_cluster: str | None = None,
     ) -> str:
         """Generate synthesis prompt for definition aggregation."""
         return self.render_template(
             "synthesis",
             word=word,
-            word_type=word_type,
             provider_definitions=provider_definitions,
+            meaning_cluster=meaning_cluster,
         )
 
-    def get_example_prompt(self, word: str, definition: str, word_type: str) -> str:
+    def get_example_prompt(
+        self,
+        word: str,
+        word_type: str,
+        definition: str,
+    ) -> str:
         """Generate example generation prompt."""
         return self.render_template(
             "example_generation",
@@ -81,11 +95,11 @@ class PromptTemplateManager:
         return self.render_template("fallback_provider", word=word)
 
     def get_meaning_extraction_prompt(
-        self, word: str, all_provider_definitions: list[tuple[str, str, str]]
+        self, word: str, definitions: list[tuple[str, str, str]]
     ) -> str:
         """Generate meaning extraction prompt."""
         return self.render_template(
             "meaning_extraction",
             word=word,
-            all_provider_definitions=all_provider_definitions,
+            definitions=definitions,
         )

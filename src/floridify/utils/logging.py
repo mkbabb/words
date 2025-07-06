@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any
 
 from loguru import logger
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from loguru import Logger
 
 
 def setup_logging(
@@ -15,19 +18,19 @@ def setup_logging(
     logs_dir: str | Path = "logs",
 ) -> None:
     """Setup loguru logging with console and file outputs.
-    
+
     Args:
         console_level: Log level for console output (DEBUG, INFO, WARNING, ERROR)
-        file_level: Log level for file output (DEBUG, INFO, WARNING, ERROR) 
+        file_level: Log level for file output (DEBUG, INFO, WARNING, ERROR)
         logs_dir: Directory to store log files
     """
     # Remove default handler
     logger.remove()
-    
+
     # Create logs directory
     logs_path = Path(logs_dir)
     logs_path.mkdir(exist_ok=True)
-    
+
     # Console handler with colors and VSCode click-to-file support
     console_format = (
         "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
@@ -35,7 +38,7 @@ def setup_logging(
         "<cyan>{file}:{line}</cyan> | "
         "<level>{message}</level>"
     )
-    
+
     logger.add(
         sys.stderr,
         format=console_format,
@@ -44,7 +47,7 @@ def setup_logging(
         backtrace=True,
         diagnose=True,
     )
-    
+
     # File handler with detailed format
     file_format = (
         "{time:YYYY-MM-DD HH:mm:ss.SSS} | "
@@ -52,7 +55,7 @@ def setup_logging(
         "{file}:{line} | "
         "{message}"
     )
-    
+
     logger.add(
         logs_path / "floridify.log",
         format=file_format,
@@ -63,7 +66,7 @@ def setup_logging(
         backtrace=True,
         diagnose=True,
     )
-    
+
     # Separate error log
     logger.add(
         logs_path / "floridify_errors.log",
@@ -77,17 +80,18 @@ def setup_logging(
     )
 
 
-def get_logger(name: str | None = None) -> Any:
+def get_logger(name: str | None = None) -> Logger:
     """Get a logger instance.
-    
+
     Args:
         name: Optional logger name (defaults to calling module)
-        
+
     Returns:
         Loguru logger instance
     """
     if name:
         return logger.bind(name=name)
+
     return logger
 
 

@@ -7,24 +7,15 @@ from typing import Any
 
 import numpy as np
 from beanie import Document
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from .constants import WordType
-
-
-class Word(BaseModel):
-    """Represents a word with its text and associated embeddings."""
-    
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    text: str
-    embedding: dict[str, np.ndarray] = Field(default_factory=dict)
 
 
 class Pronunciation(BaseModel):
     """Pronunciation data in multiple formats."""
 
-    phonetic: str  # e.g. "en coulisses -> on koo-LEES"
+    phonetic: str = ""  # e.g. "en coulisses -> on koo-LEES"
     ipa: str | None = None  # e.g. "/ɑːn kəˈliːs/"
 
 
@@ -58,21 +49,19 @@ class Examples(BaseModel):
     literature: list[LiteratureExample] = Field(default_factory=list)
 
 
-class SynonymReference(BaseModel):
-    """Forward declaration for synonym references."""
-
-    word: Word
-    word_type: WordType
-
-
 class Definition(BaseModel):
     """Single word definition with bound synonyms and examples."""
 
-    word_type: WordType
+    word_type: str
+
     definition: str
-    synonyms: list[SynonymReference] = Field(default_factory=list)
+
+    synonyms: list[str] = Field(default_factory=list)
+
     examples: Examples = Field(default_factory=Examples)
-    meaning_cluster: str | None = None  # AI-extracted meaning cluster ID
+
+    meaning_cluster: str | None = None
+
     raw_metadata: dict[str, Any] | None = None
 
 
@@ -80,17 +69,23 @@ class ProviderData(BaseModel):
     """Container for provider-specific definitions and metadata."""
 
     provider_name: str
+
     definitions: list[Definition] = Field(default_factory=list)
+
     last_updated: datetime = Field(default_factory=datetime.now)
+
     raw_metadata: dict[str, Any] | None = None
 
 
 class DictionaryEntry(Document):
     """Main entry point for word data - organized by provider for layered access."""
 
-    word: Word
+    word: str
+
     pronunciation: Pronunciation
-    providers: dict[str, ProviderData] = Field(default_factory=dict)
+
+    provider_data: dict[str, ProviderData] = Field(default_factory=dict)
+
     last_updated: datetime = Field(default_factory=datetime.now)
 
     class Settings:
@@ -103,8 +98,23 @@ class DictionaryEntry(Document):
 
     def add_provider_data(self, provider_data: ProviderData) -> None:
         """Add or update provider data."""
-        self.providers[provider_data.provider_name] = provider_data
+        self.provider_data[provider_data.provider_name] = provider_data
         self.last_updated = datetime.now()
+
+    def get_providers_data_dict(self) -> dict[str, dict[str, list[str]]]:
+        """Get all provider data as a nested dictionary:
+
+        {provider_name: word_type -> [definition]}.
+        """
+        providers_data_dict: dict[str, dict[str, list[str]]] = {}
+
+        for provider_name, provider_data in self.provider_data.items():
+            providers_data_dict[provider_name] = {
+                definition.word_type: [x.definition for x in provider_data.definitions]
+                for definition in provider_data.definitions
+            }
+
+        return providers_data_dict
 
 
 class SynthesizedDictionaryEntry(Document):
@@ -117,9 +127,12 @@ class SynthesizedDictionaryEntry(Document):
     but this entry synthesizes them into a single coherent structure for easy access.
     """
 
-    word: Word
+    word: str
+
     pronunciation: Pronunciation
+
     definitions: list[Definition] = Field(default_factory=list)
+
     last_updated: datetime = Field(default_factory=datetime.now)
 
     class Settings:

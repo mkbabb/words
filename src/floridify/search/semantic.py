@@ -48,9 +48,9 @@ class SemanticSearch:
         """
         self.cache_dir = cache_dir
         self.vector_dir = cache_dir / "vectors"
-        
+
         self.vector_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self.force_rebuild = force_rebuild
 
         # Embedding components
@@ -85,6 +85,7 @@ class SemanticSearch:
             vocabulary: List of words and phrases to create embeddings for
         """
         logger.info(f"Initializing semantic search with {len(vocabulary)} words")
+
         self.vocabulary = vocabulary
         self.word_to_id = {word: i for i, word in enumerate(vocabulary)}
 
@@ -120,6 +121,7 @@ class SemanticSearch:
 
         # Character-level embeddings (morphological patterns)
         logger.debug("Building character-level embeddings")
+
         self.char_vectorizer = TfidfVectorizer(
             analyzer="char",
             ngram_range=self.char_ngram_range,
@@ -245,7 +247,7 @@ class SemanticSearch:
     def _get_cache_paths(self) -> dict[str, Path]:
         """Get paths for all cache files."""
         vocab_hash = self._get_vocabulary_hash()
-        
+
         return {
             "metadata": self.vector_dir / f"metadata_{vocab_hash}.pkl",
             # Vectorizer paths
@@ -523,27 +525,14 @@ class SemanticSearch:
 
     def get_statistics(self) -> dict[str, Any]:
         """Get semantic search statistics and metrics."""
-        try:
-            import importlib.util
-            has_faiss = importlib.util.find_spec("faiss") is not None
-        except ImportError:
-            has_faiss = False
-            
-        try:
-            import importlib.util
-            has_sklearn = importlib.util.find_spec("sklearn") is not None
-        except ImportError:
-            has_sklearn = False
-            
+
         stats: dict[str, Any] = {
             "vocabulary_size": len(self.vocabulary),
-            "has_faiss": has_faiss,
-            "has_sklearn": has_sklearn,
             "embedding_levels": {},
             "index_size": {},
             "memory_usage": {},
         }
-        
+
         # Character level stats
         if self.char_embeddings is not None:
             stats["embedding_levels"]["character"] = {
@@ -554,10 +543,10 @@ class SemanticSearch:
             stats["memory_usage"]["char_embeddings_mb"] = (
                 self.char_embeddings.nbytes / 1024 / 1024
             )
-            
+
         if self.char_index is not None:
             stats["index_size"]["char_index"] = self.char_index.ntotal
-            
+
         # Subword level stats
         if self.subword_embeddings is not None:
             stats["embedding_levels"]["subword"] = {
@@ -568,10 +557,10 @@ class SemanticSearch:
             stats["memory_usage"]["subword_embeddings_mb"] = (
                 self.subword_embeddings.nbytes / 1024 / 1024
             )
-            
+
         if self.subword_index is not None:
             stats["index_size"]["subword_index"] = self.subword_index.ntotal
-            
+
         # Word level stats
         if self.word_embeddings is not None:
             stats["embedding_levels"]["word"] = {
@@ -582,14 +571,14 @@ class SemanticSearch:
             stats["memory_usage"]["word_embeddings_mb"] = (
                 self.word_embeddings.nbytes / 1024 / 1024
             )
-            
+
         if self.word_index is not None:
             stats["index_size"]["word_index"] = self.word_index.ntotal
-            
+
         # Calculate total memory usage
         total_memory = sum(stats["memory_usage"].values())
         stats["memory_usage"]["total_mb"] = total_memory
-        
+
         # Configuration info
         stats["configuration"] = {
             "max_features": self.max_features,
@@ -597,7 +586,7 @@ class SemanticSearch:
             "subword_ngram_range": self.subword_ngram_range,
             "cache_dir": str(self.cache_dir),
         }
-        
+
         return stats
 
     async def _search_cosine_similarity(

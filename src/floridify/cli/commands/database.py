@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ...constants import DictionaryProvider
-from ...models.dictionary import (
+from ...models.models import (
     APIResponseCache,
     DictionaryEntry,
     SynthesizedDictionaryEntry,
@@ -162,7 +162,7 @@ async def _get_quality_metrics() -> dict[str, str]:
 
             if sample_entries:
                 # Calculate average providers per word
-                total_providers = sum(len(entry.providers) for entry in sample_entries)
+                total_providers = sum(len(entry.provider_data) for entry in sample_entries)
                 avg_providers = total_providers / len(sample_entries)
                 metrics["Average providers per word"] = f"{avg_providers:.1f}"
 
@@ -172,7 +172,7 @@ async def _get_quality_metrics() -> dict[str, str]:
                     for entry in sample_entries
                     if any(
                         provider_data.definitions
-                        for provider_data in entry.providers.values()
+                        for provider_data in entry.provider_data.values()
                     )
                 )
                 coverage_pct = (entries_with_defs / len(sample_entries)) * 100

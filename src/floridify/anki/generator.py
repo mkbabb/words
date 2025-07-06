@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,101 @@ from .ankiconnect import AnkiDirectIntegration
 from .templates import AnkiCardTemplate, CardType
 
 logger = get_logger(__name__)
+
+
+def render_list_fields(template: str, fields: dict[str, Any]) -> str:
+    """Render list fields in template using {{#ListField}}{{.}}{{/ListField}} syntax."""
+    result = template
+    
+    for field_name, field_value in fields.items():
+        if isinstance(field_value, list) and field_value:  # Only if list has items
+            list_pattern = f"{{{{#{field_name}}}}}(.*?){{{{/{field_name}}}}}"
+            
+            def replace_list_items(match: re.Match[str]) -> str:
+                item_template = match.group(1)
+                rendered_items = [
+                    item_template.replace("{{.}}", str(item)) for item in field_value
+                ]
+                return "".join(rendered_items)
+            
+            result = re.sub(list_pattern, replace_list_items, result, flags=re.DOTALL)
+    
+    return result
+
+
+def render_conditional_sections(template: str, fields: dict[str, Any]) -> str:
+    """Render conditional sections using {{#FieldName}}...{{/FieldName}} syntax."""
+    result = template
+    
+    for field_name, field_value in fields.items():
+        section_pattern = f"{{{{#{field_name}}}}}(.*?){{{{/{field_name}}}}}"
+        
+        # Check if field has a meaningful value
+        has_value = _field_has_value(field_value)
+        
+        if has_value:
+            # Keep the content, remove the conditional markers
+            result = re.sub(section_pattern, r"\1", result, flags=re.DOTALL)
+        else:
+            # Remove the entire conditional section
+            result = re.sub(section_pattern, "", result, flags=re.DOTALL)
+    
+    return result
+
+
+def render_simple_fields(template: str, fields: dict[str, Any]) -> str:
+    """Render simple field substitutions using {{FieldName}} syntax."""
+    result = template
+    
+    for field_name, field_value in fields.items():
+        if isinstance(field_value, list):
+            # Convert lists to comma-separated strings for simple substitution
+            field_str = ", ".join(str(item) for item in field_value)
+        else:
+            field_str = str(field_value) if field_value is not None else ""
+        
+        result = result.replace(f"{{{{{field_name}}}}}", field_str)
+    
+    return result
+
+
+def _field_has_value(field_value: Any) -> bool:
+    """Check if a field has a meaningful value for conditional rendering."""
+    if isinstance(field_value, list):
+        return len(field_value) > 0
+    if isinstance(field_value, str):
+        return field_value.strip() != ""
+    return field_value is not None
+
+
+def render_template(template: str, fields: dict[str, Any]) -> str:
+    """Render a template with field values using functional approach."""
+    # Apply rendering in order: lists, conditionals, then simple fields
+    result = render_list_fields(template, fields)
+    result = render_conditional_sections(result, fields)
+    result = render_simple_fields(result, fields)
+    return result
+
+
+def extract_definitions(entry: DictionaryEntry | SynthesizedDictionaryEntry) -> list[Definition]:
+    """Extract definitions from either DictionaryEntry or SynthesizedDictionaryEntry."""
+    if isinstance(entry, SynthesizedDictionaryEntry):
+        # SynthesizedDictionaryEntry has definitions directly
+        return entry.definitions
+    
+    # DictionaryEntry has providers with definitions
+    ai_provider = entry.provider_data.get("ai_synthesis")
+    if ai_provider and ai_provider.definitions:
+        return ai_provider.definitions
+    
+    # Collect definitions from all providers
+    definitions = []
+    for provider_data in entry.provider_data.values():
+        definitions.extend(provider_data.definitions)
+    
+    return definitions
+
+
 
 
 
@@ -42,59 +138,12 @@ class AnkiCard:
 
     def render_front(self) -> str:
         """Render the front of the card."""
-        return self._render_template(self.template.front_template)
+        return render_template(self.template.front_template, self.fields)
 
     def render_back(self) -> str:
         """Render the back of the card."""
-        return self._render_template(self.template.back_template)
+        return render_template(self.template.back_template, self.fields)
 
-    def _render_template(self, template: str) -> str:
-        """Render a template with field values."""
-        result = template
-
-        # Handle list rendering first: {{#ListField}}{{.}}{{/ListField}}
-        for field_name, field_value in self.fields.items():
-            if isinstance(field_value, list) and field_value:  # Only if list has items
-                list_pattern = f"{{{{#{field_name}}}}}(.*?){{{{/{field_name}}}}}"
-
-                def replace_list(match: re.Match[str]) -> str:
-                    item_template = match.group(1)
-                    rendered_items = []
-                    for item in field_value:
-                        rendered_item = item_template.replace("{{.}}", str(item))
-                        rendered_items.append(rendered_item)
-                    return "".join(rendered_items)
-
-                result = re.sub(list_pattern, replace_list, result, flags=re.DOTALL)
-
-        # Handle conditional sections: {{#FieldName}}...{{/FieldName}}
-        for field_name, field_value in self.fields.items():
-            section_pattern = f"{{{{#{field_name}}}}}(.*?){{{{/{field_name}}}}}"
-
-            # Check if field has a meaningful value
-            has_value = False
-            if isinstance(field_value, list):
-                has_value = len(field_value) > 0
-            elif isinstance(field_value, str):
-                has_value = field_value.strip() != ""
-            elif field_value is not None:
-                has_value = bool(field_value)
-
-            if has_value:
-                # Show section content (remove the conditional tags)
-                result = re.sub(section_pattern, r"\1", result, flags=re.DOTALL)
-            else:
-                # Hide entire section
-                result = re.sub(section_pattern, "", result, flags=re.DOTALL)
-
-        # Handle simple substitution: {{FieldName}}
-        for field_name, field_value in self.fields.items():
-            if not isinstance(field_value, list):  # Skip lists (already handled)
-                result = result.replace(
-                    f"{{{{{field_name}}}}}", str(field_value) if field_value else ""
-                )
-
-        return result
 
 
 class AnkiCardGenerator:
@@ -131,88 +180,58 @@ class AnkiCardGenerator:
         Returns:
             List of generated Anki cards
         """
-        import time
         start_time = time.time()
         
-        logger.info(f"🎴 Starting card generation for word: '{entry.word.text}'")
+        logger.info(f"🎴 Starting card generation for word: '{entry.word}'")
+        
+        # Use default card types if none specified
         if card_types is None:
             card_types = [CardType.MULTIPLE_CHOICE, CardType.FILL_IN_BLANK]
         
-        logger.debug(
-            f"Card types: {[ct.value for ct in card_types]}, max per type: {max_cards_per_type}"
-        )
-        cards: list[Any] = []
-
-        # Get definitions based on entry type
-        if isinstance(entry, SynthesizedDictionaryEntry):
-            # SynthesizedDictionaryEntry has definitions directly
-            definitions = entry.definitions
-        else:
-            # DictionaryEntry has providers with definitions
-            ai_provider = entry.providers.get("ai_synthesis")
-            if ai_provider and ai_provider.definitions:
-                definitions = ai_provider.definitions
-            else:
-                # Collect definitions from all providers
-                definitions = []
-                for provider_data in entry.providers.values():
-                    definitions.extend(provider_data.definitions)
-
+        # Extract definitions using helper function
+        definitions = extract_definitions(entry)
         if not definitions:
-            logger.warning(f"📛 No definitions found for word: '{entry.word.text}'")
-            return cards
+            logger.warning(f"📛 No definitions found for word: '{entry.word}'")
+            return []
 
-        logger.debug(f"📖 Found {len(definitions)} definitions for '{entry.word.text}'")
+        logger.debug(f"📖 Found {len(definitions)} definitions for '{entry.word}'")
 
-        # Generate cards for each requested type
+        # Generate cards for each type and definition combination
+        cards = []
         for card_type in card_types:
-            type_start_time = time.time()
-            logger.info(f"⚡ Generating {card_type.value} cards for '{entry.word.text}'")
-            type_cards = []
-
-            for i, definition in enumerate(definitions[:max_cards_per_type]):
-                try:
-                    def_start_time = time.time()
-                    logger.debug(f"🔨 Creating {card_type.value} card {i+1}/{min(max_cards_per_type, len(definitions))}")
-                    
-                    if card_type == CardType.MULTIPLE_CHOICE:
-                        card = await self._generate_multiple_choice_card(entry, definition)
-                    elif card_type == CardType.FILL_IN_BLANK:
-                        card = await self._generate_fill_blank_card(entry, definition)
-                    else:
-                        logger.warning(f"⚠️ Unsupported card type: {card_type.value}")
-                        continue  # Skip unsupported card types
-
-                    if card:
-                        type_cards.append(card)
-                        def_elapsed = time.time() - def_start_time
-                        logger.debug(f"✅ Created {card_type.value} card in {def_elapsed:.2f}s")
-                    else:
-                        logger.warning(f"❌ Failed to create {card_type.value} card")
-
-                except Exception as e:
-                    logger.error(
-                        f"💥 Error generating {card_type.value} card for {entry.word.text}: {e}"
-                    )
-                    continue
-
-            type_elapsed = time.time() - type_start_time
-            logger.info(f"🎯 Generated {len(type_cards)} {card_type.value} cards in {type_elapsed:.2f}s")
-            cards.extend(type_cards)
+            for definition in definitions[:max_cards_per_type]:
+                card = await self._generate_card_for_type(card_type, definition, entry)
+                if card:
+                    cards.append(card)
 
         total_elapsed = time.time() - start_time
-        logger.info(f"🏁 Generated {len(cards)} total cards for '{entry.word.text}' in {total_elapsed:.2f}s")
+        logger.info(f"🏁 Generated {len(cards)} total cards for '{entry.word}' in {total_elapsed:.2f}s")
         return cards
+    
+    async def _generate_card_for_type(
+        self, card_type: CardType, definition: Definition, entry: DictionaryEntry | SynthesizedDictionaryEntry
+    ) -> AnkiCard | None:
+        """Generate a card for a specific type using appropriate method."""
+        try:
+            if card_type == CardType.MULTIPLE_CHOICE:
+                return await self._generate_multiple_choice_card(entry, definition)
+            elif card_type == CardType.FILL_IN_BLANK:
+                return await self._generate_fill_blank_card(entry, definition)
+            else:
+                logger.warning(f"⚠️ Unsupported card type: {card_type.value}")
+                return None
+        except Exception as e:
+            logger.error(f"💥 Error generating {card_type.value} card for {entry.word}: {e}")
+            return None
 
     async def _generate_multiple_choice_card(
         self, entry: DictionaryEntry | SynthesizedDictionaryEntry, definition: Definition
     ) -> AnkiCard | None:
         """Generate a multiple choice flashcard."""
         try:
-            import time
             start_time = time.time()
             
-            logger.debug(f"🧠 Generating multiple choice AI content for '{entry.word.text}'")
+            logger.debug(f"🧠 Generating multiple choice AI content for '{entry.word}'")
             
             # Prepare examples for the prompt
             examples_text = ""
@@ -224,9 +243,9 @@ class AnkiCardGenerator:
             # Generate multiple choice content using structured output
             ai_start_time = time.time()
             ai_response = await self.openai_connector.generate_anki_multiple_choice(
-                word=entry.word.text,
+                word=entry.word,
                 definition=definition.definition,
-                word_type=definition.word_type.value,
+                word_type=definition.word_type,
                 examples=examples_text,
             )
             ai_elapsed = time.time() - ai_start_time
@@ -240,13 +259,13 @@ class AnkiCardGenerator:
             
             synonyms_text = ""
             if definition.synonyms:
-                synonyms_list = [syn.word.text for syn in definition.synonyms[:5]]
+                synonyms_list = definition.synonyms[:5]
                 synonyms_text = ", ".join(synonyms_list)
             
             # Prepare card fields
             fields = {
-                "Word": entry.word.text,
-                "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word.text}/",
+                "Word": entry.word,
+                "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word}/",
                 "ChoiceA": ai_response.choice_a,
                 "ChoiceB": ai_response.choice_b,
                 "ChoiceC": ai_response.choice_c,
@@ -268,7 +287,7 @@ class AnkiCardGenerator:
             return AnkiCard(CardType.MULTIPLE_CHOICE, fields, card_template)
 
         except Exception as e:
-            logger.error(f"💥 Error generating multiple choice card for '{entry.word.text}': {e}")
+            logger.error(f"💥 Error generating multiple choice card for '{entry.word}': {e}")
             return None
 
     async def _generate_fill_blank_card(
@@ -276,10 +295,9 @@ class AnkiCardGenerator:
     ) -> AnkiCard | None:
         """Generate a fill-in-the-blank flashcard."""
         try:
-            import time
             start_time = time.time()
             
-            logger.debug(f"📝 Generating fill-in-blank AI content for '{entry.word.text}'")
+            logger.debug(f"📝 Generating fill-in-blank AI content for '{entry.word}'")
             
             # Prepare examples for the prompt
             examples_text = ""
@@ -291,9 +309,9 @@ class AnkiCardGenerator:
             # Generate fill-in-the-blank content using structured output
             ai_start_time = time.time()
             ai_response = await self.openai_connector.generate_anki_fill_blank(
-                word=entry.word.text,
+                word=entry.word,
                 definition=definition.definition,
-                word_type=definition.word_type.value,
+                word_type=definition.word_type,
                 examples=examples_text,
             )
             ai_elapsed = time.time() - ai_start_time
@@ -301,15 +319,15 @@ class AnkiCardGenerator:
 
             # Create complete sentence by replacing blank with highlighted word
             complete_sentence = ai_response.sentence.replace(
-                "_____", f'<span class="word-highlight">{entry.word.text}</span>'
+                "_____", f'<span class="word-highlight">{entry.word}</span>'
             )
 
             # Prepare card fields
             fields = {
-                "Word": entry.word.text,
-                "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word.text}/",
+                "Word": entry.word,
+                "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word}/",
                 "SentenceWithBlank": ai_response.sentence,
-                "WordType": definition.word_type.value,
+                "WordType": definition.word_type,
                 "Hint": ai_response.hint or "",
                 "CompleteSentence": complete_sentence,
                 "Definition": definition.definition,
@@ -326,7 +344,7 @@ class AnkiCardGenerator:
             return AnkiCard(CardType.FILL_IN_BLANK, fields, card_template)
 
         except Exception as e:
-            logger.error(f"💥 Error generating fill-in-blank card for '{entry.word.text}': {e}")
+            logger.error(f"💥 Error generating fill-in-blank card for '{entry.word}': {e}")
             return None
 
 
@@ -344,7 +362,6 @@ class AnkiCardGenerator:
             True if export successful, False otherwise
         """
         try:
-            import time
             start_time = time.time()
             
             logger.info(f"📦 Starting .apkg export: {len(cards)} cards to '{deck_name}'")
@@ -428,7 +445,6 @@ class AnkiCardGenerator:
             Tuple of (success, apkg_path). Success is True if cards were added to Anki
             directly, apkg_path is provided if .apkg was created as fallback.
         """
-        import time
         start_time = time.time()
         
         logger.info(f"🚀 Attempting direct export of {len(cards)} cards to Anki deck '{deck_name}'")

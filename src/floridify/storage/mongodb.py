@@ -8,7 +8,7 @@ from typing import Any
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from ..models.dictionary import APIResponseCache, DictionaryEntry, SynthesizedDictionaryEntry
+from ..models.models import APIResponseCache, DictionaryEntry, SynthesizedDictionaryEntry
 from ..utils.logging import get_logger
 from ..list.models import WordList
 
@@ -71,12 +71,12 @@ class MongoDBStorage:
 
         try:
             # Use Beanie's upsert functionality
-            existing = await DictionaryEntry.find_one(DictionaryEntry.word.text == entry.word.text)
+            existing = await DictionaryEntry.find_one(DictionaryEntry.word == entry.word)
 
             if existing:
                 # Update existing entry
                 existing.pronunciation = entry.pronunciation
-                existing.providers.update(entry.providers)
+                existing.provider_data.update(entry.provider_data)
                 existing.last_updated = datetime.now()
                 await existing.save()
             else:
@@ -86,7 +86,7 @@ class MongoDBStorage:
             return True
 
         except Exception as e:
-            logger.error(f"Error saving entry for {entry.word.text}: {e}")
+            logger.error(f"Error saving entry for {entry.word}: {e}")
             return False
 
     async def get_entry(self, word: str) -> DictionaryEntry | None:
@@ -102,7 +102,7 @@ class MongoDBStorage:
             return None
 
         try:
-            return await DictionaryEntry.find_one(DictionaryEntry.word.text == word)
+            return await DictionaryEntry.find_one(DictionaryEntry.word == word)
         except Exception as e:
             logger.error(f"Error retrieving entry for {word}: {e}")
             return None
@@ -120,7 +120,7 @@ class MongoDBStorage:
             return False
 
         try:
-            count = await DictionaryEntry.find(DictionaryEntry.word.text == word).count()
+            count = await DictionaryEntry.find(DictionaryEntry.word == word).count()
             return count > 0
         except Exception as e:
             logger.error(f"Error checking existence for {word}: {e}")
@@ -275,7 +275,7 @@ async def get_synthesized_entry(word: str) -> SynthesizedDictionaryEntry | None:
     try:
         await _ensure_initialized()
         return await SynthesizedDictionaryEntry.find_one(
-            SynthesizedDictionaryEntry.word.text == word
+            SynthesizedDictionaryEntry.word == word
         )
     except Exception:
         return None
@@ -286,7 +286,7 @@ async def save_synthesized_entry(entry: SynthesizedDictionaryEntry) -> None:
     try:
         await _ensure_initialized()
         existing = await SynthesizedDictionaryEntry.find_one(
-            SynthesizedDictionaryEntry.word.text == entry.word.text
+            SynthesizedDictionaryEntry.word == entry.word
         )
         
         if existing:

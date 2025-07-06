@@ -8,36 +8,44 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from ..utils.text_utils import normalize_word
 
-
-def normalize_word(word: str) -> str:
-    """Normalize a word for search and lookup.
-
-    Args:
-        word: Input word to normalize
-
-    Returns:
-        Normalized word
-    """
-    if not word:
-        return ""
-
-    # Convert to lowercase
-    normalized = word.lower()
-
-    # Remove extra whitespace and normalize spaces
-    normalized = re.sub(r"\s+", " ", normalized.strip())
-
-    # Normalize unicode characters (NFD form to separate accents)
-    normalized = unicodedata.normalize("NFD", normalized)
-
-    # Remove diacritics/accents but keep the base characters
-    normalized = "".join(c for c in normalized if not unicodedata.combining(c))
-
-    # Convert back to composed form
-    normalized = unicodedata.normalize("NFC", normalized)
-
-    return normalized
+# Common diacritic mappings for reference
+DIACRITIC_MAPPINGS = {
+    # French
+    'à': 'a',
+    'á': 'a',
+    'â': 'a',
+    'ã': 'a',
+    'ä': 'a',
+    'å': 'a',
+    'è': 'e',
+    'é': 'e',
+    'ê': 'e',
+    'ë': 'e',
+    'ì': 'i',
+    'í': 'i',
+    'î': 'i',
+    'ï': 'i',
+    'ò': 'o',
+    'ó': 'o',
+    'ô': 'o',
+    'õ': 'o',
+    'ö': 'o',
+    'ù': 'u',
+    'ú': 'u',
+    'û': 'u',
+    'ü': 'u',
+    'ý': 'y',
+    'ÿ': 'y',
+    'ç': 'c',
+    'ñ': 'n',
+    # German
+    'ß': 'ss',
+    # Common ligatures
+    'æ': 'ae',
+    'œ': 'oe',
+}
 
 
 def generate_word_variants(word: str) -> list[str]:
@@ -116,7 +124,7 @@ def clean_phrase(phrase: str) -> str:
 def remove_diacritics(text: str) -> str:
     """
     Remove diacritics from text while preserving base characters.
-    
+
     Examples:
         >>> remove_diacritics("à la carte")
         "a la carte"
@@ -127,13 +135,12 @@ def remove_diacritics(text: str) -> str:
     """
     # Normalize to NFD (decomposed form)
     nfd_text = unicodedata.normalize('NFD', text)
-    
+
     # Remove combining marks (diacritics)
     without_diacritics = ''.join(
-        char for char in nfd_text
-        if unicodedata.category(char) != 'Mn'
+        char for char in nfd_text if unicodedata.category(char) != 'Mn'
     )
-    
+
     # Normalize back to NFC (composed form)
     return unicodedata.normalize('NFC', without_diacritics)
 
@@ -141,7 +148,7 @@ def remove_diacritics(text: str) -> str:
 def normalize_text(text: str) -> str:
     """
     Normalize text for consistent lexicon processing.
-    
+
     Steps:
     1. Strip whitespace
     2. Convert to lowercase
@@ -153,9 +160,9 @@ def normalize_text(text: str) -> str:
 def generate_diacritic_variants(text: str) -> set[str]:
     """
     Generate all diacritic variants for improved search coverage.
-    
+
     Returns both normalized and diacritic-free versions of the input.
-    
+
     Examples:
         >>> generate_diacritic_variants("à la carte")
         {"à la carte", "a la carte"}
@@ -164,39 +171,20 @@ def generate_diacritic_variants(text: str) -> set[str]:
     """
     normalized = normalize_text(text)
     variants = {normalized}
-    
+
     # Add diacritic-free variant if different
     without_diacritics = remove_diacritics(normalized)
     if without_diacritics != normalized:
         variants.add(without_diacritics)
-    
+
     return variants
 
 
 def normalize_lexicon_entry(text: str) -> set[str]:
     """
     Comprehensive lexicon entry normalization with variant generation.
-    
+
     Combines text normalization with diacritic variant generation
     for maximum search coverage.
     """
     return generate_diacritic_variants(text)
-
-
-# Common diacritic mappings for reference
-DIACRITIC_MAPPINGS = {
-    # French
-    'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'å': 'a',
-    'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
-    'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i',
-    'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o',
-    'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u',
-    'ý': 'y', 'ÿ': 'y',
-    'ç': 'c', 'ñ': 'n',
-    
-    # German
-    'ß': 'ss',
-    
-    # Common ligatures
-    'æ': 'ae', 'œ': 'oe',
-}

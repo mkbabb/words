@@ -3,20 +3,51 @@
 from __future__ import annotations
 
 import re
+import unicodedata
+
+
+def normalize_word(word: str) -> str:
+    """Normalize a word for search and lookup.
+
+    Args:
+        word: Input word to normalize
+
+    Returns:
+        Normalized word
+    """
+    if not word:
+        return ""
+
+    # Convert to lowercase
+    normalized = word.lower()
+
+    # Remove extra whitespace and normalize spaces
+    normalized = re.sub(r"\s+", " ", normalized.strip())
+
+    # Normalize unicode characters (NFD form to separate accents)
+    normalized = unicodedata.normalize("NFD", normalized)
+
+    # Remove diacritics/accents but keep the base characters
+    normalized = "".join(c for c in normalized if not unicodedata.combining(c))
+
+    # Convert back to composed form
+    normalized = unicodedata.normalize("NFC", normalized)
+
+    return normalized
 
 
 def clean_markdown(text: str) -> str:
     """Remove markdown formatting from text.
-    
+
     Args:
         text: Text containing markdown formatting
-        
+
     Returns:
         Clean text with markdown formatting removed
     """
     # Remove bold formatting
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    # Remove italic formatting  
+    # Remove italic formatting
     text = re.sub(r'\*(.*?)\*', r'\1', text)
     # Remove code formatting
     text = re.sub(r'`(.*?)`', r'\1', text)
@@ -27,10 +58,10 @@ def clean_markdown(text: str) -> str:
 
 def ensure_sentence_case(text: str) -> str:
     """Ensure text has proper sentence case: capital first letter, period at end.
-    
+
     Args:
         text: Text to format
-        
+
     Returns:
         Text with proper sentence case
     """
@@ -54,23 +85,23 @@ def ensure_sentence_case(text: str) -> str:
 
 def bold_word_in_text(text: str, word: str) -> list[tuple[str, str]]:
     """Find and mark word/phrase for bolding in text.
-    
+
     Args:
         text: Text to search in
         word: Word or phrase to bold
-        
+
     Returns:
         List of (text_part, style) tuples for rich formatting
     """
     word_lower = word.lower()
     text_lower = text.lower()
-    
+
     # Try to find the complete phrase first
     if word_lower in text_lower:
         pattern = re.compile(re.escape(word_lower), re.IGNORECASE)
         parts = pattern.split(text)
         matches = pattern.findall(text)
-        
+
         result = []
         for i, part in enumerate(parts):
             if i > 0 and i <= len(matches):
@@ -78,12 +109,12 @@ def bold_word_in_text(text: str, word: str) -> list[tuple[str, str]]:
             if part:
                 result.append((part, "normal"))
         return result
-    
+
     # Fallback for multi-word phrases
     word_parts = word_lower.split()
     if len(word_parts) > 1:
         return [(text, "normal")]
-    
+
     # Single word fallback - try to bold significant word parts
     for word_part in word_parts:
         if len(word_part) > 3 and word_part in text_lower:
@@ -91,7 +122,7 @@ def bold_word_in_text(text: str, word: str) -> list[tuple[str, str]]:
             if pattern.search(text):
                 parts = pattern.split(text)
                 matches = pattern.findall(text)
-                
+
                 result = []
                 for i, part in enumerate(parts):
                     if i > 0 and i <= len(matches):
@@ -99,6 +130,6 @@ def bold_word_in_text(text: str, word: str) -> list[tuple[str, str]]:
                     if part:
                         result.append((part, "normal"))
                 return result
-    
+
     # No matches found
     return [(text, "normal")]

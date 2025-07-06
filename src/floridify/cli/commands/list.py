@@ -32,43 +32,22 @@ def list_command() -> None:
 @list_command.command()
 @click.argument("input_file", type=click.Path(exists=True))
 @click.option("--name", "-n", help="Word list name (auto-generated if not provided)")
-@click.option(
-    "--provider",
-    "-p",
-    type=click.Choice([p.value for p in DictionaryProvider], case_sensitive=False),
-    default="wiktionary",
-    help="Dictionary provider to use",
-)
-@click.option(
-    "--language",
-    "-l",
-    type=click.Choice([lang.value for lang in Language], case_sensitive=False),
-    default="en",
-    help="Language for lookup",
-)
-@click.option("--semantic", is_flag=True, help="Force semantic search mode")
-@click.option("--no-ai", is_flag=True, help="Skip AI synthesis")
 def create(
     input_file: str,
     name: str | None,
-    provider: str,
-    language: str,
-    semantic: bool,
-    no_ai: bool,
 ) -> None:
     """Create a new word list from file."""
     asyncio.run(
-        _create_async(Path(input_file), name, provider, language, semantic, no_ai)
+        _create_async(
+            Path(input_file),
+            name,
+        )
     )
 
 
 async def _create_async(
     input_file: Path,
     name: str | None,
-    provider: str,
-    language: str,
-    semantic: bool,
-    no_ai: bool,
 ) -> None:
     """Async implementation of create command."""
     logger.info(f"Processing word list from: {input_file}")
@@ -115,9 +94,7 @@ async def _create_async(
     console.print("Starting batch dictionary lookup...")
 
     # Process words with dictionary lookup in batches
-    await _process_words_batch(
-        [wf.text for wf in word_list.words], provider, language, semantic, no_ai
-    )
+    await _process_words_batch([wf.text for wf in word_list.words])
 
     console.print("Dictionary lookup processing completed!")
 
@@ -288,7 +265,7 @@ async def _delete_async(name: str) -> None:
 
 
 async def _process_words_batch(
-    words: list[str], provider: str, language: str, semantic: bool, no_ai: bool
+    words: list[str],
 ) -> None:
     """Process words in batches with dictionary lookup pipeline."""
     if not words:
@@ -313,7 +290,7 @@ async def _process_words_batch(
             # Create lookup tasks for each word in batch
             tasks = []
             for word in batch:
-                tasks.append(_lookup_word(word, provider, language, semantic, no_ai))
+                tasks.append(_lookup_word(word))
 
             # Execute batch
             try:
@@ -342,17 +319,11 @@ async def _process_words_batch(
     logger.info(f"Completed processing {total_words} words")
 
 
-async def _lookup_word(
-    word: str, provider: str, language: str, semantic: bool, no_ai: bool
-) -> bool:
+async def _lookup_word(word: str) -> bool:
     """Lookup a single word through the full lookup pipeline."""
     try:
         result = await lookup_word_pipeline(
             word=word,
-            provider=DictionaryProvider(provider),
-            language=Language(language),
-            semantic=semantic,
-            no_ai=no_ai,
         )
 
         if result:

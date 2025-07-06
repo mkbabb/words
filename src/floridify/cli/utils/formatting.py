@@ -17,7 +17,12 @@ from rich.table import Table
 from rich.text import Text
 
 from src.floridify.constants import DictionaryProvider, Language
-from src.floridify.utils.text_utils import bold_word_in_text, clean_markdown, ensure_sentence_case
+from src.floridify.models.models import Definition
+from src.floridify.utils.text_utils import (
+    bold_word_in_text,
+    clean_markdown,
+    ensure_sentence_case,
+)
 
 from ...models import DictionaryEntry, SynthesizedDictionaryEntry
 from ...search import SearchResult
@@ -25,8 +30,16 @@ from ...search.constants import SearchMethod
 
 # Unicode superscript mapping for meaning counters
 SUPERSCRIPT_MAP = {
-    '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
-    '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+    '0': '⁰',
+    '1': '¹',
+    '2': '²',
+    '3': '³',
+    '4': '⁴',
+    '5': '⁵',
+    '6': '⁶',
+    '7': '⁷',
+    '8': '⁸',
+    '9': '⁹',
 }
 
 
@@ -43,10 +56,10 @@ def format_meaning_cluster_name(meaning_id: str) -> str:
     if len(parts) > 1:
         # Skip the word part and format the meaning part
         meaning_parts = parts[1:]  # Skip word prefix like 'bank_'
-        return ' '.join(word.capitalize() for word in meaning_parts)
+        return ' '.join(word.lower() for word in meaning_parts)
     else:
         # Fallback for single words
-        return meaning_id.capitalize()
+        return meaning_id.lower()
 
 
 console = Console()
@@ -304,6 +317,7 @@ def format_performance_table(stats: dict[str, dict[str, Any]]) -> Table | None:
         return None
 
     table = Table(title="Search Performance")
+
     table.add_column("Method", style="cyan")
     table.add_column("Searches", justify="right", style="magenta")
     table.add_column("Total Time", justify="right", style="green")
@@ -331,8 +345,9 @@ def _format_example_with_bold_word(
 ) -> None:
     """Add example text to content with word bolded."""
     content.append("  ", style="cyan")  # Indent
-    
+
     text_parts = bold_word_in_text(example_text, word)
+
     for text_part, style_type in text_parts:
         if style_type == "bold":
             content.append(text_part, style="bold cyan")
@@ -341,7 +356,7 @@ def _format_example_with_bold_word(
 
 
 def _add_definition_content(
-    content: Text, definitions: list[Any], word: str
+    content: Text, definitions: list[Definition], word: str
 ) -> None:
     """Add definition content with examples to a Text object."""
     for i, definition in enumerate(definitions):
@@ -349,7 +364,7 @@ def _add_definition_content(
             content.append("\n\n")
 
         # Word type
-        content.append(f"{definition.word_type.value}", style="bold yellow")
+        content.append(f"{definition.word_type}", style="bold yellow")
         content.append("\n")
 
         # Clean and format definition with proper sentence case
@@ -358,21 +373,22 @@ def _add_definition_content(
         content.append(f"  {clean_def}", style="white")
 
         # Examples with special formatting
-        if hasattr(definition, 'examples') and definition.examples.generated:
-            for example in definition.examples.generated[:1]:  # Show 1 example per definition
-                content.append("\n\n")
-                
-                # Clean example text and ensure proper sentence case
-                clean_example = clean_markdown(example.sentence)
-                clean_example = ensure_sentence_case(clean_example)
-                
-                _format_example_with_bold_word(content, clean_example, word)
+        for example in definition.examples.generated[
+            :1
+        ]:  # Show 1 example per definition
+            content.append("\n\n")
+
+            # Clean example text and ensure proper sentence case
+            clean_example = clean_markdown(example.sentence)
+            clean_example = ensure_sentence_case(clean_example)
+
+            _format_example_with_bold_word(content, clean_example, word)
 
 
 def _create_meaning_panel(
     entry: SynthesizedDictionaryEntry,
     meaning_id: str,
-    definitions: list[Any],
+    definitions: list[Definition],
     counter: int,
     use_superscripts: bool,
 ) -> Panel:
@@ -382,7 +398,7 @@ def _create_meaning_panel(
         superscript = _create_superscript(counter)
         meaning_display = format_meaning_cluster_name(meaning_id)
         panel_title = Text()
-        panel_title.append(f"{entry.word.text.lower()}", style="bold bright_blue")
+        panel_title.append(f"{entry.word.lower()}", style="bold bright_blue")
         panel_title.append(superscript, style="bold bright_blue")
         panel_title.append(f" ({meaning_display})", style="dim cyan")
     else:
@@ -390,7 +406,7 @@ def _create_meaning_panel(
 
     # Create content for this meaning
     content = Text()
-    _add_definition_content(content, definitions, entry.word.text.lower())
+    _add_definition_content(content, definitions, entry.word.lower())
 
     return Panel(
         content,
@@ -401,43 +417,33 @@ def _create_meaning_panel(
     )
 
 
-def _add_provider_info(
-    content: Text, 
-    providers: list[DictionaryProvider], 
-    languages: list[Language]
-) -> None:
-    """Add provider and language information to content."""
-    if providers:
-        content.append("\n\n")
-        content.append("✨ Providers: ", style="dim")
-        content.append(", ".join(provider.name for provider in providers), style="dim")
-    
-    if languages:
-        content.append("\n")
-        content.append("🌐 Languages: ", style="dim")
-        content.append(", ".join(language.name for language in languages), style="dim")
-
-
 def format_meaning_based_definition(
     entry: SynthesizedDictionaryEntry,
     languages: list[Language],
     providers: list[DictionaryProvider],
-    meaning_groups: dict[str, list[Any]],
+    meaning_groups: dict[str, list[Definition]],
 ) -> Panel:
     """Format AI-generated definition grouped by meanings with separate panels for multiple meanings."""
     # Header with word and pronunciation (word always lowercase)
     header = Text()
-    header.append(entry.word.text.lower(), style="bold bright_blue")
-    if hasattr(entry, 'pronunciation') and entry.pronunciation.phonetic:
-        header.append(f" /{entry.pronunciation.phonetic.lower()}/", style="dim cyan")
+
+    header.append(entry.word, style="bold bright_blue")
+    header.append(f" /{entry.pronunciation.phonetic.lower()}/", style="dim cyan")
+
+    header.append("\n")
+    header.append(", ".join(language.value for language in languages), style="dim")
 
     # Check if we need superscripts and separate panels (more than 1 meaning)
     use_superscripts = len(meaning_groups) > 1
 
+    content_group: Group | Text = None  # type: ignore
+
     if use_superscripts:
         # Create separate panels for each meaning
         panels = []
-        for meaning_counter, (meaning_id, definitions) in enumerate(meaning_groups.items(), 1):
+        for meaning_counter, (meaning_id, definitions) in enumerate(
+            meaning_groups.items(), 1
+        ):
             meaning_panel = _create_meaning_panel(
                 entry, meaning_id, definitions, meaning_counter, True
             )
@@ -448,11 +454,22 @@ def format_meaning_based_definition(
         # Single meaning - use simple format without sub-panels
         meaning_id, definitions = next(iter(meaning_groups.items()))
         content = Text()
-        
-        _add_definition_content(content, definitions, entry.word.text.lower())
-        _add_provider_info(content, providers, languages)
-        
+
+        _add_definition_content(content, definitions, entry.word)
+
         content_group = Group(content)
+
+    # Add provider and language info
+    provider_info = Text()
+    provider_info.append("✨ source(s): ", style="dim")
+    provider_info.append(
+        ", ".join(provider.name.lower() for provider in providers), style="dim"
+    )
+
+    content_group = Group(
+        content_group,
+        provider_info,
+    )
 
     # Wrap everything in outer panel
     return Panel(
@@ -460,5 +477,5 @@ def format_meaning_based_definition(
         title=header,
         title_align="left",
         border_style="blue",
-        padding=(1, 1),
+        padding=(1, 1, 0, 1),
     )

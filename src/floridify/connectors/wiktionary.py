@@ -15,8 +15,6 @@ from ..models import (
     GeneratedExample,
     Pronunciation,
     ProviderData,
-    SynonymReference,
-    Word,
     WordType,
 )
 from ..utils.logging import get_logger
@@ -85,7 +83,9 @@ class WiktionaryConnector(DictionaryConnector):
             logger.error(f"Error fetching {word} from Wiktionary: {e}")
             return None
 
-    def _parse_wiktionary_response(self, word: str, data: dict[str, Any]) -> ProviderData | None:
+    def _parse_wiktionary_response(
+        self, word: str, data: dict[str, Any]
+    ) -> ProviderData | None:
         """Parse Wiktionary API response using wikitextparser.
 
         Args:
@@ -177,7 +177,9 @@ class WiktionaryConnector(DictionaryConnector):
                         examples = self._extract_examples_from_definition(def_text)
 
                         # Extract synonyms if present
-                        synonyms = self._extract_synonyms_from_definition(def_text, word_type)
+                        synonyms = self._extract_synonyms_from_definition(
+                            def_text, word_type
+                        )
 
                         # Clean the definition text
                         clean_def = self._clean_definition_text(def_text)
@@ -185,7 +187,7 @@ class WiktionaryConnector(DictionaryConnector):
                         if clean_def:
                             definitions.append(
                                 Definition(
-                                    word_type=word_type,
+                                    word_type=word_type.value,
                                     definition=clean_def,
                                     examples=examples,
                                     synonyms=synonyms,
@@ -388,7 +390,7 @@ class WiktionaryConnector(DictionaryConnector):
 
     def _extract_synonyms_from_definition(
         self, def_text: str, word_type: WordType
-    ) -> list[SynonymReference]:
+    ) -> list[str]:
         """Extract synonyms from Wiktionary definition text.
 
         Args:
@@ -413,15 +415,15 @@ class WiktionaryConnector(DictionaryConnector):
                         arg_value = str(arg.value).strip()
 
                         # Skip language codes and empty arguments
-                        if arg_value and len(arg_value) > 1 and arg_value not in ["en", "lang"]:
+                        if (
+                            arg_value
+                            and len(arg_value) > 1
+                            and arg_value not in ["en", "lang"]
+                        ):
                             # Clean up the synonym text
                             clean_synonym = self._clean_synonym_text(arg_value)
                             if clean_synonym:
-                                synonyms.append(
-                                    SynonymReference(
-                                        word=Word(text=clean_synonym), word_type=word_type
-                                    )
-                                )
+                                synonyms.append(clean_synonym)
 
             # Also look for inline synonym patterns like "syn: word1, word2"
             syn_patterns = [
@@ -438,9 +440,7 @@ class WiktionaryConnector(DictionaryConnector):
                     for syn_word in syn_words:
                         clean_synonym = self._clean_synonym_text(syn_word)
                         if clean_synonym:
-                            synonyms.append(
-                                SynonymReference(word=Word(text=clean_synonym), word_type=word_type)
-                            )
+                            synonyms.append(clean_synonym)
 
         except Exception as e:
             logger.error(f"Error extracting synonyms: {e}")
@@ -472,7 +472,17 @@ class WiktionaryConnector(DictionaryConnector):
             return ""
 
         # Skip common non-synonym words
-        skip_words = {"thesaurus", "more", "see", "also", "compare", "cf", "etc", "and", "or"}
+        skip_words = {
+            "thesaurus",
+            "more",
+            "see",
+            "also",
+            "compare",
+            "cf",
+            "etc",
+            "and",
+            "or",
+        }
         if cleaned.lower() in skip_words:
             return ""
 

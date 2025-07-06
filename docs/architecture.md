@@ -27,9 +27,9 @@ class Word(BaseModel):
 
 ```python
 class Definition(BaseModel):
-    word_type: WordType                          # noun, verb, adjective, etc.
+    word_type: str                          # noun, verb, adjective, etc.
     definition: str                              # Synthesized definition text
-    synonyms: list[SynonymReference]             # Related word references
+    synonyms: list[str]             # Related word references
     examples: Examples                           # Generated and literature examples
     meaning_cluster: str | None                  # AI-extracted meaning cluster ID
     raw_metadata: dict[str, Any] | None         # Provider-specific metadata
@@ -156,7 +156,7 @@ class AnkiCard(BaseModel):
 class MeaningCluster(BaseModel):
     meaning_id: str                          # "bank_financial", "bank_geographic"
     core_meaning: str                        # Brief description
-    word_types: list[WordType]              # Applicable grammatical types
+    word_types: list[str]              # Applicable grammatical types
     definitions_by_type: list[MeaningClusterDefinition]
     confidence: float
 ```

@@ -22,13 +22,17 @@ class Language(Enum):
 
 class DictionaryProvider(Enum):
     """Dictionary and data providers supported by the system."""
-    
+
     WIKTIONARY = "wiktionary"
+
     OXFORD = "oxford"
+
     DICTIONARY_COM = "dictionary_com"
-    AI_SYNTHETIC = "ai"
-    SYNTHETIC = "synthetic"
-    
+
+    AI_FALLBACK = "ai_fallback"
+
+    SYNTHESIS = "synthesis"
+
     @property
     def display_name(self) -> str:
         """Get human-readable display name for the provider."""
@@ -36,15 +40,15 @@ class DictionaryProvider(Enum):
             DictionaryProvider.WIKTIONARY: "Wiktionary",
             DictionaryProvider.OXFORD: "Oxford Dictionary",
             DictionaryProvider.DICTIONARY_COM: "Dictionary.com",
-            DictionaryProvider.AI_SYNTHETIC: "AI Synthesis",
-            DictionaryProvider.SYNTHETIC: "Synthetic",
+            DictionaryProvider.AI_FALLBACK: "AI Fallback",
+            DictionaryProvider.SYNTHESIS: "Synthesis",
         }
         return display_names.get(self, self.value.title())
 
 
 class OutputFormat(Enum):
     """Output formats for CLI commands and data export."""
-    
+
     JSON = "json"
     CSV = "csv"
     TXT = "txt"

@@ -18,9 +18,9 @@ from pydantic import BaseModel, Field
 
 from ...constants import Language
 from ...utils.logging import get_logger
-from ...utils.normalization import normalize_lexicon_entry
 from ..constants import LexiconFormat
 from ..phrase import MultiWordExpression, PhraseNormalizer
+from ..utils import normalize_lexicon_entry
 from .sources import LEXICON_SOURCES, LexiconSourceConfig
 
 logger = get_logger(__name__)
@@ -35,7 +35,9 @@ class LexiconData(BaseModel):
     )
     metadata: dict[str, Any] = Field(..., description="Source metadata")
     language: Language = Field(..., description="Language of the lexicon")
-    sources: list[str] = Field(default_factory=list, description="Names of loaded sources")
+    sources: list[str] = Field(
+        default_factory=list, description="Names of loaded sources"
+    )
     total_entries: int = Field(default=0, ge=0, description="Total number of entries")
     last_updated: str = Field(default="", description="Last update timestamp")
 
@@ -137,6 +139,7 @@ class LexiconLoader:
         for source in sources:
             try:
                 source_words, source_phrases = await self._load_source(source)
+
                 words.extend(source_words)
                 phrases.extend(source_phrases)
             except Exception as e:
@@ -148,7 +151,9 @@ class LexiconLoader:
         for word in words:
             # Generate all diacritic variants
             variants = normalize_lexicon_entry(word)
+
             for variant in variants:
+
                 if variant not in normalized_words_map:
                     normalized_words_map[variant] = word  # Keep original as reference
 
@@ -157,6 +162,7 @@ class LexiconLoader:
 
         # Deduplicate phrases by normalized text with priority
         phrase_dict = {}
+
         for phrase in phrases:
             # Use existing normalized form, but ensure it's in our map
             key = phrase.normalized
@@ -179,9 +185,13 @@ class LexiconLoader:
             total_entries=len(words) + len(phrases),
         )
 
-    def _get_sources_for_language(self, language: Language) -> list[LexiconSourceConfig]:
+    def _get_sources_for_language(
+        self, language: Language
+    ) -> list[LexiconSourceConfig]:
         """Get appropriate sources for a language."""
-        return [source for source in self.lexicon_sources if source.language == language]
+        return [
+            source for source in self.lexicon_sources if source.language == language
+        ]
 
     def get_lexicon_ext(self, source: LexiconSourceConfig) -> str:
         """Get the file extension for a lexicon source."""
@@ -191,24 +201,27 @@ class LexiconLoader:
         self, source: LexiconSourceConfig
     ) -> tuple[list[str], list[MultiWordExpression]]:
         """Load data from a specific source."""
-        
+
         # Check if cached data exists (unless force rebuild)
         cache_filepath = self._get_cache_filepath(source)
+
         if not self.force_rebuild and cache_filepath.exists():
             logger.info(f"Loading cached data for {source.name}")
             return await self._load_from_cache_file(cache_filepath, source)
-        
+
         # Use the downloader function (handles both regular URLs and custom scraping)
         logger.info(f"Downloading data for source: {source.name}")
-        result = await source.downloader(source.url)
-        logger.debug(f"Downloaded data for {source.name}, type: {type(result).__name__}")
-        
+        result = await source.scraper(source.url)
+        logger.debug(
+            f"Downloaded data for {source.name}, type: {type(result).__name__}"
+        )
+
         # Handle custom scraper results (returns dict) vs regular HTTP responses
         if isinstance(result, dict):
             # Custom scraper returned structured data directly - save to cache
             await self._save_scraper_data_to_cache(result, cache_filepath)
             return self._parse_scraped_data(result, source.language)
-            
+
         # Regular HTTP response - process as before
         response = result
         if not hasattr(response, 'text'):
@@ -222,7 +235,9 @@ class LexiconLoader:
                 f.write(response.text)
             logger.success(f"Successfully cached source data: {cache_filepath.name}")
         except Exception as e:
-            logger.error(f"Failed to save source data to cache {cache_filepath.name}: {e}")
+            logger.error(
+                f"Failed to save source data to cache {cache_filepath.name}: {e}"
+            )
 
         # Parse based on format
         if source.format == LexiconFormat.TEXT_LINES:
@@ -437,6 +452,7 @@ class LexiconLoader:
             if isinstance(data, dict) and "content" in data:
                 # Decode base64 content
                 import base64
+
                 content = base64.b64decode(data["content"]).decode("utf-8")
                 return self._parse_json_array(content, language)
         except Exception:
@@ -449,34 +465,31 @@ class LexiconLoader:
         """Parse CSV format with idiom,definition columns."""
         import csv
         from io import StringIO
-        
+
         phrases = []
-        
+
         try:
             # Parse CSV data
             csv_reader = csv.DictReader(StringIO(text))
-            
+
             for row in csv_reader:
                 # Try common column names for idiom text
                 idiom_text = (
-                    row.get("idiom") or 
-                    row.get("phrase") or 
-                    row.get("expression") or 
-                    row.get("text") or
-                    ""
+                    row.get("idiom")
+                    or row.get("phrase")
+                    or row.get("expression")
+                    or row.get("text")
+                    or ""
                 ).strip()
-                
+
                 if not idiom_text:
                     continue
-                
+
                 # Get definition if available (unused but kept for future use)
                 _definition = (
-                    row.get("def") or 
-                    row.get("definition") or 
-                    row.get("meaning") or
-                    ""
+                    row.get("def") or row.get("definition") or row.get("meaning") or ""
                 ).strip()
-                
+
                 # Normalize the idiom
                 normalized = self.phrase_normalizer.normalize(idiom_text)
                 if normalized and self.phrase_normalizer.is_phrase(normalized):
@@ -488,11 +501,11 @@ class LexiconLoader:
                         language=language.value,
                     )
                     phrases.append(phrase)
-                    
+
         except Exception as e:
             logger.warning(f"Failed to parse CSV idioms: {e}")
             return [], []
-        
+
         return [], phrases  # CSV idioms only contain phrases, no single words
 
     def _parse_json_phrasal_verbs(
@@ -500,27 +513,27 @@ class LexiconLoader:
     ) -> tuple[list[str], list[MultiWordExpression]]:
         """Parse JSON format with phrasal verbs, definitions, and examples."""
         phrases = []
-        
+
         try:
             data = json.loads(text)
-            
+
             if isinstance(data, list):
                 for entry in data:
                     if isinstance(entry, dict):
                         # Get the phrasal verb text
                         verb_text = (
-                            entry.get("verb") or 
-                            entry.get("phrasal_verb") or 
-                            entry.get("phrase") or
-                            ""
+                            entry.get("verb")
+                            or entry.get("phrasal_verb")
+                            or entry.get("phrase")
+                            or ""
                         ).strip()
-                        
+
                         if not verb_text:
                             continue
-                        
+
                         # Clean up verb text (remove asterisks and plus signs)
                         verb_text = verb_text.replace("*", "").replace("+", "").strip()
-                        
+
                         # Normalize the phrasal verb
                         normalized = self.phrase_normalizer.normalize(verb_text)
                         if normalized and self.phrase_normalizer.is_phrase(normalized):
@@ -532,13 +545,12 @@ class LexiconLoader:
                                 language=language.value,
                             )
                             phrases.append(phrase)
-                            
+
         except Exception as e:
             logger.warning(f"Failed to parse JSON phrasal verbs: {e}")
             return [], []
-        
-        return [], phrases  # JSON phrasal verbs only contain phrases, no single words
 
+        return [], phrases  # JSON phrasal verbs only contain phrases, no single words
 
     def _parse_scraped_data(
         self, scraped_data: dict[str, Any], language: Language
@@ -546,23 +558,23 @@ class LexiconLoader:
         """Parse data returned by custom scrapers."""
         words = []
         phrases = []
-        
+
         data = scraped_data.get("data", [])
         if not isinstance(data, list):
             logger.warning("Scraped data should contain a 'data' list")
             return [], []
-        
+
         for item in data:
             if isinstance(item, dict):
                 expression = item.get("expression", "").strip()
                 if not expression:
                     continue
-                
+
                 # Normalize the expression
                 normalized = self.phrase_normalizer.normalize(expression)
                 if not normalized:
                     continue
-                
+
                 # Determine if it's a phrase or single word
                 if self.phrase_normalizer.is_phrase(normalized):
                     phrase = MultiWordExpression(
@@ -575,7 +587,7 @@ class LexiconLoader:
                     phrases.append(phrase)
                 else:
                     words.append(normalized)
-        
+
         logger.info(f"Parsed scraped data: {len(words)} words, {len(phrases)} phrases")
         return words, phrases
 
@@ -720,7 +732,7 @@ class LexiconLoader:
             }
 
         return stats
-    
+
     def _get_cache_filepath(self, source: LexiconSourceConfig) -> Path:
         """Get cache file path for a source."""
         if source.format == LexiconFormat.CUSTOM_SCRAPER:
@@ -728,18 +740,23 @@ class LexiconLoader:
         else:
             ext = self.get_lexicon_ext(source)
             return self.lexicon_dir / f"{source.name}{ext}"
-            
-    async def _save_scraper_data_to_cache(self, data: dict[str, Any], cache_filepath: Path) -> None:
+
+    async def _save_scraper_data_to_cache(
+        self, data: dict[str, Any], cache_filepath: Path
+    ) -> None:
         """Save custom scraper data to cache file."""
         logger.info(f"Saving scraper data to cache: {cache_filepath.name}")
         import json
+
         try:
             with cache_filepath.open("w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             logger.success(f"Successfully cached scraper data: {cache_filepath.name}")
         except Exception as e:
-            logger.error(f"Failed to save scraper data to cache {cache_filepath.name}: {e}")
-        
+            logger.error(
+                f"Failed to save scraper data to cache {cache_filepath.name}: {e}"
+            )
+
     async def _load_from_cache_file(
         self, cache_filepath: Path, source: LexiconSourceConfig
     ) -> tuple[list[str], list[MultiWordExpression]]:
@@ -749,16 +766,21 @@ class LexiconLoader:
             if source.format == LexiconFormat.CUSTOM_SCRAPER:
                 # Load JSON data for custom scrapers
                 import json
+
                 with cache_filepath.open("r", encoding="utf-8") as f:
                     data = json.load(f)
-                logger.success(f"Successfully loaded cached scraper data: {cache_filepath.name}")
+                logger.success(
+                    f"Successfully loaded cached scraper data: {cache_filepath.name}"
+                )
                 return self._parse_scraped_data(data, source.language)
             else:
                 # Load text data for regular sources
                 with cache_filepath.open("r", encoding="utf-8") as f:
                     text_data = f.read()
-                logger.success(f"Successfully loaded cached source data: {cache_filepath.name}")
-                
+                logger.success(
+                    f"Successfully loaded cached source data: {cache_filepath.name}"
+                )
+
                 # Parse based on format
                 if source.format == LexiconFormat.TEXT_LINES:
                     return self._parse_text_lines(text_data, source.language)

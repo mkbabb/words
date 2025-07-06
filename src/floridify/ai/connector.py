@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, TypeVar
 
 from openai import AsyncOpenAI
@@ -13,28 +12,17 @@ from ..utils.logging import get_logger
 from .models import (
     AnkiFillBlankResponse,
     AnkiMultipleChoiceResponse,
-    EmbeddingResponse,
+    DictionaryEntryResponse,
     ExampleGenerationResponse,
-    FallbackResponse,
-    MeaningExtractionResponse,
-    ModelCapabilities,
+    MeaningClusterResponse,
     PronunciationResponse,
     SynthesisResponse,
 )
 from .templates import PromptTemplateManager
 
 T = TypeVar('T', bound=BaseModel)
+
 logger = get_logger(__name__)
-
-
-def detect_model_capabilities(model_name: str) -> ModelCapabilities:
-    """Detect model capabilities based on model name."""
-    reasoning_models = {"o1-preview", "o1-mini", "o3-mini", "o3"}
-    return ModelCapabilities(
-        supports_reasoning=model_name in reasoning_models,
-        supports_temperature=model_name not in reasoning_models,
-        supports_structured_output=True,
-    )
 
 
 class OpenAIConnector:
@@ -44,14 +32,20 @@ class OpenAIConnector:
         self,
         api_key: str,
         model_name: str = "gpt-4o",
+        embedding_model: str = "text-embedding-3-small",
         temperature: float | None = None,
         max_tokens: int = 1000,
     ) -> None:
         self.client = AsyncOpenAI(api_key=api_key)
+
         self.model_name = model_name
-        self.capabilities = detect_model_capabilities(model_name)
-        self.temperature = temperature if self.capabilities.supports_temperature else None
+
+        self.embedding_model = embedding_model
+
+        self.temperature = temperature
+
         self.max_tokens = max_tokens
+
         self.template_manager = PromptTemplateManager()
 
     async def _make_structured_request(
@@ -65,6 +59,7 @@ class OpenAIConnector:
         # Check cache first
         if cache_key:
             cached = await get_cache_entry("openai", cache_key)
+
             if cached:
                 try:
                     return response_model.model_validate(cached)
@@ -80,17 +75,17 @@ class OpenAIConnector:
         }
 
         # Add temperature if supported
-        if self.temperature is not None and self.capabilities.supports_temperature:
+        if self.temperature is not None:
             request_params["temperature"] = self.temperature
 
         # Use structured outputs if available
-        if self.capabilities.supports_structured_output:
+        if hasattr(self.client.beta.chat.completions, "parse"):
             request_params["response_format"] = response_model
 
         try:
             # Make the API call
             response = await self.client.beta.chat.completions.parse(**request_params)
-            
+
             if response.choices[0].message.parsed:
                 result = response.choices[0].message.parsed
             else:
@@ -111,15 +106,27 @@ class OpenAIConnector:
             logger.error(f"OpenAI API error: {e}")
             raise
 
-    async def synthesize_definition(
-        self, word: str, word_type: str, provider_definitions: list[tuple[str, str]]
+    async def synthesize_definitions(
+        self,
+        word: str,
+        provider_definitions: list[tuple[str, str, str]],
+        meaning_cluster: str | None = None,
     ) -> SynthesisResponse:
-        """Synthesize definitions from multiple providers."""
-        _ = [provider for provider, _ in provider_definitions]  # Keep for potential use
+        """Synthesize definitions from multiple providers.
+
+        Args:
+            word: The word to synthesize definitions for.
+            word_type: The type of the word (e.g., noun, verb).
+            provider_definitions: List of (provider_name, definition) tuples.
+        """
+
         prompt = self.template_manager.get_synthesis_prompt(
-            word, word_type, provider_definitions
+            word=word,
+            provider_definitions=provider_definitions,
+            meaning_cluster=meaning_cluster,
         )
-        cache_key = f"synthesis_{word}_{word_type}_{hash(str(provider_definitions))}"
+
+        cache_key = f"synthesis_{word}_{meaning_cluster}_{hash(str(provider_definitions))}"
 
         try:
             result = await self._make_structured_request(
@@ -128,28 +135,36 @@ class OpenAIConnector:
             # Success logging handled by synthesizer context
             return result
         except Exception as e:
-            logger.error(f"❌ Definition synthesis failed for '{word}' ({word_type}): {e}")
+            logger.error(
+                f"❌ Definition synthesis failed for '{word}' ({meaning_cluster}): {e}"
+            )
             raise
 
     async def generate_example(
-        self, word: str, definition: str, word_type: str
+        self,
+        word: str,
+        word_type: str,
+        definition: str,
     ) -> ExampleGenerationResponse:
         """Generate modern usage example."""
         logger.debug(f"📝 Generating example sentence for '{word}' ({word_type})")
-        
+
         prompt = self.template_manager.get_example_prompt(word, definition, word_type)
+
         cache_key = f"example_{word}_{word_type}_{hash(definition)}"
 
         try:
             result = await self._make_structured_request(
                 prompt, ExampleGenerationResponse, cache_key
             )
-            truncated = (
-                result.example_sentence[:50] + "..."
-                if len(result.example_sentence) > 50
-                else result.example_sentence
-            )
-            logger.debug(f"✏️  Generated example for '{word}': \"{truncated}\"")
+            if result.example_sentences:
+                first_example = result.example_sentences[0]
+                truncated = (
+                    first_example[:50] + "..."
+                    if len(first_example) > 50
+                    else first_example
+                )
+                logger.debug(f"✏️  Generated example for '{word}': \"{truncated}\"")
             return result
         except Exception as e:
             logger.error(f"❌ Example generation failed for '{word}': {e}")
@@ -158,26 +173,31 @@ class OpenAIConnector:
     async def generate_pronunciation(self, word: str) -> PronunciationResponse:
         """Generate pronunciation data."""
         prompt = self.template_manager.get_pronunciation_prompt(word)
+
         cache_key = f"pronunciation_{word}"
 
         return await self._make_structured_request(
             prompt, PronunciationResponse, cache_key
         )
 
-    async def generate_fallback_entry(self, word: str) -> FallbackResponse:
+    async def generate_fallback_entry(
+        self, word: str
+    ) -> DictionaryEntryResponse | None:
         """Generate AI fallback provider data."""
         logger.info(f"🤖 Generating AI fallback definition for '{word}'")
-        
+
         prompt = self.template_manager.get_fallback_prompt(word)
+
         cache_key = f"fallback_{word}"
 
         try:
             result = await self._make_structured_request(
-                prompt, FallbackResponse, cache_key
+                prompt, DictionaryEntryResponse, cache_key
             )
-            
-            if result.is_nonsense:
+
+            if result.provider_data is None:
                 logger.info(f"🚫 AI identified '{word}' as nonsense/invalid")
+                return None
             elif result.provider_data:
                 def_count = len(result.provider_data.definitions)
                 logger.success(
@@ -186,66 +206,42 @@ class OpenAIConnector:
                 )
             else:
                 logger.warning(f"⚠️  AI generated empty response for '{word}'")
-            
+
             return result
         except Exception as e:
             logger.error(f"❌ AI fallback generation failed for '{word}': {e}")
             raise
 
-    async def extract_meanings(
-        self, word: str, all_provider_definitions: list[tuple[str, str, str]]
-    ) -> MeaningExtractionResponse:
-        """Extract distinct meaning clusters from provider definitions."""
-        def_count = len(all_provider_definitions)
-        logger.info(f"🧠 Extracting meaning clusters for '{word}' from {def_count} definitions")
-        
-        prompt = self.template_manager.get_meaning_extraction_prompt(
-            word, all_provider_definitions
+    async def extract_meaning_clusters(
+        self, word: str, definitions: list[tuple[str, str, str]]
+    ) -> MeaningClusterResponse:
+        """Extract distinct meaning clusters from provider definitions.
+
+        Args:
+            word: The word to extract meanings for.
+            definitions: list of: (provider, word_type, definition) tuples from providers.
+        """
+        def_count = len(definitions)
+
+        logger.info(
+            f"🧠 Extracting meaning clusters for '{word}' from {def_count} definitions"
         )
-        cache_key = f"meanings_{word}_{hash(str(all_provider_definitions))}"
+
+        prompt = self.template_manager.get_meaning_extraction_prompt(word, definitions)
+
+        cache_key = f"meanings_{word}_{hash(str(definitions))}"
 
         try:
             result = await self._make_structured_request(
-                prompt, MeaningExtractionResponse, cache_key
+                prompt, MeaningClusterResponse, cache_key
             )
             logger.success(
-                f"🎯 Extracted {result.total_meanings} meaning clusters for '{word}' "
+                f"🎯 Extracted {len(result.meaning_clusters)} meaning clusters for '{word}' "
                 f"(confidence: {result.confidence:.1%})"
             )
             return result
         except Exception as e:
             logger.error(f"❌ Meaning extraction failed for '{word}': {e}")
-            raise
-
-    async def generate_embeddings(self, texts: list[str]) -> EmbeddingResponse:
-        """Generate embeddings for texts."""
-        cache_key = f"embeddings_{hash(str(texts))}"
-        
-        # Check cache first
-        cached = await get_cache_entry("openai", cache_key)
-        if cached:
-            try:
-                return EmbeddingResponse.model_validate(cached)
-            except Exception as e:
-                logger.warning(f"Failed to deserialize cached embeddings: {e}")
-
-        try:
-            response = await self.client.embeddings.create(
-                model="text-embedding-3-small",
-                input=texts,
-            )
-
-            result = EmbeddingResponse(
-                embeddings=[data.embedding for data in response.data],
-                usage=response.usage.model_dump() if response.usage else {},
-            )
-
-            # Cache the result
-            await save_cache_entry("openai", cache_key, result.model_dump())
-            return result
-
-        except Exception as e:
-            logger.error(f"OpenAI embeddings error: {e}")
             raise
 
     async def generate_anki_fill_blank(
@@ -293,14 +289,3 @@ class OpenAIConnector:
         except Exception as e:
             logger.error(f"❌ Multiple choice generation failed for '{word}': {e}")
             raise
-
-    async def batch_process(
-        self, requests: list[tuple[str, type[BaseModel], str]]
-    ) -> list[Any]:
-        """Process multiple requests in parallel for efficiency."""
-        tasks = []
-        for prompt, response_model, cache_key in requests:
-            task = self._make_structured_request(prompt, response_model, cache_key)
-            tasks.append(task)
-
-        return await asyncio.gather(*tasks, return_exceptions=True)

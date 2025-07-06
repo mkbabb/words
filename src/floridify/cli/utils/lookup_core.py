@@ -8,11 +8,11 @@ from ...ai import create_definition_synthesizer
 from ...connectors.dictionary_com import DictionaryComConnector
 from ...connectors.wiktionary import WiktionaryConnector
 from ...constants import DictionaryProvider, Language
-from ...models.dictionary import SynthesizedDictionaryEntry, Word
+from ...models.models import ProviderData, SynthesizedDictionaryEntry
 from ...search import SearchEngine
 from ...search.constants import SearchMethod
 from ...utils.logging import get_logger
-from ...utils.normalization import normalize_word
+from ...utils.text_utils import normalize_word
 
 logger = get_logger(__name__)
 
@@ -33,6 +33,7 @@ async def lookup_word_pipeline(
     try:
         # Normalize the query
         normalized_word = normalize_word(word)
+
         if normalized_word != word:
             logger.debug(f"Normalized: '{word}' → '{normalized_word}'")
 
@@ -50,6 +51,7 @@ async def lookup_word_pipeline(
                     f"No search results, trying AI fallback for '{normalized_word}'"
                 )
                 return await _ai_fallback_lookup(normalized_word)
+
             return None
 
         # Use the best match
@@ -59,7 +61,7 @@ async def lookup_word_pipeline(
         )
 
         # Get definition from provider
-        providers_dict = {}
+        providers_data = []
 
         for provider in providers:
             provider_data = await _get_provider_definition(best_match, provider)
@@ -74,14 +76,15 @@ async def lookup_word_pipeline(
 
                 return None
 
-            providers_dict[provider.value] = provider_data
+            providers_data.append(provider_data)
 
         # Synthesize with AI if enabled
         if not no_ai:
             try:
-                word_obj = Word(text=best_match)
-
-                synthesized_entry = await _synthesize_with_ai(word_obj, providers_dict)
+                synthesized_entry = await _synthesize_with_ai(
+                    word=best_match,
+                    providers=providers_data,
+                )
 
                 if synthesized_entry:
                     logger.debug(f"Successfully synthesized entry for '{best_match}'")
@@ -136,12 +139,15 @@ async def _search_word(
     return results
 
 
-async def _get_provider_definition(word: str, provider: DictionaryProvider) -> Any:
+async def _get_provider_definition(
+    word: str, provider: DictionaryProvider
+) -> ProviderData | None:
     """Get definition from specified provider."""
     logger.debug(f"Fetching definition from {provider.value}")
 
     try:
         connector: WiktionaryConnector | DictionaryComConnector | None = None
+
         if provider == DictionaryProvider.WIKTIONARY:
             connector = WiktionaryConnector()
         elif provider == DictionaryProvider.OXFORD:
@@ -167,10 +173,10 @@ async def _get_provider_definition(word: str, provider: DictionaryProvider) -> A
 
 
 async def _synthesize_with_ai(
-    word: Word, providers: dict[str, Any]
+    word: str, providers: list[ProviderData]
 ) -> SynthesizedDictionaryEntry | None:
     """Synthesize definition using AI."""
-    logger.debug(f"AI synthesis for '{word.text}'")
+    logger.debug(f"AI synthesis for '{word}'")
 
     try:
         synthesizer = create_definition_synthesizer()
@@ -186,7 +192,7 @@ async def _ai_fallback_lookup(word: str) -> SynthesizedDictionaryEntry | None:
 
     try:
         synthesizer = create_definition_synthesizer()
-        ai_entry = await synthesizer.generate_fallback_entry(Word(text=word))
+        ai_entry = await synthesizer.generate_fallback_entry(word)
 
         if ai_entry and ai_entry.definitions:
             logger.debug(f"AI fallback successful for '{word}'")

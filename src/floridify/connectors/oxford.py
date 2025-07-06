@@ -131,7 +131,7 @@ class OxfordConnector(DictionaryConnector):
 
                                 definitions.append(
                                     Definition(
-                                        word_type=word_type,
+                                        word_type=word_type.value,
                                         definition=def_text,
                                         examples=examples,
                                         raw_metadata=sense,  # Store full sense data
