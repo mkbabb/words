@@ -10,6 +10,7 @@ from .commands.config import config_group
 from .commands.database import database_group
 from .commands.lookup import lookup_group
 from .commands.search import search_group
+from .commands.similar import similar_command
 from .commands.list import list_command
 
 console = Console()
@@ -40,6 +41,7 @@ semantic search, and Anki flashcard generation.[/dim]
 
 [bold]Available Commands:[/bold]
   [green]lookup[/green]    🔍 Look up words and definitions
+  [green]similar[/green]   🔗 Find beautiful synonyms with efflorescence ranking
   [green]search[/green]    🔎 Fuzzy and semantic word search
   [green]anki[/green]      🎴 Create and manage Anki flashcard decks
   [green]list[/green]      📄 Manage word lists with dictionary lookup
@@ -52,6 +54,7 @@ semantic search, and Anki flashcard generation.[/dim]
 
 # Register command groups
 cli.add_command(lookup_group, name="lookup")
+cli.add_command(similar_command, name="similar")
 cli.add_command(search_group, name="search")
 cli.add_command(anki_command, name="anki")
 cli.add_command(list_command, name="list")

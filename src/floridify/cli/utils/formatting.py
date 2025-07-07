@@ -358,7 +358,7 @@ def _format_example_with_bold_word(
 def _add_definition_content(
     content: Text, definitions: list[Definition], word: str
 ) -> None:
-    """Add definition content with examples to a Text object."""
+    """Add definition content with examples and synonyms to a Text object."""
     for i, definition in enumerate(definitions):
         if i > 0:
             content.append("\n\n")
@@ -383,6 +383,15 @@ def _add_definition_content(
             clean_example = ensure_sentence_case(clean_example)
 
             _format_example_with_bold_word(content, clean_example, word)
+
+        # Synonyms (limit to 10)
+        if definition.synonyms:
+            content.append("\n\n")
+            content.append("  synonyms: ", style="dim italic")
+            
+            displayed_synonyms = definition.synonyms[:10]
+            synonyms_text = ", ".join(displayed_synonyms)
+            content.append(synonyms_text, style="cyan italic")
 
 
 def _create_meaning_panel(
@@ -424,6 +433,7 @@ def format_meaning_based_definition(
     meaning_groups: dict[str, list[Definition]],
 ) -> Panel:
     """Format AI-generated definition grouped by meanings with separate panels for multiple meanings."""
+    
     # Header with word and pronunciation (word always lowercase)
     header = Text()
 

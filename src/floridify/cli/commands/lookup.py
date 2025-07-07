@@ -47,18 +47,24 @@ logger = get_logger(__name__)
     is_flag=True,
     help="Skip AI synthesis",
 )
+@click.option(
+    "--force-refresh",
+    is_flag=True,
+    help="Force refresh all caches (bypass cache)",
+)
 def lookup(
     word: str,
     provider: tuple[str, ...],
     language: tuple[str, ...],
     semantic: bool,
     no_ai: bool,
+    force_refresh: bool,
 ) -> None:
     """Look up word definitions with AI enhancement.
 
     WORD: The word to look up
     """
-    asyncio.run(_lookup_async(word, provider, language, semantic, no_ai))
+    asyncio.run(_lookup_async(word, provider, language, semantic, no_ai, force_refresh))
 
 
 async def _lookup_async(
@@ -67,6 +73,7 @@ async def _lookup_async(
     language: tuple[str, ...],
     semantic: bool,
     no_ai: bool,
+    force_refresh: bool,
 ) -> None:
     """Async implementation of word lookup."""
     logger.info(f"Looking up word: '{word}' with providers: {', '.join(provider)}")
@@ -83,6 +90,7 @@ async def _lookup_async(
             languages=languages,
             semantic=semantic,
             no_ai=no_ai,
+            force_refresh=force_refresh,
         )
 
         if result:
@@ -107,6 +115,7 @@ async def _lookup_async(
     except Exception as e:
         logger.error(f"Lookup failed: {e}")
         console.print(format_error(f"Lookup failed: {e}"))
+
 
 
 lookup_group = lookup

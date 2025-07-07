@@ -12,15 +12,17 @@ logger = get_logger(__name__)
 class DictionaryComConnector(DictionaryConnector):
     """Stub connector for Dictionary.com API."""
 
-    def __init__(self, api_key: str = "", rate_limit: float = 5.0) -> None:
+    def __init__(self, api_key: str = "", rate_limit: float = 5.0, force_refresh: bool = False) -> None:
         """Initialize Dictionary.com connector stub.
 
         Args:
             api_key: Dictionary.com API key (if available)
             rate_limit: Requests per second
+            force_refresh: Force fresh HTTP requests (bypass cache)
         """
         super().__init__(rate_limit=rate_limit)
         self.api_key = api_key
+        self.force_refresh = force_refresh
 
     @property
     def provider_name(self) -> str:

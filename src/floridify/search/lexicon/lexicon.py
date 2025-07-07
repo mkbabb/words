@@ -13,7 +13,6 @@ import pickle
 from pathlib import Path
 from typing import Any
 
-import httpx
 from pydantic import BaseModel, Field
 
 from ...constants import Language
@@ -82,7 +81,6 @@ class LexiconLoader:
         self._all_phrases: list[MultiWordExpression] = []
 
         # HTTP client for downloads
-        self._http_client: httpx.AsyncClient | None = None
 
         # Use lexicon sources from sources.py
         self.lexicon_sources = LEXICON_SOURCES
@@ -95,8 +93,7 @@ class LexiconLoader:
             languages: List of languages to load
         """
         # Initialize HTTP client
-        if not self._http_client:
-            self._http_client = httpx.AsyncClient(timeout=30.0)
+        # HTTP client now handled by scrapers
 
         # Load each language
         for language in languages:
@@ -211,7 +208,8 @@ class LexiconLoader:
 
         # Use the downloader function (handles both regular URLs and custom scraping)
         logger.info(f"Downloading data for source: {source.name}")
-        result = await source.scraper(source.url)
+        # Pass force_rebuild to scraper for cache invalidation
+        result = await source.scraper(source.url, force_refresh=self.force_rebuild)
         logger.debug(
             f"Downloaded data for {source.name}, type: {type(result).__name__}"
         )
@@ -806,7 +804,6 @@ class LexiconLoader:
             return [], []
 
     async def close(self) -> None:
-        """Close HTTP client and clean up resources."""
-        if self._http_client:
-            await self._http_client.aclose()
-            self._http_client = None
+        """Clean up resources."""
+        # HTTP client resources are now managed by the caching layer
+        pass

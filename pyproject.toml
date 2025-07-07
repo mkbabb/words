@@ -50,6 +50,9 @@ dependencies = [
     "regex>=2023.0.0",      # More advanced regex engine
     "unicodedata2>=15.0.0", # Fast Unicode normalization
     "coolname>=2.2.0",
+    # Modern caching for HTTP requests and general use
+    "httpx-cache>=0.13.0",
+    "hishel>=0.1.0",      # Modern HTTP caching client
 ]
 
 

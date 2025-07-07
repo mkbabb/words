@@ -85,7 +85,7 @@ class DefinitionSynthesizer:
                 (defn.provider, defn.word_type, defn.definition)
                 for defn in cluster.definitions
             ]
-            
+
             # Synthesize definition for this word type
             synthesized_def = await self._synthesize_definitions(
                 word=word,

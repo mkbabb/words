@@ -6,9 +6,9 @@ import asyncio
 import re
 from typing import Any
 
-import httpx
 import wikitextparser as wtp  # type: ignore[import-untyped]
 
+from ..caching import get_cached_http_client
 from ..models import (
     Definition,
     Examples,
@@ -26,18 +26,19 @@ logger = get_logger(__name__)
 class WiktionaryConnector(DictionaryConnector):
     """Connector for Wiktionary using MediaWiki API with proper wikitext parsing."""
 
-    def __init__(self, rate_limit: float = 8.0) -> None:
+    def __init__(self, rate_limit: float = 8.0, force_refresh: bool = False) -> None:
         """Initialize Wiktionary connector.
 
         Args:
             rate_limit: Requests per hour (max 500 for anonymous)
+            force_refresh: Force fresh HTTP requests (bypass cache)
         """
         # Convert hourly to per-second rate limit
         super().__init__(rate_limit=rate_limit / 3600.0)
         self.base_url = "https://en.wiktionary.org/w/api.php"
-        self.session = httpx.AsyncClient(
-            headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
-            timeout=30.0,
+        self.http_client = get_cached_http_client(
+            force_refresh=force_refresh,
+            default_ttl_hours=24.0,  # Cache Wiktionary responses for 24 hours
         )
 
     @property
@@ -67,12 +68,24 @@ class WiktionaryConnector(DictionaryConnector):
                 "format": "json",
             }
 
-            response = await self.session.get(self.base_url, params=params)
+            response = await self.http_client.get(
+                self.base_url,
+                params=params,
+                ttl_hours=24.0,  # Cache Wiktionary API responses for 24 hours
+                headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
+                timeout=30.0,
+            )
 
             if response.status_code == 429:
                 # Rate limited - wait and retry once
                 await asyncio.sleep(60)
-                response = await self.session.get(self.base_url, params=params)
+                response = await self.http_client.get(
+                    self.base_url,
+                    params=params,
+                    force_refresh=True,  # Force fresh request on retry
+                    headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
+                    timeout=30.0,
+                )
 
             response.raise_for_status()
             data = response.json()
@@ -489,5 +502,5 @@ class WiktionaryConnector(DictionaryConnector):
         return cleaned
 
     async def close(self) -> None:
-        """Close the HTTP session."""
-        await self.session.aclose()
+        """Close the HTTP client."""
+        await self.http_client.close()

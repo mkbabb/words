@@ -7,7 +7,7 @@ from typing import Any, TypeVar
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
-from ..storage.mongodb import get_cache_entry, save_cache_entry
+from ..caching.decorators import cached_api_call, openai_cache_key
 from ..utils.logging import get_logger
 from .models import (
     AnkiFillBlankResponse,
@@ -16,6 +16,7 @@ from .models import (
     ExampleGenerationResponse,
     MeaningClusterResponse,
     PronunciationResponse,
+    SynonymGenerationResponse,
     SynthesisResponse,
 )
 from .templates import PromptTemplateManager
@@ -48,24 +49,24 @@ class OpenAIConnector:
 
         self.template_manager = PromptTemplateManager()
 
+    @cached_api_call(
+        ttl_hours=24.0,  # Cache OpenAI responses for 24 hours
+        use_file_cache=False,  # Use in-memory cache for API responses
+        key_func=lambda self, prompt, response_model, **kwargs: (
+            "openai_structured",
+            self.model_name,
+            hash(prompt),
+            response_model.__name__,
+            tuple(sorted(kwargs.items())),
+        ),
+    )
     async def _make_structured_request(
         self,
         prompt: str,
         response_model: type[T],
-        cache_key: str | None = None,
         **kwargs: Any,
     ) -> T:
         """Make a structured request to OpenAI with caching."""
-        # Check cache first
-        if cache_key:
-            cached = await get_cache_entry("openai", cache_key)
-
-            if cached:
-                try:
-                    return response_model.model_validate(cached)
-                except Exception as e:
-                    logger.warning(f"Failed to deserialize cached response: {e}")
-
         # Prepare request parameters
         request_params: dict[str, Any] = {
             "model": self.model_name,
@@ -96,10 +97,6 @@ class OpenAIConnector:
                 else:
                     raise ValueError("No content in response")
 
-            # Cache the result
-            if cache_key:
-                await save_cache_entry("openai", cache_key, result.model_dump())
-
             return result
 
         except Exception as e:
@@ -126,11 +123,9 @@ class OpenAIConnector:
             meaning_cluster=meaning_cluster,
         )
 
-        cache_key = f"synthesis_{word}_{meaning_cluster}_{hash(str(provider_definitions))}"
-
         try:
             result = await self._make_structured_request(
-                prompt, SynthesisResponse, cache_key
+                prompt, SynthesisResponse
             )
             # Success logging handled by synthesizer context
             return result
@@ -151,11 +146,9 @@ class OpenAIConnector:
 
         prompt = self.template_manager.get_example_prompt(word, definition, word_type)
 
-        cache_key = f"example_{word}_{word_type}_{hash(definition)}"
-
         try:
             result = await self._make_structured_request(
-                prompt, ExampleGenerationResponse, cache_key
+                prompt, ExampleGenerationResponse
             )
             if result.example_sentences:
                 first_example = result.example_sentences[0]
@@ -174,10 +167,8 @@ class OpenAIConnector:
         """Generate pronunciation data."""
         prompt = self.template_manager.get_pronunciation_prompt(word)
 
-        cache_key = f"pronunciation_{word}"
-
         return await self._make_structured_request(
-            prompt, PronunciationResponse, cache_key
+            prompt, PronunciationResponse
         )
 
     async def generate_fallback_entry(
@@ -188,11 +179,9 @@ class OpenAIConnector:
 
         prompt = self.template_manager.get_fallback_prompt(word)
 
-        cache_key = f"fallback_{word}"
-
         try:
             result = await self._make_structured_request(
-                prompt, DictionaryEntryResponse, cache_key
+                prompt, DictionaryEntryResponse
             )
 
             if result.provider_data is None:
@@ -229,11 +218,9 @@ class OpenAIConnector:
 
         prompt = self.template_manager.get_meaning_extraction_prompt(word, definitions)
 
-        cache_key = f"meanings_{word}_{hash(str(definitions))}"
-
         try:
             result = await self._make_structured_request(
-                prompt, MeaningClusterResponse, cache_key
+                prompt, MeaningClusterResponse
             )
             logger.success(
                 f"🎯 Extracted {len(result.meaning_clusters)} meaning clusters for '{word}' "
@@ -255,11 +242,9 @@ class OpenAIConnector:
             word_type=word_type,
             examples=examples or "",
         )
-        cache_key = f"anki_fill_blank_{word}_{hash(definition)}"
-
         try:
             result = await self._make_structured_request(
-                prompt, AnkiFillBlankResponse, cache_key
+                prompt, AnkiFillBlankResponse
             )
             logger.debug(f"Generated fill-blank card for '{word}'")
             return result
@@ -278,14 +263,37 @@ class OpenAIConnector:
             word_type=word_type,
             examples=examples or "",
         )
-        cache_key = f"anki_multiple_choice_{word}_{hash(definition)}"
-
         try:
             result = await self._make_structured_request(
-                prompt, AnkiMultipleChoiceResponse, cache_key
+                prompt, AnkiMultipleChoiceResponse
             )
             logger.debug(f"Generated multiple choice card for '{word}'")
             return result
         except Exception as e:
             logger.error(f"❌ Multiple choice generation failed for '{word}': {e}")
+            raise
+
+    async def generate_synonyms(
+        self, word: str, definition: str, word_type: str, count: int = 10
+    ) -> SynonymGenerationResponse:
+        """Generate synonyms with efflorescence ranking."""
+        logger.debug(f"🔗 Generating {count} synonyms for '{word}' ({word_type})")
+
+        prompt = self.template_manager.get_synonym_generation_prompt(
+            word=word,
+            definition=definition,
+            word_type=word_type,
+            count=count,
+        )
+
+        try:
+            result = await self._make_structured_request(
+                prompt, SynonymGenerationResponse
+            )
+            
+            synonym_count = len(result.synonyms)
+            logger.success(f"✨ Generated {synonym_count} synonyms for '{word}' (confidence: {result.confidence:.1%})")
+            return result
+        except Exception as e:
+            logger.error(f"❌ Synonym generation failed for '{word}': {e}")
             raise

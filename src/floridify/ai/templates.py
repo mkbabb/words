@@ -103,3 +103,15 @@ class PromptTemplateManager:
             word=word,
             definitions=definitions,
         )
+    
+    def get_synonym_generation_prompt(
+        self, word: str, definition: str, word_type: str, count: int = 10
+    ) -> str:
+        """Generate prompt for synonym generation with balanced expressiveness."""
+        return self.render_template(
+            "synonym_generation",
+            word=word,
+            definition=definition,
+            word_type=word_type,
+            count=count,
+        )

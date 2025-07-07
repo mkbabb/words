@@ -23,6 +23,7 @@ async def lookup_word_pipeline(
     languages: list[Language] = [Language.ENGLISH],
     semantic: bool = False,
     no_ai: bool = False,
+    force_refresh: bool = False,
 ) -> SynthesizedDictionaryEntry | None:
     """
     Core lookup pipeline that normalizes, searches, gets provider definitions,
@@ -64,7 +65,7 @@ async def lookup_word_pipeline(
         providers_data = []
 
         for provider in providers:
-            provider_data = await _get_provider_definition(best_match, provider)
+            provider_data = await _get_provider_definition(best_match, provider, force_refresh)
 
             if not provider_data:
                 # Try AI fallback if provider fails and AI is enabled
@@ -140,7 +141,7 @@ async def _search_word(
 
 
 async def _get_provider_definition(
-    word: str, provider: DictionaryProvider
+    word: str, provider: DictionaryProvider, force_refresh: bool = False
 ) -> ProviderData | None:
     """Get definition from specified provider."""
     logger.debug(f"Fetching definition from {provider.value}")
@@ -149,13 +150,13 @@ async def _get_provider_definition(
         connector: WiktionaryConnector | DictionaryComConnector | None = None
 
         if provider == DictionaryProvider.WIKTIONARY:
-            connector = WiktionaryConnector()
+            connector = WiktionaryConnector(force_refresh=force_refresh)
         elif provider == DictionaryProvider.OXFORD:
             # Would need API credentials from config
             logger.warning("Oxford provider requires API credentials")
             return None
         elif provider == DictionaryProvider.DICTIONARY_COM:
-            connector = DictionaryComConnector()
+            connector = DictionaryComConnector(force_refresh=force_refresh)
         else:
             logger.warning(f"Unsupported provider: {provider.value}")
             return None

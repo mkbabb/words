@@ -38,7 +38,10 @@ class DefinitionResponse(BaseModel):
         description="Definition of the word type.",
     )
 
-    synonyms: list[str] = Field(default_factory=list)
+    synonyms: list[str] = Field(
+        default_factory=list,
+        description="List of synonyms for this definition, ordered by relevance and efflorescence.",
+    )
 
 
 class ProviderDataResponse(BaseModel):
@@ -124,6 +127,25 @@ class AnkiMultipleChoiceResponse(BaseModel):
     choice_c: str = Field(description="Third answer choice")
     choice_d: str = Field(description="Fourth answer choice")
     correct_choice: str = Field(description="Letter of correct answer (A, B, C, or D)")
+
+
+class SynonymCandidate(BaseModel):
+    """A single synonym candidate with relevance and efflorescence rating."""
+    
+    word: str = Field(description="The synonym word or phrase")
+    language: str = Field(description="Language of origin (e.g., English, Latin, French)")
+    relevance: float = Field(description="Relevance score (0.0 to 1.0)")
+    efflorescence: float = Field(description="Beauty and expressive power score (0.0 to 1.0)")
+    explanation: str = Field(description="Brief explanation of the relationship and why it's beautiful")
+
+
+class SynonymGenerationResponse(BaseModel):
+    """Response for synonym generation with efflorescence ranking."""
+    
+    synonyms: list[SynonymCandidate] = Field(
+        description="List of synonyms ordered by relevance and efflorescence"
+    )
+    confidence: float = Field(description="Overall confidence in the synonym generation")
 
 
 class AIGeneratedProviderData(ProviderData):
