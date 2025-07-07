@@ -2,7 +2,6 @@
 
 from .constants import LiteratureSourceType, WordType
 from .models import (
-    APIResponseCache,
     Definition,
     DictionaryEntry,
     Examples,

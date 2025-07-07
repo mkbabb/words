@@ -13,7 +13,7 @@ from ..models import (
     ProviderData,
     SynthesizedDictionaryEntry,
 )
-from ..storage.mongodb import get_synthesized_entry, save_synthesized_entry
+from ..storage.mongodb import _ensure_initialized, get_synthesized_entry, save_synthesized_entry
 from ..utils.logging import get_logger
 from .connector import OpenAIConnector
 
@@ -27,16 +27,17 @@ class DefinitionSynthesizer:
         self.ai = openai_connector
 
     async def synthesize_entry(
-        self, word: str, providers_data: list[ProviderData]
+        self, word: str, providers_data: list[ProviderData], force_refresh: bool = False
     ) -> SynthesizedDictionaryEntry:
         """Synthesize a complete dictionary entry from provider data using meaning clusters."""
 
-        # Check if we already have a synthesized entry
-        existing = await get_synthesized_entry(word)
+        # Check if we already have a synthesized entry (unless force_refresh is True)
+        if not force_refresh:
+            existing = await get_synthesized_entry(word)
 
-        if existing is not None:
-            logger.info(f"📋 Using cached synthesized entry for '{word}'")
-            return existing
+            if existing is not None:
+                logger.info(f"📋 Using cached synthesized entry for '{word}'")
+                return existing
 
         # Generate pronunciation if not available
         pronunciation = await self._synthesize_pronunciation(word)
@@ -90,6 +91,9 @@ class DefinitionSynthesizer:
             cluster_descriptions=cluster_descriptions,
         )
 
+        # Ensure MongoDB is initialized before creating the entry
+        await _ensure_initialized()
+        
         # Create synthesized entry
         entry = SynthesizedDictionaryEntry(
             word=word,
@@ -99,11 +103,15 @@ class DefinitionSynthesizer:
         )
 
         # Save to database
-        await save_synthesized_entry(entry)
-
+        try:
+            await save_synthesized_entry(entry)
+        except Exception as e:
+            logger.error(f"Failed to save synthesized entry for '{word}': {e}")
+            # Still return the entry even if saving failed
+            
         return entry
 
-    async def generate_fallback_entry(self, word: str) -> SynthesizedDictionaryEntry:
+    async def generate_fallback_entry(self, word: str, force_refresh: bool = False) -> SynthesizedDictionaryEntry:
         """Generate a complete fallback entry using AI."""
         logger.info(f"🔮 Starting AI fallback generation for '{word}'")
 
@@ -112,6 +120,8 @@ class DefinitionSynthesizer:
 
         if dictionary_entry is None or dictionary_entry.provider_data is None:
             logger.info(f"🚫 No valid definitions generated for '{word}'")
+            # Ensure MongoDB is initialized before creating the entry
+            await _ensure_initialized()
             # Return minimal entry for nonsense words
             return SynthesizedDictionaryEntry(
                 word=word,
@@ -165,6 +175,7 @@ class DefinitionSynthesizer:
         return await self.synthesize_entry(
             word=word,
             providers_data=providers_data,
+            force_refresh=force_refresh,
         )
 
     async def _synthesize_definitions(

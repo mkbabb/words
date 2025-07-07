@@ -9,7 +9,7 @@ from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..list.models import WordList
-from ..models.models import APIResponseCache, DictionaryEntry, SynthesizedDictionaryEntry
+from ..models.models import DictionaryEntry, SynthesizedDictionaryEntry
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -45,7 +45,7 @@ class MongoDBStorage:
         # Initialize Beanie with our document models
         await init_beanie(
             database=database,
-            document_models=[DictionaryEntry, APIResponseCache, SynthesizedDictionaryEntry, WordList],
+            document_models=[DictionaryEntry, SynthesizedDictionaryEntry, WordList],
         )
 
         self._initialized = True
@@ -71,7 +71,9 @@ class MongoDBStorage:
 
         try:
             # Use Beanie's upsert functionality
-            existing = await DictionaryEntry.find_one(DictionaryEntry.word == entry.word)
+            existing = await DictionaryEntry.find_one(
+                DictionaryEntry.word == entry.word
+            )
 
             if existing:
                 # Update existing entry
@@ -126,99 +128,11 @@ class MongoDBStorage:
             logger.error(f"Error checking existence for {word}: {e}")
             return False
 
-    async def cache_api_response(
-        self, word: str, provider: str, response_data: dict[str, Any]
-    ) -> bool:
-        """Cache an API response.
+    # cache_api_response removed - using modern caching system
 
-        Args:
-            word: The word that was looked up
-            provider: The provider name
-            response_data: The raw response data
+    # get_cached_response removed - using modern caching system
 
-        Returns:
-            True if successful, False otherwise
-        """
-        if not self._initialized:
-            return False
-
-        try:
-            # Check if cache entry exists
-            existing = await APIResponseCache.find_one(
-                APIResponseCache.word == word, APIResponseCache.provider == provider
-            )
-
-            if existing:
-                # Update existing cache
-                existing.response_data = response_data
-                existing.timestamp = datetime.now()
-                await existing.save()
-            else:
-                # Create new cache entry
-                cache_entry = APIResponseCache(
-                    word=word, provider=provider, response_data=response_data
-                )
-                await cache_entry.create()
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error caching response for {word} from {provider}: {e}")
-            return False
-
-    async def get_cached_response(
-        self, word: str, provider: str, max_age_hours: int = 24
-    ) -> dict[str, Any] | None:
-        """Retrieve a cached API response.
-
-        Args:
-            word: The word to look up
-            provider: The provider name
-            max_age_hours: Maximum age of cache entry in hours
-
-        Returns:
-            Cached response data if found and fresh, None otherwise
-        """
-        if not self._initialized:
-            return None
-
-        try:
-            cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
-
-            cache_entry = await APIResponseCache.find_one(
-                APIResponseCache.word == word,
-                APIResponseCache.provider == provider,
-                APIResponseCache.timestamp >= cutoff_time,
-            )
-
-            return cache_entry.response_data if cache_entry else None
-
-        except Exception as e:
-            logger.error(f"Error retrieving cached response for {word} from {provider}: {e}")
-            return None
-
-    async def cleanup_old_cache(self, max_age_hours: int = 48) -> int:
-        """Clean up old cache entries.
-
-        Args:
-            max_age_hours: Maximum age to keep cache entries
-
-        Returns:
-            Number of deleted entries
-        """
-        if not self._initialized:
-            return 0
-
-        try:
-            cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
-
-            result = await APIResponseCache.find(APIResponseCache.timestamp < cutoff_time).delete()
-
-            return result.deleted_count if result else 0
-
-        except Exception as e:
-            logger.error(f"Error cleaning up cache: {e}")
-            return 0
+    # cleanup_old_cache removed - using modern caching system
 
 
 # Helper functions for AI module
@@ -231,43 +145,6 @@ async def _ensure_initialized() -> None:
             await _storage.connect()
         except Exception as e:
             logger.warning(f"MongoDB initialization failed: {e}")
-
-
-async def get_cache_entry(provider: str, cache_key: str) -> dict[str, Any] | None:
-    """Get cached AI response by provider and key."""
-    try:
-        await _ensure_initialized()
-        cache_entry = await APIResponseCache.find_one(
-            APIResponseCache.provider == provider,
-            APIResponseCache.word == cache_key,
-        )
-        return cache_entry.response_data if cache_entry else None
-    except Exception:
-        return None
-
-
-async def save_cache_entry(provider: str, cache_key: str, data: dict[str, Any]) -> None:
-    """Save AI response to cache."""
-    try:
-        await _ensure_initialized()
-        existing = await APIResponseCache.find_one(
-            APIResponseCache.provider == provider,
-            APIResponseCache.word == cache_key,
-        )
-        
-        if existing:
-            existing.response_data = data
-            existing.timestamp = datetime.now()
-            await existing.save()
-        else:
-            cache_entry = APIResponseCache(
-                word=cache_key,
-                provider=provider,
-                response_data=data,
-            )
-            await cache_entry.create()
-    except Exception as e:
-        logger.error(f"Error saving cache entry: {e}")
 
 
 async def get_synthesized_entry(word: str) -> SynthesizedDictionaryEntry | None:
@@ -288,7 +165,7 @@ async def save_synthesized_entry(entry: SynthesizedDictionaryEntry) -> None:
         existing = await SynthesizedDictionaryEntry.find_one(
             SynthesizedDictionaryEntry.word == entry.word
         )
-        
+
         if existing:
             existing.pronunciation = entry.pronunciation
             existing.definitions = entry.definitions

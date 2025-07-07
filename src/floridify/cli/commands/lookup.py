@@ -8,6 +8,7 @@ import click
 from rich.console import Console
 
 from ...constants import DictionaryProvider, Language
+from ...core.lookup_pipeline import lookup_word_pipeline
 from ...models import Definition
 from ...utils.logging import get_logger
 from ..utils.formatting import (
@@ -15,7 +16,6 @@ from ..utils.formatting import (
     format_meaning_based_definition,
     format_warning,
 )
-from ..utils.lookup_core import lookup_word_pipeline
 
 console = Console()
 logger = get_logger(__name__)

@@ -12,11 +12,11 @@ from ...ai.factory import create_openai_connector
 from ...anki.constants import CardType
 from ...anki.generator import AnkiCardGenerator
 from ...constants import DictionaryProvider, Language
+from ...core.lookup_pipeline import lookup_word_pipeline
 from ...list import WordList
 from ...storage.mongodb import _ensure_initialized
 from ...utils.logging import get_logger
 from ..utils.formatting import console
-from ..utils.lookup_core import lookup_word_pipeline
 
 logger = get_logger(__name__)
 

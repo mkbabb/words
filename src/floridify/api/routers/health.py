@@ -1,0 +1,79 @@
+"""Health check endpoints."""
+
+from __future__ import annotations
+
+import time
+
+from fastapi import APIRouter
+
+from ...caching.cache_manager import get_cache_manager
+from ...constants import Language
+from ...core.search_manager import get_search_engine
+from ...storage.mongodb import _ensure_initialized
+from ...utils.logging import get_logger
+from ..models.responses import HealthResponse
+
+logger = get_logger(__name__)
+router = APIRouter()
+
+# Track service start time
+_start_time = time.time()
+
+
+@router.get("/health", response_model=HealthResponse)
+async def health_check() -> HealthResponse:
+    """Get service health status.
+    
+    Returns status of all major components:
+    - Database connectivity
+    - Search engine initialization
+    - Cache system performance
+    - Service uptime
+    """
+    # Check database
+    database_status = "disconnected"
+    try:
+        await _ensure_initialized()
+        database_status = "connected"
+    except Exception as e:
+        logger.warning(f"Database health check failed: {e}")
+    
+    # Check search engine
+    search_status = "uninitialized"
+    try:
+        search_engine = await get_search_engine([Language.ENGLISH])
+        if search_engine._initialized:
+            search_status = "initialized"
+    except Exception as e:
+        logger.warning(f"Search engine health check failed: {e}")
+    
+    # Check cache system
+    cache_hit_rate = 0.0
+    try:
+        cache_manager = get_cache_manager()
+        stats = cache_manager.get_stats()
+        
+        # Calculate hit rate from memory entries vs expired entries
+        memory_entries = stats.get("memory_entries", 0)
+        expired_entries = stats.get("expired_memory_entries", 0)
+        
+        if memory_entries > 0:
+            cache_hit_rate = max(0.0, (memory_entries - expired_entries) / memory_entries)
+    except Exception as e:
+        logger.warning(f"Cache health check failed: {e}")
+    
+    # Calculate uptime
+    uptime_seconds = int(time.time() - _start_time)
+    
+    # Determine overall status
+    overall_status = "healthy"
+    if database_status != "connected" or search_status != "initialized":
+        overall_status = "degraded"
+    
+    return HealthResponse(
+        status=overall_status,
+        database=database_status,
+        search_engine=search_status,
+        cache_hit_rate=cache_hit_rate,
+        uptime_seconds=uptime_seconds,
+    )

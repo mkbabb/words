@@ -10,7 +10,6 @@ from rich.table import Table
 
 from ...constants import DictionaryProvider
 from ...models.models import (
-    APIResponseCache,
     DictionaryEntry,
     SynthesizedDictionaryEntry,
 )
@@ -78,7 +77,6 @@ async def _database_stats_async(
         # Get collection counts
         total_words = await DictionaryEntry.count()
         total_syntheses = await SynthesizedDictionaryEntry.count()
-        total_cache = await APIResponseCache.count()
 
         # Overview statistics
         console.print("[bold]Overview:[/bold]")
@@ -88,7 +86,6 @@ async def _database_stats_async(
 
         stats_table.add_row("Total Words", f"{total_words:,}")
         stats_table.add_row("AI Syntheses", f"{total_syntheses:,}")
-        stats_table.add_row("Cached Responses", f"{total_cache:,}")
 
         console.print(stats_table)
 
@@ -118,7 +115,7 @@ async def _database_stats_async(
 
         # Database size info (approximation)
         estimated_size_mb = (
-            total_words * 2.5 + total_syntheses * 1.8 + total_cache * 0.5
+            total_words * 2.5 + total_syntheses * 1.8
         )  # Rough estimate
         console.print(f"\n💾 Estimated database size: {estimated_size_mb:.1f} MB")
 
@@ -136,13 +133,15 @@ async def _database_stats_async(
 async def _get_provider_coverage() -> dict[str, int]:
     """Get count of entries by provider."""
     try:
-        # Aggregate provider counts from cache data
+        # Aggregate provider counts from dictionary entries
         pipeline = [
-            {"$group": {"_id": "$provider", "count": {"$sum": 1}}},
+            {"$project": {"providers": {"$objectToArray": "$provider_data"}}},
+            {"$unwind": "$providers"},
+            {"$group": {"_id": "$providers.k", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
         ]
 
-        results = await APIResponseCache.aggregate(pipeline).to_list()
+        results = await DictionaryEntry.aggregate(pipeline).to_list()
         return {item["_id"]: item["count"] for item in results}
 
     except Exception:

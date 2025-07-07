@@ -53,6 +53,9 @@ dependencies = [
     # Modern caching for HTTP requests and general use
     "httpx-cache>=0.13.0",
     "hishel>=0.1.0",      # Modern HTTP caching client
+    # REST API framework
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
 ]
 
 
@@ -71,6 +74,10 @@ dev = [
     "mypy>=1.16.1",
     "ruff>=0.8.0",
     "hypothesis>=6.0.0",
+    # API testing
+    "httpx>=0.28.0",
+    "pytest-mock>=3.12.0",
+    # Type stubs
     "types-toml>=0.10.8.20240310",
     "types-aiofiles>=24.1.0.20250606",
     "types-requests>=2.32.4.20250611",

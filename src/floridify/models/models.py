@@ -139,19 +139,3 @@ class SynthesizedDictionaryEntry(Document):
             [("word.text", "text")],
             "last_updated",
         ]
-
-
-class APIResponseCache(Document):
-    """Cache for API responses with TTL."""
-
-    word: str
-    provider: str
-    response_data: dict[str, Any]
-    timestamp: datetime = Field(default_factory=datetime.now)
-
-    class Settings:
-        name = "api_response_cache"
-        indexes = [
-            [("word", 1), ("provider", 1)],
-            "timestamp",
-        ]

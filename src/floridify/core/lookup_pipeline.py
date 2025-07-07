@@ -1,43 +1,56 @@
-"""Core lookup pipeline shared between CLI commands."""
+"""Core lookup pipeline for word definitions with AI synthesis."""
 
 from __future__ import annotations
 
-from ...ai import create_definition_synthesizer
-from ...connectors.dictionary_com import DictionaryComConnector
-from ...connectors.wiktionary import WiktionaryConnector
-from ...constants import DictionaryProvider, Language
-from ...models.models import ProviderData, SynthesizedDictionaryEntry
-from ...search import SearchEngine
-from ...search.constants import SearchMethod
-from ...search.core import SearchResult
-from ...utils.logging import get_logger
-from ...utils.text_utils import normalize_word
+from ..ai import create_definition_synthesizer
+from ..connectors.dictionary_com import DictionaryComConnector
+from ..connectors.wiktionary import WiktionaryConnector
+from ..constants import DictionaryProvider, Language
+from ..models.models import ProviderData, SynthesizedDictionaryEntry
+from ..search.constants import SearchMethod
+from ..search.core import SearchResult
+from ..utils.logging import get_logger
+from ..utils.text_utils import normalize_word
+from .search_manager import get_search_engine
 
 logger = get_logger(__name__)
 
 
 async def lookup_word_pipeline(
     word: str,
-    providers: list[DictionaryProvider] = [DictionaryProvider.WIKTIONARY],
-    languages: list[Language] = [Language.ENGLISH],
+    providers: list[DictionaryProvider] | None = None,
+    languages: list[Language] | None = None,
     semantic: bool = False,
     no_ai: bool = False,
     force_refresh: bool = False,
 ) -> SynthesizedDictionaryEntry | None:
-    """
-    Core lookup pipeline that normalizes, searches, gets provider definitions,
+    """Core lookup pipeline that normalizes, searches, gets provider definitions,
     and optionally synthesizes with AI.
-
-    Returns the synthesized entry or None if no definition found.
+    
+    Args:
+        word: Word to look up
+        providers: Dictionary providers to use
+        languages: Languages to search
+        semantic: Enable semantic search
+        no_ai: Skip AI synthesis
+        force_refresh: Force refresh of cached data
+        
+    Returns:
+        Synthesized dictionary entry or None if not found
     """
+    # Set defaults
+    if providers is None:
+        providers = [DictionaryProvider.WIKTIONARY]
+    if languages is None:
+        languages = [Language.ENGLISH]
+    
     try:
         # Normalize the query
         normalized_word = normalize_word(word)
-
         if normalized_word != word:
             logger.debug(f"Normalized: '{word}' → '{normalized_word}'")
 
-        # Search for the word
+        # Search for the word using singleton SearchEngine
         search_results = await _search_word(
             word=normalized_word,
             languages=languages,
@@ -47,35 +60,24 @@ async def lookup_word_pipeline(
         if not search_results:
             # Try AI fallback if no results and AI is enabled
             if not no_ai:
-                logger.info(
-                    f"No search results, trying AI fallback for '{normalized_word}'"
-                )
-                return await _ai_fallback_lookup(normalized_word)
-
+                logger.info(f"No search results, trying AI fallback for '{normalized_word}'")
+                return await _ai_fallback_lookup(normalized_word, force_refresh)
             return None
 
         # Use the best match
         best_match = search_results[0].word
-        logger.debug(
-            f"Best match: '{best_match}' (score: {search_results[0].score:.3f})"
-        )
+        logger.debug(f"Best match: '{best_match}' (score: {search_results[0].score:.3f})")
 
-        # Get definition from provider
+        # Get definition from providers
         providers_data = []
-
         for provider in providers:
             provider_data = await _get_provider_definition(best_match, provider, force_refresh)
-
             if not provider_data:
                 # Try AI fallback if provider fails and AI is enabled
                 if not no_ai:
-                    logger.info(
-                        f"Provider failed, trying AI fallback for '{best_match}'"
-                    )
-                    return await _ai_fallback_lookup(best_match)
-
+                    logger.info(f"Provider failed, trying AI fallback for '{best_match}'")
+                    return await _ai_fallback_lookup(best_match, force_refresh)
                 return None
-
             providers_data.append(provider_data)
 
         # Synthesize with AI if enabled
@@ -84,24 +86,20 @@ async def lookup_word_pipeline(
                 synthesized_entry = await _synthesize_with_ai(
                     word=best_match,
                     providers=providers_data,
+                    force_refresh=force_refresh,
                 )
-
                 if synthesized_entry:
                     logger.debug(f"Successfully synthesized entry for '{best_match}'")
                     return synthesized_entry
                 else:
                     logger.warning(f"AI synthesis failed for '{best_match}'")
                     return None
-
             except Exception as e:
                 logger.error(f"AI synthesis failed: {e}")
                 return None
         else:
             # When AI is disabled, we can't return a SynthesizedDictionaryEntry
-            # This function should only be used when AI synthesis is expected
-            logger.warning(
-                f"AI synthesis disabled, cannot return synthesized entry for '{best_match}'"
-            )
+            logger.warning(f"AI synthesis disabled, cannot return synthesized entry for '{best_match}'")
             return None
 
     except Exception as e:
@@ -110,20 +108,18 @@ async def lookup_word_pipeline(
 
 
 async def _search_word(
-    word: str, languages: list[Language], semantic: bool
+    word: str, 
+    languages: list[Language], 
+    semantic: bool
 ) -> list[SearchResult]:
-    """Search for word using the search engine."""
-    logger.debug(
-        f"Searching for '{word}' in languages: {[lang.value for lang in languages]}"
-    )
+    """Search for word using the singleton search engine."""
+    logger.debug(f"Searching for '{word}' in languages: {[lang.value for lang in languages]}")
 
-    # Initialize search engine
-    search_engine = SearchEngine(
+    # Get singleton search engine
+    search_engine = await get_search_engine(
         languages=languages,
         enable_semantic=semantic,
     )
-
-    await search_engine.initialize()
 
     # Perform search
     if semantic:
@@ -173,26 +169,28 @@ async def _get_provider_definition(
 
 
 async def _synthesize_with_ai(
-    word: str, providers: list[ProviderData]
+    word: str, providers: list[ProviderData], force_refresh: bool = False
 ) -> SynthesizedDictionaryEntry | None:
     """Synthesize definition using AI."""
     logger.debug(f"AI synthesis for '{word}'")
 
     try:
         synthesizer = create_definition_synthesizer()
-        return await synthesizer.synthesize_entry(word, providers)
+        return await synthesizer.synthesize_entry(word, providers, force_refresh)
     except Exception as e:
         logger.error(f"AI synthesis failed: {e}")
         return None
 
 
-async def _ai_fallback_lookup(word: str) -> SynthesizedDictionaryEntry | None:
+async def _ai_fallback_lookup(
+    word: str, force_refresh: bool = False
+) -> SynthesizedDictionaryEntry | None:
     """AI fallback when no provider definitions are found."""
     logger.debug(f"AI fallback for '{word}'")
 
     try:
         synthesizer = create_definition_synthesizer()
-        ai_entry = await synthesizer.generate_fallback_entry(word)
+        ai_entry = await synthesizer.generate_fallback_entry(word, force_refresh)
 
         if ai_entry and ai_entry.definitions:
             logger.debug(f"AI fallback successful for '{word}'")
