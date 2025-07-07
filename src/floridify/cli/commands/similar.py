@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 import click
 from rich.console import Console
@@ -12,6 +11,7 @@ from rich.table import Table
 from rich.text import Text
 
 from ...ai import create_openai_connector
+from ...ai.models import SynonymCandidate, SynonymGenerationResponse
 from ...constants import DictionaryProvider, Language
 from ...utils.logging import get_logger
 from ..utils.formatting import format_error, format_warning
@@ -110,14 +110,14 @@ async def _similar_async(
 
 async def _display_synonyms(
     original_word: str,
-    synonym_response: Any,
+    synonym_response: SynonymGenerationResponse,
     show_definitions: bool,
     force_refresh: bool,
 ) -> None:
     """Display synonyms in a beautiful format."""
     # Create header
     header = Text()
-    header.append(f"Synonyms for ", style="dim")
+    header.append("Synonyms for ", style="dim")
     header.append(original_word, style="bold bright_blue")
     header.append(f" (confidence: {synonym_response.confidence:.0%})", style="dim")
 
@@ -181,7 +181,7 @@ async def _display_synonyms(
 
 
 async def _show_synonym_definitions(
-    synonyms: list[Any],
+    synonyms: list[SynonymCandidate],
     force_refresh: bool,
 ) -> None:
     """Show synthesized definitions for each synonym."""

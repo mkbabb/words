@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from ...ai import create_definition_synthesizer
 from ...connectors.dictionary_com import DictionaryComConnector
 from ...connectors.wiktionary import WiktionaryConnector
@@ -11,6 +9,7 @@ from ...constants import DictionaryProvider, Language
 from ...models.models import ProviderData, SynthesizedDictionaryEntry
 from ...search import SearchEngine
 from ...search.constants import SearchMethod
+from ...search.core import SearchResult
 from ...utils.logging import get_logger
 from ...utils.text_utils import normalize_word
 
@@ -112,7 +111,7 @@ async def lookup_word_pipeline(
 
 async def _search_word(
     word: str, languages: list[Language], semantic: bool
-) -> list[Any]:
+) -> list[SearchResult]:
     """Search for word using the search engine."""
     logger.debug(
         f"Searching for '{word}' in languages: {[lang.value for lang in languages]}"

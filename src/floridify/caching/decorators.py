@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import functools
 import inspect
-from typing import Any, Awaitable, Callable, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
 
-from .cache_manager import get_cache_manager
 from ..utils.logging import get_logger
+from .cache_manager import get_cache_manager
 
 F = TypeVar("F", bound=Callable[..., Any])
 AF = TypeVar("AF", bound=Callable[..., Awaitable[Any]])

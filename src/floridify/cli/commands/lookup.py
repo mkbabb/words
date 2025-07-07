@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 import click
 from rich.console import Console
 
 from ...constants import DictionaryProvider, Language
+from ...models import Definition
 from ...utils.logging import get_logger
 from ..utils.formatting import (
     format_error,
@@ -95,7 +95,7 @@ async def _lookup_async(
 
         if result:
             # Group definitions by meaning cluster for display
-            meaning_groups: dict[str, list[Any]] = {}
+            meaning_groups: dict[str, list[Definition]] = {}
 
             for definition in result.definitions:
                 cluster = getattr(definition, 'meaning_cluster', 'general') or 'general'

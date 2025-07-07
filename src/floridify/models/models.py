@@ -5,11 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-import numpy as np
 from beanie import Document
 from pydantic import BaseModel, Field
-
-from .constants import WordType
 
 
 class Pronunciation(BaseModel):

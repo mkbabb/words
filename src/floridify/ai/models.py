@@ -61,42 +61,27 @@ class DictionaryEntryResponse(BaseModel):
     confidence: float
 
 
-class MeaningClusterDefinition(BaseModel):
-    """A definition item within a meaning cluster."""
-
-    provider: str = Field(description="The dictionary provider")
-    word_type: str = Field(description="The word type (noun, verb, etc.)")
-    definition: str = Field(description="The definition text")
 
 
-class MeaningCluster(BaseModel):
-    """A distinct meaning/sense of a word with associated word types."""
+class ClusterMapping(BaseModel):
+    """A single cluster mapping entry."""
+    
+    cluster_id: str = Field(description="Unique cluster identifier (e.g., 'bank_financial')")
+    cluster_description: str = Field(description="Human-readable description of this cluster")
+    definition_indices: list[int] = Field(description="List of definition indices (0-based) in this cluster")
 
-    meaning_cluster: str = Field(
-        description="""Unique identifier for this meaning cluster, typically a combination of word and context,
-        e.g., 'bank_financial', 'bank_geographic', 'bank_arrangement'""",
-    )
 
-    core_meaning: str = Field(
-        description="Brief description of this meaning cluster",
-    )
+class ClusterMappingResponse(BaseModel):
+    """Response containing numerical mapping of clusters to definition IDs."""
 
-    definitions: list[MeaningClusterDefinition] = Field(
+    word: str = Field(description="The word being analyzed")
+    
+    cluster_mappings: list[ClusterMapping] = Field(
         default_factory=list,
-        description="List of definitions for this meaning cluster",
+        description="List of cluster mappings with their descriptions and indices"
     )
 
-    confidence: float = 0.0
-
-
-class MeaningClusterResponse(BaseModel):
-    """Response containing distinct meaning clusters for a word."""
-
-    word: str
-
-    meaning_clusters: list[MeaningCluster]
-
-    confidence: float
+    confidence: float = Field(description="Overall confidence in the clustering (0.0-1.0)")
 
 
 class SynthesisResponse(BaseModel):

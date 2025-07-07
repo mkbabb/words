@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from jinja2 import BaseLoader, Environment, TemplateNotFound
+
+if TYPE_CHECKING:
+    from ..models import Definition
 
 
 class PromptTemplateLoader(BaseLoader):
@@ -61,14 +64,14 @@ class PromptTemplateManager:
     def get_synthesis_prompt(
         self,
         word: str,
-        provider_definitions: list[tuple[str, str, str]],
+        definitions: list[Definition],
         meaning_cluster: str | None = None,
     ) -> str:
-        """Generate synthesis prompt for definition aggregation."""
+        """Generate synthesis prompt for definition aggregation using full Definition objects."""
         return self.render_template(
             "synthesis",
             word=word,
-            provider_definitions=provider_definitions,
+            definitions=definitions,
             meaning_cluster=meaning_cluster,
         )
 
@@ -97,7 +100,7 @@ class PromptTemplateManager:
     def get_meaning_extraction_prompt(
         self, word: str, definitions: list[tuple[str, str, str]]
     ) -> str:
-        """Generate meaning extraction prompt."""
+        """Generate meaning extraction prompt with cluster mapping."""
         return self.render_template(
             "meaning_extraction",
             word=word,

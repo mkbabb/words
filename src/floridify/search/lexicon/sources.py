@@ -12,7 +12,6 @@ from pydantic import BaseModel, Field
 
 from ...constants import Language
 from ..constants import LexiconFormat
-
 from .scrapers.default import ScraperFunc, default_scraper
 from .scrapers.wikipedia_french_expressions import scrape_french_expressions
 

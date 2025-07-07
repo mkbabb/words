@@ -8,10 +8,10 @@ from rich.console import Console
 from .commands.anki import anki_command
 from .commands.config import config_group
 from .commands.database import database_group
+from .commands.list import list_command
 from .commands.lookup import lookup_group
 from .commands.search import search_group
 from .commands.similar import similar_command
-from .commands.list import list_command
 
 console = Console()
 

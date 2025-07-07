@@ -7,14 +7,15 @@ from typing import Any, TypeVar
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
-from ..caching.decorators import cached_api_call, openai_cache_key
+from ..caching.decorators import cached_api_call
+from ..models import Definition
 from ..utils.logging import get_logger
 from .models import (
     AnkiFillBlankResponse,
     AnkiMultipleChoiceResponse,
+    ClusterMappingResponse,
     DictionaryEntryResponse,
     ExampleGenerationResponse,
-    MeaningClusterResponse,
     PronunciationResponse,
     SynonymGenerationResponse,
     SynthesisResponse,
@@ -106,20 +107,20 @@ class OpenAIConnector:
     async def synthesize_definitions(
         self,
         word: str,
-        provider_definitions: list[tuple[str, str, str]],
+        definitions: list[Definition],
         meaning_cluster: str | None = None,
     ) -> SynthesisResponse:
-        """Synthesize definitions from multiple providers.
+        """Synthesize definitions from multiple providers using full Definition objects.
 
         Args:
             word: The word to synthesize definitions for.
-            word_type: The type of the word (e.g., noun, verb).
-            provider_definitions: List of (provider_name, definition) tuples.
+            definitions: List of Definition objects serialized as dictionaries.
+            meaning_cluster: The meaning cluster this definition belongs to.
         """
 
         prompt = self.template_manager.get_synthesis_prompt(
             word=word,
-            provider_definitions=provider_definitions,
+            definitions=definitions,
             meaning_cluster=meaning_cluster,
         )
 
@@ -201,34 +202,34 @@ class OpenAIConnector:
             logger.error(f"❌ AI fallback generation failed for '{word}': {e}")
             raise
 
-    async def extract_meaning_clusters(
+    async def extract_cluster_mapping(
         self, word: str, definitions: list[tuple[str, str, str]]
-    ) -> MeaningClusterResponse:
-        """Extract distinct meaning clusters from provider definitions.
+    ) -> ClusterMappingResponse:
+        """Extract numerical mapping of clusters to definition IDs.
 
         Args:
-            word: The word to extract meanings for.
+            word: The word to extract mappings for.
             definitions: list of: (provider, word_type, definition) tuples from providers.
         """
         def_count = len(definitions)
 
         logger.info(
-            f"🧠 Extracting meaning clusters for '{word}' from {def_count} definitions"
+            f"🔢 Extracting cluster mappings for '{word}' from {def_count} definitions"
         )
 
         prompt = self.template_manager.get_meaning_extraction_prompt(word, definitions)
 
         try:
             result = await self._make_structured_request(
-                prompt, MeaningClusterResponse
+                prompt, ClusterMappingResponse
             )
             logger.success(
-                f"🎯 Extracted {len(result.meaning_clusters)} meaning clusters for '{word}' "
+                f"🎯 Extracted {len(result.cluster_mappings)} cluster mappings for '{word}' "
                 f"(confidence: {result.confidence:.1%})"
             )
             return result
         except Exception as e:
-            logger.error(f"❌ Meaning extraction failed for '{word}': {e}")
+            logger.error(f"❌ Cluster mapping extraction failed for '{word}': {e}")
             raise
 
     async def generate_anki_fill_blank(

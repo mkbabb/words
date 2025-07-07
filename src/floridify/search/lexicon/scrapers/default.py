@@ -11,7 +11,6 @@ import httpx
 
 from ....caching import get_cached_http_client
 
-
 # Type alias for clarity
 ScraperFunc = Callable[[str], Awaitable[dict[str, Any] | httpx.Response]]
 

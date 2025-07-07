@@ -9,11 +9,10 @@ import click
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from ...constants import DictionaryProvider, Language
-from ...storage.mongodb import _ensure_initialized
-from ...utils.logging import get_logger
 from ...list import WordList
 from ...list.parser import generate_name, parse_file
+from ...storage.mongodb import _ensure_initialized
+from ...utils.logging import get_logger
 from ..utils.formatting import console
 from ..utils.lookup_core import lookup_word_pipeline
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+
 from ..utils.text_utils import normalize_word
 
 # Common diacritic mappings for reference
