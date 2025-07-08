@@ -22,6 +22,12 @@ export const useAppStore = defineStore('app', () => {
   const mode = ref<'dictionary' | 'thesaurus'>('dictionary');
   const pronunciationMode = ref<'phonetic' | 'ipa'>('phonetic');
   const theme = useStorage('theme', 'light');
+  const loadingProgress = ref(0);
+  const loadingStage = ref('');
+  
+  // Sidebar state 
+  const sidebarOpen = ref(false); // For mobile modal
+  const sidebarCollapsed = ref(true); // For desktop collapse
 
   // Search history (persisted)
   const searchHistory = useStorage<SearchHistory[]>('search-history', []);
@@ -57,17 +63,30 @@ export const useAppStore = defineStore('app', () => {
     searchQuery.value = normalizedQuery;
     isSearching.value = true;
     hasSearched.value = true;
+    loadingProgress.value = 0;
 
     try {
+      // Stage 1: Searching
+      loadingStage.value = 'Searching...';
+      loadingProgress.value = 25;
+      
       const response = await dictionaryApi.searchWord(normalizedQuery);
       
       if (response.success) {
         searchResults.value = response.data;
+        loadingProgress.value = 50;
         
         // If we have results, get the first one's definition
         if (response.data.length > 0) {
+          // Stage 2: Getting definition
+          loadingStage.value = 'Getting definition...';
+          loadingProgress.value = 75;
           await getDefinition(response.data[0].word);
         }
+        
+        // Stage 3: Complete
+        loadingStage.value = 'Complete';
+        loadingProgress.value = 100;
         
         // Add to search history
         addToHistory(normalizedQuery, response.data);
@@ -76,7 +95,12 @@ export const useAppStore = defineStore('app', () => {
       console.error('Search error:', error);
       searchResults.value = [];
     } finally {
-      isSearching.value = false;
+      // Small delay to show completion
+      setTimeout(() => {
+        isSearching.value = false;
+        loadingProgress.value = 0;
+        loadingStage.value = '';
+      }, 300);
     }
   }
 
@@ -157,6 +181,14 @@ export const useAppStore = defineStore('app', () => {
     theme.value = theme.value === 'light' ? 'dark' : 'light';
   }
 
+  function toggleSidebar() {
+    sidebarOpen.value = !sidebarOpen.value;
+  }
+
+  function setSidebarCollapsed(collapsed: boolean) {
+    sidebarCollapsed.value = collapsed;
+  }
+
   function reset() {
     searchQuery.value = '';
     isSearching.value = false;
@@ -179,6 +211,10 @@ export const useAppStore = defineStore('app', () => {
     pronunciationMode,
     theme,
     searchHistory,
+    sidebarOpen,
+    sidebarCollapsed,
+    loadingProgress,
+    loadingStage,
     
     // Computed
     searchState,
@@ -193,6 +229,8 @@ export const useAppStore = defineStore('app', () => {
     togglePronunciation,
     toggleMode,
     toggleTheme,
+    toggleSidebar,
+    setSidebarCollapsed,
     reset,
   };
 });

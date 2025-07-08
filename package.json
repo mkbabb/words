@@ -7,7 +7,7 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "concurrently -n \"backend,frontend\" -c \"yellow,blue\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "./dev.sh",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && python scripts/api_server.py",
     "build": "cd frontend && npm run build",

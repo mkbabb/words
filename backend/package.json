@@ -1,0 +1,9 @@
+{
+  "name": "floridify-backend",
+  "version": "1.0.0",
+  "description": "Floridify backend API server",
+  "scripts": {
+    "dev": "python scripts/run_api.py",
+    "start": "python scripts/run_api.py"
+  }
+}

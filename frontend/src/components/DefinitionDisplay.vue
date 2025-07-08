@@ -17,8 +17,8 @@
         </div>
 
         <!-- Pronunciation -->
-        <div v-if="entry.pronunciation" class="flex items-center gap-4 pt-2">
-          <span class="text-pronunciation">
+        <div v-if="entry.pronunciation" class="flex items-center gap-3 pt-2">
+          <span class="text-pronunciation font-mono text-sm">
             {{ pronunciationMode === 'phonetic' 
               ? entry.pronunciation.phonetic 
               : entry.pronunciation.ipa 
@@ -28,9 +28,9 @@
             variant="ghost"
             size="sm"
             @click="togglePronunciation"
-            class="text-xs"
+            class="text-xs px-2 py-1 h-6 hover:scale-105 transition-all duration-200"
           >
-            {{ pronunciationMode === 'phonetic' ? 'Show IPA' : 'Show Phonetic' }}
+            {{ pronunciationMode === 'phonetic' ? 'IPA' : 'Phonetic' }}
           </Button>
         </div>
       </CardHeader>
@@ -62,10 +62,19 @@
                 {{ definition.text }}
               </p>
 
-              <!-- Example -->
-              <p v-if="definition.example" class="text-sm text-muted-foreground italic mb-2">
-                "{{ definition.example }}"
-              </p>
+              <!-- Examples -->
+              <div v-if="definition.example" class="space-y-1 mb-2">
+                <p 
+                  class="text-sm text-muted-foreground italic"
+                  v-html="`&quot;${formatExampleHTML(definition.example, entry.word)}&quot;`"
+                ></p>
+                <!-- Second example (mock for now) -->
+                <p 
+                  v-if="definition.example" 
+                  class="text-sm text-muted-foreground italic"
+                  v-html="`&quot;${generateSecondExampleHTML(definition.example, entry.word)}&quot;`"
+                ></p>
+              </div>
 
               <!-- Synonyms -->
               <div v-if="definition.synonyms && definition.synonyms.length > 0" class="flex flex-wrap gap-1">
@@ -178,5 +187,30 @@ const toggleMode = () => {
 
 const togglePronunciation = () => {
   store.togglePronunciation();
+};
+
+// const formatExample = (example: string, word: string): string => {
+//   // Create a case-insensitive regex to find the word
+//   const regex = new RegExp(`\\b${word}\\b`, 'gi');
+//   return example.replace(regex, `**${word}**`);
+// };
+
+const formatExampleHTML = (example: string, word: string): string => {
+  // Create a case-insensitive regex to find the word and make it bold
+  const regex = new RegExp(`\\b${word}\\b`, 'gi');
+  return example.replace(regex, `<strong>${word}</strong>`);
+};
+
+const generateSecondExampleHTML = (_originalExample: string, word: string): string => {
+  // Simple example generation - in real app this would come from API
+  const templates = [
+    `The ${word} was evident in the situation.`,
+    `She demonstrated ${word} throughout the process.`,
+    `His ${word} made a significant difference.`,
+    `The ${word} of the moment was undeniable.`,
+  ];
+  
+  const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
+  return formatExampleHTML(randomTemplate, word);
 };
 </script>

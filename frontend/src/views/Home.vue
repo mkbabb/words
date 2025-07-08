@@ -1,5 +1,16 @@
 <template>
-  <div class="min-h-screen">
+  <!-- Sidebar -->
+  <Sidebar />
+
+  <div 
+    :class="cn(
+      'min-h-screen transition-all duration-300 ease-in-out',
+      {
+        'lg:ml-80': !store.sidebarCollapsed,
+        'lg:ml-16': store.sidebarCollapsed,
+      }
+    )"
+  >
     <!-- Landing Page View -->
     <div
       v-if="!hasSearched"
@@ -7,11 +18,6 @@
     >
       <div class="w-full max-w-4xl">
         <SearchBar />
-        
-        <!-- Search History -->
-        <div class="mt-16 max-w-2xl mx-auto">
-          <SearchHistory />
-        </div>
       </div>
     </div>
 
@@ -21,7 +27,9 @@
       class="min-h-screen"
     >
       <!-- Fixed Search Bar -->
-      <div class="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b">
+      <div 
+        class="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b transition-all duration-300 ease-in-out"
+      >
         <div class="container mx-auto px-4 py-4">
           <SearchBar />
         </div>
@@ -31,9 +39,8 @@
       <div class="container mx-auto px-4 py-8">
         <div class="max-w-4xl mx-auto">
           <!-- Search Results -->
-          <div v-if="isSearching" class="text-center py-8">
-            <div class="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto mb-4"></div>
-            <p class="text-muted-foreground">Searching...</p>
+          <div v-if="isSearching" class="space-y-8">
+            <DefinitionSkeleton />
           </div>
 
           <!-- No Results -->
@@ -78,9 +85,11 @@
 import { computed, onMounted } from 'vue';
 import { useAppStore } from '@/stores';
 import type { SearchResult } from '@/types';
+import { cn } from '@/utils';
 import SearchBar from '@/components/SearchBar.vue';
 import DefinitionDisplay from '@/components/DefinitionDisplay.vue';
-import SearchHistory from '@/components/SearchHistory.vue';
+import DefinitionSkeleton from '@/components/DefinitionSkeleton.vue';
+import Sidebar from '@/components/Sidebar.vue';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 
 const store = useAppStore();

@@ -1,4 +1,5 @@
-import axios, { type AxiosResponse } from '@/utils/mock-axios';
+import axios, { type AxiosResponse } from 'axios';
+import mockAxios from '@/utils/mock-axios';
 import type {
   ApiResponse,
   SynthesizedDictionaryEntry,
@@ -6,13 +7,17 @@ import type {
   ThesaurusEntry,
 } from '@/types';
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+const USE_MOCK_API = import.meta.env.VITE_ENABLE_MOCK_API === 'true';
+
+const realApi = axios.create({
+  baseURL: (import.meta.env.VITE_API_URL || 'http://localhost:8000') + '/api/v1',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+const api = USE_MOCK_API ? mockAxios : realApi;
 
 // Request interceptor
 api.interceptors.request.use(
@@ -35,7 +40,7 @@ api.interceptors.response.use(
 export const dictionaryApi = {
   // Search for words
   async searchWord(query: string): Promise<ApiResponse<SearchResult[]>> {
-    const response = await api.get(`/search/word`, {
+    const response = await api.get(`/search`, {
       params: { q: query },
     });
     return response.data;
@@ -55,8 +60,8 @@ export const dictionaryApi = {
 
   // Get search suggestions
   async getSuggestions(prefix: string): Promise<ApiResponse<string[]>> {
-    const response = await api.get(`/search/suggestions`, {
-      params: { prefix, limit: 10 },
+    const response = await api.get(`/suggestions`, {
+      params: { q: prefix, limit: 10 },
     });
     return response.data;
   },

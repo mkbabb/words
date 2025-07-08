@@ -33,6 +33,12 @@ const renderMath = () => {
       throwOnError: false,
       errorColor: '#cc0000',
       strict: false,
+      output: 'html',
+      trust: true,
+      macros: {
+        "\\mathscr": "\\mathcal",
+        "\\ornate": "\\mathfrak"
+      }
     });
   } catch (error) {
     console.error('KaTeX rendering error:', error);
