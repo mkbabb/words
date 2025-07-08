@@ -6,22 +6,26 @@
 **Part of Speech**: {{ word_type }}
 {% if examples %}**Examples**: {{ examples }}{% endif %}
 
-Create a GRE-level fill-in-the-blank question with multiple choice answers.
+Create a GRE-level fill-in-the-blank question that tests the student's ability to choose the correct word from four options.
 
-## Critical Requirements
-- Create a sentence with _____ where "{{ word }}" belongs
-- **NEVER include the target word "{{ word }}" in any of the four answer choices**
-- **NEVER include any form, variant, or derivative of "{{ word }}" in the choices**
-- One choice should be the correct answer (the target word itself, but this will be added separately)
-- Three choices should be plausible but incorrect words that could fit the context
+## Task
+Generate:
+1. A sophisticated sentence with _____ where "{{ word }}" belongs
+2. Four word choices (A, B, C, D) where exactly ONE will be the target word "{{ word }}"
+3. Three distractor words that are plausible but incorrect
+
+## Critical Requirements for Choices
+- **Choice A, B, C, or D must be the target word "{{ word }}" itself**
+- The other three choices must be different words (not variants of the target word)
+- All four choices must be the same part of speech as "{{ word }}"
+- Distractors should be semantically related but clearly incorrect in context
+- Distractors should be words that could plausibly fit the sentence structure
 
 ## Guidelines
-- Create a sophisticated sentence where the word is essential to meaning
-- Make the sentence challenging but not artificially obscure
-- The blank should be unambiguous when context is understood
-- Use vocabulary appropriate for graduate-level assessment
-- Make distractors words that could plausibly fit the sentence context
-- Ensure all choices are the same part of speech as the target word
-- Test semantic understanding, not rote memorization
+- Create a sentence where context clearly indicates the target word
+- Use graduate-level vocabulary and sophisticated context
+- Make distractors challenging but not impossible to eliminate
+- Ensure the sentence is unambiguous when the correct word is chosen
+- Test precise word meaning, not just grammatical fit
 
-Generate a sentence with _____ and four word choices (A, B, C, D) where one will be replaced with the target word, and specify which letter is correct.
+Generate the sentence and four word choices, then specify which letter (A, B, C, D) contains the target word "{{ word }}".

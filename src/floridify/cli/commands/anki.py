@@ -40,7 +40,7 @@ def anki_command() -> None:
     "-t",
     type=click.Choice([ct.value for ct in CardType], case_sensitive=False),
     multiple=True,
-    default=["fill_in_blank"],
+    default=["best_describes", "fill_in_blank"],
     help="Types of flashcards to generate",
 )
 @click.option(

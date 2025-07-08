@@ -284,6 +284,7 @@ class AnkiCardGenerator:
             fields = {
                 "Word": entry.word,
                 "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word}/",
+                "WordType": definition.word_type,
                 "ChoiceA": ai_response.choice_a,
                 "ChoiceB": ai_response.choice_b,
                 "ChoiceC": ai_response.choice_c,
@@ -337,25 +338,48 @@ class AnkiCardGenerator:
             ai_elapsed = time.time() - ai_start_time
             logger.debug(f"🤖 OpenAI fill-in-blank generation took {ai_elapsed:.2f}s")
 
-            # Create complete sentence by replacing blank with highlighted word
-            complete_sentence = ai_response.sentence.replace(
-                "_____", f'<span class="word-highlight">{entry.word}</span>'
-            )
+            # Format examples - ensure exactly 3 examples by augmenting if needed
+            examples_text = ""
+            if definition.examples.generated:
+                examples_list = [ex.sentence for ex in definition.examples.generated[:3]]
+                
+                # If we have fewer than 3 examples, augment with AI generation using new count parameter
+                if len(examples_list) < 3:
+                    needed_count = 3 - len(examples_list)
+                    try:
+                        example_response = await self.openai_connector.generate_example(
+                            word=entry.word,
+                            word_type=definition.word_type,
+                            definition=definition.definition,
+                            count=needed_count,
+                        )
+                        if example_response.example_sentences:
+                            examples_list.extend(example_response.example_sentences[:needed_count])
+                    except Exception as e:
+                        logger.warning(f"Failed to generate additional examples for '{entry.word}': {e}")
+                
+                examples_text = "<br><br>".join(examples_list)
+            
+            synonyms_text = ""
+            if definition.synonyms:
+                synonyms_list = definition.synonyms[:5]
+                synonyms_text = ", ".join(synonyms_list)
 
+            # AI already generated choices including target word - use directly
             # Prepare card fields
             fields = {
                 "Word": entry.word,
                 "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word}/",
                 "SentenceWithBlank": ai_response.sentence,
                 "WordType": definition.word_type,
-                "Hint": ai_response.hint or "",
                 "ChoiceA": ai_response.choice_a,
                 "ChoiceB": ai_response.choice_b,
                 "ChoiceC": ai_response.choice_c,
                 "ChoiceD": ai_response.choice_d,
                 "CorrectChoice": ai_response.correct_choice,
-                "CompleteSentence": complete_sentence,
                 "Definition": definition.definition,
+                "Examples": examples_text,
+                "Synonyms": synonyms_text,
                 "Frequency": frequency,
                 "FrequencyDisplay": f"×{frequency}" if frequency > 1 else "",
             }

@@ -335,10 +335,6 @@ class AnkiCardTemplate(BaseModel):
                 <div class="word-type">{{WordType}}</div>
             </div>
             
-            <div class="completed-sentence">
-                {{CompleteSentence}}
-            </div>
-            
             <div class="correct-answer">
                 <h3>Correct Answer: {{CorrectChoice}}</h3>
             </div>
@@ -458,24 +454,6 @@ class AnkiCardTemplate(BaseModel):
             font-weight: 600;
         }
         
-        .definition {
-            margin-bottom: 16px;
-        }
-        
-        .definition h4 {
-            color: #424245;
-            margin-bottom: 8px;
-            font-weight: 600;
-            font-size: 1em;
-        }
-        
-        .definition div {
-            background: #f5f5f7;
-            padding: 16px;
-            border-radius: 8px;
-            line-height: 1.4;
-            color: #1d1d1f;
-        }
         
         .examples-list {
             background: #f5f5f7;
@@ -535,14 +513,14 @@ class AnkiCardTemplate(BaseModel):
                 "Pronunciation",
                 "SentenceWithBlank",
                 "WordType",
-                "Hint",
                 "ChoiceA",
                 "ChoiceB",
                 "ChoiceC",
                 "ChoiceD",
                 "CorrectChoice",
-                "CompleteSentence",
                 "Definition",
+                "Examples",
+                "Synonyms",
                 "Frequency",
                 "FrequencyDisplay",
             ],
