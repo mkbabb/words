@@ -1,4 +1,34 @@
-# Floridify
+# Floridify - AI-Enhanced Dictionary
+
+A modern, full-stack dictionary application with AI-powered meaning extraction, semantic search, and beautiful typography. Built for seamless word exploration with both CLI and web interfaces.
+
+## 🌐 Web Interface (NEW!)
+
+Experience Floridify through a beautiful, responsive web interface featuring:
+
+- **Smooth Animations**: GPU-accelerated search bar transitions
+- **Typography Excellence**: Fraunces for elegance, Fira Code for technical precision  
+- **Intelligent Search**: As-you-type suggestions with debounced API calls
+- **Heatmap Visualization**: Color-coded synonym similarity scores
+- **Universal Word Linking**: Click any word to explore further
+- **Responsive Design**: Perfect on desktop, tablet, and mobile
+
+### Quick Start - Web Interface
+
+```bash
+# Start both frontend and backend
+npm run dev
+
+# Or start separately:
+npm run dev:backend  # Python FastAPI server on :8000
+npm run dev:frontend # Vue.js development server on :3000
+```
+
+Navigate to `http://localhost:3000` for the web interface.
+
+---
+
+## 📖 CLI Interface (Original)
 
 **AI-Enhanced Dictionary and Vocabulary Learning Tool**
 

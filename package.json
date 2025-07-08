@@ -1,0 +1,22 @@
+{
+  "name": "floridify-workspace",
+  "version": "1.0.0",
+  "description": "AI-Enhanced Dictionary - Full Stack Application",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n \"backend,frontend\" -c \"yellow,blue\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && python scripts/api_server.py",
+    "build": "cd frontend && npm run build",
+    "preview": "cd frontend && npm run preview",
+    "type-check": "cd frontend && npm run type-check",
+    "install:all": "npm install && cd frontend && npm install",
+    "setup": "npm run install:all"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

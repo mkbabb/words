@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 3.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 3.9%;
+  --primary: 0 0% 9%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 0 0% 96.1%;
+  --secondary-foreground: 0 0% 9%;
+  --muted: 0 0% 96.1%;
+  --muted-foreground: 0 0% 45.1%;
+  --accent: 0 0% 96.1%;
+  --accent-foreground: 0 0% 9%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 89.8%;
+  --input: 0 0% 89.8%;
+  --ring: 0 0% 3.9%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 0 0% 3.9%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 3.9%;
+  --card-foreground: 0 0% 98%;
+  --popover: 0 0% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 0 0% 98%;
+  --primary-foreground: 0 0% 9%;
+  --secondary: 0 0% 14.9%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 14.9%;
+  --muted-foreground: 0 0% 63.9%;
+  --accent: 0 0% 14.9%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 14.9%;
+  --input: 0 0% 14.9%;
+  --ring: 0 0% 83.1%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* Custom CSS variables for animations */
+:root {
+  --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-in-out-expo: cubic-bezier(0.87, 0, 0.13, 1);
+}
+
+/* Typography hierarchy */
+.text-word-title {
+  font-size: 2.5rem;
+  font-family: 'Fraunces', serif;
+  font-weight: bold;
+  line-height: 1.2;
+}
+
+@media (min-width: 768px) {
+  .text-word-title {
+    font-size: 3rem;
+  }
+}
+
+.text-pronunciation {
+  font-size: 1.125rem;
+  font-family: 'Fira Code', monospace;
+  color: hsl(var(--muted-foreground));
+}
+
+.text-definition {
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.text-part-of-speech {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Smooth transitions */
+.transition-search {
+  transition: all 0.6s var(--ease-out-expo);
+}
+
+.transition-logo {
+  transition: all 0.6s var(--ease-in-out-expo);
+}
+
+/* Search bar animations */
+.search-centered {
+  transform: translateY(0);
+}
+
+.search-moved {
+  transform: translateY(-50vh);
+}
+
+/* Logo transformations */
+.logo-dictionary::before {
+  content: 'Fd';
+}
+
+.logo-thesaurus::before {
+  content: 'Ft';
+}
+
+/* Heatmap colors */
+.heatmap-1 { background-color: rgb(254 226 226); color: rgb(127 29 29); }
+.heatmap-2 { background-color: rgb(254 202 202); color: rgb(127 29 29); }
+.heatmap-3 { background-color: rgb(252 165 165); color: rgb(127 29 29); }
+.heatmap-4 { background-color: rgb(248 113 113); color: rgb(254 226 226); }
+.heatmap-5 { background-color: rgb(239 68 68); color: rgb(254 226 226); }
+.heatmap-6 { background-color: rgb(220 38 38); color: rgb(254 226 226); }
+.heatmap-7 { background-color: rgb(185 28 28); color: rgb(254 226 226); }
+.heatmap-8 { background-color: rgb(153 27 27); color: rgb(254 226 226); }
+.heatmap-9 { background-color: rgb(127 29 29); color: rgb(254 226 226); }
+.heatmap-10 { background-color: rgb(69 10 10); color: rgb(254 226 226); }
