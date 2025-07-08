@@ -80,6 +80,7 @@ class PromptTemplateManager:
         word: str,
         word_type: str,
         definition: str,
+        count: int = 1,
     ) -> str:
         """Generate example generation prompt."""
         return self.render_template(
@@ -87,6 +88,7 @@ class PromptTemplateManager:
             word=word,
             definition=definition,
             word_type=word_type,
+            count=count,
         )
 
     def get_pronunciation_prompt(self, word: str) -> str:

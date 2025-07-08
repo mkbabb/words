@@ -23,12 +23,13 @@ logger = get_logger(__name__)
 class DefinitionSynthesizer:
     """Synthesizes dictionary entries from multiple providers_data using AI."""
 
-    def __init__(self, openai_connector: OpenAIConnector) -> None:
+    def __init__(self, openai_connector: OpenAIConnector, examples_count: int = 2) -> None:
         self.ai = openai_connector
+        self.examples_count = examples_count
 
     async def synthesize_entry(
         self, word: str, providers_data: list[ProviderData], force_refresh: bool = False
-    ) -> SynthesizedDictionaryEntry:
+    ) -> SynthesizedDictionaryEntry | None:
         """Synthesize a complete dictionary entry from provider data using meaning clusters."""
 
         # Check if we already have a synthesized entry (unless force_refresh is True)
@@ -59,13 +60,7 @@ class DefinitionSynthesizer:
 
         if not all_definition_objects:
             logger.warning(f"No definitions found for '{word}'")
-
-            return SynthesizedDictionaryEntry(
-                word=word,
-                pronunciation=pronunciation,
-                definitions=[],
-                last_updated=datetime.now(),
-            )
+            return None
 
         # Extract cluster mappings using AI
         logger.info(
@@ -132,17 +127,17 @@ class DefinitionSynthesizer:
         # Convert AI response to full provider data
         definitions: list[Definition] = []
         for definition in dictionary_entry.provider_data.definitions:
+            # Generate examples for fallback using configured count
             examples_response = await self.ai.generate_example(
                 word=word,
                 word_type=definition.word_type,
                 definition=definition.definition,
+                count=self.examples_count,
             )
 
             examples = Examples(
                 generated=[
-                    GeneratedExample(
-                        sentence=sentence,
-                    )
+                    GeneratedExample(sentence=sentence)
                     for sentence in examples_response.example_sentences
                 ]
             )
@@ -231,18 +226,17 @@ class DefinitionSynthesizer:
                 for synthesized_def in synthesis_response.definitions:
                     word_type = synthesized_def.word_type
 
-                    # Generate examples
+                    # Generate examples using configured count
                     example_response = await self.ai.generate_example(
                         word=word,
                         word_type=word_type,
                         definition=synthesized_def.definition,
+                        count=self.examples_count,
                     )
 
                     examples = Examples(
                         generated=[
-                            GeneratedExample(
-                                sentence=sentence,
-                            )
+                            GeneratedExample(sentence=sentence)
                             for sentence in example_response.example_sentences
                         ]
                     )

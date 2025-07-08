@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-import genanki  # type: ignore[import-untyped]
+import genanki
 
 from ..ai.connector import OpenAIConnector
 from ..ai.templates import PromptTemplateManager as PromptLoader
@@ -169,6 +169,7 @@ class AnkiCardGenerator:
         entry: DictionaryEntry | SynthesizedDictionaryEntry,
         card_types: list[CardType] | None = None,
         max_cards_per_type: int = 1,
+        frequency: int = 1,
     ) -> list[AnkiCard]:
         """Generate flashcards for a dictionary entry.
 
@@ -176,6 +177,7 @@ class AnkiCardGenerator:
             entry: Dictionary entry to create cards for
             card_types: Types of cards to generate (default: all types)
             max_cards_per_type: Maximum cards per type to generate
+            frequency: Word frequency count for display
 
         Returns:
             List of generated Anki cards
@@ -186,7 +188,7 @@ class AnkiCardGenerator:
         
         # Use default card types if none specified
         if card_types is None:
-            card_types = [CardType.MULTIPLE_CHOICE, CardType.FILL_IN_BLANK]
+            card_types = [CardType.BEST_DESCRIBES, CardType.FILL_IN_BLANK]
         
         # Extract definitions using helper function
         definitions = extract_definitions(entry)
@@ -200,7 +202,7 @@ class AnkiCardGenerator:
         cards = []
         for card_type in card_types:
             for definition in definitions[:max_cards_per_type]:
-                card = await self._generate_card_for_type(card_type, definition, entry)
+                card = await self._generate_card_for_type(card_type, definition, entry, frequency)
                 if card:
                     cards.append(card)
 
@@ -209,14 +211,14 @@ class AnkiCardGenerator:
         return cards
     
     async def _generate_card_for_type(
-        self, card_type: CardType, definition: Definition, entry: DictionaryEntry | SynthesizedDictionaryEntry
+        self, card_type: CardType, definition: Definition, entry: DictionaryEntry | SynthesizedDictionaryEntry, frequency: int = 1
     ) -> AnkiCard | None:
         """Generate a card for a specific type using appropriate method."""
         try:
-            if card_type == CardType.MULTIPLE_CHOICE:
-                return await self._generate_multiple_choice_card(entry, definition)
+            if card_type == CardType.BEST_DESCRIBES:
+                return await self._generate_best_describes_card(entry, definition, frequency)
             elif card_type == CardType.FILL_IN_BLANK:
-                return await self._generate_fill_blank_card(entry, definition)
+                return await self._generate_fill_blank_card(entry, definition, frequency)
             else:
                 logger.warning(f"⚠️ Unsupported card type: {card_type.value}")
                 return None
@@ -224,14 +226,14 @@ class AnkiCardGenerator:
             logger.error(f"💥 Error generating {card_type.value} card for {entry.word}: {e}")
             return None
 
-    async def _generate_multiple_choice_card(
-        self, entry: DictionaryEntry | SynthesizedDictionaryEntry, definition: Definition
+    async def _generate_best_describes_card(
+        self, entry: DictionaryEntry | SynthesizedDictionaryEntry, definition: Definition, frequency: int = 1
     ) -> AnkiCard | None:
-        """Generate a multiple choice flashcard."""
+        """Generate a best describes flashcard."""
         try:
             start_time = time.time()
             
-            logger.debug(f"🧠 Generating multiple choice AI content for '{entry.word}'")
+            logger.debug(f"🧠 Generating best describes AI content for '{entry.word}'")
             
             # Prepare examples for the prompt
             examples_text = ""
@@ -242,20 +244,36 @@ class AnkiCardGenerator:
 
             # Generate multiple choice content using structured output
             ai_start_time = time.time()
-            ai_response = await self.openai_connector.generate_anki_multiple_choice(
+            ai_response = await self.openai_connector.generate_anki_best_describes(
                 word=entry.word,
                 definition=definition.definition,
                 word_type=definition.word_type,
                 examples=examples_text,
             )
             ai_elapsed = time.time() - ai_start_time
-            logger.debug(f"🤖 OpenAI multiple choice generation took {ai_elapsed:.2f}s")
+            logger.debug(f"🤖 OpenAI best describes generation took {ai_elapsed:.2f}s")
 
-            # Format examples and synonyms as strings
+            # Format examples - ensure exactly 3 examples by augmenting if needed
             examples_text = ""
             if definition.examples.generated:
                 examples_list = [ex.sentence for ex in definition.examples.generated[:3]]
-                examples_text = " • ".join(examples_list)
+                
+                # If we have fewer than 3 examples, augment with AI generation using new count parameter
+                if len(examples_list) < 3:
+                    needed_count = 3 - len(examples_list)
+                    try:
+                        example_response = await self.openai_connector.generate_example(
+                            word=entry.word,
+                            word_type=definition.word_type,
+                            definition=definition.definition,
+                            count=needed_count,
+                        )
+                        if example_response.example_sentences:
+                            examples_list.extend(example_response.example_sentences[:needed_count])
+                    except Exception as e:
+                        logger.warning(f"Failed to generate additional examples for '{entry.word}': {e}")
+                
+                examples_text = "<br><br>".join(examples_list)
             
             synonyms_text = ""
             if definition.synonyms:
@@ -274,24 +292,26 @@ class AnkiCardGenerator:
                 "Definition": definition.definition,
                 "Examples": examples_text,
                 "Synonyms": synonyms_text,
+                "Frequency": frequency,
+                "FrequencyDisplay": f"×{frequency}" if frequency > 1 else "",
             }
 
             # Get card template
             template_start_time = time.time()
-            card_template = AnkiCardTemplate.get_multiple_choice_template()
+            card_template = AnkiCardTemplate.get_best_describes_template()
             template_elapsed = time.time() - template_start_time
             
             total_elapsed = time.time() - start_time
-            logger.debug(f"📋 Multiple choice card creation completed in {total_elapsed:.2f}s (template: {template_elapsed:.3f}s)")
+            logger.debug(f"📋 Best describes card creation completed in {total_elapsed:.2f}s (template: {template_elapsed:.3f}s)")
 
-            return AnkiCard(CardType.MULTIPLE_CHOICE, fields, card_template)
+            return AnkiCard(CardType.BEST_DESCRIBES, fields, card_template)
 
         except Exception as e:
-            logger.error(f"💥 Error generating multiple choice card for '{entry.word}': {e}")
+            logger.error(f"💥 Error generating best describes card for '{entry.word}': {e}")
             return None
 
     async def _generate_fill_blank_card(
-        self, entry: DictionaryEntry | SynthesizedDictionaryEntry, definition: Definition
+        self, entry: DictionaryEntry | SynthesizedDictionaryEntry, definition: Definition, frequency: int = 1
     ) -> AnkiCard | None:
         """Generate a fill-in-the-blank flashcard."""
         try:
@@ -329,8 +349,15 @@ class AnkiCardGenerator:
                 "SentenceWithBlank": ai_response.sentence,
                 "WordType": definition.word_type,
                 "Hint": ai_response.hint or "",
+                "ChoiceA": ai_response.choice_a,
+                "ChoiceB": ai_response.choice_b,
+                "ChoiceC": ai_response.choice_c,
+                "ChoiceD": ai_response.choice_d,
+                "CorrectChoice": ai_response.correct_choice,
                 "CompleteSentence": complete_sentence,
                 "Definition": definition.definition,
+                "Frequency": frequency,
+                "FrequencyDisplay": f"×{frequency}" if frequency > 1 else "",
             }
 
             # Get card template
@@ -350,7 +377,7 @@ class AnkiCardGenerator:
 
     def export_to_apkg(
         self, cards: list[AnkiCard], deck_name: str, output_path: str | Path
-    ) -> bool:
+    ) -> Path | None:
         """Export cards to Anki .apkg file format.
 
         Args:
@@ -359,7 +386,7 @@ class AnkiCardGenerator:
             output_path: Path to save the .apkg file
 
         Returns:
-            True if export successful, False otherwise
+            Path to exported .apkg file if successful, None otherwise
         """
         try:
             start_time = time.time()
@@ -380,7 +407,7 @@ class AnkiCardGenerator:
             # Create models for each card type
             model_creation_start = time.time()
             models = {}
-            card_type_counts = {}
+            card_type_counts: dict[str, int] = {}
             for card in cards:
                 card_type = card.card_type
                 card_type_counts[card_type.value] = card_type_counts.get(card_type.value, 0) + 1
@@ -467,7 +494,7 @@ class AnkiCardGenerator:
             if output_path is None:
                 output_path = Path.cwd() / f"{deck_name.replace(' ', '_')}"
             
-            apkg_path = self.export_to_apkg(cards, output_path)
+            apkg_path = self.export_to_apkg(cards, deck_name, output_path)
             
             if apkg_path is None:
                 logger.error("💥 .apkg export also failed")
@@ -476,7 +503,7 @@ class AnkiCardGenerator:
             # If AnkiConnect is available, try to import the .apkg directly
             if self.direct_integration.is_available():
                 logger.info("🔄 Attempting to import .apkg directly into Anki")
-                import_success = self.direct_integration.import_apkg_directly(apkg_path)
+                import_success = self.direct_integration.import_apkg_directly(str(apkg_path))
                 
                 if import_success:
                     total_time = time.time() - start_time
@@ -573,7 +600,7 @@ class AnkiCardGenerator:
         """Generate a unique model ID for the card type."""
         # Create consistent IDs for each card type
         type_ids = {
-            CardType.MULTIPLE_CHOICE: 1234567890,
+            CardType.BEST_DESCRIBES: 1234567890,
             CardType.FILL_IN_BLANK: 1234567891,
             CardType.DEFINITION_TO_WORD: 1234567892,
             CardType.WORD_TO_DEFINITION: 1234567893,

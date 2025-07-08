@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from ..models import Definition, Examples, GeneratedExample, ProviderData, WordType
+from ..models import Definition, Examples, GeneratedExample, ProviderData
 from ..utils.logging import get_logger
 from .base import DictionaryConnector
 
@@ -131,7 +131,7 @@ class OxfordConnector(DictionaryConnector):
 
                                 definitions.append(
                                     Definition(
-                                        word_type=word_type.value,
+                                        word_type=word_type,
                                         definition=def_text,
                                         examples=examples,
                                         raw_metadata=sense,  # Store full sense data
@@ -145,25 +145,25 @@ class OxfordConnector(DictionaryConnector):
             provider_name=self.provider_name, definitions=definitions, raw_metadata=data
         )
 
-    def _map_oxford_pos_to_word_type(self, oxford_pos: str) -> WordType | None:
-        """Map Oxford part of speech to our WordType enum.
+    def _map_oxford_pos_to_word_type(self, oxford_pos: str) -> str | None:
+        """Map Oxford part of speech to our word type string.
 
         Args:
             oxford_pos: Oxford API part of speech identifier
 
         Returns:
-            Corresponding WordType or None if not recognized
+            Corresponding word type string or None if not recognized
         """
         mapping = {
-            "noun": WordType.NOUN,
-            "verb": WordType.VERB,
-            "adjective": WordType.ADJECTIVE,
-            "adverb": WordType.ADVERB,
-            "pronoun": WordType.PRONOUN,
-            "preposition": WordType.PREPOSITION,
-            "conjunction": WordType.CONJUNCTION,
-            "interjection": WordType.INTERJECTION,
-            "exclamation": WordType.INTERJECTION,
+            "noun": "noun",
+            "verb": "verb",
+            "adjective": "adjective",
+            "adverb": "adverb",
+            "pronoun": "pronoun",
+            "preposition": "preposition",
+            "conjunction": "conjunction",
+            "interjection": "interjection",
+            "exclamation": "interjection",
         }
 
         return mapping.get(oxford_pos)

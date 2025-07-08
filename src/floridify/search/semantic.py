@@ -13,10 +13,10 @@ import pickle
 from pathlib import Path
 from typing import Any
 
-import faiss  # type: ignore[import-untyped]
+import faiss
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import-untyped]
-from sklearn.metrics.pairwise import cosine_similarity  # type: ignore[import-untyped]
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from ..utils.logging import get_logger
 from .constants import EmbeddingLevel
@@ -86,8 +86,15 @@ class SemanticSearch:
         """
         logger.info(f"Initializing semantic search with {len(vocabulary)} words")
 
+        # Check if vocabulary has changed to avoid unnecessary rebuilding
+        vocab_hash = hash(tuple(vocabulary))
+        if hasattr(self, '_vocab_hash') and self._vocab_hash == vocab_hash:
+            logger.debug("Vocabulary unchanged, skipping rebuild")
+            return
+            
         self.vocabulary = vocabulary
         self.word_to_id = {word: i for i, word in enumerate(vocabulary)}
+        self._vocab_hash: int = vocab_hash
 
         # Try to load from cache first (unless force rebuild)
         if not self.force_rebuild and await self._load_from_cache():

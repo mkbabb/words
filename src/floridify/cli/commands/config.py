@@ -258,7 +258,7 @@ def edit_config() -> None:
                     "rate_limit_enabled": True,
                 },
                 "anki": {
-                    "default_card_types": ["multiple_choice", "fill_blank"],
+                    "default_card_types": ["best_describes", "fill_in_blank"],
                     "max_cards_per_word": 2,
                     "export_format": "apkg",
                 },

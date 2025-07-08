@@ -23,34 +23,35 @@ class AnkiCardTemplate(BaseModel):
     fields: list[str] = Field(default_factory=list)
 
     @classmethod
-    def get_multiple_choice_template(cls) -> AnkiCardTemplate:
-        """Get template for multiple choice cards."""
-        logger.debug("🎯 Creating multiple choice card template")
+    def get_best_describes_template(cls) -> AnkiCardTemplate:
+        """Get template for best describes cards."""
+        logger.debug("🎯 Creating best describes card template")
         front_template = """
         <div class="card">
             <div class="word-header">
-                <h1 class="word">{{Word}}</h1>
+                <h1 class="word">{{Word}}{{#FrequencyDisplay}}<sup class="frequency">{{FrequencyDisplay}}</sup>{{/FrequencyDisplay}}</h1>
                 <div class="pronunciation">{{Pronunciation}}</div>
+                <div class="word-type">{{WordType}}</div>
             </div>
             
             <div class="question">
-                What does this word mean?
+                Which definition best describes this word?
             </div>
             
             <div class="choices">
-                <div class="choice" onclick="selectChoice(this, 'A')">
+                <div class="choice">
                     <span class="choice-letter">A)</span>
                     <span class="choice-text">{{ChoiceA}}</span>
                 </div>
-                <div class="choice" onclick="selectChoice(this, 'B')">
+                <div class="choice">
                     <span class="choice-letter">B)</span>
                     <span class="choice-text">{{ChoiceB}}</span>
                 </div>
-                <div class="choice" onclick="selectChoice(this, 'C')">
+                <div class="choice">
                     <span class="choice-letter">C)</span>
                     <span class="choice-text">{{ChoiceC}}</span>
                 </div>
-                <div class="choice" onclick="selectChoice(this, 'D')">
+                <div class="choice">
                     <span class="choice-letter">D)</span>
                     <span class="choice-text">{{ChoiceD}}</span>
                 </div>
@@ -62,13 +63,18 @@ class AnkiCardTemplate(BaseModel):
         back_template = """
         <div class="card">
             <div class="word-header">
-                <h1 class="word">{{Word}}</h1>
+                <h1 class="word">{{Word}}{{#FrequencyDisplay}}<sup class="frequency">{{FrequencyDisplay}}</sup>{{/FrequencyDisplay}}</h1>
                 <div class="pronunciation">{{Pronunciation}}</div>
+                <div class="word-type">{{WordType}}</div>
             </div>
             
             <div class="correct-answer">
                 <h3>Correct Answer: {{CorrectChoice}}</h3>
-                <div class="definition">{{Definition}}</div>
+            </div>
+            
+            <div class="definition">
+                <h4>Definition:</h4>
+                <div class="definition-text">{{Definition}}</div>
             </div>
             
             <div class="examples">
@@ -77,6 +83,7 @@ class AnkiCardTemplate(BaseModel):
             </div>
             
             <div class="synonyms">
+                <h4>Synonyms:</h4>
                 <div class="synonyms-list">{{Synonyms}}</div>
             </div>
         </div>
@@ -110,11 +117,25 @@ class AnkiCardTemplate(BaseModel):
             letter-spacing: -0.01em;
         }
         
+        .frequency {
+            font-size: 0.6em;
+            color: #007aff;
+            font-weight: 500;
+            margin-left: 4px;
+        }
+        
         .pronunciation {
             font-size: 1em;
             color: #86868b;
             margin-top: 4px;
             font-weight: 400;
+        }
+        
+        .word-type {
+            font-size: 0.9em;
+            color: #86868b;
+            margin-top: 2px;
+            font-style: italic;
         }
         
         .question {
@@ -137,15 +158,8 @@ class AnkiCardTemplate(BaseModel):
             border: 1px solid #d2d2d7;
             border-radius: 8px;
             padding: 12px 16px;
-            cursor: pointer;
-            transition: all 0.2s ease;
             display: flex;
             align-items: center;
-        }
-        
-        .choice:hover {
-            background: #e8e8ed;
-            border-color: #a1a1a6;
         }
         
         .choice.selected {
@@ -189,6 +203,17 @@ class AnkiCardTemplate(BaseModel):
         }
         
         .definition {
+            margin-bottom: 16px;
+        }
+        
+        .definition h4 {
+            margin-bottom: 8px;
+            color: #424245;
+            font-weight: 600;
+            font-size: 1em;
+        }
+        
+        .definition-text {
             font-size: 1.1em;
             line-height: 1.4;
             background: #f5f5f7;
@@ -217,6 +242,17 @@ class AnkiCardTemplate(BaseModel):
             line-height: 1.4;
         }
         
+        .synonyms {
+            margin-bottom: 16px;
+        }
+        
+        .synonyms h4 {
+            margin-bottom: 8px;
+            color: #424245;
+            font-weight: 600;
+            font-size: 1em;
+        }
+        
         .synonyms-list {
             background: #f5f5f7;
             padding: 8px 12px;
@@ -226,18 +262,10 @@ class AnkiCardTemplate(BaseModel):
         }
         """
 
-        javascript = """
-        function selectChoice(element, choice) {
-            // Remove previous selections
-            document.querySelectorAll('.choice').forEach(c => c.classList.remove('selected'));
-            // Mark current selection
-            element.classList.add('selected');
-            // Store selection for reveal
-            window.selectedChoice = choice;
-        }"""
+        javascript = ""
         
         return cls(
-            card_type=CardType.MULTIPLE_CHOICE,
+            card_type=CardType.BEST_DESCRIBES,
             front_template=front_template,
             back_template=back_template,
             css_styles=css_styles,
@@ -245,6 +273,7 @@ class AnkiCardTemplate(BaseModel):
             fields=[
                 "Word",
                 "Pronunciation",
+                "WordType",
                 "ChoiceA",
                 "ChoiceB",
                 "ChoiceC",
@@ -253,6 +282,8 @@ class AnkiCardTemplate(BaseModel):
                 "Definition",
                 "Examples",
                 "Synonyms",
+                "Frequency",
+                "FrequencyDisplay",
             ],
         )
 
@@ -264,6 +295,7 @@ class AnkiCardTemplate(BaseModel):
         <div class="card">
             <div class="word-header">
                 <div class="pronunciation">{{Pronunciation}}</div>
+                <div class="word-type">{{WordType}}</div>
             </div>
             
             <div class="question">
@@ -274,14 +306,23 @@ class AnkiCardTemplate(BaseModel):
                 {{SentenceWithBlank}}
             </div>
             
-            <div class="word-type">
-                <span class="label">Part of speech:</span> {{WordType}}
-            </div>
-            
-            <div class="hint">
-                {{#Hint}}
-                <div class="hint-text">💡 {{Hint}}</div>
-                {{/Hint}}
+            <div class="choices">
+                <div class="choice">
+                    <span class="choice-letter">A)</span>
+                    <span class="choice-text">{{ChoiceA}}</span>
+                </div>
+                <div class="choice">
+                    <span class="choice-letter">B)</span>
+                    <span class="choice-text">{{ChoiceB}}</span>
+                </div>
+                <div class="choice">
+                    <span class="choice-letter">C)</span>
+                    <span class="choice-text">{{ChoiceC}}</span>
+                </div>
+                <div class="choice">
+                    <span class="choice-letter">D)</span>
+                    <span class="choice-text">{{ChoiceD}}</span>
+                </div>
             </div>
         </div>
         """
@@ -289,19 +330,33 @@ class AnkiCardTemplate(BaseModel):
         back_template = """
         <div class="card">
             <div class="word-header">
-                <h1 class="word">{{Word}}</h1>
+                <h1 class="word">{{Word}}{{#FrequencyDisplay}}<sup class="frequency">{{FrequencyDisplay}}</sup>{{/FrequencyDisplay}}</h1>
                 <div class="pronunciation">{{Pronunciation}}</div>
+                <div class="word-type">{{WordType}}</div>
             </div>
             
             <div class="completed-sentence">
                 {{CompleteSentence}}
             </div>
             
-            <div class="definition">
-                <h4>Definition:</h4>
-                {{Definition}}
+            <div class="correct-answer">
+                <h3>Correct Answer: {{CorrectChoice}}</h3>
             </div>
             
+            <div class="definition">
+                <h4>Definition:</h4>
+                <div class="definition-text">{{Definition}}</div>
+            </div>
+            
+            <div class="examples">
+                <h4>Examples:</h4>
+                <div class="examples-list">{{Examples}}</div>
+            </div>
+            
+            <div class="synonyms">
+                <h4>Synonyms:</h4>
+                <div class="synonyms-list">{{Synonyms}}</div>
+            </div>
         </div>
         """
 
@@ -333,11 +388,25 @@ class AnkiCardTemplate(BaseModel):
             letter-spacing: -0.01em;
         }
         
+        .frequency {
+            font-size: 0.6em;
+            color: #007aff;
+            font-weight: 500;
+            margin-left: 4px;
+        }
+        
         .pronunciation {
             font-size: 1em;
             color: #86868b;
             margin-top: 4px;
             font-weight: 400;
+        }
+        
+        .word-type {
+            font-size: 0.9em;
+            color: #86868b;
+            margin-top: 2px;
+            font-style: italic;
         }
         
         .question {
@@ -368,31 +437,6 @@ class AnkiCardTemplate(BaseModel):
             display: inline-block;
             min-width: 80px;
             text-align: center;
-        }
-        
-        .word-type {
-            text-align: center;
-            margin-bottom: 16px;
-            font-size: 1em;
-            color: #86868b;
-        }
-        
-        .label {
-            font-weight: 500;
-        }
-        
-        .hint {
-            text-align: center;
-            margin-top: 12px;
-        }
-        
-        .hint-text {
-            background: #fff2cc;
-            color: #8b7800;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 0.9em;
-            display: inline-block;
         }
         
         .completed-sentence {
@@ -441,6 +485,44 @@ class AnkiCardTemplate(BaseModel):
             color: #424245;
             line-height: 1.4;
         }
+        
+        .choices {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .choice {
+            background: #f5f5f7;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .choice-letter {
+            font-weight: 600;
+            margin-right: 12px;
+            min-width: 20px;
+        }
+        
+        .choice-text {
+            flex: 1;
+            font-weight: 400;
+        }
+        
+        .correct-answer {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .correct-answer h3 {
+            color: #30d158;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
         """
 
         return cls(
@@ -454,7 +536,14 @@ class AnkiCardTemplate(BaseModel):
                 "SentenceWithBlank",
                 "WordType",
                 "Hint",
+                "ChoiceA",
+                "ChoiceB",
+                "ChoiceC",
+                "ChoiceD",
+                "CorrectChoice",
                 "CompleteSentence",
                 "Definition",
+                "Frequency",
+                "FrequencyDisplay",
             ],
         )

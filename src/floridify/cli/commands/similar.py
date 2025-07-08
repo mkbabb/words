@@ -36,7 +36,7 @@ logger = get_logger(__name__)
     help="Show synthesized definitions for each synonym",
 )
 @click.option(
-    "--force-refresh",
+    "--force",
     is_flag=True,
     help="Force refresh all caches (bypass cache)",
 )
@@ -44,7 +44,7 @@ def similar(
     word: str,
     count: int,
     show_definitions: bool,
-    force_refresh: bool,
+    force: bool,
 ) -> None:
     """Generate beautiful synonyms ordered by relevance and efflorescence.
     
@@ -54,14 +54,14 @@ def similar(
 
     WORD: The word to find synonyms for
     """
-    asyncio.run(_similar_async(word, count, show_definitions, force_refresh))
+    asyncio.run(_similar_async(word, count, show_definitions, force))
 
 
 async def _similar_async(
     word: str,
     count: int,
     show_definitions: bool,
-    force_refresh: bool,
+    force: bool,
 ) -> None:
     """Async implementation of similar command."""
     logger.info(f"Finding synonyms for: '{word}' (count: {count})")
@@ -74,7 +74,7 @@ async def _similar_async(
             languages=[Language.ENGLISH, Language.FRENCH],
             semantic=False,
             no_ai=False,
-            force_refresh=force_refresh,
+            force_refresh=force,
         )
 
         if not entry or not entry.definitions:
@@ -101,7 +101,7 @@ async def _similar_async(
             return
 
         # Display synonyms in a beautiful table
-        await _display_synonyms(word, synonym_response, show_definitions, force_refresh)
+        await _display_synonyms(word, synonym_response, show_definitions, force)
 
     except Exception as e:
         logger.error(f"Similar command failed: {e}")
@@ -112,7 +112,7 @@ async def _display_synonyms(
     original_word: str,
     synonym_response: SynonymGenerationResponse,
     show_definitions: bool,
-    force_refresh: bool,
+    force: bool,
 ) -> None:
     """Display synonyms in a beautiful format."""
     # Create header
@@ -177,12 +177,12 @@ async def _display_synonyms(
 
     # Show definitions if requested
     if show_definitions:
-        await _show_synonym_definitions(synonym_response.synonyms, force_refresh)
+        await _show_synonym_definitions(synonym_response.synonyms, force)
 
 
 async def _show_synonym_definitions(
     synonyms: list[SynonymCandidate],
-    force_refresh: bool,
+    force: bool,
 ) -> None:
     """Show synthesized definitions for each synonym."""
     console.print("\n" + "─" * 70)
@@ -203,7 +203,7 @@ async def _show_synonym_definitions(
                 languages=[Language.ENGLISH, Language.FRENCH],
                 semantic=True,  # Use semantic search for better matches
                 no_ai=False,
-                force_refresh=force_refresh,
+                force_refresh=force,
             )
 
             if entry and entry.definitions:

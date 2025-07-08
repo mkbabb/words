@@ -209,7 +209,7 @@ class LexiconLoader:
         # Use the downloader function (handles both regular URLs and custom scraping)
         logger.info(f"Downloading data for source: {source.name}")
         # Pass force_rebuild to scraper for cache invalidation
-        result = await source.scraper(source.url, force_refresh=self.force_rebuild)
+        result = await source.scraper(source.url)
         logger.debug(
             f"Downloaded data for {source.name}, type: {type(result).__name__}"
         )
@@ -691,11 +691,14 @@ class LexiconLoader:
 
     def get_all_words(self) -> list[str]:
         """Get all words from all loaded languages."""
-        return self._all_words.copy()
+        return self._all_words  # No copy needed since SearchEngine caches
 
     def get_all_phrases(self) -> list[str]:
         """Get all phrases as strings from all loaded languages."""
-        return [phrase.normalized for phrase in self._all_phrases]
+        # Cache phrase strings to avoid rebuilding list every time  
+        if not hasattr(self, '_phrase_strings') or len(self._phrase_strings) != len(self._all_phrases):
+            self._phrase_strings: list[str] = [phrase.normalized for phrase in self._all_phrases]
+        return self._phrase_strings
 
     def get_phrases(self) -> list[MultiWordExpression]:
         """Get all phrase objects with metadata."""

@@ -109,12 +109,16 @@ class SearchEngine:
         )
         await self.lexicon_loader.load_languages(self.languages)
 
-        # Initialize search components
-        words = self.lexicon_loader.get_all_words()
-        phrases = self.lexicon_loader.get_all_phrases()
+        # Load and cache vocabulary ONCE at initialization
+        self._words = self.lexicon_loader.get_all_words()
+        self._phrases = self.lexicon_loader.get_all_phrases()
+        self._vocabulary = self._words + self._phrases
 
+        logger.debug(f"Cached vocabulary: {len(self._words)} words, {len(self._phrases)} phrases")
+
+        # Initialize search components with pre-built vocabulary
         self.trie_search = TrieSearch()
-        self.trie_search.build_index(words + phrases)
+        self.trie_search.build_index(self._vocabulary)
 
         self.fuzzy_search = FuzzySearch(min_score=self.min_score)
 
@@ -122,15 +126,23 @@ class SearchEngine:
             self.semantic_search = SemanticSearch(
                 self.cache_dir, force_rebuild=self.force_rebuild
             )
-            await self.semantic_search.initialize(words + phrases)
+            await self.semantic_search.initialize(self._vocabulary)
 
         self._initialized = True
 
         elapsed = time.time() - start_time
         logger.success(f"Search engine initialized in {elapsed:.2f}s")
         logger.info(
-            f"Loaded {len(words)} words, {len(phrases)} phrases, semantic: {self.enable_semantic}"
+            f"Loaded {len(self._words)} words, {len(self._phrases)} phrases, semantic: {self.enable_semantic}"
         )
+
+    def get_vocabulary_size(self) -> dict[str, int]:
+        """Get vocabulary statistics for monitoring."""
+        return {
+            "words": len(self._words),
+            "phrases": len(self._phrases),
+            "total": len(self._vocabulary)
+        }
 
     async def search(
         self,
@@ -291,18 +303,13 @@ class SearchEngine:
         start_time = time.perf_counter()
 
         try:
-            if not self.fuzzy_search or not self.lexicon_loader:
+            if not self.fuzzy_search or not self._vocabulary:
                 return []
 
-            # Get vocabulary for fuzzy matching
-            words = self.lexicon_loader.get_all_words()
-            phrases = self.lexicon_loader.get_all_phrases()
-            vocabulary = words + phrases
-
-            # Use automatic method selection for fuzzy search
+            # Use pre-built vocabulary (CRITICAL PERFORMANCE FIX)
             matches = self.fuzzy_search.search(
                 query=query,
-                word_list=vocabulary,
+                word_list=self._vocabulary,
                 max_results=max_results,
                 method=FuzzySearchMethod.AUTO,
             )

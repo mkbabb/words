@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 class CardType(Enum):
     """Types of flashcards that can be generated for Anki."""
 
-    MULTIPLE_CHOICE = "multiple_choice"
+    BEST_DESCRIBES = "best_describes"
     FILL_IN_BLANK = "fill_in_blank"
     DEFINITION_TO_WORD = "definition_to_word"
     WORD_TO_DEFINITION = "word_to_definition"

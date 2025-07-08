@@ -92,8 +92,8 @@ async def lookup_word_pipeline(
                     logger.debug(f"Successfully synthesized entry for '{best_match}'")
                     return synthesized_entry
                 else:
-                    logger.warning(f"AI synthesis failed for '{best_match}'")
-                    return None
+                    logger.info(f"No provider data available, trying AI fallback for '{best_match}'")
+                    return await _ai_fallback_lookup(best_match, force_refresh)
             except Exception as e:
                 logger.error(f"AI synthesis failed: {e}")
                 return None

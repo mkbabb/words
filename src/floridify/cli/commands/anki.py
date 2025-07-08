@@ -40,7 +40,7 @@ def anki_command() -> None:
     "-t",
     type=click.Choice([ct.value for ct in CardType], case_sensitive=False),
     multiple=True,
-    default=["multiple_choice"],
+    default=["fill_in_blank"],
     help="Types of flashcards to generate",
 )
 @click.option(
@@ -57,6 +57,11 @@ def anki_command() -> None:
     default=True,
     help="Create .apkg file if direct export fails (default: True)",
 )
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Force refresh all caches (bypass cache)",
+)
 def export(
     word_list_name: str,
     output: str | None,
@@ -65,6 +70,7 @@ def export(
     deck_name: str | None,
     direct: bool,
     apkg_fallback: bool,
+    force: bool,
 ) -> None:
     """Export word list as Anki flashcard deck.
 
@@ -72,12 +78,12 @@ def export(
     Direct export requires Anki to be running with AnkiConnect add-on installed.
 
     Generates GRE-level flashcards with beautiful Claude-inspired styling.
-    Each word creates fill-in-blank and multiple choice cards using AI.
+    Each word creates fill-in-blank and best describes cards using AI.
 
     Examples:
         floridify anki export vocabulary-list
         floridify anki export gre-words --output ~/decks/gre.apkg
-        floridify anki export test-words --card-types fill_in_blank
+        floridify anki export test-words --card-types best_describes
     """
     asyncio.run(
         _export_async(
@@ -88,6 +94,7 @@ def export(
             deck_name,
             direct,
             apkg_fallback,
+            force,
         )
     )
 
@@ -100,6 +107,7 @@ async def _export_async(
     deck_name: str | None,
     direct: bool,
     apkg_fallback: bool,
+    force: bool,
 ) -> None:
     """Async implementation of Anki export."""
     await _ensure_initialized()
@@ -140,6 +148,36 @@ async def _export_async(
         openai_connector = create_openai_connector()
         card_generator = AnkiCardGenerator(openai_connector)
 
+        # First pass: normalize words and build frequency map
+        console.print("🔍 Normalizing words and building frequency map...")
+        from ...core.search_manager import get_search_engine
+        from ...utils.text_utils import normalize_word
+        
+        search_engine = await get_search_engine(
+            languages=[Language.ENGLISH],
+            enable_semantic=False,
+        )
+        
+        word_frequency_map: dict[str, int] = {}
+        original_word_map: dict[str, str] = {}  # normalized -> first original word seen
+        
+        for word_freq in word_list.words:
+            word_text = word_freq.text
+            normalized = normalize_word(word_text)
+            
+            # Try to get the canonical form from search engine
+            search_results = await search_engine.search(normalized, max_results=1)
+            canonical_word = search_results[0].word if search_results else normalized
+            
+            if canonical_word not in word_frequency_map:
+                word_frequency_map[canonical_word] = 0
+                original_word_map[canonical_word] = word_text
+            
+            word_frequency_map[canonical_word] += word_freq.frequency
+
+        unique_words = list(word_frequency_map.keys())
+        console.print(f"📊 Found {len(unique_words)} unique words after normalization (from {word_list.unique_words} original)")
+
         all_cards = []
 
         with Progress(
@@ -148,46 +186,49 @@ async def _export_async(
             console=console,
         ) as progress:
 
-            # Process each word in the word list
+            # Process each unique word
             task = progress.add_task(
-                "Generating flashcards...", total=word_list.unique_words
+                "Generating flashcards...", total=len(unique_words)
             )
 
-            for word_freq in word_list.words:
-                word_text = word_freq.text
-                progress.update(task, description=f"Processing '{word_text}'")
+            for canonical_word in unique_words:
+                frequency = word_frequency_map[canonical_word]
+                progress.update(task, description=f"Processing '{canonical_word}' (freq: {frequency})")
 
-                # Look up word to get dictionary entry using batch lookup
+                # Look up word to get dictionary entry using lookup pipeline
                 try:
                     entry = await lookup_word_pipeline(
-                        word=word_text,
+                        word=canonical_word,
                         providers=[DictionaryProvider.WIKTIONARY],
                         languages=[Language.ENGLISH],
                         semantic=False,
                         no_ai=False,
+                        force_refresh=force,
                     )
 
                     if entry:
-                        # Generate cards for this entry
+                        # Generate cards for this entry with frequency information
                         cards = await card_generator.generate_cards(
                             entry,
                             card_types=parsed_card_types,
                             max_cards_per_type=max_cards,
+                            frequency=frequency,
                         )
                         all_cards.extend(cards)
 
+                        freq_indicator = f" (×{frequency})" if frequency > 1 else ""
                         console.print(
-                            f"  Generated {len(cards)} cards for '{word_text}'"
+                            f"  Generated {len(cards)} cards for '{canonical_word}'{freq_indicator}"
                         )
                     else:
                         console.print(
-                            f"  [yellow]Warning:[/yellow] Could not find definition for '{word_text}'"
+                            f"  [yellow]Warning:[/yellow] Could not find definition for '{canonical_word}'"
                         )
 
                 except Exception as e:
-                    logger.error(f"Error processing word '{word_text}': {e}")
+                    logger.error(f"Error processing word '{canonical_word}': {e}")
                     console.print(
-                        f"  [red]Error:[/red] Failed to process '{word_text}': {e}"
+                        f"  [red]Error:[/red] Failed to process '{canonical_word}': {e}"
                     )
 
                 progress.advance(task)
@@ -241,7 +282,7 @@ async def _export_async(
                 console.print("[red]Error:[/red] Failed to export flashcards")
         else:
             # Traditional .apkg export only
-            apkg_path = card_generator.export_to_apkg(all_cards, output_path)
+            apkg_path = card_generator.export_to_apkg(all_cards, deck_name, output_path)
 
             if apkg_path:
                 console.print(
@@ -314,13 +355,13 @@ def info() -> None:
 [bold blue]🎴 Anki Flashcard Generation[/bold blue]
 
 [bold]Card Types:[/bold]
-  [green]fill_in_blank[/green]     - Context sentences with strategic word removal
-  [green]multiple_choice[/green]   - Definition-based questions with distractors
+  [green]fill_in_blank[/green]     - Context sentences with multiple choice answers
+  [green]best_describes[/green]    - Definition-based questions with distractors
 
 [bold]Features:[/bold]
   • GRE-level academic rigor
   • Claude-inspired beautiful styling
-  • Interactive multiple choice with JavaScript
+  • Interactive best describes questions
   • Comprehensive answer explanations
   • Examples and synonyms included
 

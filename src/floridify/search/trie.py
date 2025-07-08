@@ -11,7 +11,7 @@ import pickle
 from pathlib import Path
 from typing import Any
 
-import marisa_trie  # type: ignore
+import marisa_trie
 
 
 class TrieSearch:
@@ -39,6 +39,7 @@ class TrieSearch:
         self._word_frequencies: dict[str, int] = {}
         self._word_count = 0
         self._max_frequency = 0
+        self._stats_dirty = True  # Flag to track when stats need recalculation
 
     def build_index(
         self, words: list[str], frequencies: dict[str, int] | None = None
@@ -52,6 +53,7 @@ class TrieSearch:
         """
         self._word_frequencies.clear()
         self._word_count = 0
+        self._stats_dirty = True  # Mark stats as needing recalculation
         self._max_frequency = 0
 
         # Process and normalize words
@@ -150,12 +152,21 @@ class TrieSearch:
         matches = list(self._trie.keys(prefix))
 
         # Sort by frequency (descending) and return top results
-        frequency_matches = [
-            (word, self._word_frequencies.get(word, 0)) for word in matches
-        ]
-        frequency_matches.sort(key=lambda x: x[1], reverse=True)
-
-        return [word for word, _ in frequency_matches[:max_results]]
+        if len(matches) <= max_results:
+            # If we have few matches, simple frequency sort is fine
+            frequency_pairs = [
+                (word, self._word_frequencies.get(word, 0)) for word in matches
+            ]
+            frequency_pairs.sort(key=lambda x: x[1], reverse=True)
+            return [word for word, _ in frequency_pairs]
+        else:
+            # For many matches, use partial sort for better performance
+            import heapq
+            heap_items: list[tuple[int, str]] = [
+                (-self._word_frequencies.get(word, 0), word) for word in matches
+            ]
+            top_matches = heapq.nsmallest(max_results, heap_items)
+            return [word for _, word in top_matches]
 
     def contains(self, word: str) -> bool:
         """
@@ -208,15 +219,21 @@ class TrieSearch:
                 "average_word_length": 0.0,
             }
 
-        # Calculate average word length
-        all_words = list(self._trie)
-        avg_length = (
-            sum(len(word) for word in all_words) / len(all_words) if all_words else 0.0
-        )
+        # Cache statistics to avoid expensive recalculation
+        if not hasattr(self, '_cached_stats') or self._stats_dirty:
+            all_words = list(self._trie)
+            avg_length = (
+                sum(len(word) for word in all_words) / len(all_words) if all_words else 0.0
+            )
+            self._cached_avg_length = avg_length
+            self._cached_word_list_size = len(all_words)
+            self._stats_dirty = False
+        else:
+            avg_length = self._cached_avg_length
 
         return {
             "word_count": self._word_count,
-            "memory_nodes": len(all_words),  # Approximate node count
+            "memory_nodes": getattr(self, '_cached_word_list_size', self._word_count),  # Use cached size
             "average_depth": avg_length,  # Use average word length as depth approximation
             "max_frequency": self._max_frequency,
             "memory_efficiency": "5x better than Python trie",

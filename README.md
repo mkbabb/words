@@ -84,7 +84,7 @@ default_provider = "wiktionary"
 max_results = 20
 
 [anki]
-default_card_types = ["multiple_choice", "fill_in_blank"]
+default_card_types = ["best_describes", "fill_in_blank"]
 max_cards_per_word = 2
 ```
 

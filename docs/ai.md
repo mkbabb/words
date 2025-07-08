@@ -24,7 +24,7 @@ async def generate_example(word: str, definition: str, word_type: str) -> Exampl
 async def generate_fallback_entry(word: str) -> FallbackResponse
 async def generate_embeddings(texts: list[str]) -> EmbeddingResponse
 async def generate_anki_fill_blank(word: str, definition: str) -> AnkiFillBlankResponse
-async def generate_anki_multiple_choice(word: str, definition: str) -> AnkiMultipleChoiceResponse
+async def generate_anki_best_describes(word: str, definition: str) -> AnkiMultipleChoiceResponse
 ```
 
 ### Definition Synthesizer (`ai/synthesizer.py`)
@@ -147,7 +147,7 @@ class FallbackResponse(BaseModel):
 - `fallback_provider.md`: Complete AI-only entries
 - `pronunciation.md`: Phonetic pronunciations
 - `anki_fill_blank.md`: Fill-in-the-blank flashcard generation
-- `anki_multiple_choice.md`: Multiple choice flashcard generation
+- `anki_best_describes.md`: Best describes flashcard generation
 
 ### Key Template Features
 

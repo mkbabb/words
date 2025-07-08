@@ -1,12 +1,13 @@
-# Task: Generate Modern Usage Example
+# Task: Generate Modern Usage Examples
 
-Create a contemporary exemplary example sentence demonstrating proper word usage.
+Create {{ count }} contemporary example sentences demonstrating proper word usage.
 
 ## Input
 
 Word: {{ word }}
 Definition: {{ definition }}
 Word Type: {{ word_type }}
+Count: {{ count }}
 
 ## Requirements
 
@@ -15,7 +16,6 @@ Word Type: {{ word_type }}
 -   Natural tone, avoiding archaic context or usage (even if the word is esoteric, old-fashioned, or ancient)
 -   Appropriate for educational use
 -   10-25 words in length
+-   Each example should show different usage patterns or contexts
 
-## Output
-
-Single example sentence showcasing the word in context.
+Generate exactly {{ count }} high-quality example sentences showcasing the word in context.

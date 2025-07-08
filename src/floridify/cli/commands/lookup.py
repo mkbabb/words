@@ -34,7 +34,7 @@ logger = get_logger(__name__)
     "--language",
     type=click.Choice([lang.value for lang in Language], case_sensitive=False),
     multiple=True,
-    default=[Language.ENGLISH.value, Language.FRENCH.value],
+    default=[Language.ENGLISH.value],
     help="Lexicon languages to search",
 )
 @click.option(
@@ -48,7 +48,7 @@ logger = get_logger(__name__)
     help="Skip AI synthesis",
 )
 @click.option(
-    "--force-refresh",
+    "--force",
     is_flag=True,
     help="Force refresh all caches (bypass cache)",
 )
@@ -58,13 +58,13 @@ def lookup(
     language: tuple[str, ...],
     semantic: bool,
     no_ai: bool,
-    force_refresh: bool,
+    force: bool,
 ) -> None:
     """Look up word definitions with AI enhancement.
 
     WORD: The word to look up
     """
-    asyncio.run(_lookup_async(word, provider, language, semantic, no_ai, force_refresh))
+    asyncio.run(_lookup_async(word, provider, language, semantic, no_ai, force))
 
 
 async def _lookup_async(
@@ -73,7 +73,7 @@ async def _lookup_async(
     language: tuple[str, ...],
     semantic: bool,
     no_ai: bool,
-    force_refresh: bool,
+    force: bool,
 ) -> None:
     """Async implementation of word lookup."""
     logger.info(f"Looking up word: '{word}' with providers: {', '.join(provider)}")
@@ -90,7 +90,7 @@ async def _lookup_async(
             languages=languages,
             semantic=semantic,
             no_ai=no_ai,
-            force_refresh=force_refresh,
+            force_refresh=force,
         )
 
         if result:
@@ -104,7 +104,11 @@ async def _lookup_async(
                 meaning_groups[cluster].append(definition)
 
             # Display the synthesized entry
-            console.print(format_meaning_based_definition(result, languages, providers, meaning_groups))
+            console.print(
+                format_meaning_based_definition(
+                    result, languages, providers, meaning_groups
+                )
+            )
         else:
             console.print(format_warning(f"No definition found for '{word}'"))
             if not no_ai:
@@ -115,7 +119,6 @@ async def _lookup_async(
     except Exception as e:
         logger.error(f"Lookup failed: {e}")
         console.print(format_error(f"Lookup failed: {e}"))
-
 
 
 lookup_group = lookup

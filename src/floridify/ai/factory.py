@@ -41,16 +41,20 @@ def create_openai_connector(config_path: str | Path | None = None) -> OpenAIConn
     )
 
 
-def create_definition_synthesizer(config_path: str | Path | None = None) -> DefinitionSynthesizer:
+def create_definition_synthesizer(
+    config_path: str | Path | None = None, 
+    examples_count: int = 2
+) -> DefinitionSynthesizer:
     """Create definition synthesizer with OpenAI connector."""
     connector = create_openai_connector(config_path)
-    return DefinitionSynthesizer(connector)
+    return DefinitionSynthesizer(connector, examples_count=examples_count)
 
 
 def create_ai_system(
     config_path: str | Path | None = None,
+    examples_count: int = 2,
 ) -> tuple[OpenAIConnector, DefinitionSynthesizer]:
     """Create complete AI system from configuration."""
     connector = create_openai_connector(config_path)
-    synthesizer = DefinitionSynthesizer(connector)
+    synthesizer = DefinitionSynthesizer(connector, examples_count=examples_count)
     return connector, synthesizer

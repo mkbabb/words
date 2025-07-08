@@ -374,8 +374,8 @@ def _add_definition_content(
 
         # Examples with special formatting
         for example in definition.examples.generated[
-            :1
-        ]:  # Show 1 example per definition
+            :2
+        ]:  # Show 2 examples per definition
             content.append("\n\n")
 
             # Clean example text and ensure proper sentence case

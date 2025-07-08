@@ -11,7 +11,6 @@ dependencies = [
     "openai>=1.57.0",
     "toml>=0.10.2",
     "beautifulsoup4>=4.12.0",
-    "lxml>=5.0.0",
     "aiofiles>=24.1.0",
     "beanie>=1.26.0",
     "wikitextparser>=0.56.0",
@@ -21,41 +20,37 @@ dependencies = [
     # Modern optimized string matching (Rust-backed)
     "rapidfuzz>=3.0.0",
     "jellyfish>=1.2.0",
-    "polyleven>=0.8",      # Rust-backed Levenshtein
+    "polyleven>=0.8", # Rust-backed Levenshtein
     "editdistance>=0.8.1", # C++ backed edit distance
-    "fuzzywuzzy>=0.18.0",  # Used in CLI utils
+    "fuzzywuzzy>=0.18.0", # Used in CLI utils
     # Modern NLP libraries
     "spacy>=3.7.0",
     "spacy-transformers>=1.3.0",
-    "tokenizers>=0.19.0",        # Rust-backed tokenization from HuggingFace
-    "word2number>=1.1",
-    "num2words>=0.5.12",
+    "tokenizers>=0.19.0",
     "contractions>=0.1.73",
     # Optimized data structures
-    "marisa-trie>=1.2.0",   # C++ backed trie
-    "dawg-python>=0.7.2",   # DAWG (Directed Acyclic Word Graph)
+    "marisa-trie>=1.2.0", # C++ backed trie
+    "dawg-python>=0.7.2", # DAWG (Directed Acyclic Word Graph)
     "pyahocorasick>=2.1.0", # C++ Aho-Corasick automaton
-    "xxhash>=3.4.0",        # Fast hash functions
+    "xxhash>=3.4.0", # Fast hash functions
     # Scientific computing with optimized backends - CRITICAL FOR SEARCH
     "numpy>=1.24.0",
-    "scipy>=1.11.0",
     "scikit-learn>=1.3.0",
-    "faiss-cpu>=1.7.4",             # ESSENTIAL for semantic search
+    "faiss-cpu>=1.7.4", # ESSENTIAL for semantic search
     "sentence-transformers>=3.0.0", # Modern embeddings
     "transformers>=4.40.0",
     # Advanced text processing
-    "ftfy>=6.1.0",          # Fix text encoding issues
-    "jinja2>=3.1.0",        # Lightweight templating for prompts
-    "loguru>=0.7.0",        # Modern logging with colors and formatting
-    "regex>=2023.0.0",      # More advanced regex engine
+    "ftfy>=6.1.0", # Fix text encoding issues
+    "jinja2>=3.1.0", # Lightweight templating for prompts
+    "loguru>=0.7.0", # Modern logging with colors and formatting
+    "regex>=2023.0.0", # More advanced regex engine
     "unicodedata2>=15.0.0", # Fast Unicode normalization
     "coolname>=2.2.0",
-    # Modern caching for HTTP requests and general use
-    "httpx-cache>=0.13.0",
-    "hishel>=0.1.0",      # Modern HTTP caching client
+    "hishel>=0.1.0", # Modern HTTP caching client
     # REST API framework
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
+    "nltk>=3.9.1",
 ]
 
 
@@ -77,14 +72,12 @@ dev = [
     # API testing
     "httpx>=0.28.0",
     "pytest-mock>=3.12.0",
+    "pytest-benchmark>=4.0.0",
     # Type stubs
     "types-toml>=0.10.8.20240310",
     "types-aiofiles>=24.1.0.20250606",
-    "types-requests>=2.32.4.20250611",
-    "types-setuptools>=80.9.0.20250529",
     "types-beautifulsoup4>=4.12.0.20250516",
     "types-lxml>=2025.3.30",
-    "types-pygments>=2.19.0.20250516",
     "types-click>=7.1.8",
     "types-regex>=2024.11.6.20250403",
 ]

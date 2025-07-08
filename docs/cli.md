@@ -280,7 +280,7 @@ uv run ./scripts/floridify anki info
 
 **Card Types**:
 - **fill_in_blank**: Context sentences with strategic word removal and hints
-- **multiple_choice**: Definition-based questions with intelligent distractors
+- **best_describes**: Definition-based questions with intelligent distractors
 
 **AnkiConnect Setup** (for direct integration):
 1. Install AnkiConnect add-on in Anki (code: 2055492159)

@@ -141,11 +141,12 @@ class OpenAIConnector:
         word: str,
         word_type: str,
         definition: str,
+        count: int = 1,
     ) -> ExampleGenerationResponse:
-        """Generate modern usage example."""
-        logger.debug(f"📝 Generating example sentence for '{word}' ({word_type})")
+        """Generate modern usage examples."""
+        logger.debug(f"📝 Generating {count} example sentence(s) for '{word}' ({word_type})")
 
-        prompt = self.template_manager.get_example_prompt(word, definition, word_type)
+        prompt = self.template_manager.get_example_prompt(word, definition, word_type, count)
 
         try:
             result = await self._make_structured_request(
@@ -253,12 +254,12 @@ class OpenAIConnector:
             logger.error(f"❌ Fill-blank generation failed for '{word}': {e}")
             raise
 
-    async def generate_anki_multiple_choice(
+    async def generate_anki_best_describes(
         self, word: str, definition: str, word_type: str, examples: str | None = None
     ) -> AnkiMultipleChoiceResponse:
-        """Generate multiple choice flashcard using structured output."""
+        """Generate best describes flashcard using structured output."""
         prompt = self.template_manager.render_template(
-            "anki_multiple_choice",
+            "anki_best_describes",
             word=word,
             definition=definition,
             word_type=word_type,
@@ -268,10 +269,10 @@ class OpenAIConnector:
             result = await self._make_structured_request(
                 prompt, AnkiMultipleChoiceResponse
             )
-            logger.debug(f"Generated multiple choice card for '{word}'")
+            logger.debug(f"Generated best describes card for '{word}'")
             return result
         except Exception as e:
-            logger.error(f"❌ Multiple choice generation failed for '{word}': {e}")
+            logger.error(f"❌ Best describes generation failed for '{word}': {e}")
             raise
 
     async def generate_synonyms(

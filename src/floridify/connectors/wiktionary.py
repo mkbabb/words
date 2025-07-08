@@ -1,12 +1,13 @@
-"""Wiktionary connector using MediaWiki API with improved parsing."""
+"""Wiktionary connector using MediaWiki API with comprehensive wikitext parsing."""
 
 from __future__ import annotations
 
 import asyncio
 import re
+from dataclasses import dataclass
 from typing import Any
 
-import wikitextparser as wtp  # type: ignore[import-untyped]
+import wikitextparser as wtp
 
 from ..caching import get_cached_http_client
 from ..models import (
@@ -15,7 +16,6 @@ from ..models import (
     GeneratedExample,
     Pronunciation,
     ProviderData,
-    WordType,
 )
 from ..utils.logging import get_logger
 from .base import DictionaryConnector
@@ -23,38 +23,103 @@ from .base import DictionaryConnector
 logger = get_logger(__name__)
 
 
+@dataclass
+class WiktionaryExtractedData:
+    """Container for all extracted Wiktionary data."""
+    definitions: list[Definition]
+    etymology: str | None = None
+    pronunciation: Pronunciation | None = None
+    alternative_forms: list[str] | None = None
+    related_terms: list[str] | None = None
+
+
+class WikitextCleaner:
+    """Unified wikitext cleaning using wikitextparser."""
+    
+    @staticmethod
+    def clean_text(text: str, preserve_structure: bool = False) -> str:
+        """Clean wikitext using wikitextparser and targeted regex."""
+        if not text:
+            return ""
+            
+        try:
+            # Parse with wikitextparser for proper handling
+            parsed = wtp.parse(text)
+            
+            # Remove templates but preserve their content where appropriate
+            for template in parsed.templates:
+                template_name = template.name.strip().lower()
+                
+                # Preserve content from certain templates
+                if template_name in ['term', 'mention', 'lang']:
+                    # Keep the main content, remove the template wrapper
+                    if template.arguments:
+                        # Usually the last argument is the display text
+                        content = str(template.arguments[-1].value).strip()
+                        template.string = content
+                else:
+                    # Remove template entirely
+                    template.string = ""
+            
+            # Convert wikilinks to plain text
+            for wikilink in parsed.wikilinks:
+                # Use display text if available, otherwise use target
+                display_text = wikilink.text or wikilink.target
+                wikilink.string = display_text or ""
+            
+            # Get the cleaned text
+            cleaned = str(parsed)
+            
+        except Exception:
+            # Fallback to regex cleaning if wtp fails
+            cleaned = text
+            
+        # Final cleanup with regex
+        cleaned = re.sub(r'<[^>]+>', '', cleaned)  # Remove HTML tags
+        cleaned = re.sub(r'\{\{[^}]*\}\}', '', cleaned)  # Remove remaining templates
+        cleaned = re.sub(r'\[\[([^\]|]+)(?:\|[^\]]+)?\]\]', r'\1', cleaned)  # Clean links
+        cleaned = re.sub(r'<ref[^>]*>.*?</ref>', '', cleaned, flags=re.DOTALL)  # Remove refs
+        
+        if not preserve_structure:
+            cleaned = re.sub(r'\s+', ' ', cleaned)  # Normalize whitespace
+            cleaned = re.sub(r'^[^\w]*', '', cleaned)  # Remove leading punctuation
+            
+        return cleaned.strip()
+
+
 class WiktionaryConnector(DictionaryConnector):
-    """Connector for Wiktionary using MediaWiki API with proper wikitext parsing."""
+    """Enhanced Wiktionary connector with comprehensive wikitext parsing."""
+
+    # Word type mappings
+    POS_MAPPINGS = {
+        "noun": "noun",
+        "verb": "verb", 
+        "adjective": "adjective",
+        "adverb": "adverb",
+        "pronoun": "pronoun",
+        "preposition": "preposition",
+        "conjunction": "conjunction",
+        "interjection": "interjection",
+        "determiner": "adjective",  # Map to adjective
+        "article": "adjective",    # Map to adjective
+    }
 
     def __init__(self, rate_limit: float = 8.0, force_refresh: bool = False) -> None:
-        """Initialize Wiktionary connector.
-
-        Args:
-            rate_limit: Requests per hour (max 500 for anonymous)
-            force_refresh: Force fresh HTTP requests (bypass cache)
-        """
-        # Convert hourly to per-second rate limit
+        """Initialize enhanced Wiktionary connector."""
         super().__init__(rate_limit=rate_limit / 3600.0)
         self.base_url = "https://en.wiktionary.org/w/api.php"
         self.http_client = get_cached_http_client(
             force_refresh=force_refresh,
-            default_ttl_hours=24.0,  # Cache Wiktionary responses for 24 hours
+            default_ttl_hours=24.0,
         )
+        self.cleaner = WikitextCleaner()
 
     @property
     def provider_name(self) -> str:
-        """Name of the dictionary provider."""
         return "wiktionary"
 
     async def fetch_definition(self, word: str) -> ProviderData | None:
-        """Fetch definition data for a word from Wiktionary.
-
-        Args:
-            word: The word to look up
-
-        Returns:
-            ProviderData if successful, None if not found or error
-        """
+        """Fetch comprehensive definition data from Wiktionary."""
         await self._enforce_rate_limit()
 
         try:
@@ -71,18 +136,17 @@ class WiktionaryConnector(DictionaryConnector):
             response = await self.http_client.get(
                 self.base_url,
                 params=params,
-                ttl_hours=24.0,  # Cache Wiktionary API responses for 24 hours
+                ttl_hours=24.0,
                 headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
                 timeout=30.0,
             )
 
             if response.status_code == 429:
-                # Rate limited - wait and retry once
                 await asyncio.sleep(60)
                 response = await self.http_client.get(
                     self.base_url,
                     params=params,
-                    force_refresh=True,  # Force fresh request on retry
+                    force_refresh=True,
                     headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
                     timeout=30.0,
                 )
@@ -96,167 +160,177 @@ class WiktionaryConnector(DictionaryConnector):
             logger.error(f"Error fetching {word} from Wiktionary: {e}")
             return None
 
-    def _parse_wiktionary_response(
-        self, word: str, data: dict[str, Any]
-    ) -> ProviderData | None:
-        """Parse Wiktionary API response using wikitextparser.
-
-        Args:
-            word: The word being looked up
-            data: Raw API response
-
-        Returns:
-            Parsed ProviderData or None if no content
-        """
+    def _parse_wiktionary_response(self, word: str, data: dict[str, Any]) -> ProviderData | None:
+        """Parse Wiktionary response comprehensively."""
         try:
             pages = data.get("query", {}).get("pages", [])
             if not pages or "revisions" not in pages[0]:
                 return None
 
             content = pages[0]["revisions"][0]["slots"]["main"]["content"]
-
-            # Parse the wikitext content
-            definitions = self._extract_definitions_from_wikitext(content)
+            
+            # Extract all components comprehensively
+            extracted_data = self._extract_comprehensive_data(content)
 
             return ProviderData(
                 provider_name=self.provider_name,
-                definitions=definitions,
-                raw_metadata={"wikitext": content[:1000]},  # Store sample for debugging
+                definitions=extracted_data.definitions,
+                raw_metadata={
+                    "wikitext_sample": content[:1000],
+                    "etymology": extracted_data.etymology,
+                    "pronunciation": extracted_data.pronunciation.model_dump() if extracted_data.pronunciation else None,
+                    "alternative_forms": extracted_data.alternative_forms,
+                    "related_terms": extracted_data.related_terms,
+                },
             )
 
         except Exception as e:
             logger.error(f"Error parsing Wiktionary response for {word}: {e}")
             return None
 
-    def _extract_definitions_from_wikitext(self, wikitext: str) -> list[Definition]:
-        """Extract definitions from Wiktionary wikitext using proper parsing.
-
-        Args:
-            wikitext: Raw wikitext content
-
-        Returns:
-            List of parsed definitions
-        """
-        definitions: list[Definition] = []
-
+    def _extract_comprehensive_data(self, wikitext: str) -> WiktionaryExtractedData:
+        """Extract all available data from wikitext using systematic parsing."""
         try:
             parsed = wtp.parse(wikitext)
-
-            # Find the English language section
-            english_section = None
-            for section in parsed.sections:
-                if section.title and "english" in section.title.lower().strip():
-                    english_section = section
-                    break
-
+            
+            # Find English section
+            english_section = self._find_language_section(parsed, "English")
             if not english_section:
-                # Fallback: try to find any section with definitions
                 english_section = parsed
 
-            # Extract definitions from different parts of speech
-            pos_mappings = {
-                "noun": WordType.NOUN,
-                "verb": WordType.VERB,
-                "adjective": WordType.ADJECTIVE,
-                "adverb": WordType.ADVERB,
-                "pronoun": WordType.PRONOUN,
-                "preposition": WordType.PREPOSITION,
-                "conjunction": WordType.CONJUNCTION,
-                "interjection": WordType.INTERJECTION,
-            }
+            # Extract all components
+            definitions = self._extract_definitions(english_section)
+            etymology = self._extract_etymology(english_section)
+            pronunciation = self._extract_pronunciation(english_section)
+            alternative_forms = self._extract_alternative_forms(english_section)
+            related_terms = self._extract_related_terms(english_section)
 
-            for subsection in english_section.sections:
-                if not subsection.title:
-                    continue
-
-                section_title = subsection.title.strip().lower()
-
-                # Check if this is a part of speech section
-                word_type = None
-                for pos_name, pos_enum in pos_mappings.items():
-                    if pos_name in section_title:
-                        word_type = pos_enum
-                        break
-
-                if not word_type:
-                    continue
-
-                # Extract numbered definitions
-                section_defs = self._extract_numbered_definitions(str(subsection))
-
-                for def_text in section_defs:
-                    if def_text and len(def_text.strip()) > 5:  # Basic quality filter
-                        # Extract examples if present
-                        examples = self._extract_examples_from_definition(def_text)
-
-                        # Extract synonyms if present
-                        synonyms = self._extract_synonyms_from_definition(
-                            def_text, word_type
-                        )
-
-                        # Clean the definition text
-                        clean_def = self._clean_definition_text(def_text)
-
-                        if clean_def:
-                            definitions.append(
-                                Definition(
-                                    word_type=word_type.value,
-                                    definition=clean_def,
-                                    examples=examples,
-                                    synonyms=synonyms,
-                                )
-                            )
+            return WiktionaryExtractedData(
+                definitions=definitions,
+                etymology=etymology,
+                pronunciation=pronunciation,
+                alternative_forms=alternative_forms,
+                related_terms=related_terms,
+            )
 
         except Exception as e:
-            logger.error(f"Error extracting definitions: {e}")
+            logger.error(f"Error in comprehensive extraction: {e}")
+            return WiktionaryExtractedData(definitions=[])
 
-        return definitions
+    def _find_language_section(self, parsed: wtp.WikiList, language: str) -> wtp.Section | None:
+        """Find the specific language section using wtp.Section hierarchy."""
+        for section in parsed.sections:
+            if (section.title and 
+                section.title.strip().lower() == language.lower() and
+                section.level == 2):  # Language sections are level 2 (==)
+                return section
+        return None
 
-    def _extract_numbered_definitions(self, section_text: str) -> list[str]:
-        """Extract numbered definitions from a section.
-
-        Args:
-            section_text: Text of the section
-
-        Returns:
-            List of definition texts
-        """
+    def _extract_definitions(self, section: wtp.Section) -> list[Definition]:
+        """Extract definitions systematically using wtp structure."""
         definitions = []
 
-        # Pattern for numbered definitions (# at start of line)
-        pattern = r"^#\s*([^#\n]+)"
-        matches = re.findall(pattern, section_text, re.MULTILINE)
+        for subsection in section.sections:
+            if not subsection.title:
+                continue
 
-        for match in matches:
-            # Skip if it's a sub-definition (contains colons or other formatting)
-            if not re.match(r"^[\s*:]+", match):
-                definitions.append(match.strip())
+            section_title = subsection.title.strip().lower()
+            
+            # Find matching word type
+            word_type = None
+            for pos_name, pos_enum in self.POS_MAPPINGS.items():
+                if pos_name in section_title:
+                    word_type = pos_enum
+                    break
+
+            if not word_type:
+                continue
+
+            # Use wtp.WikiList to extract numbered definitions
+            definition_texts = self._extract_wikilist_items(str(subsection))
+            
+            for def_text in definition_texts:
+                if not def_text or len(def_text.strip()) < 5:
+                    continue
+
+                # Extract components from definition
+                examples = self._extract_examples(def_text)
+                synonyms = self._extract_synonyms(def_text)
+                clean_def = self.cleaner.clean_text(def_text)
+
+                if clean_def:
+                    definitions.append(Definition(
+                        word_type=word_type,
+                        definition=clean_def,
+                        examples=examples,
+                        synonyms=synonyms,
+                    ))
 
         return definitions
 
-    def _extract_examples_from_definition(self, definition_text: str) -> Examples:
-        """Extract usage examples from definition text.
+    def _extract_wikilist_items(self, section_text: str) -> list[str]:
+        """Extract numbered definition items from section text."""
+        items = []
+        
+        # Use regex to find numbered definitions (more reliable than wtp for this)
+        pattern = r"^#\s*([^#\n]+)"
+        matches = re.findall(pattern, section_text, re.MULTILINE)
+        
+        for match in matches:
+            # Clean up the definition text
+            content = match.strip()
+            if content and len(content) > 5:  # Basic quality filter
+                items.append(content)
+        
+        return items
 
-        Args:
-            definition_text: The definition text
-
-        Returns:
-            Examples object with extracted examples
-        """
+    def _extract_examples(self, definition_text: str) -> Examples:
+        """Extract examples systematically from templates and patterns."""
         examples = Examples()
+        
+        try:
+            parsed = wtp.parse(definition_text)
+            
+            # Extract from templates
+            for template in parsed.templates:
+                template_name = template.name.strip().lower()
+                
+                if template_name in ['ux', 'uxi', 'usex']:
+                    # Usage example templates
+                    if len(template.arguments) >= 2:
+                        example_text = str(template.arguments[1].value).strip()
+                        clean_example = self.cleaner.clean_text(example_text, preserve_structure=True)
+                        if clean_example and len(clean_example) > 10:
+                            examples.generated.append(
+                                GeneratedExample(sentence=clean_example, regenerable=False)
+                            )
+                
+                elif template_name.startswith('quote'):
+                    # Quote templates
+                    for arg in template.arguments:
+                        if 'text' in str(arg.name).lower() or not arg.name:
+                            quote_text = str(arg.value).strip()
+                            clean_quote = self.cleaner.clean_text(quote_text, preserve_structure=True)
+                            if clean_quote and len(clean_quote) > 15:
+                                examples.generated.append(
+                                    GeneratedExample(sentence=clean_quote, regenerable=False)
+                                )
+                                break
+                                
+        except Exception as e:
+            logger.debug(f"Error extracting examples: {e}")
 
-        # Look for quoted examples or examples in parentheses
+        # Fallback regex patterns for quotes
         quote_patterns = [
-            r'"([^"]+)"',  # Double quotes
-            r"'([^']+)'",  # Single quotes
-            r"\{\{ux\|[^|]*\|([^}]+)\}\}",  # Wiktionary usage example template
-            r"\{\{quote[^}]*\|([^}]+)\}\}",  # Quote templates
+            r'"([^"]{15,})"',
+            r"'([^']{15,})'",
+            r"''([^']{15,})''"
         ]
-
+        
         for pattern in quote_patterns:
-            matches = re.findall(pattern, definition_text, re.IGNORECASE)
+            matches = re.findall(pattern, definition_text)
             for match in matches:
-                clean_example = self._clean_example_text(match)
+                clean_example = self.cleaner.clean_text(match, preserve_structure=True)
                 if clean_example and len(clean_example) > 10:
                     examples.generated.append(
                         GeneratedExample(sentence=clean_example, regenerable=False)
@@ -264,243 +338,151 @@ class WiktionaryConnector(DictionaryConnector):
 
         return examples
 
-    def _clean_definition_text(self, text: str) -> str:
-        """Clean up definition text by removing wikitext markup.
-
-        Args:
-            text: Raw definition text
-
-        Returns:
-            Cleaned definition text
-        """
-        # Remove wikitext links [[word]] or [[word|display]]
-        text = re.sub(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]", r"\1", text)
-
-        # Remove templates {{template|content}}
-        text = re.sub(r"\{\{[^}]+\}\}", "", text)
-
-        # Remove HTML tags
-        text = re.sub(r"<[^>]+>", "", text)
-
-        # Remove reference markers
-        text = re.sub(r"<ref[^>]*>.*?</ref>", "", text, flags=re.DOTALL)
-
-        # Clean up whitespace
-        text = re.sub(r"\s+", " ", text).strip()
-
-        # Remove leading punctuation or numbers from definitions
-        text = re.sub(r"^[^\w]*", "", text)
-
-        return text
-
-    def _clean_example_text(self, text: str) -> str:
-        """Clean up example text.
-
-        Args:
-            text: Raw example text
-
-        Returns:
-            Cleaned example text
-        """
-        # Basic cleanup similar to definitions but preserve structure
-        text = re.sub(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]", r"\1", text)
-        text = re.sub(r"\{\{[^}]+\}\}", "", text)
-        text = re.sub(r"<[^>]+>", "", text)
-        text = re.sub(r"\s+", " ", text).strip()
-
-        return text
-
-    def _extract_pronunciation_from_wikitext(self, wikitext: str) -> Pronunciation:
-        """Extract pronunciation from Wiktionary wikitext.
-
-        Args:
-            wikitext: Raw wikitext content
-
-        Returns:
-            Pronunciation data
-        """
+    def _extract_synonyms(self, definition_text: str) -> list[str]:
+        """Extract synonyms systematically from templates."""
+        synonyms = []
+        
         try:
-            parsed = wtp.parse(wikitext)
-
-            # Look for IPA templates
-            ipa = None
-            phonetic = "unknown"
-
-            # Search for IPA templates in the wikitext
+            parsed = wtp.parse(definition_text)
+            
             for template in parsed.templates:
                 template_name = template.name.strip().lower()
-
-                if "ipa" in template_name:
-                    # Extract IPA from template arguments
+                
+                if template_name in ['syn', 'synonym', 'synonyms']:
                     for arg in template.arguments:
-                        arg_value = str(arg.value).strip()
-                        if "/" in arg_value:  # IPA notation typically has slashes
-                            ipa = arg_value
-                            break
+                        if not arg.name:  # Positional arguments
+                            arg_value = str(arg.value).strip()
+                            if arg_value and len(arg_value) > 1 and arg_value not in ['en', 'lang']:
+                                clean_syn = self._clean_synonym(arg_value)
+                                if clean_syn:
+                                    synonyms.append(clean_syn)
+                                    
+        except Exception as e:
+            logger.debug(f"Error extracting synonyms: {e}")
 
-                elif template_name in ["pron", "pronunciation"]:
-                    # Alternative pronunciation templates
+        return synonyms[:10]  # Limit to 10 synonyms
+
+    def _extract_etymology(self, section: wtp.Section) -> str | None:
+        """Extract etymology from dedicated section."""
+        for subsection in section.sections:
+            if subsection.title and 'etymology' in subsection.title.lower():
+                etymology_text = str(subsection.contents)
+                return self.cleaner.clean_text(etymology_text, preserve_structure=True)
+        return None
+
+    def _extract_pronunciation(self, section: wtp.Section) -> Pronunciation | None:
+        """Extract pronunciation comprehensively."""
+        ipa = None
+        phonetic = None
+        
+        try:
+            # Look for pronunciation section
+            for subsection in section.sections:
+                if subsection.title and 'pronunciation' in subsection.title.lower():
+                    section_text = str(subsection)
+                    break
+            else:
+                section_text = str(section)
+            
+            parsed = wtp.parse(section_text)
+            
+            # Extract from IPA templates
+            for template in parsed.templates:
+                template_name = template.name.strip().lower()
+                
+                if 'ipa' in template_name:
+                    for arg in template.arguments:
+                        if not arg.name:  # Positional argument
+                            arg_value = str(arg.value).strip()
+                            if '/' in arg_value or '[' in arg_value:
+                                ipa = arg_value
+                                phonetic = self._ipa_to_phonetic(ipa)
+                                break
+                                
+                elif template_name in ['pron', 'pronunciation', 'audio']:
                     for arg in template.arguments:
                         arg_value = str(arg.value).strip()
                         if arg_value and len(arg_value) > 2:
-                            phonetic = arg_value
+                            if not phonetic:  # Don't override IPA-derived phonetic
+                                phonetic = arg_value
                             break
 
-            # If we found IPA, try to create a simple phonetic version
-            if ipa:
-                phonetic = self._ipa_to_simple_phonetic(ipa)
-
-            # Fallback: look for pronunciation sections with regex
-            if ipa is None:
-                ipa_match = re.search(r"\{\{IPA\|[^|]*\|([^}]+)\}\}", wikitext)
-                if ipa_match:
-                    ipa = ipa_match.group(1)
-                    phonetic = self._ipa_to_simple_phonetic(ipa)
-
-            return Pronunciation(phonetic=phonetic, ipa=ipa)
-
+            if ipa or phonetic:
+                return Pronunciation(
+                    phonetic=phonetic or "unknown",
+                    ipa=ipa
+                )
+                
         except Exception as e:
-            logger.error(f"Error extracting pronunciation: {e}")
-            return Pronunciation(phonetic="unknown")
+            logger.debug(f"Error extracting pronunciation: {e}")
+            
+        return None
 
-    def _ipa_to_simple_phonetic(self, ipa: str) -> str:
-        """Convert IPA notation to simple phonetic representation.
+    def _extract_alternative_forms(self, section: wtp.Section) -> list[str] | None:
+        """Extract alternative forms/spellings."""
+        alternatives = []
+        
+        for subsection in section.sections:
+            title = subsection.title
+            if title and any(term in title.lower() for term in ['alternative', 'variant', 'spelling']):
+                items = self._extract_wikilist_items(str(subsection))
+                for item in items:
+                    clean_alt = self.cleaner.clean_text(item)
+                    if clean_alt and len(clean_alt) > 1:
+                        alternatives.append(clean_alt)
+                        
+        return alternatives if alternatives else None
 
-        Args:
-            ipa: IPA notation
+    def _extract_related_terms(self, section: wtp.Section) -> list[str] | None:
+        """Extract related terms, derived terms, etc."""
+        related = []
+        
+        for subsection in section.sections:
+            title = subsection.title
+            if title and any(term in title.lower() for term in ['related', 'derived', 'see also']):
+                items = self._extract_wikilist_items(str(subsection))
+                for item in items:
+                    clean_term = self.cleaner.clean_text(item)
+                    if clean_term and len(clean_term) > 1:
+                        related.append(clean_term)
+                        
+        return related[:20] if related else None  # Limit to 20 terms
 
-        Returns:
-            Simplified phonetic representation
-        """
-        # Basic IPA to phonetic conversion
-        phonetic = ipa.replace("/", "").replace("[", "").replace("]", "")
-
-        # Remove stress markers
-        phonetic = phonetic.replace("ˈ", "").replace("ˌ", "")
-
-        # Basic character substitutions (very simplified)
+    def _ipa_to_phonetic(self, ipa: str) -> str:
+        """Convert IPA to simplified phonetic representation."""
+        if not ipa:
+            return "unknown"
+            
+        phonetic = ipa.replace('/', '').replace('[', '').replace(']', '')
+        phonetic = phonetic.replace('ˈ', '').replace('ˌ', '')  # Remove stress
+        
+        # Enhanced IPA to phonetic mapping
         substitutions = {
-            "ɪ": "i",
-            "ɛ": "e",
-            "æ": "a",
-            "ɑ": "ah",
-            "ɔ": "aw",
-            "ʊ": "u",
-            "ə": "uh",
-            "θ": "th",
-            "ð": "th",
-            "ʃ": "sh",
-            "ʒ": "zh",
-            "ŋ": "ng",
-            "ʧ": "ch",
-            "ʤ": "j",
+            'ɪ': 'i', 'ɛ': 'e', 'æ': 'a', 'ɑ': 'ah', 'ɔ': 'aw', 'ʊ': 'u', 'ə': 'uh',
+            'θ': 'th', 'ð': 'th', 'ʃ': 'sh', 'ʒ': 'zh', 'ŋ': 'ng', 'ʧ': 'ch', 'ʤ': 'j',
+            'ɹ': 'r', 'ɾ': 't', 'ʔ': '', 'ː': '', 'ˑ': '', 'eɪ': 'ay', 'aɪ': 'eye',
+            'ɔɪ': 'oy', 'aʊ': 'ow', 'oʊ': 'oh'
         }
-
+        
         for ipa_char, simple_char in substitutions.items():
             phonetic = phonetic.replace(ipa_char, simple_char)
-
+            
         return phonetic.strip() or "unknown"
 
-    def _extract_synonyms_from_definition(
-        self, def_text: str, word_type: WordType
-    ) -> list[str]:
-        """Extract synonyms from Wiktionary definition text.
-
-        Args:
-            def_text: Definition text that may contain synonym templates
-            word_type: Word type for the definition
-
-        Returns:
-            List of synonym references
-        """
-        synonyms = []
-
-        try:
-            # Parse the definition text for synonym templates
-            parsed = wtp.parse(def_text)
-
-            for template in parsed.templates:
-                template_name = template.name.strip().lower()
-
-                if template_name in ["syn", "synonym", "synonyms"]:
-                    # Extract synonym words from template arguments
-                    for arg in template.arguments:
-                        arg_value = str(arg.value).strip()
-
-                        # Skip language codes and empty arguments
-                        if (
-                            arg_value
-                            and len(arg_value) > 1
-                            and arg_value not in ["en", "lang"]
-                        ):
-                            # Clean up the synonym text
-                            clean_synonym = self._clean_synonym_text(arg_value)
-                            if clean_synonym:
-                                synonyms.append(clean_synonym)
-
-            # Also look for inline synonym patterns like "syn: word1, word2"
-            syn_patterns = [
-                r"syn:\s*([^;|}\n]+)",
-                r"synonym[s]?:\s*([^;|}\n]+)",
-                r"see also:\s*([^;|}\n]+)",
-            ]
-
-            for pattern in syn_patterns:
-                matches = re.findall(pattern, def_text, re.IGNORECASE)
-                for match in matches:
-                    # Split on commas and extract individual synonyms
-                    syn_words = [word.strip() for word in match.split(",")]
-                    for syn_word in syn_words:
-                        clean_synonym = self._clean_synonym_text(syn_word)
-                        if clean_synonym:
-                            synonyms.append(clean_synonym)
-
-        except Exception as e:
-            logger.error(f"Error extracting synonyms: {e}")
-
-        return synonyms[:10]  # Limit to 10 synonyms per definition
-
-    def _clean_synonym_text(self, synonym_text: str) -> str:
-        """Clean and normalize synonym text.
-
-        Args:
-            synonym_text: Raw synonym text
-
-        Returns:
-            Cleaned synonym text or empty string if invalid
-        """
+    def _clean_synonym(self, synonym_text: str) -> str | None:
+        """Clean and validate synonym text."""
         if not synonym_text:
-            return ""
-
-        # Remove wikitext markup
-        cleaned = re.sub(r"\[\[([^|\]]+)(\|[^\]]+)?\]\]", r"\1", synonym_text)
-        cleaned = re.sub(r"\{\{[^}]+\}\}", "", cleaned)
-        cleaned = re.sub(r"<[^>]+>", "", cleaned)
-
-        # Remove extra whitespace and punctuation
-        cleaned = re.sub(r"[^\w\s-]", "", cleaned).strip()
-
-        # Basic validation
-        if len(cleaned) < 2 or len(cleaned) > 50:
-            return ""
-
-        # Skip common non-synonym words
-        skip_words = {
-            "thesaurus",
-            "more",
-            "see",
-            "also",
-            "compare",
-            "cf",
-            "etc",
-            "and",
-            "or",
-        }
-        if cleaned.lower() in skip_words:
-            return ""
-
+            return None
+            
+        cleaned = self.cleaner.clean_text(synonym_text)
+        
+        # Validation
+        if (len(cleaned) < 2 or len(cleaned) > 50 or 
+            cleaned.lower() in {'thesaurus', 'see', 'also', 'compare', 'etc', 'and', 'or'}):
+            return None
+            
         return cleaned
 
     async def close(self) -> None:
-        """Close the HTTP client."""
+        """Close HTTP client."""
         await self.http_client.close()

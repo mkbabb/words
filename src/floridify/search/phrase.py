@@ -7,13 +7,13 @@ multi-word expressions with state-of-the-art text normalization.
 
 from __future__ import annotations
 
-import contractions  # type: ignore[import-untyped]
+import contractions
 import ftfy
 import regex
 import spacy
-import unicodedata2 as unicodedata  # type: ignore[import-not-found]
+import unicodedata2 as unicodedata
 from pydantic import BaseModel, Field
-from tokenizers import pre_tokenizers  # type: ignore[import-untyped]
+from tokenizers import pre_tokenizers
 
 
 class MultiWordExpression(BaseModel):

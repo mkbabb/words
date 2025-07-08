@@ -100,7 +100,7 @@ class WordList(Document):                    # MongoDB collection: word_lists
 ```python
 class AnkiCard(BaseModel):
     word: str
-    card_type: AnkiCardType                 # "fill_blank", "multiple_choice"
+    card_type: AnkiCardType                 # "fill_in_blank", "best_describes"
     question: str                           # AI-generated question
     answer: str                             # Synthesized definition
     styling: str                            # Claude-inspired CSS

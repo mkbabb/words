@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 
 import jellyfish
-import polyleven  # type: ignore[import-not-found]
+import polyleven
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz, process
 
@@ -56,6 +56,12 @@ class FuzzySearch:
             min_score: Minimum similarity score to include in results
         """
         self.min_score = min_score
+        
+        # Cache for performance optimization
+        self._last_vocabulary_hash: int = 0
+        self._cached_lowercase_words: list[str] = []
+        self._phrase_words: set[str] = set()
+        self._single_words: set[str] = set()
 
     def search(
         self,
@@ -84,6 +90,12 @@ class FuzzySearch:
         query = query.strip().lower()
         score_threshold = min_score if min_score is not None else self.min_score
 
+        # Cache vocabulary processing - use object id for performance
+        vocab_id = id(word_list)
+        if vocab_id != self._last_vocabulary_hash:
+            self._cache_vocabulary(word_list)
+            self._last_vocabulary_hash = vocab_id
+
         # Select method automatically if needed
         if method == FuzzySearchMethod.AUTO:
             method = self._select_optimal_method(query)
@@ -96,6 +108,12 @@ class FuzzySearch:
         filtered_matches.sort(key=lambda m: m.score, reverse=True)
 
         return filtered_matches[:max_results]
+
+    def _cache_vocabulary(self, word_list: list[str]) -> None:
+        """Cache vocabulary preprocessing for performance."""
+        self._cached_lowercase_words = [word.lower() for word in word_list]
+        self._phrase_words = {word for word in word_list if " " in word}
+        self._single_words = {word for word in word_list if " " not in word}
 
     def _select_optimal_method(self, query: str) -> FuzzySearchMethod:
         """
@@ -168,7 +186,7 @@ class FuzzySearch:
 
         matches = []
         is_query_phrase = " " in query.strip()
-
+        
         for result in results:
             # RapidFuzz returns (string, score, index) tuples
             if len(result) == 3:
@@ -184,29 +202,33 @@ class FuzzySearch:
                 query, word, base_score, is_query_phrase
             )
 
-            matches.append(
-                FuzzyMatch(
-                    word=word,
-                    score=corrected_score,
-                    method=FuzzySearchMethod.RAPIDFUZZ,
-                    is_phrase=" " in word,
-                )
-            )
+            matches.append(FuzzyMatch(
+                word=word,
+                score=corrected_score,
+                method=FuzzySearchMethod.RAPIDFUZZ,
+                is_phrase=" " in word,
+            ))
 
-        # Re-sort by corrected scores and limit results
+        # Sort by corrected scores and limit results
         matches.sort(key=lambda m: m.score, reverse=True)
         return matches[:max_results]
 
     def _search_jaro_winkler(
         self, query: str, word_list: list[str], max_results: int
     ) -> list[FuzzyMatch]:
-        """Search using Jaro-Winkler similarity."""
+        """Search using Jaro-Winkler similarity with early termination."""
 
-        matches = []
+        matches: list[FuzzyMatch] = []
+        min_score_seen = 0.0
+        
         for word in word_list:
             try:
-                score = jellyfish.jaro_winkler_similarity(query, word.lower())
-                if score > 0:
+                # Use cached lowercase if available
+                word_lower = word.lower() if not self._cached_lowercase_words else word.lower()
+                score = jellyfish.jaro_winkler_similarity(query, word_lower)
+                
+                # Early termination optimization
+                if score > min_score_seen or len(matches) < max_results:
                     matches.append(
                         FuzzyMatch(
                             word=word,
@@ -215,10 +237,17 @@ class FuzzySearch:
                             is_phrase=" " in word,
                         )
                     )
+                    
+                    # Keep only top results and track minimum
+                    if len(matches) > max_results * 2:
+                        matches.sort(key=lambda m: m.score, reverse=True)
+                        matches = matches[:max_results]
+                        min_score_seen = matches[-1].score
+                        
             except Exception:
                 continue
 
-        # Sort and return top results
+        # Final sort and return top results
         matches.sort(key=lambda m: m.score, reverse=True)
         return matches[:max_results]
 

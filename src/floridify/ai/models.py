@@ -14,7 +14,7 @@ class ExampleGenerationResponse(BaseModel):
 
     example_sentences: list[str] = Field(
         default_factory=list,
-        description="List of example sentences generated for the word.",
+        description="List of high-quality example sentences.",
     )
     confidence: float
 
@@ -99,9 +99,11 @@ class AnkiFillBlankResponse(BaseModel):
     """Response for fill-in-the-blank flashcard generation."""
 
     sentence: str = Field(description="Sentence with _____ where the word belongs")
-    hint: str | None = Field(
-        default=None, description="Optional hint about context or meaning"
-    )
+    choice_a: str = Field(description="First answer choice")
+    choice_b: str = Field(description="Second answer choice")
+    choice_c: str = Field(description="Third answer choice")
+    choice_d: str = Field(description="Fourth answer choice")
+    correct_choice: str = Field(description="Letter of correct answer (A, B, C, or D)")
 
 
 class AnkiMultipleChoiceResponse(BaseModel):

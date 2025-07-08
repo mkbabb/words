@@ -22,7 +22,7 @@ def test_health_endpoint(client: TestClient) -> None:
     assert isinstance(data["status"], str)
     assert isinstance(data["database"], str)
     assert isinstance(data["search_engine"], str)
-    assert isinstance(data["cache_hit_rate"], (int, float))
+    assert isinstance(data["cache_hit_rate"], int | float)
     assert isinstance(data["uptime_seconds"], int)
     
     # Validate ranges

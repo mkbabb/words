@@ -42,7 +42,7 @@ async def get_search_engine(
     )
     
     if needs_recreation:
-        logger.info(f"Initializing SearchEngine: languages={[l.value for l in languages]}, semantic={enable_semantic}")
+        logger.info(f"Initializing SearchEngine: languages={[lang.value for lang in languages]}, semantic={enable_semantic}")
         
         _search_engine = SearchEngine(
             languages=languages,
