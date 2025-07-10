@@ -1,45 +1,38 @@
-export interface Definition {
-  id: string;
-  text: string;
-  example?: string;
-  synonyms?: string[];
-  antonyms?: string[];
+export interface Example {
+  sentence: string;
+  regenerable?: boolean;
+  source?: string;
 }
 
-export interface WordEntry {
-  id: string;
-  word: string;
-  pronunciation?: {
-    ipa?: string;
-    phonetic?: string;
+export interface Definition {
+  word_type: string;
+  definition: string;
+  synonyms?: string[];
+  antonyms?: string[];
+  examples?: {
+    generated: Example[];
+    literature: Example[];
   };
-  partOfSpeech: string;
-  definitions: Definition[];
-  etymology?: string;
-  frequency?: number;
+  meaning_cluster?: string;
 }
 
 export interface SynthesizedDictionaryEntry {
-  id: string;
   word: string;
   pronunciation?: {
     ipa?: string;
     phonetic?: string;
   };
-  meanings: Array<{
-    partOfSpeech: string;
-    definitions: Definition[];
-  }>;
+  definitions: Definition[];
   etymology?: string;
   frequency?: number;
-  lastUpdated: Date;
+  last_updated?: string;
 }
 
 export interface SearchResult {
   word: string;
   score: number;
-  type: 'exact' | 'fuzzy' | 'semantic' | 'ai';
-  entry?: SynthesizedDictionaryEntry;
+  method: 'exact' | 'fuzzy' | 'semantic' | 'prefix' | 'hybrid';
+  is_phrase?: boolean;
 }
 
 export interface SearchHistory {
@@ -51,14 +44,12 @@ export interface SearchHistory {
 
 export interface SynonymData {
   word: string;
-  similarity: number;
-  partOfSpeech?: string;
+  score: number;
 }
 
 export interface ThesaurusEntry {
   word: string;
   synonyms: SynonymData[];
-  antonyms: SynonymData[];
 }
 
 export interface ApiResponse<T> {

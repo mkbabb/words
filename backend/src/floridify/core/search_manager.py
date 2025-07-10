@@ -14,7 +14,7 @@ _search_engine: SearchEngine | None = None
 
 async def get_search_engine(
     languages: list[Language] | None = None,
-    enable_semantic: bool = True,
+    enable_semantic: bool = False,  # DISABLED BY DEFAULT
     force_rebuild: bool = False,
 ) -> SearchEngine:
     """Get or create the global SearchEngine singleton.

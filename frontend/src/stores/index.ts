@@ -61,73 +61,72 @@ export const useAppStore = defineStore('app', () => {
 
     const normalizedQuery = normalizeWord(query);
     searchQuery.value = normalizedQuery;
-    isSearching.value = true;
     hasSearched.value = true;
-    loadingProgress.value = 0;
+    
+    // Direct lookup - no need for intermediate search
+    await getDefinition(normalizedQuery);
+  }
 
+  // Search for word suggestions (used by SearchBar)
+  async function search(query: string): Promise<SearchResult[]> {
+    if (!query.trim()) return [];
+    
     try {
-      // Stage 1: Searching
-      loadingStage.value = 'Searching...';
-      loadingProgress.value = 25;
+      const results = await dictionaryApi.searchWord(query);
+      searchResults.value = results;
       
-      const response = await dictionaryApi.searchWord(normalizedQuery);
-      
-      if (response.success) {
-        searchResults.value = response.data;
-        loadingProgress.value = 50;
-        
-        // If we have results, get the first one's definition
-        if (response.data.length > 0) {
-          // Stage 2: Getting definition
-          loadingStage.value = 'Getting definition...';
-          loadingProgress.value = 75;
-          await getDefinition(response.data[0].word);
-        }
-        
-        // Stage 3: Complete
-        loadingStage.value = 'Complete';
-        loadingProgress.value = 100;
-        
-        // Add to search history
-        addToHistory(normalizedQuery, response.data);
+      // Add to history if we have results
+      if (results.length > 0) {
+        addToHistory(query, results);
       }
+      
+      return results;
     } catch (error) {
       console.error('Search error:', error);
-      searchResults.value = [];
-    } finally {
-      // Small delay to show completion
-      setTimeout(() => {
-        isSearching.value = false;
-        loadingProgress.value = 0;
-        loadingStage.value = '';
-      }, 300);
+      return [];
     }
   }
 
   async function getDefinition(word: string) {
+    isSearching.value = true;
+    loadingProgress.value = 0;
+    loadingStage.value = 'Looking up word...';
+    
     try {
-      const response = await dictionaryApi.getDefinition(word);
+      // Simulate progress
+      loadingProgress.value = 30;
+      loadingStage.value = 'Fetching definition...';
       
-      if (response.success) {
-        currentEntry.value = response.data;
-        
-        // Also get thesaurus data
-        if (mode.value === 'thesaurus') {
-          await getThesaurusData(word);
-        }
+      const entry = await dictionaryApi.getDefinition(word);
+      currentEntry.value = entry;
+      
+      loadingProgress.value = 70;
+      loadingStage.value = 'Finalizing...';
+      
+      // Also get thesaurus data
+      if (mode.value === 'thesaurus') {
+        loadingStage.value = 'Loading synonyms...';
+        await getThesaurusData(word);
       }
+      
+      loadingProgress.value = 100;
+      setTimeout(() => {
+        loadingProgress.value = 0;
+        loadingStage.value = '';
+      }, 300);
     } catch (error) {
       console.error('Definition error:', error);
+      loadingProgress.value = 0;
+      loadingStage.value = '';
+    } finally {
+      isSearching.value = false;
     }
   }
 
   async function getThesaurusData(word: string) {
     try {
-      const response = await dictionaryApi.getSynonyms(word);
-      
-      if (response.success) {
-        currentThesaurus.value = response.data;
-      }
+      const thesaurus = await dictionaryApi.getSynonyms(word);
+      currentThesaurus.value = thesaurus;
     } catch (error) {
       console.error('Thesaurus error:', error);
     }
@@ -160,6 +159,22 @@ export const useAppStore = defineStore('app', () => {
 
   function clearHistory() {
     searchHistory.value = [];
+  }
+  
+  function getHistoryBasedSuggestions(): string[] {
+    // Get unique words from recent searches
+    const recentWords = new Set<string>();
+    searchHistory.value.slice(0, 20).forEach(entry => {
+      entry.results.forEach(result => {
+        if (result.score > 0.8) {
+          recentWords.add(result.word);
+        }
+      });
+    });
+    
+    // Convert to array and shuffle
+    const words = Array.from(recentWords);
+    return words.sort(() => 0.5 - Math.random()).slice(0, 4);
   }
 
   function togglePronunciation() {
@@ -222,10 +237,12 @@ export const useAppStore = defineStore('app', () => {
     
     // Actions
     searchWord,
+    search,
     getDefinition,
     getThesaurusData,
     addToHistory,
     clearHistory,
+    getHistoryBasedSuggestions,
     togglePronunciation,
     toggleMode,
     toggleTheme,

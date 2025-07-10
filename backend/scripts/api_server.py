@@ -20,10 +20,10 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from floridify.core.lookup_pipeline import LookupPipeline
-from floridify.core.search_manager import SearchManager
-from floridify.models.models import SynthesizedDictionaryEntry
-from floridify.storage.mongodb import MongoDBStorage
+from src.floridify.core.lookup_pipeline import LookupPipeline
+from src.floridify.core.search_manager import SearchManager
+from src.floridify.models.models import SynthesizedDictionaryEntry
+from src.floridify.storage.mongodb import MongoDBStorage
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

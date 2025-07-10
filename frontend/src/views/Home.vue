@@ -28,7 +28,7 @@
     >
       <!-- Fixed Search Bar -->
       <div 
-        class="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b transition-all duration-300 ease-in-out"
+        class="sticky top-0 z-20 bg-background/95 backdrop-blur-xl border-b transition-all duration-300 ease-in-out"
       >
         <div class="container mx-auto px-4 py-4">
           <SearchBar />
@@ -38,15 +38,9 @@
       <!-- Main Content -->
       <div class="container mx-auto px-4 py-8">
         <div class="max-w-4xl mx-auto">
-          <!-- Search Results -->
+          <!-- Loading State -->
           <div v-if="isSearching" class="space-y-8">
             <DefinitionSkeleton />
-          </div>
-
-          <!-- No Results -->
-          <div v-else-if="searchResults.length === 0" class="text-center py-8">
-            <p class="text-muted-foreground">No results found for "{{ searchQuery }}"</p>
-            <p class="text-sm text-muted-foreground mt-2">Try a different spelling or search term.</p>
           </div>
 
           <!-- Definition Display -->
@@ -54,26 +48,9 @@
             <DefinitionDisplay />
           </div>
 
-          <!-- Search Results List -->
-          <div v-else class="space-y-4">
-            <h2 class="text-xl font-semibold">Search Results</h2>
-            <div class="grid gap-4">
-              <Card
-                v-for="result in searchResults"
-                :key="result.word"
-                class="cursor-pointer hover:shadow-md transition-shadow"
-                @click="selectResult(result)"
-              >
-                <CardHeader>
-                  <CardTitle>{{ result.word }}</CardTitle>
-                  <div class="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span class="capitalize">{{ result.type }}</span>
-                    <span>•</span>
-                    <span>{{ Math.round(result.score * 100) }}% match</span>
-                  </div>
-                </CardHeader>
-              </Card>
-            </div>
+          <!-- Empty State -->
+          <div v-else class="text-center py-16">
+            <p class="text-muted-foreground text-lg">Start typing to search for a word</p>
           </div>
         </div>
       </div>
@@ -84,13 +61,11 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
 import { useAppStore } from '@/stores';
-import type { SearchResult } from '@/types';
 import { cn } from '@/utils';
 import SearchBar from '@/components/SearchBar.vue';
 import DefinitionDisplay from '@/components/DefinitionDisplay.vue';
 import DefinitionSkeleton from '@/components/DefinitionSkeleton.vue';
 import Sidebar from '@/components/Sidebar.vue';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 
 const store = useAppStore();
 
@@ -102,11 +77,6 @@ onMounted(() => {
 
 const hasSearched = computed(() => store.hasSearched);
 const isSearching = computed(() => store.isSearching);
-const searchQuery = computed(() => store.searchQuery);
-const searchResults = computed(() => store.searchResults);
 const currentEntry = computed(() => store.currentEntry);
 
-const selectResult = async (result: SearchResult) => {
-  await store.getDefinition(result.word);
-};
 </script>

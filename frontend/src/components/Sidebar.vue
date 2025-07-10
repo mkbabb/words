@@ -13,7 +13,7 @@
     <!-- Desktop Sidebar -->
     <aside
       :class="cn(
-        'fixed left-0 top-0 h-full bg-background border-r border-border transition-all duration-300 ease-in-out z-30 hidden lg:flex flex-col',
+        'fixed left-0 top-0 h-full bg-background border-r border-border transition-all duration-300 ease-in-out z-30 hidden lg:flex flex-col overflow-hidden',
         {
           'w-80': !sidebarCollapsed,
           'w-16': sidebarCollapsed,
@@ -21,54 +21,60 @@
       )"
     >
       <!-- Header -->
-      <div class="p-4 border-b border-border flex items-center justify-between">
-        <div v-if="!sidebarCollapsed">
+      <div class="p-4 border-b border-border">
+        <div v-if="!sidebarCollapsed" class="flex items-center justify-between">
           <FloridifyIcon :expanded="true" />
+          <Button
+            variant="ghost"
+            size="sm"
+            @click="store.setSidebarCollapsed(!sidebarCollapsed)"
+            class="p-2 hover:scale-105 transition-all duration-200"
+          >
+            <PanelLeft :size="16" class="text-muted-foreground" />
+          </Button>
         </div>
         <div
           v-else
-          class="w-8 h-8 flex items-center justify-center cursor-pointer hover:bg-accent rounded-lg"
-          @click="store.setSidebarCollapsed(false)"
+          class="flex items-center justify-center"
         >
-          <LaTeX expression="\mathfrak{F}" class="text-primary text-lg" />
+          <Button
+            variant="ghost"
+            size="sm"
+            @click="store.setSidebarCollapsed(false)"
+            class="p-2 hover:scale-105 transition-all duration-200"
+          >
+            <PanelRight :size="16" class="text-muted-foreground" />
+          </Button>
         </div>
-        
-        <Button
-          variant="ghost"
-          size="sm"
-          @click="store.setSidebarCollapsed(!sidebarCollapsed)"
-          class="p-2 hover:scale-105 transition-all duration-200"
-        >
-          <PanelLeft :size="16" class="text-muted-foreground" />
-        </Button>
       </div>
 
-      <!-- Content -->
-      <div class="flex-1 flex flex-col min-h-0">
-        <div class="flex-1 overflow-y-auto p-2">
-          <div v-if="!sidebarCollapsed" class="mb-4">
-            <h3 class="text-sm font-medium text-muted-foreground px-2 mb-2">Recent Searches</h3>
+      <!-- Content with flex layout -->
+      <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <!-- Scrollable content area -->
+          <div class="flex-1 overflow-y-auto p-4 min-h-0">
+            <div v-if="!sidebarCollapsed" class="mb-4">
+              <h3 class="text-sm font-medium text-muted-foreground mb-3">Recent Searches</h3>
+            </div>
+            <SearchHistoryContent :collapsed="sidebarCollapsed" />
           </div>
-          <SearchHistoryContent :collapsed="sidebarCollapsed" />
-        </div>
 
-        <!-- User Section -->
-        <div class="border-t border-border p-4">
-          <div v-if="!sidebarCollapsed" class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center border border-primary/20">
-              <User :size="14" class="text-primary" />
+          <!-- User Section - locked to bottom -->
+          <div class="border-t border-border p-4 flex-shrink-0">
+            <div v-if="!sidebarCollapsed" class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center border border-primary/20">
+                <User :size="14" class="text-primary" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium truncate">Demo User</div>
+                <div class="text-xs text-muted-foreground truncate">demo@floridify.com</div>
+              </div>
             </div>
-            <div class="flex-1 min-w-0">
-              <div class="text-sm font-medium truncate">Demo User</div>
-              <div class="text-xs text-muted-foreground truncate">demo@floridify.com</div>
+            <div v-else class="flex justify-center">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center border border-primary/20">
+                <User :size="14" class="text-primary" />
+              </div>
             </div>
           </div>
-          <div v-else class="flex justify-center">
-            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center border border-primary/20">
-              <User :size="14" class="text-primary" />
-            </div>
-          </div>
-        </div>
       </div>
     </aside>
 
@@ -123,23 +129,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useAppStore } from '@/stores';
-import { useSearch } from '@/composables/useSearch';
 import { cn } from '@/utils';
 import Button from '@/components/ui/Button.vue';
 import SearchHistoryContent from '@/components/SearchHistoryContent.vue';
 import FloridifyIcon from '@/components/FloridifyIcon.vue';
-import { X, PanelLeft, User, ChevronRight } from 'lucide-vue-next';
+import { X, PanelLeft, PanelRight, User } from 'lucide-vue-next';
 
 const store = useAppStore();
-const { searchWord } = useSearch();
 
 const sidebarOpen = computed(() => store.sidebarOpen);
 const sidebarCollapsed = computed(() => store.sidebarCollapsed);
-const recentSearches = computed(() => store.recentSearches);
-
-const repeatSearch = async (query: string) => {
-  store.searchQuery = query;
-  await searchWord(query);
-  store.toggleSidebar(); // Close on mobile after search
-};
 </script>

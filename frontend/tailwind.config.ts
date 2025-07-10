@@ -82,6 +82,19 @@ const config: Config = {
           "75%": { opacity: "1" },
           "100%": { opacity: "0", transform: "scale(1)" },
         },
+        "goo-open": {
+          "0%": { transform: "translateY(-10%) scaleY(0.3)" },
+          "100%": { transform: "translateY(0) scaleY(1)" },
+        },
+        "goo-close": {
+          "0%": { transform: "translateY(0) scaleY(1)" },
+          "100%": { transform: "translateY(-10%) scaleY(0.3)" },
+        },
+        "goo-parent-ripple": {
+          "0%": { borderBottomLeftRadius: "var(--radius)", borderBottomRightRadius: "var(--radius)" },
+          "50%": { borderBottomLeftRadius: "50%", borderBottomRightRadius: "50%" },
+          "100%": { borderBottomLeftRadius: "var(--radius)", borderBottomRightRadius: "var(--radius)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -90,6 +103,9 @@ const config: Config = {
         "logo-scale": "logo-scale 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards",
         "pulse-to-light": "pulse-to-light 650ms ease-out",
         "pulse-to-dark": "pulse-to-dark 650ms ease-out",
+        "goo-open": "goo-open 0.45s cubic-bezier(0.22, 1, 0.36, 1)",
+        "goo-close": "goo-close 0.3s cubic-bezier(0.55, 0, 0.6, 0.18)",
+        "goo-parent-ripple": "goo-parent-ripple 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
       },
     },
   },

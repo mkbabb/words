@@ -123,10 +123,12 @@ class SearchEngine:
         self.fuzzy_search = FuzzySearch(min_score=self.min_score)
 
         if self.enable_semantic:
-            self.semantic_search = SemanticSearch(
-                self.cache_dir, force_rebuild=self.force_rebuild
-            )
-            await self.semantic_search.initialize(self._vocabulary)
+            # TEMPORARILY DISABLED FOR FASTER STARTUP
+            logger.warning("Semantic search is temporarily disabled for faster startup")
+            # self.semantic_search = SemanticSearch(
+            #     self.cache_dir, force_rebuild=self.force_rebuild
+            # )
+            # await self.semantic_search.initialize(self._vocabulary)
 
         self._initialized = True
 
@@ -204,7 +206,9 @@ class SearchEngine:
                     all_results.extend(results)
 
         # Remove duplicates and filter by score
+        logger.debug(f"Before deduplication: {len(all_results)} results")
         unique_results = self._deduplicate_results(all_results)
+        logger.debug(f"After deduplication: {len(unique_results)} results")
         filtered_results = [r for r in unique_results if r.score >= score_threshold]
 
         # Sort by score (descending) and return top results
@@ -234,8 +238,8 @@ class SearchEngine:
         has_spaces = " " in query.strip()
 
         if has_spaces:
-            # Phrases: prioritize exact and fuzzy (with improved phrase matching)
-            return [SearchMethod.EXACT, SearchMethod.FUZZY, SearchMethod.SEMANTIC]
+            # Phrases: prioritize exact and fuzzy (semantic disabled)
+            return [SearchMethod.EXACT, SearchMethod.FUZZY]
         elif query_len <= 3:
             # Short queries: focus on prefix matching
             return [SearchMethod.PREFIX, SearchMethod.EXACT]
@@ -243,8 +247,8 @@ class SearchEngine:
             # Medium queries: exact and fuzzy for typos
             return [SearchMethod.EXACT, SearchMethod.FUZZY]
         else:
-            # Long queries: comprehensive search
-            return [SearchMethod.EXACT, SearchMethod.FUZZY, SearchMethod.SEMANTIC]
+            # Long queries: exact and fuzzy (semantic disabled)
+            return [SearchMethod.EXACT, SearchMethod.FUZZY]
 
     async def _search_exact(self, query: str) -> list[SearchResult]:
         """Execute exact string matching."""
@@ -335,38 +339,39 @@ class SearchEngine:
             self._search_stats["fuzzy"]["total_time"] += elapsed
 
     async def _search_semantic(
-        self, query: str, max_results: int
+        self, _query: str, _max_results: int
     ) -> list[SearchResult]:
-        """Execute semantic similarity search."""
-        start_time = time.perf_counter()
-
-        try:
-            if not self.semantic_search:
-                return []
-
-            matches = await self.semantic_search.search(query, max_results)
-            results = [
-                SearchResult(
-                    word=word,
-                    score=score,
-                    method=SearchMethod.SEMANTIC,
-                    is_phrase=" " in word,
-                )
-                for word, score in matches
-            ]
-
-            return results
-
-        finally:
-            elapsed = time.perf_counter() - start_time
-            self._search_stats["semantic"]["count"] += 1
-            self._search_stats["semantic"]["total_time"] += elapsed
+        """Execute semantic similarity search - TEMPORARILY DISABLED."""
+        # SEMANTIC SEARCH DISABLED FOR PERFORMANCE
+        return []
+        
+        # start_time = time.perf_counter()
+        # try:
+        #     if not self.semantic_search:
+        #         return []
+        #     matches = await self.semantic_search.search(query, max_results)
+        #     results = [
+        #         SearchResult(
+        #             word=word,
+        #             score=score,
+        #             method=SearchMethod.SEMANTIC,
+        #             is_phrase=" " in word,
+        #         )
+        #         for word, score in matches
+        #     ]
+        #     return results
+        # finally:
+        #     elapsed = time.perf_counter() - start_time
+        #     self._search_stats["semantic"]["count"] += 1
+        #     self._search_stats["semantic"]["total_time"] += elapsed
 
     def _deduplicate_results(self, results: list[SearchResult]) -> list[SearchResult]:
         """
         Remove duplicate results, keeping the highest-scoring version.
 
         Priority order: EXACT > PREFIX > FUZZY > SEMANTIC
+        When methods have same priority, prefer higher score.
+        For exact matches, always prefer over any other method regardless of score.
         """
         method_priority = {
             SearchMethod.EXACT: 4,
@@ -378,21 +383,38 @@ class SearchEngine:
         word_to_result: dict[str, SearchResult] = {}
 
         for result in results:
-            word = result.word.lower()
+            # Normalize the word for comparison (consistent casing and whitespace)
+            normalized_word = result.word.lower().strip()
 
-            if word not in word_to_result:
-                word_to_result[word] = result
+            if normalized_word not in word_to_result:
+                word_to_result[normalized_word] = result
             else:
-                existing = word_to_result[word]
+                existing = word_to_result[normalized_word]
 
-                # Keep result with higher priority method, or higher score if same method
+                # Get priorities
                 existing_priority = method_priority.get(existing.method, 0)
                 new_priority = method_priority.get(result.method, 0)
 
-                if new_priority > existing_priority or (
-                    new_priority == existing_priority and result.score > existing.score
-                ):
-                    word_to_result[word] = result
+                should_replace = False
+
+                # EXACT matches always win, regardless of score
+                if result.method == SearchMethod.EXACT and existing.method != SearchMethod.EXACT:
+                    should_replace = True
+                    logger.debug(f"Replacing {existing.method} with EXACT match for '{normalized_word}'")
+                # If existing is EXACT and new is not, keep existing
+                elif existing.method == SearchMethod.EXACT and result.method != SearchMethod.EXACT:
+                    should_replace = False
+                    logger.debug(f"Keeping EXACT match over {result.method} for '{normalized_word}'")
+                # If both are EXACT or neither are EXACT, use priority and score
+                elif new_priority > existing_priority:
+                    should_replace = True
+                    logger.debug(f"Replacing {existing.method} with {result.method} (higher priority) for '{normalized_word}'")
+                elif new_priority == existing_priority and result.score > existing.score:
+                    should_replace = True
+                    logger.debug(f"Replacing {existing.method} with {result.method} (higher score: {result.score} > {existing.score}) for '{normalized_word}'")
+
+                if should_replace:
+                    word_to_result[normalized_word] = result
 
         return list(word_to_result.values())
 

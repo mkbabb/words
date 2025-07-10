@@ -61,14 +61,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useAppStore } from '@/stores';
-import { useSearch } from '@/composables/useSearch';
 import { formatDate } from '@/utils';
 import Button from '@/components/ui/Button.vue';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import Badge from '@/components/ui/Badge.vue';
 
 const store = useAppStore();
-const { performSearch } = useSearch();
 
 const recentSearches = computed(() => store.recentSearches);
 
@@ -78,7 +76,7 @@ const clearHistory = () => {
 
 const repeatSearch = async (query: string) => {
   store.searchQuery = query;
-  await performSearch(query);
+  await store.searchWord(query);
 };
 
 const removeFromHistory = (id: string) => {

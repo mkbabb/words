@@ -1,124 +1,162 @@
 <template>
-  <div
-    :class="cn(
-      'relative w-full transition-all duration-600 ease-out',
-      {
-        'transform -translate-y-1/2': moved,
-        'transform translate-y-0': !moved,
-      },
-      className
-    )"
-  >
-    <!-- Search Container with Card Shadow -->
-    <div class="max-w-lg mx-auto card-shadow rounded-2xl bg-background p-4">
-      <!-- Logo and Search Bar Container -->
-      <div class="flex items-center justify-center gap-2 mb-4">
-        <!-- Dictionary/Thesaurus Toggle Logo -->
-        <div 
-          :class="cn(
-            'bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg cursor-pointer transition-all duration-300 ease-out hover:scale-110 active:scale-95 flex items-center justify-center',
-            {
-              'w-10 h-10': moved,
-              'w-12 h-12': !moved,
-            }
-          )"
-          @click="store.toggleMode()"
-          :title="`Switch to ${mode === 'dictionary' ? 'Thesaurus' : 'Dictionary'} mode`"
-        >
-          <LaTeX 
-            :expression="`\\mathfrak{F}_{\\text{${mode === 'dictionary' ? 'd' : 't'}}}`"
-            :class="cn('text-primary font-bold transition-all duration-300 ease-out', {
-              'text-sm': moved,
-              'text-lg': !moved,
-            })"
-          />
+  <!-- Main Container (UI Layer - No Filter) -->
+  <div :class="cn('relative w-full max-w-lg mx-auto', className)">
+    <div class="relative">
+      <!-- Search Bar UI -->
+      <div
+        class="card-shadow rounded-2xl bg-background border border-border relative overflow-visible"
+      >
+        <!-- Search Input Area -->
+        <div class="p-4">
+          <div class="flex items-center justify-center gap-3">
+            <!-- Dictionary/Thesaurus Toggle -->
+            <div
+              class="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl cursor-pointer transition-all duration-300 ease-out hover:scale-110 active:scale-95 flex items-center justify-center w-12 h-12"
+              @click="store.toggleMode()"
+            >
+              <FancyF :mode="mode" size="base" />
+            </div>
+
+            <!-- Search Input -->
+            <div class="relative flex-1">
+              <div
+                class="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none z-20"
+              >
+                <Search :size="20" />
+              </div>
+
+              <input
+                ref="searchInput"
+                v-model="query"
+                :placeholder="placeholder"
+                autofocus
+                class="flex w-full rounded-xl bg-background px-3 py-3 text-base shadow-sm transition-all duration-200 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pl-10 pr-4 bg-muted/30 focus:bg-background h-auto"
+                @keydown.enter="handleEnter"
+                @keydown.down.prevent="navigateResults(1)"
+                @keydown.up.prevent="navigateResults(-1)"
+                @keydown.escape="closeDropdown"
+              />
+            </div>
+          </div>
         </div>
 
-        <!-- Search Input Container -->
-        <div class="relative flex-1">
-          <!-- Search Icon Overlay -->
-          <div class="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
-            <Search 
-              :size="moved ? 14 : 16" 
-              class="text-muted-foreground"
+        <!-- AI Suggestions (inside card) -->
+        <div v-if="!query && aiSuggestions.length > 0" class="px-4 pb-4">
+          <div class="pt-2 border-t border-border/50">
+            <div class="flex flex-wrap gap-2 justify-center">
+              <Button
+                v-for="word in aiSuggestions"
+                :key="word"
+                variant="outline"
+                size="sm"
+                class="rounded-xl text-xs hover:opacity-90 hover:scale-95 transition-all duration-200"
+                @click="selectWord(word)"
+              >
+                <Sparkles :size="12" class="mr-1" />
+                {{ word }}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <Transition
+          enter-active-class="transition-all duration-200 ease-out"
+          enter-from-class="opacity-0 scale-y-0"
+          enter-to-class="opacity-100 scale-y-100"
+          leave-active-class="transition-all duration-150 ease-in"
+          leave-from-class="opacity-100 scale-y-100"
+          leave-to-class="opacity-0 scale-y-0"
+        >
+          <div
+            v-if="store.loadingProgress > 0"
+            class="absolute left-0 right-0 -bottom-2"
+          >
+            <div
+              class="h-[3px] bg-gradient-to-r from-purple-600/80 via-purple-500/70 to-purple-600/80 rounded-full"
+              :style="{
+                width: `${store.loadingProgress}%`,
+                boxShadow: '0 0 12px rgba(147, 51, 234, 0.4)',
+              }"
+              style="transition: width 0.3s ease-out"
             />
           </div>
-          
-          <Input
-            v-model="searchQuery"
-            :placeholder="placeholder"
-            :class="cn(
-              'w-full pl-10 pr-4 rounded-xl border-0 focus:border-primary transition-all duration-300 bg-muted/30 focus:bg-background',
-              {
-                'py-2 text-sm': moved,
-                'py-3 text-base': !moved,
-              }
-            )"
-            @keydown.enter="handleSearch"
-          />
-          
-          <!-- Progress Bar -->
-          <div 
-            v-if="isSearching"
-            class="absolute bottom-0 left-0 h-1 bg-primary/20 rounded-b-xl overflow-hidden w-full"
+        </Transition>
+      </div>
+
+      <!-- Search Results Dropdown -->
+      <div class="relative ">
+        <div class="absolute left-0 right-0 top-full mt-2">
+          <div
+            ref="searchResultsDropdown"
+            v-if="showDropdown"
+            class="card-shadow rounded-2xl bg-background border border-border overflow-hidden"
           >
-            <div class="h-full bg-primary rounded-b-xl animate-pulse"></div>
+            <!-- Loading -->
+            <div v-if="isSearching && searchResults.length === 0" class="p-4">
+              <div class="flex items-center gap-2 text-muted-foreground">
+                <div class="flex gap-1">
+                  <span
+                    v-for="i in 3"
+                    :key="i"
+                    class="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
+                    :style="{ animationDelay: `${(i - 1) * 150}ms` }"
+                  />
+                </div>
+                <span class="text-sm">Searching...</span>
+              </div>
+            </div>
+
+            <!-- Results -->
+            <div
+              v-else-if="searchResults.length > 0"
+              class="max-h-64 overflow-y-auto"
+            >
+              <div
+                v-for="(result, index) in searchResults"
+                :key="result.word"
+                :class="
+                  cn('px-4 py-3 cursor-pointer transition-all duration-200', {
+                    'bg-accent dark:bg-accent/80 border-l-6 border-primary pl-6 font-bold':
+                      index === selectedIndex,
+                    'hover:bg-muted/50 border-l-4 border-transparent':
+                      index !== selectedIndex,
+                  })
+                "
+                @click="selectResult(result)"
+                @mouseenter="selectedIndex = index"
+              >
+                <div class="flex items-center justify-between">
+                  <span
+                    :class="
+                      cn('transition-all duration-200', {
+                        'font-bold text-primary/90 translate-x-1':
+                          index === selectedIndex,
+                        'font-medium': index !== selectedIndex,
+                      })
+                    "
+                    >{{ result.word }}</span
+                  >
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-muted-foreground">{{
+                      result.method
+                    }}</span>
+                    <span class="text-xs font-medium text-primary"
+                      >{{ Math.round(result.score * 100) }}%</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- No Results -->
+            <div
+              v-else-if="!isSearching && query.length >= 2"
+              class="p-4 text-center text-muted-foreground text-sm"
+            >
+              No matches found
+            </div>
           </div>
-        </div>
-      </div>
-
-      <!-- Search Suggestions -->
-      <div
-        v-if="showSuggestions && suggestions.length > 0"
-        class="mt-2 bg-background rounded-xl max-h-60 overflow-y-auto"
-      >
-        <div
-          v-for="(suggestion, index) in suggestions.slice(0, 4)"
-          :key="suggestion"
-          :class="cn(
-            'px-3 py-2 cursor-pointer border-b border-border/30 last:border-b-0 transition-all duration-200 hover:bg-muted/50 hover:scale-[1.01]',
-            {
-              'bg-muted/30': index === 0,
-            }
-          )"
-          @click="selectSuggestion(suggestion)"
-        >
-          <span class="text-xs text-muted-foreground/60">{{ suggestion }}</span>
-        </div>
-      </div>
-      
-      <!-- Progressive Loading Bar -->
-      <div 
-        v-if="isSearching"
-        class="mt-3 w-full"
-      >
-        <div class="h-1 bg-muted/20 rounded-full overflow-hidden">
-          <div class="h-full bg-gradient-to-r from-purple-300 via-purple-400 to-purple-500 rounded-full transition-all duration-300 ease-out animate-pulse" 
-               :style="{ width: `${loadingProgress}%` }"></div>
-        </div>
-        <div v-if="store.loadingStage" class="text-xs text-muted-foreground mt-1 text-center">
-          {{ store.loadingStage }}
-        </div>
-      </div>
-    </div>
-
-    <!-- AI Suggestions (only on landing page) -->
-    <div
-      v-if="!moved && !hasSearched"
-      class="mt-6 max-w-lg mx-auto"
-    >
-      <div class="p-4 rounded-2xl bg-muted/5 card-shadow">
-        <div class="flex flex-wrap gap-2 justify-center">
-          <Button
-            v-for="word in aiSuggestions.slice(0, 4)"
-            :key="word"
-            variant="outline"
-            size="sm"
-            class="rounded-xl hover:scale-110 transition-all duration-300 text-xs active:scale-95"
-            @click="selectSuggestion(word)"
-          >
-            {{ word }}
-          </Button>
         </div>
       </div>
     </div>
@@ -126,16 +164,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { useAppStore } from '@/stores';
-import { useSearch } from '@/composables/useSearch';
-import { useAnimations } from '@/composables/useAnimations';
 import { cn } from '@/utils';
+import type { SearchResult } from '@/types';
 import Button from '@/components/ui/Button.vue';
-import Input from '@/components/ui/Input.vue';
-// import Badge from '@/components/ui/Badge.vue';
-import { LaTeX } from '@/components/custom/latex';
-import { Search } from 'lucide-vue-next';
+import FancyF from '@/components/FancyF.vue';
+import { Search, Sparkles } from 'lucide-vue-next';
+import { gsap } from 'gsap';
 
 interface SearchBarProps {
   className?: string;
@@ -144,84 +180,195 @@ interface SearchBarProps {
 defineProps<SearchBarProps>();
 
 const store = useAppStore();
-const { suggestions, getSuggestions, performSearch } = useSearch();
-const { searchBarMoved, transitionToResults } = useAnimations();
 
-const searchQuery = computed({
-  get: () => store.searchQuery,
-  set: (value) => (store.searchQuery = value),
-});
+// State
+const query = ref('');
+const searchResults = ref<SearchResult[]>([]);
+const showDropdown = ref(false);
+const isSearching = ref(false);
+const selectedIndex = ref(0);
+const aiSuggestions = ref<string[]>([
+  'serendipity',
+  'ephemeral',
+  'luminous',
+  'eloquent',
+]);
 
-const showSuggestions = ref(false);
-const isSearching = computed(() => store.isSearching);
-const hasSearched = computed(() => store.hasSearched);
-const moved = computed(() => searchBarMoved.value);
+// Refs
+const searchInput = ref<HTMLInputElement>();
+const searchResultsDropdown = ref<HTMLElement>();
+
+// Timers
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+let lookupTimer: ReturnType<typeof setTimeout> | undefined;
+
+// Computed
 const mode = computed(() => store.mode);
-const loadingProgress = computed(() => store.loadingProgress || 0);
-
-const placeholder = computed(() => 
-  mode.value === 'dictionary' 
-    ? 'Enter a word to define...' 
+const placeholder = computed(() =>
+  mode.value === 'dictionary'
+    ? 'Enter a word to define...'
     : 'Enter a word to find synonyms...'
 );
 
-// Dynamic suggestions for landing page
-const aiSuggestions = ref<string[]>([]);
-
-// Generate dynamic suggestions on mount
-onMounted(async () => {
-  try {
-    // Get random suggestions from API
-    const response = await getSuggestions('a'); // Start with 'a' to get varied results
-    if (response.length > 0) {
-      // Take a random sample
-      const shuffled = response.sort(() => 0.5 - Math.random());
-      aiSuggestions.value = shuffled.slice(0, 4);
-    }
-  } catch (error) {
-    // Fallback to some interesting words
-    aiSuggestions.value = ['serendipity', 'ephemeral', 'luminous', 'eloquent'];
-  }
-});
-
-// Watch for search query changes to get suggestions
-watch(searchQuery, async (newQuery) => {
-  if (newQuery.length >= 2) {
-    await getSuggestions(newQuery);
-    showSuggestions.value = true;
-  } else {
-    showSuggestions.value = false;
-  }
-});
-
-// Hide suggestions when clicking outside
+// Initialize suggestions and focus
 onMounted(() => {
-  document.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    if (!target?.closest('.relative')) {
-      showSuggestions.value = false;
+  const history = store.getHistoryBasedSuggestions();
+  if (history.length >= 4) {
+    aiSuggestions.value = history;
+  }
+
+  // Focus the search input
+  nextTick(() => {
+    if (searchInput.value) {
+      searchInput.value.focus();
     }
   });
 });
 
-const handleSearch = async () => {
-  if (!searchQuery.value.trim()) return;
-  
-  console.log('Searching for:', searchQuery.value);
-  showSuggestions.value = false;
-  await performSearch(searchQuery.value);
-  await transitionToResults();
+// Watch query - SEARCH ON EVERY KEYSTROKE
+watch(query, async (newQuery) => {
+  clearTimeout(searchTimer);
+  clearTimeout(lookupTimer);
+
+  // Update store
+  store.searchQuery = newQuery;
+
+  // Reset if empty
+  if (!newQuery || newQuery.length < 2) {
+    searchResults.value = [];
+    if (showDropdown.value) {
+      animateSearchResultsOut();
+      setTimeout(() => {
+        showDropdown.value = false;
+      }, 300); // Wait for animation to complete
+    }
+    isSearching.value = false;
+    return;
+  }
+
+  // Show dropdown with loading state immediately
+  if (!showDropdown.value) {
+    showDropdown.value = true;
+    nextTick(() => {
+      animateSearchResultsIn();
+    });
+  }
+  isSearching.value = true;
+
+  // Call search API with debounce
+  searchTimer = setTimeout(async () => {
+    try {
+      const results = await store.search(newQuery);
+      searchResults.value = results.slice(0, 8);
+      selectedIndex.value = 0;
+    } catch (error) {
+      console.error('Search error:', error);
+      searchResults.value = [];
+    } finally {
+      isSearching.value = false;
+    }
+  }, 200);
+});
+
+// Handle enter key
+const handleEnter = async () => {
+  clearTimeout(searchTimer);
+  clearTimeout(lookupTimer);
+
+  if (searchResults.value.length > 0 && selectedIndex.value >= 0) {
+    await selectResult(searchResults.value[selectedIndex.value]);
+  } else if (query.value) {
+    // Direct lookup
+    closeDropdown();
+    store.searchQuery = query.value;
+    store.hasSearched = true;
+    await store.getDefinition(query.value);
+  }
 };
 
-const selectSuggestion = async (suggestion: string) => {
-  searchQuery.value = suggestion;
-  showSuggestions.value = false;
-  await handleSearch();
+// Select result
+const selectResult = async (result: SearchResult) => {
+  clearTimeout(lookupTimer);
+  query.value = result.word;
+  closeDropdown();
+
+  store.searchQuery = result.word;
+  store.hasSearched = true;
+  await store.getDefinition(result.word);
 };
 
-// const resetSearch = () => {
-//   if (moved.value) {
-//     store.reset();
-//   }
-// };
+// Select word from suggestions
+const selectWord = (word: string) => {
+  query.value = word;
+  // Let watch handle the search
+};
+
+// Navigate results with keyboard
+const navigateResults = (direction: number) => {
+  if (!showDropdown.value || searchResults.value.length === 0) return;
+
+  selectedIndex.value = Math.max(
+    0,
+    Math.min(searchResults.value.length - 1, selectedIndex.value + direction)
+  );
+};
+
+// Close dropdown
+const closeDropdown = () => {
+  if (showDropdown.value) {
+    animateSearchResultsOut();
+    setTimeout(() => {
+      showDropdown.value = false;
+    }, 300);
+  }
+};
+
+// GSAP Animation Functions
+const animateSearchResultsIn = () => {
+  if (searchResultsDropdown.value) {
+    // Set initial state
+    gsap.set(searchResultsDropdown.value, { opacity: 0, y: -10 });
+
+    // Animate the dropdown
+    gsap.to(searchResultsDropdown.value, {
+      opacity: 1,
+      y: 0,
+      duration: 0.4,
+      ease: 'power2.out',
+    });
+  }
+};
+
+const animateSearchResultsOut = () => {
+  if (searchResultsDropdown.value) {
+    // Animate dropdown out
+    gsap.to(searchResultsDropdown.value, {
+      opacity: 0,
+      y: -5,
+      duration: 0.2,
+      ease: 'power2.in',
+    });
+  }
+};
+
+// Click outside to close
+onMounted(() => {
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('.max-w-lg')) {
+      closeDropdown();
+    }
+  });
+});
 </script>
+
+<style scoped>
+/* Disable GSAP animations during reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+</style>
