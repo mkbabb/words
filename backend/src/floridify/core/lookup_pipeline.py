@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-from ..ai import create_definition_synthesizer
+from ..ai import get_definition_synthesizer
 from ..connectors.dictionary_com import DictionaryComConnector
 from ..connectors.wiktionary import WiktionaryConnector
 from ..constants import DictionaryProvider, Language
 from ..models.models import ProviderData, SynthesizedDictionaryEntry
-from ..search.constants import SearchMethod
-from ..search.core import SearchResult
 from ..utils.logging import get_logger
-from ..utils.text_utils import normalize_word
-from .search_manager import get_search_engine
+from .search_pipeline import find_best_match
 
 logger = get_logger(__name__)
 
@@ -45,28 +42,23 @@ async def lookup_word_pipeline(
         languages = [Language.ENGLISH]
     
     try:
-        # Normalize the query
-        normalized_word = normalize_word(word)
-        if normalized_word != word:
-            logger.debug(f"Normalized: '{word}' → '{normalized_word}'")
-
-        # Search for the word using singleton SearchEngine
-        search_results = await _search_word(
-            word=normalized_word,
+        # Search for the word using generalized search pipeline
+        best_match_result = await find_best_match(
+            word=word,
             languages=languages,
             semantic=semantic,
         )
 
-        if not search_results:
+        if not best_match_result:
             # Try AI fallback if no results and AI is enabled
             if not no_ai:
-                logger.info(f"No search results, trying AI fallback for '{normalized_word}'")
-                return await _ai_fallback_lookup(normalized_word, force_refresh)
+                logger.info(f"No search results, trying AI fallback for '{word}'")
+                return await _ai_fallback_lookup(word, force_refresh)
             return None
 
         # Use the best match
-        best_match = search_results[0].word
-        logger.debug(f"Best match: '{best_match}' (score: {search_results[0].score:.3f})")
+        best_match = best_match_result.word
+        logger.debug(f"Best match: '{best_match}' (score: {best_match_result.score:.3f})")
 
         # Get definition from providers
         providers_data = []
@@ -106,33 +98,6 @@ async def lookup_word_pipeline(
         logger.error(f"Lookup pipeline failed: {e}")
         return None
 
-
-async def _search_word(
-    word: str, 
-    languages: list[Language], 
-    semantic: bool
-) -> list[SearchResult]:
-    """Search for word using the singleton search engine."""
-    logger.debug(f"Searching for '{word}' in languages: {[lang.value for lang in languages]}")
-
-    # Get singleton search engine
-    search_engine = await get_search_engine(
-        languages=languages,
-        enable_semantic=semantic,
-    )
-
-    # Perform search
-    if semantic:
-        # Force semantic search
-        results = await search_engine.search(
-            word, max_results=10, methods=[SearchMethod.SEMANTIC]
-        )
-    else:
-        # Use hybrid approach
-        results = await search_engine.search(word, max_results=10)
-
-    logger.debug(f"Search returned {len(results)} results")
-    return results
 
 
 async def _get_provider_definition(
@@ -175,7 +140,7 @@ async def _synthesize_with_ai(
     logger.debug(f"AI synthesis for '{word}'")
 
     try:
-        synthesizer = create_definition_synthesizer()
+        synthesizer = get_definition_synthesizer()
         return await synthesizer.synthesize_entry(word, providers, force_refresh)
     except Exception as e:
         logger.error(f"AI synthesis failed: {e}")
@@ -189,7 +154,7 @@ async def _ai_fallback_lookup(
     logger.debug(f"AI fallback for '{word}'")
 
     try:
-        synthesizer = create_definition_synthesizer()
+        synthesizer = get_definition_synthesizer()
         ai_entry = await synthesizer.generate_fallback_entry(word, force_refresh)
 
         if ai_entry and ai_entry.definitions:

@@ -17,6 +17,7 @@ from .models import (
     DictionaryEntryResponse,
     ExampleGenerationResponse,
     PronunciationResponse,
+    SuggestionsResponse,
     SynonymGenerationResponse,
     SynthesisResponse,
 )
@@ -125,9 +126,7 @@ class OpenAIConnector:
         )
 
         try:
-            result = await self._make_structured_request(
-                prompt, SynthesisResponse
-            )
+            result = await self._make_structured_request(prompt, SynthesisResponse)
             # Success logging handled by synthesizer context
             return result
         except Exception as e:
@@ -136,7 +135,7 @@ class OpenAIConnector:
             )
             raise
 
-    async def generate_example(
+    async def examples(
         self,
         word: str,
         word_type: str,
@@ -144,9 +143,13 @@ class OpenAIConnector:
         count: int = 1,
     ) -> ExampleGenerationResponse:
         """Generate modern usage examples."""
-        logger.debug(f"📝 Generating {count} example sentence(s) for '{word}' ({word_type})")
+        logger.debug(
+            f"📝 Generating {count} example sentence(s) for '{word}' ({word_type})"
+        )
 
-        prompt = self.template_manager.get_example_prompt(word, definition, word_type, count)
+        prompt = self.template_manager.get_example_prompt(
+            word, definition, word_type, count
+        )
 
         try:
             result = await self._make_structured_request(
@@ -165,21 +168,17 @@ class OpenAIConnector:
             logger.error(f"❌ Example generation failed for '{word}': {e}")
             raise
 
-    async def generate_pronunciation(self, word: str) -> PronunciationResponse:
+    async def pronunciation(self, word: str) -> PronunciationResponse:
         """Generate pronunciation data."""
         prompt = self.template_manager.get_pronunciation_prompt(word)
 
-        return await self._make_structured_request(
-            prompt, PronunciationResponse
-        )
+        return await self._make_structured_request(prompt, PronunciationResponse)
 
-    async def generate_fallback_entry(
-        self, word: str
-    ) -> DictionaryEntryResponse | None:
+    async def lookup_fallback(self, word: str) -> DictionaryEntryResponse | None:
         """Generate AI fallback provider data."""
         logger.info(f"🤖 Generating AI fallback definition for '{word}'")
 
-        prompt = self.template_manager.get_fallback_prompt(word)
+        prompt = self.template_manager.get_lookup_prompt(word)
 
         try:
             result = await self._make_structured_request(
@@ -221,9 +220,7 @@ class OpenAIConnector:
         prompt = self.template_manager.get_meaning_extraction_prompt(word, definitions)
 
         try:
-            result = await self._make_structured_request(
-                prompt, ClusterMappingResponse
-            )
+            result = await self._make_structured_request(prompt, ClusterMappingResponse)
             logger.success(
                 f"🎯 Extracted {len(result.cluster_mappings)} cluster mappings for '{word}' "
                 f"(confidence: {result.confidence:.1%})"
@@ -245,9 +242,7 @@ class OpenAIConnector:
             examples=examples or "",
         )
         try:
-            result = await self._make_structured_request(
-                prompt, AnkiFillBlankResponse
-            )
+            result = await self._make_structured_request(prompt, AnkiFillBlankResponse)
             logger.debug(f"Generated fill-blank card for '{word}'")
             return result
         except Exception as e:
@@ -275,13 +270,13 @@ class OpenAIConnector:
             logger.error(f"❌ Best describes generation failed for '{word}': {e}")
             raise
 
-    async def generate_synonyms(
+    async def synonyms(
         self, word: str, definition: str, word_type: str, count: int = 10
     ) -> SynonymGenerationResponse:
         """Generate synonyms with efflorescence ranking."""
         logger.debug(f"🔗 Generating {count} synonyms for '{word}' ({word_type})")
 
-        prompt = self.template_manager.get_synonym_generation_prompt(
+        prompt = self.template_manager.get_synonyms_prompt(
             word=word,
             definition=definition,
             word_type=word_type,
@@ -292,10 +287,56 @@ class OpenAIConnector:
             result = await self._make_structured_request(
                 prompt, SynonymGenerationResponse
             )
-            
+
             synonym_count = len(result.synonyms)
-            logger.success(f"✨ Generated {synonym_count} synonyms for '{word}' (confidence: {result.confidence:.1%})")
+            logger.success(
+                f"✨ Generated {synonym_count} synonyms for '{word}' (confidence: {result.confidence:.1%})"
+            )
             return result
         except Exception as e:
             logger.error(f"❌ Synonym generation failed for '{word}': {e}")
+            raise
+
+    @cached_api_call(
+        ttl_hours=24.0,  # Suggestions change slowly
+        key_func=lambda self, input_words, count: (
+            "suggestions",
+            tuple(sorted(input_words)) if input_words else None,
+            count,
+        ),
+    )
+    async def suggestions(
+        self, input_words: list[str] | None, count: int = 10
+    ) -> SuggestionsResponse:
+        """Generate word suggestions based on input words.
+
+        Args:
+            input_words: List of up to 10 input words to base suggestions on
+            count: Number of suggestions to generate (8-12)
+
+        Returns:
+            SuggestionsResponse with suggestions and analysis
+        """
+        limited_words = input_words[:10] if input_words else None
+        suggestion_count = max(8, min(12, count))
+
+        logger.info(
+            f"🌸 Generating {suggestion_count} suggestions from {len(limited_words) if limited_words else 0} words"
+        )
+
+        prompt = self.template_manager.get_suggestions_prompt(
+            input_words=limited_words,
+            count=suggestion_count,
+        )
+
+        try:
+            result = await self._make_structured_request(prompt, SuggestionsResponse)
+
+            suggestions_count = len(result.suggestions)
+            logger.success(
+                f"✨ Generated {suggestions_count} suggestions (confidence: {result.confidence:.1%})"
+            )
+            return result
+        except Exception as e:
+            logger.error(f"❌ Suggestions generation failed: {e}")
             raise

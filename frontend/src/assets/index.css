@@ -243,3 +243,167 @@ body {
 .heatmap-8 { background-color: rgb(153 27 27); color: rgb(254 226 226); }
 .heatmap-9 { background-color: rgb(127 29 29); color: rgb(254 226 226); }
 .heatmap-10 { background-color: rgb(69 10 10); color: rgb(254 226 226); }
+
+/* Metallic themed cards */
+.card-gold {
+  background: linear-gradient(135deg,
+    #d4af37 0%, 
+    #ffd700 15%, 
+    #fff8dc 30%, 
+    #ffd700 45%, 
+    #d4af37 60%, 
+    #b8860b 75%, 
+    #d4af37 90%, 
+    #ffd700 100%
+  );
+  border: 2px solid #b8860b;
+  color: #8b4513;
+  position: relative;
+}
+
+.card-silver {
+  background: linear-gradient(135deg,
+    #c0c0c0 0%, 
+    #e8e8e8 15%, 
+    #ffffff 30%, 
+    #e8e8e8 45%, 
+    #c0c0c0 60%, 
+    #a8a8a8 75%, 
+    #c0c0c0 90%, 
+    #e8e8e8 100%
+  );
+  border: 2px solid #a8a8a8;
+  color: #555555;
+  position: relative;
+}
+
+.card-bronze {
+  background: linear-gradient(135deg,
+    #cd7f32 0%, 
+    #d2b48c 15%, 
+    #f5deb3 30%, 
+    #d2b48c 45%, 
+    #cd7f32 60%, 
+    #8b4513 75%, 
+    #cd7f32 90%, 
+    #d2b48c 100%
+  );
+  border: 2px solid #8b4513;
+  color: #654321;
+  position: relative;
+}
+
+/* Sparkle animations */
+@keyframes sparkle-slide {
+  0% {
+    transform: translateX(-100%) rotate(45deg);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(300%) rotate(45deg);
+    opacity: 0;
+  }
+}
+
+.sparkle-gold::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 70%
+  );
+  animation: sparkle-slide 4s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+.sparkle-silver::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 70%
+  );
+  animation: sparkle-slide 3.5s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
+.sparkle-bronze::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg,
+    transparent 30%,
+    rgba(255, 248, 220, 0.3) 50%,
+    transparent 70%
+  );
+  animation: sparkle-slide 4.5s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+/* Enhanced metallic effects on hover */
+.card-gold:hover {
+  background: linear-gradient(135deg,
+    #ffd700 0%, 
+    #ffeb3b 15%, 
+    #fffde7 30%, 
+    #ffeb3b 45%, 
+    #ffd700 60%, 
+    #d4af37 75%, 
+    #ffd700 90%, 
+    #ffeb3b 100%
+  );
+  box-shadow: 
+    0 4px 8px rgba(212, 175, 55, 0.3),
+    0 12px 24px rgba(255, 215, 0, 0.2),
+    0 24px 48px rgba(255, 215, 0, 0.1);
+}
+
+.card-silver:hover {
+  background: linear-gradient(135deg,
+    #e8e8e8 0%, 
+    #f5f5f5 15%, 
+    #ffffff 30%, 
+    #f5f5f5 45%, 
+    #e8e8e8 60%, 
+    #d3d3d3 75%, 
+    #e8e8e8 90%, 
+    #f5f5f5 100%
+  );
+  box-shadow: 
+    0 4px 8px rgba(192, 192, 192, 0.3),
+    0 12px 24px rgba(224, 224, 224, 0.2),
+    0 24px 48px rgba(248, 248, 248, 0.1);
+}
+
+.card-bronze:hover {
+  background: linear-gradient(135deg,
+    #d2b48c 0%, 
+    #deb887 15%, 
+    #f5deb3 30%, 
+    #deb887 45%, 
+    #d2b48c 60%, 
+    #cd7f32 75%, 
+    #d2b48c 90%, 
+    #deb887 100%
+  );
+  box-shadow: 
+    0 4px 8px rgba(205, 127, 50, 0.3),
+    0 12px 24px rgba(210, 180, 140, 0.2),
+    0 24px 48px rgba(210, 180, 140, 0.1);
+}

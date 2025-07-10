@@ -4,9 +4,11 @@ import { useStorage } from '@vueuse/core';
 import type {
   SearchState,
   SearchHistory,
+  LookupHistory,
   SynthesizedDictionaryEntry,
   SearchResult,
   ThesaurusEntry,
+  VocabularySuggestion,
 } from '@/types';
 import { dictionaryApi } from '@/utils/api';
 import { generateId, normalizeWord } from '@/utils';
@@ -24,13 +26,20 @@ export const useAppStore = defineStore('app', () => {
   const theme = useStorage('theme', 'light');
   const loadingProgress = ref(0);
   const loadingStage = ref('');
-  
-  // Sidebar state 
+
+  // Sidebar state
   const sidebarOpen = ref(false); // For mobile modal
   const sidebarCollapsed = ref(true); // For desktop collapse
 
-  // Search history (persisted)
+  // Search history (persisted) - keeping for search bar functionality
   const searchHistory = useStorage<SearchHistory[]>('search-history', []);
+
+  // Lookup history (persisted) - main source for suggestions and tiles
+  const lookupHistory = useStorage<LookupHistory[]>('lookup-history', []);
+
+  // Vocabulary suggestions state
+  const vocabularySuggestions = ref<VocabularySuggestion[]>([]);
+  const isLoadingSuggestions = ref(false);
 
   // Computed properties
   const searchState = computed<SearchState>(() => ({
@@ -42,17 +51,30 @@ export const useAppStore = defineStore('app', () => {
     mode: mode.value,
   }));
 
-  const recentSearches = computed(() => 
-    searchHistory.value
-      .slice(0, 10)
-      .sort((a, b) => {
-        const dateA = new Date(a.timestamp);
-        const dateB = new Date(b.timestamp);
-        if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
-          return 0;
-        }
-        return dateB.getTime() - dateA.getTime();
-      })
+  const recentSearches = computed(() =>
+    searchHistory.value.slice(0, 10).sort((a, b) => {
+      const dateA = new Date(a.timestamp);
+      const dateB = new Date(b.timestamp);
+      if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
+        return 0;
+      }
+      return dateB.getTime() - dateA.getTime();
+    })
+  );
+
+  const recentLookups = computed(() =>
+    lookupHistory.value.slice(0, 10).sort((a, b) => {
+      const dateA = new Date(a.timestamp);
+      const dateB = new Date(b.timestamp);
+      if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
+        return 0;
+      }
+      return dateB.getTime() - dateA.getTime();
+    })
+  );
+
+  const recentLookupWords = computed(() =>
+    recentLookups.value.map((lookup) => lookup.word)
   );
 
   // Actions
@@ -62,7 +84,7 @@ export const useAppStore = defineStore('app', () => {
     const normalizedQuery = normalizeWord(query);
     searchQuery.value = normalizedQuery;
     hasSearched.value = true;
-    
+
     // Direct lookup - no need for intermediate search
     await getDefinition(normalizedQuery);
   }
@@ -70,16 +92,16 @@ export const useAppStore = defineStore('app', () => {
   // Search for word suggestions (used by SearchBar)
   async function search(query: string): Promise<SearchResult[]> {
     if (!query.trim()) return [];
-    
+
     try {
       const results = await dictionaryApi.searchWord(query);
       searchResults.value = results;
-      
+
       // Add to history if we have results
       if (results.length > 0) {
         addToHistory(query, results);
       }
-      
+
       return results;
     } catch (error) {
       console.error('Search error:', error);
@@ -91,24 +113,27 @@ export const useAppStore = defineStore('app', () => {
     isSearching.value = true;
     loadingProgress.value = 0;
     loadingStage.value = 'Looking up word...';
-    
+
     try {
       // Simulate progress
       loadingProgress.value = 30;
       loadingStage.value = 'Fetching definition...';
-      
+
       const entry = await dictionaryApi.getDefinition(word);
       currentEntry.value = entry;
-      
+
+      // Add to lookup history
+      addToLookupHistory(word, entry);
+
       loadingProgress.value = 70;
       loadingStage.value = 'Finalizing...';
-      
+
       // Also get thesaurus data
       if (mode.value === 'thesaurus') {
         loadingStage.value = 'Loading synonyms...';
         await getThesaurusData(word);
       }
-      
+
       loadingProgress.value = 100;
       setTimeout(() => {
         loadingProgress.value = 0;
@@ -160,30 +185,76 @@ export const useAppStore = defineStore('app', () => {
   function clearHistory() {
     searchHistory.value = [];
   }
-  
-  function getHistoryBasedSuggestions(): string[] {
-    // Get unique words from recent searches
-    const recentWords = new Set<string>();
-    searchHistory.value.slice(0, 20).forEach(entry => {
-      entry.results.forEach(result => {
-        if (result.score > 0.8) {
-          recentWords.add(result.word);
-        }
-      });
-    });
-    
-    // Convert to array and shuffle
-    const words = Array.from(recentWords);
-    return words.sort(() => 0.5 - Math.random()).slice(0, 4);
+
+  function addToLookupHistory(word: string, entry: SynthesizedDictionaryEntry) {
+    const historyEntry: LookupHistory = {
+      id: generateId(),
+      word: normalizeWord(word),
+      timestamp: new Date(),
+      entry,
+    };
+
+    // Remove existing entry for same word
+    const existingIndex = lookupHistory.value.findIndex(
+      (lookup) => lookup.word.toLowerCase() === word.toLowerCase()
+    );
+    if (existingIndex >= 0) {
+      lookupHistory.value.splice(existingIndex, 1);
+    }
+
+    // Add new entry at the beginning
+    lookupHistory.value.unshift(historyEntry);
+
+    // Keep only last 50 lookups
+    if (lookupHistory.value.length > 50) {
+      lookupHistory.value = lookupHistory.value.slice(0, 50);
+    }
+
+    // Refresh vocabulary suggestions with new history
+    refreshVocabularySuggestions();
+  }
+
+  function clearLookupHistory() {
+    lookupHistory.value = [];
+    vocabularySuggestions.value = [];
+  }
+
+  async function refreshVocabularySuggestions() {
+    isLoadingSuggestions.value = true;
+    try {
+      const recentWords = recentLookupWords.value.slice(0, 10);
+      const response =
+        await dictionaryApi.getVocabularySuggestions(recentWords);
+      vocabularySuggestions.value = response.words.map(word => ({ word }));
+    } catch (error) {
+      console.error('Failed to get vocabulary suggestions:', error);
+      vocabularySuggestions.value = [];
+    } finally {
+      isLoadingSuggestions.value = false;
+    }
+  }
+
+  async function getHistoryBasedSuggestions(): Promise<string[]> {
+    try {
+      const recentWords = recentLookupWords.value.slice(0, 10);
+      const response =
+        await dictionaryApi.getVocabularySuggestions(recentWords);
+      return response.words;
+    } catch (error) {
+      console.error('Failed to get history-based suggestions:', error);
+      // Fallback to simple word list from history
+      return recentLookupWords.value.slice(0, 4);
+    }
   }
 
   function togglePronunciation() {
-    pronunciationMode.value = pronunciationMode.value === 'phonetic' ? 'ipa' : 'phonetic';
+    pronunciationMode.value =
+      pronunciationMode.value === 'phonetic' ? 'ipa' : 'phonetic';
   }
 
   function toggleMode() {
     mode.value = mode.value === 'dictionary' ? 'thesaurus' : 'dictionary';
-    
+
     // If we have a current word, fetch appropriate data
     if (currentEntry.value) {
       if (mode.value === 'thesaurus') {
@@ -214,6 +285,16 @@ export const useAppStore = defineStore('app', () => {
     mode.value = 'dictionary';
   }
 
+  // Initialize vocabulary suggestions on store creation
+  function initializeVocabularySuggestions() {
+    if (lookupHistory.value.length > 1) {
+      refreshVocabularySuggestions();
+    }
+  }
+
+  // Call initialization when store is created
+  initializeVocabularySuggestions();
+
   return {
     // State
     searchQuery,
@@ -226,15 +307,20 @@ export const useAppStore = defineStore('app', () => {
     pronunciationMode,
     theme,
     searchHistory,
+    lookupHistory,
+    vocabularySuggestions,
+    isLoadingSuggestions,
     sidebarOpen,
     sidebarCollapsed,
     loadingProgress,
     loadingStage,
-    
+
     // Computed
     searchState,
     recentSearches,
-    
+    recentLookups,
+    recentLookupWords,
+
     // Actions
     searchWord,
     search,
@@ -242,6 +328,10 @@ export const useAppStore = defineStore('app', () => {
     getThesaurusData,
     addToHistory,
     clearHistory,
+    addToLookupHistory,
+    clearLookupHistory,
+    refreshVocabularySuggestions,
+    initializeVocabularySuggestions,
     getHistoryBasedSuggestions,
     togglePronunciation,
     toggleMode,

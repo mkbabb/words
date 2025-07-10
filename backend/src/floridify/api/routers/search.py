@@ -7,15 +7,13 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...caching.decorators import cached_api_call
-from ...constants import Language
-from ...core.search_manager import get_search_engine
+from ...core.search_pipeline import get_search_engine
 from ...search.constants import SearchMethod
 from ...utils.logging import get_logger
-from ..models.requests import SearchParams, SuggestionParams
+from ..models.requests import SearchParams
 from ..models.responses import (
     SearchResponse,
     SearchResultItem,
-    SuggestionResponse,
 )
 
 logger = get_logger(__name__)
@@ -36,13 +34,6 @@ def parse_search_params(
         min_score=min_score,
     )
 
-
-def parse_suggestion_params(
-    q: str = Query(..., min_length=2, max_length=50, description="Partial query"),
-    limit: int = Query(default=10, ge=1, le=20, description="Maximum suggestions"),
-) -> SuggestionParams:
-    """Parse and validate suggestion parameters."""
-    return SuggestionParams(q=q, limit=limit)
 
 
 
@@ -150,79 +141,6 @@ async def search_words(
         raise HTTPException(
             status_code=500,
             detail=f"Internal error during search: {str(e)}"
-        )
-
-
-@cached_api_call(
-    ttl_hours=6.0,  # Prefix matches are relatively stable
-    key_func=lambda params: ("api_suggestions", params.q, params.limit),
-)
-async def _cached_suggestions(params: SuggestionParams) -> SuggestionResponse:
-    """Cached suggestions implementation."""
-    search_engine = await get_search_engine([Language.ENGLISH])
-    
-    # Use prefix search for fast autocomplete
-    results = await search_engine.search(
-        query=params.q,
-        max_results=params.limit,
-        methods=[SearchMethod.PREFIX],
-    )
-    
-    suggestions = [result.word for result in results]
-    
-    return SuggestionResponse(
-        query=params.q,
-        suggestions=suggestions,
-    )
-
-
-@router.get("/suggestions", response_model=SuggestionResponse)
-async def get_suggestions(
-    params: SuggestionParams = Depends(parse_suggestion_params),
-) -> SuggestionResponse:
-    """Get word suggestions for search-as-you-type autocomplete.
-    
-    Optimized for real-time user input with fast prefix matching.
-    Designed for client-side debouncing (recommended 200-300ms delay).
-    
-    Features:
-    - Ultra-fast prefix search for immediate responses
-    - Optimized for partial word input (minimum 2 characters)  
-    - Cached results for performance (6-hour TTL)
-    - Rate-limited to prevent abuse
-    
-    Best Practices:
-    - Implement 200ms debouncing on client side
-    - Abort previous requests when new input arrives
-    - Limit requests to reasonable frequency (max 5-10/second)
-    
-    Args:
-        q: Partial query string (2-50 characters)
-        limit: Maximum suggestions to return (1-20, default: 10)
-        
-    Returns:
-        List of suggested completions matching the prefix
-        
-    Example:
-        GET /api/v1/suggestions?q=ser&limit=5
-        Returns: ["serendipity", "serene", "serious", "service", "sermon"]
-    """
-    start_time = time.perf_counter()
-    
-    try:
-        result = await _cached_suggestions(params)
-        
-        # Log performance for monitoring
-        elapsed_ms = int((time.perf_counter() - start_time) * 1000)
-        logger.debug(f"Suggestions: '{params.q}' -> {len(result.suggestions)} results in {elapsed_ms}ms")
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"Suggestions failed for '{params.q}': {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal error getting suggestions: {str(e)}"
         )
 
 

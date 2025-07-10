@@ -42,6 +42,25 @@ export interface SearchHistory {
   results: SearchResult[];
 }
 
+export interface LookupHistory {
+  id: string;
+  word: string;
+  timestamp: Date;
+  entry: SynthesizedDictionaryEntry;
+}
+
+export interface VocabularySuggestion {
+  word: string;
+  reasoning: string;
+  difficulty_level: number;
+  semantic_category: string;
+}
+
+export interface VocabularySuggestionsResponse {
+  words: string[];
+  confidence: number;
+}
+
 export interface SynonymData {
   word: string;
   score: number;

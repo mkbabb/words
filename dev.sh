@@ -10,7 +10,7 @@ ROOT_DIR=$(pwd)
 kill_processes_by_pattern() {
     local pattern="$1"
     local description="$2"
-    
+
     local pids=$(pgrep -f "$pattern" | grep -v $$ | grep -v $PPID)
     if [ ! -z "$pids" ]; then
         echo "Killing existing $description processes: $pids"
@@ -23,7 +23,7 @@ kill_processes_by_pattern() {
 kill_processes_on_ports() {
     local port_pattern="$1"
     local description="$2"
-    
+
     # Find all processes listening on ports matching the pattern
     local pids=$(lsof -i -P -n | grep LISTEN | grep -E "$port_pattern" | awk '{print $2}' | sort -u)
     if [ ! -z "$pids" ]; then
@@ -58,17 +58,22 @@ sleep 1
 
 # Start backend with UV
 echo "Starting backend with UV..."
-if command -v uv &> /dev/null; then
-    cd "$ROOT_DIR/backend" && uv run scripts/run_api.py &
+if command -v uv &>/dev/null; then
+    uv run ./backend/scripts/run_api.py &
     BACKEND_PID=$!
+    echo "Backend started with PID $BACKEND_PID"
 else
     echo "Error: UV not found. Please install UV or add it to your PATH."
     exit 1
 fi
 
-# Start frontend  
-cd "$ROOT_DIR/frontend" && npm run dev &
+# Start frontend
+cd ./frontend
+npm run dev &
 FRONTEND_PID=$!
+echo "Frontend started with PID $FRONTEND_PID"
+
+cd ..
 
 # Function to kill both processes
 cleanup() {

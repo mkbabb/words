@@ -8,7 +8,7 @@ from fastapi import APIRouter
 
 from ...caching.cache_manager import get_cache_manager
 from ...constants import Language
-from ...core.search_manager import get_search_engine
+from ...core.search_pipeline import get_search_engine
 from ...storage.mongodb import _ensure_initialized
 from ...utils.logging import get_logger
 from ..models.responses import HealthResponse

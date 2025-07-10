@@ -10,20 +10,20 @@
             class="space-y-1"
           >
             <div
-              v-for="(entry, index) in limitedSearches"
+              v-for="(entry, index) in limitedLookups"
               :key="entry.id"
               :class="cn(
                 'group relative w-full rounded-lg cursor-pointer transition-all duration-200 overflow-hidden',
                 'bg-background border border-border shadow-sm',
                 'hover:shadow-md hover:bg-accent'
               )"
-              @click="searchWord(entry.query)"
+              @click="lookupWord(entry.word)"
               @mouseenter="hoveredIndex = index"
               @mouseleave="hoveredIndex = -1"
             >
               <div class="px-2 py-2 flex items-center justify-center">
                 <span class="text-xs font-bold uppercase tracking-wider">
-                  {{ entry.query.substring(0, 2) }}
+                  {{ entry.word.substring(0, 2) }}
                 </span>
               </div>
               
@@ -32,7 +32,7 @@
                 v-if="hoveredIndex === index"
                 class="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md pointer-events-none whitespace-nowrap z-50 shadow-md"
               >
-                {{ entry.query }}
+                {{ entry.word }}
               </div>
             </div>
           </TransitionGroup>
@@ -49,17 +49,17 @@
       class="space-y-1"
     >
       <div
-        v-for="entry in recentSearches"
+        v-for="entry in recentLookups"
         :key="entry.id"
         :class="cn(
           'group flex items-center justify-between px-2 py-2 rounded-lg cursor-pointer transition-all duration-200',
           'hover:bg-accent hover:pl-3'
         )"
-        @click="searchWord(entry.query)"
+        @click="lookupWord(entry.word)"
       >
         <div class="flex items-center gap-3 min-w-0">
           <History :size="14" class="text-muted-foreground shrink-0" />
-          <span class="text-sm truncate">{{ entry.query }}</span>
+          <span class="text-sm truncate">{{ entry.word }}</span>
         </div>
         <span class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
           {{ formatDate(entry.timestamp) }}
@@ -67,8 +67,8 @@
       </div>
     </TransitionGroup>
     
-    <div v-if="recentSearches.length === 0" class="text-center py-4">
-      <p class="text-xs text-muted-foreground">No recent searches</p>
+    <div v-if="recentLookups.length === 0" class="text-center py-4">
+      <p class="text-xs text-muted-foreground">No recent lookups</p>
     </div>
   </div>
 </template>
@@ -86,18 +86,18 @@ interface Props {
 defineProps<Props>();
 
 const store = useAppStore();
-const recentSearches = computed(() => store.recentSearches);
+const recentLookups = computed(() => store.recentLookups);
 
 // Stack state
 const hoveredIndex = ref(-1);
 
-const limitedSearches = computed(() => {
-  return recentSearches.value.slice(0, 20); // Limit to prevent performance issues
+const limitedLookups = computed(() => {
+  return recentLookups.value.slice(0, 20); // Limit to prevent performance issues
 });
 
-const searchWord = async (query: string) => {
-  store.searchQuery = query;
-  await store.searchWord(query);
+const lookupWord = async (word: string) => {
+  store.searchQuery = word;
+  await store.searchWord(word);
 };
 </script>
 

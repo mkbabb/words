@@ -3,6 +3,7 @@ import type {
   SynthesizedDictionaryEntry,
   SearchResult,
   ThesaurusEntry,
+  VocabularySuggestionsResponse,
 } from '@/types';
 
 const api = axios.create({
@@ -62,12 +63,29 @@ export const dictionaryApi = {
     return response.data;
   },
 
-  // Get search suggestions
-  async getSuggestions(prefix: string): Promise<string[]> {
-    const response = await api.get(`/suggestions`, {
+  // Get search autocomplete suggestions (for search bar)
+  async getSearchSuggestions(prefix: string): Promise<string[]> {
+    const response = await api.get(`/search`, {
       params: { q: prefix, limit: 10 },
     });
-    return response.data.suggestions || [];
+    return response.data.results?.map((r: SearchResult) => r.word) || [];
+  },
+
+  // Get vocabulary suggestions based on lookup history
+  async getVocabularySuggestions(words: string[]): Promise<VocabularySuggestionsResponse> {
+    // Use GET when no words (empty array), POST when words provided
+    if (!words || words.length === 0) {
+      const response = await api.get(`/suggestions`, {
+        params: { count: 10 }
+      });
+      return response.data;
+    } else {
+      const response = await api.post(`/suggestions`, {
+        words: words.slice(0, 10), // Take last 10 words max
+        count: 10
+      });
+      return response.data;
+    }
   },
 
   // Health check

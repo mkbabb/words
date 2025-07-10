@@ -1,0 +1,11 @@
+
+> floridify-frontend@0.1.0 dev
+> vite
+
+
+  VITE v7.0.3  ready in 222 ms
+
+  ➜  Local:   http://localhost:3000/
+  ➜  Network: http://10.154.12.132:3000/
+Sending Request: GET /api/v1/health
+Sending Request: GET /api/v1/health

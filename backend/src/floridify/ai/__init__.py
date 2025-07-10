@@ -5,6 +5,9 @@ from .factory import (
     create_ai_system,
     create_definition_synthesizer,
     create_openai_connector,
+    get_definition_synthesizer,
+    get_openai_connector,
+    reset_ai_singletons,
 )
 from .models import (
     AIGeneratedProviderData,
@@ -17,6 +20,9 @@ __all__ = [
     "create_ai_system",
     "create_definition_synthesizer",
     "create_openai_connector",
+    "get_definition_synthesizer",
+    "get_openai_connector",
+    "reset_ai_singletons",
     "DefinitionSynthesizer",
     "AIGeneratedProviderData",
     "SynthesisResponse",

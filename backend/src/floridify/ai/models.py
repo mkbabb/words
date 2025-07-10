@@ -135,6 +135,27 @@ class SynonymGenerationResponse(BaseModel):
     confidence: float = Field(description="Overall confidence in the synonym generation")
 
 
+class Suggestion(BaseModel):
+    """A single word suggestion."""
+    
+    word: str = Field(description="The suggested word")
+    reasoning: str = Field(description="Brief explanation of why this word is a good suggestion")
+    difficulty_level: int = Field(ge=1, le=5, description="Difficulty level from 1 (basic) to 5 (advanced)")
+    semantic_category: str = Field(description="Semantic category or theme")
+
+
+class SuggestionsResponse(BaseModel):
+    """Response for word suggestions based on input words."""
+    
+    suggestions: list[Suggestion] = Field(
+        description="List of word suggestions with explanations"
+    )
+    input_analysis: str = Field(
+        description="Brief analysis of the input words and suggestion rationale"
+    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Overall confidence in suggestions")
+
+
 class AIGeneratedProviderData(ProviderData):
     """AI fallback provider data with quality indicators."""
 

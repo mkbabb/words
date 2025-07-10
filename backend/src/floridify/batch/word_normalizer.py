@@ -12,7 +12,7 @@ import spacy
 from nltk.corpus import wordnet
 from nltk.stem import PorterStemmer, SnowballStemmer, WordNetLemmatizer
 from rich.console import Console
-from spacy import Language
+from spacy.language import Language
 
 console = Console()
 
@@ -129,7 +129,7 @@ class WordNormalizer:
             'V': wordnet.VERB,     # Verb
             'R': wordnet.ADV       # Adverb
         }
-        return tag_dict.get(tag, wordnet.NOUN)
+        return tag_dict.get(tag, wordnet.NOUN)  # type: ignore[no-any-return]
     
     def _basic_normalize(self, word: str) -> str:
         """Basic rule-based normalization for common patterns."""

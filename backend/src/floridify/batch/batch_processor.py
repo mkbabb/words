@@ -186,7 +186,8 @@ class BatchProcessor:
         for provider in self.config.providers:
             try:
                 provider_definitions = await provider.fetch_definition(word)
-                definitions.extend(provider_definitions)
+                if provider_definitions:
+                    definitions.extend(provider_definitions.definitions)
             except Exception as e:
                 console.print(f"[yellow]Warning: Provider {provider.__class__.__name__} failed for '{word}': {e}[/yellow]")
         

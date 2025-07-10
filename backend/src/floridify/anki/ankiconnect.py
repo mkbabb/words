@@ -93,7 +93,7 @@ class AnkiConnectInterface:
     
     def get_deck_names(self) -> list[str]:
         """Get all deck names from Anki."""
-        return self.invoke("deckNames")
+        return self.invoke("deckNames")  # type: ignore[no-any-return]
     
     def create_deck(self, deck_name: str) -> bool:
         """Create a new deck in Anki.
@@ -135,7 +135,7 @@ class AnkiConnectInterface:
         try:
             note_id = self.invoke("addNote", note=note_data)
             logger.debug(f"📝 Added note {note_id} to deck '{deck_name}'")
-            return note_id
+            return note_id  # type: ignore[no-any-return]
         except AnkiConnectError as e:
             # If duplicate, try to find and update existing note
             if "duplicate" in str(e).lower():
@@ -170,7 +170,7 @@ class AnkiConnectInterface:
                     self.invoke("updateNoteTags", note=note_id, tags=" ".join(tags))
                 
                 logger.debug(f"🔄 Updated existing note {note_id} in deck '{deck_name}'")
-                return note_id
+                return note_id  # type: ignore[no-any-return]
             else:
                 logger.warning(f"Could not find duplicate note to update in '{deck_name}'")
                 return None
@@ -220,7 +220,7 @@ class AnkiConnectInterface:
     
     def get_model_names(self) -> list[str]:
         """Get all note type/model names."""
-        return self.invoke("modelNames")
+        return self.invoke("modelNames")  # type: ignore[no-any-return]
     
     def create_model(self, model_name: str, fields: list[str], 
                     css: str, front_template: str, back_template: str) -> bool:

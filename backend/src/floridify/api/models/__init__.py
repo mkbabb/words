@@ -1,26 +1,26 @@
 """API models for requests and responses."""
 
-from .requests import LookupParams, SearchParams, SuggestionParams, SynonymParams
+from .requests import LookupParams, SearchParams, SuggestionsParams, SynonymParams
 from .responses import (
     HealthResponse,
     LookupResponse,
     SearchResponse,
     SearchResultItem,
-    SuggestionResponse,
+    SuggestionsAPIResponse,
     SynonymItem,
     SynonymResponse,
 )
 
 __all__ = [
+    "SuggestionsParams",
     "LookupParams",
     "SearchParams", 
-    "SuggestionParams",
     "SynonymParams",
+    "SuggestionsAPIResponse",
     "HealthResponse",
     "LookupResponse",
     "SearchResponse",
     "SearchResultItem",
-    "SuggestionResponse",
     "SynonymItem",
     "SynonymResponse",
 ]

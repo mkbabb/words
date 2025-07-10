@@ -198,7 +198,7 @@ class CachedHTTPClient:
             if hasattr(self._client, 'aclose'):
                 await self._client.aclose()
             elif hasattr(self._client, 'close'):
-                await self._client.close()
+                self._client.close()
         except Exception as e:
             logger.warning(f"Error closing HTTP client: {e}")
 

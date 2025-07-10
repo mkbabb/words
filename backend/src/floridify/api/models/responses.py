@@ -6,6 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from ...ai.models import Suggestion
 from ...models.models import Definition, Pronunciation
 from ...search.constants import SearchMethod
 
@@ -51,11 +52,11 @@ class SynonymResponse(BaseModel):
     synonyms: list[SynonymItem] = Field(default_factory=list, description="List of synonyms")
 
 
-class SuggestionResponse(BaseModel):
-    """Response for suggestion query."""
+class SuggestionsAPIResponse(BaseModel):
+    """Response for suggestions query."""
     
-    query: str = Field(..., description="Original partial query")
-    suggestions: list[str] = Field(default_factory=list, description="List of suggestions")
+    words: list[str] = Field(default_factory=list, description="Suggested words")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in suggestions")
 
 
 class HealthResponse(BaseModel):

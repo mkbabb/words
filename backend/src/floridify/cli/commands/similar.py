@@ -10,7 +10,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from ...ai import create_openai_connector
+from ...ai import get_openai_connector
 from ...ai.models import SynonymCandidate, SynonymGenerationResponse
 from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
@@ -88,8 +88,8 @@ async def _similar_async(
             word_type = entry.definitions[0].word_type
 
         # Generate synonyms using AI
-        ai_connector = create_openai_connector()
-        synonym_response = await ai_connector.generate_synonyms(
+        ai_connector = get_openai_connector()
+        synonym_response = await ai_connector.synonyms(
             word=word,
             definition=base_definition,
             word_type=word_type,

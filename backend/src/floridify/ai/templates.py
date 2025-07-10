@@ -95,9 +95,9 @@ class PromptTemplateManager:
         """Generate pronunciation prompt."""
         return self.render_template("pronunciation", word=word)
 
-    def get_fallback_prompt(self, word: str) -> str:
-        """Generate fallback provider prompt."""
-        return self.render_template("fallback_provider", word=word)
+    def get_lookup_prompt(self, word: str) -> str:
+        """Generate lookup fallback prompt."""
+        return self.render_template("lookup", word=word)
 
     def get_meaning_extraction_prompt(
         self, word: str, definitions: list[tuple[str, str, str]]
@@ -109,14 +109,24 @@ class PromptTemplateManager:
             definitions=definitions,
         )
     
-    def get_synonym_generation_prompt(
+    def get_synonyms_prompt(
         self, word: str, definition: str, word_type: str, count: int = 10
     ) -> str:
-        """Generate prompt for synonym generation with balanced expressiveness."""
+        """Generate prompt for synonyms with balanced expressiveness."""
         return self.render_template(
-            "synonym_generation",
+            "synonyms",
             word=word,
             definition=definition,
             word_type=word_type,
+            count=count,
+        )
+
+    def get_suggestions_prompt(
+        self, input_words: list[str] | None, count: int = 10
+    ) -> str:
+        """Generate prompt for word suggestions based on input words."""
+        return self.render_template(
+            "suggestions",
+            input_words=input_words,
             count=count,
         )

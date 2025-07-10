@@ -115,7 +115,7 @@ class CacheManager:
             entry = self._memory_cache[cache_key]
             if not entry.is_expired:
                 logger.debug(f"💨 Memory cache hit: {cache_key}")
-                return entry.value
+                return entry.value  # type: ignore[no-any-return]
             else:
                 # Remove expired entry
                 del self._memory_cache[cache_key]
@@ -134,7 +134,7 @@ class CacheManager:
                         # Promote to memory cache
                         self._memory_cache[cache_key] = entry
                         self._cleanup_memory_cache()
-                        return entry.value
+                        return entry.value  # type: ignore[no-any-return]
                     else:
                         # Remove expired file
                         file_path.unlink()

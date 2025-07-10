@@ -231,7 +231,7 @@ async def _update_async(name: str, input_file: Path) -> None:
         for wf in word_list.words
         if wf.text.lower() in [w.lower() for w in parsed.words]
     ]
-    await _process_words_batch(new_words_to_process, "wiktionary", "en", False, False)
+    await _process_words_batch(new_words_to_process)
 
     await word_list.save()
 

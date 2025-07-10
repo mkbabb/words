@@ -8,7 +8,7 @@ from pathlib import Path
 import click
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from ...ai.factory import create_openai_connector
+from ...ai.factory import get_openai_connector
 from ...anki.constants import CardType
 from ...anki.generator import AnkiCardGenerator
 from ...constants import DictionaryProvider, Language
@@ -145,12 +145,12 @@ async def _export_async(
 
     # Initialize AI connector and card generator
     try:
-        openai_connector = create_openai_connector()
+        openai_connector = get_openai_connector()
         card_generator = AnkiCardGenerator(openai_connector)
 
         # First pass: normalize words and build frequency map
         console.print("🔍 Normalizing words and building frequency map...")
-        from ...core.search_manager import get_search_engine
+        from ...core.search_pipeline import get_search_engine
         from ...utils.text_utils import normalize_word
         
         search_engine = await get_search_engine(

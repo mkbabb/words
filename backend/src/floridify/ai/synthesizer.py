@@ -106,12 +106,12 @@ class DefinitionSynthesizer:
             
         return entry
 
-    async def generate_fallback_entry(self, word: str, force_refresh: bool = False) -> SynthesizedDictionaryEntry:
+    async def generate_fallback_entry(self, word: str, force_refresh: bool = False) -> SynthesizedDictionaryEntry | None:
         """Generate a complete fallback entry using AI."""
         logger.info(f"🔮 Starting AI fallback generation for '{word}'")
 
         # Generate fallback provider data
-        dictionary_entry = await self.ai.generate_fallback_entry(word)
+        dictionary_entry = await self.ai.lookup_fallback(word)
 
         if dictionary_entry is None or dictionary_entry.provider_data is None:
             logger.info(f"🚫 No valid definitions generated for '{word}'")
@@ -128,7 +128,7 @@ class DefinitionSynthesizer:
         definitions: list[Definition] = []
         for definition in dictionary_entry.provider_data.definitions:
             # Generate examples for fallback using configured count
-            examples_response = await self.ai.generate_example(
+            examples_response = await self.ai.examples(
                 word=word,
                 word_type=definition.word_type,
                 definition=definition.definition,
@@ -227,7 +227,7 @@ class DefinitionSynthesizer:
                     word_type = synthesized_def.word_type
 
                     # Generate examples using configured count
-                    example_response = await self.ai.generate_example(
+                    example_response = await self.ai.examples(
                         word=word,
                         word_type=word_type,
                         definition=synthesized_def.definition,
@@ -330,7 +330,7 @@ class DefinitionSynthesizer:
     async def _synthesize_pronunciation(self, word: str) -> Pronunciation:
         """Synthesize pronunciation from providers_data or generate with AI."""
         try:
-            pronunciation_response = await self.ai.generate_pronunciation(word)
+            pronunciation_response = await self.ai.pronunciation(word)
             return Pronunciation(
                 phonetic=pronunciation_response.phonetic,
                 ipa=pronunciation_response.ipa,
