@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .middleware import LoggingMiddleware
-from .routers import health, lookup, search, suggestions, synonyms
+from .routers import health, lookup, search, suggestions, synonyms, legendre
 
 # Create FastAPI application
 app = FastAPI(
@@ -31,3 +31,4 @@ app.include_router(search.router, prefix="/api/v1", tags=["search"])
 app.include_router(synonyms.router, prefix="/api/v1", tags=["synonyms"])
 app.include_router(suggestions.router, prefix="/api/v1", tags=["suggestions"])
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
+app.include_router(legendre.router, prefix="/api/v1", tags=["legendre"])

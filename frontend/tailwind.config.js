@@ -1,7 +1,5 @@
-import type { Config } from "tailwindcss";
-import animatePlugin from "tailwindcss-animate";
-
-const config: Config = {
+/** @type {import('tailwindcss').Config} */
+export default {
   content: ["./index.html", "./src/**/*.{vue,js,ts,jsx,tsx}"],
   darkMode: "selector",
   theme: {
@@ -109,7 +107,5 @@ const config: Config = {
       },
     },
   },
-  plugins: [animatePlugin],
+  plugins: [require('tailwindcss-animate')],
 };
-
-export default config;

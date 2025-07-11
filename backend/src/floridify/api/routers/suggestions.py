@@ -51,7 +51,7 @@ async def _cached_suggestions(params: SuggestionsParams) -> SuggestionsAPIRespon
         )
         
         return SuggestionsAPIResponse(
-            words=[suggestion.word for suggestion in ai_response.suggestions],
+            words=[suggestion.word.lower() for suggestion in ai_response.suggestions],
             confidence=ai_response.confidence,
         )
         

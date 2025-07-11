@@ -50,7 +50,12 @@ dependencies = [
     # REST API framework
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
+    "python-multipart>=0.0.13",
     "nltk>=3.9.1",
+    # Image processing and scientific computing for Legendre
+    "pillow>=10.0.0",
+    "scipy>=1.11.0",
+    "matplotlib>=3.8.0",
 ]
 
 

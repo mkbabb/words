@@ -113,6 +113,7 @@
                 </div>
               </div>
             </div>
+
             
             <!-- Recent Lookups -->
             <div v-if="!sidebarCollapsed" class="mb-4">

@@ -59,9 +59,13 @@ sleep 1
 # Start backend with UV
 echo "Starting backend with UV..."
 if command -v uv &>/dev/null; then
-    uv run ./backend/scripts/run_api.py &
+    cd ./backend
+    # Clear any conflicting virtual environment
+    unset VIRTUAL_ENV
+    uv run ./scripts/run_api.py &
     BACKEND_PID=$!
     echo "Backend started with PID $BACKEND_PID"
+    cd "$ROOT_DIR"
 else
     echo "Error: UV not found. Please install UV or add it to your PATH."
     exit 1

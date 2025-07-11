@@ -42,6 +42,47 @@ api.interceptors.response.use(
   }
 );
 
+export interface LegendrePolynomial {
+  degree: number;
+  x: number[];
+  y: number[];
+}
+
+export interface LegendreSeriesResult {
+  coefficients: number[];
+  approximated_values: number[];
+  n_harmonics: number;
+  mse: number;
+}
+
+export const legendreApi = {
+  async getPolynomialData(maxDegree: number): Promise<{ polynomials: LegendrePolynomial[] }> {
+    const response = await api.get(`/legendre/polynomials/${maxDegree}`);
+    return response.data;
+  },
+
+  async computeSeries(samples: number[], nHarmonics: number): Promise<LegendreSeriesResult> {
+    const response = await api.post('/legendre/series', {
+      samples,
+      n_harmonics: nHarmonics
+    });
+    return response.data;
+  },
+
+  async processImage(file: File, encoding: string, nHarmonics: number, visualization: string): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('encoding_method', encoding);
+    formData.append('n_harmonics', nHarmonics.toString());
+    formData.append('visualization_method', visualization);
+
+    const response = await api.post('/legendre/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  }
+};
+
 export const dictionaryApi = {
   // Search for words
   async searchWord(query: string): Promise<SearchResult[]> {

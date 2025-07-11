@@ -286,10 +286,9 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // Initialize vocabulary suggestions on store creation
-  function initializeVocabularySuggestions() {
-    if (lookupHistory.value.length > 1) {
-      refreshVocabularySuggestions();
-    }
+  async function initializeVocabularySuggestions() {
+    // Always try to get suggestions, even with empty history
+    await refreshVocabularySuggestions();
   }
 
   // Call initialization when store is created

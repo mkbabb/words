@@ -8,4 +8,4 @@ Suggest {{ count }} sophisticated words, florid, and contextually relevant vocab
 
 Analyze their semantic themes and complexity, then provide florid vocabulary that builds contextually on their demonstrated interests.
 
-Return structured JSON with exactly {{ count }} suggestions.
+Return structured JSON with exactly {{ count }} suggestions. All word suggestions must be in lowercase.

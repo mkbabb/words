@@ -11,65 +11,89 @@
       }
     )"
   >
-    <!-- Landing Page View -->
-    <div
-      v-if="!hasSearched"
-      class="flex items-center justify-center min-h-screen p-8"
-    >
-      <div class="w-full max-w-4xl">
-        <SearchBar />
-      </div>
-    </div>
-
-    <!-- Results View -->
-    <div
-      v-else
-      class="min-h-screen"
-    >
-      <!-- Fixed Search Bar -->
-      <div 
-        class="sticky top-0 z-40 bg-background/95 backdrop-blur-3xl border-b transition-all duration-300 ease-in-out"
-      >
-        <div class="container mx-auto px-4 py-4">
-          <SearchBar />
-        </div>
-      </div>
-
-      <!-- Main Content -->
-      <div class="container mx-auto px-4 py-8">
-        <div class="max-w-4xl mx-auto">
-          <!-- Loading State -->
-          <div v-if="isSearching" class="space-y-8">
-            <DefinitionSkeleton />
-          </div>
-
-          <!-- Definition Display -->
-          <div v-else-if="currentEntry" class="space-y-8">
-            <!-- Theme Selector for Testing -->
-            <div class="flex gap-2 mb-4 justify-center">
-              <button 
-                v-for="variant in (['default', 'gold', 'silver', 'bronze'] as const)" 
-                :key="variant"
-                @click="selectedVariant = variant"
-                :class="[
-                  'px-3 py-1 rounded text-sm border',
-                  selectedVariant === variant 
-                    ? 'bg-primary text-primary-foreground border-primary' 
-                    : 'bg-secondary text-secondary-foreground border-border hover:bg-accent'
-                ]"
-              >
-                {{ variant.charAt(0).toUpperCase() + variant.slice(1) }}
-              </button>
+    <!-- Main View -->
+    <div class="min-h-screen">
+      <Tabs v-model="activeTab" class="w-full">
+        <!-- Fixed Header with Tabs and Search -->
+        <div class="sticky top-0 z-40 bg-background/95 backdrop-blur-3xl border-b">
+          <div class="container mx-auto px-4 py-4">
+            <div class="max-w-5xl mx-auto space-y-4">
+              <!-- Header with Author Card -->
+              <div class="flex justify-between items-center">
+                <div class="flex-1" />
+                <div class="flex-1 flex justify-center">
+                  <TabsList>
+                    <TabsTrigger value="definition" style="font-family: 'Fraunces', serif;">Dictionary</TabsTrigger>
+                    <TabsTrigger value="visualizer" style="font-family: 'Fraunces', serif;">Visualizer</TabsTrigger>
+                  </TabsList>
+                </div>
+                <div class="flex-1 flex justify-end">
+                  <HoverCard :open-delay="0">
+                    <HoverCardTrigger>
+                      <Button variant="link" class="p-0 h-auto font-mono text-sm">@mbabb</Button>
+                    </HoverCardTrigger>
+                    <HoverCardContent>
+                      <div class="flex gap-4">
+                        <Avatar>
+                          <AvatarImage src="https://avatars.githubusercontent.com/u/2848617?v=4" />
+                        </Avatar>
+                        <div>
+                          <h4 class="text-sm font-semibold hover:underline">
+                            <a href="https://github.com/mkbabb" class="font-mono">@mbabb</a>
+                          </h4>
+                          <p class="text-sm text-muted-foreground">
+                            Legendre polynomial visualization and dictionary system
+                          </p>
+                        </div>
+                      </div>
+                    </HoverCardContent>
+                  </HoverCard>
+                </div>
+              </div>
+              
+              <!-- Search Bar -->
+              <div class="search-container">
+                <SearchBar />
+              </div>
             </div>
-            <DefinitionDisplay :variant="selectedVariant" />
-          </div>
-
-          <!-- Empty State -->
-          <div v-else class="text-center py-16">
-            <p class="text-muted-foreground text-lg">Start typing to search for a word</p>
           </div>
         </div>
-      </div>
+
+        <!-- Content Area -->
+        <div class="container mx-auto px-4 py-8">
+          <div class="max-w-5xl mx-auto">
+            <!-- Definition Tab Content -->
+            <TabsContent value="definition">
+              <!-- Loading State -->
+              <div v-if="isSearching" class="space-y-8">
+                <DefinitionSkeleton />
+              </div>
+
+              <!-- Definition Display -->
+              <div v-else-if="currentEntry" class="space-y-8">
+                <DefinitionDisplay variant="default" />
+              </div>
+
+              <!-- Empty State -->
+              <div v-else class="text-center py-16">
+                <!-- Empty state - no text -->
+              </div>
+            </TabsContent>
+
+            <!-- Visualizer Tab Content -->
+            <TabsContent value="visualizer">
+              <div class="space-y-6">
+                <div>
+                  <h2 class="text-3xl font-bold tracking-tight" style="font-family: 'Fraunces', serif;">Legendre Polynomial System</h2>
+                  <p class="text-muted-foreground/70 mt-2 italic dark:text-muted-foreground/50" style="font-family: 'Fraunces', serif;">Interactive visualization and series approximation using Legendre polynomials</p>
+                </div>
+                
+                <LegendreVisualization />
+              </div>
+            </TabsContent>
+          </div>
+        </div>
+      </Tabs>
     </div>
   </div>
 </template>
@@ -82,17 +106,29 @@ import SearchBar from '@/components/SearchBar.vue';
 import DefinitionDisplay from '@/components/DefinitionDisplay.vue';
 import DefinitionSkeleton from '@/components/DefinitionSkeleton.vue';
 import Sidebar from '@/components/Sidebar.vue';
+import LegendreVisualization from '@/components/LegendreVisualization.vue';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import HoverCard from '@/components/ui/HoverCard.vue';
+import HoverCardTrigger from '@/components/ui/HoverCardTrigger.vue';
+import HoverCardContent from '@/components/ui/HoverCardContent.vue';
+import Avatar from '@/components/ui/Avatar.vue';
+import AvatarImage from '@/components/ui/AvatarImage.vue';
+import Button from '@/components/ui/Button.vue';
 
 const store = useAppStore();
-const selectedVariant = ref<'default' | 'gold' | 'silver' | 'bronze'>('default');
+const activeTab = ref<'definition' | 'visualizer'>('definition');
 
-onMounted(() => {
+onMounted(async () => {
   console.log('Home component mounted');
   console.log('Has searched:', store.hasSearched);
   console.log('Search results:', store.searchResults);
+  
+  // Ensure vocabulary suggestions are loaded
+  if (store.vocabularySuggestions.length === 0) {
+    await store.refreshVocabularySuggestions();
+  }
 });
 
-const hasSearched = computed(() => store.hasSearched);
 const isSearching = computed(() => store.isSearching);
 const currentEntry = computed(() => store.currentEntry);
 
