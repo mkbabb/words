@@ -278,3 +278,39 @@ class ImageComplexEncoder:
         buffer = BytesIO()
         img.save(buffer, format='PNG')
         return buffer.getvalue()
+
+
+class ImageToComplexArrayProcessor:
+    """API-compatible wrapper for image processing that bridges the expected interface."""
+    
+    def __init__(self, n_points: int = 1000):
+        self.encoder = ImageComplexEncoder(n_points)
+    
+    def image_to_complex_1d(self, image_data: bytes, method: str = "luminance") -> NDArray[np.complex128]:
+        """Convert image to complex array using specified encoding method."""
+        # Map API encoding methods to actual implementation methods
+        method_mapping = {
+            "luminance": "hilbert",  # Use Hilbert transform for luminance
+            "hilbert": "hilbert",
+            "rgb_complex": "auto",  # Use auto path-based method for RGB
+            "edge": "edge",
+            "contour": "contour", 
+            "vector": "vector",
+            "auto": "auto"
+        }
+        
+        actual_method = method_mapping.get(method, "auto")
+        
+        if actual_method == "hilbert":
+            return self.encoder.encode_with_hilbert(image_data)
+        else:
+            return self.encoder.encode(image_data, actual_method)
+    
+    def complex_1d_to_image(self, complex_arr: NDArray[np.complex128], 
+                           width: int, height: int, 
+                           method: str = "magnitude") -> bytes:
+        """Convert complex array back to image using specified visualization method."""
+        # For now, only magnitude visualization is implemented
+        # Future: could add phase, real, imaginary visualizations based on method parameter
+        _ = method  # Acknowledge parameter for future use
+        return self.encoder.decode_to_image(complex_arr, width, height)

@@ -1,16 +1,16 @@
 <template>
   <!-- Main Container (UI Layer - No Filter) -->
-  <div :class="cn('relative w-full max-w-lg mx-auto z-50', className)">
+  <div :class="cn('relative z-50 mx-auto w-full max-w-lg', className)">
     <!-- Search Bar UI -->
     <div
-      class="card-shadow rounded-2xl bg-background border border-border relative overflow-visible"
+      class="card-shadow bg-background border-border relative overflow-visible rounded-2xl border"
     >
       <!-- Search Input Area -->
       <div class="p-4">
         <div class="flex items-center justify-center gap-3">
           <!-- Dictionary/Thesaurus Toggle -->
           <div
-            class="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl cursor-pointer transition-all duration-300 ease-out hover:scale-110 active:scale-95 flex items-center justify-center w-12 h-12"
+            class="from-primary/10 to-primary/5 flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl bg-gradient-to-br transition-all duration-300 ease-out hover:scale-110 active:scale-95"
             @click="store.toggleMode()"
             :title="
               mode === 'dictionary'
@@ -24,7 +24,7 @@
           <!-- Search Input -->
           <div class="relative flex-1">
             <div
-              class="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none z-20"
+              class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 z-20 -translate-y-1/2 transform"
             >
               <Search :size="20" />
             </div>
@@ -34,7 +34,7 @@
               v-model="query"
               :placeholder="placeholder"
               autofocus
-              class="flex w-full rounded-xl bg-background px-3 py-3 text-base shadow-sm transition-all duration-200 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pl-10 pr-4 bg-muted/30 focus:bg-background h-auto"
+              class="bg-background placeholder:text-muted-foreground focus-visible:ring-ring bg-muted/30 focus:bg-background flex h-auto w-full rounded-xl px-3 py-3 pr-4 pl-10 text-base shadow-sm transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               @keydown.enter="handleEnter"
               @keydown.down.prevent="navigateResults(1)"
               @keydown.up.prevent="navigateResults(-1)"
@@ -45,17 +45,17 @@
       </div>
 
       <!-- AI Suggestions (inside card) -->
-      <div v-if="!query && aiSuggestions.length > 0" class="pb-2 px-4">
+      <div v-if="!query && aiSuggestions.length > 0" class="px-4 pb-2">
         <hr class="border-border/50 p-2" />
 
-        <div class="flex flex-wrap gap-2 justify-center items-center">
+        <div class="flex flex-wrap items-center justify-center gap-2">
           <Sparkles />
           <Button
             v-for="word in aiSuggestions"
             :key="word"
             variant="outline"
             size="sm"
-            class="rounded-xl text-xs hover:opacity-80 hover:font-semibold transition-all duration-200"
+            class="rounded-xl text-xs transition-all duration-200 hover:font-semibold hover:opacity-80"
             @click="selectWord(word)"
           >
             {{ word }}
@@ -74,10 +74,10 @@
       >
         <div
           v-if="store.loadingProgress > 0"
-          class="absolute left-0 right-0 -bottom-2"
+          class="absolute right-0 -bottom-2 left-0"
         >
           <div
-            class="h-[3px] bg-gradient-to-r from-purple-600/80 via-purple-500/70 to-purple-600/80 rounded-full"
+            class="h-[3px] rounded-full bg-gradient-to-r from-purple-600/80 via-purple-500/70 to-purple-600/80"
             :style="{
               width: `${store.loadingProgress}%`,
               boxShadow: '0 0 12px rgba(147, 51, 234, 0.4)',
@@ -90,20 +90,20 @@
 
     <!-- Search Results Dropdown -->
     <div class="relative">
-      <div class="absolute left-0 right-0 top-full mt-2">
+      <div class="absolute top-full right-0 left-0 mt-2 bg-background">
         <div
           ref="searchResultsDropdown"
           v-if="showDropdown"
-          class="card-shadow rounded-2xl bg-background border border-border overflow-hidden"
+          class="card-shadow bg-background border-border overflow-hidden rounded-2xl border"
         >
           <!-- Loading -->
           <div v-if="isSearching && searchResults.length === 0" class="p-4">
-            <div class="flex items-center gap-2 text-muted-foreground">
+            <div class="text-muted-foreground flex items-center gap-2">
               <div class="flex gap-1">
                 <span
                   v-for="i in 3"
                   :key="i"
-                  class="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
+                  class="bg-primary/60 h-2 w-2 animate-bounce rounded-full"
                   :style="{ animationDelay: `${(i - 1) * 150}ms` }"
                 />
               </div>
@@ -120,8 +120,8 @@
               v-for="(result, index) in searchResults"
               :key="result.word"
               :class="
-                cn('px-4 py-3 cursor-pointer transition-all duration-200', {
-                  'bg-accent dark:bg-accent/80 border-l-6 border-primary pl-6 font-bold':
+                cn('cursor-pointer px-4 py-3 transition-all duration-200', {
+                  'bg-accent dark:bg-accent/80 border-primary border-l-6 pl-6 font-bold':
                     index === selectedIndex,
                   'hover:bg-muted/50 border-l-4 border-transparent':
                     index !== selectedIndex,
@@ -134,7 +134,7 @@
                 <span
                   :class="
                     cn('transition-all duration-200', {
-                      'font-bold text-primary/90 translate-x-1':
+                      'text-primary/90 translate-x-1 font-bold':
                         index === selectedIndex,
                       'font-medium': index !== selectedIndex,
                     })
@@ -142,10 +142,10 @@
                   >{{ result.word }}</span
                 >
                 <div class="flex items-center gap-2">
-                  <span class="text-xs text-muted-foreground">{{
+                  <span class="text-muted-foreground text-xs">{{
                     result.method
                   }}</span>
-                  <span class="text-xs font-medium text-primary"
+                  <span class="text-primary text-xs font-medium"
                     >{{ Math.round(result.score * 100) }}%</span
                   >
                 </div>
@@ -156,7 +156,7 @@
           <!-- No Results -->
           <div
             v-else-if="!isSearching && query.length >= 2"
-            class="p-4 text-center text-muted-foreground text-sm"
+            class="text-muted-foreground p-4 text-center text-sm"
           >
             No matches found
           </div>
@@ -222,8 +222,7 @@ onMounted(async () => {
   });
 });
 
-// Watch query - SEARCH ON EVERY KEYSTROKE
-watch(query, async (newQuery) => {
+watch(query, async newQuery => {
   clearTimeout(searchTimer);
   clearTimeout(lookupTimer);
 
@@ -233,6 +232,7 @@ watch(query, async (newQuery) => {
   // Reset if empty
   if (!newQuery || newQuery.length < 2) {
     searchResults.value = [];
+
     if (showDropdown.value) {
       animateSearchResultsOut();
       setTimeout(() => {
@@ -297,7 +297,7 @@ const selectResult = async (result: SearchResult) => {
 // Select word from suggestions
 const selectWord = (word: string) => {
   query.value = word;
-  // Let watch handle the search
+  handleEnter();
 };
 
 // Navigate results with keyboard
@@ -350,7 +350,7 @@ const animateSearchResultsOut = () => {
 
 // Click outside to close
 onMounted(() => {
-  document.addEventListener('click', (e) => {
+  document.addEventListener('click', e => {
     const target = e.target as HTMLElement;
     if (!target.closest('.max-w-lg')) {
       closeDropdown();

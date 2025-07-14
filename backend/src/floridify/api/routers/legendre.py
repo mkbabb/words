@@ -17,7 +17,16 @@ from ..models.legendre import (
     LegendreSeriesResponse,
     LegendreImageRequest,
     LegendreImageResponse,
+    FourierSeriesRequest,
+    FourierSeriesResponse,
+    UnifiedSeriesRequest,
+    UnifiedSeriesResponse,
 )
+from ..models.visualization import (
+    VisualizationRequest,
+    VisualizationResponse,
+)
+from ...legendre.visualizer import SeriesVisualizer
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -180,3 +189,131 @@ async def get_polynomial_data(max_degree: int) -> dict[str, Any]:
     except Exception as e:
         logger.error(f"Error getting polynomial data: {e}")
         raise HTTPException(500, f"Error: {str(e)}")
+
+
+@router.post("/fourier/series", response_model=FourierSeriesResponse)
+async def compute_fourier_series(request: FourierSeriesRequest) -> FourierSeriesResponse:
+    """Compute Fourier series approximation for complex samples.
+    
+    Approximates the input samples using a Fourier series with the specified
+    number of coefficients. Returns coefficients and approximated values.
+    """
+    try:
+        # Convert to numpy array
+        samples = np.array(request.samples, dtype=complex)
+        
+        # Create approximator and compute coefficients
+        approximator = UnifiedApproximator(max_degree=request.n_coeffs)
+        fit_result = approximator.fit(samples, request.n_coeffs, method="fourier")
+        
+        # Evaluate approximation at sample points
+        x_eval = np.linspace(-1, 1, len(samples))
+        approx_values = approximator.evaluate(fit_result, x_eval)
+        
+        # Compute mean squared error
+        mse = float(np.mean(np.abs(samples - approx_values)**2))
+        
+        return FourierSeriesResponse(
+            coefficients=fit_result["coefficients"].tolist(),
+            approximated_values=approx_values.tolist(),
+            n_coeffs=request.n_coeffs,
+            mse=mse
+        )
+    except Exception as e:
+        logger.error(f"Error computing Fourier series: {e}")
+        raise HTTPException(500, f"Computation error: {str(e)}")
+
+
+@router.post("/series/unified", response_model=UnifiedSeriesResponse)
+async def compute_unified_series(request: UnifiedSeriesRequest) -> UnifiedSeriesResponse:
+    """Compute unified series approximation supporting both Fourier and Legendre methods.
+    
+    This endpoint provides basis function data for animation purposes and supports
+    both approximation methods with their respective options.
+    """
+    try:
+        # Convert to numpy array
+        samples = np.array(request.samples, dtype=complex)
+        
+        # Create approximator and compute coefficients
+        approximator = UnifiedApproximator(max_degree=request.n_coeffs)
+        fit_result = approximator.fit(
+            samples, 
+            request.n_coeffs, 
+            method=request.method,
+            type=request.type if request.method == "legendre" else "fft"
+        )
+        
+        # Evaluate approximation at sample points
+        x_eval = np.linspace(-1, 1, len(samples))
+        approx_values = approximator.evaluate(fit_result, x_eval)
+        
+        # Generate basis function data for animation
+        basis_data = []
+        x_basis = np.linspace(-1, 1, 100)  # High resolution for smooth animation
+        
+        for n in range(request.n_coeffs):  # Use all requested coefficients
+            basis_func = approximator.get_basis_function(n, fit_result["basis"])
+            basis_values = basis_func(x_basis)
+            
+            # For Fourier, include magnitude and phase data for epicycle animation
+            if request.method == "fourier":
+                coeff = fit_result["coefficients"][n]
+                basis_data.append({
+                    "index": n,
+                    "coefficient": str(complex(coeff)),
+                    "magnitude": float(np.abs(coeff)),
+                    "phase": float(np.angle(coeff)),
+                    "frequency": n,
+                    "x": x_basis.tolist(),
+                    "values": [str(complex(v)) for v in basis_values]
+                })
+            else:  # Legendre
+                coeff = fit_result["coefficients"][n]
+                basis_data.append({
+                    "index": n,
+                    "coefficient": str(complex(coeff)),
+                    "degree": n,
+                    "x": x_basis.tolist(),
+                    "values": [str(complex(v)) for v in basis_values]
+                })
+        
+        # Compute mean squared error
+        mse = float(np.mean(np.abs(samples - approx_values)**2))
+        
+        return UnifiedSeriesResponse(
+            coefficients=[str(complex(c)) for c in fit_result["coefficients"]],
+            approximated_values=[str(complex(v)) for v in approx_values],
+            n_coeffs=request.n_coeffs,
+            method=request.method,
+            type=fit_result["type"],
+            basis_data=basis_data,
+            mse=mse
+        )
+    except Exception as e:
+        logger.error(f"Error computing unified series: {e}")
+        raise HTTPException(500, f"Computation error: {str(e)}")
+
+
+@router.post("/visualization/series", response_model=VisualizationResponse)
+async def compute_series_visualization(request: VisualizationRequest) -> VisualizationResponse:
+    """Compute series visualization data optimized for animation.
+    
+    This endpoint provides clean, efficient data specifically designed for
+    frontend visualization with proper complex number serialization.
+    """
+    try:
+        # Convert string samples to complex
+        samples = np.array([complex(s) for s in request.samples])
+        
+        # Create visualizer and compute
+        visualizer = SeriesVisualizer(max_terms=request.n_terms)
+        result = visualizer.compute_visualization(
+            samples, request.method, request.n_terms, request.resolution
+        )
+        
+        return VisualizationResponse(**result)
+        
+    except Exception as e:
+        logger.error(f"Error computing visualization: {e}")
+        raise HTTPException(500, f"Visualization error: {str(e)}")

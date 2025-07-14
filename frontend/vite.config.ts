@@ -1,18 +1,16 @@
-import { defineConfig } from "vite";
-import path from "path";
-import vue from "@vitejs/plugin-vue";
+import { defineConfig } from 'vite';
+import path from 'path';
+import vue from '@vitejs/plugin-vue';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: "/",
+  base: '/',
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      '@': path.resolve(__dirname, './src'),
     },
   },
-  plugins: [
-    vue(),
-  ],
+  plugins: [vue()],
   server: {
     port: 3000,
     host: true, // Listen on all local IPs
@@ -22,8 +20,8 @@ export default defineConfig({
       overlay: true,
     },
     proxy: {
-      "/api": {
-        target: "http://localhost:8000",
+      '/api': {
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
         ws: true, // Proxy websockets
@@ -35,7 +33,7 @@ export default defineConfig({
           proxy.on('proxyReq', (proxyReq, req, res) => {
             console.log('Sending Request:', req.method, req.url);
           });
-        }
+        },
       },
     },
   },

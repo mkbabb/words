@@ -1,10 +1,23 @@
 <template>
-  <ThemedCard v-if="entry" :variant="props.variant" class="space-y-6">
+  <ThemedCard v-if="entry" :variant="selectedVariant" class="space-y-6">
     <!-- Header Section -->
     <CardHeader>
       <div class="flex items-center justify-between">
         <CardTitle class="text-word-title">{{ entry.word }}</CardTitle>
-       
+        <!-- Tabs section for to select the card variant: either gold, silver, bronze -->
+        <Tabs 
+          :default-value="selectedVariant" 
+          :model-value="selectedVariant"
+          @update:model-value="handleVariantChange"
+          class="w-auto"
+        >
+          <TabsList class="grid w-full grid-cols-4">
+            <TabsTrigger value="default" class="text-xs">Default</TabsTrigger>
+            <TabsTrigger value="bronze" class="text-xs">Bronze</TabsTrigger>
+            <TabsTrigger value="silver" class="text-xs">Silver</TabsTrigger>
+            <TabsTrigger value="gold" class="text-xs">Gold</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       <!-- Pronunciation -->
@@ -106,13 +119,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useAppStore } from '@/stores';
 import { cn, getHeatmapClass } from '@/utils';
 import Button from '@/components/ui/Button.vue';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import Badge from '@/components/ui/Badge.vue';
 import ThemedCard from '@/components/ui/ThemedCard.vue';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type CardVariant = 'default' | 'gold' | 'silver' | 'bronze';
 
@@ -126,17 +140,20 @@ const props = withDefaults(defineProps<DefinitionDisplayProps>(), {
 
 const store = useAppStore();
 
+// Local state for the selected variant
+const selectedVariant = ref<CardVariant>(props.variant);
+
 const entry = computed(() => store.currentEntry);
 const thesaurusData = computed(() => store.currentThesaurus);
 const mode = computed(() => store.mode);
 const pronunciationMode = computed(() => store.pronunciationMode);
 
-const toggleMode = () => {
-  store.toggleMode();
-};
-
 const togglePronunciation = () => {
   store.togglePronunciation();
+};
+
+const handleVariantChange = (value: string | number) => {
+  selectedVariant.value = value as CardVariant;
 };
 
 // const formatExample = (example: string, word: string): string => {

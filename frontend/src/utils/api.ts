@@ -55,6 +55,76 @@ export interface LegendreSeriesResult {
   mse: number;
 }
 
+export interface FourierSeriesResult {
+  coefficients: string[];
+  approximated_values: string[];
+  n_coeffs: number;
+  mse: number;
+}
+
+export interface BasisData {
+  index: number;
+  coefficient: string;
+  magnitude?: number;
+  phase?: number;
+  frequency?: number;
+  degree?: number;
+  x: number[];
+  values: string[];
+}
+
+export interface UnifiedSeriesResult {
+  coefficients: string[];
+  approximated_values: string[];
+  n_coeffs: number;
+  method: string;
+  type: string | null;
+  basis_data: BasisData[];
+  mse: number;
+}
+
+// Helper function to convert complex object to string
+export const complexToString = (c: { real: number; imag: number }): string => {
+  if (c.imag === 0) return c.real.toString();
+  if (c.real === 0) return c.imag === 1 ? 'j' : c.imag === -1 ? '-j' : `${c.imag}j`;
+  const imagPart = c.imag === 1 ? '+j' : c.imag === -1 ? '-j' : c.imag > 0 ? `+${c.imag}j` : `${c.imag}j`;
+  return `${c.real}${imagPart}`;
+};
+
+// Helper function to parse complex string to object
+export const parseComplex = (s: string): { real: number; imag: number } => {
+  if (s === 'j') return { real: 0, imag: 1 };
+  if (s === '-j') return { real: 0, imag: -1 };
+  
+  // Handle pure real numbers
+  if (!s.includes('j')) return { real: parseFloat(s), imag: 0 };
+  
+  // Handle pure imaginary numbers
+  if (s.startsWith('j')) return { real: 0, imag: 1 };
+  if (s === '-j') return { real: 0, imag: -1 };
+  if (s.endsWith('j') && !s.includes('+') && !s.includes('-', 1)) {
+    const imagStr = s.slice(0, -1);
+    return { real: 0, imag: parseFloat(imagStr || '1') };
+  }
+  
+  // Handle complex numbers like "1+2j" or "1-2j"
+  const match = s.match(/^([+-]?\d*\.?\d*)\s*([+-])\s*(\d*\.?\d*)j$/);
+  if (match) {
+    const real = parseFloat(match[1] || '0');
+    const imagSign = match[2] === '+' ? 1 : -1;
+    const imagMag = parseFloat(match[3] || '1');
+    return { real, imag: imagSign * imagMag };
+  }
+  
+  // Fallback: try native complex parsing
+  try {
+    const complex = new Function('return ' + s.replace('j', '*1j'))();
+    return { real: complex.real || 0, imag: complex.imag || 0 };
+  } catch {
+    return { real: 0, imag: 0 };
+  }
+};
+
 export const legendreApi = {
   async getPolynomialData(maxDegree: number): Promise<{ polynomials: LegendrePolynomial[] }> {
     const response = await api.get(`/legendre/polynomials/${maxDegree}`);
@@ -78,6 +148,82 @@ export const legendreApi = {
 
     const response = await api.post('/legendre/image', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  }
+};
+
+export const fourierApi = {
+  async computeSeries(samples: Array<{ real: number; imag: number }>, nCoeffs: number): Promise<FourierSeriesResult> {
+    const sampleStrings = samples.map(complexToString);
+    const response = await api.post('/fourier/series', {
+      samples: sampleStrings,
+      n_coeffs: nCoeffs
+    });
+    return response.data;
+  }
+};
+
+export const seriesApi = {
+  async computeUnified(
+    samples: Array<{ real: number; imag: number }>, 
+    nCoeffs: number, 
+    method: 'fourier' | 'legendre', 
+    type: 'fft' | 'quadrature' = 'fft'
+  ): Promise<UnifiedSeriesResult> {
+    const sampleStrings = samples.map(complexToString);
+    const response = await api.post('/series/unified', {
+      samples: sampleStrings,
+      n_coeffs: nCoeffs,
+      method,
+      type
+    });
+    return response.data;
+  }
+};
+
+// New clean visualization API
+export interface FourierTerm {
+  index: number;
+  coefficient: string;
+  magnitude: number;
+  phase: number;
+  frequency: number;
+}
+
+export interface LegendreTerm {
+  index: number;
+  coefficient: string;
+  degree: number;
+  x_values: number[];
+  y_values: string[];
+}
+
+export interface VisualizationResult {
+  method: string;
+  n_terms: number;
+  original_samples: string[];
+  approximation: string[];
+  mse: number;
+  fourier_terms: FourierTerm[];
+  legendre_terms: LegendreTerm[];
+  animation_domain: [number, number];
+  recommended_duration: number;
+}
+
+export const visualizationApi = {
+  async computeVisualization(
+    samples: Array<{ real: number; imag: number }>,
+    method: 'fourier' | 'legendre',
+    nTerms: number,
+    resolution: number = 200
+  ): Promise<VisualizationResult> {
+    const sampleStrings = samples.map(complexToString);
+    const response = await api.post('/visualization/series', {
+      samples: sampleStrings,
+      method,
+      n_terms: nTerms,
+      resolution
     });
     return response.data;
   }

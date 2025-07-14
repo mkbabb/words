@@ -13,7 +13,7 @@
         props.class
       )"
       v-bind="props"
-      @input="$emit('update:modelValue', Number($event.target.value))"
+      @input="$emit('update:modelValue', Number(($event.target as HTMLInputElement)?.value))"
     />
     <div
       class="absolute h-6 w-6 rounded-full border-2 border-primary bg-white dark:bg-gray-800 shadow-lg transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:scale-110"
@@ -23,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type InputHTMLAttributes } from 'vue'
+import { computed } from 'vue'
 import { cn } from '@/utils'
 
 interface Props {
