@@ -3,7 +3,7 @@
     v-bind="props"
     :class="
       cn(
-        'ring-offset-background focus-visible:ring-ring mt-2 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
+        'mt-2 focus-ring animate-in fade-in-50 duration-300',
         props.class
       )
     "

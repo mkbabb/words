@@ -174,7 +174,7 @@ import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { Play, Pause, RotateCcw } from 'lucide-vue-next';
 
 import ThemedCard from '@/components/ui/ThemedCard.vue';
-import CardContent from '@/components/ui/CardContent.vue';
+import { CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Label from '@/components/ui/Label.vue';
 import Slider from '@/components/ui/Slider.vue';

@@ -14,7 +14,9 @@
     <div class="min-h-screen">
       <Tabs v-model="activeTab" class="">
         <!-- Fixed Header with Tabs and Search -->
-        <div class="sticky top-0 z-40 border-b p-2 backdrop-blur-3xl">
+        <div
+          class="border-border/50 sticky top-0 z-40 border-b p-2 backdrop-blur-3xl"
+        >
           <div class="container grid gap-2 p-4">
             <TabsList class="flex justify-center bg-transparent">
               <TabsTrigger

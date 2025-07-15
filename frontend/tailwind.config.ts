@@ -17,6 +17,11 @@ const config: Config = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Fraunces', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
+        serif: ['Fraunces', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
+        mono: ['Fira Code', 'Consolas', 'Monaco', 'Andale Mono', 'monospace'],
+      },
       colors: {
         border: 'var(--color-border)',
         input: 'var(--color-input)',
@@ -75,16 +80,72 @@ const config: Config = {
           from: { height: 'var(--radix-collapsible-content-height)' },
           to: { height: '0' },
         },
+        shimmer: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' },
+        },
+        'sparkle-slide': {
+          '0%': { transform: 'translateX(-100%) rotate(45deg)', opacity: '0' },
+          '50%': { opacity: '1' },
+          '100%': { transform: 'translateX(300%) rotate(45deg)', opacity: '0' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'collapsible-down': 'collapsible-down 0.2s ease-in-out',
         'collapsible-up': 'collapsible-up 0.2s ease-in-out',
+        shimmer: 'shimmer 3s ease-in-out infinite',
+        'sparkle-slide': 'sparkle-slide 4s ease-in-out infinite',
+      },
+      transitionTimingFunction: {
+        'out-expo': 'cubic-bezier(0.19, 1, 0.22, 1)',
+        'in-out-expo': 'cubic-bezier(0.87, 0, 0.13, 1)',
+        'bounce-spring': 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+      },
+      boxShadow: {
+        'card': '0 4px 12px rgba(0, 0, 0, 0.08)',
+        'card-hover': '0 8px 24px rgba(0, 0, 0, 0.12)',
+        'subtle': '0 2px 8px rgba(0, 0, 0, 0.04)',
+        'glow': '0 0 20px rgba(var(--color-primary), 0.3)',
       },
     },
   },
-  plugins: [animate],
+  plugins: [
+    animate,
+    function({ addUtilities }) {
+      const newUtilities = {
+        '.hover-lift': {
+          '@apply transition-all duration-200 hover:scale-[1.02] hover:brightness-95': {},
+        },
+        '.hover-lift-sm': {
+          '@apply transition-all duration-200 hover:scale-[1.01] hover:brightness-97': {},
+        },
+        '.hover-text-grow': {
+          '@apply transition-[font-size] duration-200 hover:text-[1.02em]': {},
+        },
+        '.hover-shadow-lift': {
+          '@apply transition-shadow duration-200 hover:shadow-card-hover': {},
+        },
+        '.focus-ring': {
+          '@apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background': {},
+        },
+        '.transition-smooth': {
+          '@apply transition-all duration-200 ease-in-out': {},
+        },
+        '.delay-0': {
+          'animation-delay': '0ms',
+        },
+        '.delay-150': {
+          'animation-delay': '150ms',
+        },
+        '.delay-300': {
+          'animation-delay': '300ms',
+        },
+      }
+      addUtilities(newUtilities, ['responsive', 'hover'])
+    }
+  ],
 };
 
 export default config;

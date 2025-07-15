@@ -1,5 +1,5 @@
 <template>
-  <div :class="cn('p-6 pt-0', className)">
+  <div :class="cn('p-4 sm:p-6 pt-0', className)">
     <slot />
   </div>
 </template>

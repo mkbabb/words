@@ -3,7 +3,7 @@
     v-bind="props"
     :class="
       cn(
-        'bg-muted text-muted-foreground inline-flex h-10 items-center justify-center gap-1 rounded-md p-1',
+        'bg-muted text-muted-foreground inline-flex h-10 items-center justify-center gap-1 rounded-md p-1 transition-smooth',
         props.class
       )
     "

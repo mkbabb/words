@@ -22,7 +22,7 @@
 
       <!-- Pronunciation -->
       <div v-if="entry.pronunciation" class="flex items-center gap-3 pt-2">
-        <span class="text-pronunciation font-mono text-sm">
+        <span class="text-pronunciation">
           {{
             pronunciationMode === 'phonetic'
               ? entry.pronunciation.phonetic
