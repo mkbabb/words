@@ -2,6 +2,9 @@ import { defineConfig } from 'vite';
 import path from 'path';
 import vue from '@vitejs/plugin-vue';
 
+import tailwindcss from '@tailwindcss/vite';
+import autoprefixer from 'autoprefixer';
+
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/',
@@ -10,7 +13,12 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  plugins: [vue()],
+  css: {
+    postcss: {
+      plugins: [autoprefixer()],
+    },
+  },
+  plugins: [vue(), tailwindcss()],
   server: {
     port: 3000,
     host: true, // Listen on all local IPs
@@ -25,12 +33,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         ws: true, // Proxy websockets
-        configure: (proxy, options) => {
+        configure: (proxy, _options) => {
           // Proxy error handling
-          proxy.on('error', (err, req, res) => {
+          proxy.on('error', (err, _req, _res) => {
             console.log('proxy error', err);
           });
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+          proxy.on('proxyReq', (_proxyReq, req, _res) => {
             console.log('Sending Request:', req.method, req.url);
           });
         },

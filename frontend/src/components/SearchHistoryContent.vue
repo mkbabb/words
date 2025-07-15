@@ -1,36 +1,34 @@
 <template>
-  <div v-if="collapsed" class="w-full h-full flex flex-col">
+  <div v-if="collapsed" class="flex h-full w-full flex-col">
     <!-- Collapsed view - compact cards -->
-    <div class="flex-1 relative min-h-0">
+    <div class="relative min-h-0 flex-1">
       <div class="absolute inset-0">
-        <div class="space-y-1 max-h-full overflow-y-auto scrollbar-thin">
-          <TransitionGroup
-            name="toast-stack"
-            tag="div"
-            class="space-y-1"
-          >
+        <div class="scrollbar-thin max-h-full space-y-1 overflow-y-auto">
+          <TransitionGroup name="toast-stack" tag="div" class="space-y-1">
             <div
               v-for="(entry, index) in limitedLookups"
               :key="entry.id"
-              :class="cn(
-                'group relative w-full rounded-lg cursor-pointer transition-all duration-200 overflow-hidden',
-                'bg-background border border-border shadow-sm',
-                'hover:shadow-md hover:bg-accent'
-              )"
+              :class="
+                cn(
+                  'group relative w-full cursor-pointer overflow-hidden rounded-lg transition-all duration-200',
+                  'bg-background border-border border shadow-sm',
+                  'hover:bg-accent hover:shadow-md'
+                )
+              "
               @click="lookupWord(entry.word)"
               @mouseenter="hoveredIndex = index"
               @mouseleave="hoveredIndex = -1"
             >
-              <div class="px-2 py-2 flex items-center justify-center">
-                <span class="text-xs font-bold uppercase tracking-wider">
+              <div class="flex items-center justify-center px-2 py-2">
+                <span class="text-xs font-bold tracking-wider uppercase">
                   {{ entry.word.substring(0, 2) }}
                 </span>
               </div>
-              
+
               <!-- Tooltip on hover -->
-              <div 
+              <div
                 v-if="hoveredIndex === index"
-                class="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md pointer-events-none whitespace-nowrap z-50 shadow-md"
+                class="bg-popover text-popover-foreground pointer-events-none absolute left-full z-50 ml-2 rounded-md px-2 py-1 text-xs whitespace-nowrap shadow-md"
               >
                 {{ entry.word }}
               </div>
@@ -40,35 +38,35 @@
       </div>
     </div>
   </div>
-  
+
   <div v-else class="space-y-1">
     <!-- Expanded view -->
-    <TransitionGroup
-      name="history-list"
-      tag="div"
-      class="space-y-1"
-    >
+    <TransitionGroup name="history-list" tag="div" class="space-y-1">
       <div
         v-for="entry in recentLookups"
         :key="entry.id"
-        :class="cn(
-          'group flex items-center justify-between px-2 py-2 rounded-lg cursor-pointer transition-all duration-200',
-          'hover:bg-accent hover:pl-3'
-        )"
+        :class="
+          cn(
+            'group flex cursor-pointer items-center justify-between rounded-lg px-2 py-2 transition-all duration-200',
+            'hover:bg-accent hover:pl-3'
+          )
+        "
         @click="lookupWord(entry.word)"
       >
-        <div class="flex items-center gap-3 min-w-0">
+        <div class="flex min-w-0 items-center gap-3">
           <History :size="14" class="text-muted-foreground shrink-0" />
-          <span class="text-sm truncate">{{ entry.word }}</span>
+          <span class="truncate text-sm">{{ entry.word }}</span>
         </div>
-        <span class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+        <span
+          class="text-muted-foreground text-xs opacity-0 transition-opacity group-hover:opacity-100"
+        >
           {{ formatDate(entry.timestamp) }}
         </span>
       </div>
     </TransitionGroup>
-    
-    <div v-if="recentLookups.length === 0" class="text-center py-4">
-      <p class="text-xs text-muted-foreground">No recent lookups</p>
+
+    <div v-if="recentLookups.length === 0" class="py-4 text-center">
+      <p class="text-muted-foreground text-xs">No recent lookups</p>
     </div>
   </div>
 </template>
@@ -118,7 +116,7 @@ const lookupWord = async (word: string) => {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: theme('colors.muted.DEFAULT');
+  background: hsl(var(--muted));
   border-radius: 2px;
 }
 

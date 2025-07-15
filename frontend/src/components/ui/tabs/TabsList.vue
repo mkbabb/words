@@ -8,7 +8,7 @@
 </template>
 
 <script setup lang="ts">
-import { type HTMLAttributes, computed } from 'vue'
+import { type HTMLAttributes } from 'vue'
 import { TabsList, type TabsListProps } from 'radix-vue'
 import { cn } from '@/utils'
 

@@ -231,7 +231,7 @@ import { cn } from '@/utils';
 import Button from '@/components/ui/Button.vue';
 import SearchHistoryContent from '@/components/SearchHistoryContent.vue';
 import FloridifyIcon from '@/components/FloridifyIcon.vue';
-import { X, PanelLeft, PanelRight, User } from 'lucide-vue-next';
+import { PanelLeft, PanelRight, User } from 'lucide-vue-next';
 
 const store = useAppStore();
 

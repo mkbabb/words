@@ -74,7 +74,7 @@ export const useAppStore = defineStore('app', () => {
   );
 
   const recentLookupWords = computed(() =>
-    recentLookups.value.map((lookup) => lookup.word)
+    recentLookups.value.map(lookup => lookup.word)
   );
 
   // Actions
@@ -167,7 +167,7 @@ export const useAppStore = defineStore('app', () => {
 
     // Remove existing entry for same query
     const existingIndex = searchHistory.value.findIndex(
-      (entry) => entry.query === query
+      entry => entry.query === query
     );
     if (existingIndex >= 0) {
       searchHistory.value.splice(existingIndex, 1);
@@ -196,7 +196,7 @@ export const useAppStore = defineStore('app', () => {
 
     // Remove existing entry for same word
     const existingIndex = lookupHistory.value.findIndex(
-      (lookup) => lookup.word.toLowerCase() === word.toLowerCase()
+      lookup => lookup.word.toLowerCase() === word.toLowerCase()
     );
     if (existingIndex >= 0) {
       lookupHistory.value.splice(existingIndex, 1);
@@ -225,7 +225,12 @@ export const useAppStore = defineStore('app', () => {
       const recentWords = recentLookupWords.value.slice(0, 10);
       const response =
         await dictionaryApi.getVocabularySuggestions(recentWords);
-      vocabularySuggestions.value = response.words.map(word => ({ word }));
+      vocabularySuggestions.value = response.words.map(word => ({
+        word,
+        reasoning: '',
+        difficulty_level: 0,
+        semantic_category: '',
+      }));
     } catch (error) {
       console.error('Failed to get vocabulary suggestions:', error);
       vocabularySuggestions.value = [];

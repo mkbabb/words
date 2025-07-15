@@ -186,7 +186,6 @@ import LaTeX from '@/components/custom/latex/LaTeX.vue';
 const activeTab = ref<'polynomials' | 'series'>('polynomials');
 const animationSpeed = ref(500);
 const maxDegree = ref(15);
-const harmonics = ref(20);
 const timePosition = ref(0);
 const isAnimating = ref(false);
 // Animation control
