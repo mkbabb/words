@@ -1,5 +1,12 @@
 <template>
-  <div :class="cn('rounded-2xl bg-card text-card-foreground card-shadow transition-all duration-300 hover:card-shadow-hover', className)">
+  <div
+    :class="
+      cn(
+        'bg-card text-card-foreground card-shadow hover:card-shadow-hover rounded-2xl transition-all duration-300',
+        className
+      )
+    "
+  >
     <slot />
   </div>
 </template>

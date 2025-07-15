@@ -5,13 +5,13 @@
 </template>
 
 <script setup lang="ts">
-import { HoverCardTrigger } from 'radix-vue'
+import { HoverCardTrigger } from 'radix-vue';
 
 interface Props {
-  asChild?: boolean
+  asChild?: boolean;
 }
 
 withDefaults(defineProps<Props>(), {
-  asChild: false
-})
+  asChild: false,
+});
 </script>

@@ -15,34 +15,39 @@
     </CardHeader>
 
     <CardContent>
-      <div v-if="recentSearches.length === 0" class="text-center py-8 text-muted-foreground">
+      <div
+        v-if="recentSearches.length === 0"
+        class="text-muted-foreground py-8 text-center"
+      >
         <p>No search history yet.</p>
         <p class="text-sm">Start searching to build your history!</p>
       </div>
 
-      <div v-else class="space-y-2 max-h-96 overflow-y-auto">
+      <div v-else class="max-h-96 space-y-2 overflow-y-auto">
         <Card
           v-for="search in recentSearches"
           :key="search.id"
-          class="cursor-pointer transition-all hover:shadow-md hover:bg-accent/50"
+          class="hover:bg-accent/50 cursor-pointer transition-all hover:shadow-md"
           @click="repeatSearch(search.query)"
         >
           <CardContent class="p-3">
             <div class="flex items-center justify-between">
               <div class="flex-1">
                 <div class="font-medium">{{ search.query }}</div>
-                <div class="text-sm text-muted-foreground">
+                <div class="text-muted-foreground text-sm">
                   {{ formatDate(search.timestamp) }}
-                  <Badge 
-                    v-if="search.results.length > 0" 
+                  <Badge
+                    v-if="search.results.length > 0"
                     variant="secondary"
                     class="ml-2"
                   >
-                    {{ search.results.length }} result{{ search.results.length > 1 ? 's' : '' }}
+                    {{ search.results.length }} result{{
+                      search.results.length > 1 ? 's' : ''
+                    }}
                   </Badge>
                 </div>
               </div>
-              
+
               <Button
                 variant="ghost"
                 size="sm"

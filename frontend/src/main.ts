@@ -4,6 +4,9 @@ import { createRouter, createWebHistory } from 'vue-router';
 import App from './App.vue';
 import Home from './views/Home.vue';
 
+// Import Tailwind CSS and custom styles
+import './assets/index.css';
+
 // Create router
 const router = createRouter({
   history: createWebHistory(),

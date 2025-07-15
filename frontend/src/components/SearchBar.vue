@@ -1,6 +1,6 @@
 <template>
   <!-- Main Container (UI Layer - No Filter) -->
-  <div :class="cn('relative z-50 mx-auto w-full max-w-lg', className)">
+  <div :class="cn('relative z-50 mx-auto w-full max-w-lg p-2', className)">
     <!-- Search Bar UI -->
     <div
       class="card-shadow bg-background border-border relative overflow-visible rounded-2xl border"
@@ -10,7 +10,7 @@
         <div class="flex items-center justify-center gap-3">
           <!-- Dictionary/Thesaurus Toggle -->
           <div
-            class="from-primary/10 to-primary/5 flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl bg-gradient-to-br transition-all duration-300 ease-out hover:scale-110 active:scale-95"
+            class="from-primary/10 flex h-12 w-12 cursor-pointer items-center justify-center transition-all duration-300 ease-out hover:scale-110 active:scale-95"
             @click="store.toggleMode()"
             :title="
               mode === 'dictionary'
@@ -18,7 +18,7 @@
                 : 'Switch to dictionary mode'
             "
           >
-            <FancyF :mode="mode" size="base" />
+            <FancyF :mode="mode" size="lg" />
           </div>
 
           <!-- Search Input -->
@@ -34,7 +34,7 @@
               v-model="query"
               :placeholder="placeholder"
               autofocus
-              class="bg-background placeholder:text-muted-foreground focus-visible:ring-ring bg-muted/30 focus:bg-background flex h-auto w-full rounded-xl px-3 py-3 pr-4 pl-10 text-base shadow-sm transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              class="bg-background placeholder:text-muted-foreground focus-visible:ring-ring focus:bg-background flex h-auto w-full rounded-xl px-3 py-3 pr-4 pl-10 text-base shadow-sm transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               @keydown.enter="handleEnter"
               @keydown.down.prevent="navigateResults(1)"
               @keydown.up.prevent="navigateResults(-1)"
@@ -49,7 +49,7 @@
         <hr class="border-border/50 p-2" />
 
         <div class="flex flex-wrap items-center justify-center gap-2">
-          <Sparkles />
+          <Sparkles :size="18" />
           <Button
             v-for="word in aiSuggestions"
             :key="word"
@@ -89,77 +89,74 @@
     </div>
 
     <!-- Search Results Dropdown -->
-    <div class="relative">
-      <div class="absolute top-full right-0 left-0 mt-2 bg-background">
+
+    <div class="bg-background absolute top-full right-0 left-0 mt-2">
+      <div
+        ref="searchResultsDropdown"
+        v-if="showDropdown"
+        class="card-shadow bg-background border-border overflow-hidden rounded-2xl border"
+      >
+        <!-- Loading -->
+        <div v-if="isSearching && searchResults.length === 0" class="p-4">
+          <div class="flex items-center gap-2">
+            <div class="flex gap-1">
+              <span
+                v-for="i in 3"
+                :key="i"
+                class="bg-primary/60 h-2 w-2 animate-bounce rounded-full"
+                :style="{ animationDelay: `${(i - 1) * 150}ms` }"
+              />
+            </div>
+            <span class="text-sm">Searching...</span>
+          </div>
+        </div>
+
+        <!-- Results -->
         <div
-          ref="searchResultsDropdown"
-          v-if="showDropdown"
-          class="card-shadow bg-background border-border overflow-hidden rounded-2xl border"
+          v-else-if="searchResults.length > 0"
+          class="max-h-64 overflow-y-auto"
         >
-          <!-- Loading -->
-          <div v-if="isSearching && searchResults.length === 0" class="p-4">
-            <div class="text-muted-foreground flex items-center gap-2">
-              <div class="flex gap-1">
-                <span
-                  v-for="i in 3"
-                  :key="i"
-                  class="bg-primary/60 h-2 w-2 animate-bounce rounded-full"
-                  :style="{ animationDelay: `${(i - 1) * 150}ms` }"
-                />
-              </div>
-              <span class="text-sm">Searching...</span>
-            </div>
-          </div>
-
-          <!-- Results -->
           <div
-            v-else-if="searchResults.length > 0"
-            class="max-h-64 overflow-y-auto"
+            v-for="(result, index) in searchResults"
+            :key="result.word"
+            :class="
+              cn('cursor-pointer px-4 py-3 transition-all duration-200', {
+                'bg-accent dark:bg-accent/80 border-primary text-muted-foreground border-l-6 pl-6 font-bold':
+                  index === selectedIndex,
+                'hover:bg-muted/50 border-l-4 border-transparent':
+                  index !== selectedIndex,
+              })
+            "
+            @click="selectResult(result)"
+            @mouseenter="selectedIndex = index"
           >
-            <div
-              v-for="(result, index) in searchResults"
-              :key="result.word"
-              :class="
-                cn('cursor-pointer px-4 py-3 transition-all duration-200', {
-                  'bg-accent dark:bg-accent/80 border-primary border-l-6 pl-6 font-bold':
-                    index === selectedIndex,
-                  'hover:bg-muted/50 border-l-4 border-transparent':
-                    index !== selectedIndex,
-                })
-              "
-              @click="selectResult(result)"
-              @mouseenter="selectedIndex = index"
-            >
-              <div class="flex items-center justify-between">
-                <span
-                  :class="
-                    cn('transition-all duration-200', {
-                      'text-primary/90 translate-x-1 font-bold':
-                        index === selectedIndex,
-                      'font-medium': index !== selectedIndex,
-                    })
-                  "
-                  >{{ result.word }}</span
+            <div class="flex items-center justify-between">
+              <span
+                :class="
+                  cn('transition-all duration-200', {
+                    'text-primary/90 translate-x-1 font-bold':
+                      index === selectedIndex,
+                    'font-medium': index !== selectedIndex,
+                  })
+                "
+                >{{ result.word }}</span
+              >
+              <div class="flex items-center gap-2">
+                <span class="text-xs">{{ result.method }}</span>
+                <span class="text-xs"
+                  >{{ Math.round(result.score * 100) }}%</span
                 >
-                <div class="flex items-center gap-2">
-                  <span class="text-muted-foreground text-xs">{{
-                    result.method
-                  }}</span>
-                  <span class="text-primary text-xs font-medium"
-                    >{{ Math.round(result.score * 100) }}%</span
-                  >
-                </div>
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- No Results -->
-          <div
-            v-else-if="!isSearching && query.length >= 2"
-            class="text-muted-foreground p-4 text-center text-sm"
-          >
-            No matches found
-          </div>
+        <!-- No Results -->
+        <div
+          v-else-if="!isSearching && query.length >= 2"
+          class="text-muted-foreground p-4 text-center text-sm"
+        >
+          No matches found
         </div>
       </div>
     </div>

@@ -5,8 +5,8 @@
       <div class="flex items-center justify-between">
         <CardTitle class="text-word-title">{{ entry.word }}</CardTitle>
         <!-- Tabs section for to select the card variant: either gold, silver, bronze -->
-        <Tabs 
-          :default-value="selectedVariant" 
+        <Tabs
+          :default-value="selectedVariant"
           :model-value="selectedVariant"
           @update:model-value="handleVariantChange"
           class="w-auto"
@@ -23,22 +23,23 @@
       <!-- Pronunciation -->
       <div v-if="entry.pronunciation" class="flex items-center gap-3 pt-2">
         <span class="text-pronunciation font-mono text-sm">
-          {{ pronunciationMode === 'phonetic' 
-            ? entry.pronunciation.phonetic 
-            : entry.pronunciation.ipa 
+          {{
+            pronunciationMode === 'phonetic'
+              ? entry.pronunciation.phonetic
+              : entry.pronunciation.ipa
           }}
         </span>
         <Button
           variant="ghost"
           size="sm"
           @click="togglePronunciation"
-          class="text-xs px-2 py-1 h-6 transition-all duration-200 hover:opacity-80"
+          class="h-6 px-2 py-1 text-xs transition-all duration-200 hover:opacity-80"
         >
           {{ pronunciationMode === 'phonetic' ? 'IPA' : 'Phonetic' }}
         </Button>
       </div>
     </CardHeader>
-    
+
     <!-- Dictionary Mode Definitions -->
     <CardContent v-if="mode === 'dictionary'" class="space-y-4 pt-1">
       <div
@@ -48,37 +49,55 @@
       >
         <!-- Separator for all but first -->
         <hr v-if="index > 0" class="border-border" />
-        
+
         <div class="flex items-center gap-2">
           <Badge variant="secondary" class="text-part-of-speech">
             {{ definition.word_type }}
           </Badge>
-          <sup class="text-xs font-normal text-muted-foreground">{{ index + 1 }}</sup>
+          <sup class="text-muted-foreground text-xs font-normal">{{
+            index + 1
+          }}</sup>
         </div>
-        
-        <div class="pl-4 border-l-2 border-accent">
+
+        <div class="border-accent border-l-2 pl-4">
           <p class="text-definition mb-2">
             {{ definition.definition }}
           </p>
 
           <!-- Examples -->
-          <div v-if="definition.examples && (definition.examples.generated.length > 0 || definition.examples.literature.length > 0)" class="space-y-1 mb-2">
-            <p 
-              v-for="(example, exIndex) in definition.examples.generated.concat(definition.examples.literature)"
+          <div
+            v-if="
+              definition.examples &&
+              (definition.examples.generated.length > 0 ||
+                definition.examples.literature.length > 0)
+            "
+            class="mb-2 space-y-1"
+          >
+            <p
+              v-for="(example, exIndex) in definition.examples.generated.concat(
+                definition.examples.literature
+              )"
               :key="exIndex"
-              class="text-sm text-muted-foreground/70 italic"
-              v-html="`&quot;${formatExampleHTML(example.sentence, entry.word)}&quot;`"
+              class="text-muted-foreground/70 text-sm italic"
+              v-html="
+                `&quot;${formatExampleHTML(example.sentence, entry.word)}&quot;`
+              "
             ></p>
           </div>
 
           <!-- Synonyms -->
-          <div v-if="definition.synonyms && definition.synonyms.length > 0" class="flex flex-wrap gap-1 pt-2">
-            <span class="text-xs text-muted-foreground self-center pr-2">Synonyms:</span>
+          <div
+            v-if="definition.synonyms && definition.synonyms.length > 0"
+            class="flex flex-wrap gap-1 pt-2"
+          >
+            <span class="text-muted-foreground self-center pr-2 text-xs"
+              >Synonyms:</span
+            >
             <Badge
               v-for="synonym in definition.synonyms"
               :key="synonym"
               variant="outline"
-              class="text-xs cursor-pointer transition-all duration-200 hover:opacity-80 hover:bg-accent/50 hover:font-semibold"
+              class="hover:bg-accent/50 cursor-pointer text-xs transition-all duration-200 hover:font-semibold hover:opacity-80"
               @click="store.searchWord(synonym)"
             >
               {{ synonym }}
@@ -89,15 +108,23 @@
     </CardContent>
 
     <!-- Thesaurus Mode -->
-    <CardContent v-if="mode === 'thesaurus' && thesaurusData" class="space-y-6 pt-6">
-      <div v-if="thesaurusData.synonyms.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+    <CardContent
+      v-if="mode === 'thesaurus' && thesaurusData"
+      class="space-y-6 pt-6"
+    >
+      <div
+        v-if="thesaurusData.synonyms.length > 0"
+        class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
+      >
         <Card
           v-for="synonym in thesaurusData.synonyms"
           :key="synonym.word"
-          :class="cn(
-            'cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-105',
-            getHeatmapClass(synonym.score)
-          )"
+          :class="
+            cn(
+              'cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-lg',
+              getHeatmapClass(synonym.score)
+            )
+          "
           @click="store.searchWord(synonym.word)"
         >
           <CardContent class="px-3 py-4">
@@ -113,7 +140,7 @@
     <!-- Etymology -->
     <CardContent v-if="entry && entry.etymology" class="space-y-4">
       <h3 class="text-lg font-semibold">Etymology</h3>
-      <p class="text-sm text-muted-foreground">{{ entry.etymology }}</p>
+      <p class="text-muted-foreground text-sm">{{ entry.etymology }}</p>
     </CardContent>
   </ThemedCard>
 </template>
@@ -135,7 +162,7 @@ interface DefinitionDisplayProps {
 }
 
 const props = withDefaults(defineProps<DefinitionDisplayProps>(), {
-  variant: 'default'
+  variant: 'default',
 });
 
 const store = useAppStore();
@@ -167,5 +194,4 @@ const formatExampleHTML = (example: string, word: string): string => {
   const regex = new RegExp(`\\b${word}\\b`, 'gi');
   return example.replace(regex, `<strong>${word}</strong>`);
 };
-
 </script>

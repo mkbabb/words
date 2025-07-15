@@ -1,14 +1,20 @@
 <template>
-  <div :class="cn('w-10 h-10 transition-all duration-300 relative', starClasses)">
+  <div
+    :class="cn('relative h-10 w-10 transition-all duration-300', starClasses)"
+  >
     <!-- Background glow effect -->
-    <div class="absolute inset-0 rounded-full bg-current opacity-20 blur-sm scale-110"></div>
+    <div
+      class="absolute inset-0 scale-110 rounded-full bg-current opacity-20 blur-sm"
+    ></div>
     <svg
-      xmlns="http://www.w3.org/2000/svg" 
-      viewBox="0 0 24 24" 
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
       fill="currentColor"
-      class="w-full h-full relative z-10"
+      class="relative z-10 h-full w-full"
     >
-      <path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7.4-6.3-4.6-6.3 4.6 2.3-7.4-6-4.6h7.6z"/>
+      <path
+        d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7.4-6.3-4.6-6.3 4.6 2.3-7.4-6-4.6h7.6z"
+      />
     </svg>
   </div>
 </template>

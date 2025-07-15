@@ -5,11 +5,11 @@
 </template>
 
 <script setup lang="ts">
-import { TabsRoot, type TabsRootEmits, type TabsRootProps } from 'radix-vue'
-import { useForwardPropsEmits } from 'radix-vue'
+import { TabsRoot, type TabsRootEmits, type TabsRootProps } from 'radix-vue';
+import { useForwardPropsEmits } from 'radix-vue';
 
-const props = defineProps<TabsRootProps>()
-const emits = defineEmits<TabsRootEmits>()
+const props = defineProps<TabsRootProps>();
+const emits = defineEmits<TabsRootEmits>();
 
-const forwardedProps = useForwardPropsEmits(props, emits)
+const forwardedProps = useForwardPropsEmits(props, emits);
 </script>

@@ -1,36 +1,39 @@
 <template>
-  <div 
-    :class="cn(
-      'cursor-pointer transition-all duration-300 ease-out flex items-center',
-      {
-        'gap-1': expanded,
-        'justify-center': !expanded,
-      },
-      className
-    )"
+  <div
+    :class="
+      cn(
+        'flex cursor-pointer items-center transition-all duration-300 ease-out',
+        {
+          'gap-1': expanded,
+          'justify-center': !expanded,
+        },
+        className
+      )
+    "
     @click="$emit('click')"
   >
     <!-- Fancy F -->
-    <LaTeX 
+    <LaTeX
       :expression="'\\mathfrak{F}'"
-      :class="cn('text-primary font-bold transition-all duration-300', {
-        'text-2xl': expanded,
-        'text-xl': !expanded,
-      })"
+      :class="
+        cn('text-primary font-bold transition-all duration-300', {
+          'text-2xl': expanded,
+          'text-xl': !expanded,
+        })
+      "
     />
-    
+
     <!-- Rest of "loridify" with Fraunces font -->
-    <span 
+    <span
       v-if="expanded"
-      :class="cn(
-        'font-serif text-foreground transition-all duration-300 transform',
-        {
+      :class="
+        cn('text-foreground transform font-serif transition-all duration-300', {
           'text-xl': expanded,
           'scale-x-0 opacity-0': !expanded,
           'scale-x-100 opacity-100': expanded,
-        }
-      )"
-      style="font-family: 'Fraunces', serif; font-weight: 600;"
+        })
+      "
+      style="font-family: 'Fraunces', serif; font-weight: 600"
     >
       loridify
     </span>
@@ -49,6 +52,6 @@ interface FloridifyIconProps {
 const { expanded = false } = defineProps<FloridifyIconProps>();
 
 defineEmits<{
-  click: []
+  click: [];
 }>();
 </script>

@@ -16,27 +16,33 @@ const api = axios.create({
 
 // Request interceptor
 api.interceptors.request.use(
-  (config) => {
-    console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, config.params);
+  config => {
+    console.log(
+      `API Request: ${config.method?.toUpperCase()} ${config.url}`,
+      config.params
+    );
     return config;
   },
-  (error) => Promise.reject(error)
+  error => Promise.reject(error)
 );
 
 // Response interceptor
 api.interceptors.response.use(
   (response: AxiosResponse) => {
-    console.log(`API Response: ${response.config.method?.toUpperCase()} ${response.config.url}`, response.data);
+    console.log(
+      `API Response: ${response.config.method?.toUpperCase()} ${response.config.url}`,
+      response.data
+    );
     return response;
   },
-  (error) => {
+  error => {
     console.error('API Error:', {
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,
       statusText: error.response?.statusText,
       data: error.response?.data,
-      message: error.message
+      message: error.message,
     });
     return Promise.reject(error);
   }
@@ -86,8 +92,16 @@ export interface UnifiedSeriesResult {
 // Helper function to convert complex object to string
 export const complexToString = (c: { real: number; imag: number }): string => {
   if (c.imag === 0) return c.real.toString();
-  if (c.real === 0) return c.imag === 1 ? 'j' : c.imag === -1 ? '-j' : `${c.imag}j`;
-  const imagPart = c.imag === 1 ? '+j' : c.imag === -1 ? '-j' : c.imag > 0 ? `+${c.imag}j` : `${c.imag}j`;
+  if (c.real === 0)
+    return c.imag === 1 ? 'j' : c.imag === -1 ? '-j' : `${c.imag}j`;
+  const imagPart =
+    c.imag === 1
+      ? '+j'
+      : c.imag === -1
+        ? '-j'
+        : c.imag > 0
+          ? `+${c.imag}j`
+          : `${c.imag}j`;
   return `${c.real}${imagPart}`;
 };
 
@@ -95,10 +109,10 @@ export const complexToString = (c: { real: number; imag: number }): string => {
 export const parseComplex = (s: string): { real: number; imag: number } => {
   if (s === 'j') return { real: 0, imag: 1 };
   if (s === '-j') return { real: 0, imag: -1 };
-  
+
   // Handle pure real numbers
   if (!s.includes('j')) return { real: parseFloat(s), imag: 0 };
-  
+
   // Handle pure imaginary numbers
   if (s.startsWith('j')) return { real: 0, imag: 1 };
   if (s === '-j') return { real: 0, imag: -1 };
@@ -106,7 +120,7 @@ export const parseComplex = (s: string): { real: number; imag: number } => {
     const imagStr = s.slice(0, -1);
     return { real: 0, imag: parseFloat(imagStr || '1') };
   }
-  
+
   // Handle complex numbers like "1+2j" or "1-2j"
   const match = s.match(/^([+-]?\d*\.?\d*)\s*([+-])\s*(\d*\.?\d*)j$/);
   if (match) {
@@ -115,7 +129,7 @@ export const parseComplex = (s: string): { real: number; imag: number } => {
     const imagMag = parseFloat(match[3] || '1');
     return { real, imag: imagSign * imagMag };
   }
-  
+
   // Fallback: try native complex parsing
   try {
     const complex = new Function('return ' + s.replace('j', '*1j'))();
@@ -126,20 +140,30 @@ export const parseComplex = (s: string): { real: number; imag: number } => {
 };
 
 export const legendreApi = {
-  async getPolynomialData(maxDegree: number): Promise<{ polynomials: LegendrePolynomial[] }> {
+  async getPolynomialData(
+    maxDegree: number
+  ): Promise<{ polynomials: LegendrePolynomial[] }> {
     const response = await api.get(`/legendre/polynomials/${maxDegree}`);
     return response.data;
   },
 
-  async computeSeries(samples: number[], nHarmonics: number): Promise<LegendreSeriesResult> {
+  async computeSeries(
+    samples: number[],
+    nHarmonics: number
+  ): Promise<LegendreSeriesResult> {
     const response = await api.post('/legendre/series', {
       samples,
-      n_harmonics: nHarmonics
+      n_harmonics: nHarmonics,
     });
     return response.data;
   },
 
-  async processImage(file: File, encoding: string, nHarmonics: number, visualization: string): Promise<any> {
+  async processImage(
+    file: File,
+    encoding: string,
+    nHarmonics: number,
+    visualization: string
+  ): Promise<any> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('encoding_method', encoding);
@@ -147,28 +171,31 @@ export const legendreApi = {
     formData.append('visualization_method', visualization);
 
     const response = await api.post('/legendre/image', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
-  }
+  },
 };
 
 export const fourierApi = {
-  async computeSeries(samples: Array<{ real: number; imag: number }>, nCoeffs: number): Promise<FourierSeriesResult> {
+  async computeSeries(
+    samples: Array<{ real: number; imag: number }>,
+    nCoeffs: number
+  ): Promise<FourierSeriesResult> {
     const sampleStrings = samples.map(complexToString);
     const response = await api.post('/fourier/series', {
       samples: sampleStrings,
-      n_coeffs: nCoeffs
+      n_coeffs: nCoeffs,
     });
     return response.data;
-  }
+  },
 };
 
 export const seriesApi = {
   async computeUnified(
-    samples: Array<{ real: number; imag: number }>, 
-    nCoeffs: number, 
-    method: 'fourier' | 'legendre', 
+    samples: Array<{ real: number; imag: number }>,
+    nCoeffs: number,
+    method: 'fourier' | 'legendre',
     type: 'fft' | 'quadrature' = 'fft'
   ): Promise<UnifiedSeriesResult> {
     const sampleStrings = samples.map(complexToString);
@@ -176,10 +203,10 @@ export const seriesApi = {
       samples: sampleStrings,
       n_coeffs: nCoeffs,
       method,
-      type
+      type,
     });
     return response.data;
-  }
+  },
 };
 
 // New clean visualization API
@@ -223,10 +250,10 @@ export const visualizationApi = {
       samples: sampleStrings,
       method,
       n_terms: nTerms,
-      resolution
+      resolution,
     });
     return response.data;
-  }
+  },
 };
 
 export const dictionaryApi = {
@@ -259,17 +286,19 @@ export const dictionaryApi = {
   },
 
   // Get vocabulary suggestions based on lookup history
-  async getVocabularySuggestions(words: string[]): Promise<VocabularySuggestionsResponse> {
+  async getVocabularySuggestions(
+    words: string[]
+  ): Promise<VocabularySuggestionsResponse> {
     // Use GET when no words (empty array), POST when words provided
     if (!words || words.length === 0) {
       const response = await api.get(`/suggestions`, {
-        params: { count: 10 }
+        params: { count: 10 },
       });
       return response.data;
     } else {
       const response = await api.post(`/suggestions`, {
         words: words.slice(0, 10), // Take last 10 words max
-        count: 10
+        count: 10,
       });
       return response.data;
     }

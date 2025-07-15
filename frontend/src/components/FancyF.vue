@@ -1,12 +1,22 @@
 <template>
   <div class="inline-flex items-baseline gap-0">
-    <LaTeX 
+    <LaTeX
       :expression="'\\mathfrak{F}'"
-      :class="cn('text-primary font-bold transition-all duration-300 ease-out', sizeClass)"
+      :class="
+        cn(
+          'text-primary font-bold transition-all duration-300 ease-out',
+          sizeClass
+        )
+      "
     />
-    <LaTeX 
+    <LaTeX
       :expression="`_{\\text{${subscript}}}`"
-      :class="cn('text-primary transition-all duration-300 ease-out', subscriptSizeClass)"
+      :class="
+        cn(
+          'text-primary transition-all duration-300 ease-out',
+          subscriptSizeClass
+        )
+      "
     />
   </div>
 </template>
@@ -25,13 +35,13 @@ const props = withDefaults(defineProps<FancyFProps>(), {
   size: 'base',
 });
 
-const subscript = computed(() => props.mode === 'dictionary' ? 'd' : 't');
+const subscript = computed(() => (props.mode === 'dictionary' ? 'd' : 't'));
 
 const sizeClass = computed(() => {
   const sizes = {
     sm: 'text-lg',
     base: 'text-2xl',
-    lg: 'text-3xl', 
+    lg: 'text-3xl',
     xl: 'text-4xl',
   };
   return sizes[props.size];

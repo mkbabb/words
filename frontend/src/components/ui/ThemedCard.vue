@@ -1,25 +1,24 @@
 <template>
-  <div 
-    :class="cn(
-      'rounded-2xl text-card-foreground transition-all duration-300 relative overflow-hidden',
-      themeClasses,
-      className
-    )"
+  <div
+    :class="
+      cn(
+        'text-card-foreground relative overflow-hidden rounded-2xl transition-all duration-300',
+        themeClasses,
+        className
+      )
+    "
   >
     <!-- Star Icon for Special Variants -->
-    <div 
-      v-if="variant !== 'default'" 
-      class="absolute top-4 right-4 z-10"
-    >
+    <div v-if="variant !== 'default'" class="absolute top-4 right-4 z-10">
       <StarIcon :variant="variant" />
     </div>
-    
+
     <!-- Sparkle Animation Overlay -->
-    <div 
-      v-if="variant !== 'default'" 
-      :class="cn('absolute inset-0 pointer-events-none', sparkleClasses)"
+    <div
+      v-if="variant !== 'default'"
+      :class="cn('pointer-events-none absolute inset-0', sparkleClasses)"
     />
-    
+
     <!-- Content -->
     <div class="relative z-20">
       <slot />
@@ -40,12 +39,12 @@ interface ThemedCardProps {
 }
 
 const props = withDefaults(defineProps<ThemedCardProps>(), {
-  variant: 'default'
+  variant: 'default',
 });
 
 const themeClasses = computed(() => {
   const baseClasses = 'card-shadow transition-all duration-300';
-  
+
   switch (props.variant) {
     case 'gold':
       return `${baseClasses} card-gold`;

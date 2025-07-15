@@ -23,11 +23,11 @@ export function debounce<T extends (...args: any[]) => any>(
 
 export function formatDate(date: Date | string): string {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  
+
   if (!dateObj || isNaN(dateObj.getTime())) {
     return 'Invalid date';
   }
-  
+
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
@@ -42,7 +42,10 @@ export function generateId(): string {
 }
 
 export function normalizeWord(word: string): string {
-  return word.toLowerCase().trim().replace(/[^\w\s-]/g, '');
+  return word
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '');
 }
 
 export function getHeatmapClass(similarity: number): string {

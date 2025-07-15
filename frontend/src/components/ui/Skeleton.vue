@@ -1,10 +1,5 @@
 <template>
-  <div 
-    :class="cn(
-      'animate-pulse rounded-xl bg-muted',
-      className
-    )"
-  />
+  <div :class="cn('bg-muted animate-pulse rounded-xl', className)" />
 </template>
 
 <script setup lang="ts">

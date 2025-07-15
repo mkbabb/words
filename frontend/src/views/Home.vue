@@ -12,18 +12,11 @@
   >
     <!-- Main View -->
     <div class="min-h-screen">
-      <Tabs v-model="activeTab" class="w-full">
+      <Tabs v-model="activeTab" class="">
         <!-- Fixed Header with Tabs and Search -->
-        <div
-          class="bg-background/95 sticky top-0 z-40 border-b backdrop-blur-3xl"
-        >
-          <!-- Search Bar -->
-          <div class="search-container">
-            <SearchBar />
-          </div>
-
+        <div class="sticky top-0 z-40 border-b p-2 backdrop-blur-3xl">
           <div class="container grid gap-2 p-4">
-            <TabsList>
+            <TabsList class="flex justify-center bg-transparent">
               <TabsTrigger
                 value="definition"
                 style="font-family: 'Fraunces', serif"
@@ -36,6 +29,8 @@
               >
             </TabsList>
           </div>
+
+          <SearchBar />
         </div>
 
         <!-- Content Area -->

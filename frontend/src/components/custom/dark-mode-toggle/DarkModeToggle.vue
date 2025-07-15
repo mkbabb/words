@@ -1,6 +1,10 @@
 <template>
   <!-- Credit to Kevin Powell at https://codepen.io/kevinpowell/pen/PomqjxO -->
-  <button class="dark-mode-toggle-button" v-bind="$attrs" @click="changeTheme()">
+  <button
+    class="dark-mode-toggle-button"
+    v-bind="$attrs"
+    @click="changeTheme()"
+  >
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="472.39"
@@ -20,14 +24,14 @@
 </template>
 
 <script setup lang="ts">
-import { changeTheme } from ".";
+import { changeTheme } from '.';
 
 interface Props {
   size?: string;
 }
 
 withDefaults(defineProps<Props>(), {
-  size: "2rem",
+  size: '2rem',
 });
 </script>
 

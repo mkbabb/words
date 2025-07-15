@@ -1,9 +1,5 @@
 <template>
-  <span 
-    ref="mathElement" 
-    :class="className"
-    v-html="renderedMath"
-  ></span>
+  <span ref="mathElement" :class="className" v-html="renderedMath"></span>
 </template>
 
 <script setup lang="ts">
@@ -36,9 +32,9 @@ const renderMath = () => {
       output: 'html',
       trust: true,
       macros: {
-        "\\mathscr": "\\mathcal",
-        "\\ornate": "\\mathfrak"
-      }
+        '\\mathscr': '\\mathcal',
+        '\\ornate': '\\mathfrak',
+      },
     });
   } catch (error) {
     console.error('KaTeX rendering error:', error);
@@ -50,9 +46,12 @@ onMounted(() => {
   renderMath();
 });
 
-watch(() => props.expression, () => {
-  renderMath();
-});
+watch(
+  () => props.expression,
+  () => {
+    renderMath();
+  }
+);
 </script>
 
 <style>

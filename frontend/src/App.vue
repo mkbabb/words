@@ -4,7 +4,9 @@
     class="bg-background text-foreground min-h-screen"
   >
     <!-- Dark Mode Toggle -->
-    <div class="fixed top-0 right-0 p-2 grid z-50 gap-2 items-center justify-items-center">
+    <div
+      class="fixed top-0 right-0 z-50 grid items-center justify-items-center gap-2 p-2"
+    >
       <DarkModeToggle style="width: 2rem; height: 2rem" />
       <div class="flex">
         <HoverCard :open-delay="0">
@@ -50,6 +52,4 @@ import AvatarImage from '@/components/ui/AvatarImage.vue';
 import Button from '@/components/ui/Button.vue';
 </script>
 
-<style>
-@import '@/assets/index.css';
-</style>
+

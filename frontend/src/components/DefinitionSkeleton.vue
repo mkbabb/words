@@ -7,7 +7,7 @@
           <Skeleton class="h-8 w-48" />
           <Skeleton class="h-8 w-24" />
         </div>
-        
+
         <!-- Pronunciation Skeleton -->
         <div class="flex items-center gap-4 pt-2">
           <div class="flex items-center gap-2">
@@ -28,17 +28,21 @@
             <Skeleton class="h-4 w-4 animate-pulse" />
           </div>
         </CardHeader>
-        
+
         <CardContent class="space-y-4">
           <div class="space-y-3">
-            <div class="pl-4 border-l-2 border-accent">
-              <Skeleton class="h-6 w-full mb-2 animate-pulse" />
-              <Skeleton class="h-4 w-3/4 mb-2 animate-pulse" />
-              
+            <div class="border-accent border-l-2 pl-4">
+              <Skeleton class="mb-2 h-6 w-full animate-pulse" />
+              <Skeleton class="mb-2 h-4 w-3/4 animate-pulse" />
+
               <!-- Synonyms Skeleton -->
-              <div class="flex flex-wrap gap-1 mt-2">
+              <div class="mt-2 flex flex-wrap gap-1">
                 <Skeleton class="h-5 w-16 animate-pulse" />
-                <Skeleton v-for="j in 3" :key="j" class="h-5 w-20 animate-pulse" />
+                <Skeleton
+                  v-for="j in 3"
+                  :key="j"
+                  class="h-5 w-20 animate-pulse"
+                />
               </div>
             </div>
           </div>
@@ -53,7 +57,7 @@
       </CardHeader>
       <CardContent>
         <Skeleton class="h-4 w-full" />
-        <Skeleton class="h-4 w-2/3 mt-2" />
+        <Skeleton class="mt-2 h-4 w-2/3" />
       </CardContent>
     </Card>
   </div>
