@@ -56,6 +56,17 @@ const config: Config = {
           DEFAULT: 'var(--color-card)',
           foreground: 'var(--color-card-foreground)',
         },
+        bronze: {
+          100: '#fed7aa',
+          200: '#fdba74', 
+          300: '#fb923c',
+          400: '#f97316',
+          500: '#ea580c',
+          600: '#dc2626',
+          700: '#c2410c',
+          800: '#9a3412',
+          900: '#7c2d12',
+        },
       },
       borderRadius: {
         xl: 'calc(var(--radius) + 4px)',

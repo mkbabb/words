@@ -1,34 +1,36 @@
 <template>
   <div
-    :class="
-      cn(
-        'text-card-foreground relative overflow-hidden rounded-2xl transition-all duration-300',
-        themeClasses,
-        className
-      )
-    "
+    :class="[
+      'text-card-foreground relative overflow-hidden rounded-2xl transition-all duration-300',
+      'card-shadow',
+      variant !== 'default'
+        ? `card-${variant}`
+        : 'bg-card hover:card-shadow-hover',
+      className,
+    ]"
+    :data-variant="variant"
   >
     <!-- Star Icon for Special Variants -->
-    <div v-if="variant !== 'default'" class="absolute top-4 right-4 z-10">
+    <div
+      v-if="variant && variant !== 'default'"
+      class="absolute top-4 right-4 z-10"
+    >
       <StarIcon :variant="variant" />
     </div>
 
     <!-- Sparkle Animation Overlay -->
     <div
-      v-if="variant !== 'default'"
-      :class="cn('pointer-events-none absolute inset-0', sparkleClasses)"
+      v-if="variant && variant !== 'default'"
+      :class="`pointer-events-none absolute inset-0 sparkle-${variant}`"
     />
 
     <!-- Content -->
-    <div class="relative z-20">
-      <slot />
-    </div>
+    <slot />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { cn } from '@/utils';
+import { toRefs } from 'vue';
 import StarIcon from './StarIcon.vue';
 
 type CardVariant = 'default' | 'gold' | 'silver' | 'bronze';
@@ -38,35 +40,8 @@ interface ThemedCardProps {
   className?: string;
 }
 
-const props = withDefaults(defineProps<ThemedCardProps>(), {
-  variant: 'default',
-});
+const props = defineProps<ThemedCardProps>();
 
-const themeClasses = computed(() => {
-  const baseClasses = 'card-shadow transition-all duration-300';
-
-  switch (props.variant) {
-    case 'gold':
-      return `${baseClasses} card-gold`;
-    case 'silver':
-      return `${baseClasses} card-silver`;
-    case 'bronze':
-      return `${baseClasses} card-bronze`;
-    default:
-      return `${baseClasses} bg-card hover:card-shadow-hover`;
-  }
-});
-
-const sparkleClasses = computed(() => {
-  switch (props.variant) {
-    case 'gold':
-      return 'sparkle-gold';
-    case 'silver':
-      return 'sparkle-silver';
-    case 'bronze':
-      return 'sparkle-bronze';
-    default:
-      return '';
-  }
-});
+// Clean prop handling
+const { variant, className } = toRefs(props);
 </script>

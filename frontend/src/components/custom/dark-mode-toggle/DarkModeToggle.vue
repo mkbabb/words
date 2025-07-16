@@ -44,14 +44,12 @@ withDefaults(defineProps<Props>(), {
   border-radius: 50%;
   position: relative;
   isolation: isolate;
-  background: 0;
-
-  transition: all 0.3s ease;
-
   z-index: 999;
+  background: transparent;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 
   svg {
-    fill: hsl(var(--foreground));
+    fill: hsl(0 0% 10%);
     width: 100%;
     height: 100%;
   }
@@ -60,27 +58,58 @@ withDefaults(defineProps<Props>(), {
   &:focus {
     outline: none;
     opacity: 1;
-    background: hsl(0 0% 50% / 0.15);
+    transform: scale(1.05);
+  }
+  
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -200%;
+    z-index: -1;
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    background: radial-gradient(
+      circle closest-side,
+      hsl(0 0% 0% / 0.15),
+      transparent
+    );
   }
 }
 
 .dark-mode-toggle-button::before {
-  animation: pulse-to-dark 650ms ease-out;
+  animation: pulse 650ms ease-out;
 }
 
 .toggle-sun {
   transform-origin: center center;
-  transition: transform 750ms cubic-bezier(0.11, 0.14, 0.29, 1.5);
+  transition: transform 750ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .toggle-circle {
-  transform: translateX(0%);
-  transition: transform 500ms ease-out;
+  transform: translateX(0);
+  transition: transform 500ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .dark {
+  .dark-mode-toggle-button {
+    background: transparent;
+    
+    svg {
+      fill: hsl(0 0% 90%);
+    }
+    
+    &::before {
+      background: radial-gradient(
+        circle closest-side,
+        hsl(0 0% 100% / 0.15),
+        transparent
+      );
+    }
+  }
+  
   .dark-mode-toggle-button::before {
-    animation: pulse-to-light 650ms ease-out;
+    animation: pulse 650ms ease-out;
   }
 
   .toggle-sun {
@@ -92,37 +121,17 @@ withDefaults(defineProps<Props>(), {
   }
 }
 
-@keyframes pulse-to-light {
+@keyframes pulse {
   0% {
-    transform: scale(1);
-    opacity: 0.5;
+    opacity: 0;
+    transform: scale(0.5);
   }
-  10% {
-    transform: scale(1);
-  }
-  75% {
-    opacity: 1;
+  50% {
+    transform: scale(1.5);
   }
   100% {
     opacity: 0;
-    transform: scale(1);
-  }
-}
-
-@keyframes pulse-to-dark {
-  0% {
-    transform: scale(0);
-    opacity: 0.5;
-  }
-  10% {
-    transform: scale(1);
-  }
-  75% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1);
+    transform: scale(2.5);
   }
 }
 </style>

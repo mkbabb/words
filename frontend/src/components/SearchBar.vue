@@ -27,6 +27,12 @@
               @keydown.down.prevent="navigateResults(1)"
               @keydown.up.prevent="navigateResults(-1)"
               @keydown.escape="closeDropdown"
+              @focus="handleFocus"
+              @blur="handleBlur"
+              @input="handleInput"
+              @click="handleCursorChange"
+              @keyup="handleCursorChange"
+              @select="handleCursorChange"
             />
           </div>
         </div>
@@ -73,7 +79,7 @@
     <!-- Search Results Dropdown -->
     <div
       ref="searchResultsDropdown"
-      v-if="showDropdown"
+      v-if="shouldShowDropdown"
       class="absolute mt-2 right-0 left-0 rounded-2xl bg-background shadow-card border-2 border-border overflow-hidden"
     >
       <!-- Loading State -->
@@ -124,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useAppStore } from '@/stores';
 import { cn } from '@/utils';
 import type { SearchResult } from '@/types';
@@ -154,13 +160,13 @@ const inputVariants = cva([
 
 const inputClasses = computed(() => inputVariants());
 
-// State
-const query = ref('');
-const searchResults = ref<SearchResult[]>([]);
-const showDropdown = ref(false);
+// State - Initialize from store
+const query = ref(store.searchQuery || '');
+const searchResults = ref<SearchResult[]>(store.sessionState?.searchResults || []);
 const isSearching = ref(false);
-const selectedIndex = ref(0);
+const selectedIndex = ref(store.searchSelectedIndex || 0);
 const aiSuggestions = ref<string[]>([]);
+const isFocused = ref(false);
 
 // Refs
 const searchInput = ref<HTMLInputElement>();
@@ -168,7 +174,6 @@ const searchResultsDropdown = ref<HTMLElement>();
 
 // Timers
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
-let lookupTimer: ReturnType<typeof setTimeout> | undefined;
 
 // Computed
 const mode = computed(() => store.mode);
@@ -197,45 +202,87 @@ const getResultTextClasses = (isSelected: boolean) => {
   );
 };
 
-// Initialize suggestions and focus
-onMounted(async () => {
-  const history = await store.getHistoryBasedSuggestions();
-
-  aiSuggestions.value = history.slice(0, 4);
-
-  // Focus the search input
-  nextTick(() => {
-    if (searchInput.value) {
-      searchInput.value.focus();
-    }
-  });
+// Computed dropdown visibility - only show when focused AND has valid results
+const shouldShowDropdown = computed(() => {
+  return isFocused.value && query.value.length >= 2 && searchResults.value.length > 0;
 });
 
-watch(query, async newQuery => {
+// Handle focus
+const handleFocus = () => {
+  isFocused.value = true;
+  
+  // Restore search results from store if available and query is long enough
+  if (store.sessionState?.searchResults?.length > 0 && query.value.length >= 2) {
+    searchResults.value = store.sessionState.searchResults.slice(0, 8);
+  }
+  
+  // Restore cursor position on focus
+  nextTick(() => {
+    if (searchInput.value && store.searchCursorPosition) {
+      const pos = Math.min(store.searchCursorPosition, query.value.length);
+      searchInput.value.setSelectionRange(pos, pos);
+    }
+  });
+};
+
+// Handle blur
+const handleBlur = () => {
+  // Delay blur to allow clicking on results
+  setTimeout(() => {
+    isFocused.value = false;
+  }, 200);
+};
+
+// Handle click outside to close dropdown immediately
+const handleClickOutside = (event: Event) => {
+  const target = event.target as Element;
+  // Check if click is outside the search bar container
+  if (!target.closest('.max-w-lg')) {
+    isFocused.value = false;
+  }
+};
+
+// Handle cursor position changes (clicks, arrow keys, etc.)
+const handleCursorChange = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  store.searchCursorPosition = input.selectionStart || 0;
+};
+
+// Handle input with cursor tracking
+const handleInput = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  // Save cursor position on every input
+  store.searchCursorPosition = input.selectionStart || 0;
+  // Trigger search
+  performSearch();
+};
+
+// Perform search with debounce
+const performSearch = () => {
   clearTimeout(searchTimer);
-  clearTimeout(lookupTimer);
-
-  // Update store
-  store.searchQuery = newQuery;
-
-  // Reset if empty
-  if (!newQuery || newQuery.length < 2) {
+  
+  // Update store query
+  store.searchQuery = query.value;
+  
+  // Reset if too short
+  if (!query.value || query.value.length < 2) {
     searchResults.value = [];
-    showDropdown.value = false;
     isSearching.value = false;
     return;
   }
-
-  // Show dropdown with loading state
-  showDropdown.value = true;
+  
   isSearching.value = true;
-
-  // Call search API with debounce
+  
   searchTimer = setTimeout(async () => {
     try {
-      const results = await store.search(newQuery);
+      const results = await store.search(query.value);
       searchResults.value = results.slice(0, 8);
       selectedIndex.value = 0;
+      
+      // Save results to store
+      if (store.sessionState) {
+        store.sessionState.searchResults = results;
+      }
     } catch (error) {
       console.error('Search error:', error);
       searchResults.value = [];
@@ -243,18 +290,37 @@ watch(query, async newQuery => {
       isSearching.value = false;
     }
   }, 200);
+};
+
+// Initialize on mount
+onMounted(async () => {
+  // Load suggestions
+  try {
+    const history = await store.getHistoryBasedSuggestions();
+    aiSuggestions.value = history.slice(0, 4);
+  } catch {
+    aiSuggestions.value = [];
+  }
+  
+  // Add click outside listener
+  document.addEventListener('click', handleClickOutside);
+  
+  // DON'T restore search results immediately - only when focused
+  // This prevents dropdown from showing on refresh
+  
+  // DON'T auto-focus on mount - let user click to focus
+  // This prevents dropdown from showing on refresh
 });
 
 // Handle enter key
 const handleEnter = async () => {
   clearTimeout(searchTimer);
-  clearTimeout(lookupTimer);
 
   if (searchResults.value.length > 0 && selectedIndex.value >= 0) {
     await selectResult(searchResults.value[selectedIndex.value]);
   } else if (query.value) {
     // Direct lookup
-    closeDropdown();
+    isFocused.value = false;
     store.searchQuery = query.value;
     store.hasSearched = true;
     await store.getDefinition(query.value);
@@ -263,11 +329,14 @@ const handleEnter = async () => {
 
 // Select result
 const selectResult = async (result: SearchResult) => {
-  clearTimeout(lookupTimer);
+  clearTimeout(searchTimer);
   query.value = result.word;
-  closeDropdown();
-
   store.searchQuery = result.word;
+  
+  // Clear dropdown
+  isFocused.value = false;
+  searchResults.value = [];
+  
   store.hasSearched = true;
   await store.getDefinition(result.word);
 };
@@ -280,27 +349,29 @@ const selectWord = (word: string) => {
 
 // Navigate results with keyboard
 const navigateResults = (direction: number) => {
-  if (!showDropdown.value || searchResults.value.length === 0) return;
+  if (!shouldShowDropdown.value || searchResults.value.length === 0) return;
 
   selectedIndex.value = Math.max(
     0,
     Math.min(searchResults.value.length - 1, selectedIndex.value + direction)
   );
+  
+  // Save selected index to store
+  store.searchSelectedIndex = selectedIndex.value;
 };
 
 // Close dropdown
 const closeDropdown = () => {
-  showDropdown.value = false;
+  isFocused.value = false;
+  if (searchInput.value) {
+    searchInput.value.blur();
+  }
 };
 
-// Click outside to close
-onMounted(() => {
-  document.addEventListener('click', e => {
-    const target = e.target as HTMLElement;
-    if (!target.closest('.max-w-lg')) {
-      closeDropdown();
-    }
-  });
+// Cleanup on unmount
+onUnmounted(() => {
+  clearTimeout(searchTimer);
+  document.removeEventListener('click', handleClickOutside);
 });
 </script>
 

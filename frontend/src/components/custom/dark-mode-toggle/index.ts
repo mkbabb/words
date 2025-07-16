@@ -2,7 +2,7 @@ export { default as DarkModeToggle } from './DarkModeToggle.vue';
 
 import { useDark, useToggle } from '@vueuse/core';
 
-const isDark = useDark({ disableTransition: false });
+const isDark = useDark({ disableTransition: true });
 const toggleDark = useToggle(isDark);
 
 export const changeTheme = () => {

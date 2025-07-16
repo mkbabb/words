@@ -14,22 +14,109 @@ import { dictionaryApi } from '@/utils/api';
 import { generateId, normalizeWord } from '@/utils';
 
 export const useAppStore = defineStore('app', () => {
-  // Reactive state
-  const searchQuery = ref('');
+  // Runtime state (not persisted)
   const isSearching = ref(false);
   const hasSearched = ref(false);
   const searchResults = ref<SearchResult[]>([]);
-  const currentEntry = ref<SynthesizedDictionaryEntry>();
-  const currentThesaurus = ref<ThesaurusEntry>();
-  const mode = ref<'dictionary' | 'thesaurus'>('dictionary');
-  const pronunciationMode = ref<'phonetic' | 'ipa'>('phonetic');
-  const theme = useStorage('theme', 'light');
   const loadingProgress = ref(0);
   const loadingStage = ref('');
-
-  // Sidebar state
-  const sidebarOpen = ref(false); // For mobile modal
-  const sidebarCollapsed = ref(true); // For desktop collapse
+  
+  // Persisted UI State with validation
+  const uiState = useStorage('ui-state', {
+    mode: 'dictionary' as const,
+    pronunciationMode: 'phonetic' as const,
+    sidebarOpen: false,
+    sidebarCollapsed: true,
+    selectedCardVariant: 'default' as const,
+  }, undefined, {
+    serializer: {
+      read: (v: any) => {
+        try {
+          const parsed = JSON.parse(v);
+          // Validate card variant
+          if (!['default', 'gold', 'silver', 'bronze'].includes(parsed.selectedCardVariant)) {
+            parsed.selectedCardVariant = 'default';
+          }
+          return parsed;
+        } catch {
+          return {
+            mode: 'dictionary',
+            pronunciationMode: 'phonetic',
+            sidebarOpen: false,
+            sidebarCollapsed: true,
+            selectedCardVariant: 'default',
+          };
+        }
+      },
+      write: (v: any) => JSON.stringify(v),
+    }
+  });
+  
+  // Persisted Session State - Everything about search
+  const sessionState = useStorage('session-state', {
+    searchQuery: '',
+    searchCursorPosition: 0,
+    searchSelectedIndex: 0,
+    searchResults: [] as SearchResult[],
+    currentWord: null as string | null,
+    currentEntry: null as SynthesizedDictionaryEntry | null,
+    currentThesaurus: null as ThesaurusEntry | null,
+  });
+  
+  // Create refs that sync with persisted state
+  const searchQuery = computed({
+    get: () => sessionState.value.searchQuery,
+    set: (value) => { sessionState.value.searchQuery = value; }
+  });
+  
+  const currentEntry = computed({
+    get: () => sessionState.value.currentEntry,
+    set: (value) => { sessionState.value.currentEntry = value || null; }
+  });
+  
+  const currentThesaurus = computed({
+    get: () => sessionState.value.currentThesaurus,
+    set: (value) => { sessionState.value.currentThesaurus = value || null; }
+  });
+  
+  const mode = computed({
+    get: () => uiState.value.mode,
+    set: (value) => { uiState.value.mode = value; }
+  });
+  
+  const pronunciationMode = computed({
+    get: () => uiState.value.pronunciationMode,
+    set: (value) => { uiState.value.pronunciationMode = value; }
+  });
+  
+  const sidebarOpen = computed({
+    get: () => uiState.value.sidebarOpen,
+    set: (value) => { uiState.value.sidebarOpen = value; }
+  });
+  
+  const sidebarCollapsed = computed({
+    get: () => uiState.value.sidebarCollapsed,
+    set: (value) => { uiState.value.sidebarCollapsed = value; }
+  });
+  
+  const selectedCardVariant = computed({
+    get: () => uiState.value.selectedCardVariant,
+    set: (value) => { uiState.value.selectedCardVariant = value; }
+  });
+  
+  // Remove computed dropdown visibility - let component handle it
+  
+  const searchCursorPosition = computed({
+    get: () => sessionState.value.searchCursorPosition,
+    set: (value) => { sessionState.value.searchCursorPosition = value; }
+  });
+  
+  const searchSelectedIndex = computed({
+    get: () => sessionState.value.searchSelectedIndex,
+    set: (value) => { sessionState.value.searchSelectedIndex = value; }
+  });
+  
+  const theme = useStorage('theme', 'light');
 
   // Search history (persisted) - keeping for search bar functionality
   const searchHistory = useStorage<SearchHistory[]>('search-history', []);
@@ -37,8 +124,18 @@ export const useAppStore = defineStore('app', () => {
   // Lookup history (persisted) - main source for suggestions and tiles
   const lookupHistory = useStorage<LookupHistory[]>('lookup-history', []);
 
+  // Persisted suggestions cache
+  const suggestionsCache = useStorage('suggestions-cache', {
+    suggestions: [] as VocabularySuggestion[],
+    lastWord: null as string | null,
+    timestamp: null as number | null,
+  });
+  
   // Vocabulary suggestions state
-  const vocabularySuggestions = ref<VocabularySuggestion[]>([]);
+  const vocabularySuggestions = computed({
+    get: () => suggestionsCache.value.suggestions,
+    set: (value) => { suggestionsCache.value.suggestions = value; }
+  });
   const isLoadingSuggestions = ref(false);
 
   // Computed properties
@@ -47,7 +144,7 @@ export const useAppStore = defineStore('app', () => {
     isSearching: isSearching.value,
     hasSearched: hasSearched.value,
     results: searchResults.value,
-    currentEntry: currentEntry.value,
+    currentEntry: currentEntry.value || undefined,
     mode: mode.value,
   }));
 
@@ -96,6 +193,9 @@ export const useAppStore = defineStore('app', () => {
     try {
       const results = await dictionaryApi.searchWord(query);
       searchResults.value = results;
+      
+      // Update persisted search results
+      sessionState.value.searchResults = results;
 
       // Add to history if we have results
       if (results.length > 0) {
@@ -121,9 +221,17 @@ export const useAppStore = defineStore('app', () => {
 
       const entry = await dictionaryApi.getDefinition(word);
       currentEntry.value = entry;
+      
+      // Update current word in session
+      sessionState.value.currentWord = word;
 
       // Add to lookup history
       addToLookupHistory(word, entry);
+      
+      // Refresh suggestions if this is a new word
+      if (word !== suggestionsCache.value.lastWord) {
+        refreshVocabularySuggestions();
+      }
 
       loadingProgress.value = 70;
       loadingStage.value = 'Finalizing...';
@@ -219,21 +327,48 @@ export const useAppStore = defineStore('app', () => {
     vocabularySuggestions.value = [];
   }
 
-  async function refreshVocabularySuggestions() {
+  async function refreshVocabularySuggestions(forceRefresh = false) {
+    const ONE_HOUR = 60 * 60 * 1000;
+    const currentWord = sessionState.value.currentWord;
+    const cache = suggestionsCache.value;
+    
+    // Use cache if:
+    // 1. Not forcing refresh
+    // 2. Cache exists and has suggestions
+    // 3. Cache is less than 1 hour old
+    // 4. Current word hasn't changed
+    if (
+      !forceRefresh &&
+      cache.suggestions.length > 0 &&
+      cache.timestamp &&
+      Date.now() - cache.timestamp < ONE_HOUR &&
+      currentWord === cache.lastWord
+    ) {
+      return; // Use cached suggestions
+    }
+    
     isLoadingSuggestions.value = true;
     try {
       const recentWords = recentLookupWords.value.slice(0, 10);
       const response =
         await dictionaryApi.getVocabularySuggestions(recentWords);
-      vocabularySuggestions.value = response.words.map(word => ({
+      
+      const newSuggestions = response.words.map(word => ({
         word,
         reasoning: '',
         difficulty_level: 0,
         semantic_category: '',
       }));
+      
+      // Update cache
+      suggestionsCache.value = {
+        suggestions: newSuggestions,
+        lastWord: currentWord,
+        timestamp: Date.now(),
+      };
     } catch (error) {
       console.error('Failed to get vocabulary suggestions:', error);
-      vocabularySuggestions.value = [];
+      // Don't clear cache on error - keep using old suggestions
     } finally {
       isLoadingSuggestions.value = false;
     }
@@ -285,8 +420,8 @@ export const useAppStore = defineStore('app', () => {
     isSearching.value = false;
     hasSearched.value = false;
     searchResults.value = [];
-    currentEntry.value = undefined;
-    currentThesaurus.value = undefined;
+    currentEntry.value = null;
+    currentThesaurus.value = null;
     mode.value = 'dictionary';
   }
 
@@ -316,8 +451,12 @@ export const useAppStore = defineStore('app', () => {
     isLoadingSuggestions,
     sidebarOpen,
     sidebarCollapsed,
+    selectedCardVariant,
     loadingProgress,
     loadingStage,
+    searchCursorPosition,
+    searchSelectedIndex,
+    sessionState,
 
     // Computed
     searchState,
