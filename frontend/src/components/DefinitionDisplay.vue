@@ -1,48 +1,54 @@
 <template>
-    {{ store.selectedCardVariant }}
-  <ThemedCard
-    v-if="entry"
-    :variant="selectedCardVariant"
-    class="space-y-6"
-  >
+  <!-- Teleport the themed card variant tabs outside ThemedCard -->
+  <Teleport to="#themed-card-tabs-slot" v-if="entry && isMounted">
+    <Tabs v-model="store.selectedCardVariant" class="w-auto">
+      <TabsList class="grid w-full grid-cols-4 gap-1">
+        <TabsTrigger
+          value="default"
+          class="hover:bg-muted/50 data-[state=active]:bg-muted text-xs transition-all"
+        >
+          Default
+        </TabsTrigger>
+        <TabsTrigger
+          value="bronze"
+          class="text-xs transition-all hover:bg-orange-100/30 hover:text-orange-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-100/40 data-[state=active]:to-amber-100/40 data-[state=active]:text-orange-800 dark:hover:bg-orange-900/20 dark:hover:text-orange-400 dark:data-[state=active]:from-orange-900/30 dark:data-[state=active]:to-amber-900/30 dark:data-[state=active]:text-orange-300"
+        >
+          Bronze
+        </TabsTrigger>
+        <TabsTrigger
+          value="silver"
+          class="text-xs transition-all hover:bg-gray-100/30 hover:text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-100/40 data-[state=active]:to-slate-100/40 data-[state=active]:text-gray-800 dark:hover:bg-gray-800/20 dark:hover:text-gray-300 dark:data-[state=active]:from-gray-800/30 dark:data-[state=active]:to-slate-800/30 dark:data-[state=active]:text-gray-200"
+        >
+          Silver
+        </TabsTrigger>
+        <TabsTrigger
+          value="gold"
+          class="text-xs transition-all hover:bg-yellow-100/30 hover:text-yellow-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-100/40 data-[state=active]:to-amber-100/40 data-[state=active]:text-yellow-800 dark:hover:bg-yellow-900/20 dark:hover:text-yellow-400 dark:data-[state=active]:from-yellow-900/30 dark:data-[state=active]:to-amber-900/30 dark:data-[state=active]:text-yellow-300"
+        >
+          Gold
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
+  </Teleport>
+
+  <ThemedCard v-if="entry" :variant="selectedCardVariant" class="space-y-6">
     <!-- Header Section -->
     <CardHeader>
       <div class="flex items-center justify-between">
         <CardTitle
-          :class="
-            cn('text-word-title transition-all duration-200', titleHoverClass)
-          "
+          :class="[
+            'text-word-title transition-all duration-200',
+            {
+              'hover:text-yellow-600 dark:hover:text-yellow-400': selectedCardVariant === 'gold',
+              'hover:text-slate-600 dark:hover:text-slate-400': selectedCardVariant === 'silver',
+              'hover:text-bronze-600 dark:hover:text-bronze-400': selectedCardVariant === 'bronze',
+              'hover:text-primary': selectedCardVariant === 'default'
+            }
+          ]"
           >{{ entry.word }}</CardTitle
         >
-        <!-- Tabs section for to select the card variant: either gold, silver, bronze -->
-        <Tabs v-model="store.selectedCardVariant" class="w-auto">
-          <TabsList class="grid w-full grid-cols-4 gap-1">
-            <TabsTrigger
-              value="default"
-              class="hover:bg-muted/50 data-[state=active]:bg-muted text-xs transition-all"
-            >
-              Default
-            </TabsTrigger>
-            <TabsTrigger
-              value="bronze"
-              class="text-xs transition-all hover:bg-orange-100/30 hover:text-orange-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-100/40 data-[state=active]:to-amber-100/40 data-[state=active]:text-orange-800 dark:hover:bg-orange-900/20 dark:hover:text-orange-400 dark:data-[state=active]:from-orange-900/30 dark:data-[state=active]:to-amber-900/30 dark:data-[state=active]:text-orange-300"
-            >
-              Bronze
-            </TabsTrigger>
-            <TabsTrigger
-              value="silver"
-              class="text-xs transition-all hover:bg-gray-100/30 hover:text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-100/40 data-[state=active]:to-slate-100/40 data-[state=active]:text-gray-800 dark:hover:bg-gray-800/20 dark:hover:text-gray-300 dark:data-[state=active]:from-gray-800/30 dark:data-[state=active]:to-slate-800/30 dark:data-[state=active]:text-gray-200"
-            >
-              Silver
-            </TabsTrigger>
-            <TabsTrigger
-              value="gold"
-              class="text-xs transition-all hover:bg-yellow-100/30 hover:text-yellow-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-100/40 data-[state=active]:to-amber-100/40 data-[state=active]:text-yellow-800 dark:hover:bg-yellow-900/20 dark:hover:text-yellow-400 dark:data-[state=active]:from-yellow-900/30 dark:data-[state=active]:to-amber-900/30 dark:data-[state=active]:text-yellow-300"
-            >
-              Gold
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <!-- Teleport target for tabs - maintains original visual position -->
+        <div id="themed-card-tabs-slot"></div>
       </div>
 
       <!-- Pronunciation -->
@@ -178,7 +184,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAppStore } from '@/stores';
 import { cn, getHeatmapClass } from '@/utils';
@@ -187,6 +193,13 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import Badge from '@/components/ui/Badge.vue';
 import ThemedCard from '@/components/ui/ThemedCard.vue';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+// Track mounting state for teleport
+const isMounted = ref(false);
+
+onMounted(() => {
+  isMounted.value = true;
+});
 
 // Remove unused props interface since we're using store state
 // interface DefinitionDisplayProps {
@@ -223,19 +236,6 @@ const formatExampleHTML = (example: string, word: string): string => {
   return example.replace(regex, `<strong class="hover-word">${word}</strong>`);
 };
 
-// Computed classes based on store variant
-const titleHoverClass = computed(() => {
-  switch (selectedCardVariant.value) {
-    case 'gold':
-      return 'hover:text-yellow-600 dark:hover:text-yellow-400';
-    case 'silver':
-      return 'hover:text-slate-600 dark:hover:text-slate-400';
-    case 'bronze':
-      return 'hover:text-bronze-600 dark:hover:text-bronze-400';
-    default:
-      return 'hover:text-primary';
-  }
-});
 </script>
 
 <style scoped>

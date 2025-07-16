@@ -13,11 +13,9 @@
     <!-- Main View -->
     <div class="min-h-screen">
       <Tabs v-model="activeTab" class="">
-        <!-- Fixed Header with Tabs and Search -->
-        <div
-          class="border-border/50 sticky top-0 z-40 border-b p-2 backdrop-blur-3xl"
-        >
-          <div class="container grid gap-2 p-4">
+        <!-- Sticky Tabs -->
+        <div class="sticky top-0 z-40">
+          <div class="container grid gap-2">
             <TabsList class="flex justify-center bg-transparent">
               <TabsTrigger
                 value="definition"
@@ -32,8 +30,12 @@
             </TabsList>
           </div>
 
+          <!-- Sticky Search Bar -->
           <SearchBar />
         </div>
+
+        <!-- Border separator (not sticky) -->
+        <div class="border-border/50 border-b"></div>
 
         <!-- Content Area -->
         <div class="container mx-auto max-w-5xl px-4 py-8">

@@ -2,7 +2,7 @@
   <div
     :class="[
       'text-card-foreground relative overflow-hidden rounded-2xl transition-all duration-300',
-      'card-shadow',
+      'cartoon-shadow-lg',
       variant !== 'default'
         ? `card-${variant}`
         : 'bg-card hover:card-shadow-hover',
