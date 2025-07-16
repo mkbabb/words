@@ -1,24 +1,33 @@
 <template>
-  <div :class="cn('relative z-50 mx-auto w-full max-w-lg p-2', className)">
+  <div 
+    :class="cn(searchBarContainerClasses, className)"
+    @mouseenter="handleSearchBarHover(true)"
+    @mouseleave="handleSearchBarHover(false)"
+  >
     <!-- Search Bar -->
-    <div
-      class="border-border bg-background/50 hover-shadow-lift transition-smooth cartoon-shadow-sm relative overflow-visible rounded-2xl border-2 backdrop-blur-3xl"
-    >
+    <div :class="searchBarInnerClasses">
       <!-- Search Input Area -->
 
       <div class="flex items-center p-2">
-        <!-- Mode Toggle -->
-        <button
-          class="hover-lift flex h-12 w-12 items-center justify-center rounded-xl"
-          @click="store.toggleMode()"
-          :title="
-            mode === 'dictionary'
-              ? 'Switch to thesaurus mode'
-              : 'Switch to dictionary mode'
-          "
+        <!-- Mode Toggle with bouncy shrinking -->
+        <div 
+          ref="modeToggleContainer"
+          class="relative overflow-hidden"
+          style="width: 48px; transition: width 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)"
         >
-          <FancyF :mode="mode" size="lg" />
-        </button>
+          <button
+            ref="modeToggleButton"
+            class="hover-lift flex h-12 w-12 items-center justify-center rounded-xl absolute top-0 left-0"
+            @click="store.toggleMode()"
+            :title="
+              mode === 'dictionary'
+                ? 'Switch to thesaurus mode'
+                : 'Switch to dictionary mode'
+            "
+          >
+            <FancyF :mode="mode" size="lg" />
+          </button>
+        </div>
 
         <!-- Search Input -->
         <input
@@ -26,7 +35,7 @@
           v-model="query"
           :placeholder="placeholder"
           autofocus
-          class="w-full rounded-xl px-4 py-2 text-xl text-base placeholder:text-muted-foreground shadow-subtle hover:shadow-sm transition-smooth focus-ring disabled:cursor-not-allowed disabled:opacity-50 focus:ring-primary outline-none focus:ring-1"
+          class="w-full rounded-xl px-4 py-2 text-base placeholder:text-muted-foreground shadow-subtle hover:shadow-sm transition-smooth focus-ring disabled:cursor-not-allowed disabled:opacity-50 focus:ring-primary outline-none focus:ring-1"
           @keydown.enter="handleEnter"
           @keydown.down.prevent="navigateResults(1)"
           @keydown.up.prevent="navigateResults(-1)"
@@ -38,11 +47,161 @@
           @keyup="handleCursorChange"
           @select="handleCursorChange"
         />
+
+        <!-- Hamburger Dropdown Button with bouncy shrinking -->
+        <div 
+          ref="hamburgerContainer"
+          class="relative overflow-hidden"
+          style="width: 48px; transition: width 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)"
+        >
+          <button
+            ref="hamburgerButton"
+            class="hover-lift flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-300 absolute top-0 left-0"
+            @click="store.toggleControls()"
+            :title="store.showControls ? 'Hide controls' : 'Show controls'"
+          >
+            <div class="flex flex-col items-center justify-center w-5 h-5 space-y-1">
+              <span 
+                class="block w-4 h-0.5 bg-current transition-all duration-300 ease-out"
+                :class="{
+                  'rotate-45 translate-y-1.5': store.showControls,
+                  'rotate-0 translate-y-0': !store.showControls
+                }"
+              />
+              <span 
+                class="block w-4 h-0.5 bg-current transition-all duration-300 ease-out"
+                :class="{
+                  'opacity-0': store.showControls,
+                  'opacity-100': !store.showControls
+                }"
+              />
+              <span 
+                class="block w-4 h-0.5 bg-current transition-all duration-300 ease-out"
+                :class="{
+                  '-rotate-45 -translate-y-1.5': store.showControls,
+                  'rotate-0 translate-y-0': !store.showControls
+                }"
+              />
+            </div>
+          </button>
+        </div>
       </div>
+
+      <!-- Enhanced Controls Section -->
+      <Transition
+        enter-active-class="transition-all duration-300 ease-out"
+        enter-from-class="opacity-0 max-h-0"
+        enter-to-class="opacity-100 max-h-96"
+        leave-active-class="transition-all duration-300 ease-in"
+        leave-from-class="opacity-100 max-h-96"
+        leave-to-class="opacity-0 max-h-0"
+      >
+        <div v-if="store.showControls" class="overflow-hidden">
+          <!-- Mode Selection -->
+          <div class="border-border/50 border-t px-4 py-3">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-medium text-foreground">Search Mode</h3>
+            </div>
+            <div class="flex space-x-2">
+              <button
+                ref="wordSearchButton"
+                @click="handleModeSelect('word')"
+                :class="[
+                  'px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]',
+                  store.searchMode === 'word'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                ]"
+              >
+                Word Search
+              </button>
+              <button
+                ref="wordlistSearchButton"
+                @click="handleModeSelect('wordlist')"
+                :class="[
+                  'px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]',
+                  store.searchMode === 'wordlist'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                ]"
+              >
+                Wordlist Search
+              </button>
+            </div>
+          </div>
+
+          <!-- Source Selection (for word search mode) -->
+          <div v-if="store.searchMode === 'word'" class="border-border/50 border-t px-4 py-3">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-medium text-foreground">Sources</h3>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                @click="store.toggleSource('wiktionary')"
+                :class="[
+                  'px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 hover-lift',
+                  store.selectedSources.includes('wiktionary')
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                ]"
+              >
+                <WiktionaryIcon :size="16" class="transition-transform group-hover:scale-110" />
+                Wiktionary
+              </button>
+              <button
+                @click="store.toggleSource('oxford')"
+                :class="[
+                  'px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 hover-lift',
+                  store.selectedSources.includes('oxford')
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                ]"
+              >
+                <OxfordIcon :size="16" class="transition-transform group-hover:scale-110" />
+                Oxford
+              </button>
+              <button
+                @click="store.toggleSource('dictionary_com')"
+                :class="[
+                  'px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 hover-lift',
+                  store.selectedSources.includes('dictionary_com')
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                ]"
+              >
+                <DictionaryIcon :size="16" class="transition-transform group-hover:scale-110" />
+                Dictionary.com
+              </button>
+            </div>
+          </div>
+
+          <!-- Wordlist Selection (for wordlist search mode) -->
+          <div v-if="store.searchMode === 'wordlist'" class="border-border/50 border-t px-4 py-3">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-medium text-foreground">Select Wordlist</h3>
+            </div>
+            <div class="space-y-2">
+              <button
+                v-for="wordlist in ['SAT Vocabulary', 'GRE Advanced', 'Academic Words', 'Medical Terms']"
+                :key="wordlist"
+                @click="store.setWordlist(wordlist)"
+                :class="[
+                  'w-full px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-left',
+                  store.selectedWordlist === wordlist
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                ]"
+              >
+                {{ wordlist }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
 
       <!-- AI Suggestions -->
       <div
-        v-if="!query && aiSuggestions.length > 0"
+        v-if="!query && aiSuggestions.length > 0 && store.searchMode === 'word'"
         class="border-border/50 border-t px-4 py-3"
       >
         <div class="flex flex-wrap items-center justify-center gap-2">
@@ -105,6 +264,7 @@
       <!-- Search Results -->
       <div
         v-else-if="searchResults.length > 0"
+        ref="searchResultsContainer"
         class="scrollbar-thin max-h-64 overflow-y-auto"
       >
         <button
@@ -147,21 +307,43 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { gsap } from 'gsap';
 import { useAppStore } from '@/stores';
 import type { SearchResult } from '@/types';
 import Button from '@/components/ui/Button.vue';
-import FancyF from '@/components/FancyF.vue';
+import FancyF from '@/components/ui/icons/FancyF.vue';
 import { Sparkles } from 'lucide-vue-next';
 import { cn } from '@/utils';
+import WiktionaryIcon from '@/components/ui/icons/WiktionaryIcon.vue';
+import OxfordIcon from '@/components/ui/icons/OxfordIcon.vue';
+import DictionaryIcon from '@/components/ui/icons/DictionaryIcon.vue';
 
 interface SearchBarProps {
   className?: string;
+  shrinkPercentage?: number;
 }
 
-defineProps<SearchBarProps>();
+const props = withDefaults(defineProps<SearchBarProps>(), {
+  shrinkPercentage: 0,
+});
 
 const store = useAppStore();
+
+// Responsive styling based on shrink percentage
+const searchBarContainerClasses = computed(() => {
+  return cn(
+    'relative z-50 mx-auto w-full transition-all duration-300 ease-out',
+    props.shrinkPercentage > 0 ? 'max-w-md p-1' : 'max-w-lg p-2'
+  );
+});
+
+const searchBarInnerClasses = computed(() => {
+  return cn(
+    'border-border bg-background/50 hover-shadow-lift transition-smooth cartoon-shadow-sm relative overflow-visible rounded-2xl border-2 backdrop-blur-3xl',
+    props.shrinkPercentage > 0 ? 'scale-95' : 'scale-100'
+  );
+});
 
 // State - Initialize from store
 const query = ref(store.searchQuery || '');
@@ -172,10 +354,18 @@ const isSearching = ref(false);
 const selectedIndex = ref(store.searchSelectedIndex || 0);
 const aiSuggestions = ref<string[]>([]);
 const isFocused = ref(false);
+const isHovered = ref(false);
 
 // Refs
 const searchInput = ref<HTMLInputElement>();
 const searchResultsDropdown = ref<HTMLElement>();
+const searchResultsContainer = ref<HTMLElement>();
+const wordSearchButton = ref<HTMLButtonElement>();
+const wordlistSearchButton = ref<HTMLButtonElement>();
+const modeToggleContainer = ref<HTMLElement>();
+const hamburgerContainer = ref<HTMLElement>();
+const modeToggleButton = ref<HTMLButtonElement>();
+const hamburgerButton = ref<HTMLButtonElement>();
 
 // Timers
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -217,12 +407,31 @@ const handleFocus = () => {
   });
 };
 
-// Handle blur
+// Handle blur with search results animation
 const handleBlur = () => {
-  // Delay blur to allow clicking on results
-  setTimeout(() => {
-    isFocused.value = false;
-  }, 200);
+  // Animate search results out before hiding
+  if (searchResultsContainer.value) {
+    const buttons = searchResultsContainer.value.querySelectorAll('button');
+    gsap.to(buttons, {
+      opacity: 0,
+      y: -10,
+      scale: 0.95,
+      duration: 0.2,
+      ease: "power2.in",
+      stagger: 0.02,
+      onComplete: () => {
+        // Delay blur to allow clicking on results, but reduced since animation handles it
+        setTimeout(() => {
+          isFocused.value = false;
+        }, 100);
+      }
+    });
+  } else {
+    // Fallback for when no results container exists
+    setTimeout(() => {
+      isFocused.value = false;
+    }, 200);
+  }
 };
 
 // Handle click outside to close dropdown immediately
@@ -275,6 +484,28 @@ const performSearch = () => {
       if (store.sessionState) {
         store.sessionState.searchResults = results;
       }
+
+      // Animate search results appearance
+      nextTick(() => {
+        if (searchResultsContainer.value) {
+          const buttons = searchResultsContainer.value.querySelectorAll('button');
+          gsap.fromTo(buttons, 
+            { 
+              opacity: 0, 
+              y: 20,
+              scale: 0.9
+            },
+            { 
+              opacity: 1, 
+              y: 0,
+              scale: 1,
+              duration: 0.3,
+              ease: "back.out(1.5)",
+              stagger: 0.05
+            }
+          );
+        }
+      });
     } catch (error) {
       console.error('Search error:', error);
       searchResults.value = [];
@@ -360,6 +591,99 @@ const closeDropdown = () => {
     searchInput.value.blur();
   }
 };
+
+// Handle search bar hover for element expansion
+const handleSearchBarHover = (hovered: boolean) => {
+  isHovered.value = hovered;
+  
+  if (props.shrinkPercentage >= 0.3) {
+    // Only animate expansion if elements are shrunk
+    if (hovered) {
+      expandElements();
+    } else {
+      shrinkElements();
+    }
+  }
+};
+
+// Animate element shrinking with GSAP
+const shrinkElements = () => {
+  if (modeToggleContainer.value && hamburgerContainer.value) {
+    gsap.to([modeToggleContainer.value, hamburgerContainer.value], {
+      width: 8,
+      duration: 0.4,
+      ease: "back.in(1.7)"
+    });
+    
+    gsap.to([modeToggleButton.value, hamburgerButton.value], {
+      scale: 0.3,
+      opacity: 0.3,
+      duration: 0.3,
+      ease: "power2.in"
+    });
+  }
+};
+
+// Animate element expansion with bouncy effect
+const expandElements = () => {
+  if (modeToggleContainer.value && hamburgerContainer.value) {
+    gsap.to([modeToggleContainer.value, hamburgerContainer.value], {
+      width: 48,
+      duration: 0.5,
+      ease: "back.out(1.7)"
+    });
+    
+    gsap.to([modeToggleButton.value, hamburgerButton.value], {
+      scale: 1,
+      opacity: 1,
+      duration: 0.4,
+      ease: "back.out(2.5)"
+    });
+  }
+};
+
+// Handle mode selection with bouncy animation
+const handleModeSelect = (mode: 'word' | 'wordlist') => {
+  const targetButton = mode === 'word' ? wordSearchButton.value : wordlistSearchButton.value;
+  
+  if (targetButton) {
+    // Bouncy press animation
+    gsap.to(targetButton, {
+      scale: 0.92,
+      duration: 0.1,
+      ease: "power2.out",
+      onComplete: () => {
+        gsap.to(targetButton, {
+          scale: 1.05,
+          duration: 0.15,
+          ease: "back.out(2)",
+          onComplete: () => {
+            gsap.to(targetButton, {
+              scale: 1,
+              duration: 0.1,
+              ease: "power2.out"
+            });
+          }
+        });
+      }
+    });
+  }
+  
+  // Update mode
+  store.searchMode = mode;
+};
+
+// Watch shrink percentage for automatic element hiding/showing
+watch(() => props.shrinkPercentage, (newPercentage, oldPercentage) => {
+  // Trigger shrinking when crossing threshold
+  if (newPercentage >= 0.3 && oldPercentage < 0.3 && !isHovered.value) {
+    shrinkElements();
+  }
+  // Restore elements when scrolling back up
+  else if (newPercentage < 0.3 && oldPercentage >= 0.3) {
+    expandElements();
+  }
+});
 
 // Cleanup on unmount
 onUnmounted(() => {

@@ -4,7 +4,7 @@
     <div
       :class="
         cn(
-          'fixed top-2 left-2 z-50 transition-transform duration-250 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] lg:hidden',
+          'fixed top-2 left-2 z-70 transition-transform duration-250 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] lg:hidden',
           {
             'translate-x-0': !sidebarOpen,
             'translate-x-64': sidebarOpen, // Move with sidebar - w-64 = 256px to keep it within the sidebar
@@ -168,7 +168,7 @@
     </aside>
 
     <!-- Mobile Sidebar Modal -->
-    <div class="pointer-events-none fixed inset-0 z-40 lg:hidden">
+    <div class="pointer-events-none fixed inset-0 z-60 lg:hidden">
       <!-- Overlay that darkens only the non-sidebar area -->
       <Transition
         enter-active-class="transition-opacity duration-250 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]"
@@ -273,7 +273,7 @@ import { useAppStore } from '@/stores';
 import { cn } from '@/utils';
 import Button from '@/components/ui/Button.vue';
 import SearchHistoryContent from '@/components/SearchHistoryContent.vue';
-import FloridifyIcon from '@/components/FloridifyIcon.vue';
+import FloridifyIcon from '@/components/ui/icons/FloridifyIcon.vue';
 import { PanelLeft, PanelRight, User } from 'lucide-vue-next';
 
 const store = useAppStore();

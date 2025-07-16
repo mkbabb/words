@@ -12,15 +12,11 @@
     "
     @click="$emit('click')"
   >
-    <!-- Fancy F -->
-    <LaTeX
-      :expression="'\\mathfrak{F}'"
-      :class="
-        cn('text-primary font-bold transition-all duration-300', {
-          'text-2xl': expanded,
-          'text-xl': !expanded,
-        })
-      "
+    <!-- Fancy F using reusable component -->
+    <FancyF 
+      mode="dictionary" 
+      :size="expanded ? 'lg' : 'base'"
+      class="transition-all duration-300"
     />
 
     <!-- Rest of "loridify" with Fraunces font -->
@@ -42,7 +38,7 @@
 
 <script setup lang="ts">
 import { cn } from '@/utils';
-import { LaTeX } from '@/components/custom/latex';
+import FancyF from './FancyF.vue';
 
 interface FloridifyIconProps {
   expanded?: boolean;

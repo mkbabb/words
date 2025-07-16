@@ -28,6 +28,11 @@ export const useAppStore = defineStore('app', () => {
     sidebarOpen: false,
     sidebarCollapsed: true,
     selectedCardVariant: 'default' as const,
+    // Enhanced SearchBar state
+    searchMode: 'word' as const,
+    selectedSources: ['wiktionary', 'oxford', 'dictionary_com'] as string[],
+    showControls: false,
+    selectedWordlist: null as string | null,
   }, undefined, {
     serializer: {
       read: (v: any) => {
@@ -37,6 +42,14 @@ export const useAppStore = defineStore('app', () => {
           if (!['default', 'gold', 'silver', 'bronze'].includes(parsed.selectedCardVariant)) {
             parsed.selectedCardVariant = 'default';
           }
+          // Validate search mode
+          if (!['word', 'wordlist'].includes(parsed.searchMode)) {
+            parsed.searchMode = 'word';
+          }
+          // Validate selected sources
+          if (!Array.isArray(parsed.selectedSources)) {
+            parsed.selectedSources = ['wiktionary', 'oxford', 'dictionary_com'];
+          }
           return parsed;
         } catch {
           return {
@@ -45,6 +58,10 @@ export const useAppStore = defineStore('app', () => {
             sidebarOpen: false,
             sidebarCollapsed: true,
             selectedCardVariant: 'default',
+            searchMode: 'word',
+            selectedSources: ['wiktionary', 'oxford', 'dictionary_com'],
+            showControls: false,
+            selectedWordlist: null,
           };
         }
       },
@@ -102,6 +119,27 @@ export const useAppStore = defineStore('app', () => {
   const selectedCardVariant = computed({
     get: () => uiState.value.selectedCardVariant,
     set: (value) => { uiState.value.selectedCardVariant = value; }
+  });
+  
+  // Enhanced SearchBar computed properties
+  const searchMode = computed({
+    get: () => uiState.value.searchMode,
+    set: (value) => { uiState.value.searchMode = value; }
+  });
+  
+  const selectedSources = computed({
+    get: () => uiState.value.selectedSources,
+    set: (value) => { uiState.value.selectedSources = value; }
+  });
+  
+  const showControls = computed({
+    get: () => uiState.value.showControls,
+    set: (value) => { uiState.value.showControls = value; }
+  });
+  
+  const selectedWordlist = computed({
+    get: () => uiState.value.selectedWordlist,
+    set: (value) => { uiState.value.selectedWordlist = value; }
   });
   
   // Remove computed dropdown visibility - let component handle it
@@ -425,6 +463,28 @@ export const useAppStore = defineStore('app', () => {
     mode.value = 'dictionary';
   }
 
+  // Enhanced SearchBar functions
+  function toggleSearchMode() {
+    searchMode.value = searchMode.value === 'word' ? 'wordlist' : 'word';
+  }
+
+  function toggleControls() {
+    showControls.value = !showControls.value;
+  }
+
+  function toggleSource(source: string) {
+    const sources = selectedSources.value;
+    if (sources.includes(source)) {
+      selectedSources.value = sources.filter(s => s !== source);
+    } else {
+      selectedSources.value = [...sources, source];
+    }
+  }
+
+  function setWordlist(wordlist: string | null) {
+    selectedWordlist.value = wordlist;
+  }
+
   // Initialize vocabulary suggestions on store creation
   async function initializeVocabularySuggestions() {
     // Always try to get suggestions, even with empty history
@@ -457,6 +517,11 @@ export const useAppStore = defineStore('app', () => {
     searchCursorPosition,
     searchSelectedIndex,
     sessionState,
+    // Enhanced SearchBar state
+    searchMode,
+    selectedSources,
+    showControls,
+    selectedWordlist,
 
     // Computed
     searchState,
@@ -482,5 +547,10 @@ export const useAppStore = defineStore('app', () => {
     toggleSidebar,
     setSidebarCollapsed,
     reset,
+    // Enhanced SearchBar functions
+    toggleSearchMode,
+    toggleControls,
+    toggleSource,
+    setWordlist,
   };
 });

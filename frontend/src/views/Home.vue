@@ -13,9 +13,12 @@
     <!-- Main View -->
     <div class="min-h-screen">
       <Tabs v-model="activeTab" class="">
-        <!-- Sticky Tabs -->
-        <div class="sticky top-0 z-40">
-          <div class="container grid gap-2">
+        <!-- Sticky Tabs and Search Bar -->
+        <div :class="searchBarClasses">
+          <div class="container grid gap-2" :style="{ 
+            transform: `scale(${1 - shrinkPercentage * 0.05})`,
+            opacity: 1 - shrinkPercentage * 0.1
+          }">
             <TabsList class="flex justify-center bg-transparent">
               <TabsTrigger
                 value="definition"
@@ -30,8 +33,8 @@
             </TabsList>
           </div>
 
-          <!-- Sticky Search Bar -->
-          <SearchBar />
+          <!-- Sticky Search Bar with scroll responsiveness -->
+          <SearchBar :shrink-percentage="shrinkPercentage" />
         </div>
 
         <!-- Border separator (not sticky) -->
@@ -88,6 +91,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useAppStore } from '@/stores';
+import { useScroll } from '@vueuse/core';
 import { cn } from '@/utils';
 import SearchBar from '@/components/SearchBar.vue';
 import DefinitionDisplay from '@/components/DefinitionDisplay.vue';
@@ -112,4 +116,21 @@ onMounted(async () => {
 
 const isSearching = computed(() => store.isSearching);
 const currentEntry = computed(() => store.currentEntry);
+
+// Scroll-based shrinking animation
+const { y } = useScroll(window);
+const scrollThreshold = 100;
+
+const isScrolled = computed(() => y.value > scrollThreshold);
+const shrinkPercentage = computed(() => {
+  if (y.value <= scrollThreshold) return 0;
+  return Math.min((y.value - scrollThreshold) / 100, 1);
+});
+
+const searchBarClasses = computed(() => {
+  return cn(
+    'sticky top-0 z-40 transition-all duration-300 ease-out',
+    isScrolled.value ? 'py-2' : 'py-4'
+  );
+});
 </script>
