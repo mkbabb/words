@@ -39,11 +39,14 @@
           :class="[
             'text-word-title transition-all duration-200',
             {
-              'hover:text-yellow-600 dark:hover:text-yellow-400': selectedCardVariant === 'gold',
-              'hover:text-slate-600 dark:hover:text-slate-400': selectedCardVariant === 'silver',
-              'hover:text-bronze-600 dark:hover:text-bronze-400': selectedCardVariant === 'bronze',
-              'hover:text-primary': selectedCardVariant === 'default'
-            }
+              'hover:text-yellow-600 dark:hover:text-yellow-400':
+                selectedCardVariant === 'gold',
+              'hover:text-slate-600 dark:hover:text-slate-400':
+                selectedCardVariant === 'silver',
+              'hover:text-bronze-600 dark:hover:text-bronze-400':
+                selectedCardVariant === 'bronze',
+              'hover:text-primary': selectedCardVariant === 'default',
+            },
           ]"
           >{{ entry.word }}</CardTitle
         >
@@ -86,7 +89,7 @@
         class="space-y-3"
       >
         <!-- Separator for all but first -->
-        <hr v-if="index > 0" class="border-border" />
+        <hr v-if="index > 0" class="border-border my-2" />
 
         <div class="flex items-center gap-2">
           <Badge variant="secondary" class="text-part-of-speech">
@@ -128,9 +131,7 @@
             v-if="definition.synonyms && definition.synonyms.length > 0"
             class="flex flex-wrap gap-1 pt-2"
           >
-            <span class="text-muted-foreground self-center pr-2 text-xs"
-              >Synonyms:</span
-            >
+            <!-- <span class="self-center pr-2 text-xs">Synonyms:</span> -->
             <Badge
               v-for="synonym in definition.synonyms"
               :key="synonym"
@@ -235,7 +236,6 @@ const formatExampleHTML = (example: string, word: string): string => {
   const regex = new RegExp(`\\b${word}\\b`, 'gi');
   return example.replace(regex, `<strong class="hover-word">${word}</strong>`);
 };
-
 </script>
 
 <style scoped>

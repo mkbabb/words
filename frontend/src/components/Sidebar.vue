@@ -70,7 +70,7 @@
       <!-- Header -->
       <div class="border-border border-b p-4">
         <div v-if="!sidebarCollapsed" class="flex items-center justify-between">
-          <FloridifyIcon :expanded="true" />
+          <FloridifyIcon :expanded="true" :mode="store.mode" clickable @toggle-mode="store.toggleMode()" />
           <Button
             variant="ghost"
             size="sm"
@@ -199,7 +199,7 @@
       >
         <!-- Mobile Header -->
         <div class="border-border border-b p-4">
-          <FloridifyIcon :expanded="true" />
+          <FloridifyIcon :expanded="true" :mode="store.mode" clickable @toggle-mode="store.toggleMode()" />
         </div>
 
         <!-- Mobile Content -->

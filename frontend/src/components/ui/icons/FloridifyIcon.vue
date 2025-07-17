@@ -14,16 +14,18 @@
   >
     <!-- Fancy F using reusable component -->
     <FancyF 
-      mode="dictionary" 
+      :mode="mode" 
       :size="expanded ? 'lg' : 'base'"
+      :clickable="clickable"
       class="transition-all duration-300"
+      @toggle-mode="$emit('toggle-mode')"
     />
 
     <!-- Rest of "loridify" with Fraunces font -->
     <span
       v-if="expanded"
       :class="
-        cn('text-foreground transform font-serif transition-all duration-300', {
+        cn('text-foreground transform font-serif transition-all duration-300 -m-1', {
           'text-xl': expanded,
           'scale-x-0 opacity-0': !expanded,
           'scale-x-100 opacity-100': expanded,
@@ -43,11 +45,14 @@ import FancyF from './FancyF.vue';
 interface FloridifyIconProps {
   expanded?: boolean;
   className?: string;
+  mode?: 'dictionary' | 'thesaurus';
+  clickable?: boolean;
 }
 
-const { expanded = false } = defineProps<FloridifyIconProps>();
+const { expanded = false, mode = 'dictionary', clickable = false } = defineProps<FloridifyIconProps>();
 
 defineEmits<{
   click: [];
+  'toggle-mode': [];
 }>();
 </script>
