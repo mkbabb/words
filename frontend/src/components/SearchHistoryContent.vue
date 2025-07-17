@@ -1,74 +1,108 @@
 <template>
-  <div v-if="collapsed" class="flex h-full w-full flex-col">
-    <!-- Collapsed view - compact cards -->
-    <div class="relative min-h-0 flex-1">
-      <div class="absolute inset-0">
-        <div class="scrollbar-thin max-h-full space-y-1 overflow-y-auto">
-          <TransitionGroup name="toast-stack" tag="div" class="space-y-1">
-            <div
-              v-for="(entry, index) in limitedLookups"
-              :key="entry.id"
-              :class="
-                cn(
-                  'group relative w-full cursor-pointer overflow-hidden rounded-lg transition-all duration-200',
-                  'bg-background border-border border shadow-sm',
-                  'hover:bg-accent hover:shadow-md'
-                )
-              "
-              @click="lookupWord(entry.word)"
-              @mouseenter="hoveredIndex = index"
-              @mouseleave="hoveredIndex = -1"
+  <!-- Collapsed View -->
+  <Transition
+    enter-active-class="transition-all duration-500 ease-apple-smooth"
+    leave-active-class="transition-all duration-400 ease-apple-smooth"
+    enter-from-class="opacity-0 scale-95"
+    enter-to-class="opacity-100 scale-100"
+    leave-from-class="opacity-100 scale-100"
+    leave-to-class="opacity-0 scale-95"
+    mode="out-in"
+  >
+    <div v-if="collapsed" key="collapsed" class="flex h-full w-full flex-col">
+      <!-- Collapsed view - compact cards -->
+      <div class="relative min-h-0 flex-1">
+        <div class="absolute inset-0">
+          <div class="max-h-full space-y-1 overflow-y-auto overscroll-contain">
+            <TransitionGroup
+              enter-active-class="transition-all duration-400 ease-apple-smooth"
+              leave-active-class="transition-all duration-300 ease-apple-smooth"
+              enter-from-class="opacity-0 -translate-y-4 scale-95"
+              enter-to-class="opacity-100 translate-y-0 scale-100"
+              leave-from-class="opacity-100 translate-y-0 scale-100"
+              leave-to-class="opacity-0 translate-y-4 scale-95"
+              move-class="transition-transform duration-300 ease-apple-smooth"
+              tag="div"
+              class="space-y-1"
             >
-              <div class="flex items-center justify-center px-2 py-2">
-                <span class="text-xs font-bold tracking-wider uppercase">
-                  {{ entry.word.substring(0, 2) }}
-                </span>
-              </div>
-
-              <!-- Tooltip on hover -->
               <div
-                v-if="hoveredIndex === index"
-                class="bg-popover text-popover-foreground pointer-events-none absolute left-full z-50 ml-2 rounded-md px-2 py-1 text-xs whitespace-nowrap shadow-md"
+                v-for="(entry, index) in limitedLookups"
+                :key="entry.id"
+                :class="
+                  cn(
+                    'group relative w-full cursor-pointer overflow-hidden rounded-lg transition-all duration-300 ease-apple-smooth',
+                    'bg-background border-border border shadow-sm',
+                    'hover:bg-accent hover:shadow-md hover:scale-105'
+                  )
+                "
+                @click="lookupWord(entry.word)"
+                @mouseenter="hoveredIndex = index"
+                @mouseleave="hoveredIndex = -1"
               >
-                {{ entry.word }}
+                <div class="flex items-center justify-center px-2 py-2">
+                  <span class="text-xs font-bold tracking-wider uppercase">
+                    {{ entry.word.substring(0, 2) }}
+                  </span>
+                </div>
+
+                <!-- Tooltip on hover -->
+                <div
+                  v-if="hoveredIndex === index"
+                  class="bg-popover text-popover-foreground pointer-events-none absolute left-full z-50 ml-2 rounded-md px-2 py-1 text-xs whitespace-nowrap shadow-md"
+                >
+                  {{ entry.word }}
+                </div>
               </div>
-            </div>
-          </TransitionGroup>
+            </TransitionGroup>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div v-else class="space-y-1">
-    <!-- Expanded view -->
-    <TransitionGroup name="history-list" tag="div" class="space-y-1">
-      <div
-        v-for="entry in recentLookups"
-        :key="entry.id"
-        :class="
-          cn(
-            'group flex cursor-pointer items-center justify-between rounded-lg px-2 py-2 transition-all duration-200',
-            'hover:bg-accent hover:pl-3'
-          )
-        "
-        @click="lookupWord(entry.word)"
-      >
-        <div class="flex min-w-0 items-center gap-3">
-          <History :size="14" class="text-muted-foreground shrink-0" />
-          <span class="truncate text-sm">{{ entry.word }}</span>
-        </div>
-        <span
-          class="text-muted-foreground text-xs opacity-0 transition-opacity group-hover:opacity-100"
+    <!-- Expanded View -->
+    <div v-else key="expanded" class="space-y-1">
+      <!-- Expanded view - simple scrollable list -->
+      <div v-if="recentLookups.length > 0" class="space-y-1">
+        <TransitionGroup
+          enter-active-class="transition-all duration-400 ease-apple-smooth"
+          leave-active-class="transition-all duration-300 ease-apple-smooth"
+          enter-from-class="opacity-0 -translate-x-4"
+          enter-to-class="opacity-100 translate-x-0"
+          leave-from-class="opacity-100 translate-x-0"
+          leave-to-class="opacity-0 translate-x-4"
+          move-class="transition-transform duration-300 ease-apple-smooth"
+          tag="div"
+          class="space-y-1"
         >
-          {{ formatDate(entry.timestamp) }}
-        </span>
+          <div
+            v-for="entry in recentLookups"
+            :key="entry.id"
+            :class="
+              cn(
+                'group flex cursor-pointer items-center justify-between rounded-lg px-2 py-2 transition-all duration-300 ease-apple-smooth',
+                'hover:bg-accent hover:pl-3 hover:scale-[1.02]'
+              )
+            "
+            @click="lookupWord(entry.word)"
+          >
+            <div class="flex min-w-0 items-center gap-3">
+              <History :size="14" class="text-muted-foreground shrink-0" />
+              <span class="truncate text-sm">{{ entry.word }}</span>
+            </div>
+            <span
+              class="text-muted-foreground text-xs opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+            >
+              {{ formatDate(entry.timestamp) }}
+            </span>
+          </div>
+        </TransitionGroup>
       </div>
-    </TransitionGroup>
 
-    <div v-if="recentLookups.length === 0" class="py-4 text-center">
-      <p class="text-muted-foreground text-xs">No recent lookups</p>
+      <div v-else class="py-4 text-center">
+        <p class="text-muted-foreground text-xs">No recent lookups</p>
+      </div>
     </div>
-  </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">

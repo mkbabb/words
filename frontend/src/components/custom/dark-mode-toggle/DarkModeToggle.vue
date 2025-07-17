@@ -43,7 +43,7 @@ const { size } = defineProps({
     z-index: 999;
 
     svg {
-        fill: hsl(var(--foreground));
+        fill: var(--color-foreground);
         width: 100%;
         height: 100%;
     }
@@ -62,12 +62,12 @@ const { size } = defineProps({
 
 .toggle-sun {
     transform-origin: center center;
-    transition: transform 750ms cubic-bezier(0.11, 0.14, 0.29, 1.5);
+    transition: transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .toggle-circle {
     transform: translateX(0%);
-    transition: transform 500ms ease-out;
+    transition: transform 200ms ease-out;
 }
 
 .dark {

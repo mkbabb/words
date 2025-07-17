@@ -100,6 +100,76 @@ const config: Config = {
           '50%': { opacity: '1' },
           '100%': { transform: 'translateX(300%) rotate(45deg)', opacity: '0' },
         },
+        'fade-in': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        'fade-out': {
+          from: { opacity: '1' },
+          to: { opacity: '0' },
+        },
+        'slide-up': {
+          from: { transform: 'translateY(8px)', opacity: '0' },
+          to: { transform: 'translateY(0)', opacity: '1' },
+        },
+        'slide-down': {
+          from: { transform: 'translateY(-8px)', opacity: '0' },
+          to: { transform: 'translateY(0)', opacity: '1' },
+        },
+        'scale-in': {
+          from: { transform: 'scale(0.95)', opacity: '0' },
+          to: { transform: 'scale(1)', opacity: '1' },
+        },
+        'scale-out': {
+          from: { transform: 'scale(1)', opacity: '1' },
+          to: { transform: 'scale(0.95)', opacity: '0' },
+        },
+        'bounce-in': {
+          '0%': { transform: 'scale(0.9)', opacity: '0' },
+          '50%': { transform: 'scale(1.03)' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        'bounce-out': {
+          '0%': { transform: 'scale(1)', opacity: '1' },
+          '50%': { transform: 'scale(1.03)' },
+          '100%': { transform: 'scale(0.9)', opacity: '0' },
+        },
+        'shrink-bounce': {
+          '0%': { transform: 'scale(1)' },
+          '40%': { transform: 'scale(0.95)' },
+          '60%': { transform: 'scale(1.02)' },
+          '80%': { transform: 'scale(0.98)' },
+          '100%': { transform: 'scale(1)' },
+        },
+        'scroll-shrink': {
+          '0%': { 
+            transform: 'scale(1)',
+            opacity: '1',
+            maxWidth: '24rem'
+          },
+          '100%': { 
+            transform: 'scale(0.85)',
+            opacity: '0.9',
+            maxWidth: '18rem'
+          },
+        },
+        'icon-fade': {
+          '0%': { 
+            opacity: '1',
+            transform: 'scale(1)'
+          },
+          '100%': { 
+            opacity: '0',
+            transform: 'scale(0.8)'
+          },
+        },
+        'elastic-bounce': {
+          '0%': { transform: 'scale(1)' },
+          '30%': { transform: 'scale(1.05)' },
+          '50%': { transform: 'scale(0.95)' },
+          '70%': { transform: 'scale(1.02)' },
+          '100%': { transform: 'scale(1)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -108,11 +178,25 @@ const config: Config = {
         'collapsible-up': 'collapsible-up 0.2s ease-in-out',
         shimmer: 'shimmer 3s ease-in-out infinite',
         'sparkle-slide': 'sparkle-slide 4s ease-in-out infinite',
+        'fade-in': 'fade-in 0.2s ease-out',
+        'fade-out': 'fade-out 0.2s ease-out',
+        'slide-up': 'slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+        'slide-down': 'slide-down 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+        'scale-in': 'scale-in 0.2s ease-out',
+        'scale-out': 'scale-out 0.2s ease-out',
+        'bounce-in': 'bounce-in 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+        'bounce-out': 'bounce-out 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+        'shrink-bounce': 'shrink-bounce 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+        'scroll-shrink': 'scroll-shrink 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+        'icon-fade': 'icon-fade 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        'elastic-bounce': 'elastic-bounce 0.6s cubic-bezier(0.25, 0.1, 0.25, 1)',
       },
       transitionTimingFunction: {
         'out-expo': 'cubic-bezier(0.19, 1, 0.22, 1)',
         'in-out-expo': 'cubic-bezier(0.87, 0, 0.13, 1)',
         'bounce-spring': 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+        'apple-smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
+        'apple-bounce': 'cubic-bezier(0.25, 0.1, 0.25, 1)',
       },
       boxShadow: {
         'card': '0 4px 12px rgba(0, 0, 0, 0.08)',
@@ -124,7 +208,7 @@ const config: Config = {
   },
   plugins: [
     animate,
-    function({ addUtilities }) {
+    function({ addUtilities, matchUtilities, theme }) {
       const newUtilities = {
         '.hover-lift': {
           '@apply transition-all duration-200 hover:scale-[1.02] hover:brightness-95': {},
@@ -153,8 +237,75 @@ const config: Config = {
         '.delay-300': {
           'animation-delay': '300ms',
         },
+        // Animation state utilities
+        '.animate-show': {
+          '@apply animate-scale-in': {},
+        },
+        '.animate-hide': {
+          '@apply animate-scale-out': {},
+        },
+        '.animate-show-bounce': {
+          '@apply animate-bounce-in': {},
+        },
+        '.animate-hide-bounce': {
+          '@apply animate-bounce-out': {},
+        },
+        // Transition utilities for show/hide
+        '.transition-visibility': {
+          '@apply transition-[opacity,transform] duration-300': {},
+        },
+        '.show': {
+          '@apply opacity-100 scale-100 translate-y-0': {},
+        },
+        '.hide': {
+          '@apply opacity-0 scale-95 -translate-y-2 pointer-events-none': {},
+        },
+        '.show-from-top': {
+          '@apply opacity-100 scale-y-100 origin-top visible': {},
+        },
+        '.hide-to-top': {
+          '@apply opacity-0 scale-y-0 origin-top invisible': {},
+        },
+        // Scroll-based animation states
+        '.scroll-shrunk': {
+          '@apply transform-gpu': {},
+          transform: 'scale(0.85)',
+          opacity: '0.9',
+          maxWidth: '18rem', // ~288px - mobile friendly
+        },
+        '.scroll-normal': {
+          '@apply transform-gpu': {},
+          transform: 'scale(1)',
+          opacity: '1',
+          maxWidth: '24rem', // ~384px - desktop friendly
+        },
+        '.icons-hidden': {
+          '@apply opacity-0 pointer-events-none': {},
+          transform: 'scale(0.8)',
+        },
+        '.icons-visible': {
+          '@apply opacity-100 pointer-events-auto': {},
+          transform: 'scale(1)',
+        },
+        // Smooth transitions for scroll animations
+        '.transition-scroll': {
+          '@apply transition-all duration-300 ease-apple-smooth': {},
+        },
+        '.transition-bounce': {
+          '@apply transition-all duration-600 ease-apple-bounce': {},
+        },
       }
       addUtilities(newUtilities, ['responsive', 'hover'])
+      
+      // Dynamic transition timing utilities
+      matchUtilities(
+        {
+          'transition-timing': (value: string) => ({
+            'transition-timing-function': value,
+          }),
+        },
+        { values: theme('transitionTimingFunction') }
+      )
     }
   ],
 };

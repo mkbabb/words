@@ -31,7 +31,7 @@
     </Tabs>
   </Teleport>
 
-  <ThemedCard v-if="entry" :variant="selectedCardVariant" class="space-y-6">
+  <ThemedCard v-if="entry" :variant="selectedCardVariant">
     <!-- Header Section -->
     <CardHeader>
       <div class="flex items-center justify-between">

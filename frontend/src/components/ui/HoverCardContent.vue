@@ -7,12 +7,7 @@
       :align-offset="alignOffset"
       :collision-padding="collisionPadding"
       :avoid-collisions="avoidCollisions"
-      :class="
-        cn(
-          'bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-64 rounded-md border p-4 shadow-md outline-none',
-          $attrs.class as string
-        )
-      "
+      class="hovercard-animated bg-popover/20 backdrop-blur-md text-popover-foreground border-border/30 z-50 w-64 rounded-md border p-4 shadow-card-hover outline-none"
     >
       <slot />
     </HoverCardContent>
@@ -41,3 +36,20 @@ withDefaults(defineProps<Props>(), {
   avoidCollisions: true,
 });
 </script>
+
+<style>
+@keyframes hovercard-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.hovercard-animated {
+  animation: hovercard-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+</style>
