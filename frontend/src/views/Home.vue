@@ -11,7 +11,7 @@
     "
   >
     <!-- Main View -->
-    <div class="min-h-screen">
+    <div class="min-h-screen relative">
       <Tabs v-model="activeTab" class="">
         <!-- Sticky Tabs and Search Bar -->
         <div :class="searchBarClasses">
