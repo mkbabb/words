@@ -124,7 +124,7 @@ const scrollThreshold = 100;
 const isScrolled = computed(() => y.value > scrollThreshold);
 const shrinkPercentage = computed(() => {
   if (y.value <= scrollThreshold) return 0;
-  return Math.min((y.value - scrollThreshold) / 100, 1);
+  return Math.min((y.value - scrollThreshold) / 60, 1);
 });
 
 const searchBarClasses = computed(() => {
