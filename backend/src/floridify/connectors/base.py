@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Callable, Optional
 
 from ..models import ProviderData
 from ..utils.logging import get_logger
+from ..utils.state_tracker import PipelineStage, StateTracker
 
 logger = get_logger(__name__)
 
@@ -24,6 +25,8 @@ class DictionaryConnector(ABC):
         self.rate_limit = rate_limit
         self._rate_limiter = asyncio.Semaphore(1)
         self._last_request_time = 0.0
+        self.state_tracker: Optional[StateTracker] = None
+        self.progress_callback: Optional[Callable[[str, float, dict[str, Any]], None]] = None
 
     @property
     @abstractmethod
@@ -32,11 +35,18 @@ class DictionaryConnector(ABC):
         pass
 
     @abstractmethod
-    async def fetch_definition(self, word: str) -> ProviderData | None:
+    async def fetch_definition(
+        self, 
+        word: str,
+        state_tracker: Optional[StateTracker] = None,
+        progress_callback: Optional[Callable[[str, float, dict[str, Any]], None]] = None,
+    ) -> ProviderData | None:
         """Fetch definition data for a word.
 
         Args:
             word: The word to look up
+            state_tracker: Optional state tracker for progress updates
+            progress_callback: Optional callback for provider-specific progress
 
         Returns:
             ProviderData if successful, None if not found or error
@@ -56,6 +66,49 @@ class DictionaryConnector(ABC):
                 await asyncio.sleep(wait_time)
 
             self._last_request_time = asyncio.get_event_loop().time()
+
+    async def _report_progress(
+        self, 
+        stage: str, 
+        progress: float, 
+        metadata: dict[str, Any],
+        state_tracker: Optional[StateTracker] = None,
+    ) -> None:
+        """Report progress through callback or state tracker.
+        
+        Args:
+            stage: Current stage (e.g., 'connecting', 'downloading', 'parsing')
+            progress: Progress percentage (0-100)
+            metadata: Additional metadata about the progress
+            state_tracker: Optional state tracker to update
+        """
+        # Use provided state tracker or instance one
+        tracker = state_tracker or self.state_tracker
+        
+        if tracker:
+            # Map stage names to PipelineStage enum
+            stage_map = {
+                'start': PipelineStage.PROVIDER_START,
+                'connecting': PipelineStage.PROVIDER_CONNECTED,
+                'downloading': PipelineStage.PROVIDER_DOWNLOADING,
+                'parsing': PipelineStage.PROVIDER_PARSING,
+                'complete': PipelineStage.PROVIDER_COMPLETE,
+            }
+            
+            if stage in stage_map:
+                await tracker.update(
+                    stage_map[stage],
+                    progress,
+                    f"{self.provider_name}: {stage}",
+                    metadata
+                )
+        
+        # Also call progress callback if available
+        if self.progress_callback:
+            try:
+                self.progress_callback(stage, progress, metadata)
+            except Exception as e:
+                logger.warning(f"Progress callback error: {e}")
 
     def _normalize_response(self, response_data: dict[str, Any]) -> ProviderData:
         """Normalize provider response to internal format.

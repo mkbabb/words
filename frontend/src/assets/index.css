@@ -7,7 +7,7 @@
   }
 }
 
-@theme  {
+@theme {
   --color-background: hsl(0 0% 100%);
   --color-foreground: hsl(0 0% 3.9%);
   --color-card: hsl(0 0% 100%);
@@ -224,7 +224,7 @@
       -10px 6px 0px rgba(0, 0, 0, 0.14),
       0 10px 0px rgba(0, 0, 0, 0.14),
       -10px 10px 0px rgba(0, 0, 0, 0.12);
-    border: 3px solid var(--color-border);
+    border: 2px solid var(--color-border);
     transform: translateY(-3px);
   }
 
@@ -250,7 +250,7 @@
       -10px 6px 0px rgba(255, 255, 255, 0.09),
       0 10px 0px rgba(255, 255, 255, 0.09),
       -10px 10px 0px rgba(255, 255, 255, 0.06);
-    border: 3px solid var(--color-border);
+    border: 2px solid var(--color-border);
   }
 
   .card-shadow-hover {

@@ -4,6 +4,7 @@ import type {
   SearchResult,
   ThesaurusEntry,
   VocabularySuggestionsResponse,
+  FactsAPIResponse,
 } from '@/types';
 
 const api = axios.create({
@@ -302,6 +303,21 @@ export const dictionaryApi = {
       });
       return response.data;
     }
+  },
+
+  // Get interesting facts about a word
+  async getWordFacts(
+    word: string,
+    count: number = 5,
+    previousWords?: string[]
+  ): Promise<FactsAPIResponse> {
+    const params: any = { count };
+    if (previousWords && previousWords.length > 0) {
+      params.previous_words = previousWords.slice(0, 20); // Limit to 20 words
+    }
+    
+    const response = await api.get(`/facts/${word}`, { params });
+    return response.data;
   },
 
   // Health check

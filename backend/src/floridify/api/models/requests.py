@@ -49,3 +49,16 @@ class SuggestionsParams(BaseModel):
     count: int = Field(
         default=10, ge=4, le=12, description="Number of suggestions to generate"
     )
+
+
+class FactParams(BaseModel):
+    """Parameters for fact generation endpoint."""
+
+    count: int = Field(
+        default=5, ge=3, le=8, description="Number of facts to generate"
+    )
+    previous_words: list[str] | None = Field(
+        default=None,
+        max_length=20,
+        description="Previously searched words for context",
+    )

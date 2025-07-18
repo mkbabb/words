@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Optional
+import time
 
 import hishel
 import httpx
@@ -56,6 +57,7 @@ class CachedHTTPClient:
         url: str,
         ttl_hours: float | None = None,
         force_refresh: bool | None = None,
+        progress_callback: Optional[Callable[[str, dict[str, Any]], None]] = None,
         **kwargs: Any,
     ) -> httpx.Response:
         """Cached GET request.
@@ -85,11 +87,38 @@ class CachedHTTPClient:
             max_age = int(ttl_hours * 3600)
             kwargs.setdefault("headers", {})["Cache-Control"] = f"max-age={max_age}"
         
+        # Track timing
+        start_time = time.time()
+        
+        # Report connection start
+        if progress_callback:
+            progress_callback('connecting', {
+                'url': url,
+                'method': 'GET',
+                'cache_enabled': not should_force
+            })
+        
         # Make request
         logger.debug(f"🌐 HTTP GET: {url} (TTL: {ttl_hours}h)")
+        connection_time = time.time()
+        
         response = self._client.get(url, **kwargs)
         if hasattr(response, '__await__'):
             response = await response
+        
+        download_time = time.time()
+        
+        # Report download complete
+        if progress_callback:
+            response_size = len(response.content) if hasattr(response, 'content') else 0
+            progress_callback('downloaded', {
+                'url': url,
+                'status_code': response.status_code,
+                'response_size_bytes': response_size,
+                'connection_time_ms': (connection_time - start_time) * 1000,
+                'download_time_ms': (download_time - connection_time) * 1000,
+                'total_time_ms': (download_time - start_time) * 1000
+            })
         
         # Log cache status if available
         try:
@@ -157,8 +186,17 @@ class CachedHTTPClient:
                     logger.debug(f"📁 Using cached file: {file_path}")
                     return True
             
-            # Download file
-            response = await self.get(url, ttl_hours=ttl_hours, force_refresh=should_force, **kwargs)
+            # Download file with progress tracking
+            def file_progress_callback(stage: str, metadata: dict[str, Any]):
+                logger.debug(f"📥 File download {stage}: {metadata}")
+            
+            response = await self.get(
+                url, 
+                ttl_hours=ttl_hours, 
+                force_refresh=should_force,
+                progress_callback=file_progress_callback,
+                **kwargs
+            )
             response.raise_for_status()
             
             # Save to file

@@ -71,6 +71,19 @@ export interface ThesaurusEntry {
   synonyms: SynonymData[];
 }
 
+export interface FactItem {
+  content: string;
+  category: string;
+  confidence: number;
+}
+
+export interface FactsAPIResponse {
+  word: string;
+  facts: FactItem[];
+  confidence: number;
+  categories: string[];
+}
+
 export interface ApiResponse<T> {
   data: T;
   success: boolean;

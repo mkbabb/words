@@ -130,3 +130,19 @@ class PromptTemplateManager:
             input_words=input_words,
             count=count,
         )
+
+    def get_fact_generation_prompt(
+        self, 
+        word: str, 
+        definition: str, 
+        count: int = 5, 
+        previous_words: list[str] | None = None
+    ) -> str:
+        """Generate prompt for interesting facts about a word."""
+        return self.render_template(
+            "fact_generation",
+            word=word,
+            definition=definition,
+            count=count,
+            previous_words=previous_words or [],
+        )

@@ -1,99 +1,172 @@
-"""Custom logging configuration using loguru with colors and VSCode integration."""
+"""Logging utilities and decorators for pipeline debugging."""
 
-from __future__ import annotations
+import asyncio
+import functools
+import logging
+import time
+from typing import Any, Callable, TypeVar, cast
 
-import sys
-from pathlib import Path
-from typing import TYPE_CHECKING
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
-from loguru import logger
+console = Console()
+logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    from loguru import Logger
+T = TypeVar('T')
 
 
-def setup_logging(
-    console_level: str = "INFO",
-    file_level: str = "DEBUG",
-    logs_dir: str | Path = "logs",
-) -> None:
-    """Setup loguru logging with console and file outputs.
+class LoggerWrapper:
+    """Wrapper around logging.Logger to add success method."""
+    
+    def __init__(self, logger: logging.Logger):
+        self._logger = logger
+        
+    def __getattr__(self, name: str) -> Any:
+        """Delegate to underlying logger."""
+        return getattr(self._logger, name)
+    
+    def success(self, message: str, *args: Any, **kwargs: Any) -> None:
+        """Log success message at INFO level with success prefix."""
+        self._logger.info(f"✅ {message}", *args, **kwargs)
 
-    Args:
-        console_level: Log level for console output (DEBUG, INFO, WARNING, ERROR)
-        file_level: Log level for file output (DEBUG, INFO, WARNING, ERROR)
-        logs_dir: Directory to store log files
-    """
-    # Remove default handler
-    logger.remove()
 
-    # Create logs directory
-    logs_path = Path(logs_dir)
-    logs_path.mkdir(exist_ok=True)
+def get_logger(name: str) -> LoggerWrapper:
+    """Get a logger instance with the given name."""
+    return LoggerWrapper(logging.getLogger(name))
 
-    # Console handler with colors and VSCode click-to-file support
-    console_format = (
-        "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-        "<level>{level: <8}</level> | "
-        "<cyan>{file}:{line}</cyan> | "
-        "<level>{message}</level>"
-    )
 
-    logger.add(
-        sys.stderr,
-        format=console_format,
-        level=console_level,
-        colorize=True,
-        backtrace=True,
-        diagnose=True,
-    )
-
-    # File handler with detailed format
-    file_format = (
-        "{time:YYYY-MM-DD HH:mm:ss.SSS} | "
-        "{level: <8} | "
-        "{file}:{line} | "
-        "{message}"
-    )
-
-    logger.add(
-        logs_path / "floridify.log",
-        format=file_format,
-        level=file_level,
-        rotation="10 MB",
-        retention="30 days",
-        compression="gz",
-        backtrace=True,
-        diagnose=True,
-    )
-
-    # Separate error log
-    logger.add(
-        logs_path / "floridify_errors.log",
-        format=file_format,
-        level="ERROR",
-        rotation="5 MB",
-        retention="90 days",
-        compression="gz",
-        backtrace=True,
-        diagnose=True,
+def setup_logging(level: str = "INFO") -> None:
+    """Setup logging configuration."""
+    logging.basicConfig(
+        level=getattr(logging, level.upper(), logging.INFO),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
     )
 
 
-def get_logger(name: str | None = None) -> Logger:
-    """Get a logger instance.
+def log_timing(func: Callable[..., T]) -> Callable[..., T]:
+    """Decorator to log function execution time."""
+    @functools.wraps(func)
+    async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+        start_time = time.time()
+        func_name = f"{func.__module__}.{func.__name__}"
+        
+        logger.debug(f"⏱️  Starting {func_name}")
+        try:
+            result = await func(*args, **kwargs)
+            elapsed = time.time() - start_time
+            logger.info(f"✅ {func_name} completed in {elapsed:.2f}s")
+            return result
+        except Exception as e:
+            elapsed = time.time() - start_time
+            logger.error(f"❌ {func_name} failed after {elapsed:.2f}s: {e}")
+            raise
+    
+    @functools.wraps(func)
+    def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+        start_time = time.time()
+        func_name = f"{func.__module__}.{func.__name__}"
+        
+        logger.debug(f"⏱️  Starting {func_name}")
+        try:
+            result = func(*args, **kwargs)
+            elapsed = time.time() - start_time
+            logger.info(f"✅ {func_name} completed in {elapsed:.2f}s")
+            return result
+        except Exception as e:
+            elapsed = time.time() - start_time
+            logger.error(f"❌ {func_name} failed after {elapsed:.2f}s: {e}")
+            raise
+    
+    if asyncio.iscoroutinefunction(func):
+        return cast(Callable[..., T], async_wrapper)
+    else:
+        return cast(Callable[..., T], sync_wrapper)
 
-    Args:
-        name: Optional logger name (defaults to calling module)
 
-    Returns:
-        Loguru logger instance
-    """
-    if name:
-        return logger.bind(name=name)
+def log_stage(stage_name: str, emoji: str = "🔄") -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """Decorator to log pipeline stage transitions."""
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @functools.wraps(func)
+        async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+            logger.info(f"{emoji} Entering stage: {stage_name}")
+            console.print(Panel(
+                Text(f"Stage: {stage_name}", style="bold cyan"),
+                title="Pipeline Stage",
+                border_style="cyan"
+            ))
+            
+            try:
+                result = await func(*args, **kwargs)
+                logger.info(f"✅ Stage '{stage_name}' completed successfully")
+                return result
+            except Exception as e:
+                logger.error(f"❌ Stage '{stage_name}' failed: {e}")
+                raise
+        
+        @functools.wraps(func)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+            logger.info(f"{emoji} Entering stage: {stage_name}")
+            console.print(Panel(
+                Text(f"Stage: {stage_name}", style="bold cyan"),
+                title="Pipeline Stage",
+                border_style="cyan"
+            ))
+            
+            try:
+                result = func(*args, **kwargs)
+                logger.info(f"✅ Stage '{stage_name}' completed successfully")
+                return result
+            except Exception as e:
+                logger.error(f"❌ Stage '{stage_name}' failed: {e}")
+                raise
+        
+        if asyncio.iscoroutinefunction(func):
+            return cast(Callable[..., T], async_wrapper)
+        else:
+            return cast(Callable[..., T], sync_wrapper)
+    
+    return decorator
 
-    return logger
+
+def log_metrics(**metrics: Any) -> None:
+    """Log structured metrics for easy parsing."""
+    metrics_str = " | ".join(f"{k}={v}" for k, v in metrics.items())
+    logger.info(f"📊 Metrics: {metrics_str}")
 
 
-# Auto-setup logging when module is imported
-setup_logging()
+def log_provider_fetch(provider_name: str, word: str, success: bool, 
+                      response_size: int = 0, duration: float = 0.0) -> None:
+    """Log provider fetch attempt details."""
+    status = "✅" if success else "❌"
+    logger.debug(
+        f"{status} Provider '{provider_name}' for '{word}': "
+        f"size={response_size} bytes, duration={duration:.2f}s"
+    )
+
+
+def log_search_method(method: str, query: str, result_count: int, 
+                     duration: float = 0.0, scores: list[float] | None = None) -> None:
+    """Log search method execution details."""
+    score_info = ""
+    if scores:
+        avg_score = sum(scores) / len(scores) if scores else 0
+        score_info = f", avg_score={avg_score:.3f}"
+    
+    logger.info(
+        f"🔍 Search '{method}' for '{query}': "
+        f"results={result_count}, duration={duration:.2f}s{score_info}"
+    )
+
+
+def log_ai_synthesis(word: str, token_usage: dict[str, int], 
+                    cluster_count: int, duration: float = 0.0) -> None:
+    """Log AI synthesis details."""
+    logger.info(
+        f"🤖 AI synthesis for '{word}': "
+        f"clusters={cluster_count}, tokens={token_usage.get('total_tokens', 0)}, "
+        f"duration={duration:.2f}s"
+    )
+
+

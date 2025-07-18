@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
+import time
 
 import wikitextparser as wtp
 
@@ -18,6 +19,7 @@ from ..models import (
     ProviderData,
 )
 from ..utils.logging import get_logger
+from ..utils.state_tracker import ProviderMetrics, StateTracker
 from .base import DictionaryConnector
 
 logger = get_logger(__name__)
@@ -118,11 +120,32 @@ class WiktionaryConnector(DictionaryConnector):
     def provider_name(self) -> str:
         return "wiktionary"
 
-    async def fetch_definition(self, word: str) -> ProviderData | None:
+    async def fetch_definition(
+        self, 
+        word: str,
+        state_tracker: Optional[StateTracker] = None,
+        progress_callback: Optional[Any] = None,
+    ) -> ProviderData | None:
         """Fetch comprehensive definition data from Wiktionary."""
         await self._enforce_rate_limit()
+        
+        # Initialize timing and metrics
+        start_time = time.time()
+        metrics = ProviderMetrics(
+            provider_name=self.provider_name,
+            response_time_ms=0,
+            response_size_bytes=0,
+        )
 
         try:
+            # Report start
+            if state_tracker:
+                await self._report_progress(
+                    'start', 0, 
+                    {'provider': self.provider_name, 'word': word},
+                    state_tracker
+                )
+            
             params = {
                 "action": "query",
                 "prop": "revisions",
@@ -133,15 +156,44 @@ class WiktionaryConnector(DictionaryConnector):
                 "format": "json",
             }
 
+            # Progress callback for HTTP request
+            http_progress_data = {}
+            
+            def http_progress_callback(stage: str, metadata: dict[str, Any]):
+                http_progress_data.update(metadata)
+                if stage == 'connecting':
+                    asyncio.create_task(self._report_progress(
+                        'connecting', 25,
+                        {'provider': self.provider_name, **metadata},
+                        state_tracker
+                    ))
+                elif stage == 'downloaded':
+                    metrics.connection_time_ms = metadata.get('connection_time_ms', 0)
+                    metrics.download_time_ms = metadata.get('download_time_ms', 0)
+                    metrics.response_size_bytes = metadata.get('response_size_bytes', 0)
+                    asyncio.create_task(self._report_progress(
+                        'downloading', 50,
+                        {'provider': self.provider_name, **metadata},
+                        state_tracker
+                    ))
+            
             response = await self.http_client.get(
                 self.base_url,
                 params=params,
                 ttl_hours=24.0,
                 headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
                 timeout=30.0,
+                progress_callback=http_progress_callback if state_tracker else None,
             )
 
             if response.status_code == 429:
+                logger.warning(f"Rate limited by Wiktionary, waiting 60s...")
+                if state_tracker:
+                    await self._report_progress(
+                        'downloading', 50,
+                        {'provider': self.provider_name, 'status': 'rate_limited', 'wait_time': 60},
+                        state_tracker
+                    )
                 await asyncio.sleep(60)
                 response = await self.http_client.get(
                     self.base_url,
@@ -149,14 +201,73 @@ class WiktionaryConnector(DictionaryConnector):
                     force_refresh=True,
                     headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
                     timeout=30.0,
+                    progress_callback=http_progress_callback if state_tracker else None,
                 )
 
             response.raise_for_status()
             data = response.json()
-
-            return self._parse_wiktionary_response(word, data)
+            
+            # Report parsing start
+            if state_tracker:
+                await self._report_progress(
+                    'parsing', 75,
+                    {'provider': self.provider_name, 'word': word, 'response_size': len(str(data))},
+                    state_tracker
+                )
+            
+            parse_start = time.time()
+            result = self._parse_wiktionary_response(word, data)
+            metrics.parse_time_ms = (time.time() - parse_start) * 1000
+            
+            # Calculate quality metrics if we have a result
+            if result:
+                metrics.success = True
+                metrics.definitions_count = len(result.definitions) if result.definitions else 0
+                metrics.has_pronunciation = bool(result.raw_metadata.get('pronunciation'))
+                metrics.has_etymology = bool(result.raw_metadata.get('etymology'))
+                metrics.has_examples = any(
+                    d.examples and (d.examples.generated or d.examples.literature) 
+                    for d in (result.definitions or [])
+                )
+                metrics.calculate_completeness_score()
+            else:
+                metrics.success = False
+                
+            metrics.response_time_ms = (time.time() - start_time) * 1000
+            
+            # Report completion
+            if state_tracker:
+                await self._report_progress(
+                    'complete', 100,
+                    {
+                        'provider': self.provider_name,
+                        'word': word,
+                        'success': metrics.success,
+                        'metrics': metrics.__dict__
+                    },
+                    state_tracker
+                )
+            
+            return result
 
         except Exception as e:
+            metrics.success = False
+            metrics.error_message = str(e)
+            metrics.response_time_ms = (time.time() - start_time) * 1000
+            
+            if state_tracker:
+                await self._report_progress(
+                    'complete', 100,
+                    {
+                        'provider': self.provider_name,
+                        'word': word,
+                        'success': False,
+                        'error': str(e),
+                        'metrics': metrics.__dict__
+                    },
+                    state_tracker
+                )
+            
             logger.error(f"Error fetching {word} from Wiktionary: {e}")
             return None
 

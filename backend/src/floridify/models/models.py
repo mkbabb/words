@@ -46,6 +46,15 @@ class Examples(BaseModel):
     literature: list[LiteratureExample] = Field(default_factory=list)
 
 
+class Fact(BaseModel):
+    """Interesting fact about a word."""
+
+    content: str = Field(description="The fact content")
+    category: str = Field(description="Category of fact (etymology, usage, cultural, etc.)")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in fact accuracy")
+    generated_at: datetime = Field(default_factory=datetime.now)
+
+
 class Definition(BaseModel):
     """Single word definition with bound synonyms and examples."""
 
@@ -129,6 +138,8 @@ class SynthesizedDictionaryEntry(Document):
     pronunciation: Pronunciation
 
     definitions: list[Definition] = Field(default_factory=list)
+
+    facts: list[Fact] = Field(default_factory=list)
 
     last_updated: datetime = Field(default_factory=datetime.now)
 

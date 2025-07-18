@@ -12,6 +12,7 @@ from .models import (
     ProviderData,
     SynthesizedDictionaryEntry,
 )
+from .pipeline_state import PipelineStage, PipelineState, StateTracker
 
 __all__ = [
     "DictionaryEntry",
@@ -25,4 +26,7 @@ __all__ = [
     "Pronunciation",
     "LiteratureSourceType",
     "APIResponseCache",
+    "PipelineStage",
+    "PipelineState",
+    "StateTracker",
 ]

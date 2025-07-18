@@ -11,29 +11,19 @@
     "
   >
     <!-- Main View -->
-    <div class="min-h-screen relative">
+    <div class="relative min-h-screen p-2">
       <Tabs v-model="activeTab" class="">
         <!-- Sticky Tabs and Search Bar -->
-        <div :class="searchBarClasses">
-          <div class="container grid gap-2" :style="{ 
-            transform: `scale(${1 - shrinkPercentage * 0.05})`,
-            opacity: 1 - shrinkPercentage * 0.1
-          }">
-            <TabsList class="flex justify-center bg-transparent">
-              <TabsTrigger
-                value="definition"
-                style="font-family: 'Fraunces', serif"
-                >Dictionary</TabsTrigger
-              >
-              <TabsTrigger
-                value="visualizer"
-                style="font-family: 'Fraunces', serif"
-                >Visualizer</TabsTrigger
-              >
-            </TabsList>
-          </div>
+        <TabsList
+          class="m-auto grid w-fit grid-cols-3 justify-center gap-1 bg-transparent"
+        >
+          <TabsTrigger value="definition">Dictionary</TabsTrigger>
+          <TabsTrigger value="visualizer">Visualizer</TabsTrigger>
+          <TabsTrigger value="stage">Stage</TabsTrigger>
+        </TabsList>
 
-          <!-- Sticky Search Bar with scroll responsiveness -->
+        <!-- Sticky Search Bar with scroll responsiveness -->
+        <div :class="searchBarClasses">
           <SearchBar :shrink-percentage="shrinkPercentage" />
         </div>
 
@@ -82,14 +72,30 @@
               <SeriesVisualizer />
             </div>
           </TabsContent>
+
+          <!-- Stage Tab Content -->
+          <TabsContent value="stage">
+            <div class="space-y-8">
+              <StageTest />
+            </div>
+          </TabsContent>
         </div>
       </Tabs>
     </div>
   </div>
+
+  <!-- Loading Modal -->
+  <LoadingModal
+    v-model="isSearching"
+    :word="store.searchQuery || 'searching'"
+    :progress="store.loadingProgress"
+    :current-stage="store.loadingStage"
+    :facts="currentFacts"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useAppStore } from '@/stores';
 import { useScroll } from '@vueuse/core';
 import { cn } from '@/utils';
@@ -98,10 +104,41 @@ import DefinitionDisplay from '@/components/DefinitionDisplay.vue';
 import DefinitionSkeleton from '@/components/DefinitionSkeleton.vue';
 import Sidebar from '@/components/Sidebar.vue';
 import SeriesVisualizer from '@/components/SeriesVisualizer.vue';
+import LoadingModal from '@/components/LoadingModal.vue';
+import StageTest from '@/components/StageTest.vue';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { dictionaryApi } from '@/utils/api';
+import type { FactItem } from '@/types';
 
 const store = useAppStore();
-const activeTab = ref<'definition' | 'visualizer'>('definition');
+const activeTab = ref<'definition' | 'visualizer' | 'stage'>('definition');
+
+// Facts for loading modal
+const currentFacts = ref<FactItem[]>([]);
+
+// Watch for search queries to fetch facts
+watch(
+  () => store.searchQuery,
+  async newQuery => {
+    if (newQuery && store.isSearching) {
+      try {
+        // Fetch facts asynchronously while search is happening
+        const factsResponse = await dictionaryApi.getWordFacts(
+          newQuery,
+          5,
+          store.lookupHistory.slice(-10).map(h => h.word)
+        );
+        currentFacts.value = factsResponse.facts;
+      } catch (error) {
+        console.warn('Failed to fetch facts:', error);
+        currentFacts.value = [];
+      }
+    } else if (!newQuery) {
+      currentFacts.value = [];
+    }
+  },
+  { immediate: true }
+);
 
 onMounted(async () => {
   console.log('Home component mounted');

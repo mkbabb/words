@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import Any, TypeVar
 
 from openai import AsyncOpenAI
@@ -9,13 +11,14 @@ from pydantic import BaseModel
 
 from ..caching.decorators import cached_api_call
 from ..models import Definition
-from ..utils.logging import get_logger
+from ..utils.logging import get_logger, log_metrics
 from .models import (
     AnkiFillBlankResponse,
     AnkiMultipleChoiceResponse,
     ClusterMappingResponse,
     DictionaryEntryResponse,
     ExampleGenerationResponse,
+    FactGenerationResponse,
     PronunciationResponse,
     SuggestionsResponse,
     SynonymGenerationResponse,
@@ -69,6 +72,10 @@ class OpenAIConnector:
         **kwargs: Any,
     ) -> T:
         """Make a structured request to OpenAI with caching."""
+        start_time = time.time()
+        retry_count = 0
+        max_retries = 3
+        
         # Prepare request parameters
         request_params: dict[str, Any] = {
             "model": self.model_name,
@@ -85,25 +92,85 @@ class OpenAIConnector:
         if hasattr(self.client.beta.chat.completions, "parse"):
             request_params["response_format"] = response_model
 
-        try:
-            # Make the API call
-            response = await self.client.beta.chat.completions.parse(**request_params)
+        while retry_count < max_retries:
+            try:
+                # Log API call details
+                logger.debug(
+                    f"🤖 OpenAI API call: model={self.model_name}, "
+                    f"response_type={response_model.__name__}, "
+                    f"prompt_length={len(prompt)}, retry={retry_count}"
+                )
+                
+                # Make the API call
+                api_start = time.time()
+                response = await self.client.beta.chat.completions.parse(**request_params)
+                api_duration = time.time() - api_start
 
-            if response.choices[0].message.parsed:
-                result = response.choices[0].message.parsed
-            else:
-                # Fallback to manual parsing
-                content = response.choices[0].message.content
-                if content:
-                    result = response_model.model_validate_json(content)
+                # Extract token usage
+                token_usage = {}
+                if hasattr(response, 'usage') and response.usage:
+                    token_usage = {
+                        'prompt_tokens': response.usage.prompt_tokens,
+                        'completion_tokens': response.usage.completion_tokens,
+                        'total_tokens': response.usage.total_tokens,
+                    }
+
+                # Log successful API call
+                log_metrics(
+                    api_call="openai",
+                    model=self.model_name,
+                    response_type=response_model.__name__,
+                    duration=api_duration,
+                    retry_count=retry_count,
+                    **token_usage
+                )
+
+                if response.choices[0].message.parsed:
+                    result = response.choices[0].message.parsed
+                    # Store token usage on the result if it has that attribute
+                    if hasattr(result, 'token_usage'):
+                        result.token_usage = token_usage
                 else:
-                    raise ValueError("No content in response")
+                    # Fallback to manual parsing
+                    content = response.choices[0].message.content
+                    if content:
+                        result = response_model.model_validate_json(content)
+                    else:
+                        raise ValueError("No content in response")
 
-            return result
+                total_duration = time.time() - start_time
+                logger.info(
+                    f"✅ OpenAI API success: {response_model.__name__} "
+                    f"in {total_duration:.2f}s (tokens: {token_usage.get('total_tokens', 'N/A')})"
+                )
+                
+                return result
 
-        except Exception as e:
-            logger.error(f"OpenAI API error: {e}")
-            raise
+            except Exception as e:
+                retry_count += 1
+                duration = time.time() - start_time
+                
+                if retry_count < max_retries:
+                    wait_time = retry_count * 2  # Exponential backoff
+                    logger.warning(
+                        f"⚠️  OpenAI API error (attempt {retry_count}/{max_retries}): {e}. "
+                        f"Retrying in {wait_time}s..."
+                    )
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(
+                        f"❌ OpenAI API failed after {max_retries} attempts "
+                        f"({duration:.2f}s total): {e}"
+                    )
+                    log_metrics(
+                        api_call="openai_error",
+                        model=self.model_name,
+                        response_type=response_model.__name__,
+                        error=str(e),
+                        duration=duration,
+                        retry_count=retry_count
+                    )
+                    raise
 
     async def synthesize_definitions(
         self,
@@ -211,6 +278,7 @@ class OpenAIConnector:
             word: The word to extract mappings for.
             definitions: list of: (provider, word_type, definition) tuples from providers.
         """
+        start_time = time.time()
         def_count = len(definitions)
 
         logger.info(
@@ -221,9 +289,30 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(prompt, ClusterMappingResponse)
+            duration = time.time() - start_time
+            
+            # Log detailed cluster information
+            total_defs_mapped = sum(len(cm.definition_indices) for cm in result.cluster_mappings)
             logger.success(
-                f"🎯 Extracted {len(result.cluster_mappings)} cluster mappings for '{word}' "
-                f"(confidence: {result.confidence:.1%})"
+                f"🧮 Extracted {len(result.cluster_mappings)} meaning clusters for '{word}' "
+                f"in {duration:.2f}s (mapped {total_defs_mapped}/{def_count} definitions)"
+            )
+            
+            # Log each cluster for debugging
+            for cluster in result.cluster_mappings:
+                logger.debug(
+                    f"  • Cluster '{cluster.cluster_id}': {cluster.cluster_description} "
+                    f"({len(cluster.definition_indices)} definitions)"
+                )
+            
+            log_metrics(
+                stage="cluster_extraction",
+                word=word,
+                cluster_count=len(result.cluster_mappings),
+                definition_count=def_count,
+                mapped_count=total_defs_mapped,
+                confidence=result.confidence,
+                duration=duration
             )
             return result
         except Exception as e:
@@ -339,4 +428,60 @@ class OpenAIConnector:
             return result
         except Exception as e:
             logger.error(f"❌ Suggestions generation failed: {e}")
+            raise
+
+    @cached_api_call(
+        ttl_hours=48.0,  # Facts don't change frequently
+        key_func=lambda self, word, definition, count, previous_words: (
+            "facts",
+            word,
+            definition[:100],  # Truncate for cache key
+            count,
+            tuple(sorted(previous_words)) if previous_words else None,
+        ),
+    )
+    async def generate_facts(
+        self,
+        word: str,
+        definition: str,
+        count: int = 5,
+        previous_words: list[str] | None = None,
+    ) -> FactGenerationResponse:
+        """Generate interesting facts about a word.
+        
+        Args:
+            word: The word to generate facts about
+            definition: Main definition of the word for context
+            count: Number of facts to generate (3-8)
+            previous_words: Previously searched words for connections
+            
+        Returns:
+            FactGenerationResponse with facts and metadata
+        """
+        fact_count = max(3, min(8, count))
+        limited_previous = previous_words[:20] if previous_words else []
+        
+        logger.info(
+            f"📚 Generating {fact_count} facts for '{word}' with {len(limited_previous)} previous words"
+        )
+
+        prompt = self.template_manager.get_fact_generation_prompt(
+            word=word,
+            definition=definition,
+            count=fact_count,
+            previous_words=limited_previous,
+        )
+
+        try:
+            result = await self._make_structured_request(prompt, FactGenerationResponse)
+
+            facts_count = len(result.facts)
+            categories_str = ", ".join(result.categories) if result.categories else "general"
+            logger.success(
+                f"✨ Generated {facts_count} facts for '{word}' "
+                f"({categories_str}, confidence: {result.confidence:.1%})"
+            )
+            return result
+        except Exception as e:
+            logger.error(f"❌ Fact generation failed for '{word}': {e}")
             raise

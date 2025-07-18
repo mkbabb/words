@@ -5,20 +5,21 @@
       cn(
         [
           // Base styles
-          'inline-flex items-center justify-center',
-          'rounded-sm px-3 py-1.5',
+          'relative z-10 inline-flex items-center justify-center',
+          'rounded-lg px-6 py-2',
           'text-sm font-medium whitespace-nowrap',
           
           // Interactive states
-          'transition-smooth hover-lift-sm',
-          'hover:bg-muted/80',
+          'transition-all duration-200 ease-out',
+          'hover:text-foreground',
           'focus-ring',
           
-          // Active state
-          'data-[state=active]:bg-background',
-          'data-[state=active]:text-foreground',
-          'data-[state=active]:shadow-sm',
-          'data-[state=active]:hover:scale-100',
+          // Default state
+          'text-muted-foreground',
+          
+          // Active state - matches BouncyToggle active button
+          'data-[state=active]:text-primary',
+          'data-[state=active]:font-semibold',
           
           // Disabled state
           'disabled:pointer-events-none disabled:opacity-50',

@@ -1,0 +1,188 @@
+"""Pipeline state tracking infrastructure for progress reporting."""
+
+import asyncio
+import time
+from enum import Enum
+from typing import Any, AsyncIterator, Dict, Optional
+
+from pydantic import BaseModel, Field
+
+
+class PipelineStage(str, Enum):
+    """Standard pipeline stage identifiers."""
+    
+    # Common stages
+    INITIALIZING = "initializing"
+    VALIDATING = "validating"
+    COMPLETED = "completed"
+    ERROR = "error"
+    
+    # Lookup pipeline stages
+    LOOKUP_DICTIONARY = "lookup_dictionary"
+    LOOKUP_AI_SYNTHESIS = "lookup_ai_synthesis"
+    LOOKUP_MEANING_EXTRACTION = "lookup_meaning_extraction"
+    LOOKUP_CLUSTERING = "lookup_clustering"
+    LOOKUP_SAVING = "lookup_saving"
+    
+    # Search pipeline stages
+    SEARCH_EXACT = "search_exact"
+    SEARCH_FUZZY = "search_fuzzy"
+    SEARCH_SEMANTIC = "search_semantic"
+    SEARCH_AI = "search_ai"
+    SEARCH_RANKING = "search_ranking"
+
+
+class PipelineState(BaseModel):
+    """Represents the current state of a pipeline operation."""
+    
+    stage: str = Field(..., description="Current stage identifier")
+    progress: float = Field(0.0, ge=0.0, le=1.0, description="Progress from 0.0 to 1.0")
+    message: str = Field("", description="Human-readable status message")
+    data: Optional[Dict[str, Any]] = Field(None, description="Partial data payload")
+    timestamp: float = Field(..., description="Seconds since pipeline start")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metrics")
+    
+    class Config:
+        """Pydantic configuration."""
+        use_enum_values = True
+
+
+class StateTracker:
+    """Manages pipeline state updates with thread-safe operations."""
+    
+    def __init__(self, loop: Optional[asyncio.AbstractEventLoop] = None):
+        """Initialize the state tracker.
+        
+        Args:
+            loop: Event loop to use. If None, will get current loop when needed.
+        """
+        self._loop = loop
+        self._queue: asyncio.Queue[PipelineState] = asyncio.Queue()
+        self._current_state: Optional[PipelineState] = None
+        self._start_time: float = time.time()
+        
+    @property
+    def start_time(self) -> float:
+        """Get the pipeline start time."""
+        return self._start_time
+    
+    def reset(self) -> None:
+        """Reset the tracker to initial state."""
+        self._current_state = None
+        self._start_time = time.time()
+        # Create new queue to clear any pending items
+        self._queue = asyncio.Queue()
+    
+    def _get_timestamp(self) -> float:
+        """Calculate seconds elapsed since start."""
+        return time.time() - self._start_time
+    
+    async def update_state(
+        self,
+        stage: str,
+        progress: float = 0.0,
+        message: str = "",
+        data: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> PipelineState:
+        """Update the pipeline state asynchronously.
+        
+        Args:
+            stage: Stage identifier (can be PipelineStage enum or custom string)
+            progress: Progress value from 0.0 to 1.0
+            message: Human-readable status message
+            data: Optional partial data payload
+            metadata: Optional additional metrics
+            
+        Returns:
+            The updated pipeline state
+        """
+        state = PipelineState(
+            stage=stage.value if isinstance(stage, PipelineStage) else stage,
+            progress=progress,
+            message=message,
+            data=data,
+            timestamp=self._get_timestamp(),
+            metadata=metadata or {},
+        )
+        
+        self._current_state = state
+        await self._queue.put(state)
+        return state
+    
+    def update_state_sync(
+        self,
+        stage: str,
+        progress: float = 0.0,
+        message: str = "",
+        data: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> PipelineState:
+        """Update the pipeline state synchronously.
+        
+        This method creates a task in the event loop to handle the async update.
+        
+        Args:
+            stage: Stage identifier (can be PipelineStage enum or custom string)
+            progress: Progress value from 0.0 to 1.0
+            message: Human-readable status message
+            data: Optional partial data payload
+            metadata: Optional additional metrics
+            
+        Returns:
+            The updated pipeline state
+        """
+        state = PipelineState(
+            stage=stage.value if isinstance(stage, PipelineStage) else stage,
+            progress=progress,
+            message=message,
+            data=data,
+            timestamp=self._get_timestamp(),
+            metadata=metadata or {},
+        )
+        
+        self._current_state = state
+        
+        # Schedule async queue update
+        loop = self._loop or asyncio.get_event_loop()
+        asyncio.run_coroutine_threadsafe(self._queue.put(state), loop)
+        
+        return state
+    
+    def get_current_state(self) -> Optional[PipelineState]:
+        """Get the current pipeline state.
+        
+        Returns:
+            Current state or None if no updates yet
+        """
+        return self._current_state
+    
+    def get_progress(self) -> float:
+        """Get the current progress value.
+        
+        Returns:
+            Progress from 0.0 to 1.0, or 0.0 if no state
+        """
+        return self._current_state.progress if self._current_state else 0.0
+    
+    async def get_state_updates(self) -> AsyncIterator[PipelineState]:
+        """Async iterator for consuming state updates.
+        
+        Yields:
+            Pipeline states as they are added to the queue
+        """
+        while True:
+            state = await self._queue.get()
+            yield state
+            
+            # Exit if completed or error
+            if state.stage in (PipelineStage.COMPLETED, PipelineStage.ERROR):
+                break
+    
+    def has_updates(self) -> bool:
+        """Check if there are pending state updates.
+        
+        Returns:
+            True if updates are queued
+        """
+        return not self._queue.empty()

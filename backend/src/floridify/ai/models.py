@@ -156,6 +156,22 @@ class SuggestionsResponse(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0, description="Overall confidence in suggestions")
 
 
+class FactGenerationResponse(BaseModel):
+    """Response from AI fact generation about a word."""
+
+    facts: list[str] = Field(
+        description="List of interesting, educational facts about the word"
+    )
+    confidence: float = Field(
+        ge=0.0, le=1.0, 
+        description="Overall confidence in fact accuracy and quality"
+    )
+    categories: list[str] = Field(
+        default_factory=list,
+        description="Categories of facts generated (etymology, usage, cultural, etc.)"
+    )
+
+
 class AIGeneratedProviderData(ProviderData):
     """AI fallback provider data with quality indicators."""
 

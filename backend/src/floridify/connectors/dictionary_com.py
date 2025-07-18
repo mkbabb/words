@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Optional
+import asyncio
+import time
+
 from ..models import ProviderData
 from ..utils.logging import get_logger
+from ..utils.state_tracker import ProviderMetrics, StateTracker
 from .base import DictionaryConnector
 
 logger = get_logger(__name__)
@@ -29,17 +34,84 @@ class DictionaryComConnector(DictionaryConnector):
         """Name of the dictionary provider."""
         return "dictionary_com"
 
-    async def fetch_definition(self, word: str) -> ProviderData | None:
+    async def fetch_definition(
+        self, 
+        word: str,
+        state_tracker: Optional[StateTracker] = None,
+        progress_callback: Optional[any] = None,
+    ) -> ProviderData | None:
         """Fetch definition data for a word from Dictionary.com.
 
         This is a stub implementation that returns None.
 
         Args:
             word: The word to look up
+            state_tracker: Optional state tracker for progress updates
+            progress_callback: Optional callback for provider-specific progress
 
         Returns:
             None (stub implementation)
         """
-        # TODO: Implement Dictionary.com API integration
-        logger.info(f"Dictionary.com connector stub called for word: {word}")
-        return None
+        # Initialize timing and metrics
+        start_time = time.time()
+        metrics = ProviderMetrics(
+            provider_name=self.provider_name,
+            response_time_ms=0,
+            response_size_bytes=0,
+        )
+        
+        try:
+            # Report start
+            if state_tracker:
+                await self._report_progress(
+                    'start', 0, 
+                    {'provider': self.provider_name, 'word': word},
+                    state_tracker
+                )
+            
+            # TODO: Implement Dictionary.com API integration
+            logger.info(f"Dictionary.com connector stub called for word: {word}")
+            
+            # Simulate some work for the stub
+            await asyncio.sleep(0.1)  # Simulate network delay
+            
+            # Report completion (stub always fails)
+            metrics.success = False
+            metrics.error_message = "Dictionary.com connector not implemented"
+            metrics.response_time_ms = (time.time() - start_time) * 1000
+            
+            if state_tracker:
+                await self._report_progress(
+                    'complete', 100,
+                    {
+                        'provider': self.provider_name,
+                        'word': word,
+                        'success': False,
+                        'error': metrics.error_message,
+                        'metrics': metrics.__dict__
+                    },
+                    state_tracker
+                )
+            
+            return None
+            
+        except Exception as e:
+            metrics.success = False
+            metrics.error_message = str(e)
+            metrics.response_time_ms = (time.time() - start_time) * 1000
+            
+            if state_tracker:
+                await self._report_progress(
+                    'complete', 100,
+                    {
+                        'provider': self.provider_name,
+                        'word': word,
+                        'success': False,
+                        'error': str(e),
+                        'metrics': metrics.__dict__
+                    },
+                    state_tracker
+                )
+            
+            logger.error(f"Error in Dictionary.com stub for {word}: {e}")
+            return None
