@@ -15,10 +15,9 @@
       <Tabs v-model="activeTab" class="">
         <!-- Sticky Tabs and Search Bar -->
         <TabsList
-          class="m-auto grid w-fit grid-cols-3 justify-center gap-1 bg-transparent"
+          class="m-auto grid w-fit grid-cols-2 justify-center gap-1 bg-transparent"
         >
           <TabsTrigger value="definition">Dictionary</TabsTrigger>
-          <TabsTrigger value="visualizer">Visualizer</TabsTrigger>
           <TabsTrigger value="stage">Stage</TabsTrigger>
         </TabsList>
 
@@ -41,7 +40,7 @@
 
             <!-- Definition Display -->
             <div v-else-if="currentEntry" class="space-y-8">
-              <DefinitionDisplay variant="default" />
+              <DefinitionDisplay />
             </div>
 
             <!-- Empty State -->
@@ -50,28 +49,6 @@
             </div>
           </TabsContent>
 
-          <!-- Visualizer Tab Content -->
-          <TabsContent value="visualizer">
-            <div class="space-y-6">
-              <div>
-                <h2
-                  class="text-3xl font-bold tracking-tight"
-                  style="font-family: 'Fraunces', serif"
-                >
-                  Legendre Polynomial System
-                </h2>
-                <p
-                  class="text-muted-foreground/70 dark:text-muted-foreground/50 mt-2 italic"
-                  style="font-family: 'Fraunces', serif"
-                >
-                  Interactive visualization and series approximation using
-                  Legendre polynomials
-                </p>
-              </div>
-
-              <SeriesVisualizer />
-            </div>
-          </TabsContent>
 
           <!-- Stage Tab Content -->
           <TabsContent value="stage">
@@ -103,7 +80,6 @@ import SearchBar from '@/components/SearchBar.vue';
 import DefinitionDisplay from '@/components/DefinitionDisplay.vue';
 import DefinitionSkeleton from '@/components/DefinitionSkeleton.vue';
 import Sidebar from '@/components/Sidebar.vue';
-import SeriesVisualizer from '@/components/SeriesVisualizer.vue';
 import LoadingModal from '@/components/LoadingModal.vue';
 import StageTest from '@/components/StageTest.vue';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -111,7 +87,7 @@ import { dictionaryApi } from '@/utils/api';
 import type { FactItem } from '@/types';
 
 const store = useAppStore();
-const activeTab = ref<'definition' | 'visualizer' | 'stage'>('definition');
+const activeTab = ref<'definition' | 'stage'>('definition');
 
 // Facts for loading modal
 const currentFacts = ref<FactItem[]>([]);

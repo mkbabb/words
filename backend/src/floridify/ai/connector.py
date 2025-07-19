@@ -171,6 +171,9 @@ class OpenAIConnector:
                         retry_count=retry_count
                     )
                     raise
+        
+        # This should never be reached, but satisfies type checker
+        raise RuntimeError(f"Failed to get response after {max_retries} retries")
 
     async def synthesize_definitions(
         self,

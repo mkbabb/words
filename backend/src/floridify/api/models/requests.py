@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from ...constants import DictionaryProvider
@@ -62,3 +64,13 @@ class FactParams(BaseModel):
         max_length=20,
         description="Previously searched words for context",
     )
+
+
+class RegenerateExamplesRequest(BaseModel):
+    """Request to regenerate examples for a definition."""
+    
+    definition_index: int = Field(..., description="Index of the definition to regenerate examples for")
+    definition_text: str | None = Field(None, description="Optional custom definition text to use")
+    count: int | None = Field(2, description="Number of examples to generate", ge=1, le=5)
+
+

@@ -2,8 +2,9 @@
 
 import asyncio
 import time
+from collections.abc import AsyncIterator
 from enum import Enum
-from typing import Any, AsyncIterator, Dict, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -38,9 +39,9 @@ class PipelineState(BaseModel):
     stage: str = Field(..., description="Current stage identifier")
     progress: float = Field(0.0, ge=0.0, le=1.0, description="Progress from 0.0 to 1.0")
     message: str = Field("", description="Human-readable status message")
-    data: Optional[Dict[str, Any]] = Field(None, description="Partial data payload")
+    data: dict[str, Any] | None = Field(None, description="Partial data payload")
     timestamp: float = Field(..., description="Seconds since pipeline start")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metrics")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metrics")
     
     class Config:
         """Pydantic configuration."""
@@ -50,7 +51,7 @@ class PipelineState(BaseModel):
 class StateTracker:
     """Manages pipeline state updates with thread-safe operations."""
     
-    def __init__(self, loop: Optional[asyncio.AbstractEventLoop] = None):
+    def __init__(self, loop: asyncio.AbstractEventLoop | None = None):
         """Initialize the state tracker.
         
         Args:
@@ -58,7 +59,7 @@ class StateTracker:
         """
         self._loop = loop
         self._queue: asyncio.Queue[PipelineState] = asyncio.Queue()
-        self._current_state: Optional[PipelineState] = None
+        self._current_state: PipelineState | None = None
         self._start_time: float = time.time()
         
     @property
@@ -82,8 +83,8 @@ class StateTracker:
         stage: str,
         progress: float = 0.0,
         message: str = "",
-        data: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> PipelineState:
         """Update the pipeline state asynchronously.
         
@@ -115,8 +116,8 @@ class StateTracker:
         stage: str,
         progress: float = 0.0,
         message: str = "",
-        data: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> PipelineState:
         """Update the pipeline state synchronously.
         
@@ -149,7 +150,7 @@ class StateTracker:
         
         return state
     
-    def get_current_state(self) -> Optional[PipelineState]:
+    def get_current_state(self) -> PipelineState | None:
         """Get the current pipeline state.
         
         Returns:

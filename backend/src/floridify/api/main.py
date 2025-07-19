@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from ..utils import setup_logging
 from .middleware import LoggingMiddleware
-from .routers import health, lookup, search, suggestions, synonyms, legendre, facts
+from .routers import corpus, facts, health, lookup, search, suggestions, synonyms
+
+# Configure logging for the application
+setup_logging("DEBUG")
+logging.getLogger("floridify").setLevel(logging.DEBUG)
 
 # Create FastAPI application
 app = FastAPI(
@@ -28,8 +35,8 @@ app.add_middleware(
 # Include routers
 app.include_router(lookup.router, prefix="/api/v1", tags=["lookup"])
 app.include_router(search.router, prefix="/api/v1", tags=["search"])  
+app.include_router(corpus.router, prefix="/api/v1", tags=["corpus"])
 app.include_router(synonyms.router, prefix="/api/v1", tags=["synonyms"])
 app.include_router(suggestions.router, prefix="/api/v1", tags=["suggestions"])
 app.include_router(facts.router, prefix="/api/v1", tags=["facts"])
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
-app.include_router(legendre.router, prefix="/api/v1", tags=["legendre"])

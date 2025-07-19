@@ -6,15 +6,15 @@ import time
 from typing import TYPE_CHECKING
 
 from ..constants import Language
-from ..search import SearchEngine
 from ..search.constants import SearchMethod
-from ..search.core import SearchResult
+from ..search.generalized import SearchResult
+from ..search.language import LanguageSearch, get_language_search
 from ..utils.logging import (
     get_logger,
-    log_timing,
-    log_stage,
     log_metrics,
     log_search_method,
+    log_stage,
+    log_timing,
 )
 from ..utils.text_utils import normalize_word
 
@@ -26,61 +26,33 @@ from ..models.pipeline_state import PipelineStage
 logger = get_logger(__name__)
 
 # Global singleton instance
-_search_engine: SearchEngine | None = None
+_search_engine: LanguageSearch | None = None
 
 
 async def get_search_engine(
     languages: list[Language] | None = None,
-    enable_semantic: bool = False,  # DISABLED BY DEFAULT
+    enable_semantic: bool = False,  # Ignored for compatibility
     force_rebuild: bool = False,
-) -> SearchEngine:
-    """Get or create the global SearchEngine singleton.
+) -> LanguageSearch:
+    """Get or create the global LanguageSearch singleton.
     
     Args:
         languages: Languages to support (defaults to English)
-        enable_semantic: Whether to enable semantic search
+        enable_semantic: Ignored for compatibility
         force_rebuild: Force rebuild of search indices
         
     Returns:
-        Initialized SearchEngine instance
+        Initialized LanguageSearch instance
     """
     global _search_engine
     
-    # Use defaults
-    if languages is None:
-        languages = [Language.ENGLISH]
+    # Use simplified approach - delegate to get_language_search
+    target_languages = languages or [Language.ENGLISH]
     
-    # Check if we need to create or recreate the search engine
-    needs_recreation = (
-        _search_engine is None or
-        force_rebuild or
-        _search_engine.languages != languages or
-        _search_engine.enable_semantic != enable_semantic
-    )
+    # Check if we need to recreate
+    if _search_engine is None or _search_engine.languages != target_languages or force_rebuild:
+        _search_engine = await get_language_search(target_languages)
     
-    if needs_recreation:
-        logger.info(f"🔄 Initializing SearchEngine: languages={[lang.value for lang in languages]}, semantic={enable_semantic}")
-        start_time = time.time()
-        
-        _search_engine = SearchEngine(
-            languages=languages,
-            enable_semantic=enable_semantic,
-            force_rebuild=force_rebuild,
-        )
-        await _search_engine.initialize()
-        
-        init_duration = time.time() - start_time
-        logger.success(f"✅ SearchEngine singleton initialized in {init_duration:.2f}s")
-        
-        log_metrics(
-            engine_init_time=init_duration,
-            languages=[lang.value for lang in languages],
-            semantic_enabled=enable_semantic,
-            force_rebuild=force_rebuild
-        )
-    
-    # At this point, _search_engine is guaranteed to be non-None
-    assert _search_engine is not None
     return _search_engine
 
 

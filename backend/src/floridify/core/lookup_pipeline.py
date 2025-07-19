@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import time
-from typing import Optional
 
 from ..ai import get_definition_synthesizer
 from ..connectors.dictionary_com import DictionaryComConnector
@@ -12,12 +11,12 @@ from ..constants import DictionaryProvider, Language
 from ..models.models import ProviderData, SynthesizedDictionaryEntry
 from ..utils.logging import (
     get_logger,
-    log_timing,
-    log_stage,
     log_metrics,
     log_provider_fetch,
+    log_stage,
+    log_timing,
 )
-from ..utils.state_tracker import PipelineStage, StateTracker, ProviderMetrics
+from ..utils.state_tracker import PipelineStage, ProviderMetrics, StateTracker
 from .search_pipeline import find_best_match
 
 logger = get_logger(__name__)
@@ -32,7 +31,7 @@ async def lookup_word_pipeline(
     semantic: bool = False,
     no_ai: bool = False,
     force_refresh: bool = False,
-    state_tracker: Optional[StateTracker] = None,
+    state_tracker: StateTracker | None = None,
 ) -> SynthesizedDictionaryEntry | None:
     """Core lookup pipeline that normalizes, searches, gets provider definitions,
     and optionally synthesizes with AI.
@@ -59,7 +58,7 @@ async def lookup_word_pipeline(
     log_metrics(
         word=word,
         providers=[p.value for p in providers],
-        languages=[l.value for l in languages],
+        languages=[lang.value for lang in languages],
         semantic=semantic,
         no_ai=no_ai,
         force_refresh=force_refresh
@@ -167,9 +166,7 @@ async def lookup_word_pipeline(
                     provider=provider.value,
                     word=best_match,
                     fetch_time=provider_duration,
-                    definition_count=len(provider_data.definitions) if provider_data.definitions else 0,
-                    has_pronunciation=bool(provider_data.pronunciation),
-                    has_etymology=bool(provider_data.etymology)
+                    definition_count=len(provider_data.definitions) if provider_data.definitions else 0
                 )
             
             providers_data.append(provider_data)
@@ -270,7 +267,7 @@ async def _get_provider_definition(
     word: str, 
     provider: DictionaryProvider, 
     force_refresh: bool = False,
-    state_tracker: Optional[StateTracker] = None
+    state_tracker: StateTracker | None = None
 ) -> tuple[ProviderData | None, ProviderMetrics | None]:
     """Get definition from specified provider.
     
@@ -372,7 +369,7 @@ async def _synthesize_with_ai(
     word: str, 
     providers: list[ProviderData], 
     force_refresh: bool = False,
-    state_tracker: Optional[StateTracker] = None
+    state_tracker: StateTracker | None = None
 ) -> SynthesizedDictionaryEntry | None:
     """Synthesize definition using AI."""
     logger.debug(f"🤖 Starting AI synthesis for '{word}' with {len(providers)} providers")
@@ -404,7 +401,7 @@ async def _synthesize_with_ai(
 async def _ai_fallback_lookup(
     word: str, 
     force_refresh: bool = False,
-    state_tracker: Optional[StateTracker] = None
+    state_tracker: StateTracker | None = None
 ) -> SynthesizedDictionaryEntry | None:
     """AI fallback when no provider definitions are found."""
     logger.info(f"🔮 Attempting AI fallback generation for '{word}'")

@@ -43,7 +43,7 @@ class LexiconData(BaseModel):
     model_config = {"frozen": True}
 
 
-class LexiconLoader:
+class LexiconLanguageLoader:
     """
     Modular lexicon loader with caching and multi-language support.
 
@@ -132,16 +132,19 @@ class LexiconLoader:
         # Get sources for this language
         sources = self._get_sources_for_language(language)
 
-        # Load each source
-        for source in sources:
-            try:
-                source_words, source_phrases = await self._load_source(source)
-
-                words.extend(source_words)
-                phrases.extend(source_phrases)
-            except Exception as e:
-                logger.warning(f"Failed to load lexicon source {source.name}: {e}")
+        # Load all sources in parallel for performance
+        import asyncio
+        source_tasks = [self._load_source(source) for source in sources]
+        source_results = await asyncio.gather(*source_tasks, return_exceptions=True)
+        
+        for source, result in zip(sources, source_results, strict=False):
+            if isinstance(result, Exception):
+                logger.warning(f"Failed to load lexicon source {source.name}: {result}")
                 continue
+            
+            source_words, source_phrases = result
+            words.extend(source_words)
+            phrases.extend(source_phrases)
 
         # Enhanced deduplication with diacritic handling
         normalized_words_map = {}

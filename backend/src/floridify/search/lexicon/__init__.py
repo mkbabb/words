@@ -9,12 +9,15 @@ from __future__ import annotations
 
 from ...constants import Language
 from ..constants import LexiconFormat
-from .lexicon import LexiconData, LexiconLoader
+from .language_loader import LexiconData, LexiconLanguageLoader
+from .core import SimpleLexicon, Lexicon
 from .sources import LEXICON_SOURCES, LexiconSourceConfig
 
 __all__ = [
-    "LexiconLoader",
+    "LexiconLanguageLoader",
     "LexiconData", 
+    "SimpleLexicon",
+    "Lexicon",
     "LexiconSourceConfig",
     "LEXICON_SOURCES",
     "Language",

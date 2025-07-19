@@ -38,7 +38,7 @@
             :mode="mode"
             size="lg"
             clickable
-            @toggle-mode="store.toggleMode()"
+            @toggle-mode="handleModeToggle"
           />
         </div>
 
@@ -62,6 +62,40 @@
           @blur="handleBlur"
           @input="handleInput"
         />
+
+        <!-- Regenerate Button - Only shows when we have a current entry and in word search mode -->
+        <div
+          v-if="store.currentEntry && store.searchMode === 'word'"
+          :class="[
+            'flex items-center justify-center overflow-hidden transition-all duration-300 ease-out'
+          ]"
+          :style="{ 
+            opacity: iconOpacity,
+            transform: `scale(${0.9 + iconOpacity * 0.1})`,
+            pointerEvents: iconOpacity > 0.1 ? 'auto' : 'none',
+            width: `${iconOpacity * 48}px`,
+            marginLeft: `${iconOpacity * 8}px`
+          }"
+        >
+          <button
+            @click="handleForceRegenerate"
+            :class="[
+              'flex h-10 w-10 items-center justify-center rounded-lg',
+              store.forceRefreshMode ? 'bg-primary/20 text-primary' : '',
+              'hover:bg-muted/50 active:scale-95'
+            ]"
+            style="transition: background-color 150ms ease-out, transform 150ms ease-out"
+            :title="store.forceRefreshMode ? 'Force refresh mode ON - Next lookup will regenerate' : 'Toggle force refresh mode'"
+          >
+            <RefreshCw 
+              :size="20" 
+              :style="{
+                transform: `rotate(${regenerateRotation}deg)`,
+                transition: 'transform 700ms cubic-bezier(0.175, 0.885, 0.32, 1.4)'
+              }"
+            />
+          </button>
+        </div>
 
         <!-- Hamburger Button -->
         <div
@@ -131,7 +165,7 @@
               <button
                 v-for="source in sources"
                 :key="source.id"
-                @click="store.toggleSource(source.id)"
+                @click="handleSourceToggle(source.id)"
                 :class="[
                   'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium',
                   store.selectedSources.includes(source.id)
@@ -175,7 +209,7 @@
               <button
                 v-for="wordlist in wordlists"
                 :key="wordlist"
-                @click="store.setWordlist(wordlist)"
+                @click="handleWordlistSelect(wordlist)"
                 :class="[
                   'w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-smooth',
                   store.selectedWordlist === wordlist
@@ -227,10 +261,10 @@
               v-for="(result, index) in searchResults"
               :key="result.word"
               :class="[
-                'flex w-full items-center justify-between px-4 py-3 text-left transition-smooth',
+                'flex w-full items-center justify-between px-4 py-3 text-left transition-smooth duration-150',
                 'border-muted-foreground/50 active:scale-[0.98]',
                 index === selectedIndex
-                  ? 'bg-accent/60 scale-[1.02] border-l-8 pl-5'
+                  ? 'bg-accent/60 scale-[1.02] border-l-6 pl-4'
                   : 'border-l-0 pl-4'
               ]"
               @click="selectResult(result)"
@@ -301,7 +335,7 @@ import Button from '@/components/ui/Button.vue';
 import FancyF from '@/components/ui/icons/FancyF.vue';
 import HamburgerIcon from '@/components/ui/icons/HamburgerIcon.vue';
 import BouncyToggle from '@/components/ui/BouncyToggle.vue';
-import { Sparkles } from 'lucide-vue-next';
+import { Sparkles, RefreshCw } from 'lucide-vue-next';
 import WiktionaryIcon from '@/components/ui/icons/WiktionaryIcon.vue';
 import OxfordIcon from '@/components/ui/icons/OxfordIcon.vue';
 import DictionaryIcon from '@/components/ui/icons/DictionaryIcon.vue';
@@ -330,6 +364,7 @@ const aiSuggestions = ref<string[]>([]);
 const isContainerHovered = ref(false);
 const isFocused = ref(false);
 const isShrunken = ref(false);
+const regenerateRotation = ref(0);
 
 // State machine for scroll/hover behavior
 type SearchBarState = 'normal' | 'scrolled' | 'hovering' | 'focused';
@@ -638,6 +673,47 @@ const navigateResults = (direction: number) => {
 
 const handleHamburgerClick = () => {
   store.toggleControls();
+  // Restore focus to search input after toggling controls
+  nextTick(() => {
+    searchInput.value?.focus();
+  });
+};
+
+const handleForceRegenerate = () => {
+  // Toggle force refresh mode
+  store.forceRefreshMode = !store.forceRefreshMode;
+  
+  // Add rotation on toggle
+  regenerateRotation.value += 360;
+  
+  // Restore focus to search input after toggling
+  nextTick(() => {
+    searchInput.value?.focus();
+  });
+};
+
+const handleSourceToggle = (sourceId: string) => {
+  store.toggleSource(sourceId);
+  // Restore focus to search input after toggling source
+  nextTick(() => {
+    searchInput.value?.focus();
+  });
+};
+
+const handleWordlistSelect = (wordlist: string) => {
+  store.setWordlist(wordlist);
+  // Restore focus to search input after selecting wordlist
+  nextTick(() => {
+    searchInput.value?.focus();
+  });
+};
+
+const handleModeToggle = () => {
+  store.toggleMode();
+  // Restore focus to search input after toggling mode
+  nextTick(() => {
+    searchInput.value?.focus();
+  });
 };
 
 // Click outside handler

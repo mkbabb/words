@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import time
 from datetime import datetime
-from typing import Optional
 
 from ..constants import DictionaryProvider
 from ..models import (
@@ -34,7 +34,7 @@ class DefinitionSynthesizer:
         word: str, 
         providers_data: list[ProviderData], 
         force_refresh: bool = False,
-        state_tracker: Optional[StateTracker] = None
+        state_tracker: StateTracker | None = None
     ) -> SynthesizedDictionaryEntry | None:
         """Synthesize a complete dictionary entry from provider data using meaning clusters."""
 
@@ -161,7 +161,7 @@ class DefinitionSynthesizer:
         self, 
         word: str, 
         force_refresh: bool = False,
-        state_tracker: Optional[StateTracker] = None
+        state_tracker: StateTracker | None = None
     ) -> SynthesizedDictionaryEntry | None:
         """Generate a complete fallback entry using AI."""
         logger.info(f"🔮 Starting AI fallback generation for '{word}'")
@@ -234,7 +234,7 @@ class DefinitionSynthesizer:
         word: str,
         clustered_definitions: list[Definition],
         cluster_descriptions: dict[str, str],
-        state_tracker: Optional[StateTracker] = None,
+        state_tracker: StateTracker | None = None,
     ) -> list[Definition]:
         """Synthesize definitions by processing each cluster and creating normalized definitions.
 
@@ -351,12 +351,13 @@ class DefinitionSynthesizer:
             except Exception as e:
                 cluster_duration = time.time() - cluster_start
                 logger.error(f"❌ Failed to synthesize cluster '{cluster_id}' after {cluster_duration:.2f}s: {e}")
-                log_metrics(
-                    stage="cluster_synthesis_error",
-                    cluster_id=cluster_id,
-                    error=str(e),
-                    duration=cluster_duration
-                )
+                # TODO: Add metrics logging
+                # log_metrics(
+                #     stage="cluster_synthesis_error",
+                #     cluster_id=cluster_id,
+                #     error=str(e),
+                #     duration=cluster_duration
+                # )
                 continue
 
         logger.success(
@@ -381,7 +382,7 @@ class DefinitionSynthesizer:
         
         try:
             # Generate synonyms using the existing prompt
-            synonym_response = await self.ai.generate_synonyms(
+            synonym_response = await self.ai.synonyms(
                 word=word,
                 word_type=word_type,
                 definition=definition,

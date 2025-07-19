@@ -115,3 +115,6 @@ export interface AppState {
 // Card variant types
 export const CARD_VARIANTS = ['default', 'gold', 'silver', 'bronze'] as const;
 export type CardVariant = typeof CARD_VARIANTS[number];
+
+// Re-export wordlist types
+export * from './wordlist';

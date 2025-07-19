@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Any, AsyncGenerator
+from typing import Any
 
 from ..api.models.pipeline import PipelineState
 from ..utils.logging import get_logger
@@ -53,7 +54,7 @@ class StateTracker:
                 # Non-blocking put to avoid deadlocks
                 subscriber.put_nowait(state)
             except asyncio.QueueFull:
-                logger.warning(f"Subscriber queue full, skipping state update")
+                logger.warning("Subscriber queue full, skipping state update")
     
     async def get_states(self) -> AsyncGenerator[PipelineState, None]:
         """Get state updates as they occur."""

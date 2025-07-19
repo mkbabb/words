@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...ai.factory import get_openai_connector
 from ...caching.decorators import cached_api_call
-from ...models.models import SynthesizedDictionaryEntry
 from ...storage.mongodb import get_synthesized_entry
 from ...utils.logging import get_logger
 from ..models.requests import FactParams

@@ -29,7 +29,7 @@
                   >
                 </h4>
                 <p class="text-muted-foreground text-sm">
-                  Legendre polynomial visualization and dictionary system
+                  AI-enhanced dictionary system
                 </p>
               </div>
             </div>

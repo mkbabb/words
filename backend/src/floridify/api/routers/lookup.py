@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 
 from ...caching.decorators import cached_api_call
@@ -15,10 +16,9 @@ from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import lookup_state_tracker
 from ...utils.logging import get_logger
-from ...utils.state_tracker import PipelineStage, StateTracker, StateUpdate
-from ..models.pipeline import PipelineState
-from ..models.requests import LookupParams
-from ..models.responses import LookupResponse
+from ...utils.state_tracker import PipelineStage, StateTracker
+from ..models.requests import LookupParams, RegenerateExamplesRequest
+from ..models.responses import LookupResponse, RegenerateExamplesResponse
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -167,7 +167,7 @@ async def generate_lookup_events(
     try:
         # Subscribe to state updates
         async with lookup_state_tracker.subscribe() as queue:
-            last_partial_results = {}
+            last_partial_results: dict[str, Any] = {}
             
             while True:
                 try:
@@ -176,6 +176,34 @@ async def generate_lookup_events(
                     
                     # Format as SSE event
                     if state.is_complete:
+                        # Process any remaining events in the queue before sending complete
+                        while not queue.empty():
+                            try:
+                                pending_state = queue.get_nowait()
+                                if not pending_state.is_complete and not pending_state.error:
+                                    # Emit any pending provider_data events
+                                    if pending_state.details and "partial_results" in pending_state.details:
+                                        partial_results = pending_state.details["partial_results"]
+                                        if "provider_data" in partial_results:
+                                            provider_data_list = partial_results["provider_data"]
+                                            if len(provider_data_list) > len(last_partial_results.get("provider_data", [])):
+                                                latest_provider_data = provider_data_list[-1]
+                                                if hasattr(latest_provider_data, 'model_dump'):
+                                                    serialized_data = latest_provider_data.model_dump()
+                                                else:
+                                                    serialized_data = latest_provider_data
+                                                
+                                                provider_event = {
+                                                    "stage": "provider_data",
+                                                    "provider": serialized_data.get("provider_name", "unknown"),
+                                                    "definitions_count": len(serialized_data.get("definitions", [])),
+                                                    "data": serialized_data
+                                                }
+                                                yield f"event: provider_data\ndata: {json.dumps(jsonable_encoder(provider_event))}\n\n"
+                                                last_partial_results = partial_results
+                            except asyncio.QueueEmpty:
+                                break
+                        
                         # Get the final result
                         result = await lookup_task
                         if result:
@@ -185,9 +213,9 @@ async def generate_lookup_events(
                                 "definitions": [d.model_dump() for d in result.definitions],
                                 "last_updated": result.last_updated.isoformat(),
                             }
-                            yield f"event: complete\ndata: {json.dumps(event_data)}\n\n"
+                            yield f"event: complete\ndata: {json.dumps(jsonable_encoder(event_data))}\n\n"
                         else:
-                            yield f"event: error\ndata: {{\"error\": \"No definition found\"}}\n\n"
+                            yield "event: error\ndata: {\"error\": \"No definition found\"}\n\n"
                         break
                     elif state.error:
                         yield f"event: error\ndata: {{\"error\": \"{state.error}\"}}\n\n"
@@ -211,29 +239,30 @@ async def generate_lookup_events(
                                 provider_data_list = partial_results["provider_data"]
                                 # Check if we have new provider data
                                 if len(provider_data_list) > len(last_partial_results.get("provider_data", [])):
-                                    # Get the latest provider data
+                                    # Get the latest provider data (already serialized as dict)
                                     latest_provider_data = provider_data_list[-1]
+                                    # Ensure the provider data is properly serialized
+                                    if hasattr(latest_provider_data, 'model_dump'):
+                                        # Still a Pydantic model, serialize it
+                                        serialized_data = latest_provider_data.model_dump()
+                                    else:
+                                        # Already a dict
+                                        serialized_data = latest_provider_data
+                                    
                                     provider_event = {
                                         "stage": "provider_data",
-                                        "provider": latest_provider_data.provider_name,
-                                        "definitions_count": len(latest_provider_data.definitions) if latest_provider_data.definitions else 0,
-                                        "has_pronunciation": bool(latest_provider_data.pronunciation),
-                                        "has_etymology": bool(latest_provider_data.etymology),
-                                        "data": {
-                                            "provider_name": latest_provider_data.provider_name,
-                                            "definitions": [d.model_dump() for d in latest_provider_data.definitions] if latest_provider_data.definitions else [],
-                                            "pronunciation": latest_provider_data.pronunciation.model_dump() if latest_provider_data.pronunciation else None,
-                                            "etymology": latest_provider_data.etymology,
-                                        }
+                                        "provider": serialized_data.get("provider_name", "unknown"),
+                                        "definitions_count": len(serialized_data.get("definitions", [])),
+                                        "data": serialized_data
                                     }
-                                    yield f"event: provider_data\ndata: {json.dumps(provider_event)}\n\n"
+                                    yield f"event: provider_data\ndata: {json.dumps(jsonable_encoder(provider_event))}\n\n"
                                     last_partial_results = partial_results
                         
                         # Always emit the progress event
-                        yield f"event: progress\ndata: {json.dumps(event_data)}\n\n"
+                        yield f"event: progress\ndata: {json.dumps(jsonable_encoder(event_data))}\n\n"
                         
-                except asyncio.TimeoutError:
-                    yield f"event: error\ndata: {{\"error\": \"Timeout waiting for updates\"}}\n\n"
+                except TimeoutError:
+                    yield "event: error\ndata: {\"error\": \"Timeout waiting for updates\"}\n\n"
                     break
                     
     except Exception as e:
@@ -253,17 +282,17 @@ async def _lookup_with_tracking(word: str, params: LookupParams) -> LookupRespon
     """Perform lookup with state tracking."""
     # Create a custom state tracker that bridges to the global one
     class BridgeStateTracker(StateTracker):
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__()
-            self.partial_results = {}
+            self.partial_results: dict[str, Any] = {}
             
         async def update(
             self,
             stage: PipelineStage,
             progress: float,
             message: str,
-            metadata: Optional[dict] = None,
-            partial_data: Optional[any] = None
+            metadata: dict[str, Any] | None = None,
+            partial_data: Any | None = None
         ) -> None:
             await super().update(stage, progress, message, metadata, partial_data)
             
@@ -272,7 +301,14 @@ async def _lookup_with_tracking(word: str, params: LookupParams) -> LookupRespon
                 if "provider_data" in partial_data:
                     if "provider_data" not in self.partial_results:
                         self.partial_results["provider_data"] = []
-                    self.partial_results["provider_data"].append(partial_data["provider_data"])
+                    # Serialize ProviderData object to dict for JSON compatibility
+                    provider_data = partial_data["provider_data"]
+                    if hasattr(provider_data, 'model_dump'):
+                        # It's a Pydantic model, convert to dict
+                        self.partial_results["provider_data"].append(provider_data.model_dump())
+                    else:
+                        # It's already a dict
+                        self.partial_results["provider_data"].append(provider_data)
                 elif "best_match" in partial_data:
                     self.partial_results["best_match"] = partial_data["best_match"]
             
@@ -280,6 +316,11 @@ async def _lookup_with_tracking(word: str, params: LookupParams) -> LookupRespon
             stage_map = {
                 PipelineStage.SEARCH: "search",
                 PipelineStage.PROVIDER_FETCH: "provider_fetch",
+                PipelineStage.PROVIDER_START: "provider_start",
+                PipelineStage.PROVIDER_CONNECTED: "provider_connected",
+                PipelineStage.PROVIDER_DOWNLOADING: "provider_downloading",
+                PipelineStage.PROVIDER_PARSING: "provider_parsing",
+                PipelineStage.PROVIDER_COMPLETE: "provider_complete",
                 PipelineStage.AI_CLUSTERING: "ai_clustering",
                 PipelineStage.AI_SYNTHESIS: "ai_synthesis",
                 PipelineStage.AI_EXAMPLES: "ai_examples",
@@ -288,7 +329,7 @@ async def _lookup_with_tracking(word: str, params: LookupParams) -> LookupRespon
                 PipelineStage.COMPLETE: "complete",
             }
             
-            # Calculate overall progress (0-100 scale)
+            # Progress comes in as 0-100, convert to 0-1 for frontend
             overall_progress = progress / 100.0
             
             # Update global state tracker with timing info
@@ -299,8 +340,14 @@ async def _lookup_with_tracking(word: str, params: LookupParams) -> LookupRespon
             if self.partial_results:
                 details["partial_results"] = self.partial_results
             
+            # Map stage to string, with fallback
+            mapped_stage = stage_map.get(stage)
+            if mapped_stage is None:
+                logger.warning(f"Unknown pipeline stage: {stage}")
+                mapped_stage = str(stage.value) if hasattr(stage, 'value') else str(stage)
+            
             await lookup_state_tracker.update_state(
-                stage=stage_map.get(stage, str(stage.value)),
+                stage=mapped_stage,
                 progress=overall_progress,
                 message=message,
                 details=details,
@@ -312,7 +359,7 @@ async def _lookup_with_tracking(word: str, params: LookupParams) -> LookupRespon
     try:
         # Start tracking
         await lookup_state_tracker.update_state(
-            stage="initialization",
+            stage="search",
             progress=0.0,
             message=f"Starting lookup for '{word}'",
             details={"word": word, "providers": [p.value for p in params.providers]},
@@ -451,3 +498,96 @@ async def lookup_word_stream(
             "X-Accel-Buffering": "no",  # Disable nginx buffering
         },
     )
+
+
+@router.post("/lookup/{word}/regenerate-examples", response_model=RegenerateExamplesResponse)
+async def regenerate_examples(
+    word: str,
+    request: RegenerateExamplesRequest,
+) -> RegenerateExamplesResponse:
+    """Regenerate examples for a specific definition.
+    
+    Generates fresh AI examples for a given word definition, replacing
+    the existing generated examples while preserving literature examples.
+    
+    Args:
+        word: The word to regenerate examples for
+        request: Contains definition_index and optionally the definition text
+        
+    Returns:
+        New generated examples for the specified definition
+        
+    Raises:
+        404: Word not found in storage
+        400: Invalid definition index
+        500: AI generation error
+    """
+    from ...ai.connector import OpenAIConnector
+    from ...ai.factory import get_openai_connector
+    from ...models import Examples, GeneratedExample
+    from ...storage.mongodb import get_synthesized_entry, save_synthesized_entry
+    
+    logger.info(f"Regenerating examples for '{word}' definition {request.definition_index}")
+    
+    try:
+        # Get the existing entry
+        entry = await get_synthesized_entry(word)
+        if not entry:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No stored entry found for word: {word}"
+            )
+        
+        # Validate definition index
+        if request.definition_index >= len(entry.definitions):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid definition index: {request.definition_index}"
+            )
+        
+        # Get the target definition
+        target_def = entry.definitions[request.definition_index]
+        
+        # Get AI connector from factory
+        ai_connector = get_openai_connector()
+        
+        # Generate new examples
+        example_response = await ai_connector.examples(
+            word=word,
+            word_type=target_def.word_type,
+            definition=request.definition_text or target_def.definition,
+            count=request.count or 2,
+        )
+        
+        # Create new examples, preserving literature examples
+        new_generated = [
+            GeneratedExample(sentence=sentence, regenerable=True)
+            for sentence in example_response.example_sentences
+        ]
+        
+        # Update the definition's examples
+        if target_def.examples:
+            target_def.examples.generated = new_generated
+        else:
+            target_def.examples = Examples(generated=new_generated)
+        
+        # Save the updated entry
+        await save_synthesized_entry(entry)
+        
+        logger.success(f"✅ Regenerated {len(new_generated)} examples for '{word}'")
+        
+        return RegenerateExamplesResponse(
+            word=word,
+            definition_index=request.definition_index,
+            examples=[ex.model_dump() for ex in new_generated],
+            confidence=example_response.confidence,
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to regenerate examples for '{word}': {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to regenerate examples: {str(e)}"
+        )

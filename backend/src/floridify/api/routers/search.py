@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -16,7 +16,6 @@ from ...core.state_tracker import search_state_tracker
 from ...models.pipeline_state import StateTracker as PipelineStateTracker
 from ...search.constants import SearchMethod
 from ...utils.logging import get_logger
-from ..models.pipeline import PipelineState
 from ..models.requests import SearchParams
 from ..models.responses import (
     SearchResponse,
@@ -51,6 +50,9 @@ def parse_search_params(
 )
 async def _cached_search(params: SearchParams) -> SearchResponse:
     """Cached search implementation using the search pipeline."""
+    start_time = time.perf_counter()
+    
+    # Use existing search pipeline
     # Map string method to SearchMethod enum
     method_map = {
         "exact": SearchMethod.EXACT,
@@ -63,9 +65,6 @@ async def _cached_search(params: SearchParams) -> SearchResponse:
     # Determine if semantic search should be enabled
     # For now, disable semantic search for all methods since it's temporarily disabled
     enable_semantic = False  # search_method in (SearchMethod.SEMANTIC, SearchMethod.AUTO)
-    
-    # Perform search
-    start_time = time.perf_counter()
     
     if search_method in (SearchMethod.EXACT, SearchMethod.FUZZY) and not enable_semantic:
         # For specific non-semantic methods, use search engine directly
@@ -168,6 +167,8 @@ async def search_words(
         )
 
 
+
+
 async def generate_search_events(
     params: SearchParams,
 ) -> AsyncGenerator[str, None]:
@@ -236,8 +237,8 @@ async def generate_search_events(
                         
                         yield f"event: progress\ndata: {json.dumps(event_data)}\n\n"
                         
-                except asyncio.TimeoutError:
-                    yield f"event: error\ndata: {{\"error\": \"Timeout waiting for updates\"}}\n\n"
+                except TimeoutError:
+                    yield "event: error\ndata: {\"error\": \"Timeout waiting for updates\"}\n\n"
                     break
                     
     except Exception as e:

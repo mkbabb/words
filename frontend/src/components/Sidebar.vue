@@ -284,7 +284,6 @@
 import { computed } from 'vue';
 import { useAppStore } from '@/stores';
 import { cn } from '@/utils';
-import Button from '@/components/ui/Button.vue';
 import SearchHistoryContent from '@/components/SearchHistoryContent.vue';
 import FloridifyIcon from '@/components/ui/icons/FloridifyIcon.vue';
 import HamburgerIcon from '@/components/ui/icons/HamburgerIcon.vue';

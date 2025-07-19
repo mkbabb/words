@@ -38,10 +38,10 @@ def cached_api_call(
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             cache_manager = get_cache_manager()
             
-            # Check for force refresh parameter
-            force_refresh = kwargs.pop(force_refresh_param, False)
+            # Check for force refresh parameter (don't pop yet)
+            force_refresh = kwargs.get(force_refresh_param, False)
             
-            # Generate cache key
+            # Generate cache key (needs access to force_refresh)
             if key_func:
                 key_parts = key_func(*args, **kwargs)
             else:
@@ -104,8 +104,8 @@ def cached_computation(
         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             cache_manager = get_cache_manager()
             
-            # Check for force refresh parameter
-            force_refresh = kwargs.pop(force_refresh_param, False)
+            # Check for force refresh parameter (don't pop yet)
+            force_refresh = kwargs.get(force_refresh_param, False)
             
             # Generate cache key
             if key_func:
@@ -147,8 +147,8 @@ def cached_computation(
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             cache_manager = get_cache_manager()
             
-            # Check for force refresh parameter
-            force_refresh = kwargs.pop(force_refresh_param, False)
+            # Check for force refresh parameter (don't pop yet)
+            force_refresh = kwargs.get(force_refresh_param, False)
             
             # Generate cache key
             if key_func:

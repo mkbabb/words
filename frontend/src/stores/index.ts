@@ -20,6 +20,7 @@ export const useAppStore = defineStore('app', () => {
   const searchResults = ref<SearchResult[]>([]);
   const loadingProgress = ref(0);
   const loadingStage = ref('');
+  const forceRefreshMode = ref(false);
   
   // Persisted UI State with validation
   const uiState = useStorage('ui-state', {
@@ -247,17 +248,53 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  async function getDefinition(word: string) {
+  async function getDefinition(word: string, overrideForceRefresh?: boolean) {
+    // Use forceRefreshMode state or explicit override
+    const shouldForceRefresh = overrideForceRefresh ?? forceRefreshMode.value;
+    
     isSearching.value = true;
     loadingProgress.value = 0;
-    loadingStage.value = 'Looking up word...';
+    loadingStage.value = shouldForceRefresh ? 'Regenerating word...' : 'Looking up word...';
 
     try {
-      // Simulate progress
-      loadingProgress.value = 30;
-      loadingStage.value = 'Fetching definition...';
-
-      const entry = await dictionaryApi.getDefinition(word);
+      let entry;
+      
+      if (shouldForceRefresh) {
+        // Use streaming endpoint for force refresh to get pipeline progress
+        entry = await dictionaryApi.getDefinitionStream(
+          word,
+          true,
+          (stage, progress, message, details) => {
+            // Map stage names to user-friendly messages
+            const stageMessages: Record<string, string> = {
+              'search': 'Searching word database...',
+              'provider_fetch': 'Fetching from dictionary providers...',
+              'ai_clustering': 'AI clustering definitions...',
+              'ai_synthesis': 'AI synthesizing definitions...',
+              'ai_examples': 'Generating examples...',
+              'ai_synonyms': 'Enhancing synonyms...',
+              'storage_save': 'Saving to database...'
+            };
+            
+            loadingProgress.value = Math.round(progress * 100);
+            loadingStage.value = stageMessages[stage] || message;
+            
+            // Debug logging
+            console.log(`Stage: ${stage}, Progress: ${progress} → ${Math.round(progress * 100)}%, Message: ${message}`);
+            
+            // Log details for debugging
+            if (details) {
+              console.log(`Pipeline ${stage} details:`, details);
+            }
+          }
+        );
+      } else {
+        // Use regular endpoint for normal lookups
+        loadingProgress.value = 30;
+        loadingStage.value = 'Fetching definition...';
+        entry = await dictionaryApi.getDefinition(word, false);
+      }
+      
       currentEntry.value = entry;
       
       // Update current word in session
@@ -285,6 +322,11 @@ export const useAppStore = defineStore('app', () => {
         loadingProgress.value = 0;
         loadingStage.value = '';
       }, 300);
+      
+      // Reset force refresh mode after successful lookup
+      if (shouldForceRefresh && forceRefreshMode.value) {
+        forceRefreshMode.value = false;
+      }
     } catch (error) {
       console.error('Definition error:', error);
       loadingProgress.value = 0;
@@ -475,7 +517,7 @@ export const useAppStore = defineStore('app', () => {
   function toggleSource(source: string) {
     const sources = selectedSources.value;
     if (sources.includes(source)) {
-      selectedSources.value = sources.filter(s => s !== source);
+      selectedSources.value = sources.filter((s: string) => s !== source);
     } else {
       selectedSources.value = [...sources, source];
     }
@@ -483,6 +525,62 @@ export const useAppStore = defineStore('app', () => {
 
   function setWordlist(wordlist: string | null) {
     selectedWordlist.value = wordlist;
+  }
+
+  // Regenerate examples for a specific definition
+  async function regenerateExamples(definitionIndex: number, definitionText?: string) {
+    if (!currentEntry.value) return;
+    
+    try {
+      const response = await dictionaryApi.regenerateExamples(
+        currentEntry.value.word,
+        definitionIndex,
+        definitionText,
+        2
+      );
+      
+      // Update the current entry with new examples
+      if (currentEntry.value.definitions[definitionIndex]) {
+        const def = currentEntry.value.definitions[definitionIndex];
+        if (!def.examples) {
+          def.examples = { generated: [], literature: [] };
+        }
+        def.examples.generated = response.examples.map(ex => ({
+          sentence: ex.sentence,
+          regenerable: ex.regenerable,
+        }));
+      }
+      
+      // Also update in lookup history
+      const historyIndex = lookupHistory.value.findIndex(
+        h => h.word === currentEntry.value?.word
+      );
+      if (historyIndex >= 0) {
+        lookupHistory.value[historyIndex].entry = currentEntry.value;
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Failed to regenerate examples:', error);
+      throw error;
+    }
+  }
+  
+  // Regenerate all examples for the current word
+  async function regenerateAllExamples() {
+    if (!currentEntry.value) return;
+    
+    try {
+      // Regenerate examples for each definition
+      const promises = currentEntry.value.definitions.map((def, index) => 
+        regenerateExamples(index, def.definition)
+      );
+      
+      await Promise.all(promises);
+    } catch (error) {
+      console.error('Failed to regenerate all examples:', error);
+      throw error;
+    }
   }
 
   // Initialize vocabulary suggestions on store creation
@@ -515,6 +613,7 @@ export const useAppStore = defineStore('app', () => {
     loadingProgress,
     loadingStage,
     searchCursorPosition,
+    forceRefreshMode,
     searchSelectedIndex,
     sessionState,
     // Enhanced SearchBar state
@@ -552,5 +651,8 @@ export const useAppStore = defineStore('app', () => {
     toggleControls,
     toggleSource,
     setWordlist,
+    // Regeneration functions
+    regenerateExamples,
+    regenerateAllExamples,
   };
 });

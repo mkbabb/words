@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from ..models import ProviderData
 from ..utils.logging import get_logger
@@ -25,8 +26,8 @@ class DictionaryConnector(ABC):
         self.rate_limit = rate_limit
         self._rate_limiter = asyncio.Semaphore(1)
         self._last_request_time = 0.0
-        self.state_tracker: Optional[StateTracker] = None
-        self.progress_callback: Optional[Callable[[str, float, dict[str, Any]], None]] = None
+        self.state_tracker: StateTracker | None = None
+        self.progress_callback: Callable[[str, float, dict[str, Any]], None] | None = None
 
     @property
     @abstractmethod
@@ -38,8 +39,8 @@ class DictionaryConnector(ABC):
     async def fetch_definition(
         self, 
         word: str,
-        state_tracker: Optional[StateTracker] = None,
-        progress_callback: Optional[Callable[[str, float, dict[str, Any]], None]] = None,
+        state_tracker: StateTracker | None = None,
+        progress_callback: Callable[[str, float, dict[str, Any]], None] | None = None,
     ) -> ProviderData | None:
         """Fetch definition data for a word.
 
@@ -72,7 +73,7 @@ class DictionaryConnector(ABC):
         stage: str, 
         progress: float, 
         metadata: dict[str, Any],
-        state_tracker: Optional[StateTracker] = None,
+        state_tracker: StateTracker | None = None,
     ) -> None:
         """Report progress through callback or state tracker.
         

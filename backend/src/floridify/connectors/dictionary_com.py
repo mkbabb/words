@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Optional
 import asyncio
 import time
+from typing import Any
 
 from ..models import ProviderData
 from ..utils.logging import get_logger
@@ -37,8 +37,8 @@ class DictionaryComConnector(DictionaryConnector):
     async def fetch_definition(
         self, 
         word: str,
-        state_tracker: Optional[StateTracker] = None,
-        progress_callback: Optional[any] = None,
+        state_tracker: StateTracker | None = None,
+        progress_callback: Any | None = None,
     ) -> ProviderData | None:
         """Fetch definition data for a word from Dictionary.com.
 

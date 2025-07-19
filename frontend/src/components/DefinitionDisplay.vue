@@ -1,29 +1,29 @@
 <template>
   <!-- Teleport the themed card variant tabs outside ThemedCard -->
   <Teleport to="#themed-card-tabs-slot" v-if="entry && isMounted">
-    <Tabs v-model="store.selectedCardVariant" class="w-auto">
-      <TabsList class="grid w-full grid-cols-4 gap-1">
+    <Tabs v-model="store.selectedCardVariant" class="w-auto" :data-theme="selectedCardVariant">
+      <TabsList class="themed-tabs-list grid w-full grid-cols-4 gap-1">
         <TabsTrigger
           value="default"
-          class="hover:bg-muted/50 data-[state=active]:bg-muted text-xs transition-all"
+          class="themed-tabs-trigger text-xs transition-all"
         >
           Default
         </TabsTrigger>
         <TabsTrigger
           value="bronze"
-          class="text-xs transition-all hover:bg-orange-100/30 hover:text-orange-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-100/40 data-[state=active]:to-amber-100/40 data-[state=active]:text-orange-800 dark:hover:bg-orange-900/20 dark:hover:text-orange-400 dark:data-[state=active]:from-orange-900/30 dark:data-[state=active]:to-amber-900/30 dark:data-[state=active]:text-orange-300"
+          class="themed-tabs-trigger text-xs transition-all"
         >
           Bronze
         </TabsTrigger>
         <TabsTrigger
           value="silver"
-          class="text-xs transition-all hover:bg-gray-100/30 hover:text-gray-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-100/40 data-[state=active]:to-slate-100/40 data-[state=active]:text-gray-800 dark:hover:bg-gray-800/20 dark:hover:text-gray-300 dark:data-[state=active]:from-gray-800/30 dark:data-[state=active]:to-slate-800/30 dark:data-[state=active]:text-gray-200"
+          class="themed-tabs-trigger text-xs transition-all"
         >
           Silver
         </TabsTrigger>
         <TabsTrigger
           value="gold"
-          class="text-xs transition-all hover:bg-yellow-100/30 hover:text-yellow-700 data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-100/40 data-[state=active]:to-amber-100/40 data-[state=active]:text-yellow-800 dark:hover:bg-yellow-900/20 dark:hover:text-yellow-400 dark:data-[state=active]:from-yellow-900/30 dark:data-[state=active]:to-amber-900/30 dark:data-[state=active]:text-yellow-300"
+          class="themed-tabs-trigger text-xs transition-all"
         >
           Gold
         </TabsTrigger>
@@ -35,21 +35,9 @@
     <!-- Header Section -->
     <CardHeader>
       <div class="flex items-center justify-between">
-        <CardTitle
-          :class="[
-            'text-word-title transition-all duration-200',
-            {
-              'hover:text-yellow-600 dark:hover:text-yellow-400':
-                selectedCardVariant === 'gold',
-              'hover:text-slate-600 dark:hover:text-slate-400':
-                selectedCardVariant === 'silver',
-              'hover:text-bronze-600 dark:hover:text-bronze-400':
-                selectedCardVariant === 'bronze',
-              'hover:text-primary': selectedCardVariant === 'default',
-            },
-          ]"
-          >{{ entry.word }}</CardTitle
-        >
+        <CardTitle class="text-word-title themed-title transition-all duration-200">
+          {{ entry.word }}
+        </CardTitle>
         <!-- Teleport target for tabs - maintains original visual position -->
         <div id="themed-card-tabs-slot"></div>
       </div>
@@ -92,9 +80,9 @@
         <hr v-if="index > 0" class="border-border my-2" />
 
         <div class="flex items-center gap-2">
-          <Badge variant="secondary" class="text-part-of-speech">
+          <span class="themed-word-type">
             {{ definition.word_type }}
-          </Badge>
+          </span>
           <sup class="text-muted-foreground text-xs font-normal">{{
             index + 1
           }}</sup>
@@ -114,6 +102,34 @@
             "
             class="mb-2 space-y-1"
           >
+            <!-- Examples header with regenerate button -->
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-muted-foreground text-xs uppercase tracking-wider">Examples</span>
+              <button
+                v-if="definition.examples.generated.length > 0"
+                @click="handleRegenerateExamples(index)"
+                :class="[
+                  'group flex items-center gap-1 rounded-md px-2 py-1',
+                  'text-xs transition-all duration-200',
+                  'hover:bg-primary/10',
+                  regeneratingIndex === index
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:text-primary'
+                ]"
+                :disabled="regeneratingIndex === index"
+                title="Regenerate examples"
+              >
+                <RefreshCw
+                  :size="12"
+                  :class="[
+                    'transition-transform duration-300',
+                    'group-hover:rotate-180',
+                    regeneratingIndex === index && 'animate-spin'
+                  ]"
+                />
+              </button>
+            </div>
+            
             <p
               v-for="(example, exIndex) in definition.examples.generated.concat(
                 definition.examples.literature
@@ -132,15 +148,14 @@
             class="flex flex-wrap gap-1 pt-2"
           >
             <!-- <span class="self-center pr-2 text-xs">Synonyms:</span> -->
-            <Badge
+            <span
               v-for="synonym in definition.synonyms"
               :key="synonym"
-              variant="outline"
-              class="hover:bg-accent/50 cursor-pointer text-xs transition-all duration-200 hover:font-semibold hover:opacity-80"
+              class="themed-synonym cursor-pointer"
               @click="store.searchWord(synonym)"
             >
               {{ synonym }}
-            </Badge>
+            </span>
           </div>
         </div>
       </div>
@@ -191,12 +206,14 @@ import { useAppStore } from '@/stores';
 import { cn, getHeatmapClass } from '@/utils';
 import Button from '@/components/ui/Button.vue';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import Badge from '@/components/ui/Badge.vue';
 import ThemedCard from '@/components/ui/ThemedCard.vue';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RefreshCw } from 'lucide-vue-next';
 
 // Track mounting state for teleport
 const isMounted = ref(false);
+// Track which definition is regenerating
+const regeneratingIndex = ref<number | null>(null);
 
 onMounted(() => {
   isMounted.value = true;
@@ -225,6 +242,20 @@ const togglePronunciation = () => {
   store.togglePronunciation();
 };
 
+// Handle regenerating examples for a specific definition
+const handleRegenerateExamples = async (definitionIndex: number) => {
+  if (regeneratingIndex.value !== null) return; // Already regenerating
+  
+  regeneratingIndex.value = definitionIndex;
+  try {
+    await store.regenerateExamples(definitionIndex);
+  } catch (error) {
+    console.error('Failed to regenerate examples:', error);
+  } finally {
+    regeneratingIndex.value = null;
+  }
+};
+
 // const formatExample = (example: string, word: string): string => {
 //   // Create a case-insensitive regex to find the word
 //   const regex = new RegExp(`\\b${word}\\b`, 'gi');
@@ -249,35 +280,21 @@ const formatExampleHTML = (example: string, word: string): string => {
   transform: scale(1.05);
 }
 
-/* Gold card word hover */
-:global(.card-gold) .hover-word:hover {
-  color: #ca8a04; /* yellow-600 */
+/* Themed card word hover */
+:global([data-theme="gold"]) .hover-word:hover {
+  color: var(--theme-text);
 }
 
-:global(.dark .card-gold) .hover-word:hover {
-  color: #facc15; /* yellow-400 */
+:global([data-theme="silver"]) .hover-word:hover {
+  color: var(--theme-text);
 }
 
-/* Silver card word hover */
-:global(.card-silver) .hover-word:hover {
-  color: #475569; /* slate-600 */
-}
-
-:global(.dark .card-silver) .hover-word:hover {
-  color: #cbd5e1; /* slate-400 */
-}
-
-/* Bronze card word hover */
-:global(.card-bronze) .hover-word:hover {
-  color: #b45309; /* amber-700 */
-}
-
-:global(.dark .card-bronze) .hover-word:hover {
-  color: #fbbf24; /* amber-400 */
+:global([data-theme="bronze"]) .hover-word:hover {
+  color: var(--theme-text);
 }
 
 /* Default card word hover */
-:global(.bg-card) .hover-word:hover {
+:global([data-theme="default"]) .hover-word:hover {
   color: var(--color-primary);
 }
 </style>

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ...ai.models import Suggestion
 from ...models.models import Definition, Pronunciation
 from ...search.constants import SearchMethod
 
@@ -18,8 +17,8 @@ class StageMetrics(BaseModel):
     name: str = Field(..., description="Stage name", example="lookup_dictionary")
     duration_ms: int = Field(..., ge=0, description="Time spent in this stage (milliseconds)", example=125)
     success: bool = Field(..., description="Whether the stage completed successfully", example=True)
-    items_processed: Optional[int] = Field(None, ge=0, description="Number of items processed", example=10)
-    metadata: Optional[dict[str, Any]] = Field(None, description="Additional stage-specific metrics")
+    items_processed: int | None = Field(None, ge=0, description="Number of items processed", example=10)
+    metadata: dict[str, Any] | None = Field(None, description="Additional stage-specific metrics")
 
 
 class ProviderMetrics(BaseModel):
@@ -50,7 +49,7 @@ class SearchMethodMetrics(BaseModel):
     candidates_found: int = Field(..., ge=0, description="Number of candidates found", example=25)
     candidates_returned: int = Field(..., ge=0, description="Number of candidates returned after filtering", example=10)
     duration_ms: int = Field(..., ge=0, description="Search method execution time (milliseconds)", example=50)
-    index_size: Optional[int] = Field(None, ge=0, description="Size of the search index used", example=50000)
+    index_size: int | None = Field(None, ge=0, description="Size of the search index used", example=50000)
 
 
 class PipelineMetrics(BaseModel):
@@ -59,8 +58,8 @@ class PipelineMetrics(BaseModel):
     total_duration_ms: int = Field(..., ge=0, description="Total pipeline execution time (milliseconds)", example=1500)
     stages: list[StageMetrics] = Field(default_factory=list, description="Metrics for each pipeline stage")
     providers: list[ProviderMetrics] = Field(default_factory=list, description="External provider performance metrics")
-    ai_metrics: Optional[AIMetrics] = Field(None, description="AI usage metrics (if AI was used)")
-    search_methods: Optional[list[SearchMethodMetrics]] = Field(None, description="Search method performance (for search operations)")
+    ai_metrics: AIMetrics | None = Field(None, description="AI usage metrics (if AI was used)")
+    search_methods: list[SearchMethodMetrics] | None = Field(None, description="Search method performance (for search operations)")
     cache_hits: int = Field(default=0, ge=0, description="Number of cache hits during execution")
     cache_misses: int = Field(default=0, ge=0, description="Number of cache misses during execution")
     
@@ -122,7 +121,7 @@ class LookupResponse(BaseModel):
     pronunciation: Pronunciation = Field(..., description="Pronunciation information")
     definitions: list[Definition] = Field(default_factory=list, description="Word definitions")
     last_updated: datetime = Field(..., description="When this entry was last updated")
-    pipeline_metrics: Optional[PipelineMetrics] = Field(None, description="Pipeline execution metrics (optional)")
+    pipeline_metrics: PipelineMetrics | None = Field(None, description="Pipeline execution metrics (optional)")
 
 
 class SearchResponse(BaseModel):
@@ -132,7 +131,7 @@ class SearchResponse(BaseModel):
     results: list[SearchResultItem] = Field(default_factory=list, description="Search results")
     total_results: int = Field(..., ge=0, description="Total number of results")
     search_time_ms: int = Field(..., ge=0, description="Search execution time")
-    pipeline_metrics: Optional[PipelineMetrics] = Field(None, description="Pipeline execution metrics (optional)")
+    pipeline_metrics: PipelineMetrics | None = Field(None, description="Pipeline execution metrics (optional)")
 
 
 class SynonymItem(BaseModel):
@@ -181,3 +180,12 @@ class HealthResponse(BaseModel):
     search_engine: str = Field(..., description="Search engine status")
     cache_hit_rate: float = Field(..., ge=0.0, le=1.0, description="Cache hit rate")
     uptime_seconds: int = Field(..., ge=0, description="Service uptime in seconds")
+
+
+class RegenerateExamplesResponse(BaseModel):
+    """Response for regenerating examples."""
+    
+    word: str = Field(..., description="The word examples were regenerated for")
+    definition_index: int = Field(..., description="Index of the definition")
+    examples: list[dict[str, Any]] = Field(..., description="New generated examples")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="AI confidence in examples")

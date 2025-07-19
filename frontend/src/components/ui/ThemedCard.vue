@@ -1,14 +1,10 @@
 <template>
   <div
     :class="[
-      'text-card-foreground relative overflow-hidden rounded-2xl transition-all duration-300',
-      'cartoon-shadow-lg',
-      variant !== 'default'
-        ? `card-${variant}`
-        : 'bg-card hover:card-shadow-hover',
+      'themed-card themed-shadow-lg',
       className,
     ]"
-    :data-variant="variant"
+    :data-theme="variant || 'default'"
   >
     <!-- Star Icon for Special Variants -->
     <div
@@ -21,7 +17,7 @@
     <!-- Sparkle Animation Overlay -->
     <div
       v-if="variant && variant !== 'default'"
-      :class="`pointer-events-none absolute inset-0 sparkle-${variant}`"
+      class="themed-sparkle"
     />
 
     <!-- Content -->

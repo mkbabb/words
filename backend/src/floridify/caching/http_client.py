@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Callable, Optional
 import time
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
 import hishel
 import httpx
@@ -57,7 +58,7 @@ class CachedHTTPClient:
         url: str,
         ttl_hours: float | None = None,
         force_refresh: bool | None = None,
-        progress_callback: Optional[Callable[[str, dict[str, Any]], None]] = None,
+        progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
         **kwargs: Any,
     ) -> httpx.Response:
         """Cached GET request.

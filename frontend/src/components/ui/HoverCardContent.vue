@@ -16,7 +16,6 @@
 
 <script setup lang="ts">
 import { HoverCardContent, HoverCardPortal } from 'radix-vue';
-import { cn } from '@/utils';
 
 interface Props {
   side?: 'top' | 'right' | 'bottom' | 'left';

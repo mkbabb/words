@@ -13,56 +13,23 @@
         class="fixed inset-0 z-50 flex items-center justify-center"
         @click="handleBackdropClick"
       >
-        <!-- Backdrop with blur -->
+        <!-- Backdrop with subtle blur and bg/30 -->
         <div
-          class="absolute inset-0 bg-black/30 backdrop-blur-md"
+          class="absolute inset-0"
           :class="[
-            'dark:bg-black/50',
-            'transition-all duration-300'
+            'bg-black/30 dark:bg-black/30',
+            'backdrop-blur-sm',
+            'transition-opacity duration-300',
+            'transform-gpu',
           ]"
         />
         
-        <!-- Stage lighting container -->
+        <!-- Clean modal container -->
         <div class="relative z-10 w-full max-w-4xl p-4">
-          <!-- Main stage with downlighting effect -->
-          <div
-            class="relative mx-auto max-w-3xl"
-            :class="[
-              'stage-lighting',
-              'rounded-2xl',
-              'bg-gradient-to-b from-white/10 to-white/5',
-              'dark:from-white/5 dark:to-white/2',
-              'backdrop-blur-xl',
-              'border border-white/20',
-              'dark:border-white/10',
-              'shadow-2xl',
-              'overflow-hidden'
-            ]"
-          >
-            <!-- Spotlight effect -->
-            <div
-              class="absolute inset-0 spotlight-glow"
-              :class="[
-                'bg-gradient-radial from-yellow-100/20 via-yellow-50/10 to-transparent',
-                'dark:from-yellow-200/10 dark:via-yellow-100/5 dark:to-transparent',
-                'animate-spotlight'
-              ]"
-            />
-            
-            <!-- Content container -->
-            <div class="relative z-10 p-8">
+          <div class="relative mx-auto max-w-3xl rounded-2xl bg-background/95 backdrop-blur-sm border border-border/50 shadow-2xl overflow-hidden">
+            <div class="p-8">
               <slot />
             </div>
-            
-            <!-- Stage rim lighting -->
-            <div
-              class="absolute inset-0 rounded-2xl"
-              :class="[
-                'bg-gradient-to-b from-transparent via-transparent to-white/5',
-                'dark:to-white/2',
-                'pointer-events-none'
-              ]"
-            />
           </div>
         </div>
       </div>
@@ -113,56 +80,14 @@ onMounted(() => {
 </script>
 
 <style scoped>
-@keyframes spotlight {
-  0%, 100% {
-    background-position: 50% 20%;
-    opacity: 0.8;
+
+/* Safari-specific fixes for backdrop blur flickering */
+@supports (-webkit-backdrop-filter: blur(1px)) {
+  [style*="backdrop-filter"] {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
-  50% {
-    background-position: 50% 40%;
-    opacity: 1;
-  }
-}
-
-.animate-spotlight {
-  animation: spotlight 4s ease-in-out infinite;
-  background-size: 200% 200%;
-}
-
-.stage-lighting {
-  box-shadow:
-    0 0 30px rgba(255, 215, 0, 0.1),
-    0 20px 40px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-.dark .stage-lighting {
-  box-shadow:
-    0 0 30px rgba(255, 215, 0, 0.05),
-    0 20px 40px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-.spotlight-glow {
-  background: radial-gradient(
-    ellipse 80% 50% at 50% 30%,
-    rgba(255, 215, 0, 0.15) 0%,
-    rgba(255, 235, 59, 0.08) 30%,
-    transparent 70%
-  );
-}
-
-.dark .spotlight-glow {
-  background: radial-gradient(
-    ellipse 80% 50% at 50% 30%,
-    rgba(255, 215, 0, 0.08) 0%,
-    rgba(255, 235, 59, 0.04) 30%,
-    transparent 70%
-  );
-}
-
-/* Custom gradient for stage lighting */
-.bg-gradient-radial {
-  background: radial-gradient(var(--tw-gradient-stops));
 }
 </style>
