@@ -17,7 +17,9 @@ logger = get_logger(__name__)
 class DictionaryComConnector(DictionaryConnector):
     """Stub connector for Dictionary.com API."""
 
-    def __init__(self, api_key: str = "", rate_limit: float = 5.0, force_refresh: bool = False) -> None:
+    def __init__(
+        self, api_key: str = "", rate_limit: float = 5.0, force_refresh: bool = False
+    ) -> None:
         """Initialize Dictionary.com connector stub.
 
         Args:
@@ -35,7 +37,7 @@ class DictionaryComConnector(DictionaryConnector):
         return "dictionary_com"
 
     async def fetch_definition(
-        self, 
+        self,
         word: str,
         state_tracker: StateTracker | None = None,
         progress_callback: Any | None = None,
@@ -59,59 +61,59 @@ class DictionaryComConnector(DictionaryConnector):
             response_time_ms=0,
             response_size_bytes=0,
         )
-        
+
         try:
             # Report start
             if state_tracker:
                 await self._report_progress(
-                    'start', 0, 
-                    {'provider': self.provider_name, 'word': word},
-                    state_tracker
+                    "start", 0, {"provider": self.provider_name, "word": word}, state_tracker
                 )
-            
+
             # TODO: Implement Dictionary.com API integration
             logger.info(f"Dictionary.com connector stub called for word: {word}")
-            
+
             # Simulate some work for the stub
             await asyncio.sleep(0.1)  # Simulate network delay
-            
+
             # Report completion (stub always fails)
             metrics.success = False
             metrics.error_message = "Dictionary.com connector not implemented"
             metrics.response_time_ms = (time.time() - start_time) * 1000
-            
+
             if state_tracker:
                 await self._report_progress(
-                    'complete', 100,
+                    "complete",
+                    100,
                     {
-                        'provider': self.provider_name,
-                        'word': word,
-                        'success': False,
-                        'error': metrics.error_message,
-                        'metrics': metrics.__dict__
+                        "provider": self.provider_name,
+                        "word": word,
+                        "success": False,
+                        "error": metrics.error_message,
+                        "metrics": metrics.__dict__,
                     },
-                    state_tracker
+                    state_tracker,
                 )
-            
+
             return None
-            
+
         except Exception as e:
             metrics.success = False
             metrics.error_message = str(e)
             metrics.response_time_ms = (time.time() - start_time) * 1000
-            
+
             if state_tracker:
                 await self._report_progress(
-                    'complete', 100,
+                    "complete",
+                    100,
                     {
-                        'provider': self.provider_name,
-                        'word': word,
-                        'success': False,
-                        'error': str(e),
-                        'metrics': metrics.__dict__
+                        "provider": self.provider_name,
+                        "word": word,
+                        "success": False,
+                        "error": str(e),
+                        "metrics": metrics.__dict__,
                     },
-                    state_tracker
+                    state_tracker,
                 )
-            
+
             logger.error(f"Error in Dictionary.com stub for {word}: {e}")
             return None

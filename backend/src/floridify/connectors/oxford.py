@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from typing import Any
 
 import httpx
 
 from ..models import Definition, Examples, GeneratedExample, ProviderData
 from ..utils.logging import get_logger
+from ..utils.state_tracker import StateTracker
 from .base import DictionaryConnector
 
 logger = get_logger(__name__)
@@ -43,11 +45,18 @@ class OxfordConnector(DictionaryConnector):
         """Name of the dictionary provider."""
         return "oxford"
 
-    async def fetch_definition(self, word: str) -> ProviderData | None:
+    async def fetch_definition(
+        self,
+        word: str,
+        state_tracker: StateTracker | None = None,
+        progress_callback: Callable[[str, float, dict[str, Any]], None] | None = None,
+    ) -> ProviderData | None:
         """Fetch definition data for a word from Oxford API.
 
         Args:
             word: The word to look up
+            state_tracker: Optional state tracker for progress updates
+            progress_callback: Optional progress callback function
 
         Returns:
             ProviderData if successful, None if not found or error
@@ -98,9 +107,7 @@ class OxfordConnector(DictionaryConnector):
 
                 for lexical_entry in lexical_entries:
                     # Map Oxford part of speech to our enum
-                    oxford_pos = (
-                        lexical_entry.get("lexicalCategory", {}).get("id", "").lower()
-                    )
+                    oxford_pos = lexical_entry.get("lexicalCategory", {}).get("id", "").lower()
                     word_type = self._map_oxford_pos_to_word_type(oxford_pos)
 
                     if not word_type:

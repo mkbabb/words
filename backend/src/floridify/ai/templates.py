@@ -18,9 +18,7 @@ class PromptTemplateLoader(BaseLoader):
     def __init__(self, template_dir: str | Path) -> None:
         self.template_dir = Path(template_dir)
 
-    def get_source(
-        self, environment: Environment, template: str
-    ) -> tuple[str, str, Any]:
+    def get_source(self, environment: Environment, template: str) -> tuple[str, str, Any]:
         """Load template source from file."""
         template_path = self.template_dir / f"{template}.md"
 
@@ -108,7 +106,7 @@ class PromptTemplateManager:
             word=word,
             definitions=definitions,
         )
-    
+
     def get_synonyms_prompt(
         self, word: str, definition: str, word_type: str, count: int = 10
     ) -> str:
@@ -121,9 +119,7 @@ class PromptTemplateManager:
             count=count,
         )
 
-    def get_suggestions_prompt(
-        self, input_words: list[str] | None, count: int = 10
-    ) -> str:
+    def get_suggestions_prompt(self, input_words: list[str] | None, count: int = 10) -> str:
         """Generate prompt for word suggestions based on input words."""
         return self.render_template(
             "suggestions",
@@ -132,11 +128,7 @@ class PromptTemplateManager:
         )
 
     def get_fact_generation_prompt(
-        self, 
-        word: str, 
-        definition: str, 
-        count: int = 5, 
-        previous_words: list[str] | None = None
+        self, word: str, definition: str, count: int = 5, previous_words: list[str] | None = None
     ) -> str:
         """Generate prompt for interesting facts about a word."""
         return self.render_template(

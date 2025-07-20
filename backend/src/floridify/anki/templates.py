@@ -263,7 +263,7 @@ class AnkiCardTemplate(BaseModel):
         """
 
         javascript = ""
-        
+
         return cls(
             card_type=CardType.BEST_DESCRIBES,
             front_template=front_template,

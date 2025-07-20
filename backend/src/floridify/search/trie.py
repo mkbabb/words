@@ -11,7 +11,7 @@ import pickle
 from pathlib import Path
 from typing import Any
 
-import marisa_trie
+import marisa_trie  # type: ignore[import-not-found]
 
 
 class TrieSearch:
@@ -41,9 +41,7 @@ class TrieSearch:
         self._max_frequency = 0
         self._stats_dirty = True  # Flag to track when stats need recalculation
 
-    def build_index(
-        self, words: list[str], frequencies: dict[str, int] | None = None
-    ) -> None:
+    def build_index(self, words: list[str], frequencies: dict[str, int] | None = None) -> None:
         """
         Build the optimized trie index from a list of words.
 
@@ -67,9 +65,7 @@ class TrieSearch:
             if frequencies is None:
                 frequency = self._calculate_default_frequency(word)
             else:
-                frequency = frequencies.get(
-                    word, self._calculate_default_frequency(word)
-                )
+                frequency = frequencies.get(word, self._calculate_default_frequency(word))
 
             self._word_frequencies[word] = frequency
             self._max_frequency = max(self._max_frequency, frequency)
@@ -154,14 +150,13 @@ class TrieSearch:
         # Sort by frequency (descending) and return top results
         if len(matches) <= max_results:
             # If we have few matches, simple frequency sort is fine
-            frequency_pairs = [
-                (word, self._word_frequencies.get(word, 0)) for word in matches
-            ]
+            frequency_pairs = [(word, self._word_frequencies.get(word, 0)) for word in matches]
             frequency_pairs.sort(key=lambda x: x[1], reverse=True)
             return [word for word, _ in frequency_pairs]
         else:
             # For many matches, use partial sort for better performance
             import heapq
+
             heap_items: list[tuple[int, str]] = [
                 (-self._word_frequencies.get(word, 0), word) for word in matches
             ]
@@ -197,9 +192,7 @@ class TrieSearch:
         all_words = list(self._trie)
 
         # Sort by frequency (descending)
-        frequency_words = [
-            (word, self._word_frequencies.get(word, 0)) for word in all_words
-        ]
+        frequency_words = [(word, self._word_frequencies.get(word, 0)) for word in all_words]
         frequency_words.sort(key=lambda x: x[1], reverse=True)
 
         return [word for word, _ in frequency_words]
@@ -220,11 +213,9 @@ class TrieSearch:
             }
 
         # Cache statistics to avoid expensive recalculation
-        if not hasattr(self, '_cached_stats') or self._stats_dirty:
+        if not hasattr(self, "_cached_stats") or self._stats_dirty:
             all_words = list(self._trie)
-            avg_length = (
-                sum(len(word) for word in all_words) / len(all_words) if all_words else 0.0
-            )
+            avg_length = sum(len(word) for word in all_words) / len(all_words) if all_words else 0.0
             self._cached_avg_length = avg_length
             self._cached_word_list_size = len(all_words)
             self._stats_dirty = False
@@ -233,7 +224,9 @@ class TrieSearch:
 
         return {
             "word_count": self._word_count,
-            "memory_nodes": getattr(self, '_cached_word_list_size', self._word_count),  # Use cached size
+            "memory_nodes": getattr(
+                self, "_cached_word_list_size", self._word_count
+            ),  # Use cached size
             "average_depth": avg_length,  # Use average word length as depth approximation
             "max_frequency": self._max_frequency,
             "memory_efficiency": "5x better than Python trie",

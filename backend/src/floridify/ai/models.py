@@ -61,24 +61,24 @@ class DictionaryEntryResponse(BaseModel):
     confidence: float
 
 
-
-
 class ClusterMapping(BaseModel):
     """A single cluster mapping entry."""
-    
+
     cluster_id: str = Field(description="Unique cluster identifier (e.g., 'bank_financial')")
     cluster_description: str = Field(description="Human-readable description of this cluster")
-    definition_indices: list[int] = Field(description="List of definition indices (0-based) in this cluster")
+    definition_indices: list[int] = Field(
+        description="List of definition indices (0-based) in this cluster"
+    )
 
 
 class ClusterMappingResponse(BaseModel):
     """Response containing numerical mapping of clusters to definition IDs."""
 
     word: str = Field(description="The word being analyzed")
-    
+
     cluster_mappings: list[ClusterMapping] = Field(
         default_factory=list,
-        description="List of cluster mappings with their descriptions and indices"
+        description="List of cluster mappings with their descriptions and indices",
     )
 
     confidence: float = Field(description="Overall confidence in the clustering (0.0-1.0)")
@@ -118,17 +118,19 @@ class AnkiMultipleChoiceResponse(BaseModel):
 
 class SynonymCandidate(BaseModel):
     """A single synonym candidate with relevance and efflorescence rating."""
-    
+
     word: str = Field(description="The synonym word or phrase")
     language: str = Field(description="Language of origin (e.g., English, Latin, French)")
     relevance: float = Field(description="Relevance score (0.0 to 1.0)")
     efflorescence: float = Field(description="Beauty and expressive power score (0.0 to 1.0)")
-    explanation: str = Field(description="Brief explanation of the relationship and why it's beautiful")
+    explanation: str = Field(
+        description="Brief explanation of the relationship and why it's beautiful"
+    )
 
 
 class SynonymGenerationResponse(BaseModel):
     """Response for synonym generation with efflorescence ranking."""
-    
+
     synonyms: list[SynonymCandidate] = Field(
         description="List of synonyms ordered by relevance and efflorescence"
     )
@@ -137,19 +139,19 @@ class SynonymGenerationResponse(BaseModel):
 
 class Suggestion(BaseModel):
     """A single word suggestion."""
-    
+
     word: str = Field(description="The suggested word")
     reasoning: str = Field(description="Brief explanation of why this word is a good suggestion")
-    difficulty_level: int = Field(ge=1, le=5, description="Difficulty level from 1 (basic) to 5 (advanced)")
+    difficulty_level: int = Field(
+        ge=1, le=5, description="Difficulty level from 1 (basic) to 5 (advanced)"
+    )
     semantic_category: str = Field(description="Semantic category or theme")
 
 
 class SuggestionsResponse(BaseModel):
     """Response for word suggestions based on input words."""
-    
-    suggestions: list[Suggestion] = Field(
-        description="List of word suggestions with explanations"
-    )
+
+    suggestions: list[Suggestion] = Field(description="List of word suggestions with explanations")
     input_analysis: str = Field(
         description="Brief analysis of the input words and suggestion rationale"
     )
@@ -159,16 +161,13 @@ class SuggestionsResponse(BaseModel):
 class FactGenerationResponse(BaseModel):
     """Response from AI fact generation about a word."""
 
-    facts: list[str] = Field(
-        description="List of interesting, educational facts about the word"
-    )
+    facts: list[str] = Field(description="List of interesting, educational facts about the word")
     confidence: float = Field(
-        ge=0.0, le=1.0, 
-        description="Overall confidence in fact accuracy and quality"
+        ge=0.0, le=1.0, description="Overall confidence in fact accuracy and quality"
     )
     categories: list[str] = Field(
         default_factory=list,
-        description="Categories of facts generated (etymology, usage, cultural, etc.)"
+        description="Categories of facts generated (etymology, usage, cultural, etc.)",
     )
 
 

@@ -26,7 +26,7 @@ from .models import (
 )
 from .templates import PromptTemplateManager
 
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
 
 logger = get_logger(__name__)
 
@@ -75,7 +75,7 @@ class OpenAIConnector:
         start_time = time.time()
         retry_count = 0
         max_retries = 3
-        
+
         # Prepare request parameters
         request_params: dict[str, Any] = {
             "model": self.model_name,
@@ -100,7 +100,7 @@ class OpenAIConnector:
                     f"response_type={response_model.__name__}, "
                     f"prompt_length={len(prompt)}, retry={retry_count}"
                 )
-                
+
                 # Make the API call
                 api_start = time.time()
                 response = await self.client.beta.chat.completions.parse(**request_params)
@@ -108,11 +108,11 @@ class OpenAIConnector:
 
                 # Extract token usage
                 token_usage = {}
-                if hasattr(response, 'usage') and response.usage:
+                if hasattr(response, "usage") and response.usage:
                     token_usage = {
-                        'prompt_tokens': response.usage.prompt_tokens,
-                        'completion_tokens': response.usage.completion_tokens,
-                        'total_tokens': response.usage.total_tokens,
+                        "prompt_tokens": response.usage.prompt_tokens,
+                        "completion_tokens": response.usage.completion_tokens,
+                        "total_tokens": response.usage.total_tokens,
                     }
 
                 # Log successful API call
@@ -122,13 +122,13 @@ class OpenAIConnector:
                     response_type=response_model.__name__,
                     duration=api_duration,
                     retry_count=retry_count,
-                    **token_usage
+                    **token_usage,
                 )
 
                 if response.choices[0].message.parsed:
                     result = response.choices[0].message.parsed
                     # Store token usage on the result if it has that attribute
-                    if hasattr(result, 'token_usage'):
+                    if hasattr(result, "token_usage"):
                         result.token_usage = token_usage
                 else:
                     # Fallback to manual parsing
@@ -143,13 +143,13 @@ class OpenAIConnector:
                     f"✅ OpenAI API success: {response_model.__name__} "
                     f"in {total_duration:.2f}s (tokens: {token_usage.get('total_tokens', 'N/A')})"
                 )
-                
+
                 return result
 
             except Exception as e:
                 retry_count += 1
                 duration = time.time() - start_time
-                
+
                 if retry_count < max_retries:
                     wait_time = retry_count * 2  # Exponential backoff
                     logger.warning(
@@ -168,10 +168,10 @@ class OpenAIConnector:
                         response_type=response_model.__name__,
                         error=str(e),
                         duration=duration,
-                        retry_count=retry_count
+                        retry_count=retry_count,
                     )
                     raise
-        
+
         # This should never be reached, but satisfies type checker
         raise RuntimeError(f"Failed to get response after {max_retries} retries")
 
@@ -200,9 +200,7 @@ class OpenAIConnector:
             # Success logging handled by synthesizer context
             return result
         except Exception as e:
-            logger.error(
-                f"❌ Definition synthesis failed for '{word}' ({meaning_cluster}): {e}"
-            )
+            logger.error(f"❌ Definition synthesis failed for '{word}' ({meaning_cluster}): {e}")
             raise
 
     async def examples(
@@ -213,25 +211,15 @@ class OpenAIConnector:
         count: int = 1,
     ) -> ExampleGenerationResponse:
         """Generate modern usage examples."""
-        logger.debug(
-            f"📝 Generating {count} example sentence(s) for '{word}' ({word_type})"
-        )
+        logger.debug(f"📝 Generating {count} example sentence(s) for '{word}' ({word_type})")
 
-        prompt = self.template_manager.get_example_prompt(
-            word, definition, word_type, count
-        )
+        prompt = self.template_manager.get_example_prompt(word, definition, word_type, count)
 
         try:
-            result = await self._make_structured_request(
-                prompt, ExampleGenerationResponse
-            )
+            result = await self._make_structured_request(prompt, ExampleGenerationResponse)
             if result.example_sentences:
                 first_example = result.example_sentences[0]
-                truncated = (
-                    first_example[:50] + "..."
-                    if len(first_example) > 50
-                    else first_example
-                )
+                truncated = first_example[:50] + "..." if len(first_example) > 50 else first_example
                 logger.debug(f"✏️  Generated example for '{word}': \"{truncated}\"")
             return result
         except Exception as e:
@@ -251,9 +239,7 @@ class OpenAIConnector:
         prompt = self.template_manager.get_lookup_prompt(word)
 
         try:
-            result = await self._make_structured_request(
-                prompt, DictionaryEntryResponse
-            )
+            result = await self._make_structured_request(prompt, DictionaryEntryResponse)
 
             if result.provider_data is None:
                 logger.info(f"🚫 AI identified '{word}' as nonsense/invalid")
@@ -284,30 +270,28 @@ class OpenAIConnector:
         start_time = time.time()
         def_count = len(definitions)
 
-        logger.info(
-            f"🔢 Extracting cluster mappings for '{word}' from {def_count} definitions"
-        )
+        logger.info(f"🔢 Extracting cluster mappings for '{word}' from {def_count} definitions")
 
         prompt = self.template_manager.get_meaning_extraction_prompt(word, definitions)
 
         try:
             result = await self._make_structured_request(prompt, ClusterMappingResponse)
             duration = time.time() - start_time
-            
+
             # Log detailed cluster information
             total_defs_mapped = sum(len(cm.definition_indices) for cm in result.cluster_mappings)
             logger.success(
                 f"🧮 Extracted {len(result.cluster_mappings)} meaning clusters for '{word}' "
                 f"in {duration:.2f}s (mapped {total_defs_mapped}/{def_count} definitions)"
             )
-            
+
             # Log each cluster for debugging
             for cluster in result.cluster_mappings:
                 logger.debug(
                     f"  • Cluster '{cluster.cluster_id}': {cluster.cluster_description} "
                     f"({len(cluster.definition_indices)} definitions)"
                 )
-            
+
             log_metrics(
                 stage="cluster_extraction",
                 word=word,
@@ -315,7 +299,7 @@ class OpenAIConnector:
                 definition_count=def_count,
                 mapped_count=total_defs_mapped,
                 confidence=result.confidence,
-                duration=duration
+                duration=duration,
             )
             return result
         except Exception as e:
@@ -353,9 +337,7 @@ class OpenAIConnector:
             examples=examples or "",
         )
         try:
-            result = await self._make_structured_request(
-                prompt, AnkiMultipleChoiceResponse
-            )
+            result = await self._make_structured_request(prompt, AnkiMultipleChoiceResponse)
             logger.debug(f"Generated best describes card for '{word}'")
             return result
         except Exception as e:
@@ -376,9 +358,7 @@ class OpenAIConnector:
         )
 
         try:
-            result = await self._make_structured_request(
-                prompt, SynonymGenerationResponse
-            )
+            result = await self._make_structured_request(prompt, SynonymGenerationResponse)
 
             synonym_count = len(result.synonyms)
             logger.success(
@@ -451,19 +431,19 @@ class OpenAIConnector:
         previous_words: list[str] | None = None,
     ) -> FactGenerationResponse:
         """Generate interesting facts about a word.
-        
+
         Args:
             word: The word to generate facts about
             definition: Main definition of the word for context
             count: Number of facts to generate (3-8)
             previous_words: Previously searched words for connections
-            
+
         Returns:
             FactGenerationResponse with facts and metadata
         """
         fact_count = max(3, min(8, count))
         limited_previous = previous_words[:20] if previous_words else []
-        
+
         logger.info(
             f"📚 Generating {fact_count} facts for '{word}' with {len(limited_previous)} previous words"
         )

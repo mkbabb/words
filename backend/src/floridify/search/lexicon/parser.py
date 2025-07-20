@@ -118,9 +118,7 @@ def parse_json_idioms(
         if isinstance(item, str):
             phrase_text = item
         elif isinstance(item, dict):
-            phrase_text = (
-                item.get("idiom") or item.get("phrase") or item.get("text") or ""
-            )
+            phrase_text = item.get("idiom") or item.get("phrase") or item.get("text") or ""
         else:
             continue
 
@@ -254,10 +252,7 @@ def parse_json_phrasal_verbs(
                 if isinstance(entry, dict):
                     # Extract verb text
                     verb_text = (
-                        entry.get("verb")
-                        or entry.get("phrasal_verb")
-                        or entry.get("phrase")
-                        or ""
+                        entry.get("verb") or entry.get("phrasal_verb") or entry.get("phrase") or ""
                     ).strip()
 
                     if not verb_text:
@@ -268,9 +263,7 @@ def parse_json_phrasal_verbs(
 
                     normalized = phrase_normalizer.normalize(verb_text)
                     if normalized and phrase_normalizer.is_phrase(normalized):
-                        phrase = _create_phrase(
-                            verb_text, normalized, language, is_idiom=False
-                        )
+                        phrase = _create_phrase(verb_text, normalized, language, is_idiom=False)
                         phrases.append(phrase)
 
     except Exception as e:
@@ -299,9 +292,7 @@ def parse_scraped_data(
     if "phrases" in content and isinstance(content["phrases"], list):
         for phrase_data in content["phrases"]:
             phrase_text = (
-                phrase_data
-                if isinstance(phrase_data, str)
-                else phrase_data.get("text", "")
+                phrase_data if isinstance(phrase_data, str) else phrase_data.get("text", "")
             )
             if phrase_text:
                 normalized = phrase_normalizer.normalize(phrase_text)
@@ -311,9 +302,7 @@ def parse_scraped_data(
                         if isinstance(phrase_data, dict)
                         else False
                     )
-                    phrase = _create_phrase(
-                        phrase_text, normalized, language, is_idiom=is_idiom
-                    )
+                    phrase = _create_phrase(phrase_text, normalized, language, is_idiom=is_idiom)
                     phrases.append(phrase)
 
     return words, phrases

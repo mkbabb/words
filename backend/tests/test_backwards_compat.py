@@ -10,18 +10,16 @@ compatibility with existing API clients. It tests:
 
 from __future__ import annotations
 
-import asyncio
-import json
+import os
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
-import sys
-import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from floridify.api.models.responses import LookupResponse, SearchResponse
@@ -146,11 +144,11 @@ class TestBackwardsCompatibility:
         
         # First request without force_refresh
         response1 = client.get(f"/api/v1/lookup/{word}")
-        time1 = time.time()
+        time.time()
         
         # Second request with force_refresh
         response2 = client.get(f"/api/v1/lookup/{word}?force_refresh=true")
-        time2 = time.time()
+        time.time()
         
         # Both should return same structure
         if response1.status_code == 200:
@@ -235,7 +233,7 @@ class TestBackwardsCompatibility:
     
     def test_concurrent_compatibility(self, client: TestClient) -> None:
         """Test that concurrent requests work as before."""
-        def make_request(endpoint: str) -> Dict[str, Any]:
+        def make_request(endpoint: str) -> dict[str, Any]:
             if "lookup" in endpoint:
                 response = client.get(endpoint)
             else:
@@ -425,13 +423,13 @@ class TestAPIClientSimulation:
         # Web app making parallel requests
         import concurrent.futures
         
-        def fetch_definition(word: str) -> Dict[str, Any] | None:
+        def fetch_definition(word: str) -> dict[str, Any] | None:
             response = client.get(f"/api/v1/lookup/{word}")
             if response.status_code == 200:
                 return response.json()
             return None
         
-        def search_words(query: str) -> Dict[str, Any]:
+        def search_words(query: str) -> dict[str, Any]:
             response = client.get(f"/api/v1/search?q={query}")
             return response.json()
         
@@ -510,4 +508,4 @@ def test_no_breaking_changes_summary(client: TestClient) -> None:
     
     # Report any breaking changes
     if breaking_changes:
-        pytest.fail(f"Breaking changes detected:\n" + "\n".join(breaking_changes))
+        pytest.fail("Breaking changes detected:\n" + "\n".join(breaking_changes))

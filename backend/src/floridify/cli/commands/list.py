@@ -227,9 +227,7 @@ async def _update_async(name: str, input_file: Path) -> None:
 
     # Process new words with dictionary lookup
     new_words_to_process = [
-        wf.text
-        for wf in word_list.words
-        if wf.text.lower() in [w.lower() for w in parsed.words]
+        wf.text for wf in word_list.words if wf.text.lower() in [w.lower() for w in parsed.words]
     ]
     await _process_words_batch(new_words_to_process)
 
@@ -278,9 +276,7 @@ async def _process_words_batch(
         console=console,
         transient=True,
     ) as progress:
-        task = progress.add_task(
-            f"Processing {total_words} words...", total=total_words
-        )
+        task = progress.add_task(f"Processing {total_words} words...", total=total_words)
 
         # Process in batches
         for i in range(0, total_words, BATCH_SIZE):
@@ -306,9 +302,7 @@ async def _process_words_batch(
                     else:
                         logger.debug(f"No definition found for '{word}'")
 
-                logger.debug(
-                    f"Batch {i//BATCH_SIZE + 1}: {successful}/{len(batch)} successful"
-                )
+                logger.debug(f"Batch {i // BATCH_SIZE + 1}: {successful}/{len(batch)} successful")
 
             except Exception as e:
                 logger.warning(f"Batch processing error: {e}")

@@ -14,38 +14,38 @@ from ..utils.text_utils import normalize_word
 # Common diacritic mappings for reference
 DIACRITIC_MAPPINGS = {
     # French
-    'à': 'a',
-    'á': 'a',
-    'â': 'a',
-    'ã': 'a',
-    'ä': 'a',
-    'å': 'a',
-    'è': 'e',
-    'é': 'e',
-    'ê': 'e',
-    'ë': 'e',
-    'ì': 'i',
-    'í': 'i',
-    'î': 'i',
-    'ï': 'i',
-    'ò': 'o',
-    'ó': 'o',
-    'ô': 'o',
-    'õ': 'o',
-    'ö': 'o',
-    'ù': 'u',
-    'ú': 'u',
-    'û': 'u',
-    'ü': 'u',
-    'ý': 'y',
-    'ÿ': 'y',
-    'ç': 'c',
-    'ñ': 'n',
+    "à": "a",
+    "á": "a",
+    "â": "a",
+    "ã": "a",
+    "ä": "a",
+    "å": "a",
+    "è": "e",
+    "é": "e",
+    "ê": "e",
+    "ë": "e",
+    "ì": "i",
+    "í": "i",
+    "î": "i",
+    "ï": "i",
+    "ò": "o",
+    "ó": "o",
+    "ô": "o",
+    "õ": "o",
+    "ö": "o",
+    "ù": "u",
+    "ú": "u",
+    "û": "u",
+    "ü": "u",
+    "ý": "y",
+    "ÿ": "y",
+    "ç": "c",
+    "ñ": "n",
     # German
-    'ß': 'ss',
+    "ß": "ss",
     # Common ligatures
-    'æ': 'ae',
-    'œ': 'oe',
+    "æ": "ae",
+    "œ": "oe",
 }
 
 
@@ -135,15 +135,13 @@ def remove_diacritics(text: str) -> str:
         "naive"
     """
     # Normalize to NFD (decomposed form)
-    nfd_text = unicodedata.normalize('NFD', text)
+    nfd_text = unicodedata.normalize("NFD", text)
 
     # Remove combining marks (diacritics)
-    without_diacritics = ''.join(
-        char for char in nfd_text if unicodedata.category(char) != 'Mn'
-    )
+    without_diacritics = "".join(char for char in nfd_text if unicodedata.category(char) != "Mn")
 
     # Normalize back to NFC (composed form)
-    return unicodedata.normalize('NFC', without_diacritics)
+    return unicodedata.normalize("NFC", without_diacritics)
 
 
 def normalize_text(text: str) -> str:
@@ -155,7 +153,7 @@ def normalize_text(text: str) -> str:
     2. Convert to lowercase
     3. Unicode NFC normalization
     """
-    return unicodedata.normalize('NFC', text.strip().lower())
+    return unicodedata.normalize("NFC", text.strip().lower())
 
 
 def generate_diacritic_variants(text: str) -> set[str]:

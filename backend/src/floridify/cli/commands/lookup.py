@@ -98,23 +98,19 @@ async def _lookup_async(
             meaning_groups: dict[str, list[Definition]] = {}
 
             for definition in result.definitions:
-                cluster = getattr(definition, 'meaning_cluster', 'general') or 'general'
+                cluster = getattr(definition, "meaning_cluster", "general") or "general"
                 if cluster not in meaning_groups:
                     meaning_groups[cluster] = []
                 meaning_groups[cluster].append(definition)
 
             # Display the synthesized entry
             console.print(
-                format_meaning_based_definition(
-                    result, languages, providers, meaning_groups
-                )
+                format_meaning_based_definition(result, languages, providers, meaning_groups)
             )
         else:
             console.print(format_warning(f"No definition found for '{word}'"))
             if not no_ai:
-                console.print(
-                    "Consider checking the spelling or trying a different word."
-                )
+                console.print("Consider checking the spelling or trying a different word.")
 
     except Exception as e:
         logger.error(f"Lookup failed: {e}")

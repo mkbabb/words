@@ -5,13 +5,13 @@ from __future__ import annotations
 import time
 
 from fastapi import APIRouter
+from pydantic import BaseModel, Field
 
 from ...caching.cache_manager import get_cache_manager
 from ...constants import Language
 from ...core.search_pipeline import get_search_engine
 from ...storage.mongodb import _ensure_initialized
 from ...utils.logging import get_logger
-from ..models.responses import HealthResponse
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -20,10 +20,20 @@ router = APIRouter()
 _start_time = time.time()
 
 
+class HealthResponse(BaseModel):
+    """Response for health check."""
+
+    status: str = Field(..., description="Overall service status")
+    database: str = Field(..., description="Database connection status")
+    search_engine: str = Field(..., description="Search engine status")
+    cache_hit_rate: float = Field(..., ge=0.0, le=1.0, description="Cache hit rate")
+    uptime_seconds: int = Field(..., ge=0, description="Service uptime in seconds")
+
+
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Get service health status.
-    
+
     Returns status of all major components:
     - Database connectivity
     - Search engine initialization
@@ -37,7 +47,7 @@ async def health_check() -> HealthResponse:
         database_status = "connected"
     except Exception as e:
         logger.warning(f"Database health check failed: {e}")
-    
+
     # Check search engine
     search_status = "uninitialized"
     try:
@@ -46,30 +56,30 @@ async def health_check() -> HealthResponse:
             search_status = "initialized"
     except Exception as e:
         logger.warning(f"Search engine health check failed: {e}")
-    
+
     # Check cache system
     cache_hit_rate = 0.0
     try:
         cache_manager = get_cache_manager()
         stats = cache_manager.get_stats()
-        
+
         # Calculate hit rate from memory entries vs expired entries
         memory_entries = stats.get("memory_entries", 0)
         expired_entries = stats.get("expired_memory_entries", 0)
-        
+
         if memory_entries > 0:
             cache_hit_rate = max(0.0, (memory_entries - expired_entries) / memory_entries)
     except Exception as e:
         logger.warning(f"Cache health check failed: {e}")
-    
+
     # Calculate uptime
     uptime_seconds = int(time.time() - _start_time)
-    
+
     # Determine overall status
     overall_status = "healthy"
     if database_status != "connected" or search_status != "initialized":
         overall_status = "degraded"
-    
+
     return HealthResponse(
         status=overall_status,
         database=database_status,

@@ -63,9 +63,7 @@ def database_stats(detailed: bool, connection_string: str, database: str) -> Non
     asyncio.run(_database_stats_async(detailed, connection_string, database))
 
 
-async def _database_stats_async(
-    detailed: bool, connection_string: str, database_name: str
-) -> None:
+async def _database_stats_async(detailed: bool, connection_string: str, database_name: str) -> None:
     """Get real database statistics from MongoDB."""
     try:
         console.print("[bold blue]📊 Database Statistics[/bold blue]\n")
@@ -98,9 +96,7 @@ async def _database_stats_async(
             provider_table.add_column("Count", justify="right")
 
             for provider, count in provider_stats.items():
-                provider_table.add_row(
-                    DictionaryProvider(provider).display_name, f"{count:,}"
-                )
+                provider_table.add_row(DictionaryProvider(provider).display_name, f"{count:,}")
 
             console.print(provider_table)
 
@@ -114,9 +110,7 @@ async def _database_stats_async(
                     console.print(f"• {metric}: {value}")
 
         # Database size info (approximation)
-        estimated_size_mb = (
-            total_words * 2.5 + total_syntheses * 1.8
-        )  # Rough estimate
+        estimated_size_mb = total_words * 2.5 + total_syntheses * 1.8  # Rough estimate
         console.print(f"\n💾 Estimated database size: {estimated_size_mb:.1f} MB")
 
         await storage.disconnect()
@@ -170,8 +164,7 @@ async def _get_quality_metrics() -> dict[str, str]:
                     1
                     for entry in sample_entries
                     if any(
-                        provider_data.definitions
-                        for provider_data in entry.provider_data.values()
+                        provider_data.definitions for provider_data in entry.provider_data.values()
                     )
                 )
                 coverage_pct = (entries_with_defs / len(sample_entries)) * 100

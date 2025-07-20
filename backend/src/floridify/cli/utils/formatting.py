@@ -30,16 +30,16 @@ from ...search.constants import SearchMethod
 
 # Unicode superscript mapping for meaning counters
 SUPERSCRIPT_MAP = {
-    '0': '⁰',
-    '1': '¹',
-    '2': '²',
-    '3': '³',
-    '4': '⁴',
-    '5': '⁵',
-    '6': '⁶',
-    '7': '⁷',
-    '8': '⁸',
-    '9': '⁹',
+    "0": "⁰",
+    "1": "¹",
+    "2": "²",
+    "3": "³",
+    "4": "⁴",
+    "5": "⁵",
+    "6": "⁶",
+    "7": "⁷",
+    "8": "⁸",
+    "9": "⁹",
 }
 
 
@@ -52,11 +52,11 @@ def format_meaning_cluster_name(meaning_id: str) -> str:
         word_general -> Word General
     """
     # Remove word prefix and convert to title case
-    parts = meaning_id.split('_')
+    parts = meaning_id.split("_")
     if len(parts) > 1:
         # Skip the word part and format the meaning part
         meaning_parts = parts[1:]  # Skip word prefix like 'bank_'
-        return ' '.join(word.lower() for word in meaning_parts)
+        return " ".join(word.lower() for word in meaning_parts)
     else:
         # Fallback for single words
         return meaning_id.lower()
@@ -73,9 +73,7 @@ def format_word_display(
     return Panel(Text("Not implemented"), title="Word Display")
 
 
-def format_search_results(
-    results: list[tuple[float, str]], title: str = "Search Results"
-) -> Table:
+def format_search_results(results: list[tuple[float, str]], title: str = "Search Results") -> Table:
     """Format search results in a beautiful table."""
     table = Table(title=title, show_header=True, header_style="bold blue")
     table.add_column("Score", style="green", width=6)
@@ -117,9 +115,7 @@ def format_anki_progress(current: int, total: int, current_word: str) -> Progres
         console=console,
     )
 
-    task = progress.add_task(
-        "Creating Anki deck...", total=total, current_word=current_word
-    )
+    task = progress.add_task("Creating Anki deck...", total=total, current_word=current_word)
     progress.update(task, completed=current)
 
     return progress
@@ -138,9 +134,7 @@ def format_processing_summary(
     content.append(f"❌ Failed: {failed}\n", style="red")
     content.append(
         f"📈 Success Rate: {success_rate:.1f}%",
-        style=(
-            "green" if success_rate >= 90 else "yellow" if success_rate >= 75 else "red"
-        ),
+        style=("green" if success_rate >= 90 else "yellow" if success_rate >= 75 else "red"),
     )
 
     return Panel(
@@ -167,9 +161,7 @@ def format_deck_summary(
     ]
 
     for card_type, count in card_types.items():
-        content_lines.append(
-            Text(f"  • {card_type.replace('_', ' ').title()}: {count}")
-        )
+        content_lines.append(Text(f"  • {card_type.replace('_', ' ').title()}: {count}"))
 
     content_lines.extend(
         [
@@ -306,7 +298,7 @@ def format_statistics_table(title: str, stats: dict[str, Any]) -> Table:
             value_str = f"{value:,}"
         else:
             value_str = str(value)
-        table.add_row(metric.replace('_', ' ').title(), value_str)
+        table.add_row(metric.replace("_", " ").title(), value_str)
 
     return table
 
@@ -355,9 +347,7 @@ def _format_example_with_bold_word(
             content.append(text_part, style=base_style)
 
 
-def _add_definition_content(
-    content: Text, definitions: list[Definition], word: str
-) -> None:
+def _add_definition_content(content: Text, definitions: list[Definition], word: str) -> None:
     """Add definition content with examples and synonyms to a Text object."""
     for i, definition in enumerate(definitions):
         if i > 0:
@@ -373,9 +363,7 @@ def _add_definition_content(
         content.append(f"  {clean_def}", style="white")
 
         # Examples with special formatting
-        for example in definition.examples.generated[
-            :2
-        ]:  # Show 2 examples per definition
+        for example in definition.examples.generated[:2]:  # Show 2 examples per definition
             content.append("\n\n")
 
             # Clean example text and ensure proper sentence case
@@ -388,7 +376,7 @@ def _add_definition_content(
         if definition.synonyms:
             content.append("\n\n")
             content.append("  synonyms: ", style="dim italic")
-            
+
             displayed_synonyms = definition.synonyms[:10]
             synonyms_text = ", ".join(displayed_synonyms)
             content.append(synonyms_text, style="cyan italic")
@@ -433,7 +421,7 @@ def format_meaning_based_definition(
     meaning_groups: dict[str, list[Definition]],
 ) -> Panel:
     """Format AI-generated definition grouped by meanings with separate panels for multiple meanings."""
-    
+
     # Header with word and pronunciation (word always lowercase)
     header = Text()
 
@@ -451,9 +439,7 @@ def format_meaning_based_definition(
     if use_superscripts:
         # Create separate panels for each meaning
         panels = []
-        for meaning_counter, (meaning_id, definitions) in enumerate(
-            meaning_groups.items(), 1
-        ):
+        for meaning_counter, (meaning_id, definitions) in enumerate(meaning_groups.items(), 1):
             meaning_panel = _create_meaning_panel(
                 entry, meaning_id, definitions, meaning_counter, True
             )
@@ -472,9 +458,7 @@ def format_meaning_based_definition(
     # Add provider and language info
     provider_info = Text()
     provider_info.append("✨ source(s): ", style="dim")
-    provider_info.append(
-        ", ".join(provider.name.lower() for provider in providers), style="dim"
-    )
+    provider_info.append(", ".join(provider.name.lower() for provider in providers), style="dim")
 
     content_group = Group(
         content_group,

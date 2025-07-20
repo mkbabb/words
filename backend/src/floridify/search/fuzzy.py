@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 
 import jellyfish
-import polyleven
+import polyleven  # type: ignore[import-not-found]
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz, process
 
@@ -23,9 +23,7 @@ class FuzzyMatch(BaseModel):
     word: str = Field(..., description="Matched word")
     score: float = Field(..., ge=0.0, le=1.0, description="Similarity score (0.0-1.0)")
     method: FuzzySearchMethod = Field(..., description="Method used for matching")
-    edit_distance: int = Field(
-        default=0, ge=0, description="Edit distance (if applicable)"
-    )
+    edit_distance: int = Field(default=0, ge=0, description="Edit distance (if applicable)")
     is_phrase: bool = Field(default=False, description="Whether match is a phrase")
 
     model_config = {"frozen": True}
@@ -56,7 +54,7 @@ class FuzzySearch:
             min_score: Minimum similarity score to include in results
         """
         self.min_score = min_score
-        
+
         # Cache for performance optimization
         self._last_vocabulary_hash: int = 0
         self._cached_lowercase_words: list[str] = []
@@ -186,7 +184,7 @@ class FuzzySearch:
 
         matches = []
         is_query_phrase = " " in query.strip()
-        
+
         for result in results:
             # RapidFuzz returns (string, score, index) tuples
             if len(result) == 3:
@@ -202,12 +200,14 @@ class FuzzySearch:
                 query, word, base_score, is_query_phrase
             )
 
-            matches.append(FuzzyMatch(
-                word=word,
-                score=corrected_score,
-                method=FuzzySearchMethod.RAPIDFUZZ,
-                is_phrase=" " in word,
-            ))
+            matches.append(
+                FuzzyMatch(
+                    word=word,
+                    score=corrected_score,
+                    method=FuzzySearchMethod.RAPIDFUZZ,
+                    is_phrase=" " in word,
+                )
+            )
 
         # Sort by corrected scores and limit results
         matches.sort(key=lambda m: m.score, reverse=True)
@@ -220,13 +220,13 @@ class FuzzySearch:
 
         matches: list[FuzzyMatch] = []
         min_score_seen = 0.0
-        
+
         for word in word_list:
             try:
                 # Use cached lowercase if available
                 word_lower = word.lower() if not self._cached_lowercase_words else word.lower()
                 score = jellyfish.jaro_winkler_similarity(query, word_lower)
-                
+
                 # Early termination optimization
                 if score > min_score_seen or len(matches) < max_results:
                     matches.append(
@@ -237,13 +237,13 @@ class FuzzySearch:
                             is_phrase=" " in word,
                         )
                     )
-                    
+
                     # Keep only top results and track minimum
                     if len(matches) > max_results * 2:
                         matches.sort(key=lambda m: m.score, reverse=True)
                         matches = matches[:max_results]
                         min_score_seen = matches[-1].score
-                        
+
             except Exception:
                 continue
 

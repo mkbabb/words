@@ -5,10 +5,9 @@ This script tests the backwards compatibility of the API by making
 direct HTTP requests and verifying the responses.
 """
 
-import json
-import httpx
 import time
-from typing import Dict, Any
+
+import httpx
 
 BASE_URL = "http://localhost:8000"
 
@@ -120,7 +119,7 @@ def test_performance():
     
     # Test cached lookup
     start = time.time()
-    response = httpx.get(f"{BASE_URL}/api/v1/lookup/test")
+    httpx.get(f"{BASE_URL}/api/v1/lookup/test")
     elapsed = time.time() - start
     
     print(f"Cached lookup time: {elapsed*1000:.1f}ms")

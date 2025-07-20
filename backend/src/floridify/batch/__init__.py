@@ -7,10 +7,10 @@ from .word_normalizer import WordNormalizer
 __all__ = [
     "WordFilter",
     "FilterMethod",
-    "FilterPresets", 
+    "FilterPresets",
     "FilterStats",
     "WordNormalizer",
     "BatchProcessor",
-    "BatchJobConfig", 
-    "BatchJobStatus"
+    "BatchJobConfig",
+    "BatchJobStatus",
 ]

@@ -54,7 +54,7 @@ class WikitextCleaner:
                 template_name = template.name.strip().lower()
 
                 # Preserve content from certain templates
-                if template_name in ['term', 'mention', 'lang']:
+                if template_name in ["term", "mention", "lang"]:
                     # Keep the main content, remove the template wrapper
                     if template.arguments:
                         # Usually the last argument is the display text
@@ -78,18 +78,14 @@ class WikitextCleaner:
             cleaned = text
 
         # Final cleanup with regex
-        cleaned = re.sub(r'<[^>]+>', '', cleaned)  # Remove HTML tags
-        cleaned = re.sub(r'\{\{[^}]*\}\}', '', cleaned)  # Remove remaining templates
-        cleaned = re.sub(
-            r'\[\[([^\]|]+)(?:\|[^\]]+)?\]\]', r'\1', cleaned
-        )  # Clean links
-        cleaned = re.sub(
-            r'<ref[^>]*>.*?</ref>', '', cleaned, flags=re.DOTALL
-        )  # Remove refs
+        cleaned = re.sub(r"<[^>]+>", "", cleaned)  # Remove HTML tags
+        cleaned = re.sub(r"\{\{[^}]*\}\}", "", cleaned)  # Remove remaining templates
+        cleaned = re.sub(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]", r"\1", cleaned)  # Clean links
+        cleaned = re.sub(r"<ref[^>]*>.*?</ref>", "", cleaned, flags=re.DOTALL)  # Remove refs
 
         if not preserve_structure:
-            cleaned = re.sub(r'\s+', ' ', cleaned)  # Normalize whitespace
-            cleaned = re.sub(r'^[^\w]*', '', cleaned)  # Remove leading punctuation
+            cleaned = re.sub(r"\s+", " ", cleaned)  # Normalize whitespace
+            cleaned = re.sub(r"^[^\w]*", "", cleaned)  # Remove leading punctuation
 
         return cleaned.strip()
 
@@ -146,9 +142,9 @@ class WiktionaryConnector(DictionaryConnector):
             # Report start
             if state_tracker:
                 await self._report_progress(
-                    'start',
+                    "start",
                     0,
-                    {'provider': self.provider_name, 'word': word},
+                    {"provider": self.provider_name, "word": word},
                     state_tracker,
                 )
 
@@ -167,34 +163,36 @@ class WiktionaryConnector(DictionaryConnector):
 
             def http_progress_callback(stage: str, metadata: dict[str, Any]) -> None:
                 http_progress_data.update(metadata)
-                if stage == 'connecting' and state_tracker:
+                if stage == "connecting" and state_tracker:
                     # Schedule async progress report
-                    asyncio.create_task(self._report_progress(
-                        'connecting',
-                        25,
-                        {'provider': self.provider_name, **metadata},
-                        state_tracker,
-                    ))
-                elif stage == 'downloaded':
-                    metrics.connection_time_ms = metadata.get('connection_time_ms', 0)
-                    metrics.download_time_ms = metadata.get('download_time_ms', 0)
-                    metrics.response_size_bytes = metadata.get('response_size_bytes', 0)
+                    asyncio.create_task(
+                        self._report_progress(
+                            "connecting",
+                            25,
+                            {"provider": self.provider_name, **metadata},
+                            state_tracker,
+                        )
+                    )
+                elif stage == "downloaded":
+                    metrics.connection_time_ms = metadata.get("connection_time_ms", 0)
+                    metrics.download_time_ms = metadata.get("download_time_ms", 0)
+                    metrics.response_size_bytes = metadata.get("response_size_bytes", 0)
                     if state_tracker:
                         # Schedule async progress report
-                        asyncio.create_task(self._report_progress(
-                            'downloading',
-                            50,
-                            {'provider': self.provider_name, **metadata},
-                            state_tracker,
-                        ))
+                        asyncio.create_task(
+                            self._report_progress(
+                                "downloading",
+                                50,
+                                {"provider": self.provider_name, **metadata},
+                                state_tracker,
+                            )
+                        )
 
             response = await self.http_client.get(
                 self.base_url,
                 params=params,
                 ttl_hours=24.0,
-                headers={
-                    "User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"
-                },
+                headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
                 timeout=30.0,
                 progress_callback=http_progress_callback if state_tracker else None,
             )
@@ -203,12 +201,12 @@ class WiktionaryConnector(DictionaryConnector):
                 logger.warning("Rate limited by Wiktionary, waiting 60s...")
                 if state_tracker:
                     await self._report_progress(
-                        'downloading',
+                        "downloading",
                         50,
                         {
-                            'provider': self.provider_name,
-                            'status': 'rate_limited',
-                            'wait_time': 60,
+                            "provider": self.provider_name,
+                            "status": "rate_limited",
+                            "wait_time": 60,
                         },
                         state_tracker,
                     )
@@ -217,9 +215,7 @@ class WiktionaryConnector(DictionaryConnector):
                     self.base_url,
                     params=params,
                     force_refresh=True,
-                    headers={
-                        "User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"
-                    },
+                    headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
                     timeout=30.0,
                     progress_callback=http_progress_callback if state_tracker else None,
                 )
@@ -230,12 +226,12 @@ class WiktionaryConnector(DictionaryConnector):
             # Report parsing start
             if state_tracker:
                 await self._report_progress(
-                    'parsing',
+                    "parsing",
                     75,
                     {
-                        'provider': self.provider_name,
-                        'word': word,
-                        'response_size': len(str(data)),
+                        "provider": self.provider_name,
+                        "word": word,
+                        "response_size": len(str(data)),
                     },
                     state_tracker,
                 )
@@ -247,13 +243,9 @@ class WiktionaryConnector(DictionaryConnector):
             # Calculate quality metrics if we have a result
             if result:
                 metrics.success = True
-                metrics.definitions_count = (
-                    len(result.definitions) if result.definitions else 0
-                )
-                metrics.has_pronunciation = bool(
-                    result.raw_metadata.get('pronunciation')
-                )
-                metrics.has_etymology = bool(result.raw_metadata.get('etymology'))
+                metrics.definitions_count = len(result.definitions) if result.definitions else 0
+                metrics.has_pronunciation = bool(result.raw_metadata.get("pronunciation") if result.raw_metadata else False)
+                metrics.has_etymology = bool(result.raw_metadata.get("etymology") if result.raw_metadata else False)
                 metrics.has_examples = any(
                     d.examples and (d.examples.generated or d.examples.literature)
                     for d in (result.definitions or [])
@@ -267,13 +259,13 @@ class WiktionaryConnector(DictionaryConnector):
             # Report completion
             if state_tracker:
                 await self._report_progress(
-                    'complete',
+                    "complete",
                     100,
                     {
-                        'provider': self.provider_name,
-                        'word': word,
-                        'success': metrics.success,
-                        'metrics': metrics.__dict__,
+                        "provider": self.provider_name,
+                        "word": word,
+                        "success": metrics.success,
+                        "metrics": metrics.__dict__,
                     },
                     state_tracker,
                 )
@@ -287,14 +279,14 @@ class WiktionaryConnector(DictionaryConnector):
 
             if state_tracker:
                 await self._report_progress(
-                    'complete',
+                    "complete",
                     100,
                     {
-                        'provider': self.provider_name,
-                        'word': word,
-                        'success': False,
-                        'error': str(e),
-                        'metrics': metrics.__dict__,
+                        "provider": self.provider_name,
+                        "word": word,
+                        "success": False,
+                        "error": str(e),
+                        "metrics": metrics.__dict__,
                     },
                     state_tracker,
                 )
@@ -302,9 +294,7 @@ class WiktionaryConnector(DictionaryConnector):
             logger.error(f"Error fetching {word} from Wiktionary: {e}")
             return None
 
-    def _parse_wiktionary_response(
-        self, word: str, data: dict[str, Any]
-    ) -> ProviderData | None:
+    def _parse_wiktionary_response(self, word: str, data: dict[str, Any]) -> ProviderData | None:
         """Parse Wiktionary response comprehensively."""
         try:
             pages = data.get("query", {}).get("pages", [])
@@ -365,9 +355,7 @@ class WiktionaryConnector(DictionaryConnector):
             logger.error(f"Error in comprehensive extraction: {e}")
             return WiktionaryExtractedData(definitions=[])
 
-    def _find_language_section(
-        self, parsed: wtp.WikiList, language: str
-    ) -> wtp.Section | None:
+    def _find_language_section(self, parsed: wtp.WikiList, language: str) -> wtp.Section | None:
         """Find the specific language section using wtp.Section hierarchy."""
         for section in parsed.sections:
             if (
@@ -449,7 +437,7 @@ class WiktionaryConnector(DictionaryConnector):
             for template in parsed.templates:
                 template_name = template.name.strip().lower()
 
-                if template_name in ['ux', 'uxi', 'usex']:
+                if template_name in ["ux", "uxi", "usex"]:
                     # Usage example templates
                     if len(template.arguments) >= 2:
                         example_text = str(template.arguments[1].value).strip()
@@ -458,24 +446,20 @@ class WiktionaryConnector(DictionaryConnector):
                         )
                         if clean_example and len(clean_example) > 10:
                             examples.generated.append(
-                                GeneratedExample(
-                                    sentence=clean_example, regenerable=False
-                                )
+                                GeneratedExample(sentence=clean_example, regenerable=False)
                             )
 
-                elif template_name.startswith('quote'):
+                elif template_name.startswith("quote"):
                     # Quote templates
                     for arg in template.arguments:
-                        if 'text' in str(arg.name).lower() or not arg.name:
+                        if "text" in str(arg.name).lower() or not arg.name:
                             quote_text = str(arg.value).strip()
                             clean_quote = self.cleaner.clean_text(
                                 quote_text, preserve_structure=True
                             )
                             if clean_quote and len(clean_quote) > 15:
                                 examples.generated.append(
-                                    GeneratedExample(
-                                        sentence=clean_quote, regenerable=False
-                                    )
+                                    GeneratedExample(sentence=clean_quote, regenerable=False)
                                 )
                                 break
 
@@ -506,15 +490,11 @@ class WiktionaryConnector(DictionaryConnector):
             for template in parsed.templates:
                 template_name = template.name.strip().lower()
 
-                if template_name in ['syn', 'synonym', 'synonyms']:
+                if template_name in ["syn", "synonym", "synonyms"]:
                     for arg in template.arguments:
                         if not arg.name:  # Positional arguments
                             arg_value = str(arg.value).strip()
-                            if (
-                                arg_value
-                                and len(arg_value) > 1
-                                and arg_value not in ['en', 'lang']
-                            ):
+                            if arg_value and len(arg_value) > 1 and arg_value not in ["en", "lang"]:
                                 clean_syn = self._clean_synonym(arg_value)
                                 if clean_syn:
                                     synonyms.append(clean_syn)
@@ -527,7 +507,7 @@ class WiktionaryConnector(DictionaryConnector):
     def _extract_etymology(self, section: wtp.Section) -> str | None:
         """Extract etymology from dedicated section."""
         for subsection in section.sections:
-            if subsection.title and 'etymology' in subsection.title.lower():
+            if subsection.title and "etymology" in subsection.title.lower():
                 etymology_text = str(subsection.contents)
                 return self.cleaner.clean_text(etymology_text, preserve_structure=True)
         return None
@@ -540,7 +520,7 @@ class WiktionaryConnector(DictionaryConnector):
         try:
             # Look for pronunciation section
             for subsection in section.sections:
-                if subsection.title and 'pronunciation' in subsection.title.lower():
+                if subsection.title and "pronunciation" in subsection.title.lower():
                     section_text = str(subsection)
                     break
             else:
@@ -552,16 +532,16 @@ class WiktionaryConnector(DictionaryConnector):
             for template in parsed.templates:
                 template_name = template.name.strip().lower()
 
-                if 'ipa' in template_name:
+                if "ipa" in template_name:
                     for arg in template.arguments:
                         if not arg.name:  # Positional argument
                             arg_value = str(arg.value).strip()
-                            if '/' in arg_value or '[' in arg_value:
+                            if "/" in arg_value or "[" in arg_value:
                                 ipa = arg_value
                                 phonetic = self._ipa_to_phonetic(ipa)
                                 break
 
-                elif template_name in ['pron', 'pronunciation', 'audio']:
+                elif template_name in ["pron", "pronunciation", "audio"]:
                     for arg in template.arguments:
                         arg_value = str(arg.value).strip()
                         if arg_value and len(arg_value) > 2:
@@ -584,7 +564,7 @@ class WiktionaryConnector(DictionaryConnector):
         for subsection in section.sections:
             title = subsection.title
             if title and any(
-                term in title.lower() for term in ['alternative', 'variant', 'spelling']
+                term in title.lower() for term in ["alternative", "variant", "spelling"]
             ):
                 items = self._extract_wikilist_items(str(subsection))
                 for item in items:
@@ -600,9 +580,7 @@ class WiktionaryConnector(DictionaryConnector):
 
         for subsection in section.sections:
             title = subsection.title
-            if title and any(
-                term in title.lower() for term in ['related', 'derived', 'see also']
-            ):
+            if title and any(term in title.lower() for term in ["related", "derived", "see also"]):
                 items = self._extract_wikilist_items(str(subsection))
                 for item in items:
                     clean_term = self.cleaner.clean_text(item)
@@ -616,35 +594,35 @@ class WiktionaryConnector(DictionaryConnector):
         if not ipa:
             return "unknown"
 
-        phonetic = ipa.replace('/', '').replace('[', '').replace(']', '')
-        phonetic = phonetic.replace('ˈ', '').replace('ˌ', '')  # Remove stress
+        phonetic = ipa.replace("/", "").replace("[", "").replace("]", "")
+        phonetic = phonetic.replace("ˈ", "").replace("ˌ", "")  # Remove stress
 
         # Enhanced IPA to phonetic mapping
         substitutions = {
-            'ɪ': 'i',
-            'ɛ': 'e',
-            'æ': 'a',
-            'ɑ': 'ah',
-            'ɔ': 'aw',
-            'ʊ': 'u',
-            'ə': 'uh',
-            'θ': 'th',
-            'ð': 'th',
-            'ʃ': 'sh',
-            'ʒ': 'zh',
-            'ŋ': 'ng',
-            'ʧ': 'ch',
-            'ʤ': 'j',
-            'ɹ': 'r',
-            'ɾ': 't',
-            'ʔ': '',
-            'ː': '',
-            'ˑ': '',
-            'eɪ': 'ay',
-            'aɪ': 'eye',
-            'ɔɪ': 'oy',
-            'aʊ': 'ow',
-            'oʊ': 'oh',
+            "ɪ": "i",
+            "ɛ": "e",
+            "æ": "a",
+            "ɑ": "ah",
+            "ɔ": "aw",
+            "ʊ": "u",
+            "ə": "uh",
+            "θ": "th",
+            "ð": "th",
+            "ʃ": "sh",
+            "ʒ": "zh",
+            "ŋ": "ng",
+            "ʧ": "ch",
+            "ʤ": "j",
+            "ɹ": "r",
+            "ɾ": "t",
+            "ʔ": "",
+            "ː": "",
+            "ˑ": "",
+            "eɪ": "ay",
+            "aɪ": "eye",
+            "ɔɪ": "oy",
+            "aʊ": "ow",
+            "oʊ": "oh",
         }
 
         for ipa_char, simple_char in substitutions.items():
@@ -663,8 +641,7 @@ class WiktionaryConnector(DictionaryConnector):
         if (
             len(cleaned) < 2
             or len(cleaned) > 50
-            or cleaned.lower()
-            in {'thesaurus', 'see', 'also', 'compare', 'etc', 'and', 'or'}
+            or cleaned.lower() in {"thesaurus", "see", "also", "compare", "etc", "and", "or"}
         ):
             return None
 

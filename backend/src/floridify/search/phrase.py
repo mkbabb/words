@@ -7,13 +7,13 @@ multi-word expressions with state-of-the-art text normalization.
 
 from __future__ import annotations
 
-import contractions
+import contractions  # type: ignore[import-untyped]
 import ftfy
 import regex
 import spacy
-import unicodedata2 as unicodedata
+import unicodedata2 as unicodedata  # type: ignore[import-not-found]
 from pydantic import BaseModel, Field
-from tokenizers import pre_tokenizers
+from tokenizers import pre_tokenizers  # type: ignore[import-untyped]
 
 
 class MultiWordExpression(BaseModel):
@@ -22,13 +22,9 @@ class MultiWordExpression(BaseModel):
     text: str = Field(..., description="Original text")
     normalized: str = Field(..., description="Normalized form")
     word_count: int = Field(..., gt=0, description="Number of words")
-    is_idiom: bool = Field(
-        default=False, description="Whether this is an idiomatic expression"
-    )
+    is_idiom: bool = Field(default=False, description="Whether this is an idiomatic expression")
     language: str = Field(default="en", description="Language code")
-    frequency: float = Field(
-        default=0.0, ge=0.0, description="Usage frequency if available"
-    )
+    frequency: float = Field(default=0.0, ge=0.0, description="Usage frequency if available")
 
     model_config = {"frozen": True}
 
@@ -71,9 +67,7 @@ class PhraseNormalizer:
         self._hyphen_pattern = regex.compile(
             r"[–—‒]"
         )  # Various dash types (excluding regular hyphen)
-        self._apostrophe_pattern = regex.compile(
-            r"[''`" "]"
-        )  # Various apostrophe types
+        self._apostrophe_pattern = regex.compile(r"[''`" "]")  # Various apostrophe types
 
     def normalize(self, text: str) -> str:
         """
@@ -179,8 +173,7 @@ class PhraseNormalizer:
                                 text=ent.text,
                                 normalized=normalized,
                                 word_count=len(normalized.split()),
-                                is_idiom=ent.label_
-                                in ["WORK_OF_ART", "EVENT"],  # Likely idiomatic
+                                is_idiom=ent.label_ in ["WORK_OF_ART", "EVENT"],  # Likely idiomatic
                                 language=self.language,
                             )
                         )

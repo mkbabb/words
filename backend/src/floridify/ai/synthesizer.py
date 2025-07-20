@@ -30,11 +30,11 @@ class DefinitionSynthesizer:
         self.examples_count = examples_count
 
     async def synthesize_entry(
-        self, 
-        word: str, 
-        providers_data: list[ProviderData], 
+        self,
+        word: str,
+        providers_data: list[ProviderData],
         force_refresh: bool = False,
-        state_tracker: StateTracker | None = None
+        state_tracker: StateTracker | None = None,
     ) -> SynthesizedDictionaryEntry | None:
         """Synthesize a complete dictionary entry from provider data using meaning clusters."""
 
@@ -69,22 +69,18 @@ class DefinitionSynthesizer:
             return None
 
         # Extract cluster mappings using AI
-        logger.info(
-            f"🔍 Analyzing {len(all_definition_objects)} definitions for cluster mappings"
-        )
-        
+        logger.info(f"🔍 Analyzing {len(all_definition_objects)} definitions for cluster mappings")
+
         if state_tracker:
             await state_tracker.update(
                 PipelineStage.AI_CLUSTERING,
                 40,
                 f"Clustering {len(all_definition_objects)} definitions",
-                {"word": word, "definitions_count": len(all_definition_objects)}
+                {"word": word, "definitions_count": len(all_definition_objects)},
             )
-        
-        cluster_response = await self.ai.extract_cluster_mapping(
-            word, all_definition_tuples
-        )
-        
+
+        cluster_response = await self.ai.extract_cluster_mapping(word, all_definition_tuples)
+
         if state_tracker:
             await state_tracker.update(
                 PipelineStage.AI_CLUSTERING,
@@ -93,8 +89,8 @@ class DefinitionSynthesizer:
                 {
                     "word": word,
                     "cluster_count": len(cluster_response.cluster_mappings),
-                    "definitions_count": len(all_definition_objects)
-                }
+                    "definitions_count": len(all_definition_objects),
+                },
             )
 
         # Update Definition objects with their cluster assignments
@@ -116,7 +112,7 @@ class DefinitionSynthesizer:
 
         # Ensure MongoDB is initialized before creating the entry
         await _ensure_initialized()
-        
+
         # Create synthesized entry
         entry = SynthesizedDictionaryEntry(
             word=word,
@@ -128,21 +124,18 @@ class DefinitionSynthesizer:
         # Save to database
         if state_tracker:
             await state_tracker.update(
-                PipelineStage.STORAGE_SAVE,
-                80,
-                f"Saving entry for '{word}'",
-                {"word": word}
+                PipelineStage.STORAGE_SAVE, 80, f"Saving entry for '{word}'", {"word": word}
             )
-        
+
         try:
             await save_synthesized_entry(entry)
-            
+
             if state_tracker:
                 await state_tracker.update(
                     PipelineStage.STORAGE_SAVE,
                     90,
                     f"Saved entry for '{word}'",
-                    {"word": word, "success": True}
+                    {"word": word, "success": True},
                 )
         except Exception as e:
             logger.error(f"Failed to save synthesized entry for '{word}': {e}")
@@ -152,16 +145,13 @@ class DefinitionSynthesizer:
                     PipelineStage.STORAGE_SAVE,
                     90,
                     f"Failed to save entry for '{word}'",
-                    {"word": word, "success": False, "error": str(e)}
+                    {"word": word, "success": False, "error": str(e)},
                 )
-            
+
         return entry
 
     async def generate_fallback_entry(
-        self, 
-        word: str, 
-        force_refresh: bool = False,
-        state_tracker: StateTracker | None = None
+        self, word: str, force_refresh: bool = False, state_tracker: StateTracker | None = None
     ) -> SynthesizedDictionaryEntry | None:
         """Generate a complete fallback entry using AI."""
         logger.info(f"🔮 Starting AI fallback generation for '{word}'")
@@ -266,21 +256,21 @@ class DefinitionSynthesizer:
                 f"with {len(cluster_definitions)} definitions"
             )
             cluster_start = time.time()
-            
+
             if state_tracker:
                 # Progress from 50-60% for synthesis
                 progress = 50 + (i * 10 / total_clusters)
                 await state_tracker.update(
                     PipelineStage.AI_SYNTHESIS,
                     progress,
-                    f"Synthesizing cluster {i+1}/{total_clusters}",
+                    f"Synthesizing cluster {i + 1}/{total_clusters}",
                     {
                         "word": word,
                         "cluster_id": cluster_id,
-                        "cluster_index": i+1,
+                        "cluster_index": i + 1,
                         "total_clusters": total_clusters,
-                        "definitions_in_cluster": len(cluster_definitions)
-                    }
+                        "definitions_in_cluster": len(cluster_definitions),
+                    },
                 )
 
             try:
@@ -290,7 +280,7 @@ class DefinitionSynthesizer:
                     definitions=cluster_definitions,
                     meaning_cluster=cluster_id,
                 )
-                
+
                 cluster_duration = time.time() - cluster_start
                 logger.debug(
                     f"✅ Cluster '{cluster_id}' synthesized in {cluster_duration:.2f}s "
@@ -298,9 +288,7 @@ class DefinitionSynthesizer:
                 )
 
                 if not synthesis_response.definitions:
-                    logger.warning(
-                        f"⚠️  No definitions synthesized for cluster '{cluster_id}'"
-                    )
+                    logger.warning(f"⚠️  No definitions synthesized for cluster '{cluster_id}'")
                     continue
 
                 # Create synthesized definitions for this cluster
@@ -350,7 +338,9 @@ class DefinitionSynthesizer:
 
             except Exception as e:
                 cluster_duration = time.time() - cluster_start
-                logger.error(f"❌ Failed to synthesize cluster '{cluster_id}' after {cluster_duration:.2f}s: {e}")
+                logger.error(
+                    f"❌ Failed to synthesize cluster '{cluster_id}' after {cluster_duration:.2f}s: {e}"
+                )
                 # TODO: Add metrics logging
                 # log_metrics(
                 #     stage="cluster_synthesis_error",
@@ -373,13 +363,13 @@ class DefinitionSynthesizer:
         existing_synonyms: list[str],
     ) -> list[str]:
         """Enhance synonyms by augmenting existing list if needed."""
-        
+
         # If we already have at least 2 synonyms, don't augment
         if len(existing_synonyms) >= 2:
             return existing_synonyms
-            
+
         logger.info(f"🔗 Enhancing synonyms for '{word}' ({word_type})")
-        
+
         try:
             # Generate synonyms using the existing prompt
             synonym_response = await self.ai.synonyms(
@@ -388,16 +378,17 @@ class DefinitionSynthesizer:
                 definition=definition,
                 count=10,
             )
-            
+
             # Extract just the words from the synonym candidates
             generated_synonyms = [
-                candidate.word for candidate in synonym_response.synonyms
+                candidate.word
+                for candidate in synonym_response.synonyms
                 if candidate.word.lower() != word.lower()
             ]
-            
+
             # Combine and deduplicate
             all_synonyms = existing_synonyms + generated_synonyms
-            
+
             # Remove duplicates while preserving order
             unique_synonyms = []
             seen = set()
@@ -405,13 +396,13 @@ class DefinitionSynthesizer:
                 if synonym.lower() not in seen:
                     unique_synonyms.append(synonym)
                     seen.add(synonym.lower())
-            
+
             logger.success(
                 f"✨ Enhanced synonyms for '{word}': {len(unique_synonyms)} total synonyms"
             )
-            
+
             return unique_synonyms
-            
+
         except Exception as e:
             logger.error(f"Failed to enhance synonyms for '{word}': {e}")
             return existing_synonyms

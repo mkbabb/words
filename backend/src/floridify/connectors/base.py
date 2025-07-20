@@ -37,7 +37,7 @@ class DictionaryConnector(ABC):
 
     @abstractmethod
     async def fetch_definition(
-        self, 
+        self,
         word: str,
         state_tracker: StateTracker | None = None,
         progress_callback: Callable[[str, float, dict[str, Any]], None] | None = None,
@@ -69,14 +69,14 @@ class DictionaryConnector(ABC):
             self._last_request_time = asyncio.get_event_loop().time()
 
     async def _report_progress(
-        self, 
-        stage: str, 
-        progress: float, 
+        self,
+        stage: str,
+        progress: float,
         metadata: dict[str, Any],
         state_tracker: StateTracker | None = None,
     ) -> None:
         """Report progress through callback or state tracker.
-        
+
         Args:
             stage: Current stage (e.g., 'connecting', 'downloading', 'parsing')
             progress: Progress percentage (0-100)
@@ -85,25 +85,22 @@ class DictionaryConnector(ABC):
         """
         # Use provided state tracker or instance one
         tracker = state_tracker or self.state_tracker
-        
+
         if tracker:
             # Map stage names to PipelineStage enum
             stage_map = {
-                'start': PipelineStage.PROVIDER_START,
-                'connecting': PipelineStage.PROVIDER_CONNECTED,
-                'downloading': PipelineStage.PROVIDER_DOWNLOADING,
-                'parsing': PipelineStage.PROVIDER_PARSING,
-                'complete': PipelineStage.PROVIDER_COMPLETE,
+                "start": PipelineStage.PROVIDER_START,
+                "connecting": PipelineStage.PROVIDER_CONNECTED,
+                "downloading": PipelineStage.PROVIDER_DOWNLOADING,
+                "parsing": PipelineStage.PROVIDER_PARSING,
+                "complete": PipelineStage.PROVIDER_COMPLETE,
             }
-            
+
             if stage in stage_map:
                 await tracker.update(
-                    stage_map[stage],
-                    progress,
-                    f"{self.provider_name}: {stage}",
-                    metadata
+                    stage_map[stage], progress, f"{self.provider_name}: {stage}", metadata
                 )
-        
+
         # Also call progress callback if available
         if self.progress_callback:
             try:

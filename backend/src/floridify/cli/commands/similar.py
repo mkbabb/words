@@ -47,7 +47,7 @@ def similar(
     force: bool,
 ) -> None:
     """Generate beautiful synonyms ordered by relevance and efflorescence.
-    
+
     Generates synonyms that balance semantic accuracy with linguistic beauty,
     including words from Latin, French, and other languages that capture
     complex meanings in colorful expressions.
@@ -156,7 +156,7 @@ async def _display_synonyms(
 
         # Display synonym word without clickable functionality
         synonym_text = synonym.word
-        
+
         table.add_row(
             synonym_text,
             synonym.language,
@@ -234,8 +234,6 @@ async def _show_synonym_definitions(
         # Add spacing between definitions
         if i < len(top_synonyms):
             console.print()
-
-
 
 
 # Make the command available

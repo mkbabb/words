@@ -6,18 +6,16 @@ comparing current performance against baseline metrics.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import statistics
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Dict, List
 
 import httpx
 from rich.console import Console
-from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 
 
 @dataclass
@@ -25,9 +23,9 @@ class BenchmarkResult:
     """Container for benchmark results."""
     endpoint: str
     method: str
-    params: Dict[str, str]
-    times: List[float]
-    status_codes: List[int]
+    params: dict[str, str]
+    times: list[float]
+    status_codes: list[int]
     
     @property
     def avg_time(self) -> float:
@@ -69,7 +67,7 @@ class PerformanceBenchmark:
         self.base_url = base_url
         self.console = Console()
         
-    def run_single_request(self, endpoint: str, method: str = "GET", params: Dict[str, str] | None = None) -> tuple[float, int]:
+    def run_single_request(self, endpoint: str, method: str = "GET", params: dict[str, str] | None = None) -> tuple[float, int]:
         """Run a single request and return timing and status code."""
         with httpx.Client() as client:
             start = time.perf_counter()
@@ -77,7 +75,7 @@ class PerformanceBenchmark:
             elapsed = time.perf_counter() - start
             return elapsed, response.status_code
     
-    async def run_async_request(self, endpoint: str, method: str = "GET", params: Dict[str, str] | None = None) -> tuple[float, int]:
+    async def run_async_request(self, endpoint: str, method: str = "GET", params: dict[str, str] | None = None) -> tuple[float, int]:
         """Run an async request and return timing and status code."""
         async with httpx.AsyncClient() as client:
             start = time.perf_counter()
@@ -85,7 +83,7 @@ class PerformanceBenchmark:
             elapsed = time.perf_counter() - start
             return elapsed, response.status_code
     
-    def benchmark_endpoint(self, endpoint: str, method: str = "GET", params: Dict[str, str] | None = None, 
+    def benchmark_endpoint(self, endpoint: str, method: str = "GET", params: dict[str, str] | None = None, 
                          iterations: int = 100, concurrent: bool = False) -> BenchmarkResult:
         """Benchmark a single endpoint."""
         times = []
@@ -116,7 +114,7 @@ class PerformanceBenchmark:
             status_codes=status_codes
         )
     
-    def run_benchmarks(self) -> List[BenchmarkResult]:
+    def run_benchmarks(self) -> list[BenchmarkResult]:
         """Run all benchmarks."""
         benchmarks = [
             # Lookup endpoints - various scenarios
@@ -160,7 +158,7 @@ class PerformanceBenchmark:
         
         return results
     
-    def generate_report(self, results: List[tuple[str, BenchmarkResult]]) -> None:
+    def generate_report(self, results: list[tuple[str, BenchmarkResult]]) -> None:
         """Generate performance report."""
         self.console.print("\n[bold cyan]Performance Benchmark Report[/bold cyan]\n")
         
@@ -239,7 +237,7 @@ class PerformanceBenchmark:
             self.console.print(f"  • Overall P95 response time: {overall_p95:.1f}ms")
             self.console.print(f"  • Total requests: {len(all_times)}")
     
-    def save_results(self, results: List[tuple[str, BenchmarkResult]], filename: str = "benchmark_results.json") -> None:
+    def save_results(self, results: list[tuple[str, BenchmarkResult]], filename: str = "benchmark_results.json") -> None:
         """Save benchmark results to JSON file."""
         data = {
             "timestamp": time.time(),

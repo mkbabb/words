@@ -6,7 +6,7 @@ from .http_client import get_cached_http_client
 
 __all__ = [
     "CacheManager",
-    "cached_api_call", 
+    "cached_api_call",
     "cached_computation",
     "get_cached_http_client",
 ]

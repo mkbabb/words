@@ -71,9 +71,7 @@ class MongoDBStorage:
 
         try:
             # Use Beanie's upsert functionality
-            existing = await DictionaryEntry.find_one(
-                DictionaryEntry.word == entry.word
-            )
+            existing = await DictionaryEntry.find_one(DictionaryEntry.word == entry.word)
 
             if existing:
                 # Update existing entry
@@ -151,9 +149,7 @@ async def get_synthesized_entry(word: str) -> SynthesizedDictionaryEntry | None:
     """Get synthesized dictionary entry by word."""
     try:
         await _ensure_initialized()
-        return await SynthesizedDictionaryEntry.find_one(
-            SynthesizedDictionaryEntry.word == word
-        )
+        return await SynthesizedDictionaryEntry.find_one(SynthesizedDictionaryEntry.word == word)
     except Exception:
         return None
 

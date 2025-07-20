@@ -5,15 +5,33 @@ from __future__ import annotations
 import time
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from ...ai.factory import get_openai_connector
 from ...caching.decorators import cached_api_call
 from ...utils.logging import get_logger
-from ..models.requests import SuggestionsParams
-from ..models.responses import SuggestionsAPIResponse
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+class SuggestionsParams(BaseModel):
+    """Parameters for suggestions endpoint."""
+
+    words: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=10,
+        description="Input words to base suggestions on",
+    )
+    count: int = Field(default=10, ge=4, le=12, description="Number of suggestions to generate")
+
+
+class SuggestionsAPIResponse(BaseModel):
+    """Response for suggestions query."""
+
+    words: list[str] = Field(default_factory=list, description="Suggested words")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in suggestions")
 
 
 def parse_suggestions_params_get(
@@ -33,28 +51,32 @@ def parse_suggestions_params_post(
 
 @cached_api_call(
     ttl_hours=24.0,  # Suggestions are relatively stable
-    key_func=lambda params: ("api_suggestions", tuple(sorted(params.words)) if params.words else None, params.count),
+    key_func=lambda params: (
+        "api_suggestions",
+        tuple(sorted(params.words)) if params.words else None,
+        params.count,
+    ),
 )
 async def _cached_suggestions(params: SuggestionsParams) -> SuggestionsAPIResponse:
     """Cached suggestions implementation."""
     word_count = len(params.words) if params.words else 0
     logger.info(f"Generating suggestions based on {word_count} words")
-    
+
     try:
         # Get OpenAI connector singleton
         connector = get_openai_connector()
-        
+
         # Generate suggestions using AI
         ai_response = await connector.suggestions(
             input_words=params.words,
             count=params.count,
         )
-        
+
         return SuggestionsAPIResponse(
             words=[suggestion.word.lower() for suggestion in ai_response.suggestions],
             confidence=ai_response.confidence,
         )
-        
+
     except Exception as e:
         logger.error(f"Failed to generate suggestions: {e}")
         raise
@@ -78,48 +100,48 @@ async def get_suggestions_post(
 
 async def _handle_suggestions_request(params: SuggestionsParams) -> SuggestionsAPIResponse:
     """Handle suggestions request logic for both GET and POST endpoints.
-    
+
     Analyzes the provided words and suggests sophisticated vocabulary
     that builds upon demonstrated interests and complexity levels. Perfect for:
-    
+
     - Vocabulary expansion and intellectual growth
     - Writing enhancement with sophisticated alternatives
     - Language learning and exploration
     - Academic and creative writing improvement
-    
+
     Features:
     - AI-powered semantic analysis of input words
     - Contextually relevant suggestions with explanations
     - Difficulty level indicators for progressive learning
     - Thematic categorization for organized exploration
     - High-quality caching for optimal performance
-    
+
     Args:
         words: List of 1-10 words that represent current vocabulary interests (optional)
         count: Number of suggestions to generate (4-12, default: 10)
-        
+
     Returns:
         Structured response with word suggestions, each including:
         - The suggested word with explanation
-        - Difficulty level (1-5 scale) 
+        - Difficulty level (1-5 scale)
         - Semantic category/theme
         - Reasoning for suggestion relevance
-        
+
     Example:
         POST /api/v1/suggestions
         {
             "words": ["serendipity", "eloquent", "paradigm"],
             "count": 10
         }
-        
+
         Returns sophisticated vocabulary suggestions like "perspicacious",
         "efflorescence", "mellifluous" with detailed explanations.
     """
     start_time = time.perf_counter()
-    
+
     try:
         result = await _cached_suggestions(params)
-        
+
         # Log performance
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
         word_count = len(params.words) if params.words else 0
@@ -128,12 +150,11 @@ async def _handle_suggestions_request(params: SuggestionsParams) -> SuggestionsA
             f"{len(result.words)} suggestions in {elapsed_ms}ms "
             f"(confidence: {result.confidence:.1%})"
         )
-        
+
         return result
-        
+
     except Exception as e:
         logger.error(f"Suggestions failed: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Internal error generating suggestions: {str(e)}"
+            status_code=500, detail=f"Internal error generating suggestions: {str(e)}"
         )

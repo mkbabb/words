@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
 
-from ..api.models.pipeline import PipelineState
+from ..models.pipeline_state import PipelineState
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -16,13 +16,13 @@ logger = get_logger(__name__)
 
 class StateTracker:
     """Tracks pipeline state and provides async event streaming."""
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         """Initialize the state tracker."""
         self._queue: asyncio.Queue[PipelineState] = asyncio.Queue()
         self._current_state: PipelineState | None = None
         self._subscribers: set[asyncio.Queue[PipelineState]] = set()
-    
+
     async def update_state(
         self,
         stage: str,
@@ -42,12 +42,12 @@ class StateTracker:
             is_complete=is_complete,
             error=error,
         )
-        
+
         self._current_state = state
-        
+
         # Put state in main queue
         await self._queue.put(state)
-        
+
         # Notify all subscribers
         for subscriber in self._subscribers:
             try:
@@ -55,7 +55,7 @@ class StateTracker:
                 subscriber.put_nowait(state)
             except asyncio.QueueFull:
                 logger.warning("Subscriber queue full, skipping state update")
-    
+
     async def get_states(self) -> AsyncGenerator[PipelineState, None]:
         """Get state updates as they occur."""
         while True:
@@ -63,7 +63,7 @@ class StateTracker:
             yield state
             if state.is_complete or state.error:
                 break
-    
+
     @asynccontextmanager
     async def subscribe(self) -> AsyncGenerator[asyncio.Queue[PipelineState], None]:
         """Subscribe to state updates with a dedicated queue."""
@@ -73,7 +73,7 @@ class StateTracker:
             yield subscriber_queue
         finally:
             self._subscribers.discard(subscriber_queue)
-    
+
     def reset(self) -> None:
         """Reset the state tracker."""
         self._current_state = None
@@ -85,6 +85,5 @@ class StateTracker:
                 break
 
 
-# Global state tracker instances for different operations
+# Global state tracker instance for lookup operations
 lookup_state_tracker = StateTracker()
-search_state_tracker = StateTracker()

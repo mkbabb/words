@@ -35,9 +35,7 @@ class ReviewData(BaseModel):
     next_review_date: datetime = Field(
         default_factory=datetime.now, description="Next scheduled review"
     )
-    last_review_date: datetime | None = Field(
-        default=None, description="Last review timestamp"
-    )
+    last_review_date: datetime | None = Field(default=None, description="Last review timestamp")
     lapse_count: int = Field(default=0, ge=0, description="Total failure count")
     review_history: list[dict[str, Any]] = Field(
         default_factory=list, description="Review session history"
@@ -60,9 +58,7 @@ class ReviewData(BaseModel):
 
         # Update ease factor
         if quality >= 3:
-            new_ef = (
-                self.ease_factor + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)
-            )
+            new_ef = self.ease_factor + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)
             self.ease_factor = max(1.3, new_ef)
 
         # Calculate next review date
@@ -100,15 +96,11 @@ class WordListItem(BaseModel):
     last_visited: datetime | None = Field(
         default=None, description="Last time word was viewed/studied"
     )
-    added_date: datetime = Field(
-        default_factory=datetime.now, description="When added to list"
-    )
+    added_date: datetime = Field(default_factory=datetime.now, description="When added to list")
     created_at: datetime = Field(
         default_factory=datetime.now, description="First occurrence timestamp"
     )
-    updated_at: datetime = Field(
-        default_factory=datetime.now, description="Last update timestamp"
-    )
+    updated_at: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
     notes: str = Field(default="", description="User notes about the word")
     tags: list[str] = Field(default_factory=list, description="User-defined tags")
 
@@ -142,16 +134,10 @@ class LearningStats(BaseModel):
 
     total_reviews: int = Field(default=0, ge=0, description="Total review sessions")
     words_mastered: int = Field(default=0, ge=0, description="Words at gold level")
-    average_ease_factor: float = Field(
-        default=2.5, ge=1.3, description="Average difficulty"
-    )
-    retention_rate: float = Field(
-        default=0.0, ge=0.0, le=1.0, description="Success rate"
-    )
+    average_ease_factor: float = Field(default=2.5, ge=1.3, description="Average difficulty")
+    retention_rate: float = Field(default=0.0, ge=0.0, le=1.0, description="Success rate")
     streak_days: int = Field(default=0, ge=0, description="Consecutive study days")
-    last_study_date: datetime | None = Field(
-        default=None, description="Last study session"
-    )
+    last_study_date: datetime | None = Field(default=None, description="Last study session")
     study_time_minutes: int = Field(default=0, ge=0, description="Total study time")
 
 
@@ -161,29 +147,17 @@ class WordList(Document):
     name: str = Field(..., description="Human-readable list name")
     description: str = Field(default="", description="List description/purpose")
     hash_id: str = Field(..., description="Content-based hash identifier")
-    words: list[WordListItem] = Field(
-        default_factory=list, description="Words with learning data"
-    )
+    words: list[WordListItem] = Field(default_factory=list, description="Words with learning data")
     total_words: int = Field(default=0, ge=0, description="Total word count")
     unique_words: int = Field(default=0, ge=0, description="Unique word count")
     learning_stats: LearningStats = Field(
         default_factory=LearningStats, description="Aggregated learning statistics"
     )
-    last_accessed: datetime | None = Field(
-        default=None, description="Last time list was accessed"
-    )
-    created_at: datetime = Field(
-        default_factory=datetime.now, description="Creation timestamp"
-    )
-    updated_at: datetime = Field(
-        default_factory=datetime.now, description="Last update timestamp"
-    )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
-    )
-    tags: list[str] = Field(
-        default_factory=list, description="List categorization tags"
-    )
+    last_accessed: datetime | None = Field(default=None, description="Last time list was accessed")
+    created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
+    updated_at: datetime = Field(default_factory=datetime.now, description="Last update timestamp")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    tags: list[str] = Field(default_factory=list, description="List categorization tags")
     is_public: bool = Field(default=False, description="Public visibility flag")
     owner_id: str | None = Field(default=None, description="Owner user ID")
 
@@ -234,15 +208,11 @@ class WordList(Document):
 
         # Update learning statistics
         if self.words:
-            mastered = sum(
-                1 for w in self.words if w.mastery_level == MasteryLevel.GOLD
-            )
+            mastered = sum(1 for w in self.words if w.mastery_level == MasteryLevel.GOLD)
             self.learning_stats.words_mastered = mastered
 
             ease_factors = [w.review_data.ease_factor for w in self.words]
-            self.learning_stats.average_ease_factor = sum(ease_factors) / len(
-                ease_factors
-            )
+            self.learning_stats.average_ease_factor = sum(ease_factors) / len(ease_factors)
 
             total_reviews = sum(w.review_data.repetitions for w in self.words)
             total_lapses = sum(w.review_data.lapse_count for w in self.words)

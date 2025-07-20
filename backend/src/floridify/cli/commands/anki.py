@@ -43,9 +43,7 @@ def anki_command() -> None:
     default=["best_describes", "fill_in_blank"],
     help="Types of flashcards to generate",
 )
-@click.option(
-    "--max-cards", "-m", type=int, default=1, help="Maximum cards per type per word"
-)
+@click.option("--max-cards", "-m", type=int, default=1, help="Maximum cards per type per word")
 @click.option("--deck-name", "-d", help="Anki deck name (defaults to word list name)")
 @click.option(
     "--direct/--no-direct",
@@ -116,9 +114,7 @@ async def _export_async(
     word_list = await WordList.find_one(WordList.name == word_list_name)
     if not word_list:
         console.print(f"[red]Error:[/red] Word list '{word_list_name}' not found")
-        console.print(
-            "Use '[cyan]floridify word-list list[/cyan]' to see available word lists"
-        )
+        console.print("Use '[cyan]floridify word-list list[/cyan]' to see available word lists")
         return
 
     # Validate card types
@@ -152,31 +148,33 @@ async def _export_async(
         console.print("🔍 Normalizing words and building frequency map...")
         from ...core.search_pipeline import get_search_engine
         from ...utils.text_utils import normalize_word
-        
+
         search_engine = await get_search_engine(
             languages=[Language.ENGLISH],
             enable_semantic=False,
         )
-        
+
         word_frequency_map: dict[str, int] = {}
         original_word_map: dict[str, str] = {}  # normalized -> first original word seen
-        
+
         for word_freq in word_list.words:
             word_text = word_freq.text
             normalized = normalize_word(word_text)
-            
+
             # Try to get the canonical form from search engine
             search_results = await search_engine.search(normalized, max_results=1)
             canonical_word = search_results[0].word if search_results else normalized
-            
+
             if canonical_word not in word_frequency_map:
                 word_frequency_map[canonical_word] = 0
                 original_word_map[canonical_word] = word_text
-            
+
             word_frequency_map[canonical_word] += word_freq.frequency
 
         unique_words = list(word_frequency_map.keys())
-        console.print(f"📊 Found {len(unique_words)} unique words after normalization (from {word_list.unique_words} original)")
+        console.print(
+            f"📊 Found {len(unique_words)} unique words after normalization (from {word_list.unique_words} original)"
+        )
 
         all_cards = []
 
@@ -185,15 +183,14 @@ async def _export_async(
             TextColumn("[progress.description]{task.description}"),
             console=console,
         ) as progress:
-
             # Process each unique word
-            task = progress.add_task(
-                "Generating flashcards...", total=len(unique_words)
-            )
+            task = progress.add_task("Generating flashcards...", total=len(unique_words))
 
             for canonical_word in unique_words:
                 frequency = word_frequency_map[canonical_word]
-                progress.update(task, description=f"Processing '{canonical_word}' (freq: {frequency})")
+                progress.update(
+                    task, description=f"Processing '{canonical_word}' (freq: {frequency})"
+                )
 
                 # Look up word to get dictionary entry using lookup pipeline
                 try:
@@ -227,9 +224,7 @@ async def _export_async(
 
                 except Exception as e:
                     logger.error(f"Error processing word '{canonical_word}': {e}")
-                    console.print(
-                        f"  [red]Error:[/red] Failed to process '{canonical_word}': {e}"
-                    )
+                    console.print(f"  [red]Error:[/red] Failed to process '{canonical_word}': {e}")
 
                 progress.advance(task)
 
@@ -257,9 +252,7 @@ async def _export_async(
                     f"[green]Success![/green] Exported {len(all_cards)} flashcards directly to Anki"
                 )
                 console.print(f"Deck: [blue]{deck_name}[/blue] (available in Anki now)")
-                console.print(
-                    "\\n[dim]💡 Cards are now available in your Anki app![/dim]"
-                )
+                console.print("\\n[dim]💡 Cards are now available in your Anki app![/dim]")
             elif success and apkg_path:
                 # .apkg file was imported directly into Anki
                 console.print(
@@ -270,14 +263,10 @@ async def _export_async(
                 console.print(f"Preview: {apkg_path.with_suffix('.html')}")
             elif apkg_path:
                 # Only .apkg file created
-                console.print(
-                    f"[yellow]Created .apkg file[/yellow] ({len(all_cards)} flashcards)"
-                )
+                console.print(f"[yellow]Created .apkg file[/yellow] ({len(all_cards)} flashcards)")
                 console.print(f"Deck file: {apkg_path}")
                 console.print(f"Preview: {apkg_path.with_suffix('.html')}")
-                console.print(
-                    "\\nImport the .apkg file into Anki to use the flashcards."
-                )
+                console.print("\\nImport the .apkg file into Anki to use the flashcards.")
             else:
                 console.print("[red]Error:[/red] Failed to export flashcards")
         else:
@@ -285,14 +274,10 @@ async def _export_async(
             apkg_path = card_generator.export_to_apkg(all_cards, deck_name, output_path)
 
             if apkg_path:
-                console.print(
-                    f"[green]Success![/green] Exported {len(all_cards)} flashcards"
-                )
+                console.print(f"[green]Success![/green] Exported {len(all_cards)} flashcards")
                 console.print(f"Deck file: {apkg_path}")
                 console.print(f"Preview: {apkg_path.with_suffix('.html')}")
-                console.print(
-                    "\\nImport the .apkg file into Anki to use the flashcards."
-                )
+                console.print("\\nImport the .apkg file into Anki to use the flashcards.")
             else:
                 console.print("[red]Error:[/red] Failed to export flashcards")
 
@@ -332,9 +317,7 @@ def status() -> None:
                     console.print(f"  ... and {len(deck_names) - 5} more")
 
         except Exception as e:
-            console.print(
-                f"[yellow]⚠️ AnkiConnect responding but with errors:[/yellow] {e}"
-            )
+            console.print(f"[yellow]⚠️ AnkiConnect responding but with errors:[/yellow] {e}")
     else:
         console.print("[red]❌ AnkiConnect not available[/red]")
         console.print("\\n[dim]To enable direct Anki export:[/dim]")

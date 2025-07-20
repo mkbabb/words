@@ -46,13 +46,13 @@ def clean_markdown(text: str) -> str:
         Clean text with markdown formatting removed
     """
     # Remove bold formatting
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
     # Remove italic formatting
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r"\*(.*?)\*", r"\1", text)
     # Remove code formatting
-    text = re.sub(r'`(.*?)`', r'\1', text)
+    text = re.sub(r"`(.*?)`", r"\1", text)
     # Remove links, keep link text
-    text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)
+    text = re.sub(r"\[(.*?)\]\(.*?\)", r"\1", text)
     return text
 
 
@@ -77,8 +77,8 @@ def ensure_sentence_case(text: str) -> str:
     text = text[0].upper() + text[1:] if len(text) > 1 else text.upper()
 
     # Ensure ends with period if it doesn't end with punctuation
-    if not text.endswith(('.', '!', '?', ':', ';')):
-        text += '.'
+    if not text.endswith((".", "!", "?", ":", ";")):
+        text += "."
 
     return text
 

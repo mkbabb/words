@@ -14,7 +14,7 @@ class SearchMethod(Enum):
     """Available search methods with performance characteristics."""
 
     EXACT = "exact"  # Fastest: ~0.001ms - exact string matching
-    PREFIX = "prefix"  # Fast: ~0.001ms - prefix/autocomplete matching  
+    PREFIX = "prefix"  # Fast: ~0.001ms - prefix/autocomplete matching
     FUZZY = "fuzzy"  # Fast: ~0.01ms - typo tolerance, abbreviations
     SEMANTIC = "semantic"  # Slower: ~0.1ms - meaning-based similarity
     AUTO = "auto"  # Automatic method selection based on query
@@ -23,9 +23,9 @@ class SearchMethod(Enum):
 class EmbeddingLevel(Enum):
     """
     Different embedding levels for semantic search operations.
-    
+
     - CHAR: Character-level embeddings (64D) for morphological similarity
-    - SUBWORD: Subword-level embeddings (128D) for decomposition  
+    - SUBWORD: Subword-level embeddings (128D) for decomposition
     - WORD: Word-level embeddings (384D) for semantic relationships
     """
 
@@ -48,7 +48,7 @@ class FuzzySearchMethod(Enum):
 class LexiconFormat(Enum):
     """
     Data formats supported for lexicon sources.
-    
+
     These formats define how lexicon data is structured and should be parsed.
     """
 

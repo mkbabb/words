@@ -13,10 +13,10 @@ import pickle
 from pathlib import Path
 from typing import Any
 
-import faiss
+import faiss  # type: ignore[import-untyped]
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import-untyped]
+from sklearn.metrics.pairwise import cosine_similarity  # type: ignore[import-untyped]
 
 from ..utils.logging import get_logger
 from .constants import EmbeddingLevel
@@ -88,10 +88,10 @@ class SemanticSearch:
 
         # Check if vocabulary has changed to avoid unnecessary rebuilding
         vocab_hash = hash(tuple(vocabulary))
-        if hasattr(self, '_vocab_hash') and self._vocab_hash == vocab_hash:
+        if hasattr(self, "_vocab_hash") and self._vocab_hash == vocab_hash:
             logger.debug("Vocabulary unchanged, skipping rebuild")
             return
-            
+
         self.vocabulary = vocabulary
         self.word_to_id = {word: i for i, word in enumerate(vocabulary)}
         self._vocab_hash: int = vocab_hash
@@ -114,9 +114,7 @@ class SemanticSearch:
         logger.debug(f"Building embeddings for {len(self.vocabulary)} words")
 
         # Run embedding generation in executor to avoid blocking
-        await asyncio.get_event_loop().run_in_executor(
-            None, self._build_embeddings_sync
-        )
+        await asyncio.get_event_loop().run_in_executor(None, self._build_embeddings_sync)
 
         # Build FAISS indices
         await self._build_faiss_indices()
@@ -136,9 +134,7 @@ class SemanticSearch:
             lowercase=True,
             strip_accents="unicode",
         )
-        self.char_embeddings = self.char_vectorizer.fit_transform(
-            self.vocabulary
-        ).toarray()
+        self.char_embeddings = self.char_vectorizer.fit_transform(self.vocabulary).toarray()
 
         # Subword-level embeddings (decomposition)
         logger.debug("Building subword-level embeddings")
@@ -150,9 +146,7 @@ class SemanticSearch:
             lowercase=True,
             strip_accents="unicode",
         )
-        self.subword_embeddings = self.subword_vectorizer.fit_transform(
-            subword_texts
-        ).toarray()
+        self.subword_embeddings = self.subword_vectorizer.fit_transform(subword_texts).toarray()
 
         # Word-level embeddings (semantic meaning)
         logger.debug("Building word-level embeddings")
@@ -217,9 +211,7 @@ class SemanticSearch:
         if self.char_embeddings is not None:
             logger.debug("Building character-level FAISS index")
 
-            self.char_index = faiss.IndexFlatIP(
-                self.char_embeddings.shape[1]
-            )  # Inner product
+            self.char_index = faiss.IndexFlatIP(self.char_embeddings.shape[1])  # Inner product
             # Normalize embeddings for cosine similarity (with safety check)
             norms = np.linalg.norm(self.char_embeddings, axis=1, keepdims=True)
             norms = np.where(norms == 0, 1, norms)  # Avoid division by zero
@@ -259,13 +251,11 @@ class SemanticSearch:
             "metadata": self.vector_dir / f"metadata_{vocab_hash}.pkl",
             # Vectorizer paths
             "char_vectorizer": self.vector_dir / f"char_vectorizer_{vocab_hash}.pkl",
-            "subword_vectorizer": self.vector_dir
-            / f"subword_vectorizer_{vocab_hash}.pkl",
+            "subword_vectorizer": self.vector_dir / f"subword_vectorizer_{vocab_hash}.pkl",
             "word_vectorizer": self.vector_dir / f"word_vectorizer_{vocab_hash}.pkl",
             # Embedding paths
             "char_embeddings": self.vector_dir / f"char_embeddings_{vocab_hash}.npy",
-            "subword_embeddings": self.vector_dir
-            / f"subword_embeddings_{vocab_hash}.npy",
+            "subword_embeddings": self.vector_dir / f"subword_embeddings_{vocab_hash}.npy",
             "word_embeddings": self.vector_dir / f"word_embeddings_{vocab_hash}.npy",
             # Index paths
             "char_index": self.vector_dir / f"char_index_{vocab_hash}.faiss",
@@ -404,9 +394,7 @@ class SemanticSearch:
         except Exception as e:
             logger.error(f"Failed to save to cache: {e}")
 
-    async def search(
-        self, query: str, max_results: int = 20
-    ) -> list[tuple[str, float]]:
+    async def search(self, query: str, max_results: int = 20) -> list[tuple[str, float]]:
         """
         Perform semantic similarity search.
 
@@ -498,9 +486,7 @@ class SemanticSearch:
         if level == EmbeddingLevel.CHAR and self.char_index:
             return await self._search_faiss(query_vector, self.char_index, max_results)
         elif level == EmbeddingLevel.SUBWORD and self.subword_index:
-            return await self._search_faiss(
-                query_vector, self.subword_index, max_results
-            )
+            return await self._search_faiss(query_vector, self.subword_index, max_results)
         elif level == EmbeddingLevel.WORD and self.word_index:
             return await self._search_faiss(query_vector, self.word_index, max_results)
         else:
@@ -518,9 +504,7 @@ class SemanticSearch:
         query_norm = query_norm.reshape(1, -1).astype(np.float32)
 
         # Search
-        scores, indices = index.search(
-            query_norm, min(max_results, len(self.vocabulary))
-        )
+        scores, indices = index.search(query_norm, min(max_results, len(self.vocabulary)))
 
         # Convert to results
         results = []
@@ -547,9 +531,7 @@ class SemanticSearch:
                 "vocabulary_coverage": self.char_embeddings.shape[0],
                 "ngram_range": self.char_ngram_range,
             }
-            stats["memory_usage"]["char_embeddings_mb"] = (
-                self.char_embeddings.nbytes / 1024 / 1024
-            )
+            stats["memory_usage"]["char_embeddings_mb"] = self.char_embeddings.nbytes / 1024 / 1024
 
         if self.char_index is not None:
             stats["index_size"]["char_index"] = self.char_index.ntotal
@@ -575,9 +557,7 @@ class SemanticSearch:
                 "vocabulary_coverage": self.word_embeddings.shape[0],
                 "ngram_range": (1, 2),
             }
-            stats["memory_usage"]["word_embeddings_mb"] = (
-                self.word_embeddings.nbytes / 1024 / 1024
-            )
+            stats["memory_usage"]["word_embeddings_mb"] = self.word_embeddings.nbytes / 1024 / 1024
 
         if self.word_index is not None:
             stats["index_size"]["word_index"] = self.word_index.ntotal

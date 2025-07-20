@@ -1,332 +1,203 @@
-"""Search and discovery commands for the new unified search engine."""
+"""Search commands for CLI with proper SearchEngine integration."""
 
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
-from typing import Any
 
 import click
 from rich.console import Console
+from rich.table import Table
 
 from ...constants import Language
-from ...search import SearchEngine, SearchResult
-from ...search.constants import SearchMethod
-from ..utils.formatting import (
-    format_error,
-    format_performance_table,
-    format_search_results_table,
-    format_statistics_table,
-)
+from ...core.search_pipeline import get_search_engine, search_word_pipeline
+from ...utils.logging import get_logger
+from ..utils.formatting import format_error, format_warning
 
 console = Console()
-
-# Global search engine instance
-_search_engine: SearchEngine | None = None
-
-
-async def get_search_engine(languages: list[Language] | None = None) -> SearchEngine:
-    """Get or create the global search engine instance."""
-    global _search_engine
-
-    if _search_engine is None:
-        # Initialize search engine with specified or default languages
-        if languages is None:
-            languages = [Language.ENGLISH]
-
-        cache_dir = Path("data/search")
-        _search_engine = SearchEngine(
-            cache_dir=cache_dir,
-            languages=languages,
-            min_score=0.6,
-            enable_semantic=False,
-        )
-        await _search_engine.initialize()
-
-    return _search_engine
+logger = get_logger(__name__)
 
 
 @click.group()
 def search_group() -> None:
-    """🔎 Search for words using exact, fuzzy, and semantic matching."""
+    """🔎 Search functionality - find words across lexicons."""
     pass
 
 
 @search_group.command("word")
 @click.argument("query")
-@click.option("--max-results", "-n", default=20, help="Maximum number of results")
-@click.option(
-    "--min-score", "-s", default=None, type=float, help="Minimum match score (0.0-1.0)"
-)
-@click.option(
-    "--method",
-    "-m",
-    type=click.Choice(["exact", "prefix", "fuzzy", "semantic", "hybrid"]),
-    default="hybrid",
-    help="Search method to use",
-)
 @click.option(
     "--language",
-    "-l",
-    multiple=True,
     type=click.Choice([lang.value for lang in Language], case_sensitive=False),
+    multiple=True,
     default=[Language.ENGLISH.value],
-    help="Languages to search",
+    help="Lexicon languages to search",
 )
-def search_word(
-    query: str,
-    max_results: int,
-    min_score: float | None,
-    method: str,
-    language: tuple[str, ...],
-) -> None:
-    """Search for words and phrases in the lexicon.
+@click.option(
+    "--semantic",
+    is_flag=True,
+    help="Use semantic search for contextual matches",
+)
+@click.option(
+    "--max-results",
+    type=int,
+    default=20,
+    help="Maximum number of results to show",
+)
+def search_word(query: str, language: tuple[str, ...], semantic: bool, max_results: int) -> None:
+    """Search for words in lexicons.
 
     QUERY: The word or phrase to search for
     """
-    asyncio.run(_search_word_async(query, max_results, min_score, method, language))
+    asyncio.run(_search_word_async(query, language, semantic, max_results))
 
 
-async def _search_word_async(
-    query: str,
-    max_results: int,
-    min_score: float | None,
-    method: str,
-    language: tuple[str, ...],
-) -> None:
-    """Async implementation of word search."""
-    try:
-        # Convert language strings to enum
-        languages = (
-            [Language(lang) for lang in language] if language else [Language.ENGLISH]
-        )
+@search_group.command("similar")
+@click.argument("word")
+@click.option(
+    "--language",
+    type=click.Choice([lang.value for lang in Language], case_sensitive=False),
+    multiple=True,
+    default=[Language.ENGLISH.value],
+    help="Lexicon languages to search",
+)
+@click.option(
+    "--max-results",
+    type=int,
+    default=10,
+    help="Maximum number of similar words to show",
+)
+def search_similar(word: str, language: tuple[str, ...], max_results: int) -> None:
+    """Find words similar to the given word using semantic search.
 
-        # Get search engine
-        search_engine = await get_search_engine(languages)
-
-        # Convert string method to SearchMethod enum
-        method_map = {
-            "exact": SearchMethod.EXACT,
-            "prefix": SearchMethod.PREFIX,
-            "fuzzy": SearchMethod.FUZZY,
-            "semantic": SearchMethod.SEMANTIC,
-            "hybrid": SearchMethod.AUTO,
-        }
-        search_method = method_map.get(method, SearchMethod.AUTO)
-
-        # Perform search
-        with console.status(f"[bold blue]Searching for '{query}'..."):
-            results = await search_engine.search(
-                query=query,
-                max_results=max_results,
-                min_score=min_score,
-                methods=[search_method],
-            )
-
-        # Display results
-        if results:
-            _display_search_results(query, results)
-
-            # Show performance stats
-            stats = search_engine.get_search_stats()
-            _display_performance_stats(stats)
-        else:
-            console.print(
-                format_error(
-                    f"No results found for '{query}'",
-                    "Try using a different query, lowering the minimum score, "
-                    "or using a different search method.",
-                )
-            )
-
-    except Exception as e:
-        console.print(format_error(f"Search failed: {e}"))
+    WORD: The word to find similar words for
+    """
+    asyncio.run(_search_similar_async(word, language, max_results))
 
 
 @search_group.command("stats")
-def search_stats() -> None:
-    """Show search engine statistics and performance metrics."""
-    asyncio.run(_search_stats_async())
+@click.option(
+    "--language",
+    type=click.Choice([lang.value for lang in Language], case_sensitive=False),
+    multiple=True,
+    default=[Language.ENGLISH.value],
+    help="Lexicon languages to show stats for",
+)
+def search_stats(language: tuple[str, ...]) -> None:
+    """Show search engine statistics."""
+    asyncio.run(_search_stats_async(language))
 
 
-async def _search_stats_async() -> None:
-    """Display search engine statistics."""
+async def _search_word_async(
+    query: str, language: tuple[str, ...], semantic: bool, max_results: int
+) -> None:
+    """Async implementation of word search."""
+    logger.info(f"Searching for: '{query}' (semantic: {semantic})")
+
     try:
-        search_engine = await get_search_engine()
+        # Convert to enums
+        languages = [Language(lang) for lang in language]
 
-        # Get lexicon statistics
-        if search_engine.lexicon_loader:
-            lexicon_stats = search_engine.lexicon_loader.get_statistics()
-            _display_lexicon_stats(lexicon_stats)
+        # Perform search using the pipeline
+        results = await search_word_pipeline(
+            word=query,
+            languages=languages,
+            semantic=semantic,
+            max_results=max_results,
+        )
 
-        # Get search performance statistics
-        search_stats = search_engine.get_search_stats()
-        _display_performance_stats(search_stats)
+        if results:
+            # Create a rich table for results
+            table = Table(title=f"Search Results for '{query}'")
+            table.add_column("Word", style="cyan")
+            table.add_column("Score", style="green")
+            table.add_column("Method", style="yellow")
+            table.add_column("Type", style="blue")
 
-        # Get component statistics
-        if search_engine.trie_search:
-            trie_stats = search_engine.trie_search.get_statistics()
-            _display_trie_stats(trie_stats)
+            for result in results:
+                word_type = "phrase" if result.is_phrase else "word"
+                table.add_row(result.word, f"{result.score:.3f}", result.method.value, word_type)
 
-        if search_engine.semantic_search:
-            semantic_stats = search_engine.semantic_search.get_statistics()
-            _display_semantic_stats(semantic_stats)
+            console.print(table)
+            console.print(f"\n✅ Found {len(results)} result(s)")
+        else:
+            console.print(format_warning(f"No results found for '{query}'"))
+            if not semantic:
+                console.print("💡 Try using --semantic for broader matches")
 
     except Exception as e:
-        console.print(format_error(f"Failed to get statistics: {e}"))
+        logger.error(f"Search failed: {e}")
+        console.print(format_error(f"Search failed: {e}"))
 
 
-def _display_search_results(query: str, results: list[SearchResult]) -> None:
-    """Display search results in a formatted table."""
-    table = format_search_results_table(query, results)
-    console.print(table)
-    console.print(f"\n[dim]Found {len(results)} results[/dim]")
+async def _search_similar_async(word: str, language: tuple[str, ...], max_results: int) -> None:
+    """Async implementation of similar word search."""
+    logger.info(f"Finding similar words for: '{word}'")
+
+    try:
+        # Convert to enums
+        languages = [Language(lang) for lang in language]
+
+        # Use semantic search to find similar words
+        results = await search_word_pipeline(
+            word=word,
+            languages=languages,
+            semantic=True,
+            max_results=max_results + 1,  # +1 to account for the original word
+        )
+
+        # Filter out the original word
+        filtered_results = [result for result in results if result.word.lower() != word.lower()][
+            :max_results
+        ]
+
+        if filtered_results:
+            # Create a rich table for similar words
+            table = Table(title=f"Words Similar to '{word}'")
+            table.add_column("Word", style="cyan")
+            table.add_column("Similarity", style="green")
+            table.add_column("Type", style="blue")
+
+            for result in filtered_results:
+                word_type = "phrase" if result.is_phrase else "word"
+                table.add_row(result.word, f"{result.score:.3f}", word_type)
+
+            console.print(table)
+            console.print(f"\n✅ Found {len(filtered_results)} similar word(s)")
+        else:
+            console.print(format_warning(f"No similar words found for '{word}'"))
+
+    except Exception as e:
+        logger.error(f"Similar word search failed: {e}")
+        console.print(format_error(f"Similar word search failed: {e}"))
 
 
-def _display_performance_stats(stats: dict[str, dict[str, Any]]) -> None:
-    """Display search performance statistics."""
-    table = format_performance_table(stats)
-    if table:
+async def _search_stats_async(language: tuple[str, ...]) -> None:
+    """Async implementation of search stats."""
+    logger.info("Getting search engine statistics")
+
+    try:
+        # Convert to enums
+        languages = [Language(lang) for lang in language]
+
+        # Get search engine instance
+        search_engine = await get_search_engine(languages=languages)
+
+        # Get stats from the search engine
+        stats = search_engine.get_stats()
+
+        # Create a rich table for stats
+        table = Table(title="Search Engine Statistics")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
+
+        table.add_row("Languages", ", ".join(lang.value for lang in languages))
+        table.add_row("Total Vocabulary", str(stats.get("vocabulary_size", "unknown")))
+        table.add_row("Words", str(stats.get("words", "unknown")))
+        table.add_row("Phrases", str(stats.get("phrases", "unknown")))
+        table.add_row("Min Score Threshold", str(stats.get("min_score", "unknown")))
+
         console.print(table)
 
-
-def _display_lexicon_stats(stats: dict[str, Any]) -> None:
-    """Display lexicon loading statistics."""
-    # Flatten the stats for general table formatting
-    display_stats = {
-        "Total Words": stats['total_words'],
-        "Total Phrases": stats['total_phrases'],
-    }
-    
-    # Add per-language breakdown
-    for lang, lang_stats in stats.get("languages", {}).items():
-        display_stats[f"Words ({lang.upper()})"] = lang_stats['words']
-        display_stats[f"Phrases ({lang.upper()})"] = lang_stats['phrases']
-    
-    table = format_statistics_table("Lexicon Statistics", display_stats)
-    console.print(table)
-
-
-def _display_trie_stats(stats: dict[str, Any]) -> None:
-    """Display trie search statistics."""
-    # Prepare stats for display
-    display_stats = {
-        "Indexed Words": stats['word_count'],
-        "Memory Nodes": stats['memory_nodes'],
-        "Average Depth": f"{stats['average_depth']:.1f}",
-        "Max Frequency": stats['max_frequency'],
-    }
-    
-    table = format_statistics_table("Trie Index Statistics", display_stats)
-    console.print(table)
-
-
-def _display_semantic_stats(stats: dict[str, Any]) -> None:
-    """Display semantic search statistics."""
-    # Prepare stats for display
-    display_stats = {
-        "Vocabulary Size": stats['vocabulary_size'],
-        "FAISS Available": "Yes" if stats["has_faiss"] else "No",
-        "Scikit-learn Available": "Yes" if stats["has_sklearn"] else "No",
-    }
-    
-    # Add embedding levels
-    for level, level_stats in stats.get("embedding_levels", {}).items():
-        display_stats[f"{level.title()} Embeddings"] = f"{level_stats['features']}D"
-    
-    table = format_statistics_table("Semantic Search Statistics", display_stats)
-    console.print(table)
-
-
-@search_group.command("init")
-@click.option(
-    "--cache-dir", default="./data/search/", help="Cache directory for search index"
-)
-@click.option(
-    "--languages",
-    "-l",
-    multiple=True,
-    type=click.Choice([lang.value for lang in Language]),
-    default=[Language.ENGLISH.value, Language.FRENCH.value],
-    help="Languages to initialize",
-)
-@click.option(
-    "--enable-semantic/--no-semantic", default=False, help="Enable semantic search"
-)
-@click.option("--force", "-f", is_flag=True, help="Force rebuild of existing index")
-def search_init(
-    cache_dir: str, languages: tuple[str, ...], enable_semantic: bool, force: bool
-) -> None:
-    """Initialize the search engine index with lexical data.
-
-    This command builds the search index by downloading lexical sources,
-    creating trie structures, and initializing semantic embeddings.
-    """
-    asyncio.run(_search_init_async(cache_dir, languages, enable_semantic, force))
-
-
-async def _search_init_async(
-    cache_dir: str, languages: tuple[str, ...], enable_semantic: bool, force: bool
-) -> None:
-    """Initialize search engine index."""
-    from pathlib import Path
-
-    try:
-        # Convert language strings to Language enums
-        selected_languages = [Language(lang) for lang in languages]
-
-        console.print("[bold blue]🚀 Initializing search index...[/bold blue]")
-        console.print(f"Cache directory: {cache_dir}")
-        console.print(f"Languages: {', '.join(languages)}")
-        semantic_status = 'enabled' if enable_semantic else 'disabled'
-        console.print(f"Semantic search: {semantic_status}")
-
-        # Check if index already exists
-        cache_path = Path(cache_dir)
-        if cache_path.exists() and not force:
-            existing_files = list(cache_path.glob("*.pkl"))
-            if existing_files:
-                console.print(
-                    f"[yellow]⚠️  Index already exists with {len(existing_files)} "
-                    "cache files.[/yellow]"
-                )
-                console.print(
-                    "Use --force to rebuild, or run without --force to use existing index."
-                )
-                return
-
-        # Initialize search engine
-        search_engine = SearchEngine(
-            cache_dir=cache_path,
-            languages=selected_languages,
-            enable_semantic=enable_semantic,
-            force_rebuild=force,
-        )
-
-        with console.status("[bold blue]Building search index..."):
-            await search_engine.initialize()
-
-        # Display statistics
-        console.print(
-            "\n[bold green]✅ Search index initialized successfully![/bold green]"
-        )
-
-        # Show index statistics
-        if search_engine.lexicon_loader:
-            lexicon_stats = search_engine.lexicon_loader.get_statistics()
-            _display_lexicon_stats(lexicon_stats)
-
-        if search_engine.trie_search:
-            trie_stats = search_engine.trie_search.get_statistics()
-            _display_trie_stats(trie_stats)
-
-        if search_engine.semantic_search:
-            semantic_stats = search_engine.semantic_search.get_statistics()
-            _display_semantic_stats(semantic_stats)
-
     except Exception as e:
-        console.print(format_error(f"Failed to initialize search index: {e}"))
-
-
-# Register with the main CLI
-search_cmd = search_group
+        logger.error(f"Stats retrieval failed: {e}")
+        console.print(format_error(f"Stats retrieval failed: {e}"))
