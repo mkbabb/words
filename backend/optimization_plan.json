@@ -1,0 +1,55 @@
+{
+  "critical_bottlenecks": [
+    {
+      "component": "Search Engine Initialization",
+      "issue": "1.4+ second cold start time",
+      "impact": "First request extremely slow",
+      "solution": "Implement search engine connection pooling or lazy initialization",
+      "estimated_improvement": "80% reduction in cold start time",
+      "effort": "Medium (2-3 days)"
+    },
+    {
+      "component": "AI Synthesis Pipeline",
+      "issue": "Sequential OpenAI API calls causing long delays",
+      "impact": "2-8 second lookup times",
+      "solution": "Batch OpenAI requests, implement request deduplication",
+      "estimated_improvement": "60% reduction in AI processing time",
+      "effort": "High (1-2 weeks)"
+    }
+  ],
+  "high_impact_optimizations": [
+    {
+      "component": "Response Caching",
+      "solution": "Implement Redis/memory cache for frequent lookups",
+      "estimated_improvement": "90% reduction for repeated queries",
+      "effort": "Low (1-2 days)"
+    },
+    {
+      "component": "Connection Pooling",
+      "solution": "HTTP connection pooling for external dictionary APIs",
+      "estimated_improvement": "30% reduction in provider fetch time",
+      "effort": "Low (1 day)"
+    }
+  ],
+  "medium_impact_optimizations": [
+    {
+      "component": "MongoDB Queries",
+      "solution": "Add compound indexes, optimize connection pool",
+      "estimated_improvement": "20% reduction in database operations",
+      "effort": "Medium (2-3 days)"
+    },
+    {
+      "component": "FAISS Optimization",
+      "solution": "GPU acceleration, index quantization",
+      "estimated_improvement": "50% reduction in semantic search time",
+      "effort": "High (1-2 weeks)"
+    }
+  ],
+  "implementation_priority": [
+    "1. Implement response caching (quick win)",
+    "2. Add connection pooling (quick win)",
+    "3. Optimize search engine initialization",
+    "4. Batch AI requests and implement deduplication",
+    "5. Database and FAISS optimizations"
+  ]
+}

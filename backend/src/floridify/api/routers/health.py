@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from ...caching.cache_manager import get_cache_manager
 from ...constants import Language
 from ...core.search_pipeline import get_search_engine
-from ...storage.mongodb import _ensure_initialized
+from ...storage.mongodb import _ensure_initialized, get_storage
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -28,6 +28,7 @@ class HealthResponse(BaseModel):
     search_engine: str = Field(..., description="Search engine status")
     cache_hit_rate: float = Field(..., ge=0.0, le=1.0, description="Cache hit rate")
     uptime_seconds: int = Field(..., ge=0, description="Service uptime in seconds")
+    connection_pool: dict = Field(default_factory=dict, description="MongoDB connection pool stats")
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -40,13 +41,25 @@ async def health_check() -> HealthResponse:
     - Cache system performance
     - Service uptime
     """
-    # Check database
+    # Check database and get connection pool stats
     database_status = "disconnected"
+    connection_pool_stats = {}
     try:
         await _ensure_initialized()
-        database_status = "connected"
+        storage = await get_storage()
+        
+        # Check connection health
+        if await storage.ensure_healthy_connection():
+            database_status = "connected"
+        else:
+            database_status = "unhealthy"
+            
+        # Get connection pool statistics
+        connection_pool_stats = storage.get_connection_pool_stats()
+        
     except Exception as e:
         logger.warning(f"Database health check failed: {e}")
+        connection_pool_stats = {"status": "error", "error": str(e)}
 
     # Check search engine
     search_status = "uninitialized"
@@ -86,4 +99,5 @@ async def health_check() -> HealthResponse:
         search_engine=search_status,
         cache_hit_rate=cache_hit_rate,
         uptime_seconds=uptime_seconds,
+        connection_pool=connection_pool_stats,
     )

@@ -86,14 +86,14 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
             min_score=params.min_score,
         )
         
-        # Convert to response format
+        # Convert to response format - optimized dictionary creation
         response_items = [
-            SearchResponseItem(
-                word=result.word,
-                score=result.score,
-                method=result.method,
-                is_phrase=result.is_phrase,
-            )
+            {
+                "word": result.word,
+                "score": result.score,
+                "method": result.method,
+                "is_phrase": result.is_phrase,
+            }
             for result in results
         ]
         

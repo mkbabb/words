@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..utils.logging import setup_logging
-from .middleware import LoggingMiddleware
+from .middleware import LoggingMiddleware, CacheHeadersMiddleware
 from .routers import corpus, facts, health, lookup, search, suggestions, synonyms
 
 # Configure logging for the application
@@ -19,15 +19,17 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Add middleware
-app.add_middleware(LoggingMiddleware)
+# Add middleware (order matters - CORS should be outermost)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:8080"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
+    expose_headers=["ETag", "Cache-Control", "X-Process-Time", "X-Request-ID"],
 )
+app.add_middleware(CacheHeadersMiddleware)  # Add cache headers before logging
+app.add_middleware(LoggingMiddleware)
 
 # Include routers
 app.include_router(lookup.router, prefix="/api/v1", tags=["lookup"])

@@ -38,8 +38,24 @@ class MongoDBStorage:
         self._initialized = False
 
     async def connect(self) -> None:
-        """Connect to MongoDB and initialize Beanie."""
-        self.client = AsyncIOMotorClient(self.connection_string)
+        """Connect to MongoDB and initialize Beanie with optimized connection pool."""
+        # Optimized connection pool configuration for production performance
+        self.client = AsyncIOMotorClient(
+            self.connection_string,
+            # Connection Pool Settings
+            maxPoolSize=50,          # Increase max connections for concurrent load
+            minPoolSize=10,          # Maintain warm connections
+            maxIdleTimeMS=30000,     # Close idle connections after 30s
+            
+            # Performance Settings
+            serverSelectionTimeoutMS=3000,  # Fast server selection (3s)
+            socketTimeoutMS=20000,   # Socket timeout (20s)
+            connectTimeoutMS=10000,  # Connection timeout (10s)
+            
+            # Reliability Settings
+            retryWrites=True,        # Enable retry writes for transient failures
+            waitQueueTimeoutMS=5000, # Queue timeout for connection pool
+        )
         database: Any = self.client[self.database_name]
 
         # Initialize Beanie with our document models
@@ -49,6 +65,60 @@ class MongoDBStorage:
         )
 
         self._initialized = True
+        logger.info("MongoDB connection established with optimized pool settings")
+
+    async def ensure_healthy_connection(self) -> bool:
+        """Ensure MongoDB connection is healthy and reconnect if needed.
+        
+        Returns:
+            True if connection is healthy, False otherwise
+        """
+        if not self.client:
+            return False
+            
+        try:
+            # Ping the database to check connection health
+            await self.client.admin.command('ping')
+            return True
+        except Exception as e:
+            logger.warning(f"MongoDB connection unhealthy: {e}")
+            try:
+                await self.reconnect()
+                return True
+            except Exception as reconnect_error:
+                logger.error(f"Failed to reconnect to MongoDB: {reconnect_error}")
+                return False
+
+    async def reconnect(self) -> None:
+        """Reconnect to MongoDB with fresh connection."""
+        logger.info("Reconnecting to MongoDB...")
+        await self.disconnect()
+        await self.connect()
+
+    def get_connection_pool_stats(self) -> dict[str, Any]:
+        """Get connection pool statistics for monitoring.
+        
+        Returns:
+            Dictionary with connection pool statistics
+        """
+        if not self.client:
+            return {"status": "disconnected"}
+            
+        try:
+            pool_options = self.client.options.pool_options
+            return {
+                "status": "connected",
+                "max_pool_size": pool_options.max_pool_size,
+                "min_pool_size": pool_options.min_pool_size,
+                "max_idle_time_ms": pool_options.max_idle_time_ms,
+                "server_selection_timeout_ms": pool_options.server_selection_timeout_ms,
+                "socket_timeout_ms": pool_options.socket_timeout_ms,
+                "connect_timeout_ms": pool_options.connect_timeout_ms,
+                "initialized": self._initialized,
+            }
+        except Exception as e:
+            logger.error(f"Error getting pool stats: {e}")
+            return {"status": "error", "error": str(e)}
 
     async def disconnect(self) -> None:
         """Disconnect from MongoDB."""
@@ -143,6 +213,12 @@ async def _ensure_initialized() -> None:
             await _storage.connect()
         except Exception as e:
             logger.warning(f"MongoDB initialization failed: {e}")
+
+
+async def get_storage() -> MongoDBStorage:
+    """Get the global MongoDB storage instance."""
+    await _ensure_initialized()
+    return _storage
 
 
 async def get_synthesized_entry(word: str) -> SynthesizedDictionaryEntry | None:
