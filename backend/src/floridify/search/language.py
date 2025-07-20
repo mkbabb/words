@@ -58,7 +58,7 @@ class LanguageSearch:
         # Create lexicon adapter
         words = self.lexicon_loader.get_all_words()
         phrases = self.lexicon_loader.get_all_phrases()
-        lexicon = SimpleLexicon(words, phrases)
+        lexicon = SimpleLexicon(words=words, phrases=phrases, languages=self.languages)
 
         # Initialize search engine
         self.search_engine = SearchEngine(lexicon, self.min_score)

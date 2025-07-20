@@ -1,6 +1,6 @@
 <template>
   <TabsList
-    v-bind="props"
+    v-bind="delegatedProps"
     :class="
       cn(
         'transition-smooth relative inline-grid h-12 auto-cols-auto items-center justify-center rounded-xl border border-white/30 bg-white/20 p-1 shadow-lg backdrop-blur-sm dark:border-white/20 dark:bg-white/10',
@@ -20,60 +20,62 @@
 </template>
 
 <script setup lang="ts">
-import { type HTMLAttributes, ref, onMounted, nextTick } from 'vue';
-import { TabsList, type TabsListProps } from 'radix-vue';
-import { cn } from '@/utils';
+import type { HTMLAttributes } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
+import { reactiveOmit } from '@vueuse/core'
+import { TabsList, type TabsListProps } from 'reka-ui'
+import { cn } from '@/utils'
 
-const props = defineProps<
-  TabsListProps & { class?: HTMLAttributes['class'] }
->();
+const props = defineProps<TabsListProps & { class?: HTMLAttributes['class'] }>()
 
-const backgroundSlider = ref<HTMLElement>();
+const delegatedProps = reactiveOmit(props, 'class')
+
+const backgroundSlider = ref<HTMLElement>()
 
 const backgroundStyle = ref({
   width: '0px',
   transform: 'translateX(0px)',
   opacity: '0',
-});
+})
 
 const updateBackground = () => {
   nextTick(() => {
-    if (!backgroundSlider.value) return;
+    if (!backgroundSlider.value) return
 
-    const parentElement = backgroundSlider.value.parentElement;
-    if (!parentElement) return;
+    const parentElement = backgroundSlider.value.parentElement
+    if (!parentElement) return
 
     const activeTab = parentElement.querySelector(
       '[data-state="active"]'
-    ) as HTMLElement;
-    if (!activeTab) return;
+    ) as HTMLElement
+    if (!activeTab) return
 
-    const newWidth = `${activeTab.offsetWidth}px`;
-    const newTransform = `translateX(${activeTab.offsetLeft}px)`;
+    const newWidth = `${activeTab.offsetWidth}px`
+    const newTransform = `translateX(${activeTab.offsetLeft}px)`
 
     backgroundStyle.value = {
       width: newWidth,
       transform: newTransform,
       opacity: '1',
-    };
-  });
-};
+    }
+  })
+}
 
 onMounted(() => {
   // Initial background position
-  updateBackground();
+  updateBackground()
 
   // Watch for tab changes using MutationObserver
   const observer = new MutationObserver(() => {
-    updateBackground();
-  });
+    updateBackground()
+  })
 
   if (backgroundSlider.value?.parentElement) {
     observer.observe(backgroundSlider.value.parentElement, {
       attributes: true,
       attributeFilter: ['data-state'],
       subtree: true,
-    });
+    })
   }
-});
+})
 </script>

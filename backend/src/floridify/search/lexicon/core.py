@@ -30,12 +30,12 @@ class SimpleLexicon:
         self,
         words: list[str],
         phrases: list[str] | None = None,
-        language: Language = Language.ENGLISH,
+        languages: list[Language] = [Language.ENGLISH],
     ) -> None:
         """Initialize with pre-normalized word and phrase lists."""
         self._words = words  # Assume already normalized
         self._phrases = phrases or []
-        self.language = language
+        self.languages = languages
 
     def get_all_words(self) -> list[str]:
         """Return all words (zero-copy)."""

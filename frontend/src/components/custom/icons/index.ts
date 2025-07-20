@@ -1,0 +1,7 @@
+export { default as StarIcon } from './StarIcon.vue'
+export { default as DictionaryIcon } from './DictionaryIcon.vue'
+export { default as FancyF } from './FancyF.vue'
+export { default as FloridifyIcon } from './FloridifyIcon.vue'
+export { default as HamburgerIcon } from './HamburgerIcon.vue'
+export { default as OxfordIcon } from './OxfordIcon.vue'
+export { default as WiktionaryIcon } from './WiktionaryIcon.vue'

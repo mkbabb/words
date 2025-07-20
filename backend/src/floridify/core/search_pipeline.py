@@ -47,8 +47,12 @@ async def get_search_engine(
     target_languages = languages or [Language.ENGLISH]
 
     # Check if we need to recreate
-    if _search_engine is None or _search_engine.languages != target_languages or force_rebuild:
-        _search_engine = await get_language_search(target_languages)
+    if (
+        _search_engine is None
+        or _search_engine.languages != target_languages
+        or force_rebuild
+    ):
+        _search_engine = await get_language_search(target_languages, enable_semantic)
 
     return _search_engine
 
@@ -67,7 +71,6 @@ async def search_word_pipeline(
     languages: list[Language] | None = None,
     semantic: bool = False,
     max_results: int = 10,
-    normalize: bool = True,
 ) -> list[SearchResult]:
     """Generalized word search pipeline.
 
@@ -79,8 +82,6 @@ async def search_word_pipeline(
         languages: Languages to search in (defaults to English)
         semantic: Enable semantic search
         max_results: Maximum number of results
-        normalize: Whether to normalize the word before searching
-        state_tracker: Optional state tracker for progress updates
 
     Returns:
         List of search results ranked by relevance
@@ -95,33 +96,21 @@ async def search_word_pipeline(
     try:
         # Query processing
 
-        # Normalize the query if requested
-        search_word = normalize_word(word) if normalize else word
-        if normalize and search_word != word:
-            logger.debug(f"📝 Normalized: '{word}' → '{search_word}'")
-
         # Get singleton search engine
         search_engine = await get_search_engine(
             languages=languages,
             enable_semantic=semantic,
         )
 
-        # Determine search methods
-        if semantic:
-            pass
-        else:
-            # Let the engine auto-select methods
-            pass
-
         # Perform search
-        results = await search_engine.search(search_word, max_results=max_results)
+        results = await search_engine.search(word, max_results=max_results)
 
         # Search completed
 
         # Log search metrics
         pipeline_time = time.time() - pipeline_start
         logger.info(
-            f"✅ Search completed: {len(results)} results for '{search_word}' in {pipeline_time:.2f}s"
+            f"✅ Search completed: {len(results)} results for '{word}' in {pipeline_time:.2f}s"
         )
 
         # Log detailed metrics
@@ -129,7 +118,7 @@ async def search_word_pipeline(
             scores = [r.score for r in results]
             log_search_method(
                 method="pipeline_total",
-                query=search_word,
+                query=word,
                 result_count=len(results),
                 duration=pipeline_time,
                 scores=scores,
@@ -139,10 +128,15 @@ async def search_word_pipeline(
 
     except Exception as e:
         pipeline_time = time.time() - pipeline_start
-        logger.error(f"❌ Search pipeline failed for '{word}' after {pipeline_time:.2f}s: {e}")
+        logger.error(
+            f"❌ Search pipeline failed for '{word}' after {pipeline_time:.2f}s: {e}"
+        )
 
         log_metrics(
-            word=word, error=str(e), pipeline_time=pipeline_time, stage="search_pipeline_error"
+            word=word,
+            error=str(e),
+            pipeline_time=pipeline_time,
+            stage="search_pipeline_error",
         )
         # Search failed
         return []

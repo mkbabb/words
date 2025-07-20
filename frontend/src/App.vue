@@ -44,12 +44,8 @@
 
 <script setup lang="ts">
 import { DarkModeToggle, isDark } from '@/components/custom/dark-mode-toggle';
-import HoverCard from '@/components/ui/HoverCard.vue';
-import HoverCardTrigger from '@/components/ui/HoverCardTrigger.vue';
-import HoverCardContent from '@/components/ui/HoverCardContent.vue';
-import Avatar from '@/components/ui/Avatar.vue';
-import AvatarImage from '@/components/ui/AvatarImage.vue';
-import Button from '@/components/ui/Button.vue';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui';
+import { Avatar, AvatarImage, Button } from '@/components/ui';
 </script>
 
 

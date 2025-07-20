@@ -51,12 +51,30 @@ api.interceptors.response.use(
 
 
 export const dictionaryApi = {
-  // Search for words (fallback to lookup-based search since dedicated search endpoint removed)
+  // Search for words using the new search API
   async searchWord(query: string): Promise<SearchResult[]> {
-    // Since standalone search endpoints were removed, return empty results
-    // Frontend can use other suggestion mechanisms instead
-    console.warn('Search endpoint removed - using lookup-based workflow instead');
-    return [];
+    try {
+      // Progressive search parameters based on query length
+      const getSearchParams = (q: string) => {
+        const length = q.trim().length;
+        return {
+          max_results: length <= 4 ? 12 : 8,
+          min_score: length <= 4 ? 0.2 : length <= 6 ? 0.25 : 0.3,
+        };
+      };
+
+      const params = getSearchParams(query);
+      const response = await api.get(`/search`, {
+        params: {
+          q: query,
+          ...params,
+        },
+      });
+      return response.data.results || [];
+    } catch (error) {
+      console.error('Search API error:', error);
+      return [];
+    }
   },
 
   // Get word definition
@@ -128,7 +146,7 @@ export const dictionaryApi = {
   },
 
   // Get search autocomplete suggestions (fallback since search endpoint removed)
-  async getSearchSuggestions(prefix: string): Promise<string[]> {
+  async getSearchSuggestions(_prefix: string): Promise<string[]> {
     // Since standalone search endpoints were removed, return empty suggestions
     // Frontend can use vocabulary suggestions or other mechanisms instead
     console.warn('Search suggestions endpoint removed - using vocabulary suggestions instead');

@@ -374,7 +374,7 @@ class FuzzySearch:
             phrase_penalty = 0.85
         elif is_query_phrase and is_candidate_phrase:
             # Both phrases - bonus for length similarity
-            phrase_penalty = 1.1 if length_ratio > 0.7 else 1.0
+            phrase_penalty = 1.1 if length_ratio > 0.6 else 1.0
 
         # Short fragment penalty (aggressive for very short candidates)
         if candidate_len <= 3 and query_len > 6:

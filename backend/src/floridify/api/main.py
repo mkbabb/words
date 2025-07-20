@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ..utils.logging import setup_logging
 from .middleware import LoggingMiddleware
-from .routers import corpus, facts, health, lookup, suggestions, synonyms
+from .routers import corpus, facts, health, lookup, search, suggestions, synonyms
 
 # Configure logging for the application
 setup_logging("DEBUG")
@@ -31,6 +31,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(lookup.router, prefix="/api/v1", tags=["lookup"])
+app.include_router(search.router, prefix="/api/v1", tags=["search"])
 app.include_router(corpus.router, prefix="/api/v1", tags=["corpus"])
 app.include_router(synonyms.router, prefix="/api/v1", tags=["synonyms"])
 app.include_router(suggestions.router, prefix="/api/v1", tags=["suggestions"])
