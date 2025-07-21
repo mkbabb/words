@@ -11,6 +11,7 @@ import statistics
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from datetime import datetime
 
 import httpx
 from rich.console import Console
@@ -240,7 +241,7 @@ class PerformanceBenchmark:
     def save_results(self, results: list[tuple[str, BenchmarkResult]], filename: str = "benchmark_results.json") -> None:
         """Save benchmark results to JSON file."""
         data = {
-            "timestamp": time.time(),
+            "timestamp": datetime.now(),
             "results": [
                 {
                     "name": name,

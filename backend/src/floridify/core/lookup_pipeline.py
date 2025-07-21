@@ -74,13 +74,13 @@ async def lookup_word_pipeline(
                 {"word": word, "semantic": semantic},
             )
 
-        search_start = time.time()
+        search_start = time.perf_counter()
         best_match_result = await find_best_match(
             word=word,
             languages=languages,
             semantic=semantic,
         )
-        search_duration = time.time() - search_start
+        search_duration = time.perf_counter() - search_start
 
         if state_tracker:
             await state_tracker.update(
@@ -114,7 +114,7 @@ async def lookup_word_pipeline(
 
         # Get definition from providers
         providers_data = []
-        provider_fetch_start = time.time()
+        provider_fetch_start = time.perf_counter()
         total_providers = len(providers)
         provider_progress_base = 15
         provider_progress_range = 25  # 15-40%
@@ -130,12 +130,12 @@ async def lookup_word_pipeline(
                 )
 
             logger.debug(f"🔄 Fetching from provider: {provider.value}")
-            provider_start = time.time()
+            provider_start = time.perf_counter()
 
             provider_data, provider_metrics = await _get_provider_definition(
                 best_match, provider, force_refresh, state_tracker
             )
-            provider_duration = time.time() - provider_start
+            provider_duration = time.perf_counter() - provider_start
 
             if not provider_data:
                 logger.warning(
@@ -194,7 +194,7 @@ async def lookup_word_pipeline(
                     partial_data={"provider_data": provider_data},
                 )
 
-        total_provider_time = time.time() - provider_fetch_start
+        total_provider_time = time.perf_counter() - provider_fetch_start
         logger.info(
             f"✅ Fetched from {len(providers_data)} providers in {total_provider_time:.2f}s"
         )
@@ -203,7 +203,7 @@ async def lookup_word_pipeline(
         if not no_ai:
             try:
                 logger.info(f"🤖 Starting AI synthesis for '{best_match}'")
-                ai_start = time.time()
+                ai_start = time.perf_counter()
 
                 synthesized_entry = await _synthesize_with_ai(
                     word=best_match,
@@ -212,7 +212,7 @@ async def lookup_word_pipeline(
                     state_tracker=state_tracker,
                 )
 
-                ai_duration = time.time() - ai_start
+                ai_duration = time.perf_counter() - ai_start
 
                 if synthesized_entry:
                     logger.info(
@@ -224,7 +224,7 @@ async def lookup_word_pipeline(
                     log_metrics(
                         word=best_match,
                         ai_synthesis_time=ai_duration,
-                        total_pipeline_time=time.time() - search_start,
+                        total_pipeline_time=time.perf_counter() - search_start,
                         definition_count=len(synthesized_entry.definitions)
                         if synthesized_entry.definitions
                         else 0,
@@ -270,7 +270,7 @@ async def lookup_word_pipeline(
         log_metrics(
             word=word,
             error=str(e),
-            total_time=time.time() - search_start if "search_start" in locals() else 0,
+            total_time=time.perf_counter() - search_start if "search_start" in locals() else 0,
         )
         return None
 
@@ -288,7 +288,7 @@ async def _get_provider_definition(
         Tuple of (provider_data, provider_metrics)
     """
     logger.debug(f"📖 Fetching definition from {provider.value} for '{word}'")
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     # Initialize metrics
     metrics = ProviderMetrics(
@@ -313,9 +313,9 @@ async def _get_provider_definition(
             return None, metrics
 
         if connector:
-            fetch_start = time.time()
+            fetch_start = time.perf_counter()
             result = await connector.fetch_definition(word, state_tracker)
-            fetch_duration = time.time() - fetch_start
+            fetch_duration = time.perf_counter() - fetch_start
 
             if result:
                 # Update metrics from result
@@ -362,7 +362,7 @@ async def _get_provider_definition(
         return None, metrics
 
     except Exception as e:
-        duration = time.time() - start_time
+        duration = time.perf_counter() - start_time
         metrics.success = False
         metrics.error_message = str(e)
         metrics.response_time_ms = duration * 1000
@@ -417,10 +417,10 @@ async def _ai_fallback_lookup(
 
     try:
         synthesizer = get_definition_synthesizer()
-        start_time = time.time()
+        start_time = time.perf_counter()
 
         ai_entry = await synthesizer.generate_fallback_entry(word, force_refresh, state_tracker)
-        duration = time.time() - start_time
+        duration = time.perf_counter() - start_time
 
         if ai_entry and ai_entry.definitions:
             logger.info(

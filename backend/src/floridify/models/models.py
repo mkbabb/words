@@ -50,7 +50,9 @@ class Fact(BaseModel):
     """Interesting fact about a word."""
 
     content: str = Field(description="The fact content")
-    category: str = Field(description="Category of fact (etymology, usage, cultural, etc.)")
+    category: str = Field(
+        description="Category of fact (etymology, usage, cultural, etc.)"
+    )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in fact accuracy")
     generated_at: datetime = Field(default_factory=datetime.now)
 
@@ -59,40 +61,79 @@ class Definition(BaseModel):
     """Single word definition with bound synonyms and examples."""
 
     word_type: str
-
     definition: str
-
     synonyms: list[str] = Field(default_factory=list)
-
     examples: Examples = Field(default_factory=Examples)
-
     meaning_cluster: str | None = None
-
     raw_metadata: dict[str, Any] | None = None
+
+    # Enhanced metadata for comprehensive tracking
+    created_at: datetime = Field(
+        default_factory=datetime.now, description="When definition was created"
+    )
+    last_updated: datetime = Field(
+        default_factory=datetime.now, description="Last modification time"
+    )
+    accessed_at: datetime | None = Field(None, description="Last access time")
+    created_by: str | None = Field(
+        None, description="Creator attribution (ai-synthesis, user-edit, provider-sync)"
+    )
+    updated_by: str | None = Field(None, description="Last modifier attribution")
+    source_attribution: str | None = Field(
+        None, description="AI model or provider source (gpt-4, oxford-api, etc.)"
+    )
+    version: int = Field(1, ge=1, description="Version number for change tracking")
+    quality_score: float | None = Field(
+        None, ge=0.0, le=1.0, description="Quality/confidence score"
+    )
+    validation_status: str | None = Field(
+        None, description="Validation state (pending, verified, flagged)"
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Extensible metadata"
+    )
 
 
 class ProviderData(BaseModel):
     """Container for provider-specific definitions and metadata."""
 
     provider_name: str
-
     definitions: list[Definition] = Field(default_factory=list)
-
     last_updated: datetime = Field(default_factory=datetime.now)
-
     raw_metadata: dict[str, Any] | None = None
+
+    # Enhanced metadata
+    created_at: datetime = Field(
+        default_factory=datetime.now, description="When provider data was first created"
+    )
+    accessed_at: datetime | None = Field(
+        None, description="Last access time for provider data"
+    )
+    version: int = Field(1, ge=1, description="Provider data version")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Extensible provider metadata"
+    )
 
 
 class DictionaryEntry(Document):
     """Main entry point for word data - organized by provider for layered access."""
 
     word: str
-
     pronunciation: Pronunciation
-
     provider_data: dict[str, ProviderData] = Field(default_factory=dict)
-
     last_updated: datetime = Field(default_factory=datetime.now)
+
+    # Enhanced metadata
+    created_at: datetime = Field(
+        default_factory=datetime.now, description="When entry was first created"
+    )
+    accessed_at: datetime | None = Field(None, description="Last access time")
+    quality: float | None = Field(
+        None, ge=0.0, le=1.0, description="Overall entry quality score"
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Extensible entry metadata"
+    )
 
     class Settings:
         name = "dictionary_entries"
@@ -100,27 +141,11 @@ class DictionaryEntry(Document):
             "word.text",
             [("word.text", "text")],
             "last_updated",
+            "created_at",
+            "accessed_at",
+            "lookup_count",
+            "status",
         ]
-
-    def add_provider_data(self, provider_data: ProviderData) -> None:
-        """Add or update provider data."""
-        self.provider_data[provider_data.provider_name] = provider_data
-        self.last_updated = datetime.now()
-
-    def get_providers_data_dict(self) -> dict[str, dict[str, list[str]]]:
-        """Get all provider data as a nested dictionary:
-
-        {provider_name: word_type -> [definition]}.
-        """
-        providers_data_dict: dict[str, dict[str, list[str]]] = {}
-
-        for provider_name, provider_data in self.provider_data.items():
-            providers_data_dict[provider_name] = {
-                definition.word_type: [x.definition for x in provider_data.definitions]
-                for definition in provider_data.definitions
-            }
-
-        return providers_data_dict
 
 
 class SynthesizedDictionaryEntry(Document):
@@ -134,14 +159,27 @@ class SynthesizedDictionaryEntry(Document):
     """
 
     word: str
-
     pronunciation: Pronunciation
-
     definitions: list[Definition] = Field(default_factory=list)
-
     facts: list[Fact] = Field(default_factory=list)
-
     last_updated: datetime = Field(default_factory=datetime.now)
+
+    provider_data: dict[str, ProviderData] = Field(default_factory=dict)
+
+    # Enhanced metadata
+    created_at: datetime = Field(
+        default_factory=datetime.now, description="When synthesized entry was created"
+    )
+    accessed_at: datetime | None = Field(None, description="Last access time")
+    model: str | None = Field(
+        None, description="AI model used for synthesis (e.g., gpt-4o)"
+    )
+    confidence: float | None = Field(
+        None, ge=0.0, le=1.0, description="Overall synthesis confidence score"
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Extensible synthesis metadata"
+    )
 
     class Settings:
         name = "synthesized_dictionary_entries"
@@ -149,4 +187,9 @@ class SynthesizedDictionaryEntry(Document):
             "word.text",
             [("word.text", "text")],
             "last_updated",
+            "created_at",
+            "accessed_at",
+            "lookup_count",
+            "status",
+            "synthesis_quality",
         ]

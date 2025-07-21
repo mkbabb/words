@@ -10,6 +10,7 @@ import asyncio
 import gc
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Callable
 
 import httpx
@@ -124,7 +125,7 @@ class CacheBenchmark:
             
             # Test cache misses (use modified queries to force misses)
             for i, query in enumerate(cold_queries):
-                modified_query = f"{query}_{i}_{time.time()}"  # Ensure unique query
+                modified_query = f"{query}_{i}_{datetime.now().timestamp()}"  # Ensure unique query
                 start_time = time.perf_counter()
                 
                 try:
@@ -297,7 +298,7 @@ class CacheBenchmark:
     async def run_comprehensive_cache_benchmark(self) -> dict[str, Any]:
         """Run complete cache benchmark suite."""
         results = {
-            "timestamp": time.time(),
+            "timestamp": datetime.now(),
             "cache_warming": {},
             "hit_vs_miss": {},
             "memory_efficiency": {},
@@ -500,7 +501,7 @@ async def main():
         benchmark.generate_cache_report(results)
         
         # Save results
-        timestamp = int(time.time())
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"cache_benchmark_{timestamp}.json"
         
         import json

@@ -118,9 +118,9 @@ def test_performance():
     httpx.get(f"{BASE_URL}/api/v1/lookup/test")
     
     # Test cached lookup
-    start = time.time()
+    start = time.perf_counter()
     httpx.get(f"{BASE_URL}/api/v1/lookup/test")
-    elapsed = time.time() - start
+    elapsed = time.perf_counter() - start
     
     print(f"Cached lookup time: {elapsed*1000:.1f}ms")
     assert elapsed < 0.5, f"Lookup too slow: {elapsed}s"

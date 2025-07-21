@@ -89,7 +89,7 @@ class StateTracker:
         """
         self.callback = callback
         self.updates: list[StateUpdate] = []
-        self.start_time = time.time()
+        self.start_time = time.perf_counter()
         self.stage_start_times: dict[PipelineStage, float] = {}
 
     async def update(
@@ -112,9 +112,9 @@ class StateTracker:
         # Calculate duration if we have a previous stage time
         duration_ms = None
         if stage in self.stage_start_times:
-            duration_ms = (time.time() - self.stage_start_times[stage]) * 1000
+            duration_ms = (time.perf_counter() - self.stage_start_times[stage]) * 1000
         else:
-            self.stage_start_times[stage] = time.time()
+            self.stage_start_times[stage] = time.perf_counter()
 
         update = StateUpdate(
             stage=stage,
@@ -136,11 +136,11 @@ class StateTracker:
 
     async def start_stage(self, stage: PipelineStage) -> None:
         """Mark the start of a new stage for timing."""
-        self.stage_start_times[stage] = time.time()
+        self.stage_start_times[stage] = time.perf_counter()
 
     def get_total_duration_ms(self) -> float:
         """Get total duration since tracking started."""
-        return (time.time() - self.start_time) * 1000
+        return (time.perf_counter() - self.start_time) * 1000
 
     def get_stage_duration_ms(self, stage: PipelineStage) -> float | None:
         """Get duration for a specific stage if completed."""

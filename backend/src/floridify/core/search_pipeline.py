@@ -91,7 +91,7 @@ async def search_word_pipeline(
         languages = [Language.ENGLISH]
 
     # Track timing for performance metrics
-    pipeline_start = time.time()
+    pipeline_start = time.perf_counter()
 
     try:
         # Query processing
@@ -108,7 +108,7 @@ async def search_word_pipeline(
         # Search completed
 
         # Log search metrics
-        pipeline_time = time.time() - pipeline_start
+        pipeline_time = time.perf_counter() - pipeline_start
         logger.info(
             f"✅ Search completed: {len(results)} results for '{word}' in {pipeline_time:.2f}s"
         )
@@ -127,7 +127,7 @@ async def search_word_pipeline(
         return results
 
     except Exception as e:
-        pipeline_time = time.time() - pipeline_start
+        pipeline_time = time.perf_counter() - pipeline_start
         logger.error(
             f"❌ Search pipeline failed for '{word}' after {pipeline_time:.2f}s: {e}"
         )

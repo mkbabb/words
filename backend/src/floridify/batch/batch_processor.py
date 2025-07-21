@@ -529,7 +529,7 @@ class BatchProcessor:
         """Run the complete batch processing pipeline."""
         console.print("[bold blue]Starting Batch Processing Pipeline[/bold blue]")
 
-        start_time = datetime.now()
+        start_time = time.perf_counter()
 
         try:
             # Step 1: Get word corpus
@@ -587,15 +587,15 @@ class BatchProcessor:
                         failed_jobs.append(job)
 
             # Generate summary
-            end_time = datetime.now()
-            duration = end_time - start_time
+            end_time = time.perf_counter()
+            duration_seconds = end_time - start_time
 
             total_processed = sum(job.word_count for job in completed_jobs)
             total_failed = sum(job.word_count for job in failed_jobs)
 
             summary = {
                 "status": "completed",
-                "duration_minutes": duration.total_seconds() / 60,
+                "duration_minutes": duration_seconds / 60,
                 "total_words_input": len(filtered_words),
                 "total_words_processed": total_processed,
                 "total_words_failed": total_failed,

@@ -10,6 +10,7 @@ import asyncio
 import gc
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -269,7 +270,7 @@ class FAISSBenchmark:
     async def run_comprehensive_faiss_benchmark(self) -> dict[str, Any]:
         """Run complete FAISS benchmark suite."""
         results = {
-            "timestamp": time.time(),
+            "timestamp": datetime.now(),
             "embedding_performance": {},
             "index_performance": {},
             "similarity_accuracy": {},
@@ -430,7 +431,7 @@ async def main():
         benchmark.generate_faiss_report(results)
         
         # Save results
-        timestamp = int(time.time())
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"faiss_benchmark_{timestamp}.json"
         
         import json

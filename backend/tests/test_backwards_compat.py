@@ -144,11 +144,9 @@ class TestBackwardsCompatibility:
         
         # First request without force_refresh
         response1 = client.get(f"/api/v1/lookup/{word}")
-        time.time()
         
         # Second request with force_refresh
         response2 = client.get(f"/api/v1/lookup/{word}?force_refresh=true")
-        time.time()
         
         # Both should return same structure
         if response1.status_code == 200:

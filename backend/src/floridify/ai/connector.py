@@ -72,7 +72,7 @@ class OpenAIConnector:
         **kwargs: Any,
     ) -> T:
         """Make a structured request to OpenAI with caching."""
-        start_time = time.time()
+        start_time = time.perf_counter()
         retry_count = 0
         max_retries = 3
 
@@ -102,9 +102,9 @@ class OpenAIConnector:
                 )
 
                 # Make the API call
-                api_start = time.time()
+                api_start = time.perf_counter()
                 response = await self.client.beta.chat.completions.parse(**request_params)
-                api_duration = time.time() - api_start
+                api_duration = time.perf_counter() - api_start
 
                 # Extract token usage
                 token_usage = {}
@@ -138,7 +138,7 @@ class OpenAIConnector:
                     else:
                         raise ValueError("No content in response")
 
-                total_duration = time.time() - start_time
+                total_duration = time.perf_counter() - start_time
                 logger.info(
                     f"✅ OpenAI API success: {response_model.__name__} "
                     f"in {total_duration:.2f}s (tokens: {token_usage.get('total_tokens', 'N/A')})"
@@ -148,7 +148,7 @@ class OpenAIConnector:
 
             except Exception as e:
                 retry_count += 1
-                duration = time.time() - start_time
+                duration = time.perf_counter() - start_time
 
                 if retry_count < max_retries:
                     wait_time = retry_count * 2  # Exponential backoff
@@ -267,7 +267,7 @@ class OpenAIConnector:
             word: The word to extract mappings for.
             definitions: list of: (provider, word_type, definition) tuples from providers.
         """
-        start_time = time.time()
+        start_time = time.perf_counter()
         def_count = len(definitions)
 
         logger.info(f"🔢 Extracting cluster mappings for '{word}' from {def_count} definitions")
@@ -276,7 +276,7 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(prompt, ClusterMappingResponse)
-            duration = time.time() - start_time
+            duration = time.perf_counter() - start_time
 
             # Log detailed cluster information
             total_defs_mapped = sum(len(cm.definition_indices) for cm in result.cluster_mappings)

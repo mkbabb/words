@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 # Track service start time
-_start_time = time.time()
+_start_time = time.perf_counter()
 
 
 class HealthResponse(BaseModel):
@@ -86,7 +86,7 @@ async def health_check() -> HealthResponse:
         logger.warning(f"Cache health check failed: {e}")
 
     # Calculate uptime
-    uptime_seconds = int(time.time() - _start_time)
+    uptime_seconds = int(time.perf_counter() - _start_time)
 
     # Determine overall status
     overall_status = "healthy"

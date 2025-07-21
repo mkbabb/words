@@ -180,7 +180,7 @@ def log_timing[T](func: Callable[..., T]) -> Callable[..., T]:
 
     @functools.wraps(func)
     async def async_wrapper(*args: Any, **kwargs: Any) -> T:
-        start_time = time.time()
+        start_time = time.perf_counter()
         func_name = f"{func.__module__}.{func.__name__}"
 
         # Use loguru with function context
@@ -189,11 +189,11 @@ def log_timing[T](func: Callable[..., T]) -> Callable[..., T]:
         func_logger.debug(f"⏱️  Starting {func_name}")
         try:
             result = await func(*args, **kwargs)
-            elapsed = time.time() - start_time
+            elapsed = time.perf_counter() - start_time
             func_logger.info(f"✅ {func_name} completed in {elapsed:.2f}s", duration=elapsed)
             return result
         except Exception as e:
-            elapsed = time.time() - start_time
+            elapsed = time.perf_counter() - start_time
             func_logger.error(
                 f"❌ {func_name} failed after {elapsed:.2f}s: {e}", duration=elapsed, error=str(e)
             )
@@ -201,7 +201,7 @@ def log_timing[T](func: Callable[..., T]) -> Callable[..., T]:
 
     @functools.wraps(func)
     def sync_wrapper(*args: Any, **kwargs: Any) -> T:
-        start_time = time.time()
+        start_time = time.perf_counter()
         func_name = f"{func.__module__}.{func.__name__}"
 
         # Use loguru with function context
@@ -210,11 +210,11 @@ def log_timing[T](func: Callable[..., T]) -> Callable[..., T]:
         func_logger.debug(f"⏱️  Starting {func_name}")
         try:
             result = func(*args, **kwargs)
-            elapsed = time.time() - start_time
+            elapsed = time.perf_counter() - start_time
             func_logger.info(f"✅ {func_name} completed in {elapsed:.2f}s", duration=elapsed)
             return result
         except Exception as e:
-            elapsed = time.time() - start_time
+            elapsed = time.perf_counter() - start_time
             func_logger.error(
                 f"❌ {func_name} failed after {elapsed:.2f}s: {e}", duration=elapsed, error=str(e)
             )

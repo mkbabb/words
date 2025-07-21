@@ -14,6 +14,7 @@ import statistics
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -284,7 +285,7 @@ class SearchPipelineBenchmark:
     async def run_comprehensive_benchmark(self) -> dict[str, Any]:
         """Run complete benchmark suite."""
         results = {
-            "timestamp": time.time(),
+            "timestamp": datetime.now(),
             "config": self.config.__dict__,
             "core_search": {},
             "rest_api": {},
@@ -527,7 +528,7 @@ class SearchPipelineBenchmark:
     def save_results(self, results: dict[str, Any], filename: str = None) -> None:
         """Save detailed results to JSON."""
         if filename is None:
-            timestamp = int(time.time())
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"search_pipeline_benchmark_{timestamp}.json"
         
         filepath = Path(filename)

@@ -60,7 +60,7 @@ class StateTracker:
         self._loop = loop
         self._queue: asyncio.Queue[PipelineState] = asyncio.Queue()
         self._current_state: PipelineState | None = None
-        self._start_time: float = time.time()
+        self._start_time: float = time.perf_counter()
 
     @property
     def start_time(self) -> float:
@@ -70,13 +70,13 @@ class StateTracker:
     def reset(self) -> None:
         """Reset the tracker to initial state."""
         self._current_state = None
-        self._start_time = time.time()
+        self._start_time = time.perf_counter()
         # Create new queue to clear any pending items
         self._queue = asyncio.Queue()
 
     def _get_timestamp(self) -> float:
         """Calculate seconds elapsed since start."""
-        return time.time() - self._start_time
+        return time.perf_counter() - self._start_time
 
     async def update_state(
         self,

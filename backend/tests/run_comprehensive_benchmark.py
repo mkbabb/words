@@ -10,6 +10,7 @@ import asyncio
 import json
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -34,11 +35,11 @@ class ComprehensiveResults:
     faiss_performance: dict[str, Any] = None
     cache_performance: dict[str, Any] = None
     system_health: dict[str, Any] = None
-    timestamp: float = 0.0
+    timestamp: datetime = None
     
     def __post_init__(self):
-        if self.timestamp == 0.0:
-            self.timestamp = time.time()
+        if self.timestamp is None:
+            self.timestamp = datetime.now()
 
 
 class ComprehensiveBenchmarkOrchestrator:
@@ -139,7 +140,7 @@ class ComprehensiveBenchmarkOrchestrator:
             return results
         except Exception as e:
             self.console.print(f"[red]Search pipeline benchmark failed: {e}[/red]")
-            return {"error": str(e), "timestamp": time.time()}
+            return {"error": str(e), "timestamp": datetime.now()}
     
     async def run_faiss_benchmarks(self) -> dict[str, Any]:
         """Run FAISS and semantic search benchmarks."""
@@ -151,7 +152,7 @@ class ComprehensiveBenchmarkOrchestrator:
             return results
         except Exception as e:
             self.console.print(f"[red]FAISS benchmark failed: {e}[/red]")
-            return {"error": str(e), "timestamp": time.time()}
+            return {"error": str(e), "timestamp": datetime.now()}
     
     async def run_cache_benchmarks(self) -> dict[str, Any]:
         """Run cache performance benchmarks."""
@@ -163,7 +164,7 @@ class ComprehensiveBenchmarkOrchestrator:
             return results
         except Exception as e:
             self.console.print(f"[red]Cache benchmark failed: {e}[/red]")
-            return {"error": str(e), "timestamp": time.time()}
+            return {"error": str(e), "timestamp": datetime.now()}
     
     async def run_all_benchmarks(self) -> ComprehensiveResults:
         """Run all benchmark suites with progress tracking."""
@@ -462,7 +463,7 @@ class ComprehensiveBenchmarkOrchestrator:
     def save_comprehensive_results(self, results: ComprehensiveResults, base_filename: str = None) -> list[str]:
         """Save all benchmark results to organized files."""
         if base_filename is None:
-            timestamp = int(time.time())
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             base_filename = f"comprehensive_benchmark_{timestamp}"
         
         saved_files = []
