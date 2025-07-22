@@ -61,18 +61,14 @@ async def health_check() -> HealthResponse:
         logger.warning(f"Database health check failed: {e}")
         connection_pool_stats = {"status": "error", "error": str(e)}
 
-    # Check search engine (handle lightweight deployment gracefully)
-    search_status = "disabled"  # Default for lightweight deployment
+    # Check search engine
+    search_status = "uninitialized"
     try:
         search_engine = await get_search_engine([Language.ENGLISH])
         if search_engine._initialized:
             search_status = "initialized"
-        else:
-            search_status = "uninitialized"
     except Exception as e:
-        # Search engine disabled in lightweight deployment - this is expected
-        logger.info(f"Search engine disabled in lightweight deployment: {e}")
-        search_status = "disabled"
+        logger.warning(f"Search engine health check failed: {e}")
 
     # Check cache system
     cache_hit_rate = 0.0
@@ -92,13 +88,9 @@ async def health_check() -> HealthResponse:
     # Calculate uptime
     uptime_seconds = int(time.perf_counter() - _start_time)
 
-    # Determine overall status - only require database connection for healthy status
-    # Search engine can be disabled in lightweight deployment
+    # Determine overall status
     overall_status = "healthy"
-    if database_status != "connected":
-        overall_status = "degraded"
-    elif search_status == "uninitialized":
-        # Only degrade if search engine failed to initialize (vs being disabled)
+    if database_status != "connected" or search_status != "initialized":
         overall_status = "degraded"
 
     return HealthResponse(
