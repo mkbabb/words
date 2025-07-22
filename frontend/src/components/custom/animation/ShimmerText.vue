@@ -101,15 +101,15 @@ const shimmerStyle = computed(() => {
     shimmer-cycle var(--shimmer-cycle-duration) infinite;
   animation-delay: var(--shimmer-delay);
   
-  /* Enhanced visibility shimmer colors for light mode */
-  --shimmer-base: #1f2937;    /* gray-800 - dark base */
-  --shimmer-highlight: #e5e7eb; /* gray-200 - much lighter highlight */
+  /* Light mode shimmer colors */
+  --shimmer-base: #374151;    /* gray-700 - dark base */
+  --shimmer-highlight: #f9fafb; /* gray-50 - bright highlight */
 }
 
-/* Dark mode shimmer colors - lighter for contrast */
+/* Dark mode shimmer colors - properly inverted */
 :global(.dark) .shimmer-text {
-  --shimmer-base: #f9fafb;    /* gray-50 - very light base */
-  --shimmer-highlight: #6b7280; /* gray-500 - much darker highlight */
+  --shimmer-base: #f9fafb;    /* gray-50 - light base (inverted) */
+  --shimmer-highlight: #1f2937; /* gray-800 - dark highlight (inverted) */
 }
 
 @keyframes shimmer {

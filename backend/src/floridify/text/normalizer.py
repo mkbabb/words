@@ -33,7 +33,7 @@ CHAR_TRANSLATION_TABLE = str.maketrans({
     # Hyphen variants
     '–': '-', '—': '-', '‒': '-',
     # Apostrophe variants  
-    ''': "'", ''': "'", '`': "'", '"': "'", '"': "'"
+    '`': "'", '"': '"', '"': '"'
 })
 
 # Basic suffix rules for lemmatization fallback

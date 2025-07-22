@@ -1,0 +1,1 @@
+export { default as ProgressiveSidebar } from './ProgressiveSidebar.vue'

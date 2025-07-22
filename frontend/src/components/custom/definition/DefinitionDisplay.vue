@@ -45,7 +45,10 @@
             </DropdownMenu>
         </div>
         <!-- Header Section -->
-        <CardHeader>
+        <CardHeader :class="[
+            'transition-all duration-500',
+            shouldShowSidebar ? 'xl:ml-56 xl:pl-4' : ''
+        ]">
             <div class="flex items-center justify-between">
                 <CardTitle
                     class="themed-title transition-all duration-200"
@@ -84,7 +87,10 @@
         </CardHeader>
 
         <!-- Gradient Divider -->
-        <div class="relative h-px w-full overflow-hidden">
+        <div :class="[
+            'relative h-px w-full overflow-hidden transition-all duration-500',
+            shouldShowSidebar ? 'xl:ml-56 xl:pl-4' : ''
+        ]">
             <div
                 class="absolute inset-0 bg-gradient-to-r from-transparent
                     via-primary/30 to-transparent"
@@ -92,10 +98,14 @@
         </div>
 
         <!-- Dictionary Mode Definitions -->
-        <CardContent v-if="mode === 'dictionary'" class="grid gap-4">
+        <CardContent v-if="mode === 'dictionary'" :class="[
+            'grid gap-4 transition-all duration-500',
+            shouldShowSidebar ? 'xl:ml-56 xl:pl-4' : ''
+        ]">
             <div
                 v-for="cluster in groupedDefinitions"
                 :key="cluster.clusterId"
+                :data-cluster-id="cluster.clusterId"
                 class="space-y-4"
             >
                 <!-- Cluster header with gradient divider -->
@@ -116,6 +126,7 @@
                 <div
                     v-for="(definition, index) in cluster.definitions"
                     :key="`${cluster.clusterId}-${index}`"
+                    :data-word-type="`${cluster.clusterId}-${definition.word_type}`"
                     class="space-y-3"
                 >
                     <!-- Separator for all but first -->
@@ -220,7 +231,10 @@
         <!-- Thesaurus Mode -->
         <CardContent
             v-if="mode === 'thesaurus' && thesaurusData"
-            class="space-y-6"
+            :class="[
+                'space-y-6 transition-all duration-500',
+                shouldShowSidebar ? 'xl:ml-56 xl:pl-4' : ''
+            ]"
         >
             <div
                 v-if="thesaurusData.synonyms.length > 0"
@@ -248,7 +262,10 @@
         </CardContent>
 
         <!-- Etymology -->
-        <CardContent v-if="entry && entry.etymology" class="space-y-4">
+        <CardContent v-if="entry && entry.etymology" :class="[
+            'space-y-4 transition-all duration-500',
+            shouldShowSidebar ? 'xl:ml-56 xl:pl-4' : ''
+        ]">
             <h3 class="text-lg font-semibold">Etymology</h3>
             <p class="text-base text-muted-foreground">{{ entry.etymology }}</p>
         </CardContent>
@@ -302,6 +319,20 @@ const entry = computed(() => store.currentEntry);
 const thesaurusData = computed(() => store.currentThesaurus);
 const mode = computed(() => store.mode);
 const pronunciationMode = computed(() => store.pronunciationMode);
+
+// Check if sidebar should be shown (same logic as ProgressiveSidebar)
+const shouldShowSidebar = computed(() => {
+  if (!entry.value?.definitions) return false;
+  
+  const clusters = new Set();
+  entry.value.definitions.forEach(def => {
+    clusters.add(def.meaning_cluster || 'default');
+  });
+  
+  const hasMultipleClusters = clusters.size > 1;
+  // We'll assume desktop for this computed, actual responsive check happens in CSS
+  return hasMultipleClusters;
+});
 
 // Word type ordering for consistent display
 const wordTypeOrder = {

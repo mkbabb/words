@@ -4,7 +4,7 @@
             <!-- Animated Text with Stage Lighting -->
             <AnimatedText
                 :text="word"
-                text-class="text-8xl font-black pb-8"
+                text-class="text-6xl lg:text-8xl font-black pb-8"
                 :offset="0.15"
                 :show-dots="progress < 100"
             />
