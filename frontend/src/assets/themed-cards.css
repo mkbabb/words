@@ -447,4 +447,70 @@
       @apply transition-none;
     }
   }
+
+  /* Themed cluster titles in sidebar */
+  [data-theme="default"] .themed-cluster-title {
+    @apply text-foreground;
+  }
+
+  [data-theme]:not([data-theme="default"]) .themed-cluster-title {
+    color: var(--theme-text);
+    font-weight: 700;
+  }
+
+  /* Themed HR gradients */
+  .themed-hr {
+    height: 2px;
+    /* Use Tailwind border color variable */
+    background: linear-gradient(to right, transparent 20%, var(--color-border) 50%, transparent 80%);
+  }
+  
+  [data-theme="default"] .themed-hr {
+    background: linear-gradient(to right, transparent 20%, var(--color-border) 50%, transparent 80%);
+  }
+
+  /* Dark mode themed HRs need more opacity */
+  .dark [data-theme="default"] .themed-hr {
+    background: linear-gradient(to right, transparent 20%, rgb(255 255 255 / 0.4) 50%, transparent 80%);
+  }
+
+  [data-theme="gold"] .themed-hr {
+    background: linear-gradient(to right, transparent 20%, var(--theme-gradient-mid) 50%, transparent 80%);
+  }
+
+  [data-theme="silver"] .themed-hr {
+    background: linear-gradient(to right, transparent 20%, var(--theme-gradient-mid) 50%, transparent 80%);
+  }
+
+  [data-theme="bronze"] .themed-hr {
+    background: linear-gradient(to right, transparent 20%, var(--theme-gradient-mid) 50%, transparent 80%);
+  }
+}
+
+  /* Themed hovercard backgrounds */
+  [data-theme="default"] .themed-hovercard {
+    @apply bg-popover/90 text-popover-foreground;
+  }
+
+  [data-theme]:not([data-theme="default"]) .themed-hovercard {
+    background: linear-gradient(
+      135deg,
+      var(--theme-gradient-start) 0%,
+      var(--theme-gradient-start) 20%,
+      var(--theme-gradient-mid) 40%,
+      var(--theme-gradient-end) 60%,
+      var(--theme-gradient-mid) 80%,
+      var(--theme-gradient-start) 100%
+    );
+    color: var(--theme-text);
+  }
+
+  /* Themed definition text */
+  [data-theme="default"] .themed-definition-text {
+    @apply text-foreground;
+  }
+
+  [data-theme]:not([data-theme="default"]) .themed-definition-text {
+    color: var(--theme-text-muted);
+  }
 }

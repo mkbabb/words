@@ -100,11 +100,13 @@ sync_codebase() {
     if is_github_actions; then
         rsync -avz --delete \
             --exclude='.git' --exclude='node_modules' --exclude='__pycache__' --exclude='.venv' --exclude='dist' \
+            --exclude='.mypy_cache' --exclude='.benchmarks' --exclude='logs' --exclude='.DS_Store' \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             ./ $EC2_USER@$EC2_HOST:~/floridify/
     else
         rsync -avz --delete \
             --exclude='.git' --exclude='node_modules' --exclude='__pycache__' --exclude='.venv' --exclude='dist' \
+            --exclude='.mypy_cache' --exclude='.benchmarks' --exclude='logs' --exclude='.DS_Store' \
             -e "ssh -o StrictHostKeyChecking=no" \
             ./ $EC2_USER@$EC2_HOST:~/floridify/
     fi

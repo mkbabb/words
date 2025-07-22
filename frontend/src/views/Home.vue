@@ -14,10 +14,26 @@
     <div class="relative min-h-screen p-2">
       <!-- Sticky Search Bar with scroll responsiveness -->
       <div :class="searchBarClasses">
-        <SearchBar 
-          :shrink-percentage="shrinkPercentage" 
-          @stage-enter="handleStageEnter"
-        />
+        <!-- Mobile layout with arrow space -->
+        <div class="lg:hidden flex items-center">
+          <!-- Space for mobile sidebar arrow -->
+          <div class="w-12 flex-shrink-0"></div>
+          <!-- Search bar container -->
+          <div class="flex-1">
+            <SearchBar 
+              :shrink-percentage="shrinkPercentage" 
+              @stage-enter="handleStageEnter"
+            />
+          </div>
+        </div>
+        
+        <!-- Desktop layout -->
+        <div class="hidden lg:block">
+          <SearchBar 
+            :shrink-percentage="shrinkPercentage" 
+            @stage-enter="handleStageEnter"
+          />
+        </div>
       </div>
 
         <!-- Border separator (not sticky) -->

@@ -1,23 +1,38 @@
 <template>
   <div>
-    <!-- Mobile Toggle Button -->
+    <!-- Mobile Toggle Button - Small Arrow inline with search bar -->
     <div
       :class="
         cn(
-          'fixed top-2 left-2 z-70 transition-transform duration-400 ease-apple-smooth lg:hidden',
+          'fixed top-[18px] left-2 z-70 transition-all duration-400 ease-apple-smooth lg:hidden',
           {
             'translate-x-0': !sidebarOpen,
-            'translate-x-64': sidebarOpen, // Move with sidebar - w-64 = 256px to keep it within the sidebar
+            'translate-x-64': sidebarOpen, // Move with sidebar when opened
           }
         )
       "
     >
       <button
         @click="store.toggleSidebar()"
-        class="card-shadow bg-background/90 border-border flex h-12 w-12 items-center justify-center rounded-xl border p-4 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-105"
+        :class="
+          cn(
+            'bg-background/80 border-border flex items-center justify-center border-2 shadow-lg backdrop-blur-sm transition-all duration-200',
+            sidebarOpen 
+              ? 'card-shadow rounded-xl h-12 w-12 p-4 hover:scale-105' 
+              : 'rounded-lg h-8 w-8 p-1.5 hover:scale-110'
+          )
+        "
       >
-        <!-- Hamburger/Close Icon Animation -->
-        <div class="relative flex h-5 w-5 flex-col justify-center">
+        <!-- Arrow Icon when closed -->
+        <div v-if="!sidebarOpen" class="flex items-center justify-center">
+          <ChevronLeft 
+            :size="12" 
+            class="text-muted-foreground transition-colors duration-200 rotate-180"
+          />
+        </div>
+        
+        <!-- Hamburger Icon when opened - same as desktop -->
+        <div v-else class="relative flex h-5 w-5 flex-col justify-center">
           <span
             :class="
               cn(
@@ -68,8 +83,8 @@
       "
     >
       <!-- Header -->
-      <div class="border-border border-b p-4">
-        <div v-if="!sidebarCollapsed" class="flex items-center justify-between">
+      <div class="border-border border-b p-4 flex items-center min-h-[4rem]">
+        <div v-if="!sidebarCollapsed" class="flex items-center justify-between w-full">
           <!-- Left unit: Floridify + @mbabb grouped together -->
           <div class="flex items-center gap-3">
             <FloridifyIcon :expanded="true" :mode="store.mode" clickable @toggle-mode="store.toggleMode()" />
@@ -103,7 +118,7 @@
             @toggle="store.setSidebarCollapsed(!sidebarCollapsed)"
           />
         </div>
-        <div v-else class="flex items-center justify-center">
+        <div v-else class="flex items-center justify-center w-full">
           <button
             @click="store.setSidebarCollapsed(false)"
             class="cursor-ew-resize hover:bg-muted/50 rounded-lg p-2 transition-all duration-300 ease-apple-smooth hover:scale-105"
@@ -237,8 +252,8 @@
         "
       >
         <!-- Mobile Header -->
-        <div class="border-border border-b p-4">
-          <div class="flex items-center justify-between">
+        <div class="border-border border-b p-4 flex items-center justify-center min-h-[4rem]">
+          <div class="flex items-center justify-between w-full">
             <!-- Left unit: Floridify + @mbabb grouped together -->
             <div class="flex items-center gap-3">
               <FloridifyIcon :expanded="true" :mode="store.mode" clickable @toggle-mode="store.toggleMode()" />
@@ -265,8 +280,16 @@
                 </HoverCardContent>
               </HoverCard>
             </div>
-            <!-- Right: Dark Mode Toggle on mobile -->
-            <DarkModeToggle class="h-7 w-7" />
+            
+            <!-- Right: Dark Mode Toggle + Hamburger -->
+            <div class="flex items-center gap-3">
+              <DarkModeToggle class="h-7 w-7" />
+              <HamburgerIcon
+                :is-open="true"
+                class="cursor-pointer hover:bg-muted/50 rounded-lg p-1 transition-all duration-300 ease-apple-smooth"
+                @toggle="store.toggleSidebar()"
+              />
+            </div>
           </div>
         </div>
 
@@ -344,7 +367,7 @@ import { FloridifyIcon, HamburgerIcon } from '@/components/custom/icons';
 import { DarkModeToggle } from '@/components/custom/dark-mode-toggle';
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui';
 import { Avatar, AvatarImage, Button } from '@/components/ui';
-import { PanelRight, User } from 'lucide-vue-next';
+import { PanelRight, User, ChevronLeft } from 'lucide-vue-next';
 
 const store = useAppStore();
 

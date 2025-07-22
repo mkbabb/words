@@ -171,7 +171,8 @@
     @apply text-6xl;
     font-family: 'Fraunces', serif;
     font-weight: bold;
-    line-height: 1.2;
+    line-height: 1.4;
+    padding-bottom: 0.1em;
   }
 
   @media (min-width: 768px) {

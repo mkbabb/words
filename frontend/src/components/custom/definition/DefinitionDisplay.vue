@@ -1,15 +1,17 @@
 <template>
-    <div 
-        v-if="entry" 
+    <div
+        v-if="entry"
         :class="[
             'flex',
-            shouldShowSidebar && groupedDefinitions.length > 1 ? 'xl:gap-4' : ''
+            shouldShowSidebar && groupedDefinitions.length > 1
+                ? 'xl:gap-4'
+                : '',
         ]"
     >
         <!-- Progressive Sidebar - Truly sticky -->
-        <div 
+        <div
             v-if="shouldShowSidebar && groupedDefinitions.length > 1"
-            class="hidden xl:block w-48 flex-shrink-0"
+            class="hidden w-48 flex-shrink-0 xl:block"
         >
             <div class="sticky top-4">
                 <ProgressiveSidebar />
@@ -26,51 +28,86 @@
                     selectedCardVariant === 'default' ? 'right-2' : 'right-12',
                 ]"
             >
-                <DropdownMenu>
-                    <DropdownMenuTrigger as-child>
-                        <button
-                            class="group rounded-lg border-2 border-border
-                                bg-background/80 p-1.5 shadow-lg backdrop-blur-sm
-                                transition-all duration-200 hover:scale-110
-                                hover:bg-background"
+                <!-- Custom dropdown with controlled animations -->
+                <div class="relative">
+                    <button
+                        @click="toggleDropdown"
+                        class="bg-background/80 group rounded-lg border-2
+                            border-border p-1.5 shadow-lg backdrop-blur-sm
+                            transition-all duration-200 hover:scale-110
+                            hover:bg-background focus:outline-none focus:ring-0"
+                    >
+                        <ChevronLeft
+                            :size="14"
+                            :class="[
+                                'text-muted-foreground transition-transform duration-200 group-hover:text-foreground',
+                                showThemeDropdown && 'rotate-90',
+                            ]"
+                        />
+                    </button>
+
+                    <Transition
+                        enter-active-class="transition-all duration-300 ease-apple-bounce"
+                        leave-active-class="transition-all duration-250 ease-out"
+                        enter-from-class="opacity-0 scale-95 -translate-y-2"
+                        enter-to-class="opacity-100 scale-100 translate-y-0"
+                        leave-from-class="opacity-100 scale-100 translate-y-0"
+                        leave-to-class="opacity-0 scale-95 -translate-y-2"
+                    >
+                        <div
+                            v-if="showThemeDropdown"
+                            class="absolute right-0 top-full z-50 mt-2
+                                min-w-[140px] origin-top-right rounded-md border
+                                bg-popover text-popover-foreground shadow-md"
+                            @click.stop
                         >
-                            <ChevronLeft
-                                :size="14"
-                                class="text-muted-foreground transition-transform
-                                    duration-200 group-hover:text-foreground
-                                    group-data-[state=open]:rotate-90"
-                            />
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" class="min-w-[140px]">
-                        <DropdownMenuLabel>Card Theme</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuRadioGroup v-model="store.selectedCardVariant">
-                            <DropdownMenuRadioItem value="default">
-                                Default
-                            </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="bronze">
-                                Bronze
-                            </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="silver">
-                                Silver
-                            </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="gold">
-                                Gold
-                            </DropdownMenuRadioItem>
-                        </DropdownMenuRadioGroup>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                            <div class="p-1">
+                                <div class="px-2 py-1.5 text-sm font-semibold">
+                                    Card Theme
+                                </div>
+                                <div class="my-1 h-px bg-border"></div>
+
+                                <button
+                                    v-for="option in themeOptions"
+                                    :key="option.value"
+                                    @click="selectTheme(option.value)"
+                                    :class="[
+                                        'flex w-full items-center rounded-sm px-2 py-1.5 text-sm',
+                                        'transition-colors hover:bg-accent hover:text-accent-foreground',
+                                        'focus:bg-accent focus:text-accent-foreground focus:outline-none',
+                                        store.selectedCardVariant ===
+                                            option.value &&
+                                            'bg-accent text-accent-foreground',
+                                    ]"
+                                >
+                                    <div class="flex items-center gap-2">
+                                        <div
+                                            :class="[
+                                                'h-2 w-2 rounded-full border',
+                                                store.selectedCardVariant ===
+                                                option.value
+                                                    ? 'border-primary bg-primary'
+                                                    : 'border-muted-foreground',
+                                            ]"
+                                        ></div>
+                                        {{ option.label }}
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </Transition>
+                </div>
             </div>
             <!-- Header Section -->
             <CardHeader>
                 <div class="flex items-center justify-between">
                     <CardTitle class="themed-title transition-all duration-200">
-                        <ShimmerText 
-                            :text="entry.word" 
+                        <ShimmerText
+                            :text="entry.word"
                             text-class="text-word-title"
-                            :duration="2000"
-                            :interval="25"
+                            :duration="600"
+                            :interval="1000"
+                            :random-delay="false"
                         />
                     </CardTitle>
                 </div>
@@ -94,188 +131,197 @@
                         class="h-6 px-2 py-1 text-xs transition-all duration-200
                             hover:opacity-80"
                     >
-                        {{ pronunciationMode === 'phonetic' ? 'IPA' : 'Phonetic' }}
+                        {{
+                            pronunciationMode === 'phonetic'
+                                ? 'IPA'
+                                : 'Phonetic'
+                        }}
                     </Button>
                 </div>
             </CardHeader>
 
-            <!-- Gradient Divider -->
-            <div class="relative h-px w-full overflow-hidden">
-                <div
-                    class="absolute inset-0 bg-gradient-to-r from-transparent
-                        via-primary/30 to-transparent"
-                />
+            <!-- Themed Gradient Divider -->
+            <div>
+                <div class="relative h-0.5 w-full">
+                    <div class="themed-hr absolute inset-0" />
+                </div>
             </div>
 
             <!-- Dictionary Mode Definitions -->
             <CardContent v-if="mode === 'dictionary'" class="grid gap-4">
-            <div
-                v-for="cluster in groupedDefinitions"
-                :key="cluster.clusterId"
-                :data-cluster-id="cluster.clusterId"
-                class="space-y-4"
-            >
-                <!-- Cluster header with gradient divider -->
-                <div v-if="groupedDefinitions.length > 1" class="pb-2">
-                    <h4
-                        class="mb-2 text-base font-semibold tracking-wider
-                            text-foreground uppercase"
-                    >
-                        {{ cluster.clusterDescription }}
-                    </h4>
-                    <!-- Gradient HR -->
-                    <hr
-                        class="h-px border-0 bg-gradient-to-r from-transparent
-                            via-border to-transparent"
-                    />
-                </div>
-
                 <div
-                    v-for="(definition, index) in cluster.definitions"
-                    :key="`${cluster.clusterId}-${index}`"
-                    :data-word-type="`${cluster.clusterId}-${definition.word_type}`"
-                    class="space-y-3"
+                    v-for="cluster in groupedDefinitions"
+                    :key="cluster.clusterId"
+                    :data-cluster-id="cluster.clusterId"
+                    class="space-y-4"
                 >
-                    <!-- Separator for all but first -->
-                    <hr v-if="index > 0" class="my-2 border-border" />
-
-                    <div class="flex items-center gap-2">
-                        <span class="themed-word-type">
-                            {{ definition.word_type }}
-                        </span>
-                        <sup
-                            class="text-sm font-normal text-muted-foreground"
-                            >{{ index + 1 }}</sup
+                    <!-- Cluster header with gradient divider -->
+                    <div v-if="groupedDefinitions.length > 1" class="mt-6 pb-2">
+                        <h4
+                            class="themed-cluster-title mb-2 text-base font-bold
+                                uppercase tracking-wider"
                         >
+                            {{ cluster.clusterDescription }}
+                        </h4>
+                        <!-- Themed Gradient HR -->
+                        <div class="themed-hr h-px" />
                     </div>
 
-                    <div class="border-l-2 border-accent pl-4">
-                        <p class="text-definition mb-2">
-                            {{ definition.definition }}
-                        </p>
+                    <div
+                        v-for="(definition, index) in cluster.definitions"
+                        :key="`${cluster.clusterId}-${index}`"
+                        :data-word-type="`${cluster.clusterId}-${definition.word_type}`"
+                        class="space-y-3"
+                    >
+                        <!-- Separator for all but first -->
+                        <hr v-if="index > 0" class="my-2 border-border" />
 
-                        <!-- Examples -->
-                        <div
-                            v-if="
-                                definition.examples &&
-                                (definition.examples.generated.length > 0 ||
-                                    definition.examples.literature.length > 0)
-                            "
-                            class="mb-2 space-y-1"
-                        >
-                            <!-- Examples header with regenerate button -->
-                            <div class="mb-1 mt-3 flex items-center justify-between">
-                                <span
-                                    class="text-sm tracking-wider
-                                        text-muted-foreground uppercase"
-                                    >Examples</span
+                        <div class="flex items-center gap-2">
+                            <span class="themed-word-type">
+                                {{ definition.word_type }}
+                            </span>
+                            <sup
+                                class="text-sm font-normal
+                                    text-muted-foreground"
+                                >{{ index + 1 }}</sup
+                            >
+                        </div>
+
+                        <div class="border-l-2 border-accent pl-4">
+                            <p class="text-definition mb-2">
+                                {{ definition.definition }}
+                            </p>
+
+                            <!-- Examples -->
+                            <div
+                                v-if="
+                                    definition.examples &&
+                                    (definition.examples.generated.length > 0 ||
+                                        definition.examples.literature.length >
+                                            0)
+                                "
+                                class="mb-2 space-y-1"
+                            >
+                                <!-- Examples header with regenerate button -->
+                                <div
+                                    class="mb-1 mt-3 flex items-center
+                                        justify-between"
                                 >
-                                <button
-                                    v-if="
-                                        definition.examples.generated.length > 0
-                                    "
-                                    @click="handleRegenerateExamples(index)"
-                                    :class="[
-                                        'group flex items-center gap-1 rounded-md px-2 py-1',
-                                        'text-sm transition-all duration-200',
-                                        'hover:bg-primary/10',
-                                        regeneratingIndex === index
-                                            ? 'text-primary'
-                                            : 'text-muted-foreground hover:text-primary',
-                                    ]"
-                                    :disabled="regeneratingIndex === index"
-                                    title="Regenerate examples"
-                                >
-                                    <RefreshCw
-                                        :size="12"
+                                    <span
+                                        class="text-sm uppercase tracking-wider
+                                            text-muted-foreground"
+                                        >Examples</span
+                                    >
+                                    <button
+                                        v-if="
+                                            definition.examples.generated
+                                                .length > 0
+                                        "
+                                        @click="handleRegenerateExamples(index)"
                                         :class="[
-                                            'transition-transform duration-300',
-                                            'group-hover:rotate-180',
-                                            regeneratingIndex === index &&
-                                                'animate-spin',
+                                            'group flex items-center gap-1 rounded-md px-2 py-1',
+                                            'text-sm transition-all duration-200',
+                                            'hover:bg-primary/10',
+                                            regeneratingIndex === index
+                                                ? 'text-primary'
+                                                : 'text-muted-foreground hover:text-primary',
                                         ]"
-                                    />
-                                </button>
+                                        :disabled="regeneratingIndex === index"
+                                        title="Regenerate examples"
+                                    >
+                                        <RefreshCw
+                                            :size="12"
+                                            :class="[
+                                                'transition-transform duration-300',
+                                                'group-hover:rotate-180',
+                                                regeneratingIndex === index &&
+                                                    'animate-spin',
+                                            ]"
+                                        />
+                                    </button>
+                                </div>
+
+                                <p
+                                    v-for="(
+                                        example, exIndex
+                                    ) in definition.examples.generated.concat(
+                                        definition.examples.literature
+                                    )"
+                                    :key="exIndex"
+                                    class="themed-example-text text-base italic
+                                        text-muted-foreground"
+                                    v-html="
+                                        `&quot;${formatExampleHTML(example.sentence, entry.word)}&quot;`
+                                    "
+                                ></p>
                             </div>
 
-                            <p
-                                v-for="(
-                                    example, exIndex
-                                ) in definition.examples.generated.concat(
-                                    definition.examples.literature
-                                )"
-                                :key="exIndex"
-                                class="text-base text-muted-foreground italic themed-example-text"
-                                v-html="
-                                    `&quot;${formatExampleHTML(example.sentence, entry.word)}&quot;`
+                            <!-- Synonyms -->
+                            <div
+                                v-if="
+                                    definition.synonyms &&
+                                    definition.synonyms.length > 0
                                 "
-                            ></p>
-                        </div>
-
-                        <!-- Synonyms -->
-                        <div
-                            v-if="
-                                definition.synonyms &&
-                                definition.synonyms.length > 0
-                            "
-                            class="flex flex-wrap gap-1 pt-2"
-                        >
-                            <!-- <span class="self-center pr-2 text-xs">Synonyms:</span> -->
-                            <span
-                                v-for="synonym in definition.synonyms"
-                                :key="synonym"
-                                class="themed-synonym cursor-pointer"
-                                @click="store.searchWord(synonym)"
+                                class="flex flex-wrap gap-1 pt-2"
                             >
-                                {{ synonym }}
-                            </span>
+                                <!-- <span class="self-center pr-2 text-xs">Synonyms:</span> -->
+                                <span
+                                    v-for="synonym in definition.synonyms"
+                                    :key="synonym"
+                                    class="themed-synonym cursor-pointer"
+                                    @click="store.searchWord(synonym)"
+                                >
+                                    {{ synonym }}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </CardContent>
+            </CardContent>
 
             <!-- Thesaurus Mode -->
             <CardContent
                 v-if="mode === 'thesaurus' && thesaurusData"
                 class="space-y-6"
             >
-            <div
-                v-if="thesaurusData.synonyms.length > 0"
-                class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
-            >
-                <Card
-                    v-for="synonym in thesaurusData.synonyms"
-                    :key="synonym.word"
-                    :class="
-                        cn(
-                            'cursor-pointer py-2 transition-all duration-300 hover:scale-105 hover:shadow-lg',
-                            getHeatmapClass(synonym.score)
-                        )
-                    "
-                    @click="store.searchWord(synonym.word)"
+                <div
+                    v-if="thesaurusData.synonyms.length > 0"
+                    class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
                 >
-                    <CardContent class="px-3 py-0.5">
-                        <div class="font-medium">{{ synonym.word }}</div>
-                        <div class="text-sm opacity-75">
-                            {{ Math.round(synonym.score * 100) }}% similar
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        </CardContent>
+                    <Card
+                        v-for="synonym in thesaurusData.synonyms"
+                        :key="synonym.word"
+                        :class="
+                            cn(
+                                'cursor-pointer py-2 transition-all duration-300 hover:scale-105 hover:shadow-lg',
+                                getHeatmapClass(synonym.score)
+                            )
+                        "
+                        @click="store.searchWord(synonym.word)"
+                    >
+                        <CardContent class="px-3 py-0.5">
+                            <div class="font-medium">{{ synonym.word }}</div>
+                            <div class="text-sm opacity-75">
+                                {{ Math.round(synonym.score * 100) }}% similar
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </CardContent>
 
             <!-- Etymology -->
             <CardContent v-if="entry && entry.etymology" class="space-y-4">
                 <h3 class="text-lg font-semibold">Etymology</h3>
-                <p class="text-base text-muted-foreground">{{ entry.etymology }}</p>
+                <p class="text-base text-muted-foreground">
+                    {{ entry.etymology }}
+                </p>
             </CardContent>
         </ThemedCard>
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAppStore } from '@/stores';
 import { cn, getHeatmapClass } from '@/utils';
@@ -284,21 +330,21 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ThemedCard } from '@/components/custom/card';
 import { ShimmerText } from '@/components/custom/animation';
 import { ProgressiveSidebar } from '@/components/custom/navigation';
-import {
-    DropdownMenu,
-    DropdownMenuTrigger,
-    DropdownMenuContent,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuRadioGroup,
-    DropdownMenuRadioItem,
-} from '@/components/ui/dropdown-menu';
 import { RefreshCw, ChevronLeft } from 'lucide-vue-next';
 
 // Track mounting state for dropdown
 const isMounted = ref(false);
 // Track which definition is regenerating
 const regeneratingIndex = ref<number | null>(null);
+
+// Custom dropdown state
+const showThemeDropdown = ref(false);
+const themeOptions = [
+    { label: 'Default', value: 'default' },
+    { label: 'Bronze', value: 'bronze' },
+    { label: 'Silver', value: 'silver' },
+    { label: 'Gold', value: 'gold' },
+];
 
 onMounted(() => {
     isMounted.value = true;
@@ -325,16 +371,16 @@ const pronunciationMode = computed(() => store.pronunciationMode);
 
 // Check if sidebar should be shown (same logic as ProgressiveSidebar)
 const shouldShowSidebar = computed(() => {
-  if (!entry.value?.definitions) return false;
-  
-  const clusters = new Set();
-  entry.value.definitions.forEach(def => {
-    clusters.add(def.meaning_cluster || 'default');
-  });
-  
-  const hasMultipleClusters = clusters.size > 1;
-  // We'll assume desktop for this computed, actual responsive check happens in CSS
-  return hasMultipleClusters;
+    if (!entry.value?.definitions) return false;
+
+    const clusters = new Set();
+    entry.value.definitions.forEach((def) => {
+        clusters.add(def.meaning_cluster || 'default');
+    });
+
+    const hasMultipleClusters = clusters.size > 1;
+    // We'll assume desktop for this computed, actual responsive check happens in CSS
+    return hasMultipleClusters;
 });
 
 // Word type ordering for consistent display
@@ -456,6 +502,35 @@ const formatExampleHTML = (example: string, word: string): string => {
         `<strong class="hover-word">${word}</strong>`
     );
 };
+
+// Custom dropdown handlers
+const toggleDropdown = () => {
+    showThemeDropdown.value = !showThemeDropdown.value;
+};
+
+const selectTheme = (theme: string) => {
+    store.selectedCardVariant = theme as any;
+    showThemeDropdown.value = false;
+};
+
+// Close dropdown when clicking outside
+const handleClickOutside = (event: Event) => {
+    if (showThemeDropdown.value) {
+        const target = event.target as Element;
+        if (!target.closest('.relative')) {
+            showThemeDropdown.value = false;
+        }
+    }
+};
+
+onMounted(() => {
+    isMounted.value = true;
+    document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+    document.removeEventListener('click', handleClickOutside);
+});
 </script>
 
 <style scoped>
@@ -463,6 +538,11 @@ const formatExampleHTML = (example: string, word: string): string => {
 .hover-word {
     transition: all 0.2s ease;
     cursor: default;
+}
+
+/* Custom dropdown styling for better theme integration */
+.dropdown-content {
+    transform-origin: top right;
 }
 
 .hover-word:hover {

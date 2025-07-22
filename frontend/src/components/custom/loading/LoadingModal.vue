@@ -7,6 +7,7 @@
                 text-class="text-6xl lg:text-8xl font-black pb-8"
                 :offset="0.15"
                 :show-dots="progress < 100"
+                :force-single-line="true"
             />
 
             <!-- Progress Component -->
@@ -50,7 +51,7 @@
                     />
                 </div>
 
-                <div class="max-h-48 space-y-4 overflow-y-auto p-2">
+                <div class="space-y-4 p-2">
                     <div
                         v-for="(fact, index) in facts"
                         :key="index"
@@ -189,22 +190,5 @@ const modelValue = computed({
     opacity: 0;
 }
 
-/* Custom scrollbar for facts */
-.space-y-3::-webkit-scrollbar {
-    width: 6px;
-}
 
-.space-y-3::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-}
-
-.space-y-3::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
-}
-
-.space-y-3::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.5);
-}
 </style>

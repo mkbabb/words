@@ -1,13 +1,24 @@
 <template>
-    <div class="relative text-center">
+    <div class="relative text-center" :class="{ 'flex justify-center': forceSingleLine }">
         <h1
             class="depth-text relative z-10 select-none"
-            :class="['font-fraunces', textClass, 'text-black dark:text-white']"
+            :class="[
+                'font-fraunces', 
+                textClass, 
+                'text-black dark:text-white',
+                { 
+                    'flex flex-nowrap items-baseline': forceSingleLine,
+                    'whitespace-nowrap': forceSingleLine
+                }
+            ]"
         >
             <template v-for="(char, index) in currentText" :key="index">
                 <span
                     v-if="char !== '\n'"
-                    class="lift-down inline-block"
+                    :class="[
+                        'lift-down',
+                        forceSingleLine ? 'flex-shrink-0' : 'inline-block'
+                    ]"
                     :style="{
                         animationDelay: `${index * offset}s`,
                         animationDuration: duration,
@@ -46,12 +57,14 @@ interface Props {
     textClass?: string;
     offset?: number;
     showDots?: boolean;
+    forceSingleLine?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     textClass: 'text-7xl font-black',
     offset: 0.2,
     showDots: false,
+    forceSingleLine: false,
 });
 
 const newText = computed(() => props.text.replace(/ /g, HTML_SPACE));
@@ -60,6 +73,9 @@ const brokenText = computed(() =>
 );
 
 const currentText = computed(() => {
+    if (props.forceSingleLine) {
+        return newText.value;
+    }
     return width.value < 768 ? brokenText.value : newText.value;
 });
 
