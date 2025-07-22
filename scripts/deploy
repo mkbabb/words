@@ -274,10 +274,10 @@ verify_deployment() {
 # Cleanup temporary files
 cleanup() {
     if is_github_actions; then
-        rm -f ~/.ssh/deploy_key .env.production 2>/dev/null || true
-    else
-        rm -f .env.production 2>/dev/null || true
+        rm -f ~/.ssh/deploy_key 2>/dev/null || true
+        # Note: .env.production should not be deleted - it's a persistent config file
     fi
+    # For local deployments, don't delete any config files
 }
 
 # Main deployment function
