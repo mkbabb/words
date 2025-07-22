@@ -338,7 +338,7 @@ const groupedDefinitions = computed(() => {
             ? clusterId
                   .replace(/_/g, ' ')
                   .replace(/\b\w/g, (l) => l.toUpperCase())
-                  .replace(new RegExp(`\\b${entry.value.word}\\b`, 'gi'), '')
+                  .replace(new RegExp(`\\b${entry.value?.word}\\b`, 'gi'), '')
                   .trim()
             : 'General';
 
