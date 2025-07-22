@@ -1,10 +1,10 @@
 <template>
-  <div class="w-full max-w-lg space-y-4">
+  <div class="w-full space-y-4">
     <!-- Progress Bar -->
     <div class="relative">
       <div
         ref="progressBarRef"
-        class="h-6 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+        class="h-8 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
         :class="[
           'shadow-inner',
           'border border-gray-300 dark:border-gray-600',
@@ -24,33 +24,46 @@
       </div>
 
       <!-- Checkpoint Markers -->
-      <div class="absolute inset-0 flex items-center justify-between px-1">
+      <div class="absolute inset-0 flex items-center">
         <div
           v-for="(checkpoint, index) in checkpoints"
           :key="index"
-          class="group relative"
-          @click="handleCheckpointClick(checkpoint)"
+          class="absolute"
+          :style="{ 
+            left: checkpoint.progress === 0 ? '16px' : checkpoint.progress === 100 ? 'calc(100% - 16px)' : `${checkpoint.progress}%`, 
+            top: '50%',
+            transform: checkpoint.progress === 0 || checkpoint.progress === 100 ? 'translateX(-50%) translateY(-50%)' : 'translateX(-50%) translateY(-50%)'
+          }"
         >
-          <div
-            class="h-3 w-3 rounded-full border-2 transition-all duration-300"
-            :class="[
-              progress >= checkpoint.progress
-                ? 'scale-125 border-primary shadow-lg shadow-primary/30'
-                : 'border-gray-400 dark:border-gray-500',
-              interactive ? 'cursor-pointer hover:scale-150' : 'cursor-help hover:scale-150',
-            ]"
-          />
-          <!-- Tooltip -->
-          <div
-            class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-3 -translate-x-1/2 whitespace-nowrap opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-[-2px]"
+          <HoverCard
+            :open-delay="100"
+            :close-delay="50"
           >
-            <div class="rounded-lg border border-white/20 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md px-3 py-1.5 shadow-xl">
-              <span class="text-xs font-medium text-gray-800 dark:text-gray-200">{{ checkpoint.label }}</span>
-              <div class="absolute top-full left-1/2 -mt-[1px] h-0 w-0 -translate-x-1/2">
-                <div class="border-t-8 border-r-8 border-l-8 border-t-white/90 dark:border-t-gray-900/90 border-r-transparent border-l-transparent" />
+            <HoverCardTrigger>
+              <div
+                class="h-6 w-6 rounded-full border-[1.5px] transition-all duration-300 backdrop-blur-sm bg-white/20 dark:bg-gray-800/30"
+                :class="[
+                  progress >= checkpoint.progress
+                    ? 'scale-110 border-primary/70 shadow-lg shadow-primary/20 bg-primary/10'
+                    : 'border-gray-400/50 dark:border-gray-500/50',
+                  interactive ? 'cursor-pointer hover:scale-125' : 'cursor-help hover:scale-125',
+                ]"
+                @click="handleCheckpointClick(checkpoint)"
+              />
+            </HoverCardTrigger>
+          <HoverCardContent class="w-60" side="top" :side-offset="16" align="center" :align-offset="0">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 class="font-semibold text-sm">{{ checkpoint.label }}</h4>
+                <span class="text-xs text-primary font-medium">{{ checkpoint.progress }}%</span>
               </div>
+              <hr class="border-border/30">
+              <p class="text-xs text-muted-foreground leading-relaxed">
+                {{ getCheckpointDescription(checkpoint.progress) }}
+              </p>
             </div>
-          </div>
+          </HoverCardContent>
+          </HoverCard>
         </div>
       </div>
     </div>
@@ -67,6 +80,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { generateRainbowGradient } from '@/utils/animations'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 
 interface Checkpoint {
   progress: number
@@ -85,12 +99,14 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
   checkpoints: () => [
+    { progress: 0, label: 'Start' },
     { progress: 10, label: 'Search' },
     { progress: 40, label: 'Fetch' },
     { progress: 50, label: 'Cluster' },
     { progress: 60, label: 'Synthesize' },
     { progress: 70, label: 'Examples' },
     { progress: 90, label: 'Save' },
+    { progress: 100, label: 'Complete' },
   ],
   interactive: false,
 })
@@ -101,6 +117,21 @@ const progressBarRef = ref<HTMLElement>()
 const isDragging = ref(false)
 
 const rainbowGradient = computed(() => generateRainbowGradient(8))
+
+// Get descriptive text for checkpoint stages
+const getCheckpointDescription = (progress: number): string => {
+  const descriptions: Record<number, string> = {
+    0: 'Pipeline initialization and setup phase. Preparing search engines and AI processing systems.',
+    10: 'Searching through multiple dictionary sources including Wiktionary, Oxford, and Dictionary.com.',
+    40: 'Gathering definitions from various providers and performing data validation.',
+    50: 'Analyzing semantic patterns and clustering related definitions using AI.',
+    60: 'Synthesizing comprehensive definitions with AI-powered meaning extraction.',
+    70: 'Generating contextual usage examples and finding related terms.',
+    90: 'Saving processed data to knowledge base and updating search indices.',
+    100: 'Pipeline complete! Ready to display comprehensive word information.'
+  }
+  return descriptions[progress] || 'Processing pipeline stage...'
+}
 
 // Handle checkpoint click
 const handleCheckpointClick = (checkpoint: Checkpoint) => {

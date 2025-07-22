@@ -170,10 +170,7 @@ export function generateRainbowGradient(steps: number = 7): string {
 }
 
 // Animated rainbow gradient with time-based shifting
-export function generateAnimatedRainbowGradient(
-  animationSpeed: number = 1,
-  steps: number = 7
-): string {
+export function generateAnimatedRainbowGradient(): string {
   const baseColors = [
     'rgb(239, 68, 68)',   // red-500
     'rgb(249, 115, 22)',  // orange-500  

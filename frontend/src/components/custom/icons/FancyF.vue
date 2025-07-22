@@ -77,7 +77,7 @@ const fancyFSubscript = ref<HTMLElement>();
 
 // Handle click with bouncy animation
 const handleClick = () => {
-  if (!props.clickable) return;
+  if (!props.clickable || !fancyFMain.value || !fancyFSubscript.value) return;
   
   // Ultra-bouncy click animation
   const timeline = gsap.timeline();
@@ -113,7 +113,7 @@ const handleClick = () => {
 
 // Continuous subtle breathing animation when not clicked
 const startBreathingAnimation = () => {
-  if (!props.clickable) return;
+  if (!props.clickable || !fancyFMain.value || !fancyFSubscript.value) return;
   
   gsap.to([fancyFMain.value, fancyFSubscript.value], {
     scale: 1.02,

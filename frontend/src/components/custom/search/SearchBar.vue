@@ -2,8 +2,9 @@
   <div
     ref="searchContainer"
     :class="[
-      'search-container relative z-50 mx-auto origin-top',
-      'w-full',
+      'search-container relative z-50 origin-top',
+      'w-full max-w-60 sm:max-w-xs md:max-w-md lg:max-w-4xl',
+      'mx-auto',
       props.className
     ]"
     :style="containerStyle"
@@ -25,7 +26,7 @@
           }
         ]"
       >
-        <!-- Mode Toggle -->
+        <!-- Mode Toggle - Fixed to left edge -->
         <div
           :class="[
             'flex items-center justify-center overflow-hidden transition-all duration-300 ease-out flex-shrink-0'
@@ -34,8 +35,8 @@
             opacity: iconOpacity,
             transform: `scale(${0.9 + iconOpacity * 0.1})`,
             pointerEvents: iconOpacity > 0.1 ? 'auto' : 'none',
-            width: `${iconOpacity * 48}px`,
-            marginRight: `${iconOpacity * 8}px`
+            width: iconOpacity > 0.1 ? '48px' : '0px',
+            marginRight: iconOpacity > 0.1 ? '8px' : '0px'
           }"
         >
           <FancyF
@@ -46,8 +47,8 @@
           />
         </div>
 
-        <!-- Search Input Container with Autocomplete -->
-        <div class="relative flex-1 min-w-0 flex-grow">
+        <!-- Search Input Container with Autocomplete - Maximum space -->
+        <div class="relative flex-1 min-w-0 flex-grow max-w-none">
           <!-- Autocomplete Preview Text -->
           <div
             v-if="autocompleteText"
@@ -92,7 +93,7 @@
           />
         </div>
 
-        <!-- Regenerate Button - Only shows when we have a current entry and in lookup mode -->
+        <!-- Regenerate Button - Same size as hamburger -->
         <div
           v-if="store.currentEntry && store.searchMode === 'lookup'"
           :class="[
@@ -102,18 +103,19 @@
             opacity: iconOpacity,
             transform: `scale(${0.9 + iconOpacity * 0.1})`,
             pointerEvents: iconOpacity > 0.1 ? 'auto' : 'none',
-            width: `${iconOpacity * 48}px`,
-            marginLeft: `${iconOpacity * 8}px`
+            width: iconOpacity > 0.1 ? '48px' : '0px',
+            marginLeft: iconOpacity > 0.1 ? '8px' : '0px'
           }"
         >
           <button
             @click="handleForceRegenerate"
+            @mouseenter="handleRegenerateHover"
+            @mouseleave="handleRegenerateLeave"
             :class="[
-              'flex h-10 w-10 items-center justify-center rounded-lg',
+              'flex h-12 w-12 items-center justify-center rounded-lg',
               store.forceRefreshMode ? 'bg-primary/20 text-primary' : '',
-              'hover:bg-muted/50 active:scale-95'
+              'hover:bg-muted/50 transition-all duration-200 ease-out'
             ]"
-            style="transition: background-color 150ms ease-out, transform 150ms ease-out"
             :title="store.forceRefreshMode ? 'Force refresh mode ON - Next lookup will regenerate' : 'Toggle force refresh mode'"
           >
             <RefreshCw 
@@ -126,7 +128,7 @@
           </button>
         </div>
 
-        <!-- Hamburger Button -->
+        <!-- Hamburger Button - Always visible -->
         <div
           :class="[
             'overflow-hidden transition-all duration-300 ease-out flex-shrink-0'
@@ -135,24 +137,28 @@
             opacity: iconOpacity,
             transform: `scale(${0.9 + iconOpacity * 0.1})`,
             pointerEvents: iconOpacity > 0.1 ? 'auto' : 'none',
-            width: `${iconOpacity * 48}px`,
-            marginLeft: `${iconOpacity * 8}px`
+            width: iconOpacity > 0.1 ? '48px' : '0px',
+            marginLeft: iconOpacity > 0.1 ? '8px' : '0px'
           }"
         >
           <HamburgerIcon
-            :is-open="store.showControls"
+            :is-open="showControls"
             @toggle="handleHamburgerClick"
           />
         </div>
 
+
         <!-- Progress Bar -->
         <div
           v-if="store.loadingProgress > 0"
-          class="absolute right-0 -bottom-1 left-0 h-1 overflow-hidden"
+          class="absolute right-0 -bottom-2 left-0 h-2 overflow-hidden"
         >
           <div
-            class="h-full rounded-full bg-gradient-to-r from-purple-600/80 via-purple-500/70 to-purple-600/80 transition-[width] duration-300"
-            :style="{ width: `${store.loadingProgress}%` }"
+            class="h-full rounded-full transition-[width] duration-300"
+            :style="{ 
+              width: `${store.loadingProgress}%`,
+              background: rainbowGradient
+            }"
           />
         </div>
       </div>
@@ -169,10 +175,11 @@
           leave-to-class="opacity-0 scale-95 -translate-y-4"
         >
           <div
-            v-if="store.showControls"
+            v-if="showControls"
             ref="controlsDropdown"
             class="dropdown-element border-border bg-background/20 cartoon-shadow-sm mb-2 rounded-2xl border-2 backdrop-blur-3xl overflow-hidden origin-top"
             @mousedown.prevent
+            @click="handleSearchAreaInteraction"
           >
             <!-- Search Mode Toggle -->
           <div class="border-border/50 px-4 py-3">
@@ -236,22 +243,23 @@
           </div>
         </Transition>
 
-        <!-- Search Results Dropdown with smooth positioning -->
-        <Transition
-          enter-active-class="transition-all duration-300 ease-apple-bounce"
-          leave-active-class="transition-all duration-300 ease-apple-bounce"
-          enter-from-class="opacity-0 scale-95 translate-y-4"
-          enter-to-class="opacity-100 scale-100 translate-y-0"
-          leave-from-class="opacity-100 scale-100 translate-y-0"
-          leave-to-class="opacity-0 scale-95 translate-y-4"
-        >
-          <div
-            v-if="showSearchResults"
-            ref="searchResultsDropdown"
-            class="dropdown-element border-border bg-background/20 cartoon-shadow-sm rounded-2xl border-2 backdrop-blur-3xl overflow-hidden origin-top transition-all duration-300 ease-apple-bounce"
-            :style="searchResultsStyle"
-            @mousedown.prevent
+        <!-- Search Results Container with coordinated positioning -->
+        <div :style="resultsContainerStyle">
+          <Transition
+            enter-active-class="transition-all duration-300 ease-apple-bounce"
+            leave-active-class="transition-all duration-250 ease-out"
+            enter-from-class="opacity-0 scale-95 translate-y-4"
+            enter-to-class="opacity-100 scale-100 translate-y-0"
+            leave-from-class="opacity-100 scale-100 translate-y-0"
+            leave-to-class="opacity-0 scale-95 translate-y-4"
           >
+            <div
+              v-if="showResults"
+              ref="searchResultsDropdown"
+              class="dropdown-element border-border bg-background/20 cartoon-shadow-sm rounded-2xl border-2 backdrop-blur-3xl overflow-hidden origin-top"
+              @mousedown.prevent
+              @click="handleSearchAreaInteraction"
+            >
             <!-- Loading State -->
           <div v-if="isSearching && searchResults.length === 0" class="p-4">
             <div class="flex items-center gap-2">
@@ -329,8 +337,9 @@
           >
             No matches found
           </div>
-          </div>
-        </Transition>
+            </div>
+          </Transition>
+        </div>
       </div>
     </div>
   </div>
@@ -354,6 +363,7 @@ import { FancyF, HamburgerIcon } from '@/components/custom/icons';
 import { BouncyToggle } from '@/components/custom/animation';
 import { Sparkles, RefreshCw } from 'lucide-vue-next';
 import { WiktionaryIcon, OxfordIcon, DictionaryIcon } from '@/components/custom/icons';
+import { generateRainbowGradient } from '@/utils/animations';
 
 interface SearchBarProps {
   className?: string;
@@ -368,6 +378,7 @@ const emit = defineEmits<{
   blur: [];
   mouseenter: [];
   mouseleave: [];
+  'stage-enter': [query: string];
 }>();
 
 const props = withDefaults(defineProps<SearchBarProps>(), {
@@ -389,6 +400,11 @@ const isContainerHovered = ref(false);
 const isFocused = ref(false);
 const isShrunken = ref(false);
 const regenerateRotation = ref(0);
+
+// Enhanced dropdown state management
+const showControls = ref(false);
+const showResults = ref(false);
+const isInteractingWithSearchArea = ref(false);
 
 // State machine for scroll/hover behavior
 type SearchBarState = 'normal' | 'scrolled' | 'hovering' | 'focused';
@@ -435,19 +451,31 @@ const placeholder = computed(() =>
     ? 'Enter a word to define...'
     : 'Enter a word to find synonyms...'
 );
+const rainbowGradient = computed(() => generateRainbowGradient(8));
 
-// Computed style for search results positioning with smooth animation
-const searchResultsStyle = computed(() => {
-  // Animate search results position based on controls visibility
+// Enhanced computed properties for coordinated dropdown management
+const shouldShowResults = computed(() => {
+  return isFocused.value && query.value.length > 0 && 
+    (searchResults.value.length > 0 || isSearching.value || query.value.length >= 2);
+});
+
+// Dynamic positioning: results move down when controls are shown
+const resultsContainerStyle = computed(() => {
   return {
-    transform: store.showControls ? 'translateY(0px)' : 'translateY(-8px)',
-    marginTop: store.showControls ? '8px' : '0px'
+    paddingTop: showControls.value ? '8px' : '0px',
+    transition: 'all 300ms cubic-bezier(0.25, 0.1, 0.25, 1)'
   };
 });
 
-const showSearchResults = computed(() => {
-  return isFocused.value && query.value.length > 0 && 
-    (searchResults.value.length > 0 || isSearching.value || query.value.length >= 2);
+
+
+// Sync reactive state with computed
+watch(shouldShowResults, (newVal) => {
+  showResults.value = newVal;
+});
+
+watch(() => store.showControls, (newVal) => {
+  showControls.value = newVal;
 });
 
 
@@ -571,38 +599,43 @@ const iconOpacity = computed(() => {
 });
 
 
-// Smooth style transitions based on state
+// Smooth style transitions with optimized max-width for mobile and desktop
 const containerStyle = computed(() => {
   const progress = Math.min(scrollProgress.value / scrollInflectionPoint.value, 1);
   
-  // Focused/hovered states: full size but bounded
+  // Use CSS clamp for responsive width
+  const responsiveMaxWidth = 'min(40rem, calc(100vw - 2rem))';
+  
+  // Focused/hovered states: full size but responsive
   if (currentState.value === 'focused' || isContainerHovered.value) {
     return {
-      maxWidth: '24rem',
+      maxWidth: responsiveMaxWidth,
       transform: 'scale(1)',
       opacity: '1',
       transition: 'all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
     };
   }
   
-  // Controls/results shown: prevent shrinking but still bounded
-  if (store.showControls || showSearchResults.value) {
+  // Controls/results shown: prevent shrinking but responsive
+  if (showControls.value || showResults.value) {
     return {
-      maxWidth: '24rem',
+      maxWidth: responsiveMaxWidth,
       transform: 'scale(1)',
       opacity: '1',
       transition: 'all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
     };
   }
   
-  // Scroll-based shrinking with strict bounds
+  // Scroll-based shrinking with responsive bounds
   const clampedProgress = Math.max(0, Math.min(progress, 1));
-  const baseWidth = Math.max(18, 24 - (clampedProgress * 6)); // Bounded: 24rem -> 18rem
   const scale = Math.max(0.85, 1 - (clampedProgress * 0.15)); // Bounded: 1 -> 0.85
   const opacity = Math.max(0.9, 1 - (clampedProgress * 0.1)); // Bounded: 1 -> 0.9
   
+  // Shrink max-width more aggressively on scroll
+  const minWidth = 'min(32rem, calc(100vw - 4rem))';
+  
   return {
-    maxWidth: `${baseWidth}rem`,
+    maxWidth: clampedProgress > 0.5 ? minWidth : responsiveMaxWidth,
     transform: `scale(${scale})`,
     opacity: opacity.toString(),
     transition: clampedProgress > 0 ? 'all 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
@@ -687,12 +720,14 @@ const handleFocus = () => {
 };
 
 const handleBlur = () => {
-  // Small delay to allow for clicks within the search container
   setTimeout(() => {
+    if (isInteractingWithSearchArea.value) return;
+    
     isFocused.value = false;
     
-    // Only clear search results if controls are also hidden
-    if (!store.showControls) {
+    // Only hide results if not interacting with search area
+    if (!showControls.value) {
+      showResults.value = false;
       searchResults.value = [];
       isSearching.value = false;
     }
@@ -700,7 +735,7 @@ const handleBlur = () => {
     // Transition back to appropriate state based on scroll position
     const shouldBeScrolled = scrollProgress.value >= scrollInflectionPoint.value;
     transitionToState(shouldBeScrolled ? 'scrolled' : 'normal');
-  }, 150); // Small delay to allow for control interactions
+  }, 150);
 };
 
 const handleInput = (event: Event) => {
@@ -709,20 +744,28 @@ const handleInput = (event: Event) => {
   performSearch();
 };
 
-const handleEscape = () => {
-  const hasSearchResults = showSearchResults.value;
-  
-  if (hasSearchResults && store.showControls) {
-    // Both shown: hide controls first
+// Unified close handler
+const handleClose = () => {
+  if (showControls.value && showResults.value) {
+    // Both shown: hide both
     store.showControls = false;
-  } else if (store.showControls) {
-    // Only controls shown: hide them
-    store.showControls = false;
-  } else if (hasSearchResults) {
-    // Only search results shown: clear them
-    query.value = '';
+    showResults.value = false;
     searchResults.value = [];
     isSearching.value = false;
+  } else if (showControls.value) {
+    // Only controls shown: hide controls
+    store.showControls = false;
+  } else if (showResults.value) {
+    // Only results shown: hide results
+    showResults.value = false;
+    searchResults.value = [];
+    isSearching.value = false;
+  }
+};
+
+const handleEscape = () => {
+  if (showControls.value || showResults.value) {
+    handleClose();
   } else {
     // Nothing shown: blur input
     searchInput.value?.blur();
@@ -781,6 +824,18 @@ const handleEnter = async () => {
     return;
   }
 
+  // Handle stage mode - run mock pipeline instead of definition lookup
+  if (store.searchMode === 'stage' && query.value) {
+    store.searchQuery = query.value;
+    // Emit event to trigger mock pipeline in stage controls
+    emit('stage-enter', query.value);
+    // Blur the input after stage mode enter
+    nextTick(() => {
+      searchInput.value?.blur();
+    });
+    return;
+  }
+
   if (searchResults.value.length > 0 && selectedIndex.value >= 0) {
     await selectResult(searchResults.value[selectedIndex.value]);
   } else if (query.value) {
@@ -832,19 +887,41 @@ const navigateResults = (direction: number) => {
   });
 };
 
+// Enhanced interaction handlers
+const handleSearchAreaInteraction = () => {
+  isInteractingWithSearchArea.value = true;
+  setTimeout(() => {
+    isInteractingWithSearchArea.value = false;
+  }, 100);
+};
+
 const handleHamburgerClick = () => {
   store.toggleControls();
+  handleSearchAreaInteraction();
   // Restore focus to search input after toggling controls
   nextTick(() => {
     searchInput.value?.focus();
   });
 };
 
+// iOS-style regenerate button handlers
+const handleRegenerateHover = () => {
+  // Gentle rotation on hover (like iOS)
+  regenerateRotation.value += 180;
+};
+
+const handleRegenerateLeave = () => {
+  // Return to original position
+  regenerateRotation.value -= 180;
+};
+
 const handleForceRegenerate = () => {
+  handleSearchAreaInteraction();
+  
   // Toggle force refresh mode
   store.forceRefreshMode = !store.forceRefreshMode;
   
-  // Add rotation on toggle
+  // Full iOS-style rotation on click (360° + current)
   regenerateRotation.value += 360;
   
   // Restore focus to search input after toggling
@@ -864,10 +941,7 @@ const handleSourceToggle = (sourceId: string) => {
 
 const handleModeToggle = () => {
   store.toggleMode();
-  // Restore focus to search input after toggling mode
-  nextTick(() => {
-    searchInput.value?.focus();
-  });
+  // Do not modify focus state when toggling mode
 };
 
 // Autocomplete logic
@@ -932,6 +1006,8 @@ const handleSpaceKey = (event: KeyboardEvent) => {
 };
 
 const handleInputClick = (_event: MouseEvent) => {
+  handleSearchAreaInteraction();
+  
   if (autocompleteText.value && searchInput.value) {
     const input = searchInput.value;
     const cursorPosition = input.selectionStart || 0;
@@ -968,18 +1044,13 @@ const handleArrowKey = (event: KeyboardEvent) => {
   }
 };
 
-// Click outside handler - only close when clicking truly outside the search area
+// Click outside handler
 const handleClickOutside = (event: Event) => {
+  if (isInteractingWithSearchArea.value) return;
+  
   const target = event.target as Element;
-
-  // Don't close if clicking within the search container (includes controls and results)
   if (!target.closest('.search-container')) {
-    store.showControls = false;
-    // Only clear search results if the input loses focus
-    if (!isFocused.value) {
-      searchResults.value = [];
-      isSearching.value = false;
-    }
+    handleClose();
   }
 };
 

@@ -13,15 +13,18 @@
     <!-- Main View -->
     <div class="relative min-h-screen p-2">
       <!-- Sticky Search Bar with scroll responsiveness -->
-      <div :class="searchBarClasses" class="relative">
-        <SearchBar :shrink-percentage="shrinkPercentage" />
+      <div :class="searchBarClasses">
+        <SearchBar 
+          :shrink-percentage="shrinkPercentage" 
+          @stage-enter="handleStageEnter"
+        />
       </div>
 
         <!-- Border separator (not sticky) -->
         <div class="border-border/50 border-b"></div>
 
       <!-- Content Area -->
-      <div class="container mx-auto max-w-5xl px-4 py-8">
+      <div class="container mx-auto max-w-5xl px-2 sm:px-4 py-4 sm:py-8">
         <!-- Animated Content Cards -->
         <Transition
           mode="out-in"
@@ -63,7 +66,7 @@
           <!-- Stage Content -->
           <div v-else-if="store.searchMode === 'stage'" key="stage">
             <div class="space-y-8">
-              <StageTest />
+              <StageTest ref="stageTestRef" />
             </div>
           </div>
         </Transition>
@@ -97,8 +100,18 @@ import type { FactItem } from '@/types';
 
 const store = useAppStore();
 
+// Component refs
+const stageTestRef = ref();
+
 // Facts for loading modal
 const currentFacts = ref<FactItem[]>([]);
+
+// Handle stage mode enter key
+const handleStageEnter = (_query: string) => {
+  if (stageTestRef.value && stageTestRef.value.startMockTest) {
+    stageTestRef.value.startMockTest();
+  }
+};
 
 // Watch for search queries to fetch facts
 watch(

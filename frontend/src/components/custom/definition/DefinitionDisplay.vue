@@ -1,45 +1,42 @@
 <template>
-  <!-- Teleport the themed card variant tabs outside ThemedCard -->
-  <Teleport to="#themed-card-tabs-slot" v-if="entry && isMounted">
-    <Tabs v-model="store.selectedCardVariant" class="w-auto" :data-theme="selectedCardVariant">
-      <TabsList class="themed-tabs-list grid w-full grid-cols-4 gap-1">
-        <TabsTrigger
-          value="default"
-          class="themed-tabs-trigger text-xs transition-all"
-        >
-          Default
-        </TabsTrigger>
-        <TabsTrigger
-          value="bronze"
-          class="themed-tabs-trigger text-xs transition-all"
-        >
-          Bronze
-        </TabsTrigger>
-        <TabsTrigger
-          value="silver"
-          class="themed-tabs-trigger text-xs transition-all"
-        >
-          Silver
-        </TabsTrigger>
-        <TabsTrigger
-          value="gold"
-          class="themed-tabs-trigger text-xs transition-all"
-        >
-          Gold
-        </TabsTrigger>
-      </TabsList>
-    </Tabs>
-  </Teleport>
-
   <ThemedCard  v-if="entry" :variant="selectedCardVariant">
+    <!-- Card Theme Selector Dropdown - INSIDE the card -->
+    <div v-if="isMounted" class="absolute top-2 right-12 z-50">
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <button class="bg-background/80 backdrop-blur-sm border-2 border-border rounded-lg p-1.5 shadow-lg hover:bg-background transition-all duration-200 hover:scale-110 group">
+            <ChevronLeft
+              :size="14"
+              class="transition-transform duration-200 text-muted-foreground group-hover:text-foreground group-data-[state=open]:rotate-90"
+            />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" class="min-w-[140px]">
+          <DropdownMenuLabel>Card Theme</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuRadioGroup v-model="store.selectedCardVariant">
+            <DropdownMenuRadioItem value="default">
+              Default
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="bronze">
+              Bronze
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="silver">
+              Silver
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="gold">
+              Gold
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
     <!-- Header Section -->
     <CardHeader>
       <div class="flex items-center justify-between">
         <CardTitle class="text-word-title themed-title transition-all duration-200">
           {{ entry.word }}
         </CardTitle>
-        <!-- Teleport target for tabs - maintains original visual position -->
-        <div id="themed-card-tabs-slot"></div>
       </div>
 
       <!-- Pronunciation -->
@@ -181,7 +178,7 @@
           "
           @click="store.searchWord(synonym.word)"
         >
-          <CardContent class="px-3 py-4">
+          <CardContent class="px-3 py-2">
             <div class="font-medium">{{ synonym.word }}</div>
             <div class="text-xs opacity-75">
               {{ Math.round(synonym.score * 100) }}% similar
@@ -207,10 +204,18 @@ import { cn, getHeatmapClass } from '@/utils';
 import { Button } from '@/components/ui';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ThemedCard } from '@/components/custom/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RefreshCw } from 'lucide-vue-next';
+import { 
+  DropdownMenu, 
+  DropdownMenuTrigger, 
+  DropdownMenuContent, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuRadioGroup, 
+  DropdownMenuRadioItem 
+} from '@/components/ui/dropdown-menu';
+import { RefreshCw, ChevronLeft } from 'lucide-vue-next';
 
-// Track mounting state for teleport
+// Track mounting state for dropdown
 const isMounted = ref(false);
 // Track which definition is regenerating
 const regeneratingIndex = ref<number | null>(null);

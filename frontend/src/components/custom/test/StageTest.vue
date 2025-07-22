@@ -8,60 +8,55 @@
       >
         Loading Pipeline Demo
       </h2>
-      <p 
-        class="text-muted-foreground/70 dark:text-muted-foreground/50 mt-2"
-        style="font-family: 'Fraunces', serif"
-      >
-        Test the dramatic loading experience
-      </p>
     </div>
 
     <!-- Demo Controls -->
     <ThemedCard class="w-full">
       <CardContent class="space-y-6">
-        <!-- Test Word Input -->
-        <div class="space-y-4">
-          <div class="space-y-2">
-            <Label for="test-word">Test Word</Label>
-            <Input
-              id="test-word"
-              v-model="testWord"
-              placeholder="Enter a word..."
-              @keydown.enter="startRealTest"
-            />
-          </div>
+        <!-- Current Word Display -->
+        <div v-if="store.searchQuery" class="text-left space-y-4">
+          <h3 class="text-word-title themed-title">{{ store.searchQuery }}</h3>
           
-          <!-- Action Buttons -->
-          <div class="flex gap-3">
-            <Button
-              @click="startMockTest"
-              :disabled="isTestRunning"
-              variant="outline"
-              class="flex-1"
-            >
-              {{ isTestRunning ? 'Running...' : 'Mock Pipeline' }}
-            </Button>
-            <Button
-              @click="startRealTest"
-              :disabled="!testWord.trim() || isTestRunning"
-              class="flex-1"
-            >
-              Real Lookup
-            </Button>
+          <!-- Gradient Divider -->
+          <div class="relative h-px w-full overflow-hidden">
+            <div class="via-primary/30 absolute inset-0 bg-gradient-to-r from-transparent to-transparent" />
           </div>
         </div>
 
-        <!-- Progress Display -->
-        <div v-if="isTestRunning" class="space-y-2">
-          <Label>Current Progress (Interactive in Demo Mode)</Label>
-          <LoadingProgress 
-            :progress="simulatedProgress" 
-            :interactive="true"
-            @progress-change="handleProgressChange"
-          />
+        <!-- Progress Display - Always Visible -->
+        <div class="space-y-2">
+          <Label>Pipeline Progress (Interactive)</Label>
+          <div class="w-full">
+            <LoadingProgress 
+              :progress="simulatedProgress" 
+              :interactive="true"
+              @progress-change="handleProgressChange"
+            />
+          </div>
           <div class="text-sm text-muted-foreground text-center">
             {{ simulatedStage }}
           </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-3 justify-center">
+          <Button
+            @click="startMockTest"
+            :disabled="isTestRunning || !store.searchQuery"
+            variant="outline"
+            size="sm"
+            class="px-6"
+          >
+            {{ isTestRunning ? 'Running...' : 'Mock Pipeline' }}
+          </Button>
+          <Button
+            @click="startRealTest"
+            :disabled="!store.searchQuery || isTestRunning"
+            size="sm"
+            class="px-6"
+          >
+            Real Lookup
+          </Button>
         </div>
       </CardContent>
     </ThemedCard>
@@ -69,9 +64,9 @@
     <!-- Loading Modal -->
     <LoadingModal
       v-model="showLoadingModal"
-      :word="testWord || 'serendipity'"
-      :progress="simulatedProgress"
-      :current-stage="simulatedStage"
+      :word="store.searchQuery || 'serendipity'"
+      :progress="isRealPipeline ? store.loadingProgress : simulatedProgress"
+      :current-stage="isRealPipeline ? store.loadingStage : simulatedStage"
       :facts="mockFacts"
       :allow-dismiss="true"
       @progress-change="handleProgressChange"
@@ -80,8 +75,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Button, Input, Label, CardContent } from '@/components/ui'
+import { ref, watch } from 'vue'
+import { Button, Label, CardContent } from '@/components/ui'
 import { ThemedCard } from '@/components/custom/card'
 import { LoadingModal, LoadingProgress } from '@/components/custom/loading'
 import { useAppStore } from '@/stores'
@@ -89,11 +84,11 @@ import { useAppStore } from '@/stores'
 const store = useAppStore()
 
 // State
-const testWord = ref('serendipity')
 const showLoadingModal = ref(false)
 const isTestRunning = ref(false)
 const simulatedProgress = ref(0)
 const simulatedStage = ref('Initializing...')
+const isRealPipeline = ref(false)
 
 // Mock facts for demo
 const mockFacts = ref([
@@ -115,6 +110,7 @@ const stages = [
 // Mock pipeline simulation - purely interactive, no auto-progression
 const runMockPipeline = async () => {
   isTestRunning.value = true
+  isRealPipeline.value = false
   showLoadingModal.value = true
   
   // Start at the beginning stage
@@ -124,19 +120,16 @@ const runMockPipeline = async () => {
 
 // Real pipeline using store
 const runRealPipeline = async () => {
-  if (!testWord.value.trim()) return
+  if (!store.searchQuery.trim()) return
   
   isTestRunning.value = true
+  isRealPipeline.value = true
   showLoadingModal.value = true
   
   try {
     // Use store's force refresh to get real pipeline progress
     store.forceRefreshMode = true
-    await store.getDefinition(testWord.value.trim())
-    
-    // Sync with store progress
-    simulatedProgress.value = store.loadingProgress
-    simulatedStage.value = store.loadingStage
+    await store.getDefinition(store.searchQuery.trim())
     
   } catch (error) {
     console.error('Pipeline test failed:', error)
@@ -146,7 +139,7 @@ const runRealPipeline = async () => {
     setTimeout(() => {
       showLoadingModal.value = false
       isTestRunning.value = false
-      simulatedProgress.value = 0
+      isRealPipeline.value = false
     }, 1500)
   }
 }
@@ -162,7 +155,7 @@ const startRealTest = () => {
 
 // Handle interactive progress changes
 const handleProgressChange = (newProgress: number) => {
-  if (!isTestRunning.value) return
+  if (!isTestRunning.value || isRealPipeline.value) return
   
   simulatedProgress.value = newProgress
   
@@ -176,4 +169,23 @@ const handleProgressChange = (newProgress: number) => {
     simulatedStage.value = stage.stage
   }
 }
+
+// Watch for modal close to reset running state
+watch(showLoadingModal, (newVal) => {
+  if (!newVal) {
+    // Modal closed - reset running state after a short delay
+    setTimeout(() => {
+      isTestRunning.value = false
+      isRealPipeline.value = false
+      simulatedProgress.value = 0
+      simulatedStage.value = stages[0].stage
+    }, 500)
+  }
+})
+
+// Expose functions to parent component
+defineExpose({
+  startMockTest,
+  startRealTest
+})
 </script>

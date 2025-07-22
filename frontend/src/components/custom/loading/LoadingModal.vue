@@ -1,23 +1,24 @@
 <template>
   <Modal v-model="modelValue" :close-on-backdrop="allowDismiss">
-    <div class="flex flex-col items-center space-y-8">
+    <div class="flex flex-col items-center space-y-6 px-4">
       <!-- Animated Text with Stage Lighting -->
       <AnimatedText 
         :text="word" 
         text-class="text-7xl font-black"
-        :delay="800"
-        :stagger="200"
-        :duration="4000"
+        :offset="0.15"
+        :show-dots="progress < 100"
       />
 
       <!-- Stage Description Text -->
       <div class="max-w-md text-center">
-        <p
-          class="text-xl font-semibold text-gray-700 italic dark:text-gray-300"
+        <ShimmerText
+          :text="currentStageText"
+          text-class="text-xl font-semibold text-gray-700 italic dark:text-gray-300"
           :class="progressTextClass"
-        >
-          {{ currentStageText }}
-        </p>
+          :delay="30"
+          :duration="800"
+          shimmer-color="rgba(59, 130, 246, 0.8)"
+        />
       </div>
 
       <!-- Progress Component -->
@@ -32,7 +33,7 @@
         v-if="facts.length > 0"
         class="w-full max-w-2xl space-y-4"
         :class="[
-          'transition-all duration-500',
+          'transition-all duration-500 ease-apple-bounce',
           'transform',
           facts.length > 0
             ? 'translate-y-0 opacity-100'
@@ -40,33 +41,44 @@
         ]"
       >
         <h3
-          class="text-center text-xl font-semibold text-gray-800 dark:text-gray-200"
+          class="text-left text-lg font-medium text-foreground/80"
         >
-          Interesting Facts About "{{ word }}"
+          Interesting Facts
         </h3>
 
-        <div class="max-h-48 space-y-3 overflow-y-auto">
+        <!-- Gradient Divider -->
+        <div class="relative h-px w-full overflow-hidden">
+          <div class="via-primary/30 absolute inset-0 bg-gradient-to-r from-transparent to-transparent" />
+        </div>
+
+        <div class="max-h-48 space-y-4 overflow-y-auto p-2">
           <div
             v-for="(fact, index) in facts"
             :key="index"
-            class="rounded-lg border border-white/30 bg-white/50 p-4 dark:border-white/10 dark:bg-white/5"
+            class="themed-card rounded-xl border-2 border-border/50 p-5 mx-2"
             :class="[
-              'backdrop-blur-sm',
-              'transition-all duration-300',
-              'hover:bg-white/70 dark:hover:bg-white/10',
+              'bg-background/80 backdrop-blur-md',
+              'cartoon-shadow-sm',
+              'transition-all duration-300 ease-apple-bounce',
               'animate-fade-in',
             ]"
             :style="{ animationDelay: `${index * 150}ms` }"
           >
-            <p class="text-sm text-gray-700 dark:text-gray-300">
-              {{ fact.content }}
-            </p>
-            <span
-              v-if="fact.category && fact.category !== 'general'"
-              class="mt-2 inline-block rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-            >
-              {{ fact.category }}
-            </span>
+            <div class="border-accent border-l-2 pl-4">
+              <p class="text-definition mb-2 text-foreground/90">
+                {{ fact.content }}
+              </p>
+              <div
+                v-if="fact.category && fact.category !== 'general'"
+                class="mt-3 inline-block"
+              >
+                <span
+                  class="themed-word-type rounded-full px-2.5 py-1 text-xs font-medium"
+                >
+                  {{ fact.category }}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -77,7 +89,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Modal } from '@/components/custom';
-import { AnimatedText } from '@/components/custom/animation';
+import { AnimatedText, ShimmerText } from '@/components/custom/animation';
 import { LoadingProgress } from '@/components/custom/loading';
 
 interface Fact {

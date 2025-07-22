@@ -2,32 +2,32 @@
   <Teleport to="body">
     <Transition
       enter-active-class="transition-all duration-300 ease-out"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
+      enter-from-class="opacity-0 scale-95 translate-y-4"
+      enter-to-class="opacity-100 scale-100 translate-y-0"
       leave-active-class="transition-all duration-200 ease-in"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
+      leave-from-class="opacity-100 scale-100 translate-y-0"
+      leave-to-class="opacity-0 scale-95 translate-y-4"
     >
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-50 flex items-center justify-center"
+        class="fixed inset-0 z-[9999] flex items-center justify-center"
         @click="handleBackdropClick"
       >
-        <!-- Backdrop with subtle blur and bg/30 -->
+        <!-- Backdrop with standard blue modal styling -->
         <div
-          class="absolute inset-0"
+          class="absolute inset-0 z-0"
           :class="[
-            'bg-black/30 dark:bg-black/30',
-            'backdrop-blur-sm',
-            'transition-opacity duration-300',
+            'bg-blue-900/20 dark:bg-blue-950/30',
+            'backdrop-blur-md',
+            'transition-all duration-300',
             'transform-gpu',
           ]"
         />
         
         <!-- Clean modal container -->
-        <div class="relative z-10 w-full max-w-4xl p-4">
-          <div class="relative mx-auto max-w-3xl rounded-2xl bg-gray-500/50 dark:bg-gray-600/50 backdrop-blur-md border border-border/50 shadow-2xl overflow-hidden">
-            <div class="p-8">
+        <div class="relative z-30 w-full max-w-4xl p-4">
+          <div class="modal-content relative mx-auto max-w-3xl rounded-2xl bg-gray-900/40 dark:bg-gray-900/60 backdrop-blur-lg shadow-2xl border border-white/20 overflow-hidden">
+            <div class="p-8 relative z-20">
               <slot />
             </div>
           </div>
@@ -58,9 +58,11 @@ const emit = defineEmits<Emits>()
 const handleBackdropClick = (event: Event) => {
   if (!props.closeOnBackdrop) return
   
-  if (event.target === event.currentTarget) {
-    emit('update:modelValue', false)
-  }
+  // Check if the click was on the backdrop (not on modal content)
+  const target = event.target as Element
+  if (target.closest('.modal-content')) return
+  
+  emit('update:modelValue', false)
 }
 
 // Handle escape key

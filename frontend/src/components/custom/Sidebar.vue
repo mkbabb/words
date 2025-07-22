@@ -70,7 +70,33 @@
       <!-- Header -->
       <div class="border-border border-b p-4">
         <div v-if="!sidebarCollapsed" class="flex items-center justify-between">
-          <FloridifyIcon :expanded="true" :mode="store.mode" clickable @toggle-mode="store.toggleMode()" />
+          <!-- Left unit: Floridify + @mbabb grouped together -->
+          <div class="flex items-center gap-3">
+            <FloridifyIcon :expanded="true" :mode="store.mode" clickable @toggle-mode="store.toggleMode()" />
+            <HoverCard :open-delay="0">
+              <HoverCardTrigger>
+                <Button variant="link" class="h-auto p-0 font-mono text-sm">@mbabb</Button>
+              </HoverCardTrigger>
+              <HoverCardContent>
+                <div class="flex gap-4">
+                  <Avatar>
+                    <AvatarImage
+                      src="https://avatars.githubusercontent.com/u/2848617?v=4"
+                    />
+                  </Avatar>
+                  <div>
+                    <h4 class="text-sm font-semibold hover:underline">
+                      <a href="https://github.com/mkbabb" class="font-mono">@mbabb</a>
+                    </h4>
+                    <p class="text-muted-foreground text-sm">
+                      AI-enhanced dictionary system
+                    </p>
+                  </div>
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          </div>
+          <!-- Right controls -->
           <HamburgerIcon
             :is-open="!sidebarCollapsed"
             class="cursor-ew-resize hover:bg-muted/50 rounded-lg p-1 transition-all duration-300 ease-apple-smooth"
@@ -184,12 +210,12 @@
     <div class="pointer-events-none fixed inset-0 z-60 lg:hidden">
       <!-- Overlay that darkens only the non-sidebar area -->
       <Transition
-        enter-active-class="transition-opacity duration-400 ease-apple-smooth"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition-opacity duration-300 ease-apple-smooth"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
+        enter-active-class="transition-all duration-400 ease-apple-smooth"
+        enter-from-class="opacity-0 translate-x-full"
+        enter-to-class="opacity-100 translate-x-0"
+        leave-active-class="transition-all duration-300 ease-apple-smooth"
+        leave-from-class="opacity-100 translate-x-0"
+        leave-to-class="opacity-0 translate-x-full"
       >
         <div
           v-if="sidebarOpen"
@@ -212,7 +238,36 @@
       >
         <!-- Mobile Header -->
         <div class="border-border border-b p-4">
-          <FloridifyIcon :expanded="true" :mode="store.mode" clickable @toggle-mode="store.toggleMode()" />
+          <div class="flex items-center justify-between">
+            <!-- Left unit: Floridify + @mbabb grouped together -->
+            <div class="flex items-center gap-3">
+              <FloridifyIcon :expanded="true" :mode="store.mode" clickable @toggle-mode="store.toggleMode()" />
+              <HoverCard :open-delay="0">
+                <HoverCardTrigger>
+                  <Button variant="link" class="h-auto p-0 font-mono text-sm">@mbabb</Button>
+                </HoverCardTrigger>
+                <HoverCardContent>
+                  <div class="flex gap-4">
+                    <Avatar>
+                      <AvatarImage
+                        src="https://avatars.githubusercontent.com/u/2848617?v=4"
+                      />
+                    </Avatar>
+                    <div>
+                      <h4 class="text-sm font-semibold hover:underline">
+                        <a href="https://github.com/mkbabb" class="font-mono">@mbabb</a>
+                      </h4>
+                      <p class="text-muted-foreground text-sm">
+                        AI-enhanced dictionary system
+                      </p>
+                    </div>
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+            </div>
+            <!-- Right: Dark Mode Toggle on mobile -->
+            <DarkModeToggle class="h-7 w-7" />
+          </div>
         </div>
 
         <!-- Mobile Content -->
@@ -286,6 +341,9 @@ import { useAppStore } from '@/stores';
 import { cn } from '@/utils';
 import { SearchHistoryContent } from '@/components/custom/search';
 import { FloridifyIcon, HamburgerIcon } from '@/components/custom/icons';
+import { DarkModeToggle } from '@/components/custom/dark-mode-toggle';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui';
+import { Avatar, AvatarImage, Button } from '@/components/ui';
 import { PanelRight, User } from 'lucide-vue-next';
 
 const store = useAppStore();

@@ -8,16 +8,29 @@
         'text-black dark:text-white'
       ]"
     >
-      <span
-        v-for="(char, index) in displayChars"
-        :key="`${text}-${index}`"
-        class="char-animate inline-block"
-        :style="{
-          animationDelay: `${delay + index * stagger}ms`,
-          animationDuration: `${duration}ms`,
-        }"
-      >
-        {{ char === ' ' ? '\u00A0' : char }}
+      <template v-for="(char, index) in currentText" :key="index">
+        <span
+          v-if="char !== '\n'"
+          class="lift-down inline-block"
+          :style="{
+            animationDelay: `${index * offset}s`,
+            animationDuration: duration,
+          }"
+        >{{ char === ' ' ? '\u00A0' : char }}</span>
+        <br v-else class="w-full" />
+      </template>
+      
+      <!-- Animated dots -->
+      <span v-if="showDots" class="dots ml-1">
+        <span 
+          v-for="i in 3" 
+          :key="i"
+          class="dot-fade inline-block"
+          :style="{ 
+            animationDelay: `${(i - 1) * 0.2}s`,
+            animationDuration: '1.5s'
+          }"
+        >.</span>
       </span>
     </h1>
   </div>
@@ -25,83 +38,101 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useWindowSize } from '@vueuse/core'
+
+const HTML_SPACE = '\u00a0'
+const { width } = useWindowSize()
 
 interface Props {
   text: string
   textClass?: string
-  delay?: number
-  stagger?: number
-  duration?: number
+  offset?: number
+  showDots?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   textClass: 'text-7xl font-black',
-  delay: 500,
-  stagger: 150,
-  duration: 3000,
+  offset: 0.2,
+  showDots: false,
 })
 
-const displayChars = computed(() => {
-  return props.text.split('')
+const newText = computed(() => props.text.replace(/ /g, HTML_SPACE))
+const brokenText = computed(() => newText.value.replace(/\s/g, HTML_SPACE + '\n'))
+
+const currentText = computed(() => {
+  return width.value < 768 ? brokenText.value : newText.value
 })
+
+const duration = computed(() => `${currentText.value.length * props.offset + props.offset * 10}s`)
 </script>
 
 <style scoped>
-@keyframes char-animate {
-  0%, 60%, 100% {
-    transform: translateY(0) scale(1) rotateX(0deg);
+.lift-down {
+  animation: liftDown 3s ease-in-out infinite;
+  animation-fill-mode: forwards;
+  transform-origin: center bottom;
+}
+
+@keyframes liftDown {
+  0% {
+    transform: translateY(0);
   }
-  20% {
-    transform: translateY(-15px) scale(1.1) rotateX(-5deg);
+  5% {
+    transform: translateY(-10px);
   }
-  40% {
-    transform: translateY(-8px) scale(1.05) rotateX(-2deg);
+  10% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(0);
   }
 }
 
-.char-animate {
-  animation: char-animate ease-in-out infinite;
-  transform-origin: center bottom;
+.dot-fade {
+  animation: dotFade 1.5s ease-in-out infinite;
+  animation-fill-mode: forwards;
+}
+
+@keyframes dotFade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .depth-text {
   perspective: 1000px;
   transform-style: preserve-3d;
   
-  /* Chunky thick 3D effect - white shadows for black text */
+  /* Chunky stark 3D effect - off-white shadows for better background compatibility */
   text-shadow:
-    /* Sharp, defined depth layers */
-    1px 1px 0 rgba(255, 255, 255, 0.9),
-    2px 2px 0 rgba(255, 255, 255, 0.8),
-    3px 3px 0 rgba(255, 255, 255, 0.7),
-    4px 4px 0 rgba(255, 255, 255, 0.6),
-    5px 5px 0 rgba(255, 255, 255, 0.5),
-    6px 6px 0 rgba(255, 255, 255, 0.4),
-    7px 7px 0 rgba(255, 255, 255, 0.3),
-    8px 8px 0 rgba(255, 255, 255, 0.2),
-    9px 9px 0 rgba(255, 255, 255, 0.15),
-    10px 10px 0 rgba(255, 255, 255, 0.1),
-    11px 11px 0 rgba(255, 255, 255, 0.08),
-    12px 12px 0 rgba(255, 255, 255, 0.05);
+    /* Sharp, defined depth layers with subtle off-white tone */
+    1px 1px 0 rgba(248, 248, 248, 1),
+    2px 2px 0 rgba(248, 248, 248, 0.95),
+    3px 3px 0 rgba(248, 248, 248, 0.9),
+    4px 4px 0 rgba(248, 248, 248, 0.85),
+    5px 5px 0 rgba(248, 248, 248, 0.8),
+    6px 6px 0 rgba(248, 248, 248, 0.75),
+    7px 7px 0 rgba(248, 248, 248, 0.7),
+    8px 8px 0 rgba(248, 248, 248, 0.65);
     
   transition: all 0.3s ease;
 }
 
 .dark .depth-text {
   text-shadow:
-    /* Chunky thick black shadows for white text */
-    1px 1px 0 rgba(0, 0, 0, 0.9),
-    2px 2px 0 rgba(0, 0, 0, 0.8),
-    3px 3px 0 rgba(0, 0, 0, 0.7),
-    4px 4px 0 rgba(0, 0, 0, 0.6),
-    5px 5px 0 rgba(0, 0, 0, 0.5),
-    6px 6px 0 rgba(0, 0, 0, 0.4),
-    7px 7px 0 rgba(0, 0, 0, 0.3),
-    8px 8px 0 rgba(0, 0, 0, 0.2),
-    9px 9px 0 rgba(0, 0, 0, 0.15),
-    10px 10px 0 rgba(0, 0, 0, 0.1),
-    11px 11px 0 rgba(0, 0, 0, 0.08),
-    12px 12px 0 rgba(0, 0, 0, 0.05);
+    /* Chunky stark off-black shadows for better background compatibility */
+    1px 1px 0 rgba(32, 32, 32, 1),
+    2px 2px 0 rgba(32, 32, 32, 0.95),
+    3px 3px 0 rgba(32, 32, 32, 0.9),
+    4px 4px 0 rgba(32, 32, 32, 0.85),
+    5px 5px 0 rgba(32, 32, 32, 0.8),
+    6px 6px 0 rgba(32, 32, 32, 0.75),
+    7px 7px 0 rgba(32, 32, 32, 0.7),
+    8px 8px 0 rgba(32, 32, 32, 0.65);
 }
 
 .font-fraunces {

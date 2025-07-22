@@ -26,7 +26,7 @@
               class="space-y-1"
             >
               <HoverCard
-                v-for="(entry, index) in limitedLookups"
+                v-for="entry in limitedLookups"
                 :key="entry.id"
                 :open-delay="150"
                 :close-delay="50"
