@@ -1,0 +1,50 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HOOK_EVENT=pre bash \"${PROJECT_ROOT:-$(pwd)}/.claude/hooks/main-hook.sh\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HOOK_EVENT=post bash \"${PROJECT_ROOT:-$(pwd)}/.claude/hooks/main-hook.sh\"",
+            "timeout": 10000
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HOOK_EVENT=post TOOL_NAME=Bash bash \"${PROJECT_ROOT:-$(pwd)}/.claude/hooks/main-hook.sh\"",
+            "timeout": 3000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PROJECT_ROOT:-$(pwd)}/.claude/hooks/shared/server-health.sh\"",
+            "timeout": 2000
+          }
+        ]
+      }
+    ]
+  }
+}

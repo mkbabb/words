@@ -3,15 +3,22 @@
     <!-- Progress Bar -->
     <div class="relative">
       <div
+        ref="progressBarRef"
         class="h-6 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
         :class="[
           'shadow-inner',
           'border border-gray-300 dark:border-gray-600',
+          interactive ? 'cursor-pointer' : ''
         ]"
+        @mousedown="handleMouseDown"
+        @click="handleProgressBarInteraction"
       >
         <div
-          class="h-full rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-500 ease-out"
-          :style="{ width: `${progress}%` }"
+          class="h-full rounded-full transition-all duration-500 ease-out"
+          :style="{ 
+            width: `${progress}%`,
+            background: rainbowGradient
+          }"
           :class="['shadow-lg', progress < 100 ? 'animate-pulse' : '']"
         />
       </div>
@@ -22,6 +29,7 @@
           v-for="(checkpoint, index) in checkpoints"
           :key="index"
           class="group relative"
+          @click="handleCheckpointClick(checkpoint)"
         >
           <div
             class="h-3 w-3 rounded-full border-2 transition-all duration-300"
@@ -29,7 +37,7 @@
               progress >= checkpoint.progress
                 ? 'scale-125 border-primary shadow-lg shadow-primary/30'
                 : 'border-gray-400 dark:border-gray-500',
-              'cursor-help hover:scale-150',
+              interactive ? 'cursor-pointer hover:scale-150' : 'cursor-help hover:scale-150',
             ]"
           />
           <!-- Tooltip -->
@@ -57,6 +65,9 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref } from 'vue'
+import { generateRainbowGradient } from '@/utils/animations'
+
 interface Checkpoint {
   progress: number
   label: string
@@ -65,9 +76,14 @@ interface Checkpoint {
 interface Props {
   progress: number
   checkpoints?: Checkpoint[]
+  interactive?: boolean
 }
 
-withDefaults(defineProps<Props>(), {
+interface Emits {
+  (e: 'progress-change', progress: number): void
+}
+
+const props = withDefaults(defineProps<Props>(), {
   checkpoints: () => [
     { progress: 10, label: 'Search' },
     { progress: 40, label: 'Fetch' },
@@ -76,5 +92,52 @@ withDefaults(defineProps<Props>(), {
     { progress: 70, label: 'Examples' },
     { progress: 90, label: 'Save' },
   ],
+  interactive: false,
 })
+
+const emit = defineEmits<Emits>()
+
+const progressBarRef = ref<HTMLElement>()
+const isDragging = ref(false)
+
+const rainbowGradient = computed(() => generateRainbowGradient(8))
+
+// Handle checkpoint click
+const handleCheckpointClick = (checkpoint: Checkpoint) => {
+  if (!props.interactive) return
+  emit('progress-change', checkpoint.progress)
+}
+
+// Handle progress bar click/drag
+const handleProgressBarInteraction = (event: MouseEvent) => {
+  if (!props.interactive || !progressBarRef.value) return
+  
+  const rect = progressBarRef.value.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100))
+  
+  emit('progress-change', percentage)
+}
+
+// Mouse drag handlers
+const handleMouseDown = (event: MouseEvent) => {
+  if (!props.interactive) return
+  isDragging.value = true
+  handleProgressBarInteraction(event)
+  
+  const handleMouseMove = (e: MouseEvent) => {
+    if (isDragging.value) {
+      handleProgressBarInteraction(e)
+    }
+  }
+  
+  const handleMouseUp = () => {
+    isDragging.value = false
+    document.removeEventListener('mousemove', handleMouseMove)
+    document.removeEventListener('mouseup', handleMouseUp)
+  }
+  
+  document.addEventListener('mousemove', handleMouseMove)
+  document.addEventListener('mouseup', handleMouseUp)
+}
 </script>

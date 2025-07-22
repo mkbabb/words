@@ -30,7 +30,7 @@ export const useAppStore = defineStore('app', () => {
     sidebarCollapsed: true,
     selectedCardVariant: 'default' as const,
     // Enhanced SearchBar state
-    searchMode: 'word' as const,
+    searchMode: 'lookup' as const,
     selectedSources: ['wiktionary', 'oxford', 'dictionary_com'] as string[],
     showControls: false,
     selectedWordlist: null as string | null,
@@ -44,8 +44,8 @@ export const useAppStore = defineStore('app', () => {
             parsed.selectedCardVariant = 'default';
           }
           // Validate search mode
-          if (!['word', 'wordlist'].includes(parsed.searchMode)) {
-            parsed.searchMode = 'word';
+          if (!['lookup', 'wordlist', 'stage'].includes(parsed.searchMode)) {
+            parsed.searchMode = 'lookup';
           }
           // Validate selected sources
           if (!Array.isArray(parsed.selectedSources)) {
@@ -59,7 +59,7 @@ export const useAppStore = defineStore('app', () => {
             sidebarOpen: false,
             sidebarCollapsed: true,
             selectedCardVariant: 'default',
-            searchMode: 'word',
+            searchMode: 'lookup',
             selectedSources: ['wiktionary', 'oxford', 'dictionary_com'],
             showControls: false,
             selectedWordlist: null,
@@ -198,16 +198,40 @@ export const useAppStore = defineStore('app', () => {
     })
   );
 
-  const recentLookups = computed(() =>
-    lookupHistory.value.slice(0, 10).sort((a, b) => {
-      const dateA = new Date(a.timestamp);
-      const dateB = new Date(b.timestamp);
-      if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
-        return 0;
+  const recentLookups = computed(() => {
+    // Create a map to track the most recent lookup per word
+    const wordMap = new Map<string, LookupHistory>();
+    
+    // Process all lookups and keep only the most recent per word
+    lookupHistory.value.forEach(lookup => {
+      const normalizedWord = lookup.word.toLowerCase();
+      const existing = wordMap.get(normalizedWord);
+      
+      if (!existing) {
+        wordMap.set(normalizedWord, lookup);
+      } else {
+        // Compare timestamps and keep the more recent one
+        const currentTime = new Date(lookup.timestamp).getTime();
+        const existingTime = new Date(existing.timestamp).getTime();
+        
+        if (!isNaN(currentTime) && !isNaN(existingTime) && currentTime > existingTime) {
+          wordMap.set(normalizedWord, lookup);
+        }
       }
-      return dateB.getTime() - dateA.getTime();
-    })
-  );
+    });
+    
+    // Convert map values to array and sort by timestamp (most recent first)
+    return Array.from(wordMap.values())
+      .sort((a, b) => {
+        const dateA = new Date(a.timestamp);
+        const dateB = new Date(b.timestamp);
+        if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
+          return 0;
+        }
+        return dateB.getTime() - dateA.getTime();
+      })
+      .slice(0, 10); // Limit to 10 most recent unique words
+  });
 
   const recentLookupWords = computed(() =>
     recentLookups.value.map(lookup => lookup.word)
@@ -507,7 +531,14 @@ export const useAppStore = defineStore('app', () => {
 
   // Enhanced SearchBar functions
   function toggleSearchMode() {
-    searchMode.value = searchMode.value === 'word' ? 'wordlist' : 'word';
+    // Cycle through modes: lookup -> wordlist -> stage -> lookup
+    if (searchMode.value === 'lookup') {
+      searchMode.value = 'wordlist';
+    } else if (searchMode.value === 'wordlist') {
+      searchMode.value = 'stage';
+    } else {
+      searchMode.value = 'lookup';
+    }
   }
 
   function toggleControls() {

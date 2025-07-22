@@ -7,8 +7,8 @@
       props.className
     ]"
     :style="containerStyle"
-    @mouseenter="handleMouseEnter"
-    @mouseleave="handleMouseLeave"
+    @mouseenter="handleMouseEnterWrapper"
+    @mouseleave="handleMouseLeaveWrapper"
   >
     <!-- Main Layout -->
     <div class="pointer-events-auto relative">
@@ -18,13 +18,17 @@
         :class="[
           'search-bar flex items-center gap-2 p-2 h-16',
           'border-border bg-background/20 border-2 backdrop-blur-3xl',
-          'cartoon-shadow-sm hover-shadow-lift rounded-2xl'
+          'cartoon-shadow-sm rounded-2xl transition-all duration-200 ease-out',
+          {
+            'cartoon-shadow-sm-hover': isContainerHovered,
+            'bg-background/30': isContainerHovered
+          }
         ]"
       >
         <!-- Mode Toggle -->
         <div
           :class="[
-            'flex items-center justify-center overflow-hidden transition-all duration-300 ease-out'
+            'flex items-center justify-center overflow-hidden transition-all duration-300 ease-out flex-shrink-0'
           ]"
           :style="{ 
             opacity: iconOpacity,
@@ -42,32 +46,57 @@
           />
         </div>
 
-        <!-- Search Input -->
-        <input
-          ref="searchInput"
-          v-model="query"
-          :placeholder="placeholder"
-          :class="[
-            'placeholder:text-muted-foreground focus:ring-primary h-12 flex-1 min-w-0 rounded-xl bg-transparent py-2 text-base outline-none focus:ring-1 text-ellipsis overflow-hidden whitespace-nowrap transition-all duration-300 ease-out'
-          ]"
-          :style="{
-            paddingLeft: iconOpacity > 0.1 ? '1rem' : '1.5rem',
-            paddingRight: iconOpacity > 0.1 ? '1rem' : '1.5rem'
-          }"
-          @keydown.enter="handleEnter"
-          @keydown.down.prevent="navigateResults(1)"
-          @keydown.up.prevent="navigateResults(-1)"
-          @keydown.escape="handleEscape"
-          @focus="handleFocus"
-          @blur="handleBlur"
-          @input="handleInput"
-        />
+        <!-- Search Input Container with Autocomplete -->
+        <div class="relative flex-1 min-w-0 flex-grow">
+          <!-- Autocomplete Preview Text -->
+          <div
+            v-if="autocompleteText"
+            :class="[
+              'absolute left-0 top-0 h-12 flex items-center pointer-events-none text-base transition-all duration-300 ease-out',
+              'text-muted-foreground/50'
+            ]"
+            :style="{
+              paddingLeft: iconOpacity > 0.1 ? '1rem' : '1.5rem',
+              paddingRight: iconOpacity > 0.1 ? '1rem' : '1.5rem',
+              textAlign: iconOpacity < 0.3 ? 'center' : 'left'
+            }"
+          >
+            <span class="invisible">{{ query }}</span><span>{{ autocompleteText.slice(query.length) }}</span>
+          </div>
+          
+          <!-- Main Search Input -->
+          <input
+            ref="searchInput"
+            v-model="query"
+            :placeholder="placeholder"
+            :class="[
+              'placeholder:text-muted-foreground focus:ring-primary h-12 w-full rounded-xl bg-transparent py-2 text-base outline-none focus:ring-1 text-ellipsis overflow-hidden whitespace-nowrap transition-all duration-300 ease-out relative z-10'
+            ]"
+            :style="{
+              paddingLeft: iconOpacity > 0.1 ? '1rem' : '1.5rem',
+              paddingRight: iconOpacity > 0.1 ? '1rem' : '1.5rem',
+              textAlign: iconOpacity < 0.3 ? 'center' : 'left'
+            }"
+            @keydown.enter="handleEnter"
+            @keydown.tab.prevent="handleAutocompleteAccept"
+            @keydown.space="handleSpaceKey"
+            @keydown.down.prevent="navigateResults(1)"
+            @keydown.up.prevent="navigateResults(-1)"
+            @keydown.left="handleArrowKey"
+            @keydown.right="handleArrowKey"
+            @keydown.escape="handleEscape"
+            @focus="handleFocusWrapper"
+            @blur="handleBlurWrapper"
+            @input="handleInput"
+            @click="handleInputClick"
+          />
+        </div>
 
-        <!-- Regenerate Button - Only shows when we have a current entry and in word search mode -->
+        <!-- Regenerate Button - Only shows when we have a current entry and in lookup mode -->
         <div
-          v-if="store.currentEntry && store.searchMode === 'word'"
+          v-if="store.currentEntry && store.searchMode === 'lookup'"
           :class="[
-            'flex items-center justify-center overflow-hidden transition-all duration-300 ease-out'
+            'flex items-center justify-center overflow-hidden transition-all duration-300 ease-out flex-shrink-0'
           ]"
           :style="{ 
             opacity: iconOpacity,
@@ -100,7 +129,7 @@
         <!-- Hamburger Button -->
         <div
           :class="[
-            'overflow-hidden transition-all duration-300 ease-out'
+            'overflow-hidden transition-all duration-300 ease-out flex-shrink-0'
           ]"
           :style="{ 
             opacity: iconOpacity,
@@ -141,23 +170,26 @@
         >
           <div
             v-if="store.showControls"
+            ref="controlsDropdown"
             class="dropdown-element border-border bg-background/20 cartoon-shadow-sm mb-2 rounded-2xl border-2 backdrop-blur-3xl overflow-hidden origin-top"
+            @mousedown.prevent
           >
             <!-- Search Mode Toggle -->
           <div class="border-border/50 px-4 py-3">
-            <h3 class="mb-3 text-sm font-medium">Search Mode</h3>
+            <h3 class="mb-3 text-sm font-medium">Mode</h3>
             <BouncyToggle
               v-model="store.searchMode"
               :options="[
-                { label: 'Word Search', value: 'word' },
-                { label: 'Wordlist Search', value: 'wordlist' },
+                { label: 'Lookup', value: 'lookup' },
+                { label: 'Wordlist', value: 'wordlist' },
+                { label: 'Stage', value: 'stage' },
               ]"
             />
           </div>
 
-          <!-- Sources (Word Search Mode) -->
+          <!-- Sources (Lookup Mode) -->
           <div
-            v-if="store.searchMode === 'word'"
+            v-if="store.searchMode === 'lookup'"
             class="border-border/50 border-t px-4 py-3"
           >
             <h3 class="mb-3 text-sm font-medium">Sources</h3>
@@ -181,50 +213,30 @@
 
           <!-- AI Suggestions -->
           <div
-            v-if="store.searchMode === 'word' && aiSuggestions.length > 0"
+            v-if="store.searchMode === 'lookup' && aiSuggestions.length > 0"
             class="border-border/50 border-t px-4 py-3"
           >
-            <div class="flex flex-wrap items-center justify-center gap-2">
-              <Sparkles class="text-muted-foreground" :size="16" />
-              <Button
-                v-for="word in aiSuggestions"
-                :key="word"
-                variant="outline"
-                size="sm"
-                class="hover-text-grow text-xs"
-                @click="selectWord(word)"
-              >
-                {{ word }}
-              </Button>
+            <div class="flex items-center gap-2 overflow-hidden">
+              <Sparkles class="text-muted-foreground flex-shrink-0" :size="16" />
+              <div class="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
+                <Button
+                  v-for="word in aiSuggestions"
+                  :key="word"
+                  variant="outline"
+                  size="sm"
+                  class="hover-text-grow text-xs flex-shrink-0 whitespace-nowrap"
+                  @click="selectWord(word)"
+                >
+                  {{ word }}
+                </Button>
+              </div>
             </div>
           </div>
 
-          <!-- Wordlist Selection -->
-          <div
-            v-if="store.searchMode === 'wordlist'"
-            class="border-border/50 border-t px-4 py-3"
-          >
-            <h3 class="mb-3 text-sm font-medium">Select Wordlist</h3>
-            <div class="space-y-2">
-              <button
-                v-for="wordlist in wordlists"
-                :key="wordlist"
-                @click="handleWordlistSelect(wordlist)"
-                :class="[
-                  'w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-smooth',
-                  store.selectedWordlist === wordlist
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                ]"
-              >
-                {{ wordlist }}
-              </button>
-            </div>
-          </div>
           </div>
         </Transition>
 
-        <!-- Search Results Dropdown -->
+        <!-- Search Results Dropdown with smooth positioning -->
         <Transition
           enter-active-class="transition-all duration-300 ease-apple-bounce"
           leave-active-class="transition-all duration-300 ease-apple-bounce"
@@ -235,7 +247,10 @@
         >
           <div
             v-if="showSearchResults"
-            class="dropdown-element border-border bg-background/20 cartoon-shadow-sm rounded-2xl border-2 backdrop-blur-3xl overflow-hidden origin-top"
+            ref="searchResultsDropdown"
+            class="dropdown-element border-border bg-background/20 cartoon-shadow-sm rounded-2xl border-2 backdrop-blur-3xl overflow-hidden origin-top transition-all duration-300 ease-apple-bounce"
+            :style="searchResultsStyle"
+            @mousedown.prevent
           >
             <!-- Loading State -->
           <div v-if="isSearching && searchResults.length === 0" class="p-4">
@@ -255,11 +270,13 @@
           <!-- Search Results -->
           <div
             v-else-if="searchResults.length > 0"
+            ref="searchResultsContainer"
             class="bg-background/20 max-h-64 overflow-y-auto backdrop-blur-3xl"
           >
             <button
               v-for="(result, index) in searchResults"
               :key="result.word"
+              :ref="el => { if (el) resultRefs[index] = el as HTMLButtonElement }"
               :class="[
                 'flex w-full items-center justify-between px-4 py-3 text-left transition-smooth duration-150',
                 'border-muted-foreground/50 active:scale-[0.98]',
@@ -327,6 +344,7 @@ import {
   onUnmounted,
   nextTick,
   watch,
+  reactive,
 } from 'vue';
 import { useScroll, useMagicKeys } from '@vueuse/core';
 import { useAppStore } from '@/stores';
@@ -344,6 +362,14 @@ interface SearchBarProps {
   scrollThreshold?: number;
 }
 
+// Define emits
+const emit = defineEmits<{
+  focus: [];
+  blur: [];
+  mouseenter: [];
+  mouseleave: [];
+}>();
+
 const props = withDefaults(defineProps<SearchBarProps>(), {
   shrinkPercentage: 0,
   hideDelay: 3000,
@@ -354,6 +380,7 @@ const store = useAppStore();
 
 // State
 const query = ref(store.searchQuery || '');
+const autocompleteText = ref('');
 const searchResults = ref<SearchResult[]>([]);
 const isSearching = ref(false);
 const selectedIndex = ref(0);
@@ -371,10 +398,24 @@ const scrollProgress = ref(0); // 0-1 percentage of page height
 const scrollInflectionPoint = ref(0.35); // 35% of page height
 const documentHeight = ref(0);
 
+// Scroll momentum tracking to prevent bouncing
+const lastScrollY = ref(0);
+const scrollVelocity = ref(0);
+const scrollDirection = ref(0); // 1 for down, -1 for up, 0 for static
+const momentumThreshold = ref(8); // Lower threshold for more sensitive detection
+const velocityHistory = ref<number[]>([]); // Track velocity over time
+const isInMomentum = ref(false); // Track if we're currently in momentum scrolling
+let velocityTimer: ReturnType<typeof setTimeout> | undefined;
+let momentumCooldown: ReturnType<typeof setTimeout> | undefined;
+
 // Refs
 const searchInput = ref<HTMLInputElement>();
+const searchResultsContainer = ref<HTMLDivElement>();
+const resultRefs = reactive<(HTMLButtonElement | null)[]>([]);
 const searchContainer = ref<HTMLDivElement>();
 const searchBarElement = ref<HTMLDivElement>();
+const controlsDropdown = ref<HTMLDivElement>();
+const searchResultsDropdown = ref<HTMLDivElement>();
 
 // Timers
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -395,10 +436,20 @@ const placeholder = computed(() =>
     : 'Enter a word to find synonyms...'
 );
 
+// Computed style for search results positioning with smooth animation
+const searchResultsStyle = computed(() => {
+  // Animate search results position based on controls visibility
+  return {
+    transform: store.showControls ? 'translateY(0px)' : 'translateY(-8px)',
+    marginTop: store.showControls ? '8px' : '0px'
+  };
+});
+
 const showSearchResults = computed(() => {
   return isFocused.value && query.value.length > 0 && 
     (searchResults.value.length > 0 || isSearching.value || query.value.length >= 2);
 });
+
 
 // State machine transitions
 const transitionToState = (newState: SearchBarState) => {
@@ -413,22 +464,80 @@ const transitionToState = (newState: SearchBarState) => {
   }
 };
 
-// Debounced scroll update to prevent jittering
+// Advanced scroll update with momentum smoothing and hysteresis
 const updateScrollState = () => {
   if (scrollAnimationFrame) return;
   
   scrollAnimationFrame = requestAnimationFrame(() => {
+    // Calculate scroll velocity and direction
+    const currentScrollY = scrollY.value;
+    const deltaY = currentScrollY - lastScrollY.value;
+    const currentVelocity = Math.abs(deltaY);
+    
+    // Track scroll direction
+    if (Math.abs(deltaY) > 1) {
+      scrollDirection.value = deltaY > 0 ? 1 : -1;
+    }
+    
+    // Update velocity history (keep last 5 frames)
+    velocityHistory.value.push(currentVelocity);
+    if (velocityHistory.value.length > 5) {
+      velocityHistory.value.shift();
+    }
+    
+    // Calculate average velocity for smoother detection
+    const avgVelocity = velocityHistory.value.reduce((sum, v) => sum + v, 0) / velocityHistory.value.length;
+    scrollVelocity.value = avgVelocity;
+    lastScrollY.value = currentScrollY;
+    
+    // Detect momentum scrolling with hysteresis
+    const wasInMomentum = isInMomentum.value;
+    if (!wasInMomentum && avgVelocity > momentumThreshold.value) {
+      isInMomentum.value = true;
+    } else if (wasInMomentum && avgVelocity < momentumThreshold.value * 0.5) {
+      // Use lower threshold to exit momentum (hysteresis)
+      isInMomentum.value = false;
+    }
+    
+    // Reset momentum state after scrolling stops completely
+    clearTimeout(velocityTimer);
+    clearTimeout(momentumCooldown);
+    
+    velocityTimer = setTimeout(() => {
+      scrollVelocity.value = 0;
+      velocityHistory.value = [];
+    }, 100);
+    
+    // Add cooldown period after momentum ends
+    if (!isInMomentum.value && wasInMomentum) {
+      momentumCooldown = setTimeout(() => {
+        // Allow state changes again after momentum completely stops
+      }, 200);
+    }
+    
     const maxScroll = Math.max(documentHeight.value - window.innerHeight, 1);
     scrollProgress.value = Math.min(scrollY.value / maxScroll, 1);
     
-    // State machine logic - only transition states for icon visibility
-    // The gradual shrinking happens continuously based on scrollProgress
-    const shouldBeScrolled = scrollProgress.value >= scrollInflectionPoint.value;
+    // State machine with momentum awareness and hysteresis
+    const isHighMomentum = isInMomentum.value || avgVelocity > momentumThreshold.value;
     
-    if (currentState.value === 'normal' && shouldBeScrolled) {
-      transitionToState('scrolled');
-    } else if (currentState.value === 'scrolled' && !shouldBeScrolled && !isContainerHovered.value) {
-      transitionToState('normal');
+    // Add hysteresis: require more significant change to switch states
+    const hysteresisBuffer = 0.05; // 5% buffer zone
+    let shouldTransition = false;
+    
+    if (currentState.value === 'normal') {
+      shouldTransition = scrollProgress.value >= scrollInflectionPoint.value + hysteresisBuffer;
+    } else if (currentState.value === 'scrolled') {
+      shouldTransition = scrollProgress.value <= scrollInflectionPoint.value - hysteresisBuffer;
+    }
+    
+    // Only allow state changes when not in high momentum and with hysteresis
+    if (!isHighMomentum) {
+      if (currentState.value === 'normal' && shouldTransition) {
+        transitionToState('scrolled');
+      } else if (currentState.value === 'scrolled' && shouldTransition && !isContainerHovered.value) {
+        transitionToState('normal');
+      }
     }
     
     scrollAnimationFrame = undefined;
@@ -466,8 +575,8 @@ const iconOpacity = computed(() => {
 const containerStyle = computed(() => {
   const progress = Math.min(scrollProgress.value / scrollInflectionPoint.value, 1);
   
-  // Don't shrink if controls or search results are shown, or when focused/hovered
-  if (currentState.value === 'focused' || isContainerHovered.value || store.showControls || showSearchResults.value) {
+  // Focused/hovered states: full size but bounded
+  if (currentState.value === 'focused' || isContainerHovered.value) {
     return {
       maxWidth: '24rem',
       transform: 'scale(1)',
@@ -476,16 +585,27 @@ const containerStyle = computed(() => {
     };
   }
   
-  // Gradual interpolation based on scroll progress (0% to 35%)
-  const baseWidth = 24 - (progress * 6); // 24rem -> 18rem at 35%
-  const scale = 1 - (progress * 0.15); // 1 -> 0.85 at 35%
-  const opacity = 1 - (progress * 0.1); // 1 -> 0.9 at 35%
+  // Controls/results shown: prevent shrinking but still bounded
+  if (store.showControls || showSearchResults.value) {
+    return {
+      maxWidth: '24rem',
+      transform: 'scale(1)',
+      opacity: '1',
+      transition: 'all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+    };
+  }
+  
+  // Scroll-based shrinking with strict bounds
+  const clampedProgress = Math.max(0, Math.min(progress, 1));
+  const baseWidth = Math.max(18, 24 - (clampedProgress * 6)); // Bounded: 24rem -> 18rem
+  const scale = Math.max(0.85, 1 - (clampedProgress * 0.15)); // Bounded: 1 -> 0.85
+  const opacity = Math.max(0.9, 1 - (clampedProgress * 0.1)); // Bounded: 1 -> 0.9
   
   return {
     maxWidth: `${baseWidth}rem`,
     transform: `scale(${scale})`,
     opacity: opacity.toString(),
-    transition: progress > 0 ? 'all 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+    transition: clampedProgress > 0 ? 'all 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
   };
 });
 
@@ -496,12 +616,6 @@ const sources = [
   { id: 'dictionary_com', name: 'Dictionary.com', icon: DictionaryIcon },
 ];
 
-const wordlists = [
-  'SAT Vocabulary',
-  'GRE Advanced',
-  'Academic Words',
-  'Medical Terms',
-];
 
 
 // Initialize document height for timeline calculations
@@ -515,7 +629,17 @@ const initializeDocumentHeight = () => {
   );
 };
 
-// Simple hover management (no timers)
+// Simple hover management (no timers) with emit
+const handleMouseEnterWrapper = () => {
+  handleMouseEnter();
+  emit('mouseenter');
+};
+
+const handleMouseLeaveWrapper = () => {
+  handleMouseLeave();
+  emit('mouseleave');
+};
+
 const handleMouseEnter = () => {
   isContainerHovered.value = true;
   
@@ -532,6 +656,16 @@ const handleMouseLeave = () => {
   if (currentState.value === 'hovering' && !isFocused.value) {
     transitionToState('scrolled');
   }
+};
+
+const handleFocusWrapper = () => {
+  handleFocus();
+  emit('focus');
+};
+
+const handleBlurWrapper = () => {
+  handleBlur();
+  emit('blur');
 };
 
 const handleFocus = () => {
@@ -553,11 +687,20 @@ const handleFocus = () => {
 };
 
 const handleBlur = () => {
-  isFocused.value = false;
-  
-  // Transition back to appropriate state based on scroll position
-  const shouldBeScrolled = scrollProgress.value >= scrollInflectionPoint.value;
-  transitionToState(shouldBeScrolled ? 'scrolled' : 'normal');
+  // Small delay to allow for clicks within the search container
+  setTimeout(() => {
+    isFocused.value = false;
+    
+    // Only clear search results if controls are also hidden
+    if (!store.showControls) {
+      searchResults.value = [];
+      isSearching.value = false;
+    }
+    
+    // Transition back to appropriate state based on scroll position
+    const shouldBeScrolled = scrollProgress.value >= scrollInflectionPoint.value;
+    transitionToState(shouldBeScrolled ? 'scrolled' : 'normal');
+  }, 150); // Small delay to allow for control interactions
 };
 
 const handleInput = (event: Event) => {
@@ -632,6 +775,12 @@ const performSearch = () => {
 const handleEnter = async () => {
   clearTimeout(searchTimer);
 
+  // If autocomplete is available, accept it
+  if (autocompleteText.value) {
+    await handleAutocompleteAccept();
+    return;
+  }
+
   if (searchResults.value.length > 0 && selectedIndex.value >= 0) {
     await selectResult(searchResults.value[selectedIndex.value]);
   } else if (query.value) {
@@ -646,10 +795,14 @@ const selectResult = async (result: SearchResult) => {
   clearTimeout(searchTimer);
   query.value = result.word;
   store.searchQuery = result.word;
-  isFocused.value = false;
+  // Don't immediately lose focus, let the natural blur handle it
   searchResults.value = [];
   store.hasSearched = true;
   await store.getDefinition(result.word);
+  // Blur the input after selection
+  nextTick(() => {
+    searchInput.value?.blur();
+  });
 };
 
 const selectWord = (word: string) => {
@@ -666,6 +819,17 @@ const navigateResults = (direction: number) => {
   );
 
   store.searchSelectedIndex = selectedIndex.value;
+
+  // Scroll selected item into view
+  nextTick(() => {
+    const selectedElement = resultRefs[selectedIndex.value];
+    if (selectedElement && searchResultsContainer.value) {
+      selectedElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+      });
+    }
+  });
 };
 
 const handleHamburgerClick = () => {
@@ -697,13 +861,6 @@ const handleSourceToggle = (sourceId: string) => {
   });
 };
 
-const handleWordlistSelect = (wordlist: string) => {
-  store.setWordlist(wordlist);
-  // Restore focus to search input after selecting wordlist
-  nextTick(() => {
-    searchInput.value?.focus();
-  });
-};
 
 const handleModeToggle = () => {
   store.toggleMode();
@@ -713,14 +870,116 @@ const handleModeToggle = () => {
   });
 };
 
-// Click outside handler
+// Autocomplete logic
+const updateAutocomplete = () => {
+  if (!query.value || query.value.length < 2 || !searchResults.value.length) {
+    autocompleteText.value = '';
+    return;
+  }
+
+  // Take the top match (highest score)
+  const topMatch = searchResults.value[0];
+  
+  // Check if the top match starts with the current query (case insensitive)
+  const queryLower = query.value.toLowerCase();
+  const wordLower = topMatch.word.toLowerCase();
+  
+  if (wordLower.startsWith(queryLower) && topMatch.word.length > query.value.length) {
+    // Use the top match for completion
+    autocompleteText.value = topMatch.word;
+  } else {
+    // No suitable completion available
+    autocompleteText.value = '';
+  }
+};
+
+const handleAutocompleteAccept = async () => {
+  if (autocompleteText.value) {
+    query.value = autocompleteText.value;
+    store.searchQuery = autocompleteText.value;
+    isFocused.value = false;
+    searchResults.value = [];
+    store.hasSearched = true;
+    autocompleteText.value = '';
+    await store.getDefinition(query.value);
+  }
+};
+
+const fillAutocomplete = () => {
+  if (autocompleteText.value) {
+    query.value = autocompleteText.value;
+    store.searchQuery = autocompleteText.value;
+    autocompleteText.value = '';
+    // Move cursor to end
+    nextTick(() => {
+      if (searchInput.value) {
+        searchInput.value.setSelectionRange(query.value.length, query.value.length);
+      }
+    });
+  }
+};
+
+const handleSpaceKey = (event: KeyboardEvent) => {
+  if (autocompleteText.value) {
+    event.preventDefault();
+    fillAutocomplete();
+    // Add the space after filling
+    nextTick(() => {
+      query.value += ' ';
+      store.searchQuery = query.value;
+    });
+  }
+};
+
+const handleInputClick = (_event: MouseEvent) => {
+  if (autocompleteText.value && searchInput.value) {
+    const input = searchInput.value;
+    const cursorPosition = input.selectionStart || 0;
+    
+    // If cursor is positioned beyond the current query length (in ghost text area)
+    if (cursorPosition > query.value.length) {
+      fillAutocomplete();
+    }
+  }
+};
+
+const handleArrowKey = (event: KeyboardEvent) => {
+  if (autocompleteText.value && searchInput.value) {
+    const currentPosition = searchInput.value.selectionStart || 0;
+    
+    // If it's a right arrow and we're at the end of the current text
+    if (event.key === 'ArrowRight' && currentPosition === query.value.length) {
+      event.preventDefault();
+      fillAutocomplete();
+      return;
+    }
+    
+    // Use nextTick to get the cursor position after the arrow key press for other cases
+    nextTick(() => {
+      if (searchInput.value) {
+        const cursorPosition = searchInput.value.selectionStart || 0;
+        
+        // If cursor moves beyond the current query length (into ghost text area)
+        if (cursorPosition > query.value.length) {
+          fillAutocomplete();
+        }
+      }
+    });
+  }
+};
+
+// Click outside handler - only close when clicking truly outside the search area
 const handleClickOutside = (event: Event) => {
   const target = event.target as Element;
 
+  // Don't close if clicking within the search container (includes controls and results)
   if (!target.closest('.search-container')) {
     store.showControls = false;
-    searchResults.value = [];
-    isSearching.value = false;
+    // Only clear search results if the input loses focus
+    if (!isFocused.value) {
+      searchResults.value = [];
+      isSearching.value = false;
+    }
   }
 };
 
@@ -728,6 +987,17 @@ const handleClickOutside = (event: Event) => {
 watch(scrollY, () => {
   // Use debounced update to prevent jittering
   updateScrollState();
+});
+
+// Watchers for autocomplete
+watch(searchResults, () => {
+  selectedIndex.value = 0;
+  store.searchSelectedIndex = 0;
+  updateAutocomplete();
+});
+
+watch(query, () => {
+  updateAutocomplete();
 });
 
 // Legacy shrink state handling (enhanced with state machine)
@@ -768,6 +1038,8 @@ onMounted(async () => {
 // Cleanup
 onUnmounted(() => {
   clearTimeout(searchTimer);
+  clearTimeout(velocityTimer);
+  clearTimeout(momentumCooldown);
   if (scrollAnimationFrame) {
     cancelAnimationFrame(scrollAnimationFrame);
   }

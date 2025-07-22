@@ -145,3 +145,48 @@ export function createAutoHide(
   
   return { start, cancel };
 }
+
+// Dynamic rainbow gradient generator
+export function generateRainbowGradient(steps: number = 7): string {
+  const colors = [
+    'rgb(239, 68, 68)',   // red-500
+    'rgb(249, 115, 22)',  // orange-500
+    'rgb(234, 179, 8)',   // yellow-500
+    'rgb(34, 197, 94)',   // green-500
+    'rgb(6, 182, 212)',   // cyan-500
+    'rgb(59, 130, 246)',  // blue-500
+    'rgb(147, 51, 234)',  // purple-500
+    'rgb(236, 72, 153)',  // pink-500
+  ];
+
+  // Calculate which colors to use based on steps
+  const selectedColors = [];
+  for (let i = 0; i < steps; i++) {
+    const index = Math.floor((i / (steps - 1)) * (colors.length - 1));
+    selectedColors.push(colors[index]);
+  }
+
+  return `linear-gradient(90deg, ${selectedColors.join(', ')})`;
+}
+
+// Animated rainbow gradient with time-based shifting
+export function generateAnimatedRainbowGradient(
+  animationSpeed: number = 1,
+  steps: number = 7
+): string {
+  const baseColors = [
+    'rgb(239, 68, 68)',   // red-500
+    'rgb(249, 115, 22)',  // orange-500  
+    'rgb(234, 179, 8)',   // yellow-500
+    'rgb(34, 197, 94)',   // green-500
+    'rgb(6, 182, 212)',   // cyan-500
+    'rgb(59, 130, 246)',  // blue-500
+    'rgb(147, 51, 234)',  // purple-500
+    'rgb(236, 72, 153)',  // pink-500
+  ];
+
+  // Create a longer gradient for smooth animation
+  const extendedColors = [...baseColors, ...baseColors.slice(0, 3)];
+  
+  return `linear-gradient(90deg, ${extendedColors.join(', ')})`;
+}

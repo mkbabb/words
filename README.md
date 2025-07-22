@@ -1,286 +1,214 @@
-# Floridify - AI-Enhanced Dictionary
+# 🌻 Floridify — An Efflorescent Dictionary for Word Lovers
 
-A modern, full-stack dictionary application with AI-powered meaning extraction, semantic search, and beautiful typography. Built for seamless word exploration with both CLI and web interfaces.
+A full-stack dictionary system architected for the methodical acquisition and discovery of efflorescent words. Built with meaning-first philosophy, semantic intelligence, and the understanding that an expanded lexicon is akin to an extended color palette for precise articulation.
 
-## 🌐 Web Interface (NEW!)
+## Overview
 
-Experience Floridify through a beautiful, responsive web interface featuring:
+Floridify transcends traditional dictionary lookup through AI-synthesized meaning extraction, transforming the chaotic assemblage of definitions into hierarchical, learnable knowledge. This isn't merely another word application—it's a comprehensive vocabulary acquisition ecosystem designed for those who understand that words are the fundamental substrate of thought itself.
 
-- **Smooth Animations**: GPU-accelerated search bar transitions
-- **Typography Excellence**: Fraunces for elegance, Fira Code for technical precision  
-- **Intelligent Search**: As-you-type suggestions with debounced API calls
-- **Heatmap Visualization**: Color-coded synonym similarity scores
-- **Universal Word Linking**: Click any word to explore further
-- **Responsive Design**: Perfect on desktop, tablet, and mobile
+The system employs a sophisticated multi-method search cascade (exact → fuzzy → semantic → AI) across 269k+ lexical entries, synthesizing definitions from disparate sources into coherent, meaning-clustered presentations. Each word becomes a structured learning artifact, complete with spaced repetition algorithms, contextual examples, and direct Anki integration for systematic vocabulary development.
 
-### Quick Start - Web Interface
+## 🚀 Quick Start
 
+### Full-Stack Development
 ```bash
-# Start both frontend and backend
-npm run dev
+# Concurrent frontend (Vue 3) and backend (FastAPI) development
+./dev.sh
 
-# Or start separately:
-npm run dev:backend  # Python FastAPI server on :8000
-npm run dev:frontend # Vue.js development server on :3000
+# Navigate to localhost:3000 for the web interface
+# API available at localhost:8000
 ```
 
-Navigate to `http://localhost:3000` for the web interface.
-
----
-
-## 📖 CLI Interface (Original)
-
-**AI-Enhanced Dictionary and Vocabulary Learning Tool**
-
-A sophisticated CLI dictionary system that transforms word lookup into an intelligent, meaning-driven experience. Built for serious vocabulary learners, GRE prep, and anyone who demands more than basic definitions.
-
-## ✨ What Makes Floridify Special
-
-**🧠 AI-Powered Intelligence**: Automatically clusters word meanings and synthesizes definitions from multiple sources into clear, hierarchical explanations.
-
-**🔍 Multi-Method Search**: Exact → fuzzy → semantic → AI fallback cascade with sub-second performance across 269k+ words.
-
-**📚 Batch Processing**: Transform word lists into comprehensive vocabulary collections with frequency tracking and beautiful terminal visualizations.
-
-**🎴 Direct Anki Integration**: Generate academic-quality flashcards that appear instantly in your Anki app - no manual import required.
-
-**🎨 Beautiful CLI**: Rich terminal interface with progress tracking, heat maps, and thoughtful typography.
-
-## Quick Example
-
+### CLI Installation
 ```bash
-# Look up a word with AI-enhanced clustering
-$ floridify lookup bank
-
-╭─ bank /bæŋk/ ──────────────────────────────────────────╮
-│ ╭─ bank¹ (Financial Institution) ──────────────────╮   │
-│ │ noun                                              │   │
-│ │   A financial institution that accepts deposits   │   │
-│ │   and provides loans and other services.          │   │
-│ ╰───────────────────────────────────────────────────╯   │
-│ ╭─ bank² (Geographic Feature) ──────────────────────╮   │
-│ │ noun                                              │   │
-│ │   The sloping land alongside a river or lake.     │   │
-│ ╰───────────────────────────────────────────────────╯   │
-│ ✨ Sources: wiktionary, ai-synthesis                     │
-╰─────────────────────────────────────────────────────────╯
-
-# Process a word list and export to Anki
-$ floridify word-list create vocab.txt --name gre-prep
-$ floridify anki export gre-prep
-✅ Exported 50 flashcards directly to Anki in 3.2s
-```
-
-## 🚀 Getting Started
-
-### Prerequisites
-
--   **Python 3.12+**
--   **MongoDB** (optional, defaults to localhost:27017)
--   **OpenAI API Key** for AI features
--   **uv** package manager
-
-### Installation
-
-```bash
-# Clone and setup environment
 git clone <repository-url>
-cd floridify
+cd floridify/backend
 uv venv && source .venv/bin/activate
 uv sync
 
-# Configure API keys
+# Configure authentication
 cp auth/config.toml.example auth/config.toml
-# Edit auth/config.toml with your OpenAI API key
+# Add your OpenAI API key to auth/config.toml
 
-# Initialize search engine (one-time setup)
-uv run ./scripts/floridify search init
+# Initialize search indices (one-time setup)
+floridify search init
 
-# You're ready to go!
-uv run ./scripts/floridify lookup serendipity
+# Begin your lexical exploration
+floridify lookup perspicacious
 ```
 
-### Configuration
+## 🎯 Core Features
 
-Edit `auth/config.toml`:
+### AI-Synthesized Meaning Extraction
+The system's architectural innovation lies in **meaning-based clustering before synthesis**. Rather than presenting a bewildering array of disparate definitions, Floridify employs an LLM (configurable provider hereof) to identify semantic clusters and synthesize coherent explanations per meaning group. The result: bank¹ (financial), bank² (geographic), bank³ (arrangement) — each with focused, learnable definitions.
+
+### Multi-Method Search Intelligence
+Four-tier search architecture provides comprehensive lexical coverage:
+- **Trie-based exact matching** for instant results
+- **Fuzzy string algorithms** handling morphological variations  
+- **FAISS semantic search** with vector similarity
+- **AI fallback generation** for unknown, bespoke, or totally esoteric terms
+
+### Rich Terminal Interface
+A beautiful CLI experience leveraging the Rich library with Unicode superscripts, heat-mapped frequency visualization, progress tracking, and thoughtful typography. The terminal becomes a canvas for linguistic exploration.
+
+```bash
+# Hierarchical meaning display
+floridify lookup sanguine
+
+╭─ sanguine /ˈsæŋɡwɪn/ ────────────────────────────╮
+│ ╭─ sanguine¹ (Optimistic Temperament) ──────╮   │
+│ │ adjective                                  │   │
+│ │   Confidently optimistic and cheerful.    │   │
+│ │   synonyms: hopeful, buoyant, ebullient   │   │
+│ ╰────────────────────────────────────────────╯   │
+│ ╭─ sanguine² (Blood-red Complexion) ────────╮   │
+│ │ adjective                                  │   │
+│ │   Having a ruddy, healthy complexion.     │   │
+│ ╰────────────────────────────────────────────╯   │
+╰───────────────────────────────────────────────────╯
+```
+
+### Spaced Repetition Learning System
+Implements the proven SuperMemo SM-2 algorithm with personalized difficulty adjustment. Each word maintains review schedules, ease factors, and mastery progression (Bronze → Silver → Gold), optimizing long-term retention through scientifically-validated spacing intervals.
+
+### Comprehensive Wordlist Processing
+Transform vocabulary corpora through intelligent batch processing:
+- **Multi-format parsing**: numbered lists, CSV, tab-separated, plain text
+- **Frequency tracking** with heat-map visualization  
+- **Cost-effective batch API processing** (50% OpenAI discount)
+- **Quality filtering** with configurable aggressiveness levels
+- **Auto-generated nomenclature** via animal phrase names ("ochre-guan", "ebony-tanuki")
+
+### Direct Anki Integration
+Generate GRE-level flashcards that materialize instantly in your Anki application:
+- **Fill-in-blank cards** testing contextual comprehension
+- **Best-describes cards** with semantically relevant distractors
+- **Professional styling** with gradient backgrounds and typography
+- **AnkiConnect API** for seamless deck creation (no manual imports)
+
+### Web Interface Excellence
+Modern Vue 3 SPA with Tailwind CSS featuring:
+- **GPU-accelerated animations** with scroll-aware search bar behavior
+- **Typography-first excellence**: Fraunces serif elegance, Fira Code technical precision
+- **Intelligent state persistence** via Pinia with localStorage integration
+- **Metallic card variants** (gold, silver, bronze) with sparkle effects
+- **Real-time progress streaming** during AI synthesis operations
+
+## 🏗️ Architecture
+
+**Technology Stack**:
+- **Backend**: Python 3.12+ (FastAPI, MongoDB, OpenAI, FAISS)
+- **Frontend**: Vue 3 + TypeScript (Tailwind CSS, Pinia, Vite)
+- **Search**: Multi-method cascade with semantic vector similarity
+- **AI**: OpenAI GPT-4 with structured outputs and meaning extraction
+- **Storage**: MongoDB with Beanie ODM and multi-level caching
+
+**Data Flow**: User Input → Multi-Method Search → Provider Aggregation → AI Synthesis → Hierarchical Display → Persistent Storage
+
+**Performance Characteristics**:
+- Sub-second search across 269k+ entries
+- ~95% cache hit rate for repeated lookups  
+- 2-4 second AI synthesis with structured outputs
+- Concurrent batch processing (10 words parallel)
+- FAISS-accelerated semantic similarity matching
+
+## 📚 Advanced Functionality
+
+### Semantic Exploration
+```bash
+# Discover related concepts through vector similarity
+floridify search word --semantic efflorescence
+# Results: bloom, flourish, blossom, burgeon...
+
+# Synonym generation with "efflorescence" ranking
+floridify similar perspicacious
+# Balanced distribution: 40% common, 30% expressive, 20% foreign, 10% technical
+```
+
+### Batch Operations
+```bash
+# Process large vocabulary corpora
+floridify word-list create comprehensive-vocab.txt --name advanced-lexicon
+floridify word-list show advanced-lexicon  # Heat-mapped frequency display
+
+# Export flashcards with academic rigor
+floridify anki export advanced-lexicon --card-types fill_in_blank
+```
+
+### Database Management  
+```bash
+# Performance insights and optimization
+floridify database stats --detailed
+# Collection counts, cache metrics, synthesis quality scores
+
+# Configuration management with secure key handling
+floridify config keys set openai sk-your-api-key
+floridify config set max_results 50
+```
+
+## 🎓 Use Cases
+
+**Academic Excellence**: GRE/SAT preparation through systematic vocabulary acquisition with spaced repetition algorithms and scientifically-validated review scheduling.
+
+**Professional Development**: Industry-specific terminology expansion with contextual understanding and practical usage examples.
+
+**Linguistic Scholarship**: Comprehensive meaning analysis, etymology exploration, and semantic relationship discovery for serious language study.
+
+**Creative Writing**: Precision in lexical selection through extensive synonym networks and contextual usage guidance.
+
+## 🔧 Configuration
+
+Edit `auth/config.toml` for system customization:
 
 ```toml
 [api]
 openai_api_key = "sk-your-key-here"
+openai_model = "gpt-4o"  # Supports reasoning models (o1, o3)
 rate_limit_enabled = true
 
 [general]
 default_provider = "wiktionary"
 max_results = 20
+cache_duration_hours = 24
 
 [anki]
 default_card_types = ["best_describes", "fill_in_blank"]
 max_cards_per_word = 2
+direct_export = true  # Requires AnkiConnect add-on
 ```
 
-## 🎯 Core Features
+## 💻 Development & Deployment
 
-### Smart Word Lookup
-
+### Local Development
 ```bash
-# Single words with AI clustering
-floridify lookup perspicacious
+# Docker mode (recommended)
+./dev.sh --build  # Force image rebuild
 
-# Multi-word phrases
-floridify lookup "en coulisse"
-
-# Skip AI synthesis for faster results
-floridify lookup bank --no-ai
+# Native mode
+./dev.sh --native  # Local Python/Node execution
 ```
 
-### Intelligent Search
+### Production Deployment
 
+**One-time setup:**
 ```bash
-# Find words containing patterns
-floridify search word cogn
-# Results: recognize, cognitive, incognito...
-
-# Search with different methods
-floridify search word --semantic understanding
+# Configure GitHub secrets and EC2 access
+./scripts/setup
 ```
 
-### Word List Management
-
+**Deploy to production:**
 ```bash
-# Create from various formats
-floridify word-list create vocab.txt --name my-vocabulary
-floridify word-list create words.csv --name gre-prep
+# Manual deployment
+./scripts/deploy
 
-# View with frequency visualization
-floridify word-list show my-vocabulary
-
-# Supported formats:
-# - Numbered lists: "1. word", "2) another"
-# - CSV: "word1, word2, phrase"
-# - Tab-separated: "word1	word2"
-# - Plain text: one word per line
+# Or push to main branch for automated GitHub Actions deployment
+git push origin main
 ```
 
-### Anki Integration
+The system includes comprehensive deployment automation with:
+- Docker image building and publishing to GitHub Container Registry
+- AWS EC2 deployment with SSL certificate provisioning
+- DocumentDB integration with TLS security
+- Automated health checks and rollback capabilities
 
-```bash
-# Direct export (cards appear immediately in Anki)
-floridify anki export my-vocabulary
-
-# Specific card types
-floridify anki export gre-prep --card-types fill_in_blank
-
-# Traditional .apkg export
-floridify anki export vocab --no-direct
-
-# Check AnkiConnect status
-floridify anki status
-```
-
-**Anki Setup for Direct Export:**
-
-1. Install [AnkiConnect](https://ankiweb.net/shared/info/2055492159) add-on (code: `2055492159`)
-2. Keep Anki running during export
-3. On macOS: `defaults write net.ichi2.anki NSAppSleepDisabled -bool true`
-
-### Database & Configuration
-
-```bash
-# View database stats
-floridify database stats --detailed
-
-# Manage configuration
-floridify config show
-floridify config set max_results 50
-floridify config keys set openai sk-your-new-key
-```
-
-## 🏗️ Architecture
-
-**Data Pipeline**: Normalize → Search → Fetch → Extract Meanings → Synthesize → Display → Cache
-
-**Storage**: MongoDB collections for entries, synthesis results, and word lists
-
-**Search**: FAISS-accelerated semantic search with trie-based exact matching
-
-**AI Integration**: OpenAI GPT models with structured outputs for meaning extraction and synthesis
-
-**Caching**: Multi-level caching (API responses, synthesized entries, search indices) for performance
-
-## 💻 Technology Stack
-
--   **Python 3.12+** with modern async/await patterns
--   **MongoDB + Beanie ODM** for document storage
--   **OpenAI API** with structured outputs
--   **FAISS + scikit-learn** for semantic search
--   **Rich + Click** for beautiful CLI
--   **uv** for fast, reliable dependency management
-
-## 📊 Performance
-
--   **Search**: Sub-second across 269k+ words
--   **AI Synthesis**: ~2-4 seconds per word
--   **Batch Processing**: 10 words processed concurrently
--   **Anki Export**: Direct integration in <2 seconds
--   **Cache Hit Rate**: ~95% for repeated lookups
-
-## 🎓 Use Cases
-
-**Academic & Test Prep**
-
--   GRE/SAT vocabulary with spaced repetition flashcards
--   Language learning with meaning-based clustering
--   Research vocabulary processing
-
-**Professional Development**
-
--   Technical term exploration
--   Writing enhancement and synonym discovery
--   Industry-specific vocabulary building
-
-**Developers & Researchers**
-
--   Batch vocabulary analysis
--   Semantic similarity exploration
--   Dictionary data extraction and processing
-
-## 🔧 Advanced Usage
-
-### Batch Processing Large Lists
-
-```bash
-# Process large vocabulary lists efficiently
-floridify word-list create large-vocab.txt --name comprehensive
-floridify anki export comprehensive --max-cards 1
-```
-
-### Custom Search Methods
-
-```bash
-# Semantic search for related concepts
-floridify search word --semantic happiness
-# Results: joy, elation, contentment, euphoria...
-
-# Fuzzy search for typos
-floridify search word recieve  # → receive
-```
-
-### Performance Monitoring
-
-```bash
-# Database insights
-floridify database stats --detailed
-# Shows: collection counts, cache hit rates, performance metrics
-
-# Clear caches for fresh lookups
-floridify database cleanup --older-than 7
-```
-
-## 🤝 Development
-
-Built with modern Python practices:
-
--   **Type Safety**: Full MyPy strict mode compliance
--   **Code Quality**: Ruff formatting, comprehensive error handling
--   **Testing**: 95%+ coverage target with pytest
--   **Architecture**: Functional approach with async-first design

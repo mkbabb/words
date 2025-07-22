@@ -63,12 +63,12 @@ const updateBackground = (activeIndex: number, animate = true) => {
     const newTransform = `translateX(${activeButton.offsetLeft}px)`;
 
     if (animate) {
-      // Bouncy background animation
+      // Simple bouncy background animation
       gsap.to(backgroundSlider.value, {
         width: newWidth,
         x: activeButton.offsetLeft,
         duration: 0.4,
-        ease: "back.out(2.5)"
+        ease: "back.out(1.7)"
       });
     } else {
       // Immediate update for initial state
@@ -84,28 +84,20 @@ const handleSelect = (value: string, index: number) => {
   const activeButton = buttonRefs.value[index];
   if (!activeButton) return;
 
-  // Ultra-bouncy button press animation
+  // Simple button press animation
   gsap.timeline()
     .to(activeButton, {
-      scale: 0.88,
-      rotationZ: -1,
-      duration: 0.08,
+      scale: 0.95,
+      duration: 0.1,
       ease: "power2.out"
     })
     .to(activeButton, {
-      scale: 1.08,
-      rotationZ: 0.5,
-      duration: 0.2,
-      ease: "back.out(3.5)"
-    })
-    .to(activeButton, {
       scale: 1,
-      rotationZ: 0,
-      duration: 0.12,
-      ease: "elastic.out(1, 0.3)"
+      duration: 0.2,
+      ease: "back.out(1.7)"
     });
 
-  // Update background position with bounce
+  // Update background position
   updateBackground(index, true);
   
   // Emit the new value
@@ -128,3 +120,4 @@ computed(() => {
   }
 });
 </script>
+

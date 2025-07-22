@@ -12,27 +12,28 @@
   >
     <!-- Main View -->
     <div class="relative min-h-screen p-2">
-      <Tabs v-model="activeTab" class="">
-        <!-- Sticky Tabs and Search Bar -->
-        <TabsList
-          class="m-auto grid w-fit grid-cols-2 justify-center gap-1 bg-transparent"
-        >
-          <TabsTrigger value="definition">Dictionary</TabsTrigger>
-          <TabsTrigger value="stage">Stage</TabsTrigger>
-        </TabsList>
-
-        <!-- Sticky Search Bar with scroll responsiveness -->
-        <div :class="searchBarClasses">
-          <SearchBar :shrink-percentage="shrinkPercentage" />
-        </div>
+      <!-- Sticky Search Bar with scroll responsiveness -->
+      <div :class="searchBarClasses" class="relative">
+        <SearchBar :shrink-percentage="shrinkPercentage" />
+      </div>
 
         <!-- Border separator (not sticky) -->
         <div class="border-border/50 border-b"></div>
 
-        <!-- Content Area -->
-        <div class="container mx-auto max-w-5xl px-4 py-8">
-          <!-- Definition Tab Content -->
-          <TabsContent value="definition">
+      <!-- Content Area -->
+      <div class="container mx-auto max-w-5xl px-4 py-8">
+        <!-- Animated Content Cards -->
+        <Transition
+          mode="out-in"
+          enter-active-class="transition-all duration-300 ease-apple-bounce"
+          leave-active-class="transition-all duration-200 ease-out"
+          enter-from-class="opacity-0 scale-95 translate-x-8 rotate-1"
+          enter-to-class="opacity-100 scale-100 translate-x-0 rotate-0"
+          leave-from-class="opacity-100 scale-100 translate-x-0 rotate-0"
+          leave-to-class="opacity-0 scale-95 -translate-x-8 -rotate-1"
+        >
+          <!-- Definition Content -->
+          <div v-if="store.searchMode === 'lookup'" key="lookup">
             <!-- Loading State -->
             <div v-if="isSearching" class="space-y-8">
               <DefinitionSkeleton />
@@ -47,17 +48,26 @@
             <div v-else class="py-16 text-center">
               <!-- Empty state - no text -->
             </div>
-          </TabsContent>
+          </div>
 
+          <!-- Wordlist Content -->
+          <div v-else-if="store.searchMode === 'wordlist'" key="wordlist">
+            <div class="space-y-8">
+              <!-- Wordlist content will go here -->
+              <div class="text-center py-16 text-muted-foreground">
+                Wordlist mode coming soon...
+              </div>
+            </div>
+          </div>
 
-          <!-- Stage Tab Content -->
-          <TabsContent value="stage">
+          <!-- Stage Content -->
+          <div v-else-if="store.searchMode === 'stage'" key="stage">
             <div class="space-y-8">
               <StageTest />
             </div>
-          </TabsContent>
-        </div>
-      </Tabs>
+          </div>
+        </Transition>
+      </div>
     </div>
   </div>
 
@@ -82,12 +92,10 @@ import { DefinitionSkeleton } from '@/components/custom/definition';
 import { Sidebar } from '@/components/custom';
 import { LoadingModal } from '@/components/custom/loading';
 import { StageTest } from '@/components/custom/test';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { dictionaryApi } from '@/utils/api';
 import type { FactItem } from '@/types';
 
 const store = useAppStore();
-const activeTab = ref<'definition' | 'stage'>('definition');
 
 // Facts for loading modal
 const currentFacts = ref<FactItem[]>([]);

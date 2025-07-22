@@ -7,6 +7,7 @@ from typing import Any
 
 import toml
 
+from ..utils.config import load_config
 from ..utils.logging import get_logger
 from .connector import OpenAIConnector
 from .synthesizer import DefinitionSynthesizer
@@ -18,15 +19,7 @@ _openai_connector: OpenAIConnector | None = None
 _definition_synthesizer: DefinitionSynthesizer | None = None
 
 
-def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
-    """Load configuration from TOML file."""
-    if config_path is None:
-        # Default to auth/config.toml relative to project root
-        current_dir = Path(__file__).parent.parent.parent.parent
-        config_path = current_dir / "auth" / "config.toml"
-
-    with open(config_path, encoding="utf-8") as f:
-        return toml.load(f)
+# Configuration loading moved to utils.config
 
 
 def get_openai_connector(
@@ -48,8 +41,8 @@ def get_openai_connector(
         logger.info("Initializing OpenAI connector singleton")
         config = load_config(config_path)
 
-        api_key = config["openai"]["api_key"]
-        model_name = config["models"]["openai_model"]
+        api_key = config.openai.api_key
+        model_name = config.openai.model
 
         # Only set temperature for non-reasoning models
         temperature = None

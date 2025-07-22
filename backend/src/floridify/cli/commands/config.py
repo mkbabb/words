@@ -10,11 +10,10 @@ import toml
 from rich.console import Console
 from rich.table import Table
 
+from ...paths import get_config_path
 from ..utils.formatting import format_error, format_success, format_warning
 
 console = Console()
-
-CONFIG_FILE = Path("auth/config.toml")
 
 
 @click.group()
@@ -28,16 +27,17 @@ def config_group() -> None:
 def show_config(show_keys: bool) -> None:
     """Display current configuration."""
     try:
-        if not CONFIG_FILE.exists():
+        config_file = get_config_path()
+        if not config_file.exists():
             console.print(
                 format_warning(
                     "Configuration file not found",
-                    f"Create {CONFIG_FILE} to store settings and API keys.",
+                    f"Create {config_file} to store settings and API keys.",
                 )
             )
             return
 
-        config = toml.load(CONFIG_FILE)
+        config = toml.load(config_file)
 
         console.print("[bold blue]Current Configuration[/bold blue]\n")
 
@@ -83,12 +83,13 @@ def set_config(key: str, value: str, section: str) -> None:
     VALUE: Value to set
     """
     try:
+        config_file = get_config_path()
         # Ensure config directory exists
-        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        config_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Load existing config or create new
-        if CONFIG_FILE.exists():
-            config = toml.load(CONFIG_FILE)
+        if config_file.exists():
+            config = toml.load(config_file)
         else:
             config = {}
 
@@ -101,7 +102,7 @@ def set_config(key: str, value: str, section: str) -> None:
         config[section][key] = parsed_value
 
         # Save config
-        with open(CONFIG_FILE, "w") as f:
+        with open(config_file, "w") as f:
             toml.dump(config, f)
 
         console.print(format_success(f"Set {section}.{key} = {parsed_value}"))
@@ -119,11 +120,12 @@ def get_config(key: str, section: str) -> None:
     KEY: Configuration key to get
     """
     try:
-        if not CONFIG_FILE.exists():
+        config_file = get_config_path()
+        if not config_file.exists():
             console.print(format_error("Configuration file not found"))
             return
 
-        config = toml.load(CONFIG_FILE)
+        config = toml.load(config_file)
 
         if section not in config:
             console.print(format_error(f"Section '{section}' not found"))
@@ -150,11 +152,12 @@ def keys_group() -> None:
 def list_keys() -> None:
     """List all configured API keys."""
     try:
-        if not CONFIG_FILE.exists():
+        config_file = get_config_path()
+        if not config_file.exists():
             console.print(format_warning("No configuration file found"))
             return
 
-        config = toml.load(CONFIG_FILE)
+        config = toml.load(config_file)
 
         if "api" not in config:
             console.print("[dim]No API keys configured.[/dim]")
@@ -188,12 +191,13 @@ def set_key(service: str, api_key: str) -> None:
     API_KEY: The API key to set
     """
     try:
+        config_file = get_config_path()
         # Ensure config directory exists
-        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        config_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Load existing config or create new
-        if CONFIG_FILE.exists():
-            config = toml.load(CONFIG_FILE)
+        if config_file.exists():
+            config = toml.load(config_file)
         else:
             config = {}
 
@@ -205,7 +209,7 @@ def set_key(service: str, api_key: str) -> None:
         config["api"][key_name] = api_key
 
         # Save config
-        with open(CONFIG_FILE, "w") as f:
+        with open(config_file, "w") as f:
             toml.dump(config, f)
 
         console.print(format_success(f"Set API key for {service}"))
@@ -242,9 +246,10 @@ def test_keys(service: str) -> None:
 def edit_config() -> None:
     """Open configuration file in default editor."""
     try:
-        if not CONFIG_FILE.exists():
+        config_file = get_config_path()
+        if not config_file.exists():
             # Create default config file
-            CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+            config_file.parent.mkdir(parents=True, exist_ok=True)
             default_config = {
                 "general": {
                     "output_format": "rich",
@@ -269,14 +274,14 @@ def edit_config() -> None:
                 },
             }
 
-            with open(CONFIG_FILE, "w") as f:
+            with open(config_file, "w") as f:
                 toml.dump(default_config, f)
 
-            console.print(format_success(f"Created default configuration file: {CONFIG_FILE}"))
+            console.print(format_success(f"Created default configuration file: {config_file}"))
 
         # Open in editor
         editor = os.environ.get("EDITOR", "nano")
-        os.system(f"{editor} {CONFIG_FILE}")
+        os.system(f"{editor} {config_file}")
 
     except Exception as e:
         console.print(format_error(f"Failed to edit configuration: {str(e)}"))
@@ -292,8 +297,9 @@ def reset_config(confirm: bool) -> None:
             return
 
     try:
-        if CONFIG_FILE.exists():
-            CONFIG_FILE.unlink()
+        config_file = get_config_path()
+        if config_file.exists():
+            config_file.unlink()
 
         console.print(format_success("Configuration reset to defaults"))
         console.print("[dim]Run 'floridify config edit' to customize settings.[/dim]")

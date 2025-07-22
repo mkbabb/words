@@ -17,11 +17,12 @@ dist/
 # Python cache files
 __pycache__/
 .mypy_cache/
-.claude/
 .pytest_cache/
 *.pyc
 *.pyo
 .ruff_cache/
+*.local*
+*.production*
 
 
 logs/

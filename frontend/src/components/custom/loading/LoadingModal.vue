@@ -1,13 +1,13 @@
 <template>
-  <Modal v-model="modelValue" :close-on-backdrop="false">
+  <Modal v-model="modelValue" :close-on-backdrop="allowDismiss">
     <div class="flex flex-col items-center space-y-8">
       <!-- Animated Text with Stage Lighting -->
       <AnimatedText 
         :text="word" 
         text-class="text-7xl font-black"
-        :delay="500"
-        :stagger="150"
-        :duration="3000"
+        :delay="800"
+        :stagger="200"
+        :duration="4000"
       />
 
       <!-- Stage Description Text -->
@@ -21,7 +21,11 @@
       </div>
 
       <!-- Progress Component -->
-      <LoadingProgress :progress="progress" />
+      <LoadingProgress 
+        :progress="progress" 
+        :interactive="allowDismiss"
+        @progress-change="$emit('progress-change', $event)"
+      />
 
       <!-- AI Facts Section -->
       <div
@@ -89,14 +93,17 @@ interface Props {
   progress: number;
   currentStage: string;
   facts?: Fact[];
+  allowDismiss?: boolean;
 }
 
 interface Emits {
   (e: 'update:modelValue', value: boolean): void;
+  (e: 'progress-change', progress: number): void;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   facts: () => [],
+  allowDismiss: false,
 });
 
 const emit = defineEmits<Emits>();

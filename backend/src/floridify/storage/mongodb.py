@@ -10,6 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..list.models import WordList
 from ..models.models import DictionaryEntry, SynthesizedDictionaryEntry
+from ..utils.config import get_database_config
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -196,23 +197,28 @@ class MongoDBStorage:
             logger.error(f"Error checking existence for {word}: {e}")
             return False
 
-    # cache_api_response removed - using modern caching system
 
-    # get_cached_response removed - using modern caching system
-
-    # cleanup_old_cache removed - using modern caching system
 
 
 # Helper functions for AI module
 async def _ensure_initialized() -> None:
-    """Ensure MongoDB is initialized."""
+    """Ensure MongoDB is initialized with environment-aware configuration."""
     global _storage
     if _storage is None:
-        _storage = MongoDBStorage()
+        # Get database configuration from environment + config file
+        mongodb_url, database_name = get_database_config()
+        logger.info(f"Initializing MongoDB: {database_name} at {mongodb_url[:20]}...")
+        
+        _storage = MongoDBStorage(
+            connection_string=mongodb_url,
+            database_name=database_name
+        )
         try:
             await _storage.connect()
+            logger.info("MongoDB initialized successfully")
         except Exception as e:
-            logger.warning(f"MongoDB initialization failed: {e}")
+            logger.error(f"MongoDB initialization failed: {e}")
+            raise
 
 
 async def get_storage() -> MongoDBStorage:

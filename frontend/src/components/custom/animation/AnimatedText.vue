@@ -5,7 +5,7 @@
       :class="[
         'font-fraunces',
         textClass,
-        'text-gray-900 dark:text-gray-100'
+        'text-black dark:text-white'
       ]"
     >
       <span
@@ -68,50 +68,40 @@ const displayChars = computed(() => {
   perspective: 1000px;
   transform-style: preserve-3d;
   
-  /* Advanced layered depth effect */
+  /* Chunky thick 3D effect - white shadows for black text */
   text-shadow:
-    /* Close shadows for definition */
-    1px 1px 0 rgba(0, 0, 0, 0.4),
-    2px 2px 0 rgba(0, 0, 0, 0.35),
-    3px 3px 0 rgba(0, 0, 0, 0.3),
-    4px 4px 0 rgba(0, 0, 0, 0.25),
-    5px 5px 0 rgba(0, 0, 0, 0.2),
-    6px 6px 0 rgba(0, 0, 0, 0.15),
-    7px 7px 0 rgba(0, 0, 0, 0.1),
-    8px 8px 0 rgba(0, 0, 0, 0.08),
-    
-    /* Atmospheric depth */
-    10px 10px 8px rgba(0, 0, 0, 0.3),
-    15px 15px 20px rgba(0, 0, 0, 0.2),
-    20px 20px 30px rgba(0, 0, 0, 0.15),
-    
-    /* Dramatic glow */
-    0 0 40px rgba(0, 0, 0, 0.1),
-    0 0 80px rgba(0, 0, 0, 0.05);
+    /* Sharp, defined depth layers */
+    1px 1px 0 rgba(255, 255, 255, 0.9),
+    2px 2px 0 rgba(255, 255, 255, 0.8),
+    3px 3px 0 rgba(255, 255, 255, 0.7),
+    4px 4px 0 rgba(255, 255, 255, 0.6),
+    5px 5px 0 rgba(255, 255, 255, 0.5),
+    6px 6px 0 rgba(255, 255, 255, 0.4),
+    7px 7px 0 rgba(255, 255, 255, 0.3),
+    8px 8px 0 rgba(255, 255, 255, 0.2),
+    9px 9px 0 rgba(255, 255, 255, 0.15),
+    10px 10px 0 rgba(255, 255, 255, 0.1),
+    11px 11px 0 rgba(255, 255, 255, 0.08),
+    12px 12px 0 rgba(255, 255, 255, 0.05);
     
   transition: all 0.3s ease;
 }
 
 .dark .depth-text {
   text-shadow:
-    /* Softer shadows for dark mode */
-    1px 1px 0 rgba(255, 255, 255, 0.2),
-    2px 2px 0 rgba(255, 255, 255, 0.18),
-    3px 3px 0 rgba(255, 255, 255, 0.16),
-    4px 4px 0 rgba(255, 255, 255, 0.14),
-    5px 5px 0 rgba(255, 255, 255, 0.12),
-    6px 6px 0 rgba(255, 255, 255, 0.1),
-    7px 7px 0 rgba(255, 255, 255, 0.08),
-    8px 8px 0 rgba(255, 255, 255, 0.06),
-    
-    /* Atmospheric depth */
-    10px 10px 8px rgba(255, 255, 255, 0.15),
-    15px 15px 20px rgba(255, 255, 255, 0.1),
-    20px 20px 30px rgba(255, 255, 255, 0.08),
-    
-    /* Subtle glow */
-    0 0 40px rgba(255, 255, 255, 0.05),
-    0 0 80px rgba(255, 255, 255, 0.03);
+    /* Chunky thick black shadows for white text */
+    1px 1px 0 rgba(0, 0, 0, 0.9),
+    2px 2px 0 rgba(0, 0, 0, 0.8),
+    3px 3px 0 rgba(0, 0, 0, 0.7),
+    4px 4px 0 rgba(0, 0, 0, 0.6),
+    5px 5px 0 rgba(0, 0, 0, 0.5),
+    6px 6px 0 rgba(0, 0, 0, 0.4),
+    7px 7px 0 rgba(0, 0, 0, 0.3),
+    8px 8px 0 rgba(0, 0, 0, 0.2),
+    9px 9px 0 rgba(0, 0, 0, 0.15),
+    10px 10px 0 rgba(0, 0, 0, 0.1),
+    11px 11px 0 rgba(0, 0, 0, 0.08),
+    12px 12px 0 rgba(0, 0, 0, 0.05);
 }
 
 .font-fraunces {

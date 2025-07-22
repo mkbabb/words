@@ -7,6 +7,8 @@ from pathlib import Path
 
 import toml
 
+from .utils.paths import get_config_path
+
 
 @dataclass
 class OpenAIConfig:
@@ -44,6 +46,16 @@ class RateLimits:
 
 
 @dataclass
+class DatabaseConfig:
+    """Database configuration."""
+
+    url: str = "mongodb://localhost:27017"
+    name: str = "floridify"
+    timeout: int = 30
+    max_pool_size: int = 100
+
+
+@dataclass
 class ProcessingConfig:
     """Processing pipeline configuration."""
 
@@ -61,20 +73,24 @@ class Config:
     openai: OpenAIConfig
     oxford: OxfordConfig
     dictionary_com: DictionaryComConfig
+    database: DatabaseConfig
     rate_limits: RateLimits
     processing: ProcessingConfig
 
     @classmethod
-    def from_file(cls, config_path: str | Path = "auth/config.toml") -> Config:
+    def from_file(cls, config_path: str | Path | None = None) -> Config:
         """Load configuration from TOML file.
 
         Args:
-            config_path: Path to configuration file
+            config_path: Path to configuration file (defaults to auth/config.toml)
 
         Returns:
             Loaded configuration
         """
-        config_path = Path(config_path)
+        if config_path is None:
+            config_path = get_config_path()
+        else:
+            config_path = Path(config_path)
 
         if not config_path.exists():
             raise FileNotFoundError(f"Configuration file not found: {config_path}")
@@ -98,6 +114,13 @@ class Config:
             authorization=data.get("dictionary_com", {}).get("authorization", "")
         )
 
+        database_config = DatabaseConfig(
+            url=data.get("database", {}).get("url", "mongodb://localhost:27017"),
+            name=data.get("database", {}).get("name", "floridify"),
+            timeout=data.get("database", {}).get("timeout", 30),
+            max_pool_size=data.get("database", {}).get("max_pool_size", 100),
+        )
+
         rate_limits = RateLimits(
             oxford_rps=data.get("rate_limits", {}).get("oxford_rps", 10.0),
             dictionary_com_rps=data.get("rate_limits", {}).get("dictionary_com_rps", 20.0),
@@ -119,6 +142,7 @@ class Config:
             openai=openai_config,
             oxford=oxford_config,
             dictionary_com=dictionary_com_config,
+            database=database_config,
             rate_limits=rate_limits,
             processing=processing,
         )

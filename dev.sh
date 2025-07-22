@@ -1,16 +1,246 @@
 #!/bin/bash
 
-# Start backend and frontend in parallel
-echo "Starting floridify development servers..."
+# Development server management script for Dockerized Floridify
+# Provides both Docker and native execution modes
+
+# Parse command line arguments
+RESTART_MODE=false
+DOCKER_MODE=true
+LOGS_MODE=false
+BUILD_MODE=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --restart)
+            RESTART_MODE=true
+            shift
+            ;;
+        --native)
+            DOCKER_MODE=false
+            shift
+            ;;
+        --logs)
+            LOGS_MODE=true
+            shift
+            ;;
+        --build)
+            BUILD_MODE=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --restart    Only restart servers if they're already running"
+            echo "  --native     Run servers natively (without Docker)"
+            echo "  --logs       Show Docker logs after starting"
+            echo "  --build      Force rebuild Docker images"
+            echo "  --help, -h   Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  $0                Start servers with Docker"
+            echo "  $0 --native       Start servers without Docker"
+            echo "  $0 --restart      Restart Docker containers"
+            echo "  $0 --build        Rebuild and start Docker containers"
+            echo "  $0 --logs         Start containers and follow logs"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--restart] [--native] [--logs] [--build] [--help]"
+            echo "Try '$0 --help' for more information."
+            exit 1
+            ;;
+    esac
+done
 
 # Get current directory
 ROOT_DIR=$(pwd)
 
-# Function to find and kill processes by pattern
+# Function to check if Docker is running
+check_docker() {
+    if ! docker info > /dev/null 2>&1; then
+        echo "Error: Docker is not running. Please start Docker Desktop."
+        exit 1
+    fi
+}
+
+# Function to check if .env file exists
+check_env_file() {
+    if [ ! -f "$ROOT_DIR/.env" ]; then
+        echo "Warning: .env file not found. Creating from .env.example..."
+        if [ -f "$ROOT_DIR/.env.example" ]; then
+            cp "$ROOT_DIR/.env.example" "$ROOT_DIR/.env"
+            echo "Created .env file. Please update it with your API keys and configuration."
+            echo ""
+        else
+            echo "Error: .env.example not found. Cannot create .env file."
+            exit 1
+        fi
+    fi
+}
+
+# Function to manage SSH tunnel for DocumentDB access
+manage_ssh_tunnel() {
+    local action="$1"
+    local tunnel_port="27018"
+    local ec2_host="54.209.241.47"
+    local docdb_host="docdb-2025-07-21-21-16-19.cluster-cuvowu48w9vs.us-east-1.docdb.amazonaws.com"
+    
+    case "$action" in
+        "start")
+            # Check if tunnel is already running
+            if lsof -Pi :$tunnel_port -sTCP:LISTEN -t >/dev/null 2>&1; then
+                echo "📡 SSH tunnel already active on port $tunnel_port"
+                return 0
+            fi
+            
+            echo "📡 Creating SSH tunnel to DocumentDB..."
+            ssh -o ExitOnForwardFailure=yes -f -N -L $tunnel_port:$docdb_host:27017 ubuntu@$ec2_host
+            
+            if [ $? -eq 0 ]; then
+                sleep 2
+                if lsof -Pi :$tunnel_port -sTCP:LISTEN -t >/dev/null 2>&1; then
+                    echo "✅ SSH tunnel established: localhost:$tunnel_port -> DocumentDB"
+                else
+                    echo "❌ SSH tunnel failed to start"
+                    return 1
+                fi
+            else
+                echo "❌ Failed to create SSH tunnel"
+                return 1
+            fi
+            ;;
+        "stop")
+            echo "📡 Stopping SSH tunnel..."
+            pkill -f "ssh.*-L.*$tunnel_port:" 2>/dev/null
+            echo "✅ SSH tunnel stopped"
+            ;;
+        "status")
+            if lsof -Pi :$tunnel_port -sTCP:LISTEN -t >/dev/null 2>&1; then
+                echo "✅ SSH tunnel active on port $tunnel_port"
+                return 0
+            else
+                echo "❌ SSH tunnel not running"
+                return 1
+            fi
+            ;;
+    esac
+}
+
+# Function to display configuration information from auth/config.toml
+display_config_info() {
+    if [ -f "$ROOT_DIR/auth/config.toml" ]; then
+        echo ""
+        echo "📋 Current Configuration (from auth/config.toml):"
+        
+        # Extract and display key configuration values
+        local openai_model=$(grep "openai_model" "$ROOT_DIR/auth/config.toml" | cut -d'"' -f2 2>/dev/null || echo "not configured")
+        local reasoning_effort=$(grep "reasoning_effort" "$ROOT_DIR/auth/config.toml" | cut -d'"' -f2 2>/dev/null || echo "not configured")
+        local embedding_model=$(grep "embedding_model" "$ROOT_DIR/auth/config.toml" | cut -d'"' -f2 2>/dev/null || echo "not configured")
+        
+        # Extract MongoDB info (mask sensitive parts)
+        local mongo_info=""
+        if grep -q "url.*mongodb" "$ROOT_DIR/auth/config.toml" 2>/dev/null; then
+            if grep -q "docdb.*amazonaws" "$ROOT_DIR/auth/config.toml" 2>/dev/null; then
+                mongo_info="AWS DocumentDB (Production)"
+            elif grep -q "localhost:27017" "$ROOT_DIR/auth/config.toml" 2>/dev/null; then
+                mongo_info="Local MongoDB (Development)"
+            else
+                mongo_info="Custom MongoDB Instance"
+            fi
+        else
+            mongo_info="not configured"
+        fi
+        
+        echo "  OpenAI Model: $openai_model"
+        echo "  Reasoning Effort: $reasoning_effort"
+        echo "  Embedding Model: $embedding_model"
+        echo "  MongoDB: $mongo_info"
+        
+        # Check for API key presence (without revealing)
+        local api_key_status="❌ not found"
+        if grep -q "api_key.*sk-" "$ROOT_DIR/auth/config.toml" 2>/dev/null; then
+            api_key_status="✅ configured"
+        fi
+        echo "  OpenAI API Key: $api_key_status"
+        
+        # Check SSH tunnel status
+        manage_ssh_tunnel status >/dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            echo "  SSH Tunnel: ✅ active (DocumentDB accessible)"
+        else
+            echo "  SSH Tunnel: ❌ inactive (DocumentDB not accessible)"
+        fi
+        
+    else
+        echo ""
+        echo "⚠️  Configuration file not found at auth/config.toml"
+        echo "   This file is required for OpenAI API access and database connections."
+    fi
+}
+
+# Docker mode functions
+start_docker_servers() {
+    echo "Starting Floridify with Docker..."
+    
+    check_docker
+    check_env_file
+    
+    # Start SSH tunnel for DocumentDB access
+    manage_ssh_tunnel start
+    if [ $? -ne 0 ]; then
+        echo "Warning: SSH tunnel failed - DocumentDB will not be accessible"
+    fi
+    
+    # Build images if requested
+    if [ "$BUILD_MODE" = true ]; then
+        echo "Building Docker images..."
+        docker-compose build --parallel
+    fi
+    
+    # Start services
+    if [ "$RESTART_MODE" = true ]; then
+        echo "Restarting Docker containers..."
+        docker-compose --profile dev restart
+    else
+        echo "Starting Docker containers..."
+        docker-compose --profile dev up -d
+    fi
+    
+    # Show status
+    display_config_info
+    echo ""
+    echo "🚀 Floridify servers are running in Docker!"
+    echo "  Backend:  http://localhost:8000"
+    echo "  Frontend: http://localhost:3000"
+    echo "  MongoDB:  mongodb://localhost:27017"
+    echo ""
+    echo "Useful commands:"
+    echo "  docker-compose ps          - Show container status"
+    echo "  docker-compose logs -f     - Follow all logs"
+    echo "  docker-compose logs -f backend  - Follow backend logs"
+    echo "  docker-compose logs -f frontend - Follow frontend logs"
+    echo "  docker-compose down        - Stop all containers"
+    echo "  docker-compose exec backend bash - Shell into backend"
+    echo ""
+    echo "Production deployment:"
+    echo "  ./scripts/setup            - Configure GitHub secrets and EC2"
+    echo "  ./scripts/deploy           - Deploy to production"
+    echo ""
+    
+    # Show logs if requested
+    if [ "$LOGS_MODE" = true ]; then
+        echo "Following logs (Ctrl+C to exit)..."
+        docker-compose logs -f
+    fi
+}
+
+# Native mode functions (original functionality)
 kill_processes_by_pattern() {
     local pattern="$1"
     local description="$2"
-
+    
     local pids=$(pgrep -f "$pattern" | grep -v $$ | grep -v $PPID)
     if [ ! -z "$pids" ]; then
         echo "Killing existing $description processes: $pids"
@@ -19,12 +249,10 @@ kill_processes_by_pattern() {
     fi
 }
 
-# Function to find processes using network ports
 kill_processes_on_ports() {
     local port_pattern="$1"
     local description="$2"
-
-    # Find all processes listening on ports matching the pattern
+    
     local pids=$(lsof -i -P -n | grep LISTEN | grep -E "$port_pattern" | awk '{print $2}' | sort -u)
     if [ ! -z "$pids" ]; then
         echo "Killing $description processes on ports matching '$port_pattern': $pids"
@@ -33,62 +261,108 @@ kill_processes_on_ports() {
     fi
 }
 
-# Kill existing backend processes
-echo "Checking for existing backend processes..."
-# Look for Python processes running our backend script
-kill_processes_by_pattern "python.*run_api\.py" "backend (run_api.py)"
-kill_processes_by_pattern "uvicorn.*floridify" "backend (uvicorn)"
-# Also check for any FastAPI/Uvicorn processes on typical backend ports
-kill_processes_on_ports ":800[0-9]" "backend"
-kill_processes_on_ports ":3[0-9]{3}" "backend API"
-
-# Kill existing frontend processes
-echo "Checking for existing frontend processes..."
-# Look for Node/npm dev server processes
-kill_processes_by_pattern "node.*vite" "frontend (vite)"
-kill_processes_by_pattern "npm.*dev" "frontend (npm dev)"
-kill_processes_by_pattern "node.*frontend" "frontend"
-# Check for processes on typical frontend dev ports
-kill_processes_on_ports ":517[0-9]" "frontend (vite)"
-kill_processes_on_ports ":300[0-9]" "frontend (react)"
-kill_processes_on_ports ":808[0-9]" "frontend dev server"
-
-# Brief pause to ensure processes are fully terminated
-sleep 1
-
-# Start backend with UV
-echo "Starting backend with UV..."
-if command -v uv &>/dev/null; then
-    cd ./backend
-    # Clear any conflicting virtual environment
-    unset VIRTUAL_ENV
-    uv run ./scripts/run_api.py &
-    BACKEND_PID=$!
-    echo "Backend started with PID $BACKEND_PID"
-    cd "$ROOT_DIR"
-else
-    echo "Error: UV not found. Please install UV or add it to your PATH."
-    exit 1
-fi
-
-# Start frontend
-cd ./frontend
-npm run dev &
-FRONTEND_PID=$!
-echo "Frontend started with PID $FRONTEND_PID"
-
-cd ..
-
-# Function to kill both processes
-cleanup() {
-    echo "Shutting down servers..."
-    kill $BACKEND_PID 2>/dev/null
-    kill $FRONTEND_PID 2>/dev/null
-    exit
+check_servers_running() {
+    local backend_running=false
+    local frontend_running=false
+    
+    if pgrep -f "python.*run_api\.py" > /dev/null || pgrep -f "uvicorn.*floridify" > /dev/null; then
+        backend_running=true
+    fi
+    
+    if pgrep -f "node.*vite" > /dev/null || pgrep -f "npm.*dev" > /dev/null; then
+        frontend_running=true
+    fi
+    
+    if lsof -i :8000 -P -n | grep LISTEN > /dev/null 2>&1; then
+        backend_running=true
+    fi
+    
+    if lsof -i :5173 -P -n | grep LISTEN > /dev/null 2>&1; then
+        frontend_running=true
+    fi
+    
+    if [ "$backend_running" = true ] || [ "$frontend_running" = true ]; then
+        return 0
+    else
+        return 1
+    fi
 }
 
-# Set up trap to catch Ctrl+C
-trap cleanup INT
+start_native_servers() {
+    echo "Starting Floridify servers natively (without Docker)..."
+    
+    check_env_file
+    
+    # In restart mode, check if servers are running first
+    if [ "$RESTART_MODE" = true ]; then
+        if ! check_servers_running; then
+            echo "No servers are currently running. Use './dev.sh --native' without --restart to start fresh."
+            exit 1
+        fi
+        echo "Servers detected. Restarting..."
+    fi
+    
+    # Kill existing backend processes
+    echo "Checking for existing backend processes..."
+    kill_processes_by_pattern "python.*run_api\.py" "backend (run_api.py)"
+    kill_processes_by_pattern "uvicorn.*floridify" "backend (uvicorn)"
+    kill_processes_on_ports ":800[0-9]" "backend"
+    
+    # Kill existing frontend processes
+    echo "Checking for existing frontend processes..."
+    kill_processes_by_pattern "node.*vite" "frontend (vite)"
+    kill_processes_by_pattern "npm.*dev" "frontend (npm dev)"
+    kill_processes_on_ports ":300[0-9]" "frontend (vite)"
+    
+    sleep 1
+    
+    # Start backend with UV
+    echo "Starting backend with UV..."
+    if command -v uv &>/dev/null; then
+        cd ./backend
+        unset VIRTUAL_ENV
+        uv run ./scripts/run_api.py &
+        BACKEND_PID=$!
+        echo "Backend started with PID $BACKEND_PID"
+        cd "$ROOT_DIR"
+    else
+        echo "Error: UV not found. Please install UV or add it to your PATH."
+        exit 1
+    fi
+    
+    # Start frontend
+    cd ./frontend
+    npm run dev &
+    FRONTEND_PID=$!
+    echo "Frontend started with PID $FRONTEND_PID"
+    
+    cd "$ROOT_DIR"
+    
+    # Function to kill both processes
+    cleanup() {
+        echo "Shutting down servers..."
+        kill $BACKEND_PID 2>/dev/null
+        kill $FRONTEND_PID 2>/dev/null
+        exit
+    }
+    
+    trap cleanup INT
+    
+    display_config_info
+    echo ""
+    echo "🚀 Floridify servers are running natively!"
+    echo "  Backend:  http://localhost:8000"
+    echo "  Frontend: http://localhost:3000"
+    echo ""
+    echo "Press Ctrl+C to stop all servers"
+    echo ""
+    
+    wait $BACKEND_PID $FRONTEND_PID
+}
 
-# Wait for both processes
-wait $BACKEND_PID $FRONTEND_PID
+# Main execution
+if [ "$DOCKER_MODE" = true ]; then
+    start_docker_servers
+else
+    start_native_servers
+fi

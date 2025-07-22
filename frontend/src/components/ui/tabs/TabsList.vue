@@ -11,7 +11,7 @@
     <!-- Animated background slider -->
     <div
       ref="backgroundSlider"
-      class="bg-primary/5 absolute top-0 left-0 rounded-lg shadow-sm transition-all duration-300 ease-out inset-2 mt-2 z-[-1]"
+      class="bg-primary/10 absolute top-0 left-0 rounded-lg shadow-sm transition-all duration-300 ease-out inset-2 mt-2 z-[1]"
       :style="backgroundStyle"
     />
 

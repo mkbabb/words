@@ -53,8 +53,12 @@
 
         <!-- Progress Display -->
         <div v-if="isTestRunning" class="space-y-2">
-          <Label>Current Progress</Label>
-          <LoadingProgress :progress="simulatedProgress" />
+          <Label>Current Progress (Interactive in Demo Mode)</Label>
+          <LoadingProgress 
+            :progress="simulatedProgress" 
+            :interactive="true"
+            @progress-change="handleProgressChange"
+          />
           <div class="text-sm text-muted-foreground text-center">
             {{ simulatedStage }}
           </div>
@@ -69,6 +73,8 @@
       :progress="simulatedProgress"
       :current-stage="simulatedStage"
       :facts="mockFacts"
+      :allow-dismiss="true"
+      @progress-change="handleProgressChange"
     />
   </div>
 </template>
@@ -95,36 +101,25 @@ const mockFacts = ref([
   { content: 'Derived from the Persian fairy tale "The Three Princes of Serendip"', category: 'origin', confidence: 0.88 },
 ])
 
-// Pipeline stages for mock
+// Pipeline stages for mock - using keys that match LoadingModal's stageMessages
 const stages = [
-  { progress: 0, stage: 'Initializing search...' },
-  { progress: 10, stage: 'Searching dictionaries...' },
-  { progress: 30, stage: 'Fetching definitions...' },
-  { progress: 50, stage: 'Analyzing meanings...' },
-  { progress: 70, stage: 'Generating examples...' },
-  { progress: 90, stage: 'Finalizing...' },
-  { progress: 100, stage: 'Complete!' },
+  { progress: 0, stage: 'initialization' },
+  { progress: 10, stage: 'search' },
+  { progress: 30, stage: 'provider_fetch' },
+  { progress: 50, stage: 'ai_clustering' },
+  { progress: 70, stage: 'ai_synthesis' },
+  { progress: 90, stage: 'storage_save' },
+  { progress: 100, stage: 'complete' },
 ]
 
-// Mock pipeline simulation
+// Mock pipeline simulation - purely interactive, no auto-progression
 const runMockPipeline = async () => {
   isTestRunning.value = true
   showLoadingModal.value = true
   
-  for (const stageData of stages) {
-    simulatedProgress.value = stageData.progress
-    simulatedStage.value = stageData.stage
-    
-    // Wait between stages
-    await new Promise(resolve => setTimeout(resolve, 800))
-  }
-  
-  // Show completion briefly
-  setTimeout(() => {
-    showLoadingModal.value = false
-    isTestRunning.value = false
-    simulatedProgress.value = 0
-  }, 1500)
+  // Start at the beginning stage
+  simulatedProgress.value = 0
+  simulatedStage.value = stages[0].stage
 }
 
 // Real pipeline using store
@@ -163,5 +158,22 @@ const startMockTest = () => {
 
 const startRealTest = () => {
   runRealPipeline()
+}
+
+// Handle interactive progress changes
+const handleProgressChange = (newProgress: number) => {
+  if (!isTestRunning.value) return
+  
+  simulatedProgress.value = newProgress
+  
+  // Find the appropriate stage based on progress
+  const stage = stages.find((s, index) => {
+    const nextStage = stages[index + 1]
+    return newProgress >= s.progress && (!nextStage || newProgress < nextStage.progress)
+  })
+  
+  if (stage) {
+    simulatedStage.value = stage.stage
+  }
 }
 </script>

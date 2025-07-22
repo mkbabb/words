@@ -25,34 +25,68 @@
               tag="div"
               class="space-y-1"
             >
-              <div
+              <HoverCard
                 v-for="(entry, index) in limitedLookups"
                 :key="entry.id"
-                :class="
-                  cn(
-                    'group relative w-full cursor-pointer overflow-hidden rounded-lg transition-all duration-300 ease-apple-smooth',
-                    'bg-background border-border border shadow-sm',
-                    'hover:bg-accent hover:shadow-md hover:scale-105'
-                  )
-                "
-                @click="lookupWord(entry.word)"
-                @mouseenter="hoveredIndex = index"
-                @mouseleave="hoveredIndex = -1"
+                :open-delay="150"
+                :close-delay="50"
               >
-                <div class="flex items-center justify-center px-2 py-2">
-                  <span class="text-xs font-bold tracking-wider uppercase">
-                    {{ entry.word.substring(0, 2) }}
-                  </span>
-                </div>
-
-                <!-- Tooltip on hover -->
-                <div
-                  v-if="hoveredIndex === index"
-                  class="bg-popover text-popover-foreground pointer-events-none absolute left-full z-50 ml-2 rounded-md px-2 py-1 text-xs whitespace-nowrap shadow-md"
-                >
-                  {{ entry.word }}
-                </div>
-              </div>
+                <HoverCardTrigger>
+                  <div
+                    :class="
+                      cn(
+                        'group relative w-full cursor-pointer overflow-hidden rounded-lg transition-all duration-300 ease-apple-smooth',
+                        'bg-background border-border border shadow-sm',
+                        'hover:bg-accent hover:shadow-md hover:scale-105'
+                      )
+                    "
+                    @click="lookupWord(entry.word)"
+                  >
+                    <div class="flex items-center justify-center px-2 py-2">
+                      <span class="text-xs font-bold tracking-wider uppercase">
+                        {{ entry.word.substring(0, 2) }}
+                      </span>
+                    </div>
+                  </div>
+                </HoverCardTrigger>
+                <HoverCardContent class="w-80 max-h-96" side="right" :side-offset="8">
+                  <div class="space-y-3">
+                    <!-- Word Header -->
+                    <div class="flex items-center justify-between">
+                      <h3 class="text-base font-semibold">{{ entry.word }}</h3>
+                      <span class="text-muted-foreground text-xs">
+                        {{ formatDate(entry.timestamp) }}
+                      </span>
+                    </div>
+                    
+                    <!-- Pronunciation -->
+                    <div v-if="entry.entry.pronunciation?.phonetic" class="text-sm text-muted-foreground">
+                      {{ entry.entry.pronunciation.phonetic }}
+                    </div>
+                    
+                    <!-- Separator -->
+                    <hr class="border-border/30">
+                    
+                    <!-- Definitions -->
+                    <div class="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
+                      <div
+                        v-for="(def, defIndex) in entry.entry.definitions"
+                        :key="defIndex"
+                        class="text-sm break-words"
+                      >
+                        <span class="font-medium text-accent-foreground">{{ def.word_type }}</span>
+                        <span class="text-muted-foreground ml-2">{{ def.definition }}</span>
+                      </div>
+                    </div>
+                    
+                    <!-- Metadata -->
+                    <div v-if="entry.entry.frequency || entry.entry.lookup_count" class="flex justify-between text-xs text-muted-foreground border-t border-border/30 pt-2">
+                      <span v-if="entry.entry.frequency">Frequency: {{ entry.entry.frequency }}</span>
+                      <span v-if="entry.entry.lookup_count">Lookups: {{ entry.entry.lookup_count }}</span>
+                    </div>
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
             </TransitionGroup>
           </div>
         </div>
@@ -106,10 +140,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 import { useAppStore } from '@/stores';
 import { formatDate, cn } from '@/utils';
 import { History } from 'lucide-vue-next';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui';
 
 interface Props {
   collapsed: boolean;
@@ -119,9 +154,6 @@ defineProps<Props>();
 
 const store = useAppStore();
 const recentLookups = computed(() => store.recentLookups);
-
-// Stack state
-const hoveredIndex = ref(-1);
 
 const limitedLookups = computed(() => {
   return recentLookups.value.slice(0, 20); // Limit to prevent performance issues
