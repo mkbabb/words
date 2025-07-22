@@ -107,16 +107,21 @@ class MongoDBStorage:
             
         try:
             pool_options = self.client.options.pool_options
-            return {
+            stats = {
                 "status": "connected",
                 "max_pool_size": pool_options.max_pool_size,
                 "min_pool_size": pool_options.min_pool_size,
-                "max_idle_time_ms": pool_options.max_idle_time_ms,
                 "server_selection_timeout_ms": pool_options.server_selection_timeout_ms,
                 "socket_timeout_ms": pool_options.socket_timeout_ms,
                 "connect_timeout_ms": pool_options.connect_timeout_ms,
                 "initialized": self._initialized,
             }
+            
+            # Handle max_idle_time_ms attribute safely (may not exist in all driver versions)
+            if hasattr(pool_options, 'max_idle_time_ms'):
+                stats["max_idle_time_ms"] = pool_options.max_idle_time_ms
+            
+            return stats
         except Exception as e:
             logger.error(f"Error getting pool stats: {e}")
             return {"status": "error", "error": str(e)}
