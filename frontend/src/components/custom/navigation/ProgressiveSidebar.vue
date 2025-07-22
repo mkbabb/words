@@ -9,13 +9,11 @@
   >
     <div
       v-if="shouldShowSidebar && sidebarSections.length > 1"
-      class="sticky top-20 left-0 z-10 h-fit max-h-[calc(100vh-6rem)] w-56 overflow-y-auto"
+      class="sticky top-0 left-2 z-10 h-fit max-h-[calc(100vh-6rem)] w-52 overflow-y-auto"
     >
-      <ThemedCard
-        :variant="selectedCardVariant"
-        class="backdrop-blur-sm"
+      <div
+        class="bg-background/95 backdrop-blur-sm rounded-lg p-2 space-y-1 border-0"
       >
-        <div class="p-3 space-y-2">
           <!-- Navigation Sections -->
           <nav class="space-y-1">
             <div
@@ -29,11 +27,11 @@
                 :class="[
                   'group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm font-medium transition-all duration-200',
                   activeCluster === cluster.clusterId
-                    ? 'bg-primary/10 text-primary shimmer-active'
+                    ? 'bg-primary/10 text-primary sidebar-shimmer'
                     : 'text-foreground/80 hover:bg-muted/50 hover:text-foreground'
                 ]"
               >
-                <span class="truncate">{{ cluster.clusterDescription }}</span>
+                <span class="truncate text-left">{{ cluster.clusterDescription }}</span>
                 <div
                   v-if="activeCluster === cluster.clusterId"
                   class="h-1.5 w-1.5 rounded-full bg-primary animate-pulse"
@@ -61,26 +59,20 @@
               <!-- Gradient Divider between clusters -->
               <div
                 v-if="clusterIndex < sidebarSections.length - 1"
-                class="my-3 relative h-px w-full overflow-hidden"
-              >
-                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
-              </div>
+                class="my-3 h-px w-full gradient-hr"
+              />
             </div>
           </nav>
-        </div>
-      </ThemedCard>
+      </div>
     </div>
   </Transition>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores'
-import { ThemedCard } from '@/components/custom/card'
 
 const store = useAppStore()
-const { selectedCardVariant } = storeToRefs(store)
 
 // Active tracking
 const activeCluster = ref<string>('')
@@ -267,46 +259,71 @@ watch(() => store.currentEntry?.definitions, () => {
 
 <style scoped>
 /* Active shimmer animation for current cluster */
-.shimmer-active {
+.sidebar-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: linear-gradient(
-    -45deg,
-    var(--shimmer-base) 35%,
-    var(--shimmer-highlight) 50%,
-    var(--shimmer-base) 65%
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
   );
-  background-size: 200%;
-  background-position-x: 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  animation: sidebar-shimmer 2s ease-in-out infinite;
-  
-  /* Light mode shimmer colors */
-  --shimmer-base: #3b82f6;    /* blue-500 - primary base */
-  --shimmer-highlight: #dbeafe; /* blue-100 - bright highlight */
+  animation: sidebar-shimmer-move 2s ease-in-out infinite;
+  pointer-events: none;
 }
 
-/* Dark mode shimmer colors for sidebar */
-:global(.dark) .shimmer-active {
-  --shimmer-base: #dbeafe;    /* blue-100 - light base (inverted) */
-  --shimmer-highlight: #1e40af; /* blue-800 - dark highlight (inverted) */
+:global(.dark) .sidebar-shimmer::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.3) 50%,
+    transparent 100%
+  );
 }
 
-@keyframes sidebar-shimmer {
-  0%, 100% {
-    background-position-x: 100%;
+@keyframes sidebar-shimmer-move {
+  0% {
+    transform: translateX(-100%);
   }
-  50% {
-    background-position-x: 0%;
+  100% {
+    transform: translateX(100%);
   }
+}
+
+/* Gradient support for both themes */
+.gradient-hr {
+  background: linear-gradient(
+    to right,
+    transparent,
+    hsl(var(--primary) / 0.2),
+    transparent
+  );
+}
+
+/* Ensure proper theme contrast for gradients */
+:global(.dark) .gradient-hr {
+  background: linear-gradient(
+    to right,
+    transparent,
+    hsl(var(--primary) / 0.3),
+    transparent
+  );
 }
 
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .shimmer-active {
-    animation: none;
-    background: none;
-    color: var(--color-primary);
+  .sidebar-shimmer::after {
+    animation: none !important;
+    opacity: 0 !important;
   }
   
   * {

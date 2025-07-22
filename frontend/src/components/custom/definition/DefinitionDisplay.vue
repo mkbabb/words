@@ -1,5 +1,5 @@
 <template>
-    <ThemedCard v-if="entry" :variant="selectedCardVariant">
+    <ThemedCard v-if="entry" :variant="selectedCardVariant" class="relative">
         <!-- Card Theme Selector Dropdown - INSIDE the card -->
         <div
             v-if="isMounted"
@@ -47,7 +47,7 @@
         <!-- Header Section -->
         <CardHeader :class="[
             'transition-all duration-500',
-            shouldShowSidebar ? 'xl:ml-56 xl:pl-4' : ''
+            shouldShowSidebar ? 'xl:ml-52 xl:pl-4' : ''
         ]">
             <div class="flex items-center justify-between">
                 <CardTitle
@@ -89,7 +89,7 @@
         <!-- Gradient Divider -->
         <div :class="[
             'relative h-px w-full overflow-hidden transition-all duration-500',
-            shouldShowSidebar ? 'xl:ml-56 xl:pl-4' : ''
+            shouldShowSidebar ? 'xl:ml-52 xl:pl-4' : ''
         ]">
             <div
                 class="absolute inset-0 bg-gradient-to-r from-transparent
@@ -97,10 +97,13 @@
             />
         </div>
 
+        <!-- Progressive Sidebar positioned after header -->
+        <ProgressiveSidebar />
+
         <!-- Dictionary Mode Definitions -->
         <CardContent v-if="mode === 'dictionary'" :class="[
             'grid gap-4 transition-all duration-500',
-            shouldShowSidebar ? 'xl:ml-56 xl:pl-4' : ''
+            shouldShowSidebar ? 'xl:ml-52 xl:pl-4' : ''
         ]">
             <div
                 v-for="cluster in groupedDefinitions"
@@ -233,7 +236,7 @@
             v-if="mode === 'thesaurus' && thesaurusData"
             :class="[
                 'space-y-6 transition-all duration-500',
-                shouldShowSidebar ? 'xl:ml-56 xl:pl-4' : ''
+                shouldShowSidebar ? 'xl:ml-52 xl:pl-4' : ''
             ]"
         >
             <div
@@ -264,11 +267,12 @@
         <!-- Etymology -->
         <CardContent v-if="entry && entry.etymology" :class="[
             'space-y-4 transition-all duration-500',
-            shouldShowSidebar ? 'xl:ml-56 xl:pl-4' : ''
+            shouldShowSidebar ? 'xl:ml-52 xl:pl-4' : ''
         ]">
             <h3 class="text-lg font-semibold">Etymology</h3>
             <p class="text-base text-muted-foreground">{{ entry.etymology }}</p>
         </CardContent>
+
     </ThemedCard>
 </template>
 
@@ -281,6 +285,7 @@ import { Button } from '@/components/ui';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ThemedCard } from '@/components/custom/card';
 import { ShimmerText } from '@/components/custom/animation';
+import { ProgressiveSidebar } from '@/components/custom/navigation';
 import {
     DropdownMenu,
     DropdownMenuTrigger,

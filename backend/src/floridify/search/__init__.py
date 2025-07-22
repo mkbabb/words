@@ -14,9 +14,8 @@ from .fuzzy import FuzzySearch
 from .language import LanguageSearch
 from .lexicon import LexiconLanguageLoader, LexiconSourceConfig
 from .phrase import MultiWordExpression, PhraseNormalizer
-# TEMPORARILY DISABLED FOR LIGHTWEIGHT DEPLOYMENT
-# from .semantic import SemanticSearch
-from .semantic_stub import SemanticSearch
+# Semantic search with graceful degradation when dependencies unavailable  
+from .semantic import SemanticSearch
 from .trie import TrieSearch
 
 __all__ = [

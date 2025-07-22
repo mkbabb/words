@@ -44,10 +44,7 @@
 
             <!-- Definition Display -->
             <div v-else-if="currentEntry" class="space-y-8">
-              <div class="relative">
-                <DefinitionDisplay />
-                <ProgressiveSidebar />
-              </div>
+              <DefinitionDisplay />
             </div>
 
             <!-- Empty State -->
@@ -95,7 +92,6 @@ import { cn } from '@/utils';
 import { SearchBar } from '@/components/custom/search';
 import { DefinitionDisplay } from '@/components/custom/definition';
 import { DefinitionSkeleton } from '@/components/custom/definition';
-import { ProgressiveSidebar } from '@/components/custom/navigation';
 import { Sidebar } from '@/components/custom';
 import { LoadingModal } from '@/components/custom/loading';
 import { StageTest } from '@/components/custom/test';

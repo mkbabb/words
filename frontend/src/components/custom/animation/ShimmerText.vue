@@ -1,8 +1,11 @@
 <template>
   <span 
-    class="shimmer-text hover-shimmer" 
-    :class="[textClass, { 'is-hovered': isHovered }]"
-    :style="shimmerStyle"
+    :class="[
+      'shimmer-text',
+      textClass,
+      { 'is-hovered': isHovered }
+    ]"
+    :style="shimmerStyles"
     @mouseenter="isHovered = true"
     @mouseleave="isHovered = false"
   >
@@ -19,141 +22,152 @@ interface Props {
   text: string
   textClass?: string
   duration?: number
-  interval?: number // Time between shimmers in seconds
+  interval?: number
+  gradientFrom?: string
+  gradientTo?: string
+  textColor?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   textClass: 'text-base',
   duration: 1800,
-  interval: 15 // Default: shimmer every 15 seconds
+  interval: 15,
+  gradientFrom: '', // Will use CSS custom properties
+  gradientTo: '',   // Will use CSS custom properties
+  textColor: ''     // Will use CSS custom properties
 })
 
-// Calculate shimmer window size based on text length and estimated size
-const shimmerWindowSize = computed(() => {
-  const textLength = props.text.length
-  const hasLargeText = props.textClass?.includes('text-xl') || 
-                      props.textClass?.includes('text-2xl') ||
-                      props.textClass?.includes('text-3xl') ||
-                      props.textClass?.includes('text-4xl') ||
-                      props.textClass?.includes('text-5xl') ||
-                      props.textClass?.includes('text-6xl') ||
-                      props.textClass?.includes('text-7xl') ||
-                      props.textClass?.includes('text-8xl')
-  
-  // Base window size, adjusted for text size and length
-  let baseSize = 300
-  
-  // Larger text gets a bigger shimmer window
-  if (hasLargeText) {
-    baseSize = 400
-  }
-  
-  // Longer text gets a slightly bigger window for smoother effect
-  if (textLength > 50) {
-    baseSize += 50
-  } else if (textLength > 100) {
-    baseSize += 100
-  }
-  
-  return baseSize
-})
-
-// Generate shimmer style with randomized interval-based animation
-const shimmerStyle = computed(() => {
+const shimmerStyles = computed(() => {
   // Add randomness to the interval (±40% variation)
   const randomVariation = 0.4;
   const minInterval = props.interval * (1 - randomVariation);
   const maxInterval = props.interval * (1 + randomVariation);
   const randomizedInterval = Math.random() * (maxInterval - minInterval) + minInterval;
   
-  const totalCycleDuration = randomizedInterval * 1000; // Convert to milliseconds
-  const shimmerDuration = props.duration;
-  const randomDelay = Math.random() * randomizedInterval * 200; // Random delay within first 20% of interval
-  
-  // Faster hover shimmer duration
-  const hoverShimmerDuration = Math.max(shimmerDuration * 0.7, 800); // 30% faster, minimum 800ms
-  
+  const totalCycleDuration = randomizedInterval * 1000;
+  const randomDelay = Math.random() * randomizedInterval * 200;
+  const hoverDuration = Math.max(props.duration * 0.7, 800);
+
   return {
-    '--shimmer-window-size': `${shimmerWindowSize.value}%`,
-    '--shimmer-duration': `${shimmerDuration}ms`,
-    '--shimmer-hover-duration': `${hoverShimmerDuration}ms`,
+    '--shimmer-duration': `${props.duration}ms`,
+    '--shimmer-hover-duration': `${hoverDuration}ms`,
     '--shimmer-cycle-duration': `${totalCycleDuration}ms`,
-    '--shimmer-delay': `${randomDelay}ms`
+    '--shimmer-delay': `${randomDelay}ms`,
+    '--gradient-from': props.gradientFrom,
+    '--gradient-to': props.gradientTo,
+    '--text-color': props.textColor,
   };
 })
 </script>
 
 <style scoped>
 .shimmer-text {
-  background: linear-gradient(
-    -45deg,
-    var(--shimmer-base) 35%,
-    var(--shimmer-highlight) 50%,
-    var(--shimmer-base) 65%
-  );
-  background-size: var(--shimmer-window-size);
-  background-position-x: 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  animation: 
-    shimmer var(--shimmer-duration) ease-in-out,
-    shimmer-cycle var(--shimmer-cycle-duration) infinite;
-  animation-delay: var(--shimmer-delay);
+  /* Default colors */
+  --text-color: hsl(var(--foreground));
   
-  /* Light mode shimmer colors */
-  --shimmer-base: #374151;    /* gray-700 - dark base */
-  --shimmer-highlight: #f9fafb; /* gray-50 - bright highlight */
+  /* Set normal text color */
+  color: var(--text-color);
+  position: relative;
+  overflow: hidden;
+  
+  /* Animation setup */
+  animation: shimmer-cycle var(--shimmer-cycle-duration) infinite;
+  animation-delay: var(--shimmer-delay);
 }
 
-/* Dark mode shimmer colors - properly inverted */
-:global(.dark) .shimmer-text {
-  --shimmer-base: #f9fafb;    /* gray-50 - light base (inverted) */
-  --shimmer-highlight: #1f2937; /* gray-800 - dark highlight (inverted) */
+.shimmer-text::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
 }
 
-@keyframes shimmer {
-  0% {
-    background-position-x: 100%;
-  }
-  15% {
-    background-position-x: 85%;
-  }
-  85% {
-    background-position-x: 15%;
-  }
-  100% {
-    background-position-x: 0%;
-  }
+/* Dark mode shimmer - dark gradient for white text */
+:global(.dark) .shimmer-text::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.4) 50%,
+    transparent 100%
+  );
 }
 
 @keyframes shimmer-cycle {
   0%, 90% {
-    opacity: 1;
+    /* Do nothing most of the time */
   }
-  95%, 100% {
-    opacity: 1;
+  91% {
+    /* Start shimmer */
+  }
+  91%, 99% {
+    /* Shimmer duration */
+  }
+  100% {
+    /* End shimmer */
   }
 }
 
-/* Hover-triggered shimmer - override existing animation */
-.hover-shimmer.is-hovered {
+.shimmer-text::after {
+  animation: shimmer-sweep var(--shimmer-duration) ease-in-out;
+  animation-delay: calc(var(--shimmer-delay) + var(--shimmer-cycle-duration) * 0.9);
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Hover shimmer - immediate */
+.shimmer-text.is-hovered::after {
   animation: shimmer-hover var(--shimmer-hover-duration) ease-in-out !important;
   animation-delay: 0s !important;
 }
 
 @keyframes shimmer-hover {
   0% {
-    background-position-x: 100%;
+    transform: translateX(-100%);
+    opacity: 0;
   }
-  15% {
-    background-position-x: 85%;
+  20% {
+    opacity: 1;
   }
-  85% {
-    background-position-x: 15%;
+  80% {
+    opacity: 1;
   }
   100% {
-    background-position-x: 0%;
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text,
+  .shimmer-text::after {
+    animation: none !important;
   }
 }
 </style>
