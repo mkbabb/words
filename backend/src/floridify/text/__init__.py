@@ -9,7 +9,13 @@ from .utils import (
     join_words, 
     extract_phrases,
     find_hyphenated_phrases,
-    find_quoted_phrases
+    find_quoted_phrases,
+    detect_multiword_expressions,
+    calculate_mwe_confidence,
+    get_phrase_variants,
+    normalize_phrase,
+    phrase_word_count,
+    is_compound_word
 )
 
 __all__ = [
@@ -27,4 +33,10 @@ __all__ = [
     "extract_phrases",
     "find_hyphenated_phrases",
     "find_quoted_phrases",
+    "detect_multiword_expressions",
+    "calculate_mwe_confidence",
+    "get_phrase_variants",
+    "normalize_phrase",
+    "phrase_word_count",
+    "is_compound_word",
 ]

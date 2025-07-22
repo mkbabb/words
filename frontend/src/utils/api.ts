@@ -8,7 +8,7 @@ import type {
 } from '@/types';
 
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: '/api',  // Clean API path - versioning handled by deployment
   timeout: 60000, // 60 seconds (1 minute)
   headers: {
     'Content-Type': 'application/json',
@@ -95,7 +95,7 @@ export const dictionaryApi = {
       const params = new URLSearchParams();
       if (forceRefresh) params.append('force_refresh', 'true');
       
-      const url = `/api/v1/lookup/${word}/stream${params.toString() ? '?' + params.toString() : ''}`;
+      const url = `/api/lookup/${word}/stream${params.toString() ? '?' + params.toString() : ''}`;
       const eventSource = new EventSource(url);
       
       eventSource.addEventListener('progress', (event) => {

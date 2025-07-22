@@ -24,11 +24,17 @@ from ..utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-# Pre-compiled regex patterns
+# Pre-compiled regex patterns for performance
 WHITESPACE_PATTERN = re.compile(r'\s+')
 PUNCTUATION_PATTERN = re.compile(r'[^\w\s\'-]', re.UNICODE) 
-HYPHEN_PATTERN = re.compile(r'[–—‒]')
-APOSTROPHE_PATTERN = re.compile(r'[''`" "]')
+
+# Translation table for character replacements (faster than regex)
+CHAR_TRANSLATION_TABLE = str.maketrans({
+    # Hyphen variants
+    '–': '-', '—': '-', '‒': '-',
+    # Apostrophe variants  
+    ''': "'", ''': "'", '`': "'", '"': "'", '"': "'"
+})
 
 # Basic suffix rules for lemmatization fallback
 SUFFIX_RULES = {
@@ -73,9 +79,8 @@ def normalize_text(text: str, fix_encoding: bool = True, expand_contractions: bo
     # Step 3: Case normalization
     normalized = normalized.lower()
     
-    # Step 4: Standardize punctuation
-    normalized = APOSTROPHE_PATTERN.sub("'", normalized)
-    normalized = HYPHEN_PATTERN.sub("-", normalized)
+    # Step 4: Standardize punctuation (using translate for better performance)
+    normalized = normalized.translate(CHAR_TRANSLATION_TABLE)
     
     # Step 5: Expand contractions if available
     if expand_contractions and CONTRACTIONS_AVAILABLE:

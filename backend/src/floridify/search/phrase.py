@@ -9,15 +9,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from ..constants import Language
 from ..text import (
-    normalize_text,
-    is_phrase,
-    split_phrase, 
-    join_words,
-    extract_phrases,
-    find_hyphenated_phrases,
-    find_quoted_phrases,
     TextProcessor,
+    extract_phrases,
+    is_phrase,
+    join_words,
+    normalize_text,
+    split_phrase,
 )
 
 
@@ -28,7 +27,7 @@ class MultiWordExpression(BaseModel):
     normalized: str = Field(..., description="Normalized form")
     word_count: int = Field(..., gt=0, description="Number of words")
     is_idiom: bool = Field(default=False, description="Whether this is an idiomatic expression")
-    language: str = Field(default="en", description="Language code")
+    language: Language = Field(default=Language.ENGLISH, description="Language code")
     frequency: float = Field(default=0.0, ge=0.0, description="Usage frequency if available")
 
     model_config = {"frozen": True}
@@ -42,10 +41,17 @@ class PhraseNormalizer:
     of phrases, idioms, and multi-word expressions.
     """
 
-    def __init__(self, language: str = "en") -> None:
-        """Initialize the advanced phrase normalizer."""
+    def __init__(self, language: Language = Language.ENGLISH) -> None:
+        """Initialize the advanced phrase normalizer with performance optimizations."""
         self.language = language
         self.text_processor = TextProcessor()
+        
+        # Performance optimizations: cache frequently used functions (KISS)
+        self._normalize = normalize_text
+        self._extract_phrases = extract_phrases
+        self._is_phrase = is_phrase
+        self._split_phrase = split_phrase  
+        self._join_words = join_words
 
     def normalize(self, text: str) -> str:
         """
@@ -60,8 +66,8 @@ class PhraseNormalizer:
         if not text:
             return ""
 
-        # Use the text processing abstraction for comprehensive normalization
-        return normalize_text(text, fix_encoding=True, expand_contractions=True)
+        # Use cached function reference for better performance
+        return self._normalize(text, fix_encoding=True, expand_contractions=True)
 
     def extract_phrases(self, text: str) -> list[MultiWordExpression]:
         """
@@ -78,8 +84,8 @@ class PhraseNormalizer:
 
         phrases: list[MultiWordExpression] = []
 
-        # Extract phrases using the text processing abstraction
-        extracted_phrases = extract_phrases(text)
+        # Extract phrases using cached function for performance
+        extracted_phrases = self._extract_phrases(text)
         
         for phrase_text in extracted_phrases:
             normalized = self.normalize(phrase_text)
@@ -90,7 +96,7 @@ class PhraseNormalizer:
                         normalized=normalized,
                         word_count=len(normalized.split()),
                         is_idiom='"' in text,  # Simple heuristic for quoted phrases
-                        language=self.language,
+                        language=self.language.value,  # Convert enum to string value
                     )
                 )
 
@@ -107,7 +113,7 @@ class PhraseNormalizer:
         Returns:
             True if text is a multi-word expression
         """
-        return is_phrase(text)
+        return self._is_phrase(text)
 
     def split_phrase(self, phrase: str) -> list[str]:
         """
@@ -119,7 +125,7 @@ class PhraseNormalizer:
         Returns:
             List of component words
         """
-        return split_phrase(phrase)
+        return self._split_phrase(phrase)
 
     def join_words(self, words: list[str], prefer_hyphens: bool = False) -> str:
         """
@@ -132,4 +138,4 @@ class PhraseNormalizer:
         Returns:
             Joined phrase
         """
-        return join_words(words, prefer_hyphens)
+        return self._join_words(words, prefer_hyphens)
