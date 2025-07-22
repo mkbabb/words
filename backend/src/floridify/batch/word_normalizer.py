@@ -7,14 +7,12 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-import nltk
-# TEMPORARILY DISABLED FOR LIGHTWEIGHT DEPLOYMENT
-# import spacy
-from nltk.corpus import wordnet
-from nltk.stem import PorterStemmer, SnowballStemmer, WordNetLemmatizer
 from rich.console import Console
-# from spacy.language import Language
 
+from ..text import TextProcessor, lemmatize_word, basic_lemmatize, normalize_text
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 console = Console()
 
 
@@ -39,7 +37,7 @@ class WordNormalizer:
 
     def __init__(
         self,
-        method: str = "spacy",  # "spacy", "nltk", or "hybrid"
+        method: str = "auto",  # "auto", "advanced", or "basic"
         language: str = "en",
         cache_file: Path | None = None,
         min_word_length: int = 3,
@@ -54,40 +52,14 @@ class WordNormalizer:
         # Reverse mapping (original -> normalized)
         self.reverse_mappings: dict[str, str] = {}
 
-        # Initialize processors
-        self.spacy_nlp: Language | None = None
-        self.porter_stemmer: PorterStemmer | None = None
-        self.snowball_stemmer: SnowballStemmer | None = None
-        self.wordnet_lemmatizer: WordNetLemmatizer | None = None
+        # Initialize text processor
+        self.text_processor = TextProcessor()
 
         # Load cache if exists
         self._load_cache()
 
-        # Initialize processors based on method
-        self._initialize_processors()
+        logger.info(f"WordNormalizer initialized with method: {method}")
 
-    def _initialize_processors(self) -> None:
-        """Initialize normalization processors based on selected method."""
-        if self.method in ["spacy", "hybrid"]:
-            try:
-                model_name = f"{self.language}_core_web_sm"
-                self.spacy_nlp = spacy.load(model_name)
-            except OSError:
-                console.print(
-                    f"[yellow]spaCy model {self.language}_core_web_sm not found. Install with: python -m spacy download {self.language}_core_web_sm[/yellow]"
-                )
-                if self.method == "spacy":
-                    self.method = "nltk"
-
-        if self.method in ["nltk", "hybrid"]:
-            # Download required NLTK data
-            nltk.download("wordnet", quiet=True)
-            nltk.download("averaged_perceptron_tagger", quiet=True)
-            nltk.download("omw-1.4", quiet=True)
-
-            self.porter_stemmer = PorterStemmer()
-            self.snowball_stemmer = SnowballStemmer("english")
-            self.wordnet_lemmatizer = WordNetLemmatizer()
 
     def _load_cache(self) -> None:
         """Load cached word mappings from file."""
@@ -126,115 +98,39 @@ class WordNormalizer:
         except Exception as e:
             console.print(f"[yellow]Could not save cache: {e}[/yellow]")
 
-    def _get_wordnet_pos(self, word: str) -> str:
-        """Map POS tag to WordNet POS tag."""
-        tag = nltk.pos_tag([word])[0][1][0].upper()
-        tag_dict = {
-            "J": wordnet.ADJ,  # Adjective
-            "N": wordnet.NOUN,  # Noun
-            "V": wordnet.VERB,  # Verb
-            "R": wordnet.ADV,  # Adverb
-        }
-        return tag_dict.get(tag, wordnet.NOUN)  # type: ignore[no-any-return]
 
-    def _basic_normalize(self, word: str) -> str:
-        """Basic rule-based normalization for common patterns."""
+    def _normalize_word_internal(self, word: str) -> tuple[str, str]:
+        """
+        Internal word normalization using best available method.
+        
+        Returns:
+            Tuple of (normalized_word, normalization_type)
+        """
         word = word.lower().strip()
-
+        
         # Skip if too short
         if len(word) < self.min_word_length:
-            return word
-
-        # Common plural patterns
-        if word.endswith("ies") and len(word) > 4:
-            return word[:-3] + "y"  # stories -> story
-        elif word.endswith("es") and len(word) > 3:
-            if word.endswith(("ches", "shes", "xes", "zes")):
-                return word[:-2]  # boxes -> box
-            elif word.endswith("ves"):
-                return word[:-3] + "f"  # knives -> knife
-            else:
-                return word[:-1]  # goes -> go
-        elif word.endswith("s") and len(word) > 3:
-            # Avoid removing 's' from words that end naturally with 's'
-            if not word.endswith(("ss", "us", "is")):
-                return word[:-1]  # cats -> cat
-
-        # Common verb forms
-        if word.endswith("ing") and len(word) > 5:
-            if word[-4] == word[-5]:  # running -> run
-                return word[:-4]
-            else:
-                return word[:-3]  # walking -> walk
-        elif word.endswith("ed") and len(word) > 4:
-            if word[-3] == word[-4]:  # stopped -> stop
-                return word[:-3]
-            else:
-                return word[:-2]  # walked -> walk
-
-        # Comparative/superlative adjectives
-        if word.endswith("er") and len(word) > 4:
-            return word[:-2]  # bigger -> big
-        elif word.endswith("est") and len(word) > 5:
-            return word[:-3]  # biggest -> big
-
-        return word
-
-    def _spacy_normalize(self, word: str) -> tuple[str, str]:
-        """Normalize using spaCy lemmatization."""
-        if not self.spacy_nlp:
             return word, "unchanged"
-
-        doc = self.spacy_nlp(word)
-        if doc and len(doc) > 0:
-            lemma = doc[0].lemma_
-            pos = doc[0].pos_
-
-            # Skip pronouns and special tokens
-            if lemma == "-PRON-" or lemma.startswith("-"):
-                return word, "unchanged"
-
-            # Determine normalization type
-            if pos == "NOUN" and word != lemma:
-                return lemma, "plural"
-            elif pos in ["VERB", "AUX"] and word != lemma:
-                return lemma, "verb_form"
-            elif pos == "ADJ" and word != lemma:
-                return lemma, "adjective_form"
-            elif word != lemma:
-                return lemma, "other_form"
+        
+        if self.method == "basic":
+            # Use basic rule-based lemmatization
+            normalized = basic_lemmatize(word)
+            return normalized, "basic" if normalized != word else "unchanged"
+        
+        # Use advanced text processing for lemmatization
+        normalized = lemmatize_word(word)
+        
+        if normalized != word:
+            # Simple heuristic to determine normalization type
+            if word.endswith(('s', 'es', 'ies')):
+                return normalized, "plural"
+            elif word.endswith(('ing', 'ed')):
+                return normalized, "verb_form"
+            elif word.endswith(('er', 'est', 'ly')):
+                return normalized, "adjective_form"
             else:
-                return word, "unchanged"
-
-        return word, "unchanged"
-
-    def _nltk_normalize(self, word: str) -> tuple[str, str]:
-        """Normalize using NLTK lemmatization and stemming."""
-        if not (self.wordnet_lemmatizer and self.porter_stemmer):
-            return word, "unchanged"
-
-        # Get POS tag for better lemmatization
-        pos = self._get_wordnet_pos(word)
-
-        # Try lemmatization first (more accurate)
-        lemma = self.wordnet_lemmatizer.lemmatize(word, pos=pos)
-
-        if lemma != word:
-            # Determine type of normalization
-            if pos == wordnet.NOUN:
-                return lemma, "plural"
-            elif pos == wordnet.VERB:
-                return lemma, "verb_form"
-            elif pos == wordnet.ADJ:
-                return lemma, "adjective_form"
-            else:
-                return lemma, "other_form"
-
-        # If lemmatization didn't change the word, try stemming
-        stem = self.porter_stemmer.stem(word)
-        if stem != word and len(stem) >= self.min_word_length:
-            return stem, "stem"
-
+                return normalized, "other_form"
+        
         return word, "unchanged"
 
     def normalize_word(self, word: str) -> tuple[str, str]:
@@ -253,20 +149,8 @@ class WordNormalizer:
         if len(cleaned_word) < self.min_word_length:
             return word, "unchanged"
 
-        # Apply normalization based on method
-        if self.method == "spacy":
-            normalized, norm_type = self._spacy_normalize(cleaned_word)
-        elif self.method == "nltk":
-            normalized, norm_type = self._nltk_normalize(cleaned_word)
-        elif self.method == "hybrid":
-            # Try spaCy first, fall back to NLTK
-            normalized, norm_type = self._spacy_normalize(cleaned_word)
-            if norm_type == "unchanged":
-                normalized, norm_type = self._nltk_normalize(cleaned_word)
-        else:
-            # Basic rule-based
-            normalized = self._basic_normalize(cleaned_word)
-            norm_type = "basic" if normalized != cleaned_word else "unchanged"
+        # Apply normalization using abstracted method
+        normalized, norm_type = self._normalize_word_internal(cleaned_word)
 
         # Update mappings
         if normalized != word:
@@ -361,7 +245,7 @@ class NormalizerPresets:
     def conservative() -> WordNormalizer:
         """Conservative normalization - prefer accuracy over compression."""
         return WordNormalizer(
-            method="spacy",
+            method="advanced",
             cache_file=Path("./cache/word_normalizer_conservative.json"),
             min_word_length=2,
         )
@@ -370,7 +254,7 @@ class NormalizerPresets:
     def aggressive() -> WordNormalizer:
         """Aggressive normalization - maximize compression."""
         return WordNormalizer(
-            method="hybrid",
+            method="auto",
             cache_file=Path("./cache/word_normalizer_aggressive.json"),
             min_word_length=3,
         )
@@ -379,14 +263,16 @@ class NormalizerPresets:
     def fast() -> WordNormalizer:
         """Fast normalization - basic rules for speed."""
         return WordNormalizer(
-            method="basic", cache_file=Path("./cache/word_normalizer_fast.json"), min_word_length=3
+            method="basic", 
+            cache_file=Path("./cache/word_normalizer_fast.json"), 
+            min_word_length=3
         )
 
     @staticmethod
     def balanced() -> WordNormalizer:
         """Balanced normalization - good accuracy and compression."""
         return WordNormalizer(
-            method="nltk",
+            method="auto",
             cache_file=Path("./cache/word_normalizer_balanced.json"),
             min_word_length=3,
         )

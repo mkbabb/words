@@ -25,9 +25,8 @@ services:
       target: production
     # Use pre-built image in production
     image: ${REGISTRY:-ghcr.io}/${REPO_OWNER:-yourusername}/floridify-frontend:${VERSION:-latest}
-    # Map to port 80 inside container (nginx)
-    ports:
-      - "${FRONTEND_PORT:-80}:80"
+    # No external port mapping when using nginx reverse proxy
+    # Port 80 handled by nginx container in ssl profile
     # No volume mounts in production
     volumes: []
     # No command override - uses nginx from Dockerfile
@@ -40,6 +39,7 @@ services:
     restart: unless-stopped
     environment:
       CERTBOT_EMAIL: ${CERTBOT_EMAIL}
+      DOMAIN: ${DOMAIN}
       # STAGING: 1  # Uncomment for Let's Encrypt staging
     ports:
       - "80:80"
