@@ -25,8 +25,8 @@ services:
       target: production
     # Use pre-built image in production
     image: ${REGISTRY:-ghcr.io}/${REPO_OWNER:-yourusername}/floridify-frontend:${VERSION:-latest}
-    # No external port mapping when using nginx reverse proxy
-    # Port 80 handled by nginx container in ssl profile
+    # Remove port mappings when using nginx (ssl profile)
+    ports: []
     # No volume mounts in production
     volumes: []
     # No command override - uses nginx from Dockerfile
