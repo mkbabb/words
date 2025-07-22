@@ -1,110 +1,114 @@
 <template>
-    <ThemedCard v-if="entry" :variant="selectedCardVariant" class="relative">
-        <!-- Card Theme Selector Dropdown - INSIDE the card -->
-        <div
-            v-if="isMounted"
-            :class="[
-                'absolute top-2 z-50 transition-all duration-300 ease-out',
-                selectedCardVariant === 'default' ? 'right-2' : 'right-12',
-            ]"
+    <div 
+        v-if="entry" 
+        :class="[
+            'flex',
+            shouldShowSidebar && groupedDefinitions.length > 1 ? 'xl:gap-4' : ''
+        ]"
+    >
+        <!-- Progressive Sidebar - Truly sticky -->
+        <div 
+            v-if="shouldShowSidebar && groupedDefinitions.length > 1"
+            class="hidden xl:block w-48 flex-shrink-0"
         >
-            <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                    <button
-                        class="group rounded-lg border-2 border-border
-                            bg-background/80 p-1.5 shadow-lg backdrop-blur-sm
-                            transition-all duration-200 hover:scale-110
-                            hover:bg-background"
-                    >
-                        <ChevronLeft
-                            :size="14"
-                            class="text-muted-foreground transition-transform
-                                duration-200 group-hover:text-foreground
-                                group-data-[state=open]:rotate-90"
-                        />
-                    </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" class="min-w-[140px]">
-                    <DropdownMenuLabel>Card Theme</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuRadioGroup v-model="store.selectedCardVariant">
-                        <DropdownMenuRadioItem value="default">
-                            Default
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="bronze">
-                            Bronze
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="silver">
-                            Silver
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="gold">
-                            Gold
-                        </DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-            </DropdownMenu>
-        </div>
-        <!-- Header Section -->
-        <CardHeader :class="[
-            'transition-all duration-500',
-            shouldShowSidebar ? 'xl:ml-52 xl:pl-4' : ''
-        ]">
-            <div class="flex items-center justify-between">
-                <CardTitle
-                    class="themed-title transition-all duration-200"
-                >
-                    <ShimmerText 
-                        :text="entry.word" 
-                        text-class="text-word-title"
-                        :duration="2000"
-                        :interval="25"
-                    />
-                </CardTitle>
+            <div class="sticky top-4">
+                <ProgressiveSidebar />
             </div>
+        </div>
 
-            <!-- Pronunciation -->
+        <!-- Main Card Content -->
+        <ThemedCard :variant="selectedCardVariant" class="relative flex-1">
+            <!-- Card Theme Selector Dropdown - INSIDE the card -->
             <div
-                v-if="entry.pronunciation"
-                class="flex items-center gap-3 pt-2"
+                v-if="isMounted"
+                :class="[
+                    'absolute top-2 z-50 transition-all duration-300 ease-out',
+                    selectedCardVariant === 'default' ? 'right-2' : 'right-12',
+                ]"
             >
-                <span class="text-pronunciation">
-                    {{
-                        pronunciationMode === 'phonetic'
-                            ? entry.pronunciation.phonetic
-                            : entry.pronunciation.ipa
-                    }}
-                </span>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    @click="togglePronunciation"
-                    class="h-6 px-2 py-1 text-xs transition-all duration-200
-                        hover:opacity-80"
-                >
-                    {{ pronunciationMode === 'phonetic' ? 'IPA' : 'Phonetic' }}
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                        <button
+                            class="group rounded-lg border-2 border-border
+                                bg-background/80 p-1.5 shadow-lg backdrop-blur-sm
+                                transition-all duration-200 hover:scale-110
+                                hover:bg-background"
+                        >
+                            <ChevronLeft
+                                :size="14"
+                                class="text-muted-foreground transition-transform
+                                    duration-200 group-hover:text-foreground
+                                    group-data-[state=open]:rotate-90"
+                            />
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" class="min-w-[140px]">
+                        <DropdownMenuLabel>Card Theme</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuRadioGroup v-model="store.selectedCardVariant">
+                            <DropdownMenuRadioItem value="default">
+                                Default
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="bronze">
+                                Bronze
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="silver">
+                                Silver
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="gold">
+                                Gold
+                            </DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
-        </CardHeader>
+            <!-- Header Section -->
+            <CardHeader>
+                <div class="flex items-center justify-between">
+                    <CardTitle class="themed-title transition-all duration-200">
+                        <ShimmerText 
+                            :text="entry.word" 
+                            text-class="text-word-title"
+                            :duration="2000"
+                            :interval="25"
+                        />
+                    </CardTitle>
+                </div>
 
-        <!-- Gradient Divider -->
-        <div :class="[
-            'relative h-px w-full overflow-hidden transition-all duration-500',
-            shouldShowSidebar ? 'xl:ml-52 xl:pl-4' : ''
-        ]">
-            <div
-                class="absolute inset-0 bg-gradient-to-r from-transparent
-                    via-primary/30 to-transparent"
-            />
-        </div>
+                <!-- Pronunciation -->
+                <div
+                    v-if="entry.pronunciation"
+                    class="flex items-center gap-3 pt-2"
+                >
+                    <span class="text-pronunciation">
+                        {{
+                            pronunciationMode === 'phonetic'
+                                ? entry.pronunciation.phonetic
+                                : entry.pronunciation.ipa
+                        }}
+                    </span>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        @click="togglePronunciation"
+                        class="h-6 px-2 py-1 text-xs transition-all duration-200
+                            hover:opacity-80"
+                    >
+                        {{ pronunciationMode === 'phonetic' ? 'IPA' : 'Phonetic' }}
+                    </Button>
+                </div>
+            </CardHeader>
 
-        <!-- Progressive Sidebar positioned after header -->
-        <ProgressiveSidebar />
+            <!-- Gradient Divider -->
+            <div class="relative h-px w-full overflow-hidden">
+                <div
+                    class="absolute inset-0 bg-gradient-to-r from-transparent
+                        via-primary/30 to-transparent"
+                />
+            </div>
 
-        <!-- Dictionary Mode Definitions -->
-        <CardContent v-if="mode === 'dictionary'" :class="[
-            'grid gap-4 transition-all duration-500',
-            shouldShowSidebar ? 'xl:ml-52 xl:pl-4' : ''
-        ]">
+            <!-- Dictionary Mode Definitions -->
+            <CardContent v-if="mode === 'dictionary'" class="grid gap-4">
             <div
                 v-for="cluster in groupedDefinitions"
                 :key="cluster.clusterId"
@@ -231,14 +235,11 @@
             </div>
         </CardContent>
 
-        <!-- Thesaurus Mode -->
-        <CardContent
-            v-if="mode === 'thesaurus' && thesaurusData"
-            :class="[
-                'space-y-6 transition-all duration-500',
-                shouldShowSidebar ? 'xl:ml-52 xl:pl-4' : ''
-            ]"
-        >
+            <!-- Thesaurus Mode -->
+            <CardContent
+                v-if="mode === 'thesaurus' && thesaurusData"
+                class="space-y-6"
+            >
             <div
                 v-if="thesaurusData.synonyms.length > 0"
                 class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
@@ -264,16 +265,13 @@
             </div>
         </CardContent>
 
-        <!-- Etymology -->
-        <CardContent v-if="entry && entry.etymology" :class="[
-            'space-y-4 transition-all duration-500',
-            shouldShowSidebar ? 'xl:ml-52 xl:pl-4' : ''
-        ]">
-            <h3 class="text-lg font-semibold">Etymology</h3>
-            <p class="text-base text-muted-foreground">{{ entry.etymology }}</p>
-        </CardContent>
-
-    </ThemedCard>
+            <!-- Etymology -->
+            <CardContent v-if="entry && entry.etymology" class="space-y-4">
+                <h3 class="text-lg font-semibold">Etymology</h3>
+                <p class="text-base text-muted-foreground">{{ entry.etymology }}</p>
+            </CardContent>
+        </ThemedCard>
+    </div>
 </template>
 
 <script setup lang="ts">

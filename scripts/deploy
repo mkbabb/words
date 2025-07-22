@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Simplified deployment script for Floridify
-# Used by GitHub Actions - pulls pre-built images from registry
+# Direct server-side deployment script for Floridify
+# Builds containers directly on server - no GitHub registry needed
 
 set -e
 
@@ -11,26 +11,17 @@ if [ -f ".env.production" ]; then
     EC2_HOST_DEFAULT=$(grep '^EC2_HOST=' .env.production | cut -d'=' -f2-)
     EC2_USER_DEFAULT=$(grep '^EC2_USER=' .env.production | cut -d'=' -f2-)
     DOMAIN_DEFAULT=$(grep '^DOMAIN=' .env.production | cut -d'=' -f2-)
-    REGISTRY_DEFAULT=$(grep '^REGISTRY=' .env.production | cut -d'=' -f2-)
-    REPO_OWNER_DEFAULT=$(grep '^REPO_OWNER=' .env.production | cut -d'=' -f2-)
-    VERSION_DEFAULT=$(grep '^VERSION=' .env.production | cut -d'=' -f2-)
 else
     # Fallback defaults
     EC2_HOST_DEFAULT="54.209.241.47"
     EC2_USER_DEFAULT="ubuntu"
     DOMAIN_DEFAULT="words.babb.dev"
-    REGISTRY_DEFAULT="ghcr.io"
-    REPO_OWNER_DEFAULT="mkbabb"
-    VERSION_DEFAULT="latest"
 fi
 
 # Configuration with defaults from .env.production or environment
 export EC2_HOST="${EC2_HOST:-$EC2_HOST_DEFAULT}"
 export EC2_USER="${EC2_USER:-$EC2_USER_DEFAULT}"
 export DOMAIN="${DOMAIN:-$DOMAIN_DEFAULT}"
-export REGISTRY="${REGISTRY:-$REGISTRY_DEFAULT}"
-export REPO_OWNER="${REPO_OWNER:-$REPO_OWNER_DEFAULT}"
-export VERSION="${VERSION:-$VERSION_DEFAULT}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -102,51 +93,37 @@ test_ssh() {
     fi
 }
 
-# Prepare EC2 server
-prepare_ec2() {
-    print_status "Preparing EC2 server..."
+# Sync entire codebase to server
+sync_codebase() {
+    print_status "Syncing codebase to server..."
+    
+    if is_github_actions; then
+        rsync -avz --delete \
+            --exclude='.git' --exclude='node_modules' --exclude='__pycache__' --exclude='.venv' --exclude='dist' \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            ./ $EC2_USER@$EC2_HOST:~/floridify/
+    else
+        rsync -avz --delete \
+            --exclude='.git' --exclude='node_modules' --exclude='__pycache__' --exclude='.venv' --exclude='dist' \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            ./ $EC2_USER@$EC2_HOST:~/floridify/
+    fi
+    
+    print_status "✓ Codebase synced"
+}
+
+# Create production environment file on server
+create_env_file() {
+    print_status "Creating production environment file..."
     
     local ssh_cmd="ssh -o StrictHostKeyChecking=no"
     if is_github_actions; then
         ssh_cmd="$ssh_cmd -i ~/.ssh/deploy_key"
     fi
     
-    $ssh_cmd $EC2_USER@$EC2_HOST << 'EOSSH'
-        # Update system
-        sudo apt-get update
-        
-        # Install Docker if not present
-        if ! command -v docker &> /dev/null; then
-            echo "Installing Docker..."
-            curl -fsSL https://get.docker.com | sudo sh
-            sudo usermod -aG docker $USER
-        fi
-        
-        # Install Docker Compose if not present
-        if ! command -v docker-compose &> /dev/null; then
-            echo "Installing Docker Compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-        fi
-        
-        # Create app directory
-        mkdir -p ~/floridify/nginx/user_conf.d
-        
-        # Start Docker service
-        sudo systemctl start docker
-        sudo systemctl enable docker
-        
-        echo "EC2 server prepared successfully"
-EOSSH
-
-    print_status "✓ EC2 server prepared"
-}
-
-# Create production environment file
-create_env_file() {
-    print_status "Creating production environment file..."
-    
-    cat > .env.production << EOF
+    $ssh_cmd $EC2_USER@$EC2_HOST << EOF
+        cd ~/floridify
+        cat > .env << 'ENV_EOF'
 # Production Environment
 DOMAIN=$DOMAIN
 CERTBOT_EMAIL=${CERTBOT_EMAIL:-mike@babb.dev}
@@ -154,71 +131,57 @@ ENVIRONMENT=production
 LOG_LEVEL=INFO
 BUILD_TARGET=production
 BACKEND_CORS_ORIGINS=["https://$DOMAIN","https://www.$DOMAIN"]
-FRONTEND_PORT=80
+FRONTEND_PORT=3001
 VITE_API_URL=https://$DOMAIN/api
 VITE_APP_TITLE=Floridify
-REGISTRY=$REGISTRY
-REPO_OWNER=$REPO_OWNER
-VERSION=$VERSION
 AWS_REGION=us-east-1
 EC2_HOST=$EC2_HOST
 EC2_USER=$EC2_USER
+ENV_EOF
+        echo "Environment file created successfully"
 EOF
 
     print_status "✓ Environment file created"
 }
 
-# Copy deployment files to EC2
-copy_files() {
-    print_status "Copying deployment files to EC2..."
-    
-    local scp_opts="-o StrictHostKeyChecking=no"
-    if is_github_actions; then
-        scp_opts="$scp_opts -i ~/.ssh/deploy_key"
-    fi
-    
-    # Copy Docker Compose files and environment
-    scp $scp_opts \
-        docker-compose.yml \
-        docker-compose.prod.yml \
-        .env.production \
-        $EC2_USER@$EC2_HOST:~/floridify/
-    
-    # Copy nginx configuration
-    scp $scp_opts \
-        nginx/user_conf.d/floridify.conf \
-        $EC2_USER@$EC2_HOST:~/floridify/nginx/user_conf.d/
-    
-    print_status "✓ Files copied to EC2"
-}
-
-# Create auth configuration on EC2 from secrets
+# Create auth configuration on server from secrets
 create_auth_config() {
-    print_status "Creating auth configuration on EC2..."
+    print_status "Creating auth configuration..."
     
     local ssh_cmd="ssh -o StrictHostKeyChecking=no"
     if is_github_actions; then
         ssh_cmd="$ssh_cmd -i ~/.ssh/deploy_key"
     fi
     
-    # Create auth/config.toml on EC2 from GitHub secrets
+    # Create auth/config.toml on server from environment/secrets
     $ssh_cmd $EC2_USER@$EC2_HOST << EOF
-        mkdir -p ~/floridify/auth
-        cat > ~/floridify/auth/config.toml << 'CONFIG_EOF'
-[ai]
+        cd ~/floridify
+        mkdir -p auth
+        cat > auth/config.toml << 'CONFIG_EOF'
+[openai]
 api_key = "${OPENAI_API_KEY}"
-model = "gpt-4o-mini"
-max_tokens = 4096
-temperature = 0.3
 
-[mongodb]
-connection_string = "${MONGODB_CONNECTION_STRING}"
-database = "floridify"
+[models]
+openai_model = "gpt-4o"
+reasoning_effort = "high"
+embedding_model = "text-embedding-3-large"
 
-[server]
-host = "0.0.0.0"
-port = 8000
-debug = false
+[oxford]
+app_id = "${OXFORD_APP_ID:-}"
+api_key = "${OXFORD_API_KEY:-}"
+
+[dictionary_com]
+authorization = "${DICTIONARY_COM_AUTH:-}"
+
+# Database configuration
+[database]
+url = "${MONGODB_CONNECTION_STRING}"
+name = "floridify"
+timeout = 30
+max_pool_size = 100
+
+[general]
+invalid-key-format = "value"
 CONFIG_EOF
         echo "Auth configuration created successfully"
 EOF
@@ -226,9 +189,9 @@ EOF
     print_status "✓ Auth configuration created"
 }
 
-# Deploy application on EC2
-deploy_app() {
-    print_status "Deploying application on EC2..."
+# Build and deploy application on server
+build_and_deploy() {
+    print_status "Building and deploying application..."
     
     local ssh_cmd="ssh -o StrictHostKeyChecking=no"
     if is_github_actions; then
@@ -238,44 +201,48 @@ deploy_app() {
     $ssh_cmd $EC2_USER@$EC2_HOST << 'EOSSH'
         cd ~/floridify
         
-        # Set environment variables from .env.production
-        export $(cat .env.production | grep -v '^#' | xargs)
-        
-        # Login to GitHub Container Registry if token available
-        if [ -n "$GITHUB_TOKEN" ]; then
-            echo "Logging into GitHub Container Registry..."
-            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$REPO_OWNER" --password-stdin
+        # Install Docker and Docker Compose if not present
+        if ! command -v docker &> /dev/null; then
+            echo "Installing Docker..."
+            curl -fsSL https://get.docker.com | sudo sh
+            sudo usermod -aG docker $USER
+            sudo systemctl start docker
+            sudo systemctl enable docker
         fi
         
-        # Pull latest images
-        echo "Pulling latest Docker images..."
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml pull
+        if ! command -v docker-compose &> /dev/null; then
+            echo "Installing Docker Compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+        fi
         
         # Stop existing containers
         echo "Stopping existing containers..."
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml --profile ssl down || true
+        sudo docker-compose -f docker-compose.yml -f docker-compose.prod.yml --profile ssl down || true
+        
+        # Build containers directly on server
+        echo "Building containers on server..."
+        sudo docker-compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache
         
         # Start new deployment with SSL
         echo "Starting services with SSL..."
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml --profile ssl up -d
+        sudo docker-compose -f docker-compose.yml -f docker-compose.prod.yml --profile ssl up -d
         
         # Wait for services to start
         sleep 30
         
         # Show status
         echo "=== Deployment Status ==="
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps
+        sudo docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps
         
-        echo "=== Container Logs (last 20 lines) ==="
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=20
+        # Clean up old images and build cache
+        sudo docker image prune -f
+        sudo docker builder prune -f
         
-        # Clean up old images
-        docker image prune -f
-        
-        echo "Deployment completed successfully!"
+        echo "Build and deployment completed successfully!"
 EOSSH
 
-    print_status "✓ Application deployed"
+    print_status "✓ Application built and deployed"
 }
 
 # Verify deployment
@@ -296,7 +263,7 @@ verify_deployment() {
         print_info "Check manually: https://$DOMAIN"
     else
         print_warning "❌ Application responded with HTTP $response"
-        print_info "Check deployment logs on EC2"
+        print_info "Check deployment logs on server"
     fi
 }
 
@@ -304,26 +271,22 @@ verify_deployment() {
 cleanup() {
     if is_github_actions; then
         rm -f ~/.ssh/deploy_key 2>/dev/null || true
-        # Note: .env.production should not be deleted - it's a persistent config file
     fi
-    # For local deployments, don't delete any config files
 }
-
 
 # Main deployment function
 main() {
-    print_status "🚀 Starting Floridify deployment to $EC2_HOST"
+    print_status "🚀 Starting Floridify server-side deployment to $EC2_HOST"
     
     # Trap cleanup on exit
     trap cleanup EXIT
     
     setup_ssh
     test_ssh
-    prepare_ec2
+    sync_codebase
     create_env_file
-    copy_files
     create_auth_config
-    deploy_app
+    build_and_deploy
     verify_deployment
     
     print_status "🎉 Deployment completed successfully!"
@@ -334,21 +297,21 @@ main() {
 
 # Help message
 if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    echo "Floridify Deployment Script"
+    echo "Floridify Server-Side Deployment Script"
     echo ""
-    echo "Simplified script for GitHub Actions deployment to EC2."
-    echo "Pulls pre-built images from GitHub Container Registry."
+    echo "Syncs code to server and builds containers directly on EC2."
+    echo "No GitHub Container Registry needed - builds from source."
     echo ""
     echo "Environment Variables:"
     echo "  EC2_HOST              - Optional: EC2 IP (default: 54.209.241.47)"
     echo "  EC2_USER              - Optional: EC2 username (default: ubuntu)"
     echo "  DOMAIN                - Optional: Domain name (default: words.babb.dev)"
     echo "  CERTBOT_EMAIL         - Optional: Email for Let's Encrypt"
-    echo "  GITHUB_TOKEN          - Required: For container registry access"
     echo "  OPENAI_API_KEY        - Required: OpenAI API key for backend"
     echo "  MONGODB_CONNECTION_STRING - Required: MongoDB connection string"
     echo ""
     echo "Usage:"
+    echo "  Local:                ./scripts/deploy"
     echo "  GitHub Actions:       ./scripts/deploy"
     exit 0
 fi

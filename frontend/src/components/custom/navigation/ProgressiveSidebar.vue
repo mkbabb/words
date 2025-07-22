@@ -1,71 +1,55 @@
 <template>
-  <Transition
-    enter-active-class="transition-all duration-500 ease-apple-smooth"
-    leave-active-class="transition-all duration-400 ease-out"
-    enter-from-class="opacity-0 -translate-x-full"
-    leave-from-class="opacity-100 translate-x-0"
-    enter-to-class="opacity-100 translate-x-0"
-    leave-to-class="opacity-0 -translate-x-full"
-  >
-    <div
-      v-if="shouldShowSidebar && sidebarSections.length > 1"
-      class="sticky top-0 left-2 z-10 h-fit max-h-[calc(100vh-6rem)] w-52 overflow-y-auto"
-    >
+  <div class="bg-background/95 backdrop-blur-sm rounded-lg p-3 space-y-2">
+    <!-- Navigation Sections -->
+    <nav class="space-y-2">
       <div
-        class="bg-background/95 backdrop-blur-sm rounded-lg p-2 space-y-1 border-0"
+        v-for="(cluster, clusterIndex) in sidebarSections"
+        :key="cluster.clusterId"
+        class="space-y-1"
       >
-          <!-- Navigation Sections -->
-          <nav class="space-y-1">
-            <div
-              v-for="(cluster, clusterIndex) in sidebarSections"
-              :key="cluster.clusterId"
-              class="space-y-1"
-            >
-              <!-- Cluster Section -->
-              <button
-                @click="scrollToCluster(cluster.clusterId)"
-                :class="[
-                  'group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm font-medium transition-all duration-200',
-                  activeCluster === cluster.clusterId
-                    ? 'bg-primary/10 text-primary sidebar-shimmer'
-                    : 'text-foreground/80 hover:bg-muted/50 hover:text-foreground'
-                ]"
-              >
-                <span class="truncate text-left">{{ cluster.clusterDescription }}</span>
-                <div
-                  v-if="activeCluster === cluster.clusterId"
-                  class="h-1.5 w-1.5 rounded-full bg-primary animate-pulse"
-                />
-              </button>
+        <!-- Cluster Section -->
+        <button
+          @click="scrollToCluster(cluster.clusterId)"
+          :class="[
+            'group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm font-medium transition-all duration-200',
+            activeCluster === cluster.clusterId
+              ? 'bg-primary/10 text-primary sidebar-shimmer'
+              : 'text-foreground/80 hover:bg-muted/50 hover:text-foreground'
+          ]"
+        >
+          <span class="truncate text-left">{{ cluster.clusterDescription }}</span>
+          <div
+            v-if="activeCluster === cluster.clusterId"
+            class="h-1.5 w-1.5 rounded-full bg-primary animate-pulse"
+          />
+        </button>
 
-              <!-- Word Type Sub-sections -->
-              <div class="ml-3 space-y-1">
-                <div
-                  v-for="wordType in cluster.wordTypes"
-                  :key="`${cluster.clusterId}-${wordType.type}`"
-                  @click="scrollToWordType(cluster.clusterId, wordType.type)"
-                  :class="[
-                    'flex w-full items-center justify-between cursor-pointer rounded-md px-2 py-1.5 transition-all duration-200',
-                    activeWordType === `${cluster.clusterId}-${wordType.type}`
-                      ? 'bg-accent/15 opacity-100'
-                      : 'opacity-60 hover:bg-muted/30 hover:opacity-100'
-                  ]"
-                >
-                  <span class="themed-word-type text-xs">{{ wordType.type }}</span>
-                  <span class="text-xs opacity-70">{{ wordType.count }}</span>
-                </div>
-              </div>
+        <!-- Word Type Sub-sections -->
+        <div class="ml-3 space-y-1">
+          <div
+            v-for="wordType in cluster.wordTypes"
+            :key="`${cluster.clusterId}-${wordType.type}`"
+            @click="scrollToWordType(cluster.clusterId, wordType.type)"
+            :class="[
+              'flex w-full items-center justify-between cursor-pointer rounded-md px-2 py-1 transition-all duration-200',
+              activeWordType === `${cluster.clusterId}-${wordType.type}`
+                ? 'bg-accent/15 opacity-100'
+                : 'opacity-60 hover:bg-muted/30 hover:opacity-100'
+            ]"
+          >
+            <span class="themed-word-type text-xs">{{ wordType.type }}</span>
+            <span class="text-xs opacity-70">{{ wordType.count }}</span>
+          </div>
+        </div>
 
-              <!-- Gradient Divider between clusters -->
-              <div
-                v-if="clusterIndex < sidebarSections.length - 1"
-                class="my-3 h-px w-full gradient-hr"
-              />
-            </div>
-          </nav>
+        <!-- Gradient Divider between clusters -->
+        <div
+          v-if="clusterIndex < sidebarSections.length - 1"
+          class="my-3 h-px w-full gradient-hr"
+        />
       </div>
-    </div>
-  </Transition>
+    </nav>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -260,42 +244,42 @@ watch(() => store.currentEntry?.definitions, () => {
 <style scoped>
 /* Active shimmer animation for current cluster */
 .sidebar-shimmer {
-  position: relative;
-  overflow: hidden;
-}
-
-.sidebar-shimmer::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
   background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.3) 50%,
-    transparent 100%
+    -45deg,
+    var(--shimmer-base) 35%,
+    var(--shimmer-highlight) 50%,
+    var(--shimmer-base) 65%
   );
+  background-size: 200%;
+  background-position-x: 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
   animation: sidebar-shimmer-move 2s ease-in-out infinite;
-  pointer-events: none;
+  
+  /* Light mode colors - use design system */
+  --shimmer-base: hsl(var(--primary));
+  --shimmer-highlight: hsl(var(--primary-foreground) / 0.8);
 }
 
-:global(.dark) .sidebar-shimmer::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(0, 0, 0, 0.3) 50%,
-    transparent 100%
-  );
+/* Dark mode - highlight should still be lighter */
+:global(.dark) .sidebar-shimmer {
+  --shimmer-base: hsl(var(--primary));
+  --shimmer-highlight: hsl(var(--primary-foreground) / 0.9);
 }
 
 @keyframes sidebar-shimmer-move {
   0% {
-    transform: translateX(-100%);
+    background-position-x: 100%;
+  }
+  15% {
+    background-position-x: 85%;
+  }
+  85% {
+    background-position-x: 15%;
   }
   100% {
-    transform: translateX(100%);
+    background-position-x: 0%;
   }
 }
 
@@ -321,9 +305,10 @@ watch(() => store.currentEntry?.definitions, () => {
 
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .sidebar-shimmer::after {
+  .sidebar-shimmer {
     animation: none !important;
-    opacity: 0 !important;
+    color: hsl(var(--primary)) !important;
+    background: none !important;
   }
   
   * {
