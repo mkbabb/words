@@ -39,8 +39,11 @@ For each word type represented in the source definitions, synthesize a clear, co
 -   Removes redundancy
 -   Leverages the full context from examples, synonyms, and metadata
 -   Creates a supreme, normalized definition for this meaning cluster
+-   Includes a relevancy score (0.0-1.0) indicating how commonly this definition is used compared to others in this cluster
 
 Use all available information (synonyms, examples, metadata) to inform your synthesis.
+
+**Output Requirements**: Each synthesized definition must include a relevancy score where 1.0 represents the most commonly encountered usage within this meaning cluster, and 0.0 represents highly specialized or rare usage.
 
 Synthesize clear, unique definitions with distinct word types and meanings. Avoid duplicating semantically identical definitions.
 

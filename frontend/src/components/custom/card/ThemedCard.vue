@@ -46,10 +46,9 @@ const { variant, className } = toRefs(props);
 const sparkleStyle = computed(() => {
   if (!variant.value || variant.value === 'default') return {};
   
-  // Generate truly random delays for each card instance
-  // Use larger ranges for more varied shimmer timing
-  const delay1 = Math.random() * 8 + 2; // 2-10 seconds
-  const delay2 = Math.random() * 12 + 4; // 4-16 seconds
+  // Generate shorter delays for more visible sparkle animation
+  const delay1 = Math.random() * 2 + 0.5; // 0.5-2.5 seconds
+  const delay2 = Math.random() * 3 + 1; // 1-4 seconds
   
   return {
     '--sparkle-delay': `${delay1}s`,

@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full space-y-4">
+  <div class="w-full space-y-4 gap-1 flex flex-col">
     <!-- Progress Bar -->
     <div class="relative">
       <div
@@ -69,11 +69,11 @@
     </div>
 
     <!-- Progress Percentage -->
-    <div class="text-center">
+    <!-- <div class="text-center">
       <span class="text-2xl font-bold text-gray-800 dark:text-gray-200 tracking-tight">
         {{ Math.round(progress) }}%
       </span>
-    </div>
+    </div> -->
   </div>
 </template>
 

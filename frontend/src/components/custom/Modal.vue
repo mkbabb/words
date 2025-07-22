@@ -26,7 +26,7 @@
         
         <!-- Clean modal container -->
         <div class="relative z-30 w-full max-w-4xl p-4">
-          <div class="modal-content relative mx-auto max-w-3xl rounded-2xl bg-gray-900/40 dark:bg-gray-900/60 backdrop-blur-lg shadow-2xl border border-white/20 overflow-hidden">
+          <div class="modal-content relative mx-auto max-w-3xl rounded-2xl bg-background/80 backdrop-blur-md shadow-2xl cartoon-shadow-lg border border-border/30 overflow-hidden">
             <div class="p-8 relative z-20">
               <slot />
             </div>

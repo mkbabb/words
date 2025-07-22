@@ -31,6 +31,7 @@ Return a list of cluster mappings, where each mapping contains:
 2. **cluster_description**: Human-readable description of this cluster
 3. **definition_indices**: List of definition indices (0-based) that belong to this cluster
 4. **confidence**: Overall confidence in the clustering (0.0-1.0)
+5. **relevancy**: How relevant this cluster is to common usage (0.0-1.0, where 1.0 is most commonly used meaning)
 
 ## Guidelines
 

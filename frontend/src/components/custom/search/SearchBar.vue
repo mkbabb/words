@@ -71,7 +71,8 @@
             v-model="query"
             :placeholder="placeholder"
             :class="[
-              'placeholder:text-muted-foreground focus:ring-primary h-12 w-full rounded-xl bg-transparent py-2 text-base outline-none focus:ring-1 text-ellipsis overflow-hidden whitespace-nowrap transition-all duration-300 ease-out relative z-10'
+              'placeholder:text-muted-foreground h-12 w-full rounded-xl bg-transparent py-2 text-base outline-none text-ellipsis overflow-hidden whitespace-nowrap transition-all duration-300 ease-out relative z-10',
+              'focus:ring-1 focus:ring-gray-300 dark:focus:ring-gray-600'
             ]"
             :style="{
               paddingLeft: iconOpacity > 0.1 ? '1rem' : '1.5rem',
@@ -544,6 +545,17 @@ const updateScrollState = () => {
     }
     
     const maxScroll = Math.max(documentHeight.value - window.innerHeight, 1);
+    
+    // Don't engage scrolling behavior if there's nothing to scroll
+    if (maxScroll <= 10) { // Small buffer for minor height differences
+      scrollProgress.value = 0;
+      if (currentState.value === 'scrolled') {
+        transitionToState('normal');
+      }
+      scrollAnimationFrame = undefined;
+      return;
+    }
+    
     scrollProgress.value = Math.min(scrollY.value / maxScroll, 1);
     
     // State machine with momentum awareness and hysteresis

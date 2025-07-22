@@ -42,6 +42,13 @@ class DefinitionResponse(BaseModel):
         default_factory=list,
         description="List of synonyms for this definition, ordered by relevance and efflorescence.",
     )
+    
+    relevancy: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Relevancy score for this definition within its meaning cluster (0.0-1.0, where 1.0 is most commonly used).",
+    )
 
 
 class ProviderDataResponse(BaseModel):
@@ -68,6 +75,18 @@ class ClusterMapping(BaseModel):
     cluster_description: str = Field(description="Human-readable description of this cluster")
     definition_indices: list[int] = Field(
         description="List of definition indices (0-based) in this cluster"
+    )
+    confidence: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Confidence in this cluster mapping (0.0-1.0)"
+    )
+    relevancy: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="How relevant this cluster is to common usage (0.0-1.0, where 1.0 is most commonly used meaning)"
     )
 
 

@@ -20,7 +20,7 @@
     --theme-gradient-end: theme('colors.gray.600');
     --theme-border: theme('colors.gray.400/50');
     --theme-text: theme('colors.slate.950');
-    --theme-text-muted: theme('colors.slate.900');
+    --theme-text-muted: theme('colors.slate.800');
     --theme-bg-subtle: theme('colors.gray.50');
     --theme-bg-hover: theme('colors.gray.100');
     --theme-sparkle: theme('colors.gray.300/40');
@@ -258,64 +258,45 @@
     color: var(--theme-text);
   }
 
-  /* Sparkle overlay animation */
+  /* Holographic shimmer overlay - like Pokemon cards */
   .themed-sparkle {
-    @apply pointer-events-none absolute inset-0 overflow-hidden;
+    @apply pointer-events-none absolute inset-0 overflow-hidden rounded-xl;
   }
 
   .themed-sparkle::before {
     content: '';
-    @apply absolute -top-1/2 -left-1/2 w-[200%] h-[200%];
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
     background: linear-gradient(
       45deg,
-      transparent 20%,
-      var(--theme-sparkle) 40%,
-      rgba(255, 255, 255, 0.8) 50%,
-      var(--theme-sparkle) 60%,
-      transparent 80%
-    );
-    animation: sparkle-slide 12s ease-in-out infinite;
-    animation-delay: var(--sparkle-delay, 0s);
-  }
-
-  /* Add sparkle variations with different delays */
-  .themed-sparkle::after {
-    content: '';
-    @apply absolute -top-1/2 -left-1/2 w-[200%] h-[200%];
-    background: linear-gradient(
-      135deg,
       transparent 30%,
-      var(--theme-sparkle) 50%,
+      rgba(255, 255, 255, 0.1) 40%,
+      rgba(255, 255, 255, 0.6) 50%,
+      rgba(255, 255, 255, 0.1) 60%,
       transparent 70%
     );
-    animation: sparkle-slide-reverse 15s ease-in-out infinite;
-    animation-delay: var(--sparkle-delay-2, 6s);
+    transform: translateX(-100%) rotate(45deg);
+    animation: holographic-shimmer var(--shimmer-duration, 12s) ease-in-out infinite;
+    animation-delay: var(--sparkle-delay, 2s);
   }
 
-  @keyframes sparkle-slide {
-    0%, 95% {
-      transform: translateX(-150%) translateY(-50%) rotate(45deg);
+  @keyframes holographic-shimmer {
+    0%, 90% {
+      transform: translateX(-100%) rotate(45deg);
       opacity: 0;
     }
-    97%, 99% {
+    92% {
       opacity: 1;
     }
-    100% {
-      transform: translateX(250%) translateY(-50%) rotate(45deg);
-      opacity: 0;
+    96% {
+      transform: translateX(100%) rotate(45deg);
+      opacity: 1;
     }
-  }
-
-  @keyframes sparkle-slide-reverse {
-    0%, 93% {
-      transform: translateX(150%) translateY(50%) rotate(135deg);
-      opacity: 0;
-    }
-    95%, 97% {
-      opacity: 0.6;
-    }
-    100% {
-      transform: translateX(-250%) translateY(50%) rotate(135deg);
+    98%, 100% {
+      transform: translateX(100%) rotate(45deg);
       opacity: 0;
     }
   }

@@ -25,6 +25,7 @@ export interface Definition {
   source_attribution?: string; // AI model or provider source
   version: number; // Version number for change tracking
   quality_score?: number; // Quality/confidence score (0.0-1.0)
+  relevancy?: number; // Relevancy score for meaning cluster ordering (0.0-1.0)
   validation_status?: string; // Validation state
   metadata: Record<string, any>; // Extensible metadata
 }

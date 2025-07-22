@@ -86,6 +86,9 @@ class Definition(BaseModel):
     quality_score: float | None = Field(
         None, ge=0.0, le=1.0, description="Quality/confidence score"
     )
+    relevancy: float | None = Field(
+        None, ge=0.0, le=1.0, description="Relevancy score for meaning cluster ordering"
+    )
     validation_status: str | None = Field(
         None, description="Validation state (pending, verified, flagged)"
     )

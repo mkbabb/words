@@ -168,7 +168,7 @@
 
   /* Typography classes */
   .text-word-title {
-    font-size: 2.5rem;
+    @apply text-6xl;
     font-family: 'Fraunces', serif;
     font-weight: bold;
     line-height: 1.2;
@@ -176,7 +176,7 @@
 
   @media (min-width: 768px) {
     .text-word-title {
-      font-size: 3.5rem;
+      @apply text-7xl;
     }
   }
 

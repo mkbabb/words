@@ -1,16 +1,6 @@
 <template>
   <span class="shimmer-text" :class="textClass">
-    <span
-      v-for="(char, index) in displayChars"
-      :key="`${text}-${index}`"
-      class="shimmer-char"
-      :style="{
-        '--char-index': index,
-        '--total-chars': displayChars.length,
-        animationDelay: `${index * delay}ms`,
-        animationDuration: `${duration}ms`
-      }"
-    >{{ char === ' ' ? '\u00A0' : char }}</span>
+    {{ text }}
   </span>
 </template>
 
@@ -20,86 +10,84 @@ import { computed } from 'vue'
 interface Props {
   text: string
   textClass?: string
-  delay?: number
   duration?: number
-  shimmerColor?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   textClass: 'text-base',
-  delay: 20,
-  duration: 600,
-  shimmerColor: 'rgba(59, 130, 246, 0.9)'
+  duration: 1800
 })
 
-const displayChars = computed(() => {
-  return props.text.split('')
+// Calculate shimmer window size based on text length and estimated size
+const shimmerWindowSize = computed(() => {
+  const textLength = props.text.length
+  const hasLargeText = props.textClass?.includes('text-xl') || 
+                      props.textClass?.includes('text-2xl') ||
+                      props.textClass?.includes('text-3xl') ||
+                      props.textClass?.includes('text-4xl') ||
+                      props.textClass?.includes('text-5xl') ||
+                      props.textClass?.includes('text-6xl') ||
+                      props.textClass?.includes('text-7xl') ||
+                      props.textClass?.includes('text-8xl')
+  
+  // Base window size, adjusted for text size and length
+  let baseSize = 300
+  
+  // Larger text gets a bigger shimmer window
+  if (hasLargeText) {
+    baseSize = 400
+  }
+  
+  // Longer text gets a slightly bigger window for smoother effect
+  if (textLength > 50) {
+    baseSize += 50
+  } else if (textLength > 100) {
+    baseSize += 100
+  }
+  
+  return baseSize
 })
 </script>
 
 <style scoped>
 .shimmer-text {
-  display: inline-block;
-  position: relative;
+  background: linear-gradient(
+    -45deg,
+    var(--shimmer-base) 35%,
+    var(--shimmer-highlight) 50%,
+    var(--shimmer-base) 65%
+  );
+  background-size: v-bind('shimmerWindowSize + "%"');
+  background-position-x: 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: shimmer v-bind('props.duration + "ms"') ease-in-out infinite;
+  animation-delay: v-bind('Math.random() * 200 + "ms"');
+  
+  /* Enhanced visibility shimmer colors for light mode */
+  --shimmer-base: #1f2937;    /* gray-800 - dark base */
+  --shimmer-highlight: #e5e7eb; /* gray-200 - much lighter highlight */
 }
 
-.shimmer-char {
-  display: inline-block;
-  position: relative;
-  color: inherit;
-  animation: shimmer var(--duration, 1500ms) ease-in-out infinite;
+/* Dark mode shimmer colors - lighter for contrast */
+:global(.dark) .shimmer-text {
+  --shimmer-base: #f9fafb;    /* gray-50 - very light base */
+  --shimmer-highlight: #6b7280; /* gray-500 - much darker highlight */
 }
 
 @keyframes shimmer {
   0% {
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      transparent 45%,
-      v-bind(shimmerColor) 50%,
-      transparent 55%,
-      transparent 100%
-    );
-    background-size: 300% 100%;
-    background-position: -300% 0;
-    background-clip: text;
-    -webkit-background-clip: text;
-    color: transparent;
+    background-position-x: 100%;
   }
-  
-  50% {
-    background-position: 150% 0;
-    background-clip: text;
-    -webkit-background-clip: text;
-    color: transparent;
+  15% {
+    background-position-x: 85%;
   }
-  
-  60% {
-    background: none;
-    color: inherit;
+  85% {
+    background-position-x: 15%;
   }
-  
   100% {
-    background: none;
-    color: inherit;
+    background-position-x: 0%;
   }
-}
-
-/* Tailwind compatibility - ensure proper shimmer effect */
-.shimmer-char:global(.text-white) {
-  --shimmer-color: rgba(255, 255, 255, 0.8);
-}
-
-.shimmer-char:global(.text-black) {
-  --shimmer-color: rgba(0, 0, 0, 0.8);
-}
-
-.shimmer-char:global(.text-primary) {
-  --shimmer-color: rgb(var(--primary));
-}
-
-/* Dark mode compatibility */
-:global(.dark) .shimmer-char {
-  --shimmer-color: rgba(255, 255, 255, 0.9);
 }
 </style>

@@ -107,32 +107,32 @@ const duration = computed(() => `${currentText.value.length * props.offset + pro
   perspective: 1000px;
   transform-style: preserve-3d;
   
-  /* Chunky stark 3D effect - off-white shadows for better background compatibility */
+  /* Chunky stark 3D effect - highly visible shadows */
   text-shadow:
-    /* Sharp, defined depth layers with subtle off-white tone */
-    1px 1px 0 rgba(248, 248, 248, 1),
-    2px 2px 0 rgba(248, 248, 248, 0.95),
-    3px 3px 0 rgba(248, 248, 248, 0.9),
-    4px 4px 0 rgba(248, 248, 248, 0.85),
-    5px 5px 0 rgba(248, 248, 248, 0.8),
-    6px 6px 0 rgba(248, 248, 248, 0.75),
-    7px 7px 0 rgba(248, 248, 248, 0.7),
-    8px 8px 0 rgba(248, 248, 248, 0.65);
+    /* Sharp, defined depth layers with strong contrast */
+    1px 1px 0 rgba(200, 200, 200, 1),
+    2px 2px 0 rgba(200, 200, 200, 0.95),
+    3px 3px 0 rgba(200, 200, 200, 0.9),
+    4px 4px 0 rgba(200, 200, 200, 0.85),
+    5px 5px 0 rgba(200, 200, 200, 0.8),
+    6px 6px 0 rgba(200, 200, 200, 0.75),
+    7px 7px 0 rgba(200, 200, 200, 0.7),
+    8px 8px 0 rgba(200, 200, 200, 0.65);
     
   transition: all 0.3s ease;
 }
 
 .dark .depth-text {
   text-shadow:
-    /* Chunky stark off-black shadows for better background compatibility */
-    1px 1px 0 rgba(32, 32, 32, 1),
-    2px 2px 0 rgba(32, 32, 32, 0.95),
-    3px 3px 0 rgba(32, 32, 32, 0.9),
-    4px 4px 0 rgba(32, 32, 32, 0.85),
-    5px 5px 0 rgba(32, 32, 32, 0.8),
-    6px 6px 0 rgba(32, 32, 32, 0.75),
-    7px 7px 0 rgba(32, 32, 32, 0.7),
-    8px 8px 0 rgba(32, 32, 32, 0.65);
+    /* Chunky stark highly visible dark shadows */
+    1px 1px 0 rgba(40, 40, 40, 1),
+    2px 2px 0 rgba(40, 40, 40, 0.95),
+    3px 3px 0 rgba(40, 40, 40, 0.9),
+    4px 4px 0 rgba(40, 40, 40, 0.85),
+    5px 5px 0 rgba(40, 40, 40, 0.8),
+    6px 6px 0 rgba(40, 40, 40, 0.75),
+    7px 7px 0 rgba(40, 40, 40, 0.7),
+    8px 8px 0 rgba(40, 40, 40, 0.65);
 }
 
 .font-fraunces {

@@ -325,6 +325,7 @@ class DefinitionSynthesizer:
                         synonyms=enhanced_synonyms,
                         examples=examples,
                         meaning_cluster=cluster_id,
+                        relevancy=synthesized_def.relevancy,
                         raw_metadata={
                             "synthesis_confidence": synthesis_response.confidence,
                             "example_confidence": example_response.confidence,
