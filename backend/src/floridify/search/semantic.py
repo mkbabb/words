@@ -13,10 +13,11 @@ import pickle
 from pathlib import Path
 from typing import Any
 
-import faiss  # type: ignore[import-untyped]
+# TEMPORARILY DISABLED FOR LIGHTWEIGHT DEPLOYMENT
+# import faiss  # type: ignore[import-untyped]
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import-untyped]
-from sklearn.metrics.pairwise import cosine_similarity  # type: ignore[import-untyped]
+# from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import-untyped]
+# from sklearn.metrics.pairwise import cosine_similarity  # type: ignore[import-untyped]
 
 from ..utils.logging import get_logger
 from .constants import EmbeddingLevel
@@ -26,7 +27,7 @@ logger = get_logger(__name__)
 
 class SemanticSearch:
     """
-    Vector-based semantic similarity using multiple embedding levels.
+    TEMPORARILY DISABLED - Vector-based semantic similarity using multiple embedding levels.
 
     Embedding Strategy:
     - Character Embeddings (64D): Handle morphological similarity (helpful → helpfully)

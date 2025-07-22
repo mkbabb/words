@@ -10,10 +10,11 @@ from __future__ import annotations
 import contractions  # type: ignore[import-untyped]
 import ftfy
 import regex
-import spacy
+# TEMPORARILY DISABLED FOR LIGHTWEIGHT DEPLOYMENT
+# import spacy
 import unicodedata2 as unicodedata  # type: ignore[import-not-found]
 from pydantic import BaseModel, Field
-from tokenizers import pre_tokenizers  # type: ignore[import-untyped]
+# from tokenizers import pre_tokenizers  # type: ignore[import-untyped]
 
 
 class MultiWordExpression(BaseModel):

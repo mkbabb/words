@@ -8,11 +8,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import nltk
-import spacy
+# TEMPORARILY DISABLED FOR LIGHTWEIGHT DEPLOYMENT
+# import spacy
 from nltk.corpus import wordnet
 from nltk.stem import PorterStemmer, SnowballStemmer, WordNetLemmatizer
 from rich.console import Console
-from spacy.language import Language
+# from spacy.language import Language
 
 console = Console()
 
