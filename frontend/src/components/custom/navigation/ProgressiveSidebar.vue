@@ -1,6 +1,6 @@
 <template>
   <div 
-    class="themed-card themed-shadow-lg bg-background/95 backdrop-blur-sm rounded-lg p-2 space-y-0.5"
+    class="themed-card themed-shadow-lg bg-background/95 backdrop-blur-sm rounded-lg p-2 space-y-0.5 relative z-20 overflow-visible"
     :data-theme="selectedCardVariant || 'default'"
   >
     <!-- Navigation Sections -->
@@ -52,7 +52,7 @@
                 :class="[
                   'flex w-full items-center justify-between cursor-pointer rounded-md px-2 py-0.5 transition-all duration-200',
                   activeWordType === `${cluster.clusterId}-${wordType.type}`
-                    ? 'bg-muted/70 text-foreground shadow-sm opacity-100'
+                    ? 'bg-secondary text-secondary-foreground shadow-sm opacity-100'
                     : 'opacity-60 hover:bg-muted/30 hover:opacity-100'
                 ]"
               >
@@ -62,15 +62,15 @@
             </HoverCardTrigger>
             <HoverCardContent 
               :class="cn(
-                'themed-hovercard w-80',
+                'themed-hovercard w-80 z-[80]',
                 selectedCardVariant !== 'default' ? 'themed-shadow-sm' : ''
               )" 
               :data-theme="selectedCardVariant || 'default'"
             >
               <div class="space-y-3">
                 <div class="flex items-center justify-between">
-                  <h4 class="themed-cluster-title text-sm font-semibold">
-                    Definitions
+                  <h4 class="themed-cluster-title text-sm font-semibold uppercase">
+                    {{ cluster.clusterDescription }}
                   </h4>
                   <span class="themed-word-type text-xs">{{ wordType.count }}</span>
                 </div>
@@ -124,6 +124,19 @@ const pendingActiveWordType = ref<string>('')
 
 // Responsive behavior
 const shouldShowSidebar = ref(false)
+
+// Helper function to detect if user is at document bottom
+const isAtDocumentBottom = () => {
+  const scrollTop = window.pageYOffset || document.documentElement.scrollTop
+  const windowHeight = window.innerHeight
+  const docHeight = document.documentElement.scrollHeight
+  
+  // Consider "at bottom" if within 50px of actual bottom, or if scrolled to max
+  const atBottom = (scrollTop + windowHeight) >= (docHeight - 50)
+  const atMaxScroll = scrollTop >= (docHeight - windowHeight - 10)
+  
+  return atBottom || atMaxScroll
+}
 
 // Debounce helper
 const debounce = (func: Function, wait: number) => {
@@ -338,20 +351,16 @@ const initializeActiveStates = () => {
     updateActiveWordType(bestWordType)
   }
 
-  // Fallback: if no visible clusters, determine based on scroll position
+  // Fallback: if no visible clusters, use robust position-based detection
   if (!bestCluster) {
-    const scrollTop = window.pageYOffset || document.documentElement.scrollTop
-    const docHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight
-    const viewportHeight = window.innerHeight
-    
-    if (scrollTop < 200) {
-      // Near top, activate first cluster
-      const firstCluster = sidebarSections.value[0]
-      updateActiveCluster(firstCluster.clusterId)
-    } else if (scrollTop >= docHeight - 200 || (scrollTop + viewportHeight >= document.documentElement.scrollHeight - 50)) {
-      // Near bottom or at bottom, activate last cluster
-      const lastCluster = sidebarSections.value[sidebarSections.value.length - 1]
-      updateActiveCluster(lastCluster.clusterId)
+    setFallbackCluster()
+  }
+  
+  // Ensure word type is set for active cluster if not already set
+  if (bestCluster && !bestWordType) {
+    const activeClusterData = sidebarSections.value.find(c => c.clusterId === bestCluster)
+    if (activeClusterData && activeClusterData.wordTypes.length > 0) {
+      updateActiveWordType(`${bestCluster}-${activeClusterData.wordTypes[0].type}`)
     }
   }
 }
@@ -373,31 +382,80 @@ const setupObservers = async () => {
   const visibleClusters = new Map<string, number>()
   const visibleWordTypes = new Map<string, number>()
   
-  // Fallback function to set top/bottom cluster when no clusters are visible
+  // Robust fallback function to set appropriate cluster based on scroll position
   const setFallbackCluster = () => {
     if (sidebarSections.value.length === 0) return
     
     const firstCluster = sidebarSections.value[0]
     const lastCluster = sidebarSections.value[sidebarSections.value.length - 1]
     
-    // Check scroll position to determine if we're at top or bottom
-    const scrollTop = window.pageYOffset || document.documentElement.scrollTop
-    const docHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight
-    const viewportHeight = window.innerHeight
+    // Get precise scroll metrics
+    const scrollTop = Math.max(0, window.pageYOffset || document.documentElement.scrollTop)
+    const docHeight = document.documentElement.scrollHeight
+    const clientHeight = document.documentElement.clientHeight
+    const maxScrollTop = Math.max(0, docHeight - clientHeight)
+    const scrollProgress = maxScrollTop > 0 ? scrollTop / maxScrollTop : 0
     
-    if (scrollTop < 200) {
-      // Near top, activate first cluster
+    // Define bounds with hysteresis - more generous bottom threshold
+    const topThreshold = 0.05  // Top 5% of document
+    const bottomThreshold = 0.85  // Bottom 15% of document (more generous for last cluster)
+    
+    if (scrollProgress < topThreshold) {
+      // Near top - activate first cluster and its first word type
       updateActiveCluster(firstCluster.clusterId)
-    } else if (scrollTop >= docHeight - 200 || (scrollTop + viewportHeight >= document.documentElement.scrollHeight - 50)) {
-      // Near bottom or at bottom, activate last cluster
+      if (firstCluster.wordTypes.length > 0) {
+        updateActiveWordType(`${firstCluster.clusterId}-${firstCluster.wordTypes[0].type}`)
+      }
+    } else if (scrollProgress > bottomThreshold || isAtDocumentBottom()) {
+      // Near bottom or at document bottom - activate last cluster and its last word type
       updateActiveCluster(lastCluster.clusterId)
+      if (lastCluster.wordTypes.length > 0) {
+        const lastWordType = lastCluster.wordTypes[lastCluster.wordTypes.length - 1]
+        updateActiveWordType(`${lastCluster.clusterId}-${lastWordType.type}`)
+      }
+    } else {
+      // Middle section - find best cluster based on actual element positions
+      findBestClusterByPosition()
+    }
+  }
+  
+  // Helper function to find best cluster based on element positions
+  const findBestClusterByPosition = () => {
+    if (sidebarSections.value.length === 0) return
+    
+    const viewportCenter = window.innerHeight / 2 + window.pageYOffset
+    let closestCluster: typeof sidebarSections.value[0] | null = null
+    let closestDistance = Infinity
+    
+    sidebarSections.value.forEach((cluster) => {
+      const element = document.querySelector(`[data-cluster-id="${cluster.clusterId}"]`)
+      if (element) {
+        const rect = element.getBoundingClientRect()
+        const elementCenter = rect.top + rect.height / 2 + window.pageYOffset
+        const distance = Math.abs(elementCenter - viewportCenter)
+        
+        if (distance < closestDistance) {
+          closestDistance = distance
+          closestCluster = cluster
+        }
+      }
+    })
+    
+    if (closestCluster) {
+      updateActiveCluster(closestCluster.clusterId)
+      // Also set first word type of the cluster
+      if (closestCluster.wordTypes.length > 0) {
+        updateActiveWordType(`${closestCluster.clusterId}-${closestCluster.wordTypes[0].type}`)
+      }
     }
   }
 
   // Cluster observers with hysteresis
-  sidebarSections.value.forEach((cluster) => {
+  sidebarSections.value.forEach((cluster, clusterIndex) => {
     const element = document.querySelector(`[data-cluster-id="${cluster.clusterId}"]`)
     if (element) {
+      const isLastCluster = clusterIndex === sidebarSections.value.length - 1
+      
       const observer = new IntersectionObserver(
         ([entry]) => {
           const rect = entry.boundingClientRect
@@ -409,36 +467,61 @@ const setupObservers = async () => {
           const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0)
           const visibilityScore = Math.max(0, visibleHeight / elementHeight)
           
-          if (entry.isIntersecting && visibilityScore > 0.05) {
+          if (entry.isIntersecting && visibilityScore > 0.03) {
             visibleClusters.set(cluster.clusterId, visibilityScore)
             
             // Find cluster with highest visibility score
             const bestCluster = Array.from(visibleClusters.entries())
               .sort(([, a], [, b]) => b - a)[0]
             
-            if (bestCluster && bestCluster[1] > 0.1) {
+            if (bestCluster && bestCluster[1] > 0.05) {
               updateActiveCluster(bestCluster[0])
+              
+              // Reset word type when cluster changes
+              const clusterData = sidebarSections.value.find(c => c.clusterId === bestCluster[0])
+              if (clusterData && clusterData.wordTypes.length > 0) {
+                const currentWordType = activeWordType.value
+                if (!currentWordType.startsWith(bestCluster[0])) {
+                  updateActiveWordType(`${bestCluster[0]}-${clusterData.wordTypes[0].type}`)
+                }
+              }
             }
           } else {
             visibleClusters.delete(cluster.clusterId)
             
-            // If this was the active cluster, find next best
+            // If this was the active cluster, find next best or use fallback
             if (activeCluster.value === cluster.clusterId) {
               const nextBest = Array.from(visibleClusters.entries())
                 .sort(([, a], [, b]) => b - a)[0]
               
-              if (nextBest && nextBest[1] > 0.08) {
+              if (nextBest && nextBest[1] > 0.03) {
                 updateActiveCluster(nextBest[0])
+                
+                // Update word type for new cluster
+                const clusterData = sidebarSections.value.find(c => c.clusterId === nextBest[0])
+                if (clusterData && clusterData.wordTypes.length > 0) {
+                  updateActiveWordType(`${nextBest[0]}-${clusterData.wordTypes[0].type}`)
+                }
               } else {
-                // No visible clusters, use fallback
-                setFallbackCluster()
+                // No visible clusters, check if we're at bottom and should activate last cluster
+                if (isAtDocumentBottom() && isLastCluster) {
+                  updateActiveCluster(cluster.clusterId)
+                  if (cluster.wordTypes.length > 0) {
+                    const lastWordType = cluster.wordTypes[cluster.wordTypes.length - 1]
+                    updateActiveWordType(`${cluster.clusterId}-${lastWordType.type}`)
+                  }
+                } else {
+                  // Use robust fallback
+                  setFallbackCluster()
+                }
               }
             }
           }
         },
         { 
-          rootMargin: '-5% 0px -20% 0px', 
-          threshold: [0.05, 0.1, 0.15, 0.25, 0.4, 0.6, 0.8] 
+          // Use more generous bottom margin for last cluster to catch bottom edge
+          rootMargin: isLastCluster ? '-2% 0px -5% 0px' : '-2% 0px -15% 0px', 
+          threshold: [0.03, 0.05, 0.1, 0.15, 0.25, 0.4, 0.6, 0.8] 
         }
       )
       observer.observe(element)
@@ -454,7 +537,7 @@ const setupObservers = async () => {
             const key = `${cluster.clusterId}-${wordType.type}`
             const ratio = entry.intersectionRatio
             
-            if (entry.isIntersecting && ratio > 0.2) {
+            if (entry.isIntersecting && ratio > 0.1) {
               visibleWordTypes.set(key, ratio)
               
               // Only update if we're in the active cluster
@@ -463,17 +546,34 @@ const setupObservers = async () => {
                   .filter(([wt]) => wt.startsWith(cluster.clusterId))
                   .sort(([, a], [, b]) => b - a)
                 
-                if (clusterWordTypes.length > 0 && clusterWordTypes[0][1] > 0.3) {
+                if (clusterWordTypes.length > 0 && clusterWordTypes[0][1] > 0.15) {
                   updateActiveWordType(clusterWordTypes[0][0])
                 }
               }
             } else {
               visibleWordTypes.delete(key)
+              
+              // If this was the active word type, find next best in cluster
+              if (activeWordType.value === key && activeCluster.value === cluster.clusterId) {
+                const clusterWordTypes = Array.from(visibleWordTypes.entries())
+                  .filter(([wt]) => wt.startsWith(cluster.clusterId))
+                  .sort(([, a], [, b]) => b - a)
+                
+                if (clusterWordTypes.length > 0 && clusterWordTypes[0][1] > 0.1) {
+                  updateActiveWordType(clusterWordTypes[0][0])
+                } else {
+                  // No visible word types in cluster, set to first word type
+                  const clusterData = sidebarSections.value.find(c => c.clusterId === cluster.clusterId)
+                  if (clusterData && clusterData.wordTypes.length > 0) {
+                    updateActiveWordType(`${cluster.clusterId}-${clusterData.wordTypes[0].type}`)
+                  }
+                }
+              }
             }
           },
           { 
-            rootMargin: '-20% 0px -30% 0px', 
-            threshold: [0.2, 0.3, 0.5, 0.7] 
+            rootMargin: '-15% 0px -25% 0px', 
+            threshold: [0.1, 0.15, 0.25, 0.4, 0.6] 
           }
         )
         observer.observe(element)
@@ -483,9 +583,27 @@ const setupObservers = async () => {
   })
 }
 
+// Debounced scroll handler to check for bottom state
+const handleScroll = debounce(() => {
+  if (sidebarSections.value.length === 0) return
+  
+  // Check if at bottom and last cluster isn't active
+  if (isAtDocumentBottom()) {
+    const lastCluster = sidebarSections.value[sidebarSections.value.length - 1]
+    if (activeCluster.value !== lastCluster.clusterId) {
+      updateActiveCluster(lastCluster.clusterId)
+      if (lastCluster.wordTypes.length > 0) {
+        const lastWordType = lastCluster.wordTypes[lastCluster.wordTypes.length - 1]
+        updateActiveWordType(`${lastCluster.clusterId}-${lastWordType.type}`)
+      }
+    }
+  }
+}, 100)
+
 onMounted(() => {
   checkShowSidebar()
   window.addEventListener('resize', checkShowSidebar)
+  window.addEventListener('scroll', handleScroll, { passive: true })
   
   // Setup observers when definitions are loaded
   if (sidebarSections.value.length > 0) {
@@ -495,6 +613,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkShowSidebar)
+  window.removeEventListener('scroll', handleScroll)
   clusterObservers.forEach(observer => observer.disconnect())
   wordTypeObservers.forEach(observer => observer.disconnect())
 })

@@ -3,7 +3,7 @@
         ref="searchContainer"
         :class="[
             'search-container relative z-50 origin-top',
-            'w-full max-w-60 sm:max-w-xs md:max-w-md lg:max-w-2xl',
+            'w-full max-w-60 sm:max-w-xs md:max-w-md lg:max-w-3xl',
             'mx-auto',
             props.className,
         ]"

@@ -13,7 +13,7 @@
             v-if="shouldShowSidebar && groupedDefinitions.length > 1"
             class="hidden w-48 flex-shrink-0 xl:block"
         >
-            <div class="sticky top-4">
+            <div class="sticky top-4 z-60">
                 <ProgressiveSidebar />
             </div>
         </div>
@@ -32,10 +32,10 @@
                 <div class="relative">
                     <button
                         @click="toggleDropdown"
-                        class="bg-background/80 group rounded-lg border-2
-                            border-border p-1.5 shadow-lg backdrop-blur-sm
+                        class="group rounded-lg border-2 border-border
+                            bg-background/80 p-1.5 shadow-lg backdrop-blur-sm
                             transition-all duration-200 hover:scale-110
-                            hover:bg-background focus:outline-none focus:ring-0"
+                            hover:bg-background focus:ring-0 focus:outline-none"
                     >
                         <ChevronLeft
                             :size="14"
@@ -56,7 +56,7 @@
                     >
                         <div
                             v-if="showThemeDropdown"
-                            class="absolute right-0 top-full z-50 mt-2
+                            class="absolute top-full right-0 z-50 mt-2
                                 min-w-[140px] origin-top-right rounded-md border
                                 bg-popover text-popover-foreground shadow-md"
                             @click.stop
@@ -141,11 +141,8 @@
             </CardHeader>
 
             <!-- Themed Gradient Divider -->
-            <div>
-                <div class="relative h-0.5 w-full">
-                    <div class="themed-hr absolute inset-0" />
-                </div>
-            </div>
+
+            <div class="themed-hr" />
 
             <!-- Dictionary Mode Definitions -->
             <CardContent v-if="mode === 'dictionary'" class="grid gap-4">
@@ -158,13 +155,13 @@
                     <!-- Cluster header with gradient divider -->
                     <div v-if="groupedDefinitions.length > 1" class="mt-6 pb-2">
                         <h4
-                            class="themed-cluster-title mb-2 text-base font-bold
-                                uppercase tracking-wider"
+                            class="themed-cluster-title text-base font-bold
+                                tracking-wider uppercase"
                         >
                             {{ cluster.clusterDescription }}
                         </h4>
                         <!-- Themed Gradient HR -->
-                        <div class="themed-hr h-px" />
+                        <!-- <div class="themed-hr h-px" /> -->
                     </div>
 
                     <div
@@ -204,12 +201,12 @@
                             >
                                 <!-- Examples header with regenerate button -->
                                 <div
-                                    class="mb-1 mt-3 flex items-center
+                                    class="mt-3 mb-1 flex items-center
                                         justify-between"
                                 >
                                     <span
-                                        class="text-sm uppercase tracking-wider
-                                            text-muted-foreground"
+                                        class="text-sm tracking-wider
+                                            text-muted-foreground uppercase"
                                         >Examples</span
                                     >
                                     <button
@@ -248,8 +245,8 @@
                                         definition.examples.literature
                                     )"
                                     :key="exIndex"
-                                    class="themed-example-text text-base italic
-                                        text-muted-foreground"
+                                    class="themed-example-text text-base
+                                        text-muted-foreground italic"
                                     v-html="
                                         `&quot;${formatExampleHTML(example.sentence, entry.word)}&quot;`
                                     "
