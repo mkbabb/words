@@ -63,8 +63,23 @@ extract_secrets() {
     CERTBOT_EMAIL=$(grep '^CERTBOT_EMAIL=' .env.production | cut -d'=' -f2-)
     DOMAIN=$(grep '^DOMAIN=' .env.production | cut -d'=' -f2-)
     
+    # Extract from auth/config.toml  
+    OPENAI_API_KEY=$(grep -A5 '\[openai\]' auth/config.toml | grep '^api_key' | cut -d'=' -f2- | sed 's/^[[:space:]]*"\(.*\)"[[:space:]]*$/\1/')
+    MONGODB_CONNECTION_STRING=$(grep -A10 '\[database\]' auth/config.toml | grep '^url' | cut -d'=' -f2- | sed 's/^[[:space:]]*"\(.*\)"[[:space:]]*$/\1/')
+    
     # Read SSH private key
     EC2_SSH_KEY=$(cat ~/.ssh/id_rsa)
+    
+    # Validate extracted values
+    if [ -z "$OPENAI_API_KEY" ]; then
+        print_error "OPENAI_API_KEY not found in auth/config.toml"
+        exit 1
+    fi
+    
+    if [ -z "$MONGODB_CONNECTION_STRING" ]; then
+        print_error "MONGODB_CONNECTION_STRING not found in auth/config.toml"
+        exit 1
+    fi
     
     print_status "Secrets extracted successfully"
 }
@@ -84,6 +99,14 @@ set_github_secrets() {
     # Set DOMAIN
     echo "$DOMAIN" | gh secret set DOMAIN --repo="$GITHUB_REPO"
     print_status "✓ Set DOMAIN"
+    
+    # Set OPENAI_API_KEY
+    echo "$OPENAI_API_KEY" | gh secret set OPENAI_API_KEY --repo="$GITHUB_REPO"
+    print_status "✓ Set OPENAI_API_KEY"
+    
+    # Set MONGODB_CONNECTION_STRING
+    echo "$MONGODB_CONNECTION_STRING" | gh secret set MONGODB_CONNECTION_STRING --repo="$GITHUB_REPO"
+    print_status "✓ Set MONGODB_CONNECTION_STRING"
     
     print_status "All GitHub secrets have been set successfully!"
 }
@@ -117,7 +140,7 @@ verify_secrets() {
     
     SECRETS=$(gh secret list --repo="$GITHUB_REPO")
     
-    for secret in "EC2_SSH_KEY" "CERTBOT_EMAIL" "DOMAIN"; do
+    for secret in "EC2_SSH_KEY" "CERTBOT_EMAIL" "DOMAIN" "OPENAI_API_KEY" "MONGODB_CONNECTION_STRING"; do
         if echo "$SECRETS" | grep -q "$secret"; then
             print_status "✓ $secret verified"
         else

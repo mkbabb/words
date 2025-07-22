@@ -1,21 +1,31 @@
 <template>
-  <span class="shimmer-text" :class="textClass">
+  <span 
+    class="shimmer-text hover-shimmer" 
+    :class="[textClass, { 'is-hovered': isHovered }]"
+    :style="shimmerStyle"
+    @mouseenter="isHovered = true"
+    @mouseleave="isHovered = false"
+  >
     {{ text }}
   </span>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+
+const isHovered = ref(false)
 
 interface Props {
   text: string
   textClass?: string
   duration?: number
+  interval?: number // Time between shimmers in seconds
 }
 
 const props = withDefaults(defineProps<Props>(), {
   textClass: 'text-base',
-  duration: 1800
+  duration: 1800,
+  interval: 15 // Default: shimmer every 15 seconds
 })
 
 // Calculate shimmer window size based on text length and estimated size
@@ -47,6 +57,30 @@ const shimmerWindowSize = computed(() => {
   
   return baseSize
 })
+
+// Generate shimmer style with randomized interval-based animation
+const shimmerStyle = computed(() => {
+  // Add randomness to the interval (±40% variation)
+  const randomVariation = 0.4;
+  const minInterval = props.interval * (1 - randomVariation);
+  const maxInterval = props.interval * (1 + randomVariation);
+  const randomizedInterval = Math.random() * (maxInterval - minInterval) + minInterval;
+  
+  const totalCycleDuration = randomizedInterval * 1000; // Convert to milliseconds
+  const shimmerDuration = props.duration;
+  const randomDelay = Math.random() * randomizedInterval * 200; // Random delay within first 20% of interval
+  
+  // Faster hover shimmer duration
+  const hoverShimmerDuration = Math.max(shimmerDuration * 0.7, 800); // 30% faster, minimum 800ms
+  
+  return {
+    '--shimmer-window-size': `${shimmerWindowSize.value}%`,
+    '--shimmer-duration': `${shimmerDuration}ms`,
+    '--shimmer-hover-duration': `${hoverShimmerDuration}ms`,
+    '--shimmer-cycle-duration': `${totalCycleDuration}ms`,
+    '--shimmer-delay': `${randomDelay}ms`
+  };
+})
 </script>
 
 <style scoped>
@@ -57,13 +91,15 @@ const shimmerWindowSize = computed(() => {
     var(--shimmer-highlight) 50%,
     var(--shimmer-base) 65%
   );
-  background-size: v-bind('shimmerWindowSize + "%"');
+  background-size: var(--shimmer-window-size);
   background-position-x: 100%;
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-  animation: shimmer v-bind('props.duration + "ms"') ease-in-out infinite;
-  animation-delay: v-bind('Math.random() * 200 + "ms"');
+  animation: 
+    shimmer var(--shimmer-duration) ease-in-out,
+    shimmer-cycle var(--shimmer-cycle-duration) infinite;
+  animation-delay: var(--shimmer-delay);
   
   /* Enhanced visibility shimmer colors for light mode */
   --shimmer-base: #1f2937;    /* gray-800 - dark base */
@@ -77,6 +113,36 @@ const shimmerWindowSize = computed(() => {
 }
 
 @keyframes shimmer {
+  0% {
+    background-position-x: 100%;
+  }
+  15% {
+    background-position-x: 85%;
+  }
+  85% {
+    background-position-x: 15%;
+  }
+  100% {
+    background-position-x: 0%;
+  }
+}
+
+@keyframes shimmer-cycle {
+  0%, 90% {
+    opacity: 1;
+  }
+  95%, 100% {
+    opacity: 1;
+  }
+}
+
+/* Hover-triggered shimmer - override existing animation */
+.hover-shimmer.is-hovered {
+  animation: shimmer-hover var(--shimmer-hover-duration) ease-in-out !important;
+  animation-delay: 0s !important;
+}
+
+@keyframes shimmer-hover {
   0% {
     background-position-x: 100%;
   }

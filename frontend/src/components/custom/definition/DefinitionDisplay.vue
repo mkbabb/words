@@ -48,10 +48,14 @@
         <CardHeader>
             <div class="flex items-center justify-between">
                 <CardTitle
-                    class="text-word-title themed-title transition-all
-                        duration-200"
+                    class="themed-title transition-all duration-200"
                 >
-                    {{ entry.word }}
+                    <ShimmerText 
+                        :text="entry.word" 
+                        text-class="text-word-title"
+                        :duration="2000"
+                        :interval="25"
+                    />
                 </CardTitle>
             </div>
 
@@ -97,7 +101,7 @@
                 <!-- Cluster header with gradient divider -->
                 <div v-if="groupedDefinitions.length > 1" class="pb-2">
                     <h4
-                        class="mb-2 text-sm font-semibold tracking-wider
+                        class="mb-2 text-base font-semibold tracking-wider
                             text-foreground uppercase"
                     >
                         {{ cluster.clusterDescription }}
@@ -122,7 +126,7 @@
                             {{ definition.word_type }}
                         </span>
                         <sup
-                            class="text-xs font-normal text-muted-foreground"
+                            class="text-sm font-normal text-muted-foreground"
                             >{{ index + 1 }}</sup
                         >
                     </div>
@@ -142,9 +146,9 @@
                             class="mb-2 space-y-1"
                         >
                             <!-- Examples header with regenerate button -->
-                            <div class="mb-1 flex items-center justify-between">
+                            <div class="mb-1 mt-3 flex items-center justify-between">
                                 <span
-                                    class="text-xs tracking-wider
+                                    class="text-sm tracking-wider
                                         text-muted-foreground uppercase"
                                     >Examples</span
                                 >
@@ -155,7 +159,7 @@
                                     @click="handleRegenerateExamples(index)"
                                     :class="[
                                         'group flex items-center gap-1 rounded-md px-2 py-1',
-                                        'text-xs transition-all duration-200',
+                                        'text-sm transition-all duration-200',
                                         'hover:bg-primary/10',
                                         regeneratingIndex === index
                                             ? 'text-primary'
@@ -183,7 +187,7 @@
                                     definition.examples.literature
                                 )"
                                 :key="exIndex"
-                                class="text-sm text-muted-foreground italic themed-example-text"
+                                class="text-base text-muted-foreground italic themed-example-text"
                                 v-html="
                                     `&quot;${formatExampleHTML(example.sentence, entry.word)}&quot;`
                                 "
@@ -235,7 +239,7 @@
                 >
                     <CardContent class="px-3 py-0.5">
                         <div class="font-medium">{{ synonym.word }}</div>
-                        <div class="text-xs opacity-75">
+                        <div class="text-sm opacity-75">
                             {{ Math.round(synonym.score * 100) }}% similar
                         </div>
                     </CardContent>
@@ -246,7 +250,7 @@
         <!-- Etymology -->
         <CardContent v-if="entry && entry.etymology" class="space-y-4">
             <h3 class="text-lg font-semibold">Etymology</h3>
-            <p class="text-sm text-muted-foreground">{{ entry.etymology }}</p>
+            <p class="text-base text-muted-foreground">{{ entry.etymology }}</p>
         </CardContent>
     </ThemedCard>
 </template>
@@ -259,6 +263,7 @@ import { cn, getHeatmapClass } from '@/utils';
 import { Button } from '@/components/ui';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ThemedCard } from '@/components/custom/card';
+import { ShimmerText } from '@/components/custom/animation';
 import {
     DropdownMenu,
     DropdownMenuTrigger,

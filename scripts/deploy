@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Unified deployment script for Floridify
-# Used by both local deployment and GitHub Actions
+# Simplified deployment script for Floridify
+# Used by GitHub Actions - pulls pre-built images from registry
 
 set -e
 
@@ -189,12 +189,41 @@ copy_files() {
         nginx/user_conf.d/floridify.conf \
         $EC2_USER@$EC2_HOST:~/floridify/nginx/user_conf.d/
     
-    # Copy auth configuration
-    scp $scp_opts -r \
-        auth \
-        $EC2_USER@$EC2_HOST:~/floridify/
-    
     print_status "✓ Files copied to EC2"
+}
+
+# Create auth configuration on EC2 from secrets
+create_auth_config() {
+    print_status "Creating auth configuration on EC2..."
+    
+    local ssh_cmd="ssh -o StrictHostKeyChecking=no"
+    if is_github_actions; then
+        ssh_cmd="$ssh_cmd -i ~/.ssh/deploy_key"
+    fi
+    
+    # Create auth/config.toml on EC2 from GitHub secrets
+    $ssh_cmd $EC2_USER@$EC2_HOST << EOF
+        mkdir -p ~/floridify/auth
+        cat > ~/floridify/auth/config.toml << 'CONFIG_EOF'
+[ai]
+api_key = "${OPENAI_API_KEY}"
+model = "gpt-4o-mini"
+max_tokens = 4096
+temperature = 0.3
+
+[mongodb]
+connection_string = "${MONGODB_CONNECTION_STRING}"
+database = "floridify"
+
+[server]
+host = "0.0.0.0"
+port = 8000
+debug = false
+CONFIG_EOF
+        echo "Auth configuration created successfully"
+EOF
+
+    print_status "✓ Auth configuration created"
 }
 
 # Deploy application on EC2
@@ -220,7 +249,7 @@ deploy_app() {
         
         # Pull latest images
         echo "Pulling latest Docker images..."
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml pull || echo "Pull failed, will build locally"
+        docker-compose -f docker-compose.yml -f docker-compose.prod.yml pull
         
         # Stop existing containers
         echo "Stopping existing containers..."
@@ -228,7 +257,7 @@ deploy_app() {
         
         # Start new deployment with SSL
         echo "Starting services with SSL..."
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml --profile ssl up -d --build
+        docker-compose -f docker-compose.yml -f docker-compose.prod.yml --profile ssl up -d
         
         # Wait for services to start
         sleep 30
@@ -280,65 +309,10 @@ cleanup() {
     # For local deployments, don't delete any config files
 }
 
-# Build and push images locally
-build_and_push_local() {
-    print_status "Building and pushing Docker images locally..."
-    
-    # Check if Docker is running
-    if ! docker info >/dev/null 2>&1; then
-        print_error "Docker is not running. Please start Docker Desktop."
-        exit 1
-    fi
-    
-    # Login to GitHub Container Registry
-    print_status "Logging into GitHub Container Registry..."
-    if [ -z "$GITHUB_TOKEN" ]; then
-        print_warning "GITHUB_TOKEN not set. Attempting to use gh auth token..."
-        GITHUB_TOKEN=$(gh auth token 2>/dev/null || echo "")
-        if [ -z "$GITHUB_TOKEN" ]; then
-            print_error "No GitHub token available. Run: gh auth login --with-token"
-            exit 1
-        fi
-    fi
-    
-    echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$REPO_OWNER" --password-stdin
-    
-    # Build and push backend
-    print_status "Building backend image..."
-    docker build -t "ghcr.io/$REPO_OWNER/floridify-backend:latest" \
-        --target production \
-        --platform linux/amd64 \
-        backend/
-    
-    print_status "Pushing backend image..."
-    docker push "ghcr.io/$REPO_OWNER/floridify-backend:latest"
-    
-    # Build and push frontend
-    print_status "Building frontend image..."
-    docker build -t "ghcr.io/$REPO_OWNER/floridify-frontend:latest" \
-        --target production \
-        --platform linux/amd64 \
-        --build-arg "VITE_API_URL=https://$DOMAIN/api" \
-        --build-arg "VITE_APP_TITLE=Floridify" \
-        frontend/
-    
-    print_status "Pushing frontend image..."
-    docker push "ghcr.io/$REPO_OWNER/floridify-frontend:latest"
-    
-    print_status "✓ Images built and pushed successfully"
-}
 
 # Main deployment function
 main() {
     print_status "🚀 Starting Floridify deployment to $EC2_HOST"
-    
-    # Check for local build flag
-    if [ "$1" = "--local" ] || [ "$LOCAL_BUILD" = "true" ]; then
-        print_status "🔨 Local build mode enabled"
-        build_and_push_local
-    fi
-    
-    # MongoDB configuration is now handled via auth/config.toml
     
     # Trap cleanup on exit
     trap cleanup EXIT
@@ -348,6 +322,7 @@ main() {
     prepare_ec2
     create_env_file
     copy_files
+    create_auth_config
     deploy_app
     verify_deployment
     
@@ -361,28 +336,20 @@ main() {
 if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "Floridify Deployment Script"
     echo ""
-    echo "This unified script handles deployment to EC2 with two image strategies:"
-    echo "  - Registry mode: Pull pre-built images from GitHub Container Registry (GitHub Actions)"
-    echo "  - Local mode: Build images locally and push to registry before deployment"
+    echo "Simplified script for GitHub Actions deployment to EC2."
+    echo "Pulls pre-built images from GitHub Container Registry."
     echo ""
     echo "Environment Variables:"
-    # MongoDB configuration is in auth/config.toml (copied to server)
-    echo "  EC2_HOST        - Optional: EC2 IP (default: 54.209.241.47)"
-    echo "  EC2_USER        - Optional: EC2 username (default: ubuntu)"
-    echo "  DOMAIN          - Optional: Domain name (default: words.babb.dev)"
-    echo "  CERTBOT_EMAIL   - Optional: Email for Let's Encrypt"
-    echo "  GITHUB_TOKEN    - Optional: For container registry access (auto-detected from gh cli)"
-    echo "  LOCAL_BUILD     - Optional: Set to 'true' to force local build"
+    echo "  EC2_HOST              - Optional: EC2 IP (default: 54.209.241.47)"
+    echo "  EC2_USER              - Optional: EC2 username (default: ubuntu)"
+    echo "  DOMAIN                - Optional: Domain name (default: words.babb.dev)"
+    echo "  CERTBOT_EMAIL         - Optional: Email for Let's Encrypt"
+    echo "  GITHUB_TOKEN          - Required: For container registry access"
+    echo "  OPENAI_API_KEY        - Required: OpenAI API key for backend"
+    echo "  MONGODB_CONNECTION_STRING - Required: MongoDB connection string"
     echo ""
     echo "Usage:"
-    echo "  Registry deployment:  ./scripts/deploy"
-    echo "  Local build + deploy: ./scripts/deploy --local"
-    echo "  GitHub Actions:       Automatically uses registry mode"
-    echo ""
-    echo "Local build requirements:"
-    echo "  - Docker Desktop running"
-    echo "  - GitHub CLI authenticated (gh auth login)"
-    echo "  - Multi-platform build capability for linux/amd64"
+    echo "  GitHub Actions:       ./scripts/deploy"
     exit 0
 fi
 

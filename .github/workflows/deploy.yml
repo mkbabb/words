@@ -113,11 +113,13 @@ jobs:
           cache-to: type=gha,mode=max,scope=frontend
           platforms: linux/amd64
       
-      - name: Deploy to EC2 using unified script
+      - name: Deploy to EC2 using simplified script
         env:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
           CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MONGODB_CONNECTION_STRING: ${{ secrets.MONGODB_CONNECTION_STRING }}
           GITHUB_ACTIONS: true
         run: |
           # Make deploy script executable

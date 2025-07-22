@@ -138,7 +138,7 @@
 
   /* Themed elements within cards */
   .themed-word-type {
-    @apply font-medium text-xs uppercase tracking-wider px-2 py-1 rounded-md;
+    @apply font-medium text-sm uppercase tracking-wider px-2 py-1 rounded-md;
   }
   
   [data-theme="default"] .themed-word-type {
@@ -151,7 +151,7 @@
   }
 
   .themed-synonym {
-    @apply text-sm font-medium transition-all duration-200 px-2 py-1 rounded-md border cursor-pointer;
+    @apply text-base font-medium transition-all duration-200 px-2 py-1 rounded-md border cursor-pointer;
   }
 
   [data-theme="default"] .themed-synonym {
@@ -256,6 +256,23 @@
   /* Themed title */
   [data-theme]:not([data-theme="default"]) .themed-title {
     color: var(--theme-text);
+  }
+
+  /* Themed example text for better legibility */
+  [data-theme]:not([data-theme="default"]) .themed-example-text {
+    color: var(--theme-text-muted) !important;
+    font-weight: 500;
+  }
+
+  /* Enhanced contrast for silver theme examples */
+  [data-theme="silver"] .themed-example-text {
+    color: var(--theme-text) !important;
+    font-weight: 600;
+  }
+
+  .dark [data-theme="silver"] .themed-example-text {
+    color: var(--theme-text) !important;
+    font-weight: 500;
   }
 
   /* Holographic shimmer overlay - like Pokemon cards */
