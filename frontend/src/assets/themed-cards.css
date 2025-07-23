@@ -38,41 +38,41 @@
         --theme-sparkle: theme('colors.orange.300/30');
     }
 
-    /* Dark mode theme overrides */
+    /* Dark mode theme overrides - proper Tailwind 4 syntax */
     .dark [data-theme='gold'] {
-        --theme-gradient-start: theme('colors.yellow.200/15');
-        --theme-gradient-mid: theme('colors.amber.400/15');
-        --theme-gradient-end: theme('colors.amber.600/15');
-        --theme-border: theme('colors.amber.400/30');
-        --theme-text: theme('colors.amber.300');
-        --theme-text-muted: theme('colors.amber.400');
-        --theme-bg-subtle: theme('colors.amber.400/10');
-        --theme-bg-hover: theme('colors.amber.400/20');
-        --theme-sparkle: theme('colors.amber.300/20');
+        --theme-gradient-start: rgb(251 191 36 / 0.4);
+        --theme-gradient-mid: rgb(245 158 11 / 0.5);
+        --theme-gradient-end: rgb(217 119 6 / 0.6);
+        --theme-border: rgb(245 158 11 / 0.4);
+        --theme-text: rgb(254 240 138);
+        --theme-text-muted: rgb(252 211 77);
+        --theme-bg-subtle: rgb(245 158 11 / 0.2);
+        --theme-bg-hover: rgb(245 158 11 / 0.3);
+        --theme-sparkle: rgb(252 211 77 / 0.3);
     }
 
     .dark [data-theme='silver'] {
-        --theme-gradient-start: theme('colors.gray.200/10');
-        --theme-gradient-mid: theme('colors.gray.400/10');
-        --theme-gradient-end: theme('colors.gray.600/10');
-        --theme-border: theme('colors.gray.400/30');
-        --theme-text: theme('colors.gray.300');
-        --theme-text-muted: theme('colors.gray.400');
-        --theme-bg-subtle: theme('colors.gray.400/10');
-        --theme-bg-hover: theme('colors.gray.400/20');
-        --theme-sparkle: theme('colors.gray.300/20');
+        --theme-gradient-start: rgb(209 213 219 / 0.35);
+        --theme-gradient-mid: rgb(156 163 175 / 0.45);
+        --theme-gradient-end: rgb(107 114 128 / 0.55);
+        --theme-border: rgb(156 163 175 / 0.4);
+        --theme-text: rgb(229 231 235);
+        --theme-text-muted: rgb(209 213 219);
+        --theme-bg-subtle: rgb(156 163 175 / 0.2);
+        --theme-bg-hover: rgb(156 163 175 / 0.3);
+        --theme-sparkle: rgb(209 213 219 / 0.3);
     }
 
     .dark [data-theme='bronze'] {
-        --theme-gradient-start: theme('colors.orange.200/15');
-        --theme-gradient-mid: theme('colors.orange.400/15');
-        --theme-gradient-end: theme('colors.orange.600/15');
-        --theme-border: theme('colors.orange.400/30');
-        --theme-text: theme('colors.orange.300');
-        --theme-text-muted: theme('colors.orange.400');
-        --theme-bg-subtle: theme('colors.orange.400/10');
-        --theme-bg-hover: theme('colors.orange.400/20');
-        --theme-sparkle: theme('colors.orange.300/20');
+        --theme-gradient-start: rgb(251 146 60 / 0.4);
+        --theme-gradient-mid: rgb(249 115 22 / 0.5);
+        --theme-gradient-end: rgb(234 88 12 / 0.6);
+        --theme-border: rgb(249 115 22 / 0.4);
+        --theme-text: rgb(254 215 170);
+        --theme-text-muted: rgb(253 186 116);
+        --theme-bg-subtle: rgb(249 115 22 / 0.2);
+        --theme-bg-hover: rgb(249 115 22 / 0.3);
+        --theme-sparkle: rgb(253 186 116 / 0.3);
     }
 
     /* Base themed card styles */
@@ -82,15 +82,55 @@
     }
 
     .themed-card[data-theme]:not([data-theme='default']) {
-        background: linear-gradient(
-            135deg,
-            var(--theme-gradient-start) 0%,
-            var(--theme-gradient-start) 20%,
-            var(--theme-gradient-mid) 40%,
-            var(--theme-gradient-end) 60%,
-            var(--theme-gradient-mid) 80%,
-            var(--theme-gradient-start) 100%
-        );
+        position: relative;
+        background: var(--theme-gradient-start);
+        /* Ensure background is visible in dark mode */
+        background-color: var(--theme-gradient-start);
+    }
+
+    /* Tiled gradient overlay system for natural metallic effect */
+    .themed-card[data-theme]:not([data-theme='default'])::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        z-index: 0;
+        background: 
+            /* Primary metallic bands - repeating at fixed intervals */
+            repeating-linear-gradient(
+                135deg,
+                transparent 0px,
+                var(--theme-gradient-mid) 50px,
+                var(--theme-gradient-end) 100px,
+                var(--theme-gradient-mid) 150px,
+                transparent 200px
+            ),
+            /* Secondary overlay for depth */
+            repeating-linear-gradient(
+                -45deg,
+                transparent 0px,
+                var(--theme-gradient-start) 80px,
+                var(--theme-gradient-mid) 160px,
+                transparent 240px
+            ),
+            /* Base metallic gradient */
+            linear-gradient(
+                135deg,
+                var(--theme-gradient-start) 0%,
+                var(--theme-gradient-mid) 50%,
+                var(--theme-gradient-end) 100%
+            );
+        opacity: 0.7;
+        border-radius: inherit;
+    }
+
+    /* Ensure card content appears above the gradient overlay - exclude absolutely positioned elements */
+    .themed-card[data-theme]:not([data-theme='default']) > *:not([class*="absolute"]) {
+        position: relative;
+        z-index: 1;
     }
 
     /* Apply border colors directly to themed cards with shadow classes */
@@ -446,6 +486,7 @@
         }
     }
 
+
     /* Reduced motion support */
     @media (prefers-reduced-motion: reduce) {
         .themed-sparkle::before,
@@ -544,16 +585,52 @@
 }
 
 [data-theme]:not([data-theme='default']) .themed-hovercard {
-    background: linear-gradient(
-        135deg,
-        var(--theme-gradient-start) 0%,
-        var(--theme-gradient-start) 20%,
-        var(--theme-gradient-mid) 40%,
-        var(--theme-gradient-end) 60%,
-        var(--theme-gradient-mid) 80%,
-        var(--theme-gradient-start) 100%
-    );
+    position: relative;
+    background: var(--theme-gradient-start);
     color: var(--theme-text);
+}
+
+/* Apply same tiled gradient system to hover cards */
+[data-theme]:not([data-theme='default']) .themed-hovercard::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: 
+        /* Smaller scale for hover cards */
+        repeating-linear-gradient(
+            135deg,
+            transparent 0px,
+            var(--theme-gradient-mid) 25px,
+            var(--theme-gradient-end) 50px,
+            var(--theme-gradient-mid) 75px,
+            transparent 100px
+        ),
+        repeating-linear-gradient(
+            -45deg,
+            transparent 0px,
+            var(--theme-gradient-start) 40px,
+            var(--theme-gradient-mid) 80px,
+            transparent 120px
+        ),
+        linear-gradient(
+            135deg,
+            var(--theme-gradient-start) 0%,
+            var(--theme-gradient-mid) 50%,
+            var(--theme-gradient-end) 100%
+        );
+    opacity: 0.6;
+    border-radius: inherit;
+}
+
+/* Ensure hover card content appears above the gradient overlay */
+[data-theme]:not([data-theme='default']) .themed-hovercard > *:not(.absolute) {
+    position: relative;
+    z-index: 1;
 }
 
 /* Themed definition text */

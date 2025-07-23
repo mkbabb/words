@@ -10,7 +10,7 @@ import toml
 from rich.console import Console
 from rich.table import Table
 
-from ...paths import get_config_path
+from ...utils.paths import get_config_path
 from ..utils.formatting import format_error, format_success, format_warning
 
 console = Console()

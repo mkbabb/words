@@ -3,7 +3,7 @@
         ref="searchContainer"
         :class="[
             'search-container relative z-50 origin-top',
-            'w-full max-w-60 sm:max-w-xs md:max-w-md lg:max-w-3xl',
+            'w-full',
             'mx-auto',
             props.className,
         ]"
@@ -17,7 +17,7 @@
             <div
                 ref="searchBarElement"
                 :class="[
-                    'search-bar flex h-16 items-center gap-2 p-2',
+                    'search-bar flex h-16 items-center gap-2 p-1',
                     'border-2 border-border bg-background/20 backdrop-blur-3xl',
                     'cartoon-shadow-sm rounded-2xl transition-all duration-200 ease-out',
                     {
@@ -36,7 +36,7 @@
                         transform: `scale(${0.9 + iconOpacity * 0.1})`,
                         pointerEvents: iconOpacity > 0.1 ? 'auto' : 'none',
                         width: iconOpacity > 0.1 ? '48px' : '0px',
-                        marginRight: iconOpacity > 0.1 ? '8px' : '0px',
+                        marginRight: iconOpacity > 0.1 ? '2px' : '0px',
                     }"
                 >
                     <FancyF
@@ -53,7 +53,7 @@
                     <div
                         v-if="autocompleteText"
                         :class="[
-                            'pointer-events-none absolute top-0 left-0 flex h-12 items-center text-base transition-all duration-300 ease-out',
+                            'pointer-events-none absolute top-0 left-0 flex h-12 items-center text-lg transition-all duration-300 ease-out',
                             'text-muted-foreground/50',
                         ]"
                         :style="{
@@ -72,7 +72,7 @@
                         v-model="query"
                         :placeholder="placeholder"
                         :class="[
-                            'relative z-10 h-12 w-full overflow-hidden rounded-xl bg-transparent py-2 text-base text-ellipsis whitespace-nowrap transition-all duration-300 ease-out outline-none placeholder:text-muted-foreground',
+                            'relative z-10 h-12 w-full overflow-hidden rounded-xl bg-transparent py-2 text-lg text-ellipsis whitespace-nowrap transition-all duration-300 ease-out outline-none placeholder:text-muted-foreground',
                             'focus:ring-1 focus:ring-gray-300 dark:focus:ring-gray-600',
                         ]"
                         :style="{
@@ -241,16 +241,6 @@
                             class="border-t border-border/50 px-4 py-3"
                         >
                             <div class="flex flex-col items-center gap-3">
-                                <div class="flex items-center gap-2">
-                                    <Sparkles
-                                        class="flex-shrink-0
-                                            text-muted-foreground"
-                                        :size="16"
-                                    />
-                                    <span class="text-sm text-muted-foreground"
-                                        >AI Suggestions</span
-                                    >
-                                </div>
                                 <div
                                     class="flex flex-wrap items-center
                                         justify-center gap-2"
@@ -272,8 +262,11 @@
                     </div>
                 </Transition>
 
-                <!-- Search Results Container with coordinated positioning -->
-                <div :style="resultsContainerStyle">
+                <!-- Search Results Container - positioned below controls when both visible -->
+                <div
+                    :style="resultsContainerStyle"
+                    :class="{ 'mt-2': showControls }"
+                >
                     <Transition
                         enter-active-class="transition-all duration-300 ease-apple-bounce"
                         leave-active-class="transition-all duration-250 ease-out"
@@ -417,7 +410,7 @@ import type { SearchResult } from '@/types';
 import { Button } from '@/components/ui';
 import { FancyF, HamburgerIcon } from '@/components/custom/icons';
 import { BouncyToggle } from '@/components/custom/animation';
-import { Sparkles, RefreshCw } from 'lucide-vue-next';
+import { RefreshCw } from 'lucide-vue-next';
 import {
     WiktionaryIcon,
     OxfordIcon,
@@ -502,22 +495,21 @@ const placeholder = computed(() =>
 );
 const rainbowGradient = computed(() => generateRainbowGradient(8));
 
-// Enhanced computed properties for coordinated dropdown management
+// Independent: search results only depend on input state
 const shouldShowResults = computed(() => {
     return (
         isFocused.value &&
         query.value.length > 0 &&
         (searchResults.value.length > 0 ||
             isSearching.value ||
-            query.value.length >= 2) &&
-        !showControls.value
-    ); // Don't show results when controls dropdown is open
+            query.value.length >= 2)
+    );
 });
 
-// Dynamic positioning: results move down when controls are shown
+// Independent positioning: results always at consistent location
 const resultsContainerStyle = computed(() => {
     return {
-        paddingTop: showControls.value ? '8px' : '0px',
+        paddingTop: '0px',
         transition: 'all 300ms cubic-bezier(0.25, 0.1, 0.25, 1)',
     };
 });
@@ -590,7 +582,7 @@ const iconOpacity = computed(() => {
         return 1;
     }
 
-    // Don't fade when controls or results are showing
+    // Don't fade when either dropdown is showing
     if (showControls.value || showResults.value) {
         return 1;
     }
@@ -750,12 +742,10 @@ const handleBlur = () => {
 
         isFocused.value = false;
 
-        // Only hide results if not interacting with search area
-        if (!showControls.value) {
-            showResults.value = false;
-            searchResults.value = [];
-            isSearching.value = false;
-        }
+        // Always hide results on blur (independent of controls)
+        showResults.value = false;
+        searchResults.value = [];
+        isSearching.value = false;
 
         // Transition back to normal or hovering state
         transitionToState(isContainerHovered.value ? 'hovering' : 'normal');
@@ -768,23 +758,21 @@ const handleInput = (event: Event) => {
     performSearch();
 };
 
-// Unified close handler
+// Independent close handlers
+const closeControls = () => {
+    store.showControls = false;
+};
+
+const closeResults = () => {
+    showResults.value = false;
+    searchResults.value = [];
+    isSearching.value = false;
+};
+
 const handleClose = () => {
-    if (showControls.value && showResults.value) {
-        // Both shown: hide both
-        store.showControls = false;
-        showResults.value = false;
-        searchResults.value = [];
-        isSearching.value = false;
-    } else if (showControls.value) {
-        // Only controls shown: hide controls
-        store.showControls = false;
-    } else if (showResults.value) {
-        // Only results shown: hide results
-        showResults.value = false;
-        searchResults.value = [];
-        isSearching.value = false;
-    }
+    // Close both dropdowns independently
+    closeControls();
+    closeResults();
 };
 
 const handleEscape = () => {
@@ -926,14 +914,6 @@ const handleHamburgerClick = () => {
     store.toggleControls();
     handleSearchAreaInteraction();
 
-    // Hide search results when opening controls
-    if (store.showControls) {
-        showResults.value = false;
-        searchResults.value = [];
-        isSearching.value = false;
-    }
-
-    // Restore focus to search input after toggling controls
     nextTick(() => {
         searchInput.value?.focus();
     });
@@ -1092,8 +1072,26 @@ const handleClickOutside = (event: Event) => {
     if (isInteractingWithSearchArea.value) return;
 
     const target = event.target as Element;
-    if (!target.closest('.search-container')) {
+    const searchContainer = target.closest('.search-container');
+
+    if (!searchContainer) {
+        // Click completely outside - close both
         handleClose();
+        return;
+    }
+
+    // Check specific dropdown areas for targeted closing
+    const controlsArea = target.closest('[ref="controlsDropdown"]');
+    const resultsArea = target.closest('[ref="searchResultsDropdown"]');
+
+    if (!controlsArea && showControls.value) {
+        // Clicked outside controls but inside search container
+        closeControls();
+    }
+
+    if (!resultsArea && showResults.value) {
+        // Clicked outside results but inside search container
+        closeResults();
     }
 };
 
@@ -1128,9 +1126,6 @@ watch(
 
 // Mounted
 onMounted(async () => {
-    // Reset controls state on mount
-    store.showControls = false;
-
     // Initialize document height for timeline calculations
     initializeDocumentHeight();
 
@@ -1145,6 +1140,12 @@ onMounted(async () => {
     }
 
     document.addEventListener('click', handleClickOutside);
+
+    // Auto-focus search input on page load
+    await nextTick();
+    if (searchInput.value) {
+        searchInput.value.focus();
+    }
 });
 
 // Cleanup

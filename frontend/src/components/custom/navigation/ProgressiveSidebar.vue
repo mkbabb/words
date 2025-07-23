@@ -14,10 +14,10 @@
         <button
           @click="scrollToCluster(cluster.clusterId)"
           :class="[
-            'group flex w-full items-center rounded-md px-2 py-1 text-left text-sm font-medium transition-all duration-200',
+            'group flex w-full items-center rounded-md px-2 py-1 text-left text-sm transition-all duration-200',
             activeCluster === cluster.clusterId
-              ? 'text-foreground'
-              : 'text-foreground/80 hover:bg-muted/50 hover:text-foreground'
+              ? 'text-foreground font-bold'
+              : 'text-foreground/80 font-normal hover:bg-muted/50 hover:text-foreground'
           ]"
         >
           <div class="flex-1 min-w-0">
@@ -52,7 +52,7 @@
                 :class="[
                   'flex w-full items-center justify-between cursor-pointer rounded-md px-2 py-0.5 transition-all duration-200',
                   activeWordType === `${cluster.clusterId}-${wordType.type}`
-                    ? 'bg-secondary text-secondary-foreground shadow-sm opacity-100'
+                    ? 'bg-gradient-to-r from-primary/15 to-primary/8 border border-primary/25 text-foreground shadow-sm opacity-100'
                     : 'opacity-60 hover:bg-muted/30 hover:opacity-100'
                 ]"
               >
@@ -169,18 +169,21 @@ const wordTypeOrder = {
   article: 10,
 }
 
+// Type definition for cluster structure
+type SidebarCluster = {
+  clusterId: string
+  clusterDescription: string
+  wordTypes: Array<{ type: string; count: number }>
+  maxRelevancy: number
+}
+
 // Computed sidebar data structure - MUST match DefinitionDisplay ordering exactly
-const sidebarSections = computed(() => {
+const sidebarSections = computed((): SidebarCluster[] => {
   const entry = store.currentEntry
   if (!entry?.definitions) return []
 
   // Group by meaning cluster (same logic as DefinitionDisplay)
-  const clusters = new Map<string, {
-    clusterId: string
-    clusterDescription: string
-    wordTypes: Array<{ type: string; count: number }>
-    maxRelevancy: number
-  }>()
+  const clusters = new Map<string, SidebarCluster>()
 
   entry.definitions.forEach((definition) => {
     const clusterId = definition.meaning_cluster || 'default'
@@ -296,6 +299,37 @@ const updateActiveWordType = (wordTypeKey: string) => {
   pendingActiveWordType.value = wordTypeKey
 }
 
+// Helper function to find best cluster based on element positions
+const findBestClusterByPosition = () => {
+  if (sidebarSections.value.length === 0) return
+  
+  const viewportCenter = window.innerHeight / 2 + window.pageYOffset
+  let closestCluster: SidebarCluster | null = null
+  let closestDistance = Infinity
+  
+  sidebarSections.value.forEach((cluster) => {
+    const element = document.querySelector(`[data-cluster-id="${cluster.clusterId}"]`)
+    if (element) {
+      const rect = element.getBoundingClientRect()
+      const elementCenter = rect.top + rect.height / 2 + window.pageYOffset
+      const distance = Math.abs(elementCenter - viewportCenter)
+      
+      if (distance < closestDistance) {
+        closestDistance = distance
+        closestCluster = cluster
+      }
+    }
+  })
+  
+  if (closestCluster) {
+    const cluster = closestCluster as SidebarCluster
+    updateActiveCluster(cluster.clusterId)
+    // Also set first word type of the cluster
+    if (cluster.wordTypes.length > 0) {
+      updateActiveWordType(`${cluster.clusterId}-${cluster.wordTypes[0].type}`)
+    }
+  }
+}
 
 // Initialize active states based on current scroll position
 const initializeActiveStates = () => {
@@ -353,7 +387,7 @@ const initializeActiveStates = () => {
 
   // Fallback: if no visible clusters, use robust position-based detection
   if (!bestCluster) {
-    setFallbackCluster()
+    findBestClusterByPosition()
   }
   
   // Ensure word type is set for active cluster if not already set
@@ -419,36 +453,6 @@ const setupObservers = async () => {
     }
   }
   
-  // Helper function to find best cluster based on element positions
-  const findBestClusterByPosition = () => {
-    if (sidebarSections.value.length === 0) return
-    
-    const viewportCenter = window.innerHeight / 2 + window.pageYOffset
-    let closestCluster: typeof sidebarSections.value[0] | null = null
-    let closestDistance = Infinity
-    
-    sidebarSections.value.forEach((cluster) => {
-      const element = document.querySelector(`[data-cluster-id="${cluster.clusterId}"]`)
-      if (element) {
-        const rect = element.getBoundingClientRect()
-        const elementCenter = rect.top + rect.height / 2 + window.pageYOffset
-        const distance = Math.abs(elementCenter - viewportCenter)
-        
-        if (distance < closestDistance) {
-          closestDistance = distance
-          closestCluster = cluster
-        }
-      }
-    })
-    
-    if (closestCluster) {
-      updateActiveCluster(closestCluster.clusterId)
-      // Also set first word type of the cluster
-      if (closestCluster.wordTypes.length > 0) {
-        updateActiveWordType(`${closestCluster.clusterId}-${closestCluster.wordTypes[0].type}`)
-      }
-    }
-  }
 
   // Cluster observers with hysteresis
   sidebarSections.value.forEach((cluster, clusterIndex) => {

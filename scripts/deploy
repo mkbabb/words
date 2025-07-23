@@ -5,15 +5,20 @@
 
 set -e
 
-# Load configuration from .env.production if available
+# Load configuration from .env.production or .env if available
 if [ -f ".env.production" ]; then
     # Source configuration from .env.production
     EC2_HOST_DEFAULT=$(grep '^EC2_HOST=' .env.production | cut -d'=' -f2-)
     EC2_USER_DEFAULT=$(grep '^EC2_USER=' .env.production | cut -d'=' -f2-)
     DOMAIN_DEFAULT=$(grep '^DOMAIN=' .env.production | cut -d'=' -f2-)
+elif [ -f ".env" ]; then
+    # Source configuration from .env
+    EC2_HOST_DEFAULT=$(grep '^EC2_HOST=' .env | cut -d'=' -f2-)
+    EC2_USER_DEFAULT=$(grep '^EC2_USER=' .env | cut -d'=' -f2-)
+    DOMAIN_DEFAULT=$(grep '^DOMAIN=' .env | cut -d'=' -f2-)
 else
     # Fallback defaults
-    EC2_HOST_DEFAULT="54.209.241.47"
+    EC2_HOST_DEFAULT="44.216.140.209"
     EC2_USER_DEFAULT="ubuntu"
     DOMAIN_DEFAULT="words.babb.dev"
 fi

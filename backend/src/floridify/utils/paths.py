@@ -24,17 +24,12 @@ def find_project_root() -> Path:
         # Look for the root that has both backend and auth directories
         if (current / "backend").exists() and (current / "auth").exists():
             return current
-        # Also check for pyproject.toml in a parent that has auth/
-        if (current / "pyproject.toml").exists() and (current / "auth").exists():
-            return current
         current = current.parent
     
     # Fallback to current working directory search  
     current = Path.cwd()
     while current != current.parent:
         if (current / "backend").exists() and (current / "auth").exists():
-            return current
-        if (current / "pyproject.toml").exists() and (current / "auth").exists():
             return current
         current = current.parent
     

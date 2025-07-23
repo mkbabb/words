@@ -1,4 +1,8 @@
 import { gsap } from 'gsap';
+import { CSSPlugin } from 'gsap/CSSPlugin';
+
+// Register GSAP plugins to prevent property warnings
+gsap.registerPlugin(CSSPlugin);
 
 // Check for reduced motion preference
 const prefersReducedMotion = () => {

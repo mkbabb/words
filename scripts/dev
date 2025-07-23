@@ -84,7 +84,7 @@ check_env_file() {
 manage_ssh_tunnel() {
     local action="$1"
     local tunnel_port="27018"
-    local ec2_host="54.209.241.47"
+    local ec2_host="44.216.140.209"
     local docdb_host="docdb-2025-07-21-21-16-19.cluster-cuvowu48w9vs.us-east-1.docdb.amazonaws.com"
     
     case "$action" in

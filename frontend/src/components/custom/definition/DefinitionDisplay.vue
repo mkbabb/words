@@ -20,13 +20,10 @@
 
         <!-- Main Card Content -->
         <ThemedCard :variant="selectedCardVariant" class="relative flex-1">
-            <!-- Card Theme Selector Dropdown - INSIDE the card -->
+            <!-- Card Theme Selector Dropdown - absolute positioned -->
             <div
                 v-if="isMounted"
-                :class="[
-                    'absolute top-2 z-50 transition-all duration-300 ease-out',
-                    selectedCardVariant === 'default' ? 'right-2' : 'right-12',
-                ]"
+                class="absolute top-2 right-12 z-40"
             >
                 <!-- Custom dropdown with controlled animations -->
                 <div class="relative">
@@ -35,7 +32,7 @@
                         class="group rounded-lg border-2 border-border
                             bg-background/80 p-1.5 shadow-lg backdrop-blur-sm
                             transition-all duration-200 hover:scale-110
-                            hover:bg-background focus:ring-0 focus:outline-none"
+                            hover:bg-background focus:ring-0 focus:outline-none mt-1"
                     >
                         <ChevronLeft
                             :size="14"
@@ -56,7 +53,7 @@
                     >
                         <div
                             v-if="showThemeDropdown"
-                            class="absolute top-full right-0 z-50 mt-2
+                            class="absolute top-full right-0 z-50 mt-4
                                 min-w-[140px] origin-top-right rounded-md border
                                 bg-popover text-popover-foreground shadow-md"
                             @click.stop
@@ -141,173 +138,185 @@
             </CardHeader>
 
             <!-- Themed Gradient Divider -->
+            <div class="themed-hr -mt-2 -mb-2" />
 
-            <div class="themed-hr" />
-
-            <!-- Dictionary Mode Definitions -->
-            <CardContent v-if="mode === 'dictionary'" class="grid gap-4">
-                <div
-                    v-for="cluster in groupedDefinitions"
-                    :key="cluster.clusterId"
-                    :data-cluster-id="cluster.clusterId"
-                    class="space-y-4"
-                >
-                    <!-- Cluster header with gradient divider -->
-                    <div v-if="groupedDefinitions.length > 1" class="mt-6 pb-2">
-                        <h4
-                            class="themed-cluster-title text-base font-bold
-                                tracking-wider uppercase"
+            <!-- Mode Content with Animation -->
+            <Transition
+                mode="out-in"
+                enter-active-class="transition-all duration-300 ease-apple-bounce"
+                leave-active-class="transition-all duration-200 ease-out"
+                enter-from-class="opacity-0 scale-95 translate-x-8 rotate-1"
+                enter-to-class="opacity-100 scale-100 translate-x-0 rotate-0"
+                leave-from-class="opacity-100 scale-100 translate-x-0 rotate-0"
+                leave-to-class="opacity-0 scale-95 -translate-x-8 -rotate-1"
+            >
+                <div :key="mode">
+                    <!-- Dictionary Mode Definitions -->
+                    <CardContent v-if="mode === 'dictionary'" class="grid gap-4 px-3 sm:px-6">
+                        <div
+                            v-for="cluster in groupedDefinitions"
+                            :key="cluster.clusterId"
+                            :data-cluster-id="cluster.clusterId"
+                            class="space-y-4"
                         >
-                            {{ cluster.clusterDescription }}
-                        </h4>
-                        <!-- Themed Gradient HR -->
-                        <!-- <div class="themed-hr h-px" /> -->
-                    </div>
-
-                    <div
-                        v-for="(definition, index) in cluster.definitions"
-                        :key="`${cluster.clusterId}-${index}`"
-                        :data-word-type="`${cluster.clusterId}-${definition.word_type}`"
-                        class="space-y-3"
-                    >
-                        <!-- Separator for all but first -->
-                        <hr v-if="index > 0" class="my-2 border-border" />
-
-                        <div class="flex items-center gap-2">
-                            <span class="themed-word-type">
-                                {{ definition.word_type }}
-                            </span>
-                            <sup
-                                class="text-sm font-normal
-                                    text-muted-foreground"
-                                >{{ index + 1 }}</sup
-                            >
-                        </div>
-
-                        <div class="border-l-2 border-accent pl-4">
-                            <p class="text-definition mb-2">
-                                {{ definition.definition }}
-                            </p>
-
-                            <!-- Examples -->
-                            <div
-                                v-if="
-                                    definition.examples &&
-                                    (definition.examples.generated.length > 0 ||
-                                        definition.examples.literature.length >
-                                            0)
-                                "
-                                class="mb-2 space-y-1"
-                            >
-                                <!-- Examples header with regenerate button -->
-                                <div
-                                    class="mt-3 mb-1 flex items-center
-                                        justify-between"
+                            <!-- Cluster header with gradient divider -->
+                            <div v-if="groupedDefinitions.length > 1" class="mt-6 pb-2">
+                                <h4
+                                    class="themed-cluster-title text-base font-bold
+                                        tracking-wider uppercase"
                                 >
-                                    <span
-                                        class="text-sm tracking-wider
-                                            text-muted-foreground uppercase"
-                                        >Examples</span
+                                    {{ cluster.clusterDescription }}
+                                </h4>
+                                <!-- Themed Gradient HR -->
+                                <!-- <div class="themed-hr h-px" /> -->
+                            </div>
+
+                            <div
+                                v-for="(definition, index) in cluster.definitions"
+                                :key="`${cluster.clusterId}-${index}`"
+                                :data-word-type="`${cluster.clusterId}-${definition.word_type}`"
+                                class="space-y-3"
+                            >
+                                <!-- Separator for all but first -->
+                                <hr v-if="index > 0" class="my-2 border-border" />
+
+                                <div class="flex items-center gap-2">
+                                    <span class="themed-word-type">
+                                        {{ definition.word_type }}
+                                    </span>
+                                    <sup
+                                        class="text-sm font-normal
+                                            text-muted-foreground"
+                                        >{{ index + 1 }}</sup
                                     >
-                                    <button
-                                        v-if="
-                                            definition.examples.generated
-                                                .length > 0
-                                        "
-                                        @click="handleRegenerateExamples(index)"
-                                        :class="[
-                                            'group flex items-center gap-1 rounded-md px-2 py-1',
-                                            'text-sm transition-all duration-200',
-                                            'hover:bg-primary/10',
-                                            regeneratingIndex === index
-                                                ? 'text-primary'
-                                                : 'text-muted-foreground hover:text-primary',
-                                        ]"
-                                        :disabled="regeneratingIndex === index"
-                                        title="Regenerate examples"
-                                    >
-                                        <RefreshCw
-                                            :size="12"
-                                            :class="[
-                                                'transition-transform duration-300',
-                                                'group-hover:rotate-180',
-                                                regeneratingIndex === index &&
-                                                    'animate-spin',
-                                            ]"
-                                        />
-                                    </button>
                                 </div>
 
-                                <p
-                                    v-for="(
-                                        example, exIndex
-                                    ) in definition.examples.generated.concat(
-                                        definition.examples.literature
-                                    )"
-                                    :key="exIndex"
-                                    class="themed-example-text text-base
-                                        text-muted-foreground italic"
-                                    v-html="
-                                        `&quot;${formatExampleHTML(example.sentence, entry.word)}&quot;`
-                                    "
-                                ></p>
-                            </div>
+                                <div class="border-l-2 border-accent pl-4">
+                                    <p class="text-definition mb-2">
+                                        {{ definition.definition }}
+                                    </p>
 
-                            <!-- Synonyms -->
-                            <div
-                                v-if="
-                                    definition.synonyms &&
-                                    definition.synonyms.length > 0
-                                "
-                                class="flex flex-wrap gap-1 pt-2"
-                            >
-                                <!-- <span class="self-center pr-2 text-xs">Synonyms:</span> -->
-                                <span
-                                    v-for="synonym in definition.synonyms"
-                                    :key="synonym"
-                                    class="themed-synonym cursor-pointer"
-                                    @click="store.searchWord(synonym)"
-                                >
-                                    {{ synonym }}
-                                </span>
+                                    <!-- Examples -->
+                                    <div
+                                        v-if="
+                                            definition.examples &&
+                                            (definition.examples.generated.length > 0 ||
+                                                definition.examples.literature.length >
+                                                    0)
+                                        "
+                                        class="mb-2 space-y-1"
+                                    >
+                                        <!-- Examples header with regenerate button -->
+                                        <div
+                                            class="mt-3 mb-1 flex items-center
+                                                justify-between"
+                                        >
+                                            <span
+                                                class="text-sm tracking-wider
+                                                    text-muted-foreground uppercase"
+                                                >Examples</span
+                                            >
+                                            <button
+                                                v-if="
+                                                    definition.examples.generated
+                                                        .length > 0
+                                                "
+                                                @click="handleRegenerateExamples(index)"
+                                                :class="[
+                                                    'group flex items-center gap-1 rounded-md px-2 py-1',
+                                                    'text-sm transition-all duration-200',
+                                                    'hover:bg-primary/10',
+                                                    regeneratingIndex === index
+                                                        ? 'text-primary'
+                                                        : 'text-muted-foreground hover:text-primary',
+                                                ]"
+                                                :disabled="regeneratingIndex === index"
+                                                title="Regenerate examples"
+                                            >
+                                                <RefreshCw
+                                                    :size="12"
+                                                    :class="[
+                                                        'transition-transform duration-300',
+                                                        'group-hover:rotate-180',
+                                                        regeneratingIndex === index &&
+                                                            'animate-spin',
+                                                    ]"
+                                                />
+                                            </button>
+                                        </div>
+
+                                        <p
+                                            v-for="(
+                                                example, exIndex
+                                            ) in definition.examples.generated.concat(
+                                                definition.examples.literature
+                                            )"
+                                            :key="exIndex"
+                                            class="themed-example-text text-base
+                                                text-muted-foreground italic"
+                                            v-html="
+                                                `&quot;${formatExampleHTML(example.sentence, entry.word)}&quot;`
+                                            "
+                                        ></p>
+                                    </div>
+
+                                    <!-- Synonyms -->
+                                    <div
+                                        v-if="
+                                            definition.synonyms &&
+                                            definition.synonyms.length > 0
+                                        "
+                                        class="flex flex-wrap gap-1 pt-2"
+                                    >
+                                        <!-- <span class="self-center pr-2 text-xs">Synonyms:</span> -->
+                                        <span
+                                            v-for="synonym in definition.synonyms"
+                                            :key="synonym"
+                                            class="themed-synonym cursor-pointer"
+                                            @click="store.searchWord(synonym)"
+                                        >
+                                            {{ synonym }}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </CardContent>
+                    </CardContent>
 
-            <!-- Thesaurus Mode -->
-            <CardContent
-                v-if="mode === 'thesaurus' && thesaurusData"
-                class="space-y-6"
-            >
-                <div
-                    v-if="thesaurusData.synonyms.length > 0"
-                    class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
-                >
-                    <Card
-                        v-for="synonym in thesaurusData.synonyms"
-                        :key="synonym.word"
-                        :class="
-                            cn(
-                                'cursor-pointer py-2 transition-all duration-300 hover:scale-105 hover:shadow-lg',
-                                getHeatmapClass(synonym.score)
-                            )
-                        "
-                        @click="store.searchWord(synonym.word)"
+                    <!-- Thesaurus Mode -->
+                    <CardContent
+                        v-if="mode === 'thesaurus' && thesaurusData"
+                        class="space-y-6 px-3 sm:px-6"
                     >
-                        <CardContent class="px-3 py-0.5">
-                            <div class="font-medium">{{ synonym.word }}</div>
-                            <div class="text-sm opacity-75">
-                                {{ Math.round(synonym.score * 100) }}% similar
-                            </div>
-                        </CardContent>
-                    </Card>
+                        <div
+                            v-if="thesaurusData.synonyms.length > 0"
+                            class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
+                        >
+                            <Card
+                                v-for="synonym in thesaurusData.synonyms"
+                                :key="synonym.word"
+                                :class="
+                                    cn(
+                                        'cursor-pointer py-2 transition-all duration-300 hover:scale-105 hover:shadow-lg',
+                                        getHeatmapClass(synonym.score)
+                                    )
+                                "
+                                @click="store.searchWord(synonym.word)"
+                            >
+                                <CardContent class="px-3 py-0.5">
+                                    <div class="font-medium">{{ synonym.word }}</div>
+                                    <div class="text-sm opacity-75">
+                                        {{ Math.round(synonym.score * 100) }}% similar
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </CardContent>
                 </div>
-            </CardContent>
+            </Transition>
 
             <!-- Etymology -->
-            <CardContent v-if="entry && entry.etymology" class="space-y-4">
+            <CardContent v-if="entry && entry.etymology" class="space-y-4 px-3 sm:px-6">
                 <h3 class="text-lg font-semibold">Etymology</h3>
                 <p class="text-base text-muted-foreground">
                     {{ entry.etymology }}

@@ -14,6 +14,8 @@
             <LoadingProgress
                 :progress="progress"
                 :interactive="allowDismiss"
+                :current-stage="currentStage"
+                :stage-message="currentStageText"
                 @progress-change="$emit('progress-change', $event)"
             />
 

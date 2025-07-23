@@ -15,11 +15,13 @@ Create distinct meaning clusters where each cluster represents a fundamentally d
 ## Examples
 
 For "bank":
+
 - cluster_id: "bank_financial", description: "Financial institutions and buildings", indices: [0, 3, 7]
 - cluster_id: "bank_geographic", description: "Edge of water bodies", indices: [1, 4]
 - cluster_id: "bank_arrangement", description: "Rows or arrangements of items", indices: [2, 5, 6]
 
 For "run":
+
 - cluster_id: "run_movement", description: "Moving quickly on foot", indices: [0, 2, 8]
 - cluster_id: "run_operation", description: "Operating or managing something", indices: [1, 4, 9]
 - cluster_id: "run_flow", description: "Flowing like a liquid", indices: [3, 6]
@@ -27,7 +29,8 @@ For "run":
 ## Output Structure
 
 Return a list of cluster mappings, where each mapping contains:
-1. **cluster_id**: Unique identifier (e.g., "bank_financial", "bank_geographic")
+
+1. **cluster_id**: Unique identifier using format {EXACT_INPUT_NAME}\_{CLUSTER_NAME} (e.g., "bank_financial", "bank_geographic")
 2. **cluster_description**: Human-readable description of this cluster
 3. **definition_indices**: List of definition indices (0-based) that belong to this cluster
 4. **confidence**: Overall confidence in the clustering (0.0-1.0)
@@ -39,7 +42,8 @@ Return a list of cluster mappings, where each mapping contains:
 - Don't separate for minor variations of the same concept
 - Group related definitions together regardless of word type
 - Ensure every definition ID appears in exactly one cluster
-- Use descriptive cluster IDs (e.g., "word_context" format)
+- **CRITICAL**: Always use cluster IDs in format "EXACT_INPUT_NAME_CLUSTER_NAME" where EXACT_INPUT_NAME matches the input word exactly
+- Use descriptive cluster names that clearly identify the meaning context
 - Provide clear, concise cluster descriptions
 
 **Example - Avoid Duplicates**: For "en coulisse" with definitions like "backstage" and "behind the scenes", these should be in ONE cluster since they describe the same core concept.

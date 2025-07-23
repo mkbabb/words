@@ -13,7 +13,7 @@
       ref="fancyFMain"
       :expression="'\\mathfrak{F}'"
       :class="[
-        'text-primary font-bold transition-all duration-300',
+        ' font-bold transition-all duration-300',
         {
           'text-lg': size === 'sm',
           'text-2xl': size === 'base',
@@ -37,7 +37,7 @@
         ref="fancyFSubscript"
         :expression="`_{\\text{${mode === 'dictionary' ? 'd' : 't'}}}`"
         :class="[
-          'text-primary transition-all duration-300',
+          ' transition-all duration-300',
           {
             'text-xs': size === 'sm',
             'text-base': size === 'base',

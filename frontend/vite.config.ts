@@ -29,10 +29,12 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://backend:8000',
+        target: process.env.VITE_API_URL || 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
         ws: true, // Proxy websockets
+        timeout: 30000, // 30 second timeout for OpenAI API calls
+        proxyTimeout: 30000, // 30 second proxy timeout
         configure: (proxy, _options) => {
           // Proxy error handling
           proxy.on('error', (err, _req, _res) => {

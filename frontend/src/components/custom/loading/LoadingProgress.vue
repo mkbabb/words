@@ -46,6 +46,9 @@
                   progress >= checkpoint.progress
                     ? 'scale-110 border-primary/70 shadow-lg shadow-primary/20 bg-primary/10'
                     : 'border-gray-400/50 dark:border-gray-500/50',
+                  isActiveCheckpoint(checkpoint.progress)
+                    ? 'animate-pulse ring-2 ring-primary/30 scale-125 bg-primary/20'
+                    : '',
                   interactive ? 'cursor-pointer hover:scale-125' : 'cursor-help hover:scale-125',
                 ]"
                 @click="handleCheckpointClick(checkpoint)"
@@ -61,6 +64,10 @@
               <p class="text-xs text-muted-foreground leading-relaxed">
                 {{ getCheckpointDescription(checkpoint.progress) }}
               </p>
+              <!-- Show current stage info if this checkpoint is active -->
+              <div v-if="isActiveCheckpoint(checkpoint.progress)" class="mt-2 p-2 bg-primary/5 rounded border border-primary/20">
+                <p class="text-xs font-medium text-primary">Current: {{ stageMessage || 'In progress...' }}</p>
+              </div>
             </div>
           </HoverCardContent>
           </HoverCard>
@@ -91,6 +98,8 @@ interface Props {
   progress: number
   checkpoints?: Checkpoint[]
   interactive?: boolean
+  currentStage?: string
+  stageMessage?: string
 }
 
 interface Emits {
@@ -99,13 +108,12 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
   checkpoints: () => [
-    { progress: 0, label: 'Start' },
+    { progress: 0, label: 'Initialize' },
     { progress: 10, label: 'Search' },
-    { progress: 40, label: 'Fetch' },
-    { progress: 50, label: 'Cluster' },
+    { progress: 25, label: 'Fetch' },
+    { progress: 45, label: 'Cluster' },
     { progress: 60, label: 'Synthesize' },
-    { progress: 70, label: 'Examples' },
-    { progress: 90, label: 'Save' },
+    { progress: 80, label: 'Storage' },
     { progress: 100, label: 'Complete' },
   ],
   interactive: false,
@@ -122,15 +130,35 @@ const rainbowGradient = computed(() => generateRainbowGradient(8))
 const getCheckpointDescription = (progress: number): string => {
   const descriptions: Record<number, string> = {
     0: 'Pipeline initialization and setup phase. Preparing search engines and AI processing systems.',
-    10: 'Searching through multiple dictionary sources including Wiktionary, Oxford, and Dictionary.com.',
-    40: 'Gathering definitions from various providers and performing data validation.',
-    50: 'Analyzing semantic patterns and clustering related definitions using AI.',
-    60: 'Synthesizing comprehensive definitions with AI-powered meaning extraction.',
-    70: 'Generating contextual usage examples and finding related terms.',
-    90: 'Saving processed data to knowledge base and updating search indices.',
-    100: 'Pipeline complete! Ready to display comprehensive word information.'
+    10: 'Searching through multiple dictionary sources to find the best word match.',
+    25: 'Fetching definitions from dictionary providers including Wiktionary, Oxford, and Dictionary.com.',
+    45: 'AI clustering analysis - grouping definitions by semantic meaning and context.',
+    60: 'AI synthesis phase - creating comprehensive definitions from clustered data.',
+    80: 'Saving processed entry to knowledge base and updating search indices.',
+    100: 'Pipeline complete! Ready to display comprehensive word information with examples and synonyms.'
   }
   return descriptions[progress] || 'Processing pipeline stage...'
+}
+
+// Check if a checkpoint is currently active
+const isActiveCheckpoint = (checkpointProgress: number): boolean => {
+  // Find the current checkpoint range
+  const sortedCheckpoints = props.checkpoints.sort((a, b) => a.progress - b.progress)
+  const currentIndex = sortedCheckpoints.findIndex(cp => cp.progress >= props.progress)
+  
+  if (currentIndex === -1) {
+    // Progress is beyond all checkpoints, check if this is the last one
+    return checkpointProgress === sortedCheckpoints[sortedCheckpoints.length - 1].progress
+  }
+  
+  if (currentIndex === 0) {
+    // Progress is at or before first checkpoint
+    return checkpointProgress === sortedCheckpoints[0].progress
+  }
+  
+  // Progress is between checkpoints, return the previous checkpoint as active
+  const activeCheckpoint = sortedCheckpoints[currentIndex - 1]
+  return checkpointProgress === activeCheckpoint.progress
 }
 
 // Handle checkpoint click

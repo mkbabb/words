@@ -7,7 +7,7 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "./dev.sh",
+    "dev": "./scripts/dev",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && python scripts/api_server.py",
     "build": "cd frontend && npm run build",

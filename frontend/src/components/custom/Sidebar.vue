@@ -4,10 +4,10 @@
     <div
       :class="
         cn(
-          'fixed top-[18px] left-2 z-70 transition-all duration-400 ease-apple-smooth lg:hidden',
+          'fixed top-10 z-70 transition-all duration-400 ease-apple-smooth lg:hidden',
           {
-            'translate-x-0': !sidebarOpen,
-            'translate-x-64': sidebarOpen, // Move with sidebar when opened
+            
+            'hidden': sidebarOpen
           }
         )
       "
@@ -111,14 +111,18 @@
               </HoverCardContent>
             </HoverCard>
           </div>
-          <!-- Right controls -->
-          <HamburgerIcon
-            :is-open="!sidebarCollapsed"
-            class="cursor-ew-resize hover:bg-muted/50 rounded-lg p-1 transition-all duration-300 ease-apple-smooth"
-            @toggle="store.setSidebarCollapsed(!sidebarCollapsed)"
-          />
+          <!-- Right: Dark Mode Toggle + Controls -->
+          <div class="flex items-center gap-3">
+            <DarkModeToggle class="h-7 w-7 transition-all duration-500 ease-apple-smooth" />
+            <HamburgerIcon
+              :is-open="!sidebarCollapsed"
+              class="cursor-ew-resize hover:bg-muted/50 rounded-lg p-1 transition-all duration-300 ease-apple-smooth"
+              @toggle="store.setSidebarCollapsed(!sidebarCollapsed)"
+            />
+          </div>
         </div>
-        <div v-else class="flex items-center justify-center w-full">
+        <div v-else class="flex items-center justify-between w-full">
+          <DarkModeToggle class="h-7 w-7" />
           <button
             @click="store.setSidebarCollapsed(false)"
             class="cursor-ew-resize hover:bg-muted/50 rounded-lg p-2 transition-all duration-300 ease-apple-smooth hover:scale-105"
@@ -283,7 +287,7 @@
             
             <!-- Right: Dark Mode Toggle + Hamburger -->
             <div class="flex items-center gap-3">
-              <DarkModeToggle class="h-7 w-7" />
+              <DarkModeToggle class="h-7 w-7 transition-all duration-500 ease-apple-smooth" />
               <HamburgerIcon
                 :is-open="true"
                 class="cursor-pointer hover:bg-muted/50 rounded-lg p-1 transition-all duration-300 ease-apple-smooth"

@@ -25,68 +25,71 @@
               tag="div"
               class="space-y-1"
             >
-              <HoverCard
+              <div
                 v-for="entry in limitedLookups"
                 :key="entry.id"
-                :open-delay="150"
-                :close-delay="50"
               >
-                <HoverCardTrigger>
-                  <div
-                    :class="
-                      cn(
-                        'group relative w-full cursor-pointer overflow-hidden rounded-lg transition-all duration-300 ease-apple-smooth',
-                        'bg-background border-border border shadow-sm',
-                        'hover:bg-accent hover:shadow-md hover:scale-105'
-                      )
-                    "
-                    @click="lookupWord(entry.word)"
-                  >
-                    <div class="flex items-center justify-center px-2 py-2">
-                      <span class="text-xs font-bold tracking-wider uppercase">
-                        {{ entry.word.substring(0, 2) }}
-                      </span>
-                    </div>
-                  </div>
-                </HoverCardTrigger>
-                <HoverCardContent class="w-80 max-h-96" side="right" :side-offset="8">
-                  <div class="space-y-3">
-                    <!-- Word Header -->
-                    <div class="flex items-center justify-between">
-                      <h3 class="text-base font-semibold">{{ entry.word }}</h3>
-                      <span class="text-muted-foreground text-xs">
-                        {{ formatDate(entry.timestamp) }}
-                      </span>
-                    </div>
-                    
-                    <!-- Pronunciation -->
-                    <div v-if="entry.entry.pronunciation?.phonetic" class="text-sm text-muted-foreground">
-                      {{ entry.entry.pronunciation.phonetic }}
-                    </div>
-                    
-                    <!-- Separator -->
-                    <hr class="border-border/30">
-                    
-                    <!-- Definitions -->
-                    <div class="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-                      <div
-                        v-for="(def, defIndex) in entry.entry.definitions"
-                        :key="defIndex"
-                        class="text-sm break-words"
-                      >
-                        <span class="font-medium text-accent-foreground">{{ def.word_type }}</span>
-                        <span class="text-muted-foreground ml-2">{{ def.definition }}</span>
+                <HoverCard
+                  :open-delay="150"
+                  :close-delay="50"
+                >
+                  <HoverCardTrigger>
+                    <div
+                      :class="
+                        cn(
+                          'group relative w-full cursor-pointer overflow-hidden rounded-lg transition-all duration-300 ease-apple-smooth',
+                          'bg-background border-border border shadow-sm',
+                          'hover:bg-accent hover:shadow-md hover:scale-105'
+                        )
+                      "
+                      @click="lookupWord(entry.word)"
+                    >
+                      <div class="flex items-center justify-center px-2 py-2">
+                        <span class="text-xs font-bold tracking-wider uppercase">
+                          {{ entry.word.substring(0, 2) }}
+                        </span>
                       </div>
                     </div>
-                    
-                    <!-- Metadata -->
-                    <div v-if="entry.entry.frequency || entry.entry.lookup_count" class="flex justify-between text-xs text-muted-foreground border-t border-border/30 pt-2">
-                      <span v-if="entry.entry.frequency">Frequency: {{ entry.entry.frequency }}</span>
-                      <span v-if="entry.entry.lookup_count">Lookups: {{ entry.entry.lookup_count }}</span>
+                  </HoverCardTrigger>
+                  <HoverCardContent class="w-80 max-h-96" side="right" :side-offset="8">
+                    <div class="space-y-3">
+                      <!-- Word Header -->
+                      <div class="flex items-center justify-between">
+                        <h3 class="text-base font-semibold">{{ entry.word }}</h3>
+                        <span class="text-muted-foreground text-xs">
+                          {{ formatDate(entry.timestamp) }}
+                        </span>
+                      </div>
+                      
+                      <!-- Pronunciation -->
+                      <div v-if="entry.entry.pronunciation?.phonetic" class="text-sm text-muted-foreground">
+                        {{ entry.entry.pronunciation.phonetic }}
+                      </div>
+                      
+                      <!-- Separator -->
+                      <hr class="border-border/30">
+                      
+                      <!-- Definitions -->
+                      <div class="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
+                        <div
+                          v-for="(def, defIndex) in entry.entry.definitions"
+                          :key="defIndex"
+                          class="text-sm break-words"
+                        >
+                          <span class="font-medium text-accent-foreground">{{ def.word_type }}</span>
+                          <span class="text-muted-foreground ml-2">{{ def.definition }}</span>
+                        </div>
+                      </div>
+                      
+                      <!-- Metadata -->
+                      <div v-if="entry.entry.frequency || entry.entry.lookup_count" class="flex justify-between text-xs text-muted-foreground border-t border-border/30 pt-2">
+                        <span v-if="entry.entry.frequency">Frequency: {{ entry.entry.frequency }}</span>
+                        <span v-if="entry.entry.lookup_count">Lookups: {{ entry.entry.lookup_count }}</span>
+                      </div>
                     </div>
-                  </div>
-                </HoverCardContent>
-              </HoverCard>
+                  </HoverCardContent>
+                </HoverCard>
+              </div>
             </TransitionGroup>
           </div>
         </div>
