@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
+
+from src.floridify.storage.mongodb import get_synthesized_entry
 
 from ..ai import get_definition_synthesizer
 from ..connectors.dictionary_com import DictionaryComConnector
@@ -16,8 +19,8 @@ from ..utils.logging import (
     log_stage,
     log_timing,
 )
-from ..utils.state_tracker import PipelineStage, ProviderMetrics, StateTracker
 from .search_pipeline import find_best_match
+from .state_tracker import StateTracker
 
 logger = get_logger(__name__)
 
@@ -68,10 +71,7 @@ async def lookup_word_pipeline(
         # Search for the word using generalized search pipeline
         if state_tracker:
             await state_tracker.update(
-                PipelineStage.SEARCH,
-                0,
-                f"Searching for '{word}'",
-                {"word": word, "semantic": semantic},
+                stage="SEARCH_START",
             )
 
         search_start = time.perf_counter()
@@ -84,24 +84,26 @@ async def lookup_word_pipeline(
 
         if state_tracker:
             await state_tracker.update(
-                PipelineStage.SEARCH,
-                10,
-                f"Search complete for '{word}'",
-                {
+                stage="SEARCH_COMPLETE",
+                message=f"Search complete for '{word}'",
+                details={
                     "word": word,
+                    "best_match": best_match_result.word if best_match_result else None,
                     "found": bool(best_match_result),
                     "score": best_match_result.score if best_match_result else None,
                     "duration_ms": search_duration * 1000,
                 },
-                partial_data={"best_match": best_match_result.word if best_match_result else None},
             )
 
         if not best_match_result:
-            logger.warning(f"No search results found for '{word}' after {search_duration:.2f}s")
+            logger.warning(
+                f"No search results found for '{word}' after {search_duration:.2f}s"
+            )
             # Try AI fallback if no results and AI is enabled
             if not no_ai:
                 logger.info(f"No search results, trying AI fallback for '{word}'")
                 return await _ai_fallback_lookup(word, force_refresh, state_tracker)
+
             return None
 
         # Use the best match
@@ -112,97 +114,86 @@ async def lookup_word_pipeline(
             f"search_time: {search_duration:.2f}s)"
         )
 
-        # Get definition from providers
-        providers_data = []
-        provider_fetch_start = time.perf_counter()
-        total_providers = len(providers)
-        provider_progress_base = 15
-        provider_progress_range = 25  # 15-40%
+        # Try to get a cached entry first
+        if not no_ai and not force_refresh:
+            existing = await get_synthesized_entry(word)
+            if existing:
+                logger.info(f"📋 Using cached synthesized entry for '{best_match}'")
+                return existing
 
-        for i, provider in enumerate(providers):
-            if state_tracker:
-                progress = provider_progress_base + (i * provider_progress_range / total_providers)
-                await state_tracker.update(
-                    PipelineStage.PROVIDER_FETCH,
-                    progress,
-                    f"Fetching from {provider.value}",
-                    {"provider": provider.value, "word": best_match},
-                )
-
-            logger.debug(f"🔄 Fetching from provider: {provider.value}")
-            provider_start = time.perf_counter()
-
-            provider_data, provider_metrics = await _get_provider_definition(
-                best_match, provider, force_refresh, state_tracker
+        # Get definitions from providers in parallel
+        if state_tracker:
+            await state_tracker.update(
+                stage="PROVIDER_FETCH_START",
+                message=f"Fetching from {len(providers)} providers",
+                details={"providers": [p.value for p in providers], "word": best_match},
             )
-            provider_duration = time.perf_counter() - provider_start
 
-            if not provider_data:
+        logger.info(
+            f"🔄 Fetching from {len(providers)} providers in parallel: {[p.value for p in providers]}"
+        )
+        provider_fetch_start = time.perf_counter()
+
+        # Fetch from all providers in parallel
+        provider_tasks = [
+            _get_provider_definition(best_match, provider, force_refresh, state_tracker)
+            for provider in providers
+        ]
+        providers_results = await asyncio.gather(
+            *provider_tasks, return_exceptions=True
+        )
+
+        # Filter out None results and exceptions
+        providers_data = []
+        for i, result in enumerate(providers_results):
+            provider = providers[i]
+            if isinstance(result, Exception):
                 logger.warning(
-                    f"❌ Provider {provider.value} failed for '{best_match}' "
-                    f"after {provider_duration:.2f}s"
+                    f"❌ Provider {provider.value} failed with exception: {result}"
                 )
-                # Try AI fallback if provider fails and AI is enabled
-                if not no_ai:
-                    logger.info(f"Provider failed, trying AI fallback for '{best_match}'")
-                    return await _ai_fallback_lookup(best_match, force_refresh, state_tracker)
-                return None
-
-            # Log successful provider fetch with quality metrics
-            if provider_metrics:
-                log_metrics(
-                    provider=provider.value,
-                    word=best_match,
-                    fetch_time=provider_duration,
-                    definition_count=provider_metrics.definitions_count,
-                    has_pronunciation=provider_metrics.has_pronunciation,
-                    has_etymology=provider_metrics.has_etymology,
-                    completeness_score=provider_metrics.completeness_score,
-                    response_size_bytes=provider_metrics.response_size_bytes,
-                    connection_time_ms=provider_metrics.connection_time_ms,
-                    download_time_ms=provider_metrics.download_time_ms,
-                    parse_time_ms=provider_metrics.parse_time_ms,
+            elif result is None:
+                logger.warning(
+                    f"❌ Provider {provider.value} returned no data for '{best_match}'"
                 )
             else:
-                log_metrics(
-                    provider=provider.value,
-                    word=best_match,
-                    fetch_time=provider_duration,
-                    definition_count=len(provider_data.definitions)
-                    if provider_data.definitions
-                    else 0,
-                )
-
-            providers_data.append(provider_data)
-
-            if state_tracker:
-                progress = provider_progress_base + (
-                    (i + 1) * provider_progress_range / total_providers
-                )
-                await state_tracker.update(
-                    PipelineStage.PROVIDER_FETCH,
-                    progress,
-                    f"Fetched from {provider.value}",
-                    {
-                        "provider": provider.value,
-                        "word": best_match,
-                        "success": True,
-                        "duration_ms": provider_duration * 1000,
-                        "definitions_count": len(provider_data.definitions) if provider_data else 0,
-                        "quality_metrics": provider_metrics.__dict__ if provider_metrics else None,
-                    },
-                    partial_data={"provider_data": provider_data},
+                providers_data.append(result)
+                logger.debug(
+                    f"✅ Provider {provider.value} returned data for '{best_match}'"
                 )
 
         total_provider_time = time.perf_counter() - provider_fetch_start
         logger.info(
-            f"✅ Fetched from {len(providers_data)} providers in {total_provider_time:.2f}s"
+            f"✅ Fetched from {len(providers_data)}/{len(providers)} providers in {total_provider_time:.2f}s"
         )
 
-        # Synthesize with AI if enabled
-        if not no_ai:
+        if state_tracker:
+            await state_tracker.update(
+                stage="PROVIDER_FETCH_COMPLETE",
+                message=f"Fetched from {len(providers_data)}/{len(providers)} providers",
+                details={
+                    "successful_providers": len(providers_data),
+                    "total_providers": len(providers),
+                    "word": best_match,
+                    "duration_ms": total_provider_time * 1000,
+                },
+            )
+
+        # Only try AI fallback if ALL providers failed
+        if not providers_data and not no_ai:
+            logger.info(f"All providers failed, trying AI fallback for '{best_match}'")
+            return await _ai_fallback_lookup(best_match, force_refresh, state_tracker)
+        elif not providers_data:
+            logger.warning(
+                f"All providers failed and AI is disabled for '{best_match}'"
+            )
+            return None
+
+        # Synthesize with AI if enabled and we have provider data
+        if not no_ai and providers_data:
             try:
-                logger.info(f"🤖 Starting AI synthesis for '{best_match}'")
+                logger.info(
+                    f"🤖 Starting AI synthesis for '{best_match}' with {len(providers_data)} providers"
+                )
                 ai_start = time.perf_counter()
 
                 synthesized_entry = await _synthesize_with_ai(
@@ -225,39 +216,29 @@ async def lookup_word_pipeline(
                         word=best_match,
                         ai_synthesis_time=ai_duration,
                         total_pipeline_time=time.perf_counter() - search_start,
-                        definition_count=len(synthesized_entry.definitions)
-                        if synthesized_entry.definitions
-                        else 0,
+                        definition_count=(
+                            len(synthesized_entry.definitions)
+                            if synthesized_entry.definitions
+                            else 0
+                        ),
                         provider_count=len(providers_data),
                     )
-
-                    if state_tracker:
-                        await state_tracker.update(
-                            PipelineStage.COMPLETE,
-                            100,
-                            f"Lookup complete for '{best_match}'",
-                            {
-                                "word": best_match,
-                                "total_duration_ms": state_tracker.get_total_duration_ms(),
-                                "definitions_count": len(synthesized_entry.definitions)
-                                if synthesized_entry.definitions
-                                else 0,
-                            },
-                        )
-
                     return synthesized_entry
                 else:
                     logger.warning(
                         f"⚠️  AI synthesis returned empty result for '{best_match}' "
                         f"after {ai_duration:.2f}s"
                     )
-                    logger.info(
-                        f"No provider data available, trying AI fallback for '{best_match}'"
+                    # Try fallback if synthesis fails
+                    return await _ai_fallback_lookup(
+                        best_match, force_refresh, state_tracker
                     )
-                    return await _ai_fallback_lookup(best_match, force_refresh, state_tracker)
             except Exception as e:
                 logger.error(f"❌ AI synthesis failed: {e}")
-                return None
+                # Try fallback if synthesis fails
+                return await _ai_fallback_lookup(
+                    best_match, force_refresh, state_tracker
+                )
         else:
             # When AI is disabled, we can't return a SynthesizedDictionaryEntry
             logger.warning(
@@ -270,7 +251,9 @@ async def lookup_word_pipeline(
         log_metrics(
             word=word,
             error=str(e),
-            total_time=time.perf_counter() - search_start if "search_start" in locals() else 0,
+            total_time=(
+                time.perf_counter() - search_start if "search_start" in locals() else 0
+            ),
         )
         return None
 
@@ -281,7 +264,7 @@ async def _get_provider_definition(
     provider: DictionaryProvider,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
-) -> tuple[ProviderData | None, ProviderMetrics | None]:
+) -> ProviderData | None:
     """Get definition from specified provider.
 
     Returns:
@@ -289,13 +272,6 @@ async def _get_provider_definition(
     """
     logger.debug(f"📖 Fetching definition from {provider.value} for '{word}'")
     start_time = time.perf_counter()
-
-    # Initialize metrics
-    metrics = ProviderMetrics(
-        provider_name=provider.value,
-        response_time_ms=0,
-        response_size_bytes=0,
-    )
 
     try:
         connector: WiktionaryConnector | DictionaryComConnector | None = None
@@ -305,12 +281,12 @@ async def _get_provider_definition(
         elif provider == DictionaryProvider.OXFORD:
             # Would need API credentials from config
             logger.warning("Oxford provider requires API credentials")
-            return None, metrics
+            return None
         elif provider == DictionaryProvider.DICTIONARY_COM:
             connector = DictionaryComConnector(force_refresh=force_refresh)
         else:
             logger.warning(f"Unsupported provider: {provider.value}")
-            return None, metrics
+            return None
 
         if connector:
             fetch_start = time.perf_counter()
@@ -320,21 +296,6 @@ async def _get_provider_definition(
             if result:
                 # Update metrics from result
                 response_size = len(str(result.model_dump_json())) if result else 0
-                metrics.response_size_bytes = response_size
-                metrics.definitions_count = len(result.definitions) if result.definitions else 0
-                metrics.has_pronunciation = bool(
-                    result.raw_metadata and result.raw_metadata.get("pronunciation")
-                )
-                metrics.has_etymology = bool(
-                    result.raw_metadata and result.raw_metadata.get("etymology")
-                )
-                metrics.has_examples = any(
-                    d.examples and (d.examples.generated or d.examples.literature)
-                    for d in (result.definitions or [])
-                )
-                metrics.success = True
-                metrics.response_time_ms = fetch_duration * 1000
-                metrics.calculate_completeness_score()
 
                 log_provider_fetch(
                     provider_name=provider.value,
@@ -343,35 +304,30 @@ async def _get_provider_definition(
                     response_size=response_size,
                     duration=fetch_duration,
                 )
-
-                logger.debug(
-                    f"✅ Provider {provider.value} returned {metrics.definitions_count} "
-                    f"definitions for '{word}' (completeness: {metrics.completeness_score:.2f})"
-                )
             else:
-                metrics.success = False
-                metrics.response_time_ms = fetch_duration * 1000
 
                 log_provider_fetch(
-                    provider_name=provider.value, word=word, success=False, duration=fetch_duration
+                    provider_name=provider.value,
+                    word=word,
+                    success=False,
+                    duration=fetch_duration,
                 )
-                logger.debug(f"⚠️  Provider {provider.value} returned no results for '{word}'")
+                logger.debug(
+                    f"⚠️  Provider {provider.value} returned no results for '{word}'"
+                )
 
-            return result, metrics
+            return result
 
-        return None, metrics
+        return None
 
     except Exception as e:
         duration = time.perf_counter() - start_time
-        metrics.success = False
-        metrics.error_message = str(e)
-        metrics.response_time_ms = duration * 1000
 
         log_provider_fetch(
             provider_name=provider.value, word=word, success=False, duration=duration
         )
         logger.error(f"❌ Provider {provider.value} failed for '{word}': {e}")
-        return None, metrics
+        return None
 
 
 @log_timing
@@ -383,15 +339,21 @@ async def _synthesize_with_ai(
     state_tracker: StateTracker | None = None,
 ) -> SynthesizedDictionaryEntry | None:
     """Synthesize definition using AI."""
-    logger.debug(f"🤖 Starting AI synthesis for '{word}' with {len(providers)} providers")
+    logger.debug(
+        f"🤖 Starting AI synthesis for '{word}' with {len(providers)} providers"
+    )
 
     # Log provider data quality
-    total_definitions = sum(len(p.definitions) if p.definitions else 0 for p in providers)
+    total_definitions = sum(
+        len(p.definitions) if p.definitions else 0 for p in providers
+    )
     logger.debug(f"📊 Total definitions to synthesize: {total_definitions}")
 
     try:
         synthesizer = get_definition_synthesizer()
-        result = await synthesizer.synthesize_entry(word, providers, force_refresh, state_tracker)
+        result = await synthesizer.synthesize_entry(
+            word, providers, force_refresh, state_tracker
+        )
 
         if result:
             logger.debug(
@@ -419,7 +381,9 @@ async def _ai_fallback_lookup(
         synthesizer = get_definition_synthesizer()
         start_time = time.perf_counter()
 
-        ai_entry = await synthesizer.generate_fallback_entry(word, force_refresh, state_tracker)
+        ai_entry = await synthesizer.generate_fallback_entry(
+            word, force_refresh, state_tracker
+        )
         duration = time.perf_counter() - start_time
 
         if ai_entry and ai_entry.definitions:
@@ -434,19 +398,6 @@ async def _ai_fallback_lookup(
                 definition_count=len(ai_entry.definitions),
                 is_fallback=True,
             )
-
-            if state_tracker:
-                await state_tracker.update(
-                    PipelineStage.COMPLETE,
-                    100,
-                    f"AI fallback complete for '{word}'",
-                    {
-                        "word": word,
-                        "fallback": True,
-                        "total_duration_ms": state_tracker.get_total_duration_ms(),
-                        "definitions_count": len(ai_entry.definitions),
-                    },
-                )
 
             return ai_entry
         else:

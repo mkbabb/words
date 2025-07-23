@@ -14,9 +14,13 @@ from ..models import (
     ProviderData,
     SynthesizedDictionaryEntry,
 )
-from ..storage.mongodb import _ensure_initialized, get_synthesized_entry, save_synthesized_entry
+from ..storage.mongodb import (
+    _ensure_initialized,
+    get_synthesized_entry,
+    save_synthesized_entry,
+)
 from ..utils.logging import get_logger
-from ..utils.state_tracker import PipelineStage, StateTracker
+from ..core.state_tracker import StateTracker
 from .connector import OpenAIConnector
 
 logger = get_logger(__name__)
@@ -25,7 +29,9 @@ logger = get_logger(__name__)
 class DefinitionSynthesizer:
     """Synthesizes dictionary entries from multiple providers_data using AI."""
 
-    def __init__(self, openai_connector: OpenAIConnector, examples_count: int = 2) -> None:
+    def __init__(
+        self, openai_connector: OpenAIConnector, examples_count: int = 2
+    ) -> None:
         self.ai = openai_connector
         self.examples_count = examples_count
 
@@ -41,9 +47,7 @@ class DefinitionSynthesizer:
         # Check if we already have a synthesized entry (unless force_refresh is True)
         if not force_refresh:
             existing = await get_synthesized_entry(word)
-
             if existing is not None:
-                logger.info(f"📋 Using cached synthesized entry for '{word}'")
                 return existing
 
         # Generate pronunciation if not available
@@ -69,24 +73,29 @@ class DefinitionSynthesizer:
             return None
 
         # Extract cluster mappings using AI
-        logger.info(f"🔍 Analyzing {len(all_definition_objects)} definitions for cluster mappings")
+        logger.info(
+            f"🔍 Analyzing {len(all_definition_objects)} definitions for cluster mappings"
+        )
 
         if state_tracker:
             await state_tracker.update(
-                PipelineStage.AI_CLUSTERING,
-                40,
-                f"Clustering {len(all_definition_objects)} definitions",
-                {"word": word, "definitions_count": len(all_definition_objects)},
+                stage="AI_CLUSTERING",
+                message=f"Clustering {len(all_definition_objects)} definitions",
+                details={
+                    "word": word,
+                    "definitions_count": len(all_definition_objects),
+                },
             )
 
-        cluster_response = await self.ai.extract_cluster_mapping(word, all_definition_tuples)
+        cluster_response = await self.ai.extract_cluster_mapping(
+            word, all_definition_tuples
+        )
 
         if state_tracker:
             await state_tracker.update(
-                PipelineStage.AI_CLUSTERING,
-                50,
-                f"Clustered into {len(cluster_response.cluster_mappings)} groups",
-                {
+                stage="AI_CLUSTERING",
+                message=f"Clustered into {len(cluster_response.cluster_mappings)} groups",
+                details={
                     "word": word,
                     "cluster_count": len(cluster_response.cluster_mappings),
                     "definitions_count": len(all_definition_objects),
@@ -124,7 +133,9 @@ class DefinitionSynthesizer:
         # Save to database
         if state_tracker:
             await state_tracker.update(
-                PipelineStage.STORAGE_SAVE, 80, f"Saving entry for '{word}'", {"word": word}
+                stage="STORAGE_SAVE",
+                message=f"Saving entry for '{word}'",
+                details={"word": word},
             )
 
         try:
@@ -132,29 +143,37 @@ class DefinitionSynthesizer:
 
             if state_tracker:
                 await state_tracker.update(
-                    PipelineStage.STORAGE_SAVE,
-                    90,
-                    f"Saved entry for '{word}'",
-                    {"word": word, "success": True},
+                    stage="STORAGE_SAVE",
+                    message=f"Saved entry for '{word}'",
+                    details={"word": word, "success": True},
                 )
         except Exception as e:
             logger.error(f"Failed to save synthesized entry for '{word}': {e}")
             # Still return the entry even if saving failed
             if state_tracker:
                 await state_tracker.update(
-                    PipelineStage.STORAGE_SAVE,
-                    90,
-                    f"Failed to save entry for '{word}'",
-                    {"word": word, "success": False, "error": str(e)},
+                    stage="STORAGE_SAVE",
+                    message=f"Failed to save entry for '{word}'",
+                    details={"word": word, "success": False, "error": str(e)},
                 )
 
         return entry
 
     async def generate_fallback_entry(
-        self, word: str, force_refresh: bool = False, state_tracker: StateTracker | None = None
+        self,
+        word: str,
+        force_refresh: bool = False,
+        state_tracker: StateTracker | None = None,
     ) -> SynthesizedDictionaryEntry | None:
         """Generate a complete fallback entry using AI."""
         logger.info(f"🔮 Starting AI fallback generation for '{word}'")
+
+        if state_tracker:
+            await state_tracker.update(
+                stage="AI_FALLBACK",
+                message=f"Starting AI fallback generation for '{word}'",
+                details={"word": word},
+            )
 
         # Generate fallback provider data
         dictionary_entry = await self.ai.lookup_fallback(word)
@@ -208,6 +227,17 @@ class DefinitionSynthesizer:
 
         providers_data = [provider_data]
 
+        if state_tracker:
+            await state_tracker.update(
+                stage="AI_FALLBACK",
+                message=f"Created AI fallback entry with {len(definitions)} definitions",
+                details={
+                    "word": word,
+                    "definitions_count": len(definitions),
+                    "confidence": dictionary_entry.confidence,
+                },
+            )
+
         logger.success(
             f"🎉 Successfully created AI fallback entry for '{word}' "
             f"with {len(definitions)} definitions"
@@ -217,6 +247,7 @@ class DefinitionSynthesizer:
             word=word,
             providers_data=providers_data,
             force_refresh=force_refresh,
+            state_tracker=state_tracker,
         )
 
     async def _synthesize_definitions(
@@ -258,13 +289,10 @@ class DefinitionSynthesizer:
             cluster_start = time.time()
 
             if state_tracker:
-                # Progress from 50-60% for synthesis
-                progress = 50 + (i * 10 / total_clusters)
                 await state_tracker.update(
-                    PipelineStage.AI_SYNTHESIS,
-                    progress,
-                    f"Synthesizing cluster {i + 1}/{total_clusters}",
-                    {
+                    stage="AI_SYNTHESIS",
+                    message=f"Synthesizing cluster {i + 1}/{total_clusters}",
+                    details={
                         "word": word,
                         "cluster_id": cluster_id,
                         "cluster_index": i + 1,
@@ -288,7 +316,9 @@ class DefinitionSynthesizer:
                 )
 
                 if not synthesis_response.definitions:
-                    logger.warning(f"⚠️  No definitions synthesized for cluster '{cluster_id}'")
+                    logger.warning(
+                        f"⚠️  No definitions synthesized for cluster '{cluster_id}'"
+                    )
                     continue
 
                 # Create synthesized definitions for this cluster
@@ -330,7 +360,9 @@ class DefinitionSynthesizer:
                             "synthesis_confidence": synthesis_response.confidence,
                             "example_confidence": example_response.confidence,
                             "sources_used": synthesis_response.sources_used,
-                            "cluster_description": cluster_descriptions.get(cluster_id, ""),
+                            "cluster_description": cluster_descriptions.get(
+                                cluster_id, ""
+                            ),
                             "original_definition_count": len(cluster_definitions),
                         },
                     )

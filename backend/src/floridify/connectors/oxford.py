@@ -8,9 +8,9 @@ from typing import Any
 
 import httpx
 
+from ..core.state_tracker import PipelineState, StateTracker
 from ..models import Definition, Examples, GeneratedExample, ProviderData
 from ..utils.logging import get_logger
-from ..utils.state_tracker import StateTracker
 from .base import DictionaryConnector
 
 logger = get_logger(__name__)

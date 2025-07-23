@@ -8,10 +8,31 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
 
-from ..models.pipeline_state import PipelineState
+from pydantic import BaseModel, Field
+
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+class PipelineState(BaseModel):
+    """Represents the current state of a pipeline operation."""
+
+    stage: str = Field(..., description="Current stage identifier")
+    progress: int = Field(0, ge=0, le=100, description="Progress from 0 to 100")
+    message: str = Field("", description="Human-readable status message")
+    details: dict[str, Any] = Field(
+        default_factory=dict, description="Additional stage-specific details"
+    )
+    timestamp: datetime = Field(
+        default_factory=datetime.now, description="When this state was recorded"
+    )
+    is_complete: bool = Field(
+        default=False, description="Whether the pipeline has completed"
+    )
+    error: str | None = Field(
+        default=None, description="Error message if pipeline failed"
+    )
 
 
 class StateTracker:
@@ -23,11 +44,11 @@ class StateTracker:
         self._current_state: PipelineState | None = None
         self._subscribers: set[asyncio.Queue[PipelineState]] = set()
 
-    async def update_state(
+    async def update(
         self,
         stage: str,
-        progress: float,
-        message: str,
+        progress: int = 0,
+        message: str = "",
         details: dict[str, Any] | None = None,
         is_complete: bool = False,
         error: str | None = None,

@@ -101,12 +101,29 @@ export const dictionaryApi = {
         providers.forEach(provider => params.append('providers', provider));
       }
       
-      const url = `/api/lookup/${word}/stream${params.toString() ? '?' + params.toString() : ''}`;
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+      const url = `${baseUrl}/api/lookup/${word}/stream${params.toString() ? '?' + params.toString() : ''}`;
+      
+      console.log(`Opening SSE connection to: ${url}`);
       const eventSource = new EventSource(url);
+      
+      let hasReceivedData = false;
+      let connectionTimeout: NodeJS.Timeout;
+      
+      // Set a timeout for initial connection
+      connectionTimeout = setTimeout(() => {
+        if (!hasReceivedData) {
+          console.error('SSE connection timeout - no data received within 5 seconds');
+          eventSource.close();
+          reject(new Error('Connection timeout. Please try again.'));
+        }
+      }, 5000);
       
       eventSource.addEventListener('progress', (event) => {
         try {
           const data = JSON.parse(event.data);
+          hasReceivedData = true;
+          clearTimeout(connectionTimeout);
           if (onProgress) {
             onProgress(data.stage, data.progress, data.message, data.details);
           }
@@ -118,29 +135,42 @@ export const dictionaryApi = {
       eventSource.addEventListener('complete', (event) => {
         try {
           const data = JSON.parse(event.data);
+          clearTimeout(connectionTimeout);
           eventSource.close();
+          console.log('SSE connection completed successfully');
           resolve(data);
         } catch (e) {
+          clearTimeout(connectionTimeout);
           eventSource.close();
           reject(new Error('Failed to parse complete event'));
         }
       });
       
       eventSource.addEventListener('error', (event) => {
-        eventSource.close();
-        if (event.type === 'error') {
+        console.error('SSE error event:', event);
+        clearTimeout(connectionTimeout);
+        if (event.type === 'error' && (event as any).data) {
           try {
             const data = JSON.parse((event as any).data);
+            eventSource.close();
             reject(new Error(data.error || 'Stream error'));
           } catch {
-            reject(new Error('Connection error'));
+            // Not a JSON error message
           }
         }
       });
       
-      eventSource.onerror = () => {
+      eventSource.onerror = (error) => {
+        console.error('SSE connection error:', error);
+        clearTimeout(connectionTimeout);
         eventSource.close();
-        reject(new Error('Stream connection failed'));
+        
+        // If we haven't received any data, it might be a connection issue
+        if (!hasReceivedData) {
+          reject(new Error('Failed to establish SSE connection. Please try again.'));
+        } else {
+          reject(new Error('Stream connection lost'));
+        }
       };
     });
   },

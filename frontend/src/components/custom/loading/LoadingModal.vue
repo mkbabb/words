@@ -1,7 +1,6 @@
 <template>
     <Modal v-model="modelValue" :close-on-backdrop="allowDismiss">
         <div class="flex flex-col items-center space-y-6 px-4">
-            <!-- Animated Text with Stage Lighting -->
             <AnimatedText
                 :text="word"
                 text-class="text-6xl lg:text-8xl font-black pb-8"
@@ -92,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { Modal } from '@/components/custom';
 import { AnimatedText, ShimmerText } from '@/components/custom/animation';
 import { LoadingProgress } from '@/components/custom/loading';
@@ -123,6 +122,21 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<Emits>();
+
+// Debug props
+watch(
+    () => props.progress,
+    (newVal) => {
+        console.log('LoadingModal progress prop:', newVal);
+    }
+);
+
+watch(
+    () => props.modelValue,
+    (newVal) => {
+        console.log('LoadingModal visible:', newVal);
+    }
+);
 
 // Computed properties
 
@@ -190,6 +204,4 @@ const modelValue = computed({
     animation: fade-in 0.5s ease-out forwards;
     opacity: 0;
 }
-
-
 </style>

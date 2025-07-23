@@ -19,7 +19,7 @@ from ..models import (
     ProviderData,
 )
 from ..utils.logging import get_logger
-from ..utils.state_tracker import ProviderMetrics, StateTracker
+from ..core.state_tracker import PipelineState, StateTracker
 from .base import DictionaryConnector
 
 logger = get_logger(__name__)
@@ -80,8 +80,12 @@ class WikitextCleaner:
         # Final cleanup with regex
         cleaned = re.sub(r"<[^>]+>", "", cleaned)  # Remove HTML tags
         cleaned = re.sub(r"\{\{[^}]*\}\}", "", cleaned)  # Remove remaining templates
-        cleaned = re.sub(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]", r"\1", cleaned)  # Clean links
-        cleaned = re.sub(r"<ref[^>]*>.*?</ref>", "", cleaned, flags=re.DOTALL)  # Remove refs
+        cleaned = re.sub(
+            r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]", r"\1", cleaned
+        )  # Clean links
+        cleaned = re.sub(
+            r"<ref[^>]*>.*?</ref>", "", cleaned, flags=re.DOTALL
+        )  # Remove refs
 
         if not preserve_structure:
             cleaned = re.sub(r"\s+", " ", cleaned)  # Normalize whitespace
@@ -125,27 +129,17 @@ class WiktionaryConnector(DictionaryConnector):
         self,
         word: str,
         state_tracker: StateTracker | None = None,
-        progress_callback: Any | None = None,
     ) -> ProviderData | None:
         """Fetch comprehensive definition data from Wiktionary."""
         await self._enforce_rate_limit()
 
-        # Initialize timing and metrics
-        start_time = time.time()
-        metrics = ProviderMetrics(
-            provider_name=self.provider_name,
-            response_time_ms=0,
-            response_size_bytes=0,
-        )
-
         try:
             # Report start
             if state_tracker:
-                await self._report_progress(
-                    "start",
-                    0,
-                    {"provider": self.provider_name, "word": word},
-                    state_tracker,
+                await state_tracker.update(
+                    stage="PROVIDER_FETCH_START",
+                    message=f"Fetching from {self.provider_name}",
+                    details={"word": word},
                 )
 
             params = {
@@ -166,25 +160,21 @@ class WiktionaryConnector(DictionaryConnector):
                 if stage == "connecting" and state_tracker:
                     # Schedule async progress report
                     asyncio.create_task(
-                        self._report_progress(
-                            "connecting",
-                            25,
-                            {"provider": self.provider_name, **metadata},
-                            state_tracker,
+                        state_tracker.update(
+                            stage="PROVIDER_FETCH_HTTP_CONNECTING",
+                            message=f"Connecting to {self.provider_name}",
+                            details={"word": word, **metadata},
                         )
                     )
                 elif stage == "downloaded":
-                    metrics.connection_time_ms = metadata.get("connection_time_ms", 0)
-                    metrics.download_time_ms = metadata.get("download_time_ms", 0)
-                    metrics.response_size_bytes = metadata.get("response_size_bytes", 0)
+
                     if state_tracker:
                         # Schedule async progress report
                         asyncio.create_task(
-                            self._report_progress(
-                                "downloading",
-                                50,
-                                {"provider": self.provider_name, **metadata},
-                                state_tracker,
+                            state_tracker.update(
+                                stage="PROVIDER_FETCH_HTTP_DOWNLOADING",
+                                message=f"Downloading from {self.provider_name}",
+                                details={"word": word, **metadata},
                             )
                         )
 
@@ -192,7 +182,9 @@ class WiktionaryConnector(DictionaryConnector):
                 self.base_url,
                 params=params,
                 ttl_hours=24.0,
-                headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
+                headers={
+                    "User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"
+                },
                 timeout=30.0,
                 progress_callback=http_progress_callback if state_tracker else None,
             )
@@ -200,22 +192,21 @@ class WiktionaryConnector(DictionaryConnector):
             if response.status_code == 429:
                 logger.warning("Rate limited by Wiktionary, waiting 60s...")
                 if state_tracker:
-                    await self._report_progress(
-                        "downloading",
-                        50,
-                        {
-                            "provider": self.provider_name,
-                            "status": "rate_limited",
-                            "wait_time": 60,
-                        },
-                        state_tracker,
+                    await state_tracker.update(
+                        stage="PROVIDER_FETCH_HTTP_RATE_LIMITED",
+                        message=f"Rate limited by {self.provider_name}, waiting 60s...",
+                        details={"word": word},
                     )
+
                 await asyncio.sleep(60)
+
                 response = await self.http_client.get(
                     self.base_url,
                     params=params,
                     force_refresh=True,
-                    headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
+                    headers={
+                        "User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"
+                    },
                     timeout=30.0,
                     progress_callback=http_progress_callback if state_tracker else None,
                 )
@@ -225,76 +216,47 @@ class WiktionaryConnector(DictionaryConnector):
 
             # Report parsing start
             if state_tracker:
-                await self._report_progress(
-                    "parsing",
-                    75,
-                    {
+                await state_tracker.update(
+                    stage="PROVIDER_FETCH_HTTP_PARSING",
+                    message=f"Parsing response from {self.provider_name}",
+                    details={
                         "provider": self.provider_name,
                         "word": word,
                         "response_size": len(str(data)),
                     },
-                    state_tracker,
                 )
 
-            parse_start = time.time()
             result = self._parse_wiktionary_response(word, data)
-            metrics.parse_time_ms = (time.time() - parse_start) * 1000
-
-            # Calculate quality metrics if we have a result
-            if result:
-                metrics.success = True
-                metrics.definitions_count = len(result.definitions) if result.definitions else 0
-                metrics.has_pronunciation = bool(result.raw_metadata.get("pronunciation") if result.raw_metadata else False)
-                metrics.has_etymology = bool(result.raw_metadata.get("etymology") if result.raw_metadata else False)
-                metrics.has_examples = any(
-                    d.examples and (d.examples.generated or d.examples.literature)
-                    for d in (result.definitions or [])
-                )
-                metrics.calculate_completeness_score()
-            else:
-                metrics.success = False
-
-            metrics.response_time_ms = (time.time() - start_time) * 1000
 
             # Report completion
             if state_tracker:
-                await self._report_progress(
-                    "complete",
-                    100,
-                    {
+                await state_tracker.update(
+                    stage="PROVIDER_FETCH_HTTP_COMPLETE",
+                    message=f"Completed fetching from {self.provider_name}",
+                    details={
                         "provider": self.provider_name,
                         "word": word,
-                        "success": metrics.success,
-                        "metrics": metrics.__dict__,
+                        "success": bool(result),
                     },
-                    state_tracker,
                 )
 
             return result
 
         except Exception as e:
-            metrics.success = False
-            metrics.error_message = str(e)
-            metrics.response_time_ms = (time.time() - start_time) * 1000
 
             if state_tracker:
-                await self._report_progress(
-                    "complete",
-                    100,
-                    {
-                        "provider": self.provider_name,
-                        "word": word,
-                        "success": False,
-                        "error": str(e),
-                        "metrics": metrics.__dict__,
-                    },
-                    state_tracker,
+                await state_tracker.update(
+                    stage="PROVIDER_FETCH_ERROR",
+                    message=f"Error fetching from {self.provider_name}",
+                    details={"word": word, "error": str(e)},
                 )
 
             logger.error(f"Error fetching {word} from Wiktionary: {e}")
             return None
 
-    def _parse_wiktionary_response(self, word: str, data: dict[str, Any]) -> ProviderData | None:
+    def _parse_wiktionary_response(
+        self, word: str, data: dict[str, Any]
+    ) -> ProviderData | None:
         """Parse Wiktionary response comprehensively."""
         try:
             pages = data.get("query", {}).get("pages", [])
@@ -355,7 +317,9 @@ class WiktionaryConnector(DictionaryConnector):
             logger.error(f"Error in comprehensive extraction: {e}")
             return WiktionaryExtractedData(definitions=[])
 
-    def _find_language_section(self, parsed: wtp.WikiList, language: str) -> wtp.Section | None:
+    def _find_language_section(
+        self, parsed: wtp.WikiList, language: str
+    ) -> wtp.Section | None:
         """Find the specific language section using wtp.Section hierarchy."""
         for section in parsed.sections:
             if (
@@ -446,7 +410,9 @@ class WiktionaryConnector(DictionaryConnector):
                         )
                         if clean_example and len(clean_example) > 10:
                             examples.generated.append(
-                                GeneratedExample(sentence=clean_example, regenerable=False)
+                                GeneratedExample(
+                                    sentence=clean_example, regenerable=False
+                                )
                             )
 
                 elif template_name.startswith("quote"):
@@ -459,7 +425,9 @@ class WiktionaryConnector(DictionaryConnector):
                             )
                             if clean_quote and len(clean_quote) > 15:
                                 examples.generated.append(
-                                    GeneratedExample(sentence=clean_quote, regenerable=False)
+                                    GeneratedExample(
+                                        sentence=clean_quote, regenerable=False
+                                    )
                                 )
                                 break
 
@@ -494,7 +462,11 @@ class WiktionaryConnector(DictionaryConnector):
                     for arg in template.arguments:
                         if not arg.name:  # Positional arguments
                             arg_value = str(arg.value).strip()
-                            if arg_value and len(arg_value) > 1 and arg_value not in ["en", "lang"]:
+                            if (
+                                arg_value
+                                and len(arg_value) > 1
+                                and arg_value not in ["en", "lang"]
+                            ):
                                 clean_syn = self._clean_synonym(arg_value)
                                 if clean_syn:
                                     synonyms.append(clean_syn)
@@ -580,7 +552,9 @@ class WiktionaryConnector(DictionaryConnector):
 
         for subsection in section.sections:
             title = subsection.title
-            if title and any(term in title.lower() for term in ["related", "derived", "see also"]):
+            if title and any(
+                term in title.lower() for term in ["related", "derived", "see also"]
+            ):
                 items = self._extract_wikilist_items(str(subsection))
                 for item in items:
                     clean_term = self.cleaner.clean_text(item)
@@ -641,7 +615,8 @@ class WiktionaryConnector(DictionaryConnector):
         if (
             len(cleaned) < 2
             or len(cleaned) > 50
-            or cleaned.lower() in {"thesaurus", "see", "also", "compare", "etc", "and", "or"}
+            or cleaned.lower()
+            in {"thesaurus", "see", "also", "compare", "etc", "and", "or"}
         ):
             return None
 

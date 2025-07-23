@@ -4,7 +4,7 @@
     <div class="relative">
       <div
         ref="progressBarRef"
-        class="h-8 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+        class="h-8 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700 relative"
         :class="[
           'shadow-inner',
           'border border-gray-300 dark:border-gray-600',
@@ -16,10 +16,11 @@
         <div
           class="h-full rounded-full transition-all duration-500 ease-out"
           :style="{ 
-            width: `${progress}%`,
+            width: `${normalizedProgress}%`,
             background: rainbowGradient
           }"
-          :class="['shadow-lg', progress < 100 ? 'animate-pulse' : '']"
+          :class="['shadow-lg', normalizedProgress < 100 ? 'animate-pulse' : '']"
+          :data-progress="normalizedProgress"
         />
       </div>
 
@@ -39,22 +40,30 @@
             :open-delay="100"
             :close-delay="50"
           >
-            <HoverCardTrigger>
-              <div
-                class="h-6 w-6 rounded-full border-2 transition-all duration-300"
+            <HoverCardTrigger as-child>
+              <button
+                class="h-6 w-6 rounded-full border-2 transition-all duration-300 outline-none"
                 :class="[
-                  progress >= checkpoint.progress
-                    ? 'scale-110 border-primary shadow-lg shadow-primary/20'
-                    : 'border-gray-400 dark:border-gray-500',
+                  normalizedProgress >= checkpoint.progress
+                    ? 'scale-110 border-primary bg-primary'
+                    : 'border-gray-400 dark:border-gray-500 bg-background',
                   isActiveCheckpoint(checkpoint.progress)
-                    ? 'animate-pulse ring-2 ring-primary/30'
+                    ? 'animate-pulse'
                     : '',
                   interactive ? 'cursor-pointer hover:scale-125' : 'cursor-help hover:scale-125',
                 ]"
                 @click="handleCheckpointClick(checkpoint)"
+                :aria-label="`${checkpoint.label} - ${checkpoint.progress}%`"
+                :style="{
+                  boxShadow: isActiveCheckpoint(checkpoint.progress) 
+                    ? '0 0 0 4px rgba(59, 130, 246, 0.2)' 
+                    : progress >= checkpoint.progress 
+                      ? '0 4px 6px -1px rgba(59, 130, 246, 0.2)' 
+                      : 'none'
+                }"
               />
             </HoverCardTrigger>
-          <HoverCardContent class="w-60" side="top" :side-offset="16" align="center" :align-offset="0">
+          <HoverCardContent class="w-60 z-[10000]" side="top" :side-offset="16" align="center" :align-offset="0">
             <div class="space-y-2">
               <div class="flex items-center justify-between">
                 <h4 class="font-semibold text-sm">{{ checkpoint.label }}</h4>
@@ -102,6 +111,12 @@ interface Props {
   stageMessage?: string
 }
 
+// Ensure progress is a number
+const normalizedProgress = computed(() => {
+  const p = Number(props.progress) || 0;
+  return Math.max(0, Math.min(100, p));
+});
+
 interface Emits {
   (e: 'progress-change', progress: number): void
 }
@@ -122,8 +137,16 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>()
 
 // Debug logging
-watch(() => props.progress, (newVal) => {
-  console.log('LoadingProgress received progress:', newVal)
+watch(() => props.progress, (newVal, oldVal) => {
+  console.log(`LoadingProgress prop: ${oldVal} → ${newVal}`)
+})
+
+watch(normalizedProgress, (newVal, oldVal) => {
+  console.log(`LoadingProgress normalized: ${oldVal} → ${newVal}`)
+})
+
+watch(() => props.currentStage, (newVal) => {
+  console.log('LoadingProgress stage:', newVal)
 })
 
 const progressBarRef = ref<HTMLElement>()
@@ -149,7 +172,7 @@ const getCheckpointDescription = (progress: number): string => {
 const isActiveCheckpoint = (checkpointProgress: number): boolean => {
   // Find the current checkpoint range
   const sortedCheckpoints = props.checkpoints.sort((a, b) => a.progress - b.progress)
-  const currentIndex = sortedCheckpoints.findIndex(cp => cp.progress >= props.progress)
+  const currentIndex = sortedCheckpoints.findIndex(cp => cp.progress >= normalizedProgress.value)
   
   if (currentIndex === -1) {
     // Progress is beyond all checkpoints, check if this is the last one

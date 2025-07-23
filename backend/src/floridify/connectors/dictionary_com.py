@@ -6,9 +6,9 @@ import asyncio
 import time
 from typing import Any
 
+from ..core.state_tracker import PipelineState, StateTracker
 from ..models import ProviderData
 from ..utils.logging import get_logger
-from ..utils.state_tracker import ProviderMetrics, StateTracker
 from .base import DictionaryConnector
 
 logger = get_logger(__name__)
@@ -40,7 +40,6 @@ class DictionaryComConnector(DictionaryConnector):
         self,
         word: str,
         state_tracker: StateTracker | None = None,
-        progress_callback: Any | None = None,
     ) -> ProviderData | None:
         """Fetch definition data for a word from Dictionary.com.
 
@@ -54,19 +53,13 @@ class DictionaryComConnector(DictionaryConnector):
         Returns:
             None (stub implementation)
         """
-        # Initialize timing and metrics
-        start_time = time.time()
-        metrics = ProviderMetrics(
-            provider_name=self.provider_name,
-            response_time_ms=0,
-            response_size_bytes=0,
-        )
-
         try:
             # Report start
             if state_tracker:
-                await self._report_progress(
-                    "start", 0, {"provider": self.provider_name, "word": word}, state_tracker
+                await state_tracker.update(
+                    stage="PROVIDER_FETCH_START",
+                    message=f"Fetching from {self.provider_name}",
+                    details={"word": word},
                 )
 
             # TODO: Implement Dictionary.com API integration
@@ -75,45 +68,27 @@ class DictionaryComConnector(DictionaryConnector):
             # Simulate some work for the stub
             await asyncio.sleep(0.1)  # Simulate network delay
 
-            # Report completion (stub always fails)
-            metrics.success = False
-            metrics.error_message = "Dictionary.com connector not implemented"
-            metrics.response_time_ms = (time.time() - start_time) * 1000
-
             if state_tracker:
-                await self._report_progress(
-                    "complete",
-                    100,
-                    {
-                        "provider": self.provider_name,
+                await state_tracker.update(
+                    stage="PROVIDER_FETCH_COMPLETE",
+                    message=f"Fetch complete for {self.provider_name}",
+                    details={
                         "word": word,
                         "success": False,
-                        "error": metrics.error_message,
-                        "metrics": metrics.__dict__,
+                        "error": "Dictionary.com connector not implemented",
                     },
-                    state_tracker,
                 )
 
             return None
 
         except Exception as e:
-            metrics.success = False
-            metrics.error_message = str(e)
-            metrics.response_time_ms = (time.time() - start_time) * 1000
-
             if state_tracker:
-                await self._report_progress(
-                    "complete",
-                    100,
-                    {
-                        "provider": self.provider_name,
-                        "word": word,
-                        "success": False,
-                        "error": str(e),
-                        "metrics": metrics.__dict__,
-                    },
-                    state_tracker,
+                await state_tracker.update(
+                    stage="PROVIDER_FETCH_ERROR",
+                    message=f"Error fetching from {self.provider_name}",
+                    details={"word": word, "error": str(e)},
                 )
 
             logger.error(f"Error in Dictionary.com stub for {word}: {e}")
+
             return None
