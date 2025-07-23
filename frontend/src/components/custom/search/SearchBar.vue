@@ -232,6 +232,32 @@
                             </div>
                         </div>
 
+                        <!-- Languages (Lookup Mode) -->
+                        <div
+                            v-if="store.searchMode === 'lookup'"
+                            class="border-t border-border/50 px-4 py-3"
+                        >
+                            <h3 class="mb-3 text-sm font-medium">Languages</h3>
+                            <div class="flex flex-wrap gap-2">
+                                <button
+                                    v-for="language in languages"
+                                    :key="language.value"
+                                    @click="handleLanguageToggle(language.value)"
+                                    :class="[
+                                        'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium',
+                                        store.selectedLanguages.includes(
+                                            language.value
+                                        )
+                                            ? 'bg-primary text-primary-foreground shadow-sm'
+                                            : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                                    ]"
+                                >
+                                    <component :is="language.icon" :size="16" />
+                                    {{ language.label }}
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- AI Suggestions -->
                         <div
                             v-if="
@@ -249,9 +275,9 @@
                                         v-for="word in aiSuggestions"
                                         :key="word"
                                         variant="outline"
-                                        size="sm"
+                                        size="default"
                                         class="hover-text-grow flex-shrink-0
-                                            text-xs whitespace-nowrap"
+                                            text-sm whitespace-nowrap font-medium"
                                         @click="selectWord(word)"
                                     >
                                         {{ word }}
@@ -410,8 +436,9 @@ import type { SearchResult } from '@/types';
 import { Button } from '@/components/ui';
 import { FancyF, HamburgerIcon } from '@/components/custom/icons';
 import { BouncyToggle } from '@/components/custom/animation';
-import { RefreshCw } from 'lucide-vue-next';
+import { RefreshCw, Languages, Globe } from 'lucide-vue-next';
 import {
+    AppleIcon,
     WiktionaryIcon,
     OxfordIcon,
     DictionaryIcon,
@@ -453,11 +480,12 @@ const isContainerHovered = ref(false);
 const isFocused = ref(false);
 const isShrunken = ref(false);
 const regenerateRotation = ref(0);
+const isInteractingWithSearchArea = ref(false);
 
-// Enhanced dropdown state management
+// KISS dropdown state management
+const inputFocused = ref(false);
 const showControls = ref(false);
 const showResults = ref(false);
-const isInteractingWithSearchArea = ref(false);
 
 // Simplified scroll tracking for continuous animations
 type SearchBarState = 'normal' | 'hovering' | 'focused';
@@ -495,14 +523,12 @@ const placeholder = computed(() =>
 );
 const rainbowGradient = computed(() => generateRainbowGradient(8));
 
-// Independent: search results only depend on input state
+// KISS: Show search results dropdown when input focused AND query exists AND not doing definition lookup
 const shouldShowResults = computed(() => {
     return (
-        isFocused.value &&
-        query.value.length > 0 &&
-        (searchResults.value.length > 0 ||
-            isSearching.value ||
-            query.value.length >= 2)
+        inputFocused.value &&
+        query.value.trim().length > 0 &&
+        !store.isSearching
     );
 });
 
@@ -523,7 +549,8 @@ watch(
     () => store.showControls,
     (newVal) => {
         showControls.value = newVal;
-    }
+    },
+    { immediate: true }
 );
 
 // Simple state transitions for hover/focus only
@@ -664,6 +691,16 @@ const sources = [
     { id: 'wiktionary', name: 'Wiktionary', icon: WiktionaryIcon },
     { id: 'oxford', name: 'Oxford', icon: OxfordIcon },
     { id: 'dictionary_com', name: 'Dictionary.com', icon: DictionaryIcon },
+    { id: 'apple_dictionary', name: 'Apple Dictionary', icon: AppleIcon },
+];
+
+// Languages configuration with Lucide icons
+const languages = [
+    { value: 'en', label: 'EN', icon: Globe },
+    { value: 'fr', label: 'FR', icon: Languages },
+    { value: 'es', label: 'ES', icon: Languages },
+    { value: 'de', label: 'DE', icon: Languages },
+    { value: 'it', label: 'IT', icon: Languages },
 ];
 
 // Initialize document height for timeline calculations
@@ -714,6 +751,7 @@ const handleBlurWrapper = () => {
 
 const handleFocus = () => {
     isFocused.value = true;
+    inputFocused.value = true; // KISS: Set input focused state
 
     // Transition to focused state
     transitionToState('focused');
@@ -741,8 +779,9 @@ const handleBlur = () => {
         if (isInteractingWithSearchArea.value) return;
 
         isFocused.value = false;
+        inputFocused.value = false; // KISS: Clear input focused state
 
-        // Always hide results on blur (independent of controls)
+        // KISS: Always hide results on blur (independent of controls)
         showResults.value = false;
         searchResults.value = [];
         isSearching.value = false;
@@ -943,10 +982,12 @@ const handleForceRegenerate = () => {
 
 const handleSourceToggle = (sourceId: string) => {
     store.toggleSource(sourceId);
-    // Restore focus to search input after toggling source
-    nextTick(() => {
-        searchInput.value?.focus();
-    });
+    // Don't restore focus - let user continue interacting with controls
+};
+
+const handleLanguageToggle = (languageCode: string) => {
+    store.toggleLanguage(languageCode);
+    // Don't restore focus - let user continue interacting with controls
 };
 
 const handleModeToggle = () => {

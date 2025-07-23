@@ -641,3 +641,12 @@
 [data-theme]:not([data-theme='default']) .themed-definition-text {
     color: var(--theme-text-muted);
 }
+
+/* Themed word type background for sidebar active state */
+[data-theme='default'] .themed-word-type-bg {
+    @apply bg-secondary;
+}
+
+[data-theme]:not([data-theme='default']) .themed-word-type-bg {
+    background-color: var(--theme-bg-subtle);
+}

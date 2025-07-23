@@ -15,14 +15,54 @@ from ..utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+class Stages:
+    """Optimized stage constants with progress mapping."""
+    
+    # Main pipeline stages with expected progress values
+    START = "START"
+    SEARCH_START = "SEARCH_START"
+    SEARCH_COMPLETE = "SEARCH_COMPLETE" 
+    PROVIDER_FETCH_START = "PROVIDER_FETCH_START"
+    PROVIDER_FETCH_COMPLETE = "PROVIDER_FETCH_COMPLETE"
+    AI_CLUSTERING = "AI_CLUSTERING"
+    AI_SYNTHESIS = "AI_SYNTHESIS"
+    AI_FALLBACK = "AI_FALLBACK"
+    STORAGE_SAVE = "STORAGE_SAVE"
+    COMPLETE = "COMPLETE"
+    ERROR = "ERROR"
+    
+    # Provider sub-stages (rarely used by frontend)
+    PROVIDER_FETCH_HTTP_CONNECTING = "PROVIDER_FETCH_HTTP_CONNECTING"
+    PROVIDER_FETCH_HTTP_DOWNLOADING = "PROVIDER_FETCH_HTTP_DOWNLOADING"
+    PROVIDER_FETCH_HTTP_RATE_LIMITED = "PROVIDER_FETCH_HTTP_RATE_LIMITED"
+    PROVIDER_FETCH_HTTP_PARSING = "PROVIDER_FETCH_HTTP_PARSING"
+    PROVIDER_FETCH_HTTP_COMPLETE = "PROVIDER_FETCH_HTTP_COMPLETE"
+    PROVIDER_FETCH_ERROR = "PROVIDER_FETCH_ERROR"
+    
+    # Progress mapping for automatic progress calculation
+    PROGRESS_MAP = {
+        START: 5,
+        SEARCH_START: 10,
+        SEARCH_COMPLETE: 20,
+        PROVIDER_FETCH_START: 25,
+        PROVIDER_FETCH_COMPLETE: 60,
+        AI_CLUSTERING: 70,
+        AI_SYNTHESIS: 85,
+        AI_FALLBACK: 90,
+        STORAGE_SAVE: 95,
+        COMPLETE: 100,
+        ERROR: 0,
+    }
+
+
 class PipelineState(BaseModel):
-    """Represents the current state of a pipeline operation."""
+    """Optimized pipeline state with minimal payload size."""
 
     stage: str = Field(..., description="Current stage identifier")
     progress: int = Field(0, ge=0, le=100, description="Progress from 0 to 100")
     message: str = Field("", description="Human-readable status message")
-    details: dict[str, Any] = Field(
-        default_factory=dict, description="Additional stage-specific details"
+    details: dict[str, Any] | None = Field(
+        default=None, description="Optional stage-specific details (for debugging)"
     )
     timestamp: datetime = Field(
         default_factory=datetime.now, description="When this state was recorded"
@@ -33,6 +73,29 @@ class PipelineState(BaseModel):
     error: str | None = Field(
         default=None, description="Error message if pipeline failed"
     )
+
+    def model_dump_optimized(self) -> dict[str, Any]:
+        """Return optimized dict with only essential fields for frontend."""
+        result = {
+            "stage": self.stage,
+            "progress": self.progress,
+        }
+        
+        # Only include message if it differs from stage (avoid redundancy)
+        if self.message and self.message.lower() != self.stage.lower().replace('_', ' '):
+            result["message"] = self.message
+            
+        # Only include details for debugging or if explicitly needed
+        if self.details:
+            result["details"] = self.details
+            
+        # Include completion/error states
+        if self.is_complete:
+            result["is_complete"] = True
+        if self.error:
+            result["error"] = self.error
+            
+        return result
 
 
 class StateTracker:
@@ -58,7 +121,7 @@ class StateTracker:
             stage=stage,
             progress=progress,
             message=message,
-            details=details or {},
+            details=details,
             timestamp=datetime.now(),
             is_complete=is_complete,
             error=error,
@@ -76,6 +139,30 @@ class StateTracker:
                 subscriber.put_nowait(state)
             except asyncio.QueueFull:
                 logger.warning("Subscriber queue full, skipping state update")
+
+    async def update_stage(self, stage: str, progress: int | None = None) -> None:
+        """Optimized update for stage-only changes (most common case)."""
+        # Auto-calculate progress from stage if not provided
+        if progress is None:
+            progress = Stages.PROGRESS_MAP.get(stage, 0)
+        await self.update(stage=stage, progress=progress)
+
+    async def update_progress(self, progress: int) -> None:
+        """Optimized update for progress-only changes."""
+        if self._current_state:
+            await self.update(
+                stage=self._current_state.stage,
+                progress=progress,
+                message=self._current_state.message,
+            )
+
+    async def update_complete(self, stage: str = "COMPLETE", message: str = "Pipeline completed") -> None:
+        """Optimized update for completion."""
+        await self.update(stage=stage, progress=100, message=message, is_complete=True)
+
+    async def update_error(self, error: str, stage: str = "ERROR") -> None:
+        """Optimized update for errors."""
+        await self.update(stage=stage, error=error, is_complete=True)
 
     async def get_states(self) -> AsyncGenerator[PipelineState, None]:
         """Get state updates as they occur."""

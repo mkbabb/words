@@ -80,7 +80,7 @@ check_env_file() {
     fi
 }
 
-# Function to manage SSH tunnel for DocumentDB access (local development only)
+# SSH tunnel for DocumentDB access (required since DocumentDB is VPC-only)
 manage_ssh_tunnel() {
     local action="$1"
     local tunnel_port="27018"
@@ -89,14 +89,13 @@ manage_ssh_tunnel() {
     
     case "$action" in
         "start")
-            # Check if tunnel is already running
             if lsof -Pi :$tunnel_port -sTCP:LISTEN -t >/dev/null 2>&1; then
                 echo "📡 SSH tunnel already active on port $tunnel_port"
                 return 0
             fi
             
             echo "📡 Creating SSH tunnel to DocumentDB..."
-            ssh -o ExitOnForwardFailure=yes -f -N -L 0.0.0.0:$tunnel_port:$docdb_host:27017 ubuntu@$ec2_host
+            ssh -o StrictHostKeyChecking=no -f -N -L $tunnel_port:$docdb_host:27017 ubuntu@$ec2_host
             
             if [ $? -eq 0 ]; then
                 sleep 2
@@ -127,6 +126,7 @@ manage_ssh_tunnel() {
             ;;
     esac
 }
+
 
 # Function to display configuration information from auth/config.toml
 display_config_info() {
@@ -165,7 +165,7 @@ display_config_info() {
         fi
         echo "  OpenAI API Key: $api_key_status"
         
-        # Check SSH tunnel status for local development
+        # Check SSH tunnel status for DocumentDB access
         manage_ssh_tunnel status >/dev/null 2>&1
         if [ $? -eq 0 ]; then
             echo "  SSH Tunnel: ✅ active (DocumentDB accessible)"
@@ -187,7 +187,7 @@ start_docker_servers() {
     check_docker
     check_env_file
     
-    # Start SSH tunnel for DocumentDB access in local development
+    # Start SSH tunnel for DocumentDB access
     manage_ssh_tunnel start
     if [ $? -ne 0 ]; then
         echo "Warning: SSH tunnel failed - DocumentDB will not be accessible"
@@ -214,7 +214,7 @@ start_docker_servers() {
     echo "🚀 Floridify servers are running in Docker!"
     echo "  Backend:  http://localhost:8000"
     echo "  Frontend: http://localhost:3000"
-    echo "  MongoDB:  mongodb://localhost:27017"
+    echo "  MongoDB:  DocumentDB via SSH tunnel (localhost:27018)"
     echo ""
     echo "Useful commands:"
     echo "  docker-compose ps          - Show container status"

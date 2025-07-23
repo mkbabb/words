@@ -1,3 +1,4 @@
+export { default as AppleIcon } from './AppleIcon.vue'
 export { default as StarIcon } from './StarIcon.vue'
 export { default as DictionaryIcon } from './DictionaryIcon.vue'
 export { default as FancyF } from './FancyF.vue'

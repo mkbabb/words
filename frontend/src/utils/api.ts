@@ -4,7 +4,6 @@ import type {
   SearchResult,
   ThesaurusEntry,
   VocabularySuggestionsResponse,
-  FactsAPIResponse,
 } from '@/types';
 
 const api = axios.create({
@@ -78,9 +77,27 @@ export const dictionaryApi = {
   },
 
   // Get word definition
-  async getDefinition(word: string, forceRefresh: boolean = false): Promise<SynthesizedDictionaryEntry> {
+  async getDefinition(
+    word: string, 
+    forceRefresh: boolean = false,
+    providers?: string[],
+    languages?: string[]
+  ): Promise<SynthesizedDictionaryEntry> {
+    const params = new URLSearchParams();
+    if (forceRefresh) params.append('force_refresh', 'true');
+    
+    // Add providers to the query parameters
+    if (providers && providers.length > 0) {
+      providers.forEach(provider => params.append('providers', provider));
+    }
+    
+    // Add languages to the query parameters
+    if (languages && languages.length > 0) {
+      languages.forEach(language => params.append('languages', language));
+    }
+    
     const response = await api.get(`/lookup/${word}`, {
-      params: forceRefresh ? { force_refresh: true } : undefined
+      params: Object.fromEntries(params.entries())
     });
     return response.data;
   },
@@ -90,6 +107,7 @@ export const dictionaryApi = {
     word: string,
     forceRefresh: boolean = false,
     providers?: string[],
+    languages?: string[],
     onProgress?: (stage: string, progress: number, message: string, details?: any) => void
   ): Promise<SynthesizedDictionaryEntry> {
     return new Promise((resolve, reject) => {
@@ -99,6 +117,11 @@ export const dictionaryApi = {
       // Add providers to the query parameters
       if (providers && providers.length > 0) {
         providers.forEach(provider => params.append('providers', provider));
+      }
+      
+      // Add languages to the query parameters
+      if (languages && languages.length > 0) {
+        languages.forEach(language => params.append('languages', language));
       }
       
       const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
@@ -138,7 +161,10 @@ export const dictionaryApi = {
           clearTimeout(connectionTimeout);
           eventSource.close();
           console.log('SSE connection completed successfully');
-          resolve(data);
+          
+          // Extract the result from the details field, or fallback to direct data
+          const result = data.details?.result || data;
+          resolve(result);
         } catch (e) {
           clearTimeout(connectionTimeout);
           eventSource.close();
@@ -208,20 +234,6 @@ export const dictionaryApi = {
     }
   },
 
-  // Get interesting facts about a word
-  async getWordFacts(
-    word: string,
-    count: number = 5,
-    previousWords?: string[]
-  ): Promise<FactsAPIResponse> {
-    const params: any = { count };
-    if (previousWords && previousWords.length > 0) {
-      params.previous_words = previousWords.slice(0, 20); // Limit to 20 words
-    }
-    
-    const response = await api.get(`/facts/${word}`, { params });
-    return response.data;
-  },
 
   // Regenerate examples for a definition
   async regenerateExamples(

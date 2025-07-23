@@ -57,6 +57,8 @@ dependencies = [
     # "scipy>=1.11.0",   # DISABLED - heavy scientific computing
     # "matplotlib>=3.8.0",  # DISABLED - heavy plotting library
     "psutil>=7.0.0",
+    "pyobjc-framework-coreservices>=11.1",
+    "nltk>=3.9.1",
 ]
 
 

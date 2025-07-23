@@ -30,7 +30,7 @@ For "run":
 
 Return a list of cluster mappings, where each mapping contains:
 
-1. **cluster_id**: Unique identifier using format {EXACT_INPUT_NAME}\_{CLUSTER_NAME} (e.g., "bank_financial", "bank_geographic") -- the cluster names should be pithy, minimal, and pertinent. Short names are preferred.
+1. **cluster_id**: Unique identifier using the format {EXACT_INPUT_NAME}\_{CLUSTER_NAME} (e.g., "bank_financial", "bank_geographic") -- the cluster names should be pithy, minimal, and pertinent. Short names are preferred.
 2. **cluster_description**: Human-readable description of this cluster
 3. **definition_indices**: List of definition indices (0-based) that belong to this cluster
 4. **confidence**: Overall confidence in the clustering (0.0-1.0)
@@ -39,13 +39,10 @@ Return a list of cluster mappings, where each mapping contains:
 ## Guidelines
 
 - Only create separate clusters for truly distinct senses/meanings
-- Don't separate for minor variations of the same concept
+- **DO NOT** separate for minor variations of the same concept
 - Group related definitions together regardless of word type
 - Ensure every definition ID appears in exactly one cluster
-- **CRITICAL**: Always use cluster IDs in format "EXACT_INPUT_NAME_CLUSTER_NAME" where EXACT_INPUT_NAME matches the input word exactly
-- Use descriptive cluster names that clearly identify the meaning context
-- Provide clear, concise cluster descriptions
 
-**Example - Avoid Duplicates**: For "en coulisse" with definitions like "backstage" and "behind the scenes", these should be in ONE cluster since they describe the same core concept.
+**CRITICAL: Avoid Duplicates**: For example, with "en coulisse" has definitions like "backstage" and "behind the scenes", etc: these should be in ONE cluster since they describe the same core concept.
 
 Return a structured response with the numerical mappings.

@@ -67,7 +67,6 @@
       :word="store.searchQuery || 'serendipity'"
       :progress="isRealPipeline ? store.loadingProgress : simulatedProgress"
       :current-stage="isRealPipeline ? store.loadingStage : simulatedStage"
-      :facts="mockFacts"
       :allow-dismiss="true"
       @progress-change="handleProgressChange"
     />
@@ -90,11 +89,6 @@ const simulatedProgress = ref(0)
 const simulatedStage = ref('Initializing...')
 const isRealPipeline = ref(false)
 
-// Mock facts for demo
-const mockFacts = ref([
-  { content: 'This word was coined by Horace Walpole in 1754', category: 'etymology', confidence: 0.95 },
-  { content: 'Derived from the Persian fairy tale "The Three Princes of Serendip"', category: 'origin', confidence: 0.88 },
-])
 
 // Pipeline stages for mock - using keys that match LoadingModal's stageMessages
 const stages = [

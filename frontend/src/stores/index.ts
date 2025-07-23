@@ -37,7 +37,9 @@ export const useAppStore = defineStore('app', () => {
                 'wiktionary',
                 'oxford',
                 'dictionary_com',
+                'apple_dictionary',
             ] as string[],
+            selectedLanguages: ['en'] as string[],
             showControls: false,
             selectedWordlist: null as string | null,
         },
@@ -71,6 +73,10 @@ export const useAppStore = defineStore('app', () => {
                                 'dictionary_com',
                             ];
                         }
+                        // Validate selected languages
+                        if (!Array.isArray(parsed.selectedLanguages)) {
+                            parsed.selectedLanguages = ['en'];
+                        }
                         return parsed;
                     } catch {
                         return {
@@ -85,6 +91,7 @@ export const useAppStore = defineStore('app', () => {
                                 'oxford',
                                 'dictionary_com',
                             ],
+                            selectedLanguages: ['en'],
                             showControls: false,
                             selectedWordlist: null,
                         };
@@ -175,6 +182,13 @@ export const useAppStore = defineStore('app', () => {
         get: () => uiState.value.selectedSources,
         set: (value) => {
             uiState.value.selectedSources = value;
+        },
+    });
+
+    const selectedLanguages = computed({
+        get: () => uiState.value.selectedLanguages,
+        set: (value) => {
+            uiState.value.selectedLanguages = value;
         },
     });
 
@@ -331,10 +345,10 @@ export const useAppStore = defineStore('app', () => {
         }
     }
 
-    async function getDefinition(word: string, overrideForceRefresh?: boolean) {
+    async function getDefinition(word: string, forceRefresh?: boolean) {
         // Use forceRefreshMode state or explicit override
         const shouldForceRefresh =
-            overrideForceRefresh ?? forceRefreshMode.value;
+            forceRefresh ?? forceRefreshMode.value;
 
         isSearching.value = true;
         loadingProgress.value = 0;
@@ -350,6 +364,7 @@ export const useAppStore = defineStore('app', () => {
                 word,
                 shouldForceRefresh,
                 selectedSources.value, // Pass selected providers
+                selectedLanguages.value, // Pass selected languages
                 (stage, progress, message, details) => {
                     // Enhanced debug logging with provider info
                     console.log(
@@ -605,6 +620,15 @@ export const useAppStore = defineStore('app', () => {
         }
     }
 
+    function toggleLanguage(language: string) {
+        const languages = selectedLanguages.value;
+        if (languages.includes(language)) {
+            selectedLanguages.value = languages.filter((l: string) => l !== language);
+        } else {
+            selectedLanguages.value = [...languages, language];
+        }
+    }
+
     function setWordlist(wordlist: string | null) {
         selectedWordlist.value = wordlist;
     }
@@ -730,6 +754,7 @@ export const useAppStore = defineStore('app', () => {
         // Enhanced SearchBar state
         searchMode,
         selectedSources,
+        selectedLanguages,
         showControls,
         selectedWordlist,
 
@@ -761,6 +786,7 @@ export const useAppStore = defineStore('app', () => {
         toggleSearchMode,
         toggleControls,
         toggleSource,
+        toggleLanguage,
         setWordlist,
         // Regeneration functions
         regenerateExamples,

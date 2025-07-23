@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from ...caching.decorators import cached_api_call
 from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
-from ...core.state_tracker import lookup_state_tracker
+from ...core.state_tracker import Stages, lookup_state_tracker
 from ...models.models import Definition, Pronunciation
 from ...utils.logging import get_logger
 from .common import PipelineMetrics
@@ -63,6 +63,9 @@ def parse_lookup_params(
     providers: list[str] = Query(
         default=["wiktionary"], description="Dictionary providers"
     ),
+    languages: list[str] = Query(
+        default=["en"], description="Languages to query"
+    ),
     no_ai: bool = Query(default=False, description="Skip AI synthesis"),
 ) -> LookupParams:
     """Parse and validate lookup parameters."""
@@ -78,9 +81,22 @@ def parse_lookup_params(
     if not provider_enums:
         provider_enums = [DictionaryProvider.WIKTIONARY]
 
+    # Convert string languages to enum
+    language_enums = []
+    for language_str in languages:
+        try:
+            language_enums.append(Language(language_str.lower()))
+        except ValueError:
+            # Skip invalid languages
+            logger.warning(f"Invalid language: {language_str}")
+
+    if not language_enums:
+        language_enums = [Language.ENGLISH]
+
     return LookupParams(
         force_refresh=force_refresh,
         providers=provider_enums,
+        languages=language_enums,
         no_ai=no_ai,
     )
 
@@ -201,7 +217,7 @@ async def generate_lookup_events(
                                 not pending_state.is_complete
                                 and not pending_state.error
                             ):
-                                yield f"event: progress\ndata: {json.dumps(jsonable_encoder(pending_state))}\n\n"
+                                yield f"event: progress\ndata: {json.dumps(pending_state.model_dump_optimized())}\n\n"
                         except asyncio.QueueEmpty:
                             break
                     # Emit the final complete event
@@ -211,8 +227,8 @@ async def generate_lookup_events(
                     yield f'event: error\ndata: {{"error": "{state.error}"}}\n\n'
                     break
                 else:
-                    # Always emit the progress event
-                    yield f"event: progress\ndata: {json.dumps(jsonable_encoder(state))}\n\n"
+                    # Always emit the progress event with optimized payload
+                    yield f"event: progress\ndata: {json.dumps(state.model_dump_optimized())}\n\n"
 
     except Exception as e:
         logger.error(f"SSE generation failed: {e}")
@@ -231,17 +247,8 @@ async def _lookup_with_tracking(
     word: str, params: LookupParams
 ) -> LookupResponse | None:
     """Perform lookup with state tracking."""
-    start_time = time.perf_counter()
 
-    await lookup_state_tracker.update(
-        stage="START",
-        message=f"Starting lookup for '{word}'",
-        details={
-            "word": word,
-            "providers": [p.value for p in params.providers],
-            **params.model_dump(),
-        },
-    )
+    await lookup_state_tracker.update_stage(Stages.START)
 
     # Execute the actual lookup pipeline with state tracking
     logger.info(f"Looking up word: {word} with state tracking")
@@ -255,15 +262,10 @@ async def _lookup_with_tracking(
         state_tracker=lookup_state_tracker,
     )
 
-    # Calculate elapsed time for the lookup
-    elapsed_ms = int((time.perf_counter() - start_time) * 1000)
 
     if not entry:
-        await lookup_state_tracker.update(
-            stage="COMPLETE",
-            message="Lookup completed - word not found",
-            is_complete=True,
-            details={"found": False},
+        await lookup_state_tracker.update_complete(
+            message="Word not found"
         )
         return None
 
@@ -276,16 +278,13 @@ async def _lookup_with_tracking(
         pipeline_metrics=None,
     )
 
-    # Mark as complete with result
+    # Mark as complete with result data
     await lookup_state_tracker.update(
-        stage="complete",
-        message="Lookup completed successfully",
+        stage=Stages.COMPLETE,
+        progress=100,
+        message=f"Found {len(result.definitions)} definitions", 
         is_complete=True,
-        details={
-            "found": True,
-            "definitions_count": len(result.definitions),
-            "elapsed_ms": elapsed_ms,
-        },
+        details={"result": result.model_dump()}
     )
 
     return result

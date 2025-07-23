@@ -19,7 +19,7 @@ from ..models import (
     ProviderData,
 )
 from ..utils.logging import get_logger
-from ..core.state_tracker import PipelineState, StateTracker
+from ..core.state_tracker import PipelineState, StateTracker, Stages
 from .base import DictionaryConnector
 
 logger = get_logger(__name__)
@@ -136,11 +136,7 @@ class WiktionaryConnector(DictionaryConnector):
         try:
             # Report start
             if state_tracker:
-                await state_tracker.update(
-                    stage="PROVIDER_FETCH_START",
-                    message=f"Fetching from {self.provider_name}",
-                    details={"word": word},
-                )
+                await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
 
             params = {
                 "action": "query",
@@ -193,9 +189,8 @@ class WiktionaryConnector(DictionaryConnector):
                 logger.warning("Rate limited by Wiktionary, waiting 60s...")
                 if state_tracker:
                     await state_tracker.update(
-                        stage="PROVIDER_FETCH_HTTP_RATE_LIMITED",
-                        message=f"Rate limited by {self.provider_name}, waiting 60s...",
-                        details={"word": word},
+                        stage=Stages.PROVIDER_FETCH_HTTP_RATE_LIMITED,
+                        message="Rate limited - waiting 60s"
                     )
 
                 await asyncio.sleep(60)
@@ -217,13 +212,8 @@ class WiktionaryConnector(DictionaryConnector):
             # Report parsing start
             if state_tracker:
                 await state_tracker.update(
-                    stage="PROVIDER_FETCH_HTTP_PARSING",
-                    message=f"Parsing response from {self.provider_name}",
-                    details={
-                        "provider": self.provider_name,
-                        "word": word,
-                        "response_size": len(str(data)),
-                    },
+                    stage=Stages.PROVIDER_FETCH_HTTP_PARSING,
+                    progress=55
                 )
 
             result = self._parse_wiktionary_response(word, data)
@@ -231,13 +221,8 @@ class WiktionaryConnector(DictionaryConnector):
             # Report completion
             if state_tracker:
                 await state_tracker.update(
-                    stage="PROVIDER_FETCH_HTTP_COMPLETE",
-                    message=f"Completed fetching from {self.provider_name}",
-                    details={
-                        "provider": self.provider_name,
-                        "word": word,
-                        "success": bool(result),
-                    },
+                    stage=Stages.PROVIDER_FETCH_HTTP_COMPLETE,
+                    progress=58
                 )
 
             return result
@@ -245,11 +230,7 @@ class WiktionaryConnector(DictionaryConnector):
         except Exception as e:
 
             if state_tracker:
-                await state_tracker.update(
-                    stage="PROVIDER_FETCH_ERROR",
-                    message=f"Error fetching from {self.provider_name}",
-                    details={"word": word, "error": str(e)},
-                )
+                await state_tracker.update_error(f"Provider error: {str(e)}")
 
             logger.error(f"Error fetching {word} from Wiktionary: {e}")
             return None

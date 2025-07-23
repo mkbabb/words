@@ -6,7 +6,7 @@ import asyncio
 import time
 from typing import Any
 
-from ..core.state_tracker import PipelineState, StateTracker
+from ..core.state_tracker import PipelineState, StateTracker, Stages
 from ..models import ProviderData
 from ..utils.logging import get_logger
 from .base import DictionaryConnector
@@ -56,11 +56,7 @@ class DictionaryComConnector(DictionaryConnector):
         try:
             # Report start
             if state_tracker:
-                await state_tracker.update(
-                    stage="PROVIDER_FETCH_START",
-                    message=f"Fetching from {self.provider_name}",
-                    details={"word": word},
-                )
+                await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
 
             # TODO: Implement Dictionary.com API integration
             logger.info(f"Dictionary.com connector stub called for word: {word}")
@@ -70,24 +66,17 @@ class DictionaryComConnector(DictionaryConnector):
 
             if state_tracker:
                 await state_tracker.update(
-                    stage="PROVIDER_FETCH_COMPLETE",
-                    message=f"Fetch complete for {self.provider_name}",
-                    details={
-                        "word": word,
-                        "success": False,
-                        "error": "Dictionary.com connector not implemented",
-                    },
+                    stage=Stages.PROVIDER_FETCH_COMPLETE,
+                    progress=58,
+                    message="Provider unavailable",
+                    metadata={"error": "Dictionary.com connector not implemented"}
                 )
 
             return None
 
         except Exception as e:
             if state_tracker:
-                await state_tracker.update(
-                    stage="PROVIDER_FETCH_ERROR",
-                    message=f"Error fetching from {self.provider_name}",
-                    details={"word": word, "error": str(e)},
-                )
+                await state_tracker.update_error(f"Provider error: {str(e)}")
 
             logger.error(f"Error in Dictionary.com stub for {word}: {e}")
 

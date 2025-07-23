@@ -1,0 +1,395 @@
+"""Apple Dictionary connector using macOS Dictionary Services via PyObjC."""
+
+from __future__ import annotations
+
+import platform
+import re
+from typing import Any
+
+from ..models import Definition, Examples, ProviderData
+from ..utils.logging import get_logger
+from ..core.state_tracker import StateTracker, Stages
+from .base import DictionaryConnector
+
+logger = get_logger(__name__)
+
+
+class AppleDictionaryError(Exception):
+    """Base exception for Apple Dictionary Service errors."""
+    pass
+
+
+class PlatformError(AppleDictionaryError):
+    """Raised when platform doesn't support Dictionary Services."""
+    pass
+
+
+class ImportError(AppleDictionaryError):
+    """Raised when required PyObjC modules cannot be imported."""
+    pass
+
+
+class AppleDictionaryConnector(DictionaryConnector):
+    """Apple Dictionary connector using macOS Dictionary Services."""
+
+    def __init__(self, rate_limit: float = 10.0) -> None:
+        """Initialize Apple Dictionary connector.
+        
+        Args:
+            rate_limit: Maximum requests per second (default 10.0 for local API)
+        """
+        super().__init__(rate_limit=rate_limit)
+        self._dictionary_service = None
+        self._platform_compatible = self._check_platform_compatibility()
+        self._initialize_service()
+
+    @property
+    def provider_name(self) -> str:
+        """Name of the dictionary provider."""
+        return "apple_dictionary"
+
+    def _check_platform_compatibility(self) -> bool:
+        """Check if running on macOS (Darwin)."""
+        if platform.system() != 'Darwin':
+            logger.warning(f"Apple Dictionary Services not available on {platform.system()}")
+            return False
+        return True
+
+    def _initialize_service(self) -> None:
+        """Initialize macOS Dictionary Services."""
+        if not self._platform_compatible:
+            self._dictionary_service = None
+            return
+
+        try:
+            from CoreServices import DCSCopyTextDefinition
+            self._dictionary_service = DCSCopyTextDefinition
+            logger.info("Apple Dictionary Services initialized successfully")
+        except ImportError as e:
+            logger.warning(
+                f"Failed to import CoreServices.DictionaryServices: {e}. "
+                "Install PyObjC with: pip install pyobjc-framework-CoreServices"
+            )
+            self._dictionary_service = None
+
+    def _is_available(self) -> bool:
+        """Check if Dictionary Services is available."""
+        return self._platform_compatible and self._dictionary_service is not None
+
+    def _lookup_definition(self, word: str) -> str | None:
+        """Look up definition using macOS Dictionary Services.
+        
+        Args:
+            word: The word to look up
+            
+        Returns:
+            Definition text or None if not found
+        """
+        if not self._is_available():
+            return None
+
+        try:
+            # Create CFRange for the entire word
+            word_range = (0, len(word))
+            
+            # Call Dictionary Services
+            definition = self._dictionary_service(None, word, word_range)
+            return definition
+        except Exception as e:
+            logger.error(f"Dictionary lookup failed for '{word}': {e}")
+            return None
+
+    def _parse_apple_definition(self, word: str, raw_definition: str) -> list[Definition]:
+        """Parse Apple Dictionary definition text into structured format.
+        
+        Args:
+            word: The word being defined
+            raw_definition: Raw definition text from Apple Dictionary
+            
+        Returns:
+            List of Definition objects
+        """
+        if not raw_definition:
+            return []
+
+        definitions = []
+        
+        # Clean up the raw definition text
+        cleaned_text = self._clean_definition_text(raw_definition)
+        
+        # Split by numbered definitions (1, 2, 3, etc.)
+        definition_parts = re.split(r'\n(?=\d+\s)', cleaned_text)
+        
+        current_word_type = "unknown"
+        
+        for part in definition_parts:
+            part = part.strip()
+            if not part:
+                continue
+                
+            # Extract word type (noun, verb, adjective, etc.)
+            word_type_match = re.search(r'\b(noun|verb|adjective|adverb|preposition|conjunction|interjection|pronoun|determiner)\b', part, re.IGNORECASE)
+            if word_type_match:
+                current_word_type = word_type_match.group(1).lower()
+            
+            # Extract numbered definitions
+            definition_match = re.search(r'^\d+\s+(.*?)(?=\n\d+|\Z)', part, re.DOTALL)
+            if definition_match:
+                definition_text = definition_match.group(1).strip()
+            else:
+                # Handle cases without numbers
+                definition_text = self._extract_main_definition(part)
+            
+            if definition_text:
+                # Extract examples if present
+                examples = self._extract_examples(definition_text)
+                
+                # Clean definition text of examples
+                clean_definition = self._remove_examples_from_definition(definition_text)
+                
+                definition = Definition(
+                    word_type=self._normalize_word_type(current_word_type),
+                    definition=clean_definition,
+                    synonyms=[],  # Apple Dictionary doesn't typically provide synonyms in structured format
+                    examples=examples,
+                    raw_metadata={
+                        "provider": self.provider_name,
+                        "raw_text": part,
+                        "extracted_word_type": current_word_type
+                    }
+                )
+                definitions.append(definition)
+        
+        # If no structured definitions found, create a single definition
+        if not definitions and cleaned_text:
+            definition = Definition(
+                word_type="unknown",
+                definition=cleaned_text,
+                synonyms=[],
+                examples=Examples(),
+                raw_metadata={
+                    "provider": self.provider_name,
+                    "raw_text": raw_definition,
+                    "fallback_parsing": True
+                }
+            )
+            definitions.append(definition)
+        
+        return definitions
+
+    def _clean_definition_text(self, text: str) -> str:
+        """Clean raw definition text from Apple Dictionary.
+        
+        Args:
+            text: Raw definition text
+            
+        Returns:
+            Cleaned definition text
+        """
+        # Remove pronunciation markers like |ˈæpəl|
+        text = re.sub(r'\|[^|]+\|', '', text)
+        
+        # Remove extra whitespace and normalize
+        text = re.sub(r'\s+', ' ', text)
+        text = text.strip()
+        
+        return text
+
+    def _extract_main_definition(self, text: str) -> str:
+        """Extract the main definition from a text block.
+        
+        Args:
+            text: Text block that may contain definition
+            
+        Returns:
+            Main definition text
+        """
+        # Look for text after word type indicators
+        pattern = r'(?:noun|verb|adjective|adverb|preposition|conjunction|interjection|pronoun|determiner)\s+(.*?)(?:\n|$)'
+        match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        
+        # Fallback: return the whole text if no pattern found
+        return text.strip()
+
+    def _extract_examples(self, definition_text: str) -> Examples:
+        """Extract examples from definition text.
+        
+        Args:
+            definition_text: Definition text that may contain examples
+            
+        Returns:
+            Examples object with extracted examples
+        """
+        examples = Examples()
+        
+        # Look for quoted examples or examples in specific formats
+        example_patterns = [
+            r'"([^"]+)"',  # Quoted examples
+            r':\s*([A-Z][^.!?]*[.!?])',  # Examples after colons
+            r'e\.g\.(?:,)?\s*([^.!?]*[.!?])',  # Examples after "e.g."
+        ]
+        
+        for pattern in example_patterns:
+            matches = re.findall(pattern, definition_text)
+            for match in matches:
+                if len(match.strip()) > 5:  # Filter out very short matches
+                    examples.generated.append({
+                        "example": match.strip(),
+                        "source": "apple_dictionary"
+                    })
+        
+        return examples
+
+    def _remove_examples_from_definition(self, definition_text: str) -> str:
+        """Remove example text from definition to get clean definition.
+        
+        Args:
+            definition_text: Definition text with examples
+            
+        Returns:
+            Clean definition text without examples
+        """
+        # Remove quoted examples
+        text = re.sub(r'"[^"]*"', '', definition_text)
+        
+        # Remove examples after colons that look like sentences
+        text = re.sub(r':\s*[A-Z][^.!?]*[.!?]', '.', text)
+        
+        # Remove "e.g." sections
+        text = re.sub(r'e\.g\.(?:,)?\s*[^.!?]*[.!?]', '', text, flags=re.IGNORECASE)
+        
+        # Clean up extra whitespace and punctuation
+        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r'\s*,\s*\.$', '.', text)  # Fix trailing comma-period
+        text = text.strip()
+        
+        return text
+
+    def _normalize_word_type(self, word_type: str) -> str:
+        """Normalize word type to standard format.
+        
+        Args:
+            word_type: Raw word type from parsing
+            
+        Returns:
+            Normalized word type
+        """
+        word_type = word_type.lower().strip()
+        
+        # Normalize common variations
+        normalizations = {
+            "n": "noun",
+            "v": "verb", 
+            "adj": "adjective",
+            "adv": "adverb",
+            "prep": "preposition",
+            "conj": "conjunction",
+            "interj": "interjection",
+            "pron": "pronoun",
+            "det": "determiner"
+        }
+        
+        return normalizations.get(word_type, word_type)
+
+    async def fetch_definition(
+        self,
+        word: str,
+        state_tracker: StateTracker | None = None,
+    ) -> ProviderData | None:
+        """Fetch definition data for a word from Apple Dictionary.
+
+        Args:
+            word: The word to look up
+            state_tracker: Optional state tracker for progress updates
+
+        Returns:
+            ProviderData if successful, None if not found or error
+        """
+        if not word or not isinstance(word, str):
+            return None
+
+        # Update state tracker
+        if state_tracker:
+            await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
+
+        # Check if service is available
+        if not self._is_available():
+            error_msg = (
+                "Apple Dictionary Services not available. "
+                f"Platform: {platform.system()}, "
+                f"Service initialized: {self._dictionary_service is not None}"
+            )
+            if state_tracker:
+                await state_tracker.update_error(error_msg)
+            logger.warning(error_msg)
+            return None
+
+        try:
+            # Enforce rate limiting
+            await self._enforce_rate_limit()
+
+            # Update progress
+            if state_tracker:
+                await state_tracker.update_stage(Stages.PROVIDER_FETCH_HTTP_CONNECTING)
+
+            # Look up the word
+            raw_definition = self._lookup_definition(word.strip())
+            
+            if state_tracker:
+                await state_tracker.update_stage(Stages.PROVIDER_FETCH_HTTP_PARSING)
+
+            if not raw_definition:
+                logger.debug(f"No definition found for '{word}' in Apple Dictionary")
+                if state_tracker:
+                    await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
+                return None
+
+            # Parse the definition
+            definitions = self._parse_apple_definition(word, raw_definition)
+
+            if not definitions:
+                logger.warning(f"Failed to parse definition for '{word}' from Apple Dictionary")
+                return None
+
+            # Create provider data
+            provider_data = ProviderData(
+                provider_name=self.provider_name,
+                definitions=definitions,
+                raw_metadata={
+                    "platform": platform.system(),
+                    "platform_version": platform.mac_ver()[0] if platform.system() == 'Darwin' else None,
+                    "raw_definition": raw_definition,
+                    "word_processed": word,
+                    "definitions_count": len(definitions)
+                }
+            )
+
+            if state_tracker:
+                await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
+
+            logger.info(f"Successfully fetched {len(definitions)} definitions for '{word}' from Apple Dictionary")
+            return provider_data
+
+        except Exception as e:
+            error_msg = f"Apple Dictionary lookup failed for '{word}': {str(e)}"
+            logger.error(error_msg)
+            if state_tracker:
+                await state_tracker.update_error(error_msg)
+            return None
+
+    def get_service_info(self) -> dict[str, Any]:
+        """Get information about the Apple Dictionary service.
+        
+        Returns:
+            Dictionary with service information
+        """
+        return {
+            "provider_name": self.provider_name,
+            "platform": platform.system(),
+            "platform_version": platform.mac_ver()[0] if platform.system() == 'Darwin' else None,
+            "is_available": self._is_available(),
+            "service_initialized": self._dictionary_service is not None,
+            "rate_limit": self.rate_limit
+        }

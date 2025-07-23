@@ -29,6 +29,8 @@ class DictionaryProvider(Enum):
 
     DICTIONARY_COM = "dictionary_com"
 
+    APPLE_DICTIONARY = "apple_dictionary"
+
     AI_FALLBACK = "ai_fallback"
 
     SYNTHESIS = "synthesis"
@@ -40,6 +42,7 @@ class DictionaryProvider(Enum):
             DictionaryProvider.WIKTIONARY: "Wiktionary",
             DictionaryProvider.OXFORD: "Oxford Dictionary",
             DictionaryProvider.DICTIONARY_COM: "Dictionary.com",
+            DictionaryProvider.APPLE_DICTIONARY: "Apple Dictionary",
             DictionaryProvider.AI_FALLBACK: "AI Fallback",
             DictionaryProvider.SYNTHESIS: "Synthesis",
         }

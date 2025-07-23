@@ -110,6 +110,23 @@
                                 : entry.pronunciation.ipa
                         }}
                     </span>
+                    
+                    <!-- Provider Source Icons -->
+                    <div v-if="usedProviders.length > 0" class="flex items-center gap-1">
+                        <div
+                            v-for="provider in usedProviders"
+                            :key="provider"
+                            :title="`Source: ${getProviderDisplayName(provider)}`"
+                            class="flex h-5 w-5 items-center justify-center rounded-full bg-background/80 border border-border/50 shadow-sm hover:bg-accent/50 transition-colors"
+                        >
+                            <component 
+                                :is="getProviderIcon(provider)" 
+                                :size="12" 
+                                class="text-muted-foreground"
+                            />
+                        </div>
+                    </div>
+                    
                     <Button
                         variant="ghost"
                         size="sm"
@@ -171,6 +188,7 @@
                                     definition, index
                                 ) in cluster.definitions"
                                 :key="`${cluster.clusterId}-${index}`"
+                                :id="`${cluster.clusterId}-${definition.word_type}`"
                                 :data-word-type="`${cluster.clusterId}-${definition.word_type}`"
                                 class="space-y-3"
                             >
@@ -354,6 +372,12 @@ import { ThemedCard } from '@/components/custom/card';
 import { ShimmerText } from '@/components/custom/animation';
 import { ProgressiveSidebar } from '@/components/custom/navigation';
 import { RefreshCw, ChevronLeft } from 'lucide-vue-next';
+import { 
+    AppleIcon,
+    WiktionaryIcon, 
+    OxfordIcon, 
+    DictionaryIcon 
+} from '@/components/custom/icons';
 
 // Track mounting state for dropdown
 const isMounted = ref(false);
@@ -391,6 +415,62 @@ const entry = computed(() => store.currentEntry);
 const thesaurusData = computed(() => store.currentThesaurus);
 const mode = computed(() => store.mode);
 const pronunciationMode = computed(() => store.pronunciationMode);
+
+// Extract unique providers from definitions
+const usedProviders = computed(() => {
+    if (!entry.value?.definitions) return [];
+    
+    const providers = new Set<string>();
+    entry.value.definitions.forEach((def) => {
+        if (def.source_attribution) {
+            // Extract provider name from source attribution
+            const provider = extractProviderFromAttribution(def.source_attribution);
+            if (provider) {
+                providers.add(provider);
+            }
+        }
+    });
+    
+    return Array.from(providers);
+});
+
+// Helper function to extract provider from source attribution
+function extractProviderFromAttribution(attribution: string): string | null {
+    if (!attribution) return null;
+    
+    const lower = attribution.toLowerCase();
+    if (lower.includes('wiktionary')) return 'wiktionary';
+    if (lower.includes('oxford')) return 'oxford';
+    if (lower.includes('dictionary.com') || lower.includes('dictionary_com')) return 'dictionary_com';
+    if (lower.includes('apple') || lower.includes('apple_dictionary')) return 'apple_dictionary';
+    if (lower.includes('ai') || lower.includes('gpt')) return 'ai_fallback';
+    
+    return null;
+}
+
+// Helper function to get provider display name
+function getProviderDisplayName(provider: string): string {
+    const names: Record<string, string> = {
+        wiktionary: 'Wiktionary',
+        oxford: 'Oxford Dictionary',
+        dictionary_com: 'Dictionary.com',
+        apple_dictionary: 'Apple Dictionary',
+        ai_fallback: 'AI Generated',
+    };
+    return names[provider] || provider;
+}
+
+// Helper function to get provider icon component
+function getProviderIcon(provider: string) {
+    const icons: Record<string, any> = {
+        wiktionary: WiktionaryIcon,
+        oxford: OxfordIcon,
+        dictionary_com: DictionaryIcon,
+        apple_dictionary: AppleIcon,
+        ai_fallback: RefreshCw, // Use RefreshCw for AI
+    };
+    return icons[provider] || RefreshCw;
+}
 
 // Check if sidebar should be shown (same logic as ProgressiveSidebar)
 const shouldShowSidebar = computed(() => {
@@ -546,13 +626,89 @@ const handleClickOutside = (event: Event) => {
     }
 };
 
+// Create a list of all word types in order for keyboard navigation
+const orderedWordTypes = computed(() => {
+    const wordTypes: Array<{clusterId: string, wordType: string, key: string}> = [];
+    
+    groupedDefinitions.value.forEach(cluster => {
+        // Group by word type within each cluster
+        const wordTypeGroups = new Map<string, any[]>();
+        cluster.definitions.forEach(def => {
+            const wordType = def.word_type;
+            if (!wordTypeGroups.has(wordType)) {
+                wordTypeGroups.set(wordType, []);
+            }
+            wordTypeGroups.get(wordType)!.push(def);
+        });
+        
+        // Sort word types within cluster
+        const sortedWordTypes = Array.from(wordTypeGroups.keys()).sort(
+            (a, b) => (wordTypeOrder[a as keyof typeof wordTypeOrder] || 999) - 
+                      (wordTypeOrder[b as keyof typeof wordTypeOrder] || 999)
+        );
+        
+        sortedWordTypes.forEach(wordType => {
+            wordTypes.push({
+                clusterId: cluster.clusterId,
+                wordType,
+                key: `${cluster.clusterId}-${wordType}`
+            });
+        });
+    });
+    
+    return wordTypes;
+});
+
+// Current word type index for keyboard navigation
+const currentWordTypeIndex = computed(() => {
+    // Simplified: always start from first word type
+    return 0;
+});
+
+// Keyboard navigation handler for up/down arrows (always active)
+const handleKeyDown = (event: KeyboardEvent) => {
+    if (!entry.value?.definitions) return;
+    
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        
+        const currentIndex = currentWordTypeIndex.value;
+        let nextIndex: number;
+        
+        if (event.key === 'ArrowDown') {
+            nextIndex = currentIndex < orderedWordTypes.value.length - 1 ? currentIndex + 1 : 0;
+        } else {
+            nextIndex = currentIndex > 0 ? currentIndex - 1 : orderedWordTypes.value.length - 1;
+        }
+        
+        if (nextIndex >= 0 && nextIndex < orderedWordTypes.value.length) {
+            const nextWordType = orderedWordTypes.value[nextIndex];
+            scrollToWordType(nextWordType.clusterId, nextWordType.wordType);
+        }
+    }
+};
+
+// Scroll to word type function (same as used in ProgressiveSidebar)
+const scrollToWordType = (clusterId: string, wordType: string) => {
+    const element = document.getElementById(`${clusterId}-${wordType}`);
+    if (element) {
+        element.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+        });
+        // Note: activeWordType functionality removed for KISS approach
+    }
+};
+
 onMounted(() => {
     isMounted.value = true;
     document.addEventListener('click', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
 });
 
 onUnmounted(() => {
     document.removeEventListener('click', handleClickOutside);
+    document.removeEventListener('keydown', handleKeyDown);
 });
 </script>
 

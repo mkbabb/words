@@ -37,7 +37,6 @@ export interface SynthesizedDictionaryEntry {
     phonetic?: string;
   };
   definitions: Definition[];
-  facts?: FactItem[]; // AI-generated facts about the word
   etymology?: string;
   frequency?: number;
   last_updated?: string;
@@ -48,7 +47,6 @@ export interface SynthesizedDictionaryEntry {
   synthesis_version?: string; // AI synthesis model version
   synthesis_quality?: number; // Overall synthesis quality score (0.0-1.0)
   definition_count: number; // Number of definitions synthesized
-  fact_count: number; // Number of facts generated
   lookup_count: number; // Number of times accessed
   regeneration_count: number; // Number of times content was regenerated
   status: string; // Entry status (active, archived, flagged, needs_review)
@@ -98,19 +96,6 @@ export interface ThesaurusEntry {
   synonyms: SynonymData[];
 }
 
-export interface FactItem {
-  content: string;
-  category: string;
-  confidence: number;
-  generated_at: string; // ISO date string
-}
-
-export interface FactsAPIResponse {
-  word: string;
-  facts: FactItem[];
-  confidence: number;
-  categories: string[];
-}
 
 export interface ApiResponse<T> {
   data: T;

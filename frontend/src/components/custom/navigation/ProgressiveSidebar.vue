@@ -56,7 +56,7 @@
                 :class="[
                   'flex w-full items-center justify-between cursor-pointer rounded-md px-2 py-0.5 transition-all duration-200',
                   activeWordType === `${cluster.clusterId}-${wordType.type}`
-                    ? 'bg-gradient-to-r from-primary/15 to-primary/8 border border-primary/25 text-foreground shadow-sm opacity-100'
+                    ? 'themed-word-type-bg text-foreground shadow-sm opacity-100 border border-primary/25'
                     : 'opacity-60 hover:bg-muted/30 hover:opacity-100'
                 ]"
               >

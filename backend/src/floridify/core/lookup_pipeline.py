@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import platform
 import time
 
 from src.floridify.storage.mongodb import get_synthesized_entry
 
 from ..ai import get_definition_synthesizer
+from ..connectors.apple_dictionary import AppleDictionaryConnector
 from ..connectors.dictionary_com import DictionaryComConnector
 from ..connectors.wiktionary import WiktionaryConnector
 from ..constants import DictionaryProvider, Language
@@ -20,7 +22,7 @@ from ..utils.logging import (
     log_timing,
 )
 from .search_pipeline import find_best_match
-from .state_tracker import StateTracker
+from .state_tracker import StateTracker, Stages
 
 logger = get_logger(__name__)
 
@@ -54,6 +56,9 @@ async def lookup_word_pipeline(
     # Set defaults
     if providers is None:
         providers = [DictionaryProvider.WIKTIONARY]
+        # Add Apple Dictionary as default on macOS
+        if platform.system() == 'Darwin':
+            providers.append(DictionaryProvider.APPLE_DICTIONARY)
     if languages is None:
         languages = [Language.ENGLISH]
 
@@ -70,9 +75,7 @@ async def lookup_word_pipeline(
     try:
         # Search for the word using generalized search pipeline
         if state_tracker:
-            await state_tracker.update(
-                stage="SEARCH_START",
-            )
+            await state_tracker.update_stage(Stages.SEARCH_START)
 
         search_start = time.perf_counter()
         best_match_result = await find_best_match(
@@ -83,17 +86,7 @@ async def lookup_word_pipeline(
         search_duration = time.perf_counter() - search_start
 
         if state_tracker:
-            await state_tracker.update(
-                stage="SEARCH_COMPLETE",
-                message=f"Search complete for '{word}'",
-                details={
-                    "word": word,
-                    "best_match": best_match_result.word if best_match_result else None,
-                    "found": bool(best_match_result),
-                    "score": best_match_result.score if best_match_result else None,
-                    "duration_ms": search_duration * 1000,
-                },
-            )
+            await state_tracker.update_stage(Stages.SEARCH_COMPLETE)
 
         if not best_match_result:
             logger.warning(
@@ -123,11 +116,7 @@ async def lookup_word_pipeline(
 
         # Get definitions from providers in parallel
         if state_tracker:
-            await state_tracker.update(
-                stage="PROVIDER_FETCH_START",
-                message=f"Fetching from {len(providers)} providers",
-                details={"providers": [p.value for p in providers], "word": best_match},
-            )
+            await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
 
         logger.info(
             f"🔄 Fetching from {len(providers)} providers in parallel: {[p.value for p in providers]}"
@@ -167,16 +156,7 @@ async def lookup_word_pipeline(
         )
 
         if state_tracker:
-            await state_tracker.update(
-                stage="PROVIDER_FETCH_COMPLETE",
-                message=f"Fetched from {len(providers_data)}/{len(providers)} providers",
-                details={
-                    "successful_providers": len(providers_data),
-                    "total_providers": len(providers),
-                    "word": best_match,
-                    "duration_ms": total_provider_time * 1000,
-                },
-            )
+            await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
 
         # Only try AI fallback if ALL providers failed
         if not providers_data and not no_ai:
@@ -274,7 +254,7 @@ async def _get_provider_definition(
     start_time = time.perf_counter()
 
     try:
-        connector: WiktionaryConnector | DictionaryComConnector | None = None
+        connector: WiktionaryConnector | DictionaryComConnector | AppleDictionaryConnector | None = None
 
         if provider == DictionaryProvider.WIKTIONARY:
             connector = WiktionaryConnector(force_refresh=force_refresh)
@@ -284,6 +264,8 @@ async def _get_provider_definition(
             return None
         elif provider == DictionaryProvider.DICTIONARY_COM:
             connector = DictionaryComConnector(force_refresh=force_refresh)
+        elif provider == DictionaryProvider.APPLE_DICTIONARY:
+            connector = AppleDictionaryConnector()
         else:
             logger.warning(f"Unsupported provider: {provider.value}")
             return None

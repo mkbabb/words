@@ -28,64 +28,6 @@
                 />
             </div>
 
-            <!-- AI Facts Section - Commented out for now -->
-            <!-- <div
-                v-if="facts.length > 0"
-                class="w-full max-w-2xl space-y-4"
-                :class="[
-                    'ease-apple-bounce transition-all duration-500',
-                    'transform',
-                    facts.length > 0
-                        ? 'translate-y-0 opacity-100'
-                        : 'translate-y-4 opacity-0',
-                ]"
-            >
-                <h3 class="text-left text-lg font-medium text-foreground/80">
-                    Interesting Facts
-                </h3>
-
-                <div class="relative h-px w-full overflow-hidden">
-                    <div
-                        class="absolute inset-0 bg-gradient-to-r
-                            from-transparent via-primary/30 to-transparent"
-                    />
-                </div>
-
-                <div class="space-y-4 p-2">
-                    <div
-                        v-for="(fact, index) in facts"
-                        :key="index"
-                        class="themed-card mx-2 rounded-xl border-2
-                            border-border/50 p-5"
-                        :class="[
-                            'bg-background/80 backdrop-blur-md',
-                            'cartoon-shadow-sm',
-                            'ease-apple-bounce transition-all duration-300',
-                            'animate-fade-in',
-                        ]"
-                        :style="{ animationDelay: `${index * 150}ms` }"
-                    >
-                        <div class="border-l-2 border-accent pl-4">
-                            <p class="text-definition mb-2 text-foreground/90">
-                                {{ fact.content }}
-                            </p>
-                            <div
-                                v-if="
-                                    fact.category && fact.category !== 'general'
-                                "
-                                class="mt-3 inline-block"
-                            >
-                                <span
-                                    class="themed-word-type rounded-full px-2.5
-                                        py-1 text-xs font-medium"
-                                >
-                                    {{ fact.category }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div> -->
         </div>
     </Modal>
 </template>
@@ -96,18 +38,12 @@ import { Modal } from '@/components/custom';
 import { AnimatedText, ShimmerText } from '@/components/custom/animation';
 import { LoadingProgress } from '@/components/custom/loading';
 
-interface Fact {
-    content: string;
-    category: string;
-    confidence: number;
-}
 
 interface Props {
     modelValue: boolean;
     word: string;
     progress: number;
     currentStage: string;
-    facts?: Fact[];
     allowDismiss?: boolean;
 }
 
@@ -117,7 +53,6 @@ interface Emits {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    facts: () => [],
     allowDismiss: false,
 });
 
@@ -143,37 +78,49 @@ watch(
 const currentStageText = computed(() => {
     // Handle undefined or empty stage
     if (!props.currentStage) {
-        return 'Processing...';
+        return 'Initializing...';
     }
 
     const stageMessages: Record<string, string> = {
-        // Main pipeline stages
-        initialization: 'Initializing search...',
-        search: 'Searching through dictionaries...',
-        provider_fetch: 'Gathering definitions...',
-        ai_clustering: 'Analyzing meaning patterns...',
-        ai_synthesis: 'Synthesizing comprehensive definitions...',
-        ai_examples: 'Generating modern usage examples...',
-        ai_synonyms: 'Finding beautiful synonyms...',
-        storage_save: 'Saving to knowledge base...',
-        complete: 'Ready!',
+        // Main pipeline stages (uppercase from backend)
+        START: 'Initializing lookup pipeline...',
+        SEARCH_START: 'Beginning word search...',
+        SEARCH_COMPLETE: 'Search results found...',
+        PROVIDER_FETCH_START: 'Fetching from dictionary providers...',
+        PROVIDER_FETCH_COMPLETE: 'Provider data collected...',
+        AI_CLUSTERING: 'Clustering definitions by meaning...',
+        AI_SYNTHESIS: 'AI synthesizing comprehensive definitions...',
+        AI_FALLBACK: 'Using AI fallback for definitions...',
+        STORAGE_SAVE: 'Saving to knowledge base...',
+        COMPLETE: 'Lookup complete!',
+        complete: 'Lookup complete!', // Handle both cases
+        
+        // Provider-specific HTTP stages
+        PROVIDER_FETCH_HTTP_CONNECTING: 'Connecting to dictionary APIs...',
+        PROVIDER_FETCH_HTTP_DOWNLOADING: 'Downloading dictionary data...',
+        PROVIDER_FETCH_HTTP_RATE_LIMITED: 'Rate limited - waiting...',
+        PROVIDER_FETCH_HTTP_PARSING: 'Parsing provider responses...',
+        PROVIDER_FETCH_HTTP_COMPLETE: 'Provider fetch complete...',
+        PROVIDER_FETCH_ERROR: 'Provider error - retrying...',
+        
+        // Error state
         error: 'An error occurred',
-
-        // Provider sub-stages
-        provider_start: 'Connecting to dictionary providers...',
-        provider_connected: 'Connected to providers...',
-        provider_downloading: 'Downloading definitions...',
-        provider_parsing: 'Parsing dictionary data...',
-        provider_complete: 'Provider data ready...',
-
-        // Search sub-stages
-        search_exact: 'Searching for exact matches...',
-        search_fuzzy: 'Trying fuzzy search...',
-        search_semantic: 'Performing semantic search...',
-        search_prefix: 'Searching by prefix...',
     };
 
-    return stageMessages[props.currentStage] || 'Processing...';
+    // Return the mapped message if available, otherwise use the stage itself as a readable message
+    const mappedMessage = stageMessages[props.currentStage];
+    if (mappedMessage) {
+        return mappedMessage;
+    }
+    
+    // If no mapping exists, convert the stage to a readable format
+    // Convert UPPERCASE_STAGE to "Uppercase stage..."
+    const readableStage = props.currentStage
+        .toLowerCase()
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+    
+    return `${readableStage}...`;
 });
 
 const progressTextClass = computed(() => ({

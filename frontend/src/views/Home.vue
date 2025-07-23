@@ -14,15 +14,16 @@
         <div class="relative min-h-screen p-0 lg:p-4">
             <!-- Sticky Search Bar with scroll responsiveness -->
             <div :class="searchBarClasses">
-                <SearchBar
-                    :shrink-percentage="shrinkPercentage"
-                    @stage-enter="handleStageEnter"
-                    class="lg:my-6"
-                />
+                <div class="mx-auto max-w-4xl">
+                    <SearchBar
+                        :shrink-percentage="shrinkPercentage"
+                        @stage-enter="handleStageEnter"
+                    />
+                </div>
             </div>
 
             <!-- Border separator (not sticky) -->
-            <div class="border-b border-border/50"></div>
+            <div class="border-b border-border/50 lg:my-6"></div>
 
             <!-- Content Area -->
             <div class="container mx-auto max-w-5xl">
@@ -86,12 +87,11 @@
         :word="store.searchQuery || 'searching'"
         :progress="store.loadingProgress"
         :current-stage="store.loadingStage"
-        :facts="currentFacts"
     />
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useAppStore } from '@/stores';
 import { useScroll } from '@vueuse/core';
 import { cn } from '@/utils';
@@ -101,16 +101,12 @@ import { DefinitionSkeleton } from '@/components/custom/definition';
 import { Sidebar } from '@/components/custom';
 import { LoadingModal } from '@/components/custom/loading';
 import { StageTest } from '@/components/custom/test';
-import { dictionaryApi } from '@/utils/api';
-import type { FactItem } from '@/types';
 
 const store = useAppStore();
 
 // Component refs
 const stageTestRef = ref();
 
-// Facts for loading modal
-const currentFacts = ref<FactItem[]>([]);
 
 // Handle stage mode enter key
 const handleStageEnter = (_query: string) => {
@@ -119,29 +115,6 @@ const handleStageEnter = (_query: string) => {
     }
 };
 
-// Watch for search queries to fetch facts
-watch(
-    () => store.searchQuery,
-    async (newQuery) => {
-        if (newQuery && store.isSearching) {
-            try {
-                // Fetch facts asynchronously while search is happening
-                const factsResponse = await dictionaryApi.getWordFacts(
-                    newQuery,
-                    5,
-                    store.lookupHistory.slice(-10).map((h) => h.word)
-                );
-                currentFacts.value = factsResponse.facts;
-            } catch (error) {
-                console.warn('Failed to fetch facts:', error);
-                currentFacts.value = [];
-            }
-        } else if (!newQuery) {
-            currentFacts.value = [];
-        }
-    },
-    { immediate: true }
-);
 
 onMounted(async () => {
     console.log('Home component mounted');

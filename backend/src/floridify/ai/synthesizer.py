@@ -20,7 +20,7 @@ from ..storage.mongodb import (
     save_synthesized_entry,
 )
 from ..utils.logging import get_logger
-from ..core.state_tracker import StateTracker
+from ..core.state_tracker import StateTracker, Stages
 from .connector import OpenAIConnector
 
 logger = get_logger(__name__)
@@ -78,29 +78,14 @@ class DefinitionSynthesizer:
         )
 
         if state_tracker:
-            await state_tracker.update(
-                stage="AI_CLUSTERING",
-                message=f"Clustering {len(all_definition_objects)} definitions",
-                details={
-                    "word": word,
-                    "definitions_count": len(all_definition_objects),
-                },
-            )
+            await state_tracker.update_stage(Stages.AI_CLUSTERING)
 
         cluster_response = await self.ai.extract_cluster_mapping(
             word, all_definition_tuples
         )
 
         if state_tracker:
-            await state_tracker.update(
-                stage="AI_CLUSTERING",
-                message=f"Clustered into {len(cluster_response.cluster_mappings)} groups",
-                details={
-                    "word": word,
-                    "cluster_count": len(cluster_response.cluster_mappings),
-                    "definitions_count": len(all_definition_objects),
-                },
-            )
+            await state_tracker.update_stage(Stages.AI_CLUSTERING, progress=70)
 
         # Update Definition objects with their cluster assignments
         cluster_descriptions = {}
@@ -132,30 +117,18 @@ class DefinitionSynthesizer:
 
         # Save to database
         if state_tracker:
-            await state_tracker.update(
-                stage="STORAGE_SAVE",
-                message=f"Saving entry for '{word}'",
-                details={"word": word},
-            )
+            await state_tracker.update_stage(Stages.STORAGE_SAVE)
 
         try:
             await save_synthesized_entry(entry)
 
             if state_tracker:
-                await state_tracker.update(
-                    stage="STORAGE_SAVE",
-                    message=f"Saved entry for '{word}'",
-                    details={"word": word, "success": True},
-                )
+                await state_tracker.update_stage(Stages.STORAGE_SAVE, progress=95)
         except Exception as e:
             logger.error(f"Failed to save synthesized entry for '{word}': {e}")
             # Still return the entry even if saving failed
             if state_tracker:
-                await state_tracker.update(
-                    stage="STORAGE_SAVE",
-                    message=f"Failed to save entry for '{word}'",
-                    details={"word": word, "success": False, "error": str(e)},
-                )
+                await state_tracker.update_error(f"Storage failed: {str(e)}")
 
         return entry
 
@@ -169,11 +142,7 @@ class DefinitionSynthesizer:
         logger.info(f"🔮 Starting AI fallback generation for '{word}'")
 
         if state_tracker:
-            await state_tracker.update(
-                stage="AI_FALLBACK",
-                message=f"Starting AI fallback generation for '{word}'",
-                details={"word": word},
-            )
+            await state_tracker.update_stage(Stages.AI_FALLBACK)
 
         # Generate fallback provider data
         dictionary_entry = await self.ai.lookup_fallback(word)
@@ -228,15 +197,7 @@ class DefinitionSynthesizer:
         providers_data = [provider_data]
 
         if state_tracker:
-            await state_tracker.update(
-                stage="AI_FALLBACK",
-                message=f"Created AI fallback entry with {len(definitions)} definitions",
-                details={
-                    "word": word,
-                    "definitions_count": len(definitions),
-                    "confidence": dictionary_entry.confidence,
-                },
-            )
+            await state_tracker.update_stage(Stages.AI_FALLBACK, progress=90)
 
         logger.success(
             f"🎉 Successfully created AI fallback entry for '{word}' "
@@ -289,17 +250,9 @@ class DefinitionSynthesizer:
             cluster_start = time.time()
 
             if state_tracker:
-                await state_tracker.update(
-                    stage="AI_SYNTHESIS",
-                    message=f"Synthesizing cluster {i + 1}/{total_clusters}",
-                    details={
-                        "word": word,
-                        "cluster_id": cluster_id,
-                        "cluster_index": i + 1,
-                        "total_clusters": total_clusters,
-                        "definitions_in_cluster": len(cluster_definitions),
-                    },
-                )
+                # Calculate progressive synthesis progress (75-85%)
+                synthesis_progress = 75 + int((i / total_clusters) * 10)
+                await state_tracker.update_stage(Stages.AI_SYNTHESIS, progress=synthesis_progress)
 
             try:
                 # Synthesize definitions for this cluster using full Definition objects
