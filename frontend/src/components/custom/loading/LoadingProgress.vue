@@ -41,13 +41,13 @@
           >
             <HoverCardTrigger>
               <div
-                class="h-6 w-6 rounded-full border-[1.5px] transition-all duration-300 backdrop-blur-sm bg-white/20 dark:bg-gray-800/30"
+                class="h-6 w-6 rounded-full border-2 transition-all duration-300"
                 :class="[
                   progress >= checkpoint.progress
-                    ? 'scale-110 border-primary/70 shadow-lg shadow-primary/20 bg-primary/10'
-                    : 'border-gray-400/50 dark:border-gray-500/50',
+                    ? 'scale-110 border-primary shadow-lg shadow-primary/20'
+                    : 'border-gray-400 dark:border-gray-500',
                   isActiveCheckpoint(checkpoint.progress)
-                    ? 'animate-pulse ring-2 ring-primary/30 scale-125 bg-primary/20'
+                    ? 'animate-pulse ring-2 ring-primary/30'
                     : '',
                   interactive ? 'cursor-pointer hover:scale-125' : 'cursor-help hover:scale-125',
                 ]"
@@ -65,8 +65,8 @@
                 {{ getCheckpointDescription(checkpoint.progress) }}
               </p>
               <!-- Show current stage info if this checkpoint is active -->
-              <div v-if="isActiveCheckpoint(checkpoint.progress)" class="mt-2 p-2 bg-primary/5 rounded border border-primary/20">
-                <p class="text-xs font-medium text-primary">Current: {{ stageMessage || 'In progress...' }}</p>
+              <div v-if="isActiveCheckpoint(checkpoint.progress) && stageMessage" class="mt-2 p-2 bg-primary/5 rounded border border-primary/20">
+                <p class="text-xs font-medium text-primary">{{ stageMessage }}</p>
               </div>
             </div>
           </HoverCardContent>
@@ -85,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { generateRainbowGradient } from '@/utils/animations'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 
@@ -110,8 +110,8 @@ const props = withDefaults(defineProps<Props>(), {
   checkpoints: () => [
     { progress: 0, label: 'Initialize' },
     { progress: 10, label: 'Search' },
-    { progress: 25, label: 'Fetch' },
-    { progress: 45, label: 'Cluster' },
+    { progress: 15, label: 'Provider' },
+    { progress: 40, label: 'Cluster' },
     { progress: 60, label: 'Synthesize' },
     { progress: 80, label: 'Storage' },
     { progress: 100, label: 'Complete' },
@@ -120,6 +120,11 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<Emits>()
+
+// Debug logging
+watch(() => props.progress, (newVal) => {
+  console.log('LoadingProgress received progress:', newVal)
+})
 
 const progressBarRef = ref<HTMLElement>()
 const isDragging = ref(false)
@@ -131,8 +136,8 @@ const getCheckpointDescription = (progress: number): string => {
   const descriptions: Record<number, string> = {
     0: 'Pipeline initialization and setup phase. Preparing search engines and AI processing systems.',
     10: 'Searching through multiple dictionary sources to find the best word match.',
-    25: 'Fetching definitions from dictionary providers including Wiktionary, Oxford, and Dictionary.com.',
-    45: 'AI clustering analysis - grouping definitions by semantic meaning and context.',
+    15: 'Fetching definitions from dictionary providers including Wiktionary, Oxford, and Dictionary.com.',
+    40: 'AI clustering analysis - grouping definitions by semantic meaning and context.',
     60: 'AI synthesis phase - creating comprehensive definitions from clustered data.',
     80: 'Saving processed entry to knowledge base and updating search indices.',
     100: 'Pipeline complete! Ready to display comprehensive word information with examples and synonyms.'

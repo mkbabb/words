@@ -913,10 +913,6 @@ const handleSearchAreaInteraction = () => {
 const handleHamburgerClick = () => {
     store.toggleControls();
     handleSearchAreaInteraction();
-
-    nextTick(() => {
-        searchInput.value?.focus();
-    });
 };
 
 // iOS-style regenerate button handlers
@@ -1140,12 +1136,6 @@ onMounted(async () => {
     }
 
     document.addEventListener('click', handleClickOutside);
-
-    // Auto-focus search input on page load
-    await nextTick();
-    if (searchInput.value) {
-        searchInput.value.focus();
-    }
 });
 
 // Cleanup

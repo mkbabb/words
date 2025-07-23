@@ -89,11 +89,17 @@ export const dictionaryApi = {
   async getDefinitionStream(
     word: string,
     forceRefresh: boolean = false,
+    providers?: string[],
     onProgress?: (stage: string, progress: number, message: string, details?: any) => void
   ): Promise<SynthesizedDictionaryEntry> {
     return new Promise((resolve, reject) => {
       const params = new URLSearchParams();
       if (forceRefresh) params.append('force_refresh', 'true');
+      
+      // Add providers to the query parameters
+      if (providers && providers.length > 0) {
+        providers.forEach(provider => params.append('providers', provider));
+      }
       
       const url = `/api/lookup/${word}/stream${params.toString() ? '?' + params.toString() : ''}`;
       const eventSource = new EventSource(url);

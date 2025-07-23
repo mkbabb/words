@@ -283,41 +283,61 @@ export const useAppStore = defineStore('app', () => {
     try {
       let entry;
       
-      if (shouldForceRefresh) {
-        // Use streaming endpoint for force refresh to get pipeline progress
-        entry = await dictionaryApi.getDefinitionStream(
-          word,
-          true,
-          (stage, progress, message, details) => {
-            // Map stage names to user-friendly messages
-            const stageMessages: Record<string, string> = {
-              'search': 'Searching word database...',
-              'provider_fetch': 'Fetching from dictionary providers...',
-              'ai_clustering': 'AI clustering definitions...',
-              'ai_synthesis': 'AI synthesizing definitions...',
-              'ai_examples': 'Generating examples...',
-              'ai_synonyms': 'Enhancing synonyms...',
-              'storage_save': 'Saving to database...'
-            };
-            
-            loadingProgress.value = Math.round(progress * 100);
-            loadingStage.value = stageMessages[stage] || message;
-            
-            // Debug logging
-            console.log(`Stage: ${stage}, Progress: ${progress} → ${Math.round(progress * 100)}%, Message: ${message}`);
-            
-            // Log details for debugging
-            if (details) {
-              console.log(`Pipeline ${stage} details:`, details);
-            }
+      // Always use streaming endpoint to get pipeline progress
+      entry = await dictionaryApi.getDefinitionStream(
+        word,
+        shouldForceRefresh,
+        selectedSources.value, // Pass selected providers
+        (stage, progress, message, details) => {
+          // Map stage names to user-friendly messages
+          const stageMessages: Record<string, string> = {
+            'search': 'Searching word database...',
+            'provider_fetch': `Fetching from ${selectedSources.value.length} provider${selectedSources.value.length > 1 ? 's' : ''}...`,
+            'ai_clustering': 'AI clustering definitions...',
+            'ai_synthesis': 'AI synthesizing definitions...',
+            'ai_examples': 'Generating examples...',
+            'ai_synonyms': 'Enhancing synonyms...',
+            'storage_save': 'Saving to database...'
+          };
+          
+          // Convert 0-1 to 0-100 progress
+          const progressPercent = Math.round(progress * 100);
+          
+          // Enhanced debug logging with provider info
+          console.log(`Stage: ${stage}, Progress: ${progress} → ${progressPercent}%, Message: ${message}`);
+          if (details?.provider) {
+            console.log(`Provider: ${details.provider}`);
           }
-        );
-      } else {
-        // Use regular endpoint for normal lookups
-        loadingProgress.value = 30;
-        loadingStage.value = 'Fetching definition...';
-        entry = await dictionaryApi.getDefinition(word, false);
-      }
+          
+          // IMPORTANT: Ignore sub-stage progress updates that reset progress
+          // Only update progress for main pipeline stages
+          const subStages = ['provider_start', 'provider_connected', 'provider_downloading', 'provider_parsing', 'provider_complete'];
+          
+          if (subStages.includes(stage)) {
+            console.log(`Ignoring sub-stage ${stage} progress update`);
+            // Only update the message, not the progress
+            if (details && details.provider) {
+              loadingStage.value = `${details.provider}: ${stage.replace('provider_', '')}...`;
+            }
+            return; // Don't update progress for sub-stages
+          }
+          
+          // Update progress only for main stages
+          loadingProgress.value = progressPercent;
+          
+          // Show provider-specific messages when available
+          let stageMessage = stageMessages[stage] || message;
+          if (details && details.provider && stage === 'provider_fetch') {
+            stageMessage = `Fetching from ${details.provider}...`;
+          }
+          loadingStage.value = stageMessage;
+          
+          // Log details for debugging
+          if (details) {
+            console.log(`Pipeline ${stage} details:`, details);
+          }
+        }
+      );
       
       currentEntry.value = entry;
       

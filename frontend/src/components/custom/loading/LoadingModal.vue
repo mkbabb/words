@@ -29,8 +29,8 @@
                 />
             </div>
 
-            <!-- AI Facts Section -->
-            <div
+            <!-- AI Facts Section - Commented out for now -->
+            <!-- <div
                 v-if="facts.length > 0"
                 class="w-full max-w-2xl space-y-4"
                 :class="[
@@ -45,7 +45,6 @@
                     Interesting Facts
                 </h3>
 
-                <!-- Gradient Divider -->
                 <div class="relative h-px w-full overflow-hidden">
                     <div
                         class="absolute inset-0 bg-gradient-to-r
@@ -87,7 +86,7 @@
                         </div>
                     </div>
                 </div>
-            </div>
+            </div> -->
         </div>
     </Modal>
 </template>

@@ -20,15 +20,19 @@
               : 'text-foreground/80 font-normal hover:bg-muted/50 hover:text-foreground'
           ]"
         >
-          <div class="flex-1 min-w-0">
+          <div class="flex-1 min-w-0 pr-2 overflow-hidden text-ellipsis whitespace-nowrap">
             <ShimmerText 
               v-if="activeCluster === cluster.clusterId"
               :text="cluster.clusterDescription.toUpperCase()" 
-              text-class="themed-cluster-title truncate text-left uppercase text-xs font-bold tracking-wider"
+              text-class="themed-cluster-title text-left uppercase text-xs font-bold tracking-wider"
               :duration="400"
               :interval="15000"
             />
-            <span v-else class="themed-cluster-title truncate text-left uppercase text-xs font-bold tracking-wider">
+            <span 
+              v-else 
+              class="themed-cluster-title text-left uppercase text-xs font-bold tracking-wider"
+              :title="cluster.clusterDescription.toUpperCase()"
+            >
               {{ cluster.clusterDescription.toUpperCase() }}
             </span>
           </div>

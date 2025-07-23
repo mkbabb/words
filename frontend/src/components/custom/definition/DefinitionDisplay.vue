@@ -1,13 +1,5 @@
 <template>
-    <div
-        v-if="entry"
-        :class="[
-            'flex',
-            shouldShowSidebar && groupedDefinitions.length > 1
-                ? 'xl:gap-4'
-                : '',
-        ]"
-    >
+    <div v-if="entry" class="relative flex gap-4">
         <!-- Progressive Sidebar - Truly sticky -->
         <div
             v-if="shouldShowSidebar && groupedDefinitions.length > 1"
@@ -21,18 +13,15 @@
         <!-- Main Card Content -->
         <ThemedCard :variant="selectedCardVariant" class="relative flex-1">
             <!-- Card Theme Selector Dropdown - absolute positioned -->
-            <div
-                v-if="isMounted"
-                class="absolute top-2 right-12 z-40"
-            >
+            <div v-if="isMounted" class="absolute top-2 right-12 z-40">
                 <!-- Custom dropdown with controlled animations -->
                 <div class="relative">
                     <button
                         @click="toggleDropdown"
-                        class="group rounded-lg border-2 border-border
+                        class="group mt-1 rounded-lg border-2 border-border
                             bg-background/80 p-1.5 shadow-lg backdrop-blur-sm
                             transition-all duration-200 hover:scale-110
-                            hover:bg-background focus:ring-0 focus:outline-none mt-1"
+                            hover:bg-background focus:ring-0 focus:outline-none"
                     >
                         <ChevronLeft
                             :size="14"
@@ -152,7 +141,10 @@
             >
                 <div :key="mode">
                     <!-- Dictionary Mode Definitions -->
-                    <CardContent v-if="mode === 'dictionary'" class="grid gap-4 px-3 sm:px-6">
+                    <CardContent
+                        v-if="mode === 'dictionary'"
+                        class="grid gap-4"
+                    >
                         <div
                             v-for="cluster in groupedDefinitions"
                             :key="cluster.clusterId"
@@ -160,10 +152,13 @@
                             class="space-y-4"
                         >
                             <!-- Cluster header with gradient divider -->
-                            <div v-if="groupedDefinitions.length > 1" class="mt-6 pb-2">
+                            <div
+                                v-if="groupedDefinitions.length > 1"
+                                class="mt-6 pb-2"
+                            >
                                 <h4
-                                    class="themed-cluster-title text-base font-bold
-                                        tracking-wider uppercase"
+                                    class="themed-cluster-title text-base
+                                        font-bold tracking-wider uppercase"
                                 >
                                     {{ cluster.clusterDescription }}
                                 </h4>
@@ -172,13 +167,18 @@
                             </div>
 
                             <div
-                                v-for="(definition, index) in cluster.definitions"
+                                v-for="(
+                                    definition, index
+                                ) in cluster.definitions"
                                 :key="`${cluster.clusterId}-${index}`"
                                 :data-word-type="`${cluster.clusterId}-${definition.word_type}`"
                                 class="space-y-3"
                             >
                                 <!-- Separator for all but first -->
-                                <hr v-if="index > 0" class="my-2 border-border" />
+                                <hr
+                                    v-if="index > 0"
+                                    class="my-2 border-border"
+                                />
 
                                 <div class="flex items-center gap-2">
                                     <span class="themed-word-type">
@@ -200,9 +200,10 @@
                                     <div
                                         v-if="
                                             definition.examples &&
-                                            (definition.examples.generated.length > 0 ||
-                                                definition.examples.literature.length >
-                                                    0)
+                                            (definition.examples.generated
+                                                .length > 0 ||
+                                                definition.examples.literature
+                                                    .length > 0)
                                         "
                                         class="mb-2 space-y-1"
                                     >
@@ -213,15 +214,20 @@
                                         >
                                             <span
                                                 class="text-sm tracking-wider
-                                                    text-muted-foreground uppercase"
+                                                    text-muted-foreground
+                                                    uppercase"
                                                 >Examples</span
                                             >
                                             <button
                                                 v-if="
-                                                    definition.examples.generated
-                                                        .length > 0
+                                                    definition.examples
+                                                        .generated.length > 0
                                                 "
-                                                @click="handleRegenerateExamples(index)"
+                                                @click="
+                                                    handleRegenerateExamples(
+                                                        index
+                                                    )
+                                                "
                                                 :class="[
                                                     'group flex items-center gap-1 rounded-md px-2 py-1',
                                                     'text-sm transition-all duration-200',
@@ -230,7 +236,9 @@
                                                         ? 'text-primary'
                                                         : 'text-muted-foreground hover:text-primary',
                                                 ]"
-                                                :disabled="regeneratingIndex === index"
+                                                :disabled="
+                                                    regeneratingIndex === index
+                                                "
                                                 title="Regenerate examples"
                                             >
                                                 <RefreshCw
@@ -238,7 +246,8 @@
                                                     :class="[
                                                         'transition-transform duration-300',
                                                         'group-hover:rotate-180',
-                                                        regeneratingIndex === index &&
+                                                        regeneratingIndex ===
+                                                            index &&
                                                             'animate-spin',
                                                     ]"
                                                 />
@@ -272,7 +281,8 @@
                                         <span
                                             v-for="synonym in definition.synonyms"
                                             :key="synonym"
-                                            class="themed-synonym cursor-pointer"
+                                            class="themed-synonym
+                                                cursor-pointer"
                                             @click="store.searchWord(synonym)"
                                         >
                                             {{ synonym }}
@@ -286,11 +296,12 @@
                     <!-- Thesaurus Mode -->
                     <CardContent
                         v-if="mode === 'thesaurus' && thesaurusData"
-                        class="space-y-6 px-3 sm:px-6"
+                        class="space-y-6"
                     >
                         <div
                             v-if="thesaurusData.synonyms.length > 0"
-                            class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
+                            class="grid grid-cols-1 gap-3 md:grid-cols-2
+                                lg:grid-cols-3"
                         >
                             <Card
                                 v-for="synonym in thesaurusData.synonyms"
@@ -304,9 +315,12 @@
                                 @click="store.searchWord(synonym.word)"
                             >
                                 <CardContent class="px-3 py-0.5">
-                                    <div class="font-medium">{{ synonym.word }}</div>
+                                    <div class="font-medium">
+                                        {{ synonym.word }}
+                                    </div>
                                     <div class="text-sm opacity-75">
-                                        {{ Math.round(synonym.score * 100) }}% similar
+                                        {{ Math.round(synonym.score * 100) }}%
+                                        similar
                                     </div>
                                 </CardContent>
                             </Card>
@@ -316,7 +330,10 @@
             </Transition>
 
             <!-- Etymology -->
-            <CardContent v-if="entry && entry.etymology" class="space-y-4 px-3 sm:px-6">
+            <CardContent
+                v-if="entry && entry.etymology"
+                class="space-y-4 px-3 sm:px-6"
+            >
                 <h3 class="text-lg font-semibold">Etymology</h3>
                 <p class="text-base text-muted-foreground">
                     {{ entry.etymology }}

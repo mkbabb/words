@@ -11,12 +11,13 @@
         "
     >
         <!-- Main View -->
-        <div class="relative min-h-screen p-2 lg:p-4">
+        <div class="relative min-h-screen p-0 lg:p-4">
             <!-- Sticky Search Bar with scroll responsiveness -->
             <div :class="searchBarClasses">
                 <SearchBar
                     :shrink-percentage="shrinkPercentage"
                     @stage-enter="handleStageEnter"
+                    class="lg:my-6"
                 />
             </div>
 
@@ -24,7 +25,7 @@
             <div class="border-b border-border/50"></div>
 
             <!-- Content Area -->
-            <div class="container mx-auto max-w-5xl px-2 py-4 sm:px-2 sm:py-8">
+            <div class="container mx-auto max-w-5xl">
                 <!-- Animated Content Cards -->
                 <Transition
                     mode="out-in"

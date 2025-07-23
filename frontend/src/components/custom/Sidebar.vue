@@ -4,7 +4,7 @@
     <div
       :class="
         cn(
-          'fixed top-10 z-70 transition-all duration-400 ease-apple-smooth lg:hidden',
+          'fixed top-[50%] z-70 transition-all duration-400 ease-apple-smooth lg:hidden',
           {
             
             'hidden': sidebarOpen

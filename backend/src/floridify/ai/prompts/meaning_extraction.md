@@ -30,7 +30,7 @@ For "run":
 
 Return a list of cluster mappings, where each mapping contains:
 
-1. **cluster_id**: Unique identifier using format {EXACT_INPUT_NAME}\_{CLUSTER_NAME} (e.g., "bank_financial", "bank_geographic")
+1. **cluster_id**: Unique identifier using format {EXACT_INPUT_NAME}\_{CLUSTER_NAME} (e.g., "bank_financial", "bank_geographic") -- the cluster names should be pithy, minimal, and pertinent. Short names are preferred.
 2. **cluster_description**: Human-readable description of this cluster
 3. **definition_indices**: List of definition indices (0-based) that belong to this cluster
 4. **confidence**: Overall confidence in the clustering (0.0-1.0)

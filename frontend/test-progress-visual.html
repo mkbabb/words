@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Progress Bar Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .progress-container {
+            position: relative;
+            height: 32px;
+            background: #e0e0e0;
+            border-radius: 16px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff);
+            transition: width 0.3s ease-out;
+            border-radius: 16px;
+        }
+        .progress-text {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 2px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Progress Bar Visual Test</h1>
+        
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+        </div>
+        
+        <div class="progress-text" id="progressText">0%</div>
+        
+        <div class="controls">
+            <button onclick="testBackendProgress()">Test Backend Progress</button>
+            <button onclick="simulateProgress()">Simulate Progress</button>
+            <button onclick="resetProgress()">Reset</button>
+        </div>
+        
+        <h3>Log</h3>
+        <div class="log" id="log"></div>
+    </div>
+
+    <script>
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const logDiv = document.getElementById('log');
+        
+        function log(message) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function updateProgress(value) {
+            const percent = Math.round(value * 100);
+            progressBar.style.width = percent + '%';
+            progressText.textContent = percent + '%';
+            log(`Progress updated: ${value} (${percent}%)`);
+        }
+        
+        function resetProgress() {
+            updateProgress(0);
+            logDiv.innerHTML = '';
+            log('Progress reset');
+        }
+        
+        function simulateProgress() {
+            log('Starting simulated progress...');
+            const stages = [
+                { progress: 0.0, stage: 'initialization' },
+                { progress: 0.1, stage: 'search' },
+                { progress: 0.15, stage: 'provider_fetch' },
+                { progress: 0.25, stage: 'provider_connected' },
+                { progress: 0.40, stage: 'provider_complete' },
+                { progress: 0.50, stage: 'ai_clustering' },
+                { progress: 0.60, stage: 'ai_synthesis' },
+                { progress: 0.80, stage: 'storage_save' },
+                { progress: 1.0, stage: 'complete' }
+            ];
+            
+            let index = 0;
+            const interval = setInterval(() => {
+                if (index < stages.length) {
+                    const stage = stages[index];
+                    log(`Stage: ${stage.stage}`);
+                    updateProgress(stage.progress);
+                    index++;
+                } else {
+                    clearInterval(interval);
+                    log('Simulation complete');
+                }
+            }, 1000);
+        }
+        
+        async function testBackendProgress() {
+            log('Testing backend streaming API...');
+            resetProgress();
+            
+            const url = 'http://localhost:8000/api/lookup/hello/stream?providers=wiktionary';
+            const eventSource = new EventSource(url);
+            
+            eventSource.addEventListener('progress', (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    const progress = data.progress;
+                    const stage = data.stage;
+                    
+                    log(`Backend: ${stage} - ${progress}`);
+                    
+                    // Only update for main pipeline stages, ignore sub-stages
+                    const mainStages = ['search', 'provider_fetch', 'ai_clustering', 'ai_synthesis', 'storage_save', 'complete'];
+                    if (mainStages.includes(stage)) {
+                        updateProgress(progress);
+                    }
+                } catch (e) {
+                    log('Error parsing progress: ' + e.message);
+                }
+            });
+            
+            eventSource.addEventListener('complete', () => {
+                log('Backend streaming complete');
+                eventSource.close();
+            });
+            
+            eventSource.addEventListener('error', (e) => {
+                log('Backend error: ' + e.type);
+                eventSource.close();
+            });
+        }
+    </script>
+</body>
+</html>
