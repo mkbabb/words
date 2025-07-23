@@ -80,53 +80,8 @@ check_env_file() {
     fi
 }
 
-# Function to manage SSH tunnel for DocumentDB access
-manage_ssh_tunnel() {
-    local action="$1"
-    local tunnel_port="27018"
-    local ec2_host="44.216.140.209"
-    local docdb_host="docdb-2025-07-21-21-16-19.cluster-cuvowu48w9vs.us-east-1.docdb.amazonaws.com"
-    
-    case "$action" in
-        "start")
-            # Check if tunnel is already running
-            if lsof -Pi :$tunnel_port -sTCP:LISTEN -t >/dev/null 2>&1; then
-                echo "📡 SSH tunnel already active on port $tunnel_port"
-                return 0
-            fi
-            
-            echo "📡 Creating SSH tunnel to DocumentDB..."
-            ssh -o ExitOnForwardFailure=yes -f -N -L $tunnel_port:$docdb_host:27017 ubuntu@$ec2_host
-            
-            if [ $? -eq 0 ]; then
-                sleep 2
-                if lsof -Pi :$tunnel_port -sTCP:LISTEN -t >/dev/null 2>&1; then
-                    echo "✅ SSH tunnel established: localhost:$tunnel_port -> DocumentDB"
-                else
-                    echo "❌ SSH tunnel failed to start"
-                    return 1
-                fi
-            else
-                echo "❌ Failed to create SSH tunnel"
-                return 1
-            fi
-            ;;
-        "stop")
-            echo "📡 Stopping SSH tunnel..."
-            pkill -f "ssh.*-L.*$tunnel_port:" 2>/dev/null
-            echo "✅ SSH tunnel stopped"
-            ;;
-        "status")
-            if lsof -Pi :$tunnel_port -sTCP:LISTEN -t >/dev/null 2>&1; then
-                echo "✅ SSH tunnel active on port $tunnel_port"
-                return 0
-            else
-                echo "❌ SSH tunnel not running"
-                return 1
-            fi
-            ;;
-    esac
-}
+# Note: Direct DocumentDB connection - no SSH tunnel needed
+# DocumentDB is accessible directly from this environment
 
 # Function to display configuration information from auth/config.toml
 display_config_info() {
@@ -165,13 +120,8 @@ display_config_info() {
         fi
         echo "  OpenAI API Key: $api_key_status"
         
-        # Check SSH tunnel status
-        manage_ssh_tunnel status >/dev/null 2>&1
-        if [ $? -eq 0 ]; then
-            echo "  SSH Tunnel: ✅ active (DocumentDB accessible)"
-        else
-            echo "  SSH Tunnel: ❌ inactive (DocumentDB not accessible)"
-        fi
+        # Direct DocumentDB connection (no tunnel needed)
+        echo "  DocumentDB: ✅ Direct connection to production cluster"
         
     else
         echo ""
@@ -187,11 +137,8 @@ start_docker_servers() {
     check_docker
     check_env_file
     
-    # Start SSH tunnel for DocumentDB access
-    manage_ssh_tunnel start
-    if [ $? -ne 0 ]; then
-        echo "Warning: SSH tunnel failed - DocumentDB will not be accessible"
-    fi
+    # DocumentDB connection is direct - no tunnel setup needed
+    echo "📡 Using direct connection to production DocumentDB cluster"
     
     # Build images if requested
     if [ "$BUILD_MODE" = true ]; then
