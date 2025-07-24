@@ -1,5 +1,5 @@
 """API routers."""
 
-from . import corpus, facts, health, lookup, suggestions, synonyms
+from . import batch, corpus, definitions, facts, health, lookup, search, suggestions, synonyms
 
-__all__ = ["corpus", "health", "lookup", "suggestions", "synonyms", "facts"]
+__all__ = ["batch", "corpus", "definitions", "facts", "health", "lookup", "search", "suggestions", "synonyms"]

@@ -7,7 +7,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any
 
-from ..models import ProviderData
+from ..models import ProviderData, Word, Definition, Pronunciation, Etymology
+from ..constants import DictionaryProvider
 from ..utils.logging import get_logger
 from ..core.state_tracker import PipelineState, StateTracker
 
@@ -54,6 +55,43 @@ class DictionaryConnector(ABC):
         """
         pass
 
+    @abstractmethod
+    async def extract_pronunciation(self, raw_data: dict[str, Any]) -> Pronunciation | None:
+        """Extract pronunciation from raw provider data.
+
+        Args:
+            raw_data: Raw response from provider API
+
+        Returns:
+            Pronunciation if found, None otherwise
+        """
+        pass
+
+    @abstractmethod
+    async def extract_definitions(self, raw_data: dict[str, Any], word_id: str) -> list[Definition]:
+        """Extract definitions from raw provider data.
+
+        Args:
+            raw_data: Raw response from provider API
+            word_id: ID of the word these definitions belong to
+
+        Returns:
+            List of Definition objects
+        """
+        pass
+
+    @abstractmethod
+    async def extract_etymology(self, raw_data: dict[str, Any]) -> Etymology | None:
+        """Extract etymology from raw provider data.
+
+        Args:
+            raw_data: Raw response from provider API
+
+        Returns:
+            Etymology if found, None otherwise
+        """
+        pass
+
     async def _enforce_rate_limit(self) -> None:
         """Enforce rate limiting between requests."""
         async with self._rate_limiter:
@@ -70,16 +108,42 @@ class DictionaryConnector(ABC):
 
             self._last_request_time = asyncio.get_event_loop().time()
 
-    def _normalize_response(self, response_data: dict[str, Any]) -> ProviderData:
+    async def _normalize_response(self, response_data: dict[str, Any], word: Word) -> ProviderData:
         """Normalize provider response to internal format.
 
         Args:
             response_data: Raw response from provider API
+            word: The Word object this data belongs to
 
         Returns:
             Normalized ProviderData
         """
-        # Default implementation - override in subclasses
-        return ProviderData(
-            provider_name=self.provider_name, definitions=[], raw_metadata=response_data
+        # Extract components using abstract methods
+        pronunciation = await self.extract_pronunciation(response_data)
+        definitions = await self.extract_definitions(response_data, word.id)
+        etymology = await self.extract_etymology(response_data)
+        
+        # Save pronunciation if found
+        pronunciation_id = None
+        if pronunciation:
+            pronunciation.word_id = word.id
+            await pronunciation.save()
+            pronunciation_id = pronunciation.id
+        
+        # Save definitions and collect IDs
+        definition_ids = []
+        for definition in definitions:
+            await definition.save()
+            definition_ids.append(definition.id)
+        
+        # Create provider data
+        provider_data = ProviderData(
+            word_id=word.id,
+            provider=DictionaryProvider(self.provider_name),
+            definition_ids=definition_ids,
+            pronunciation_id=pronunciation_id,
+            etymology=etymology,
+            raw_data=response_data,
         )
+        
+        return provider_data

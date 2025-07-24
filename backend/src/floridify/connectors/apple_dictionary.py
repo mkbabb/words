@@ -393,3 +393,152 @@ class AppleDictionaryConnector(DictionaryConnector):
             "service_initialized": self._dictionary_service is not None,
             "rate_limit": self.rate_limit
         }
+
+    async def extract_pronunciation(self, raw_data: dict[str, Any]) -> Pronunciation | None:
+        """Extract pronunciation from Apple Dictionary data.
+
+        Args:
+            raw_data: Raw response containing definition text
+
+        Returns:
+            Pronunciation if found, None otherwise
+        """
+        if "raw_definition" not in raw_data:
+            return None
+        
+        # Apple Dictionary includes IPA in format |ˈæpəl|
+        ipa_match = re.search(r'\|([^|]+)\|', raw_data["raw_definition"])
+        if ipa_match:
+            ipa = ipa_match.group(1)
+            # Convert IPA to simple phonetic
+            phonetic = self._ipa_to_phonetic(ipa)
+            
+            return Pronunciation(
+                word_id="",  # Will be set by base connector
+                phonetic=phonetic,
+                ipa_american=ipa,  # Apple typically uses American pronunciation
+                syllables=[],
+                stress_pattern=None,
+            )
+        
+        return None
+
+    async def extract_definitions(self, raw_data: dict[str, Any], word_id: str) -> list[Definition]:
+        """Extract definitions from Apple Dictionary data.
+
+        Args:
+            raw_data: Raw response containing definition text
+            word_id: ID of the word these definitions belong to
+
+        Returns:
+            List of Definition objects
+        """
+        if "raw_definition" not in raw_data:
+            return []
+        
+        raw_definition = raw_data["raw_definition"]
+        word = raw_data.get("word", "")
+        
+        # Parse definitions
+        parsed_defs = self._parse_apple_definition(word, raw_definition)
+        
+        # Convert to new model structure
+        definitions = []
+        meaning_order = 0
+        
+        for idx, old_def in enumerate(parsed_defs):
+            # Create meaning cluster
+            meaning_cluster = MeaningCluster(
+                id=f"apple_{old_def.word_type}_{idx}",
+                name=f"{old_def.word_type.title()} sense {idx + 1}",
+                description=old_def.definition[:100] + "..." if len(old_def.definition) > 100 else old_def.definition,
+                order=meaning_order,
+                relevance=0.8 - (idx * 0.1),
+            )
+            meaning_order += 1
+            
+            # Create definition
+            definition = Definition(
+                word_id=word_id,
+                part_of_speech=old_def.word_type,
+                text=old_def.definition,
+                meaning_cluster=meaning_cluster,
+                sense_number=f"{idx + 1}",
+                synonyms=old_def.synonyms,
+                antonyms=[],
+                example_ids=[],
+            )
+            
+            # Save definition to get ID
+            await definition.save()
+            
+            # Convert and save examples
+            for gen_ex in old_def.examples.generated:
+                example = Example(
+                    definition_id=definition.id,
+                    text=gen_ex.sentence,
+                    type="generated",  # Apple examples are typically generated
+                )
+                await example.save()
+                definition.example_ids.append(example.id)
+            
+            # Update definition with example IDs
+            await definition.save()
+            definitions.append(definition)
+        
+        return definitions
+
+    async def extract_etymology(self, raw_data: dict[str, Any]) -> Etymology | None:
+        """Extract etymology from Apple Dictionary data.
+
+        Args:
+            raw_data: Raw response containing definition text
+
+        Returns:
+            Etymology if found, None otherwise
+        """
+        # Apple Dictionary sometimes includes etymology in the definition
+        # Look for patterns like "ORIGIN" or "Etymology:"
+        if "raw_definition" not in raw_data:
+            return None
+        
+        text = raw_data["raw_definition"]
+        
+        # Common etymology patterns
+        etym_match = re.search(
+            r'(?:ORIGIN|Etymology:?|from)\s+(.+?)(?=\n|$)', 
+            text, 
+            re.IGNORECASE | re.MULTILINE
+        )
+        
+        if etym_match:
+            etym_text = etym_match.group(1).strip()
+            return Etymology(
+                text=etym_text,
+                origin_language=None,  # Could parse from text
+                root_words=[],
+            )
+        
+        return None
+
+    def _ipa_to_phonetic(self, ipa: str) -> str:
+        """Convert IPA notation to simple phonetic spelling."""
+        # Basic IPA to phonetic mapping
+        mappings = {
+            'æ': 'a',
+            'ə': 'uh',
+            'ɪ': 'i',
+            'ʊ': 'u',
+            'ɛ': 'e',
+            'ɔ': 'aw',
+            'ɑ': 'ah',
+            'ʌ': 'u',
+            'ˈ': '',  # Remove stress marks
+            'ˌ': '',
+        }
+        
+        phonetic = ipa
+        for ipa_char, simple in mappings.items():
+            phonetic = phonetic.replace(ipa_char, simple)
+        
+        return phonetic

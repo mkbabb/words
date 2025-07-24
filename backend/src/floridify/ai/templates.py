@@ -138,3 +138,90 @@ class PromptTemplateManager:
             count=count,
             previous_words=previous_words or [],
         )
+
+    def get_antonym_prompt(self, word: str, definition: str, word_type: str) -> str:
+        """Generate prompt for antonym generation."""
+        return self.render_template(
+            "antonym_generation",
+            word=word,
+            definition=definition,
+            word_type=word_type,
+        )
+
+    def get_etymology_prompt(self, word: str, provider_data: list[dict[str, Any]]) -> str:
+        """Generate prompt for etymology extraction."""
+        return self.render_template(
+            "etymology_extraction",
+            word=word,
+            provider_data=provider_data,
+        )
+
+    def get_word_forms_prompt(self, word: str, word_type: str) -> str:
+        """Generate prompt for word form generation."""
+        return self.render_template(
+            "word_form_generation",
+            word=word,
+            word_type=word_type,
+        )
+
+    def get_frequency_prompt(self, word: str, definition: str) -> str:
+        """Generate prompt for frequency band assessment."""
+        return self.render_template(
+            "frequency_assessment",
+            word=word,
+            definition=definition,
+        )
+
+    def get_register_prompt(self, definition: str) -> str:
+        """Generate prompt for register classification."""
+        return self.render_template(
+            "register_classification",
+            definition=definition,
+        )
+
+    def get_domain_prompt(self, definition: str) -> str:
+        """Generate prompt for domain identification."""
+        return self.render_template(
+            "domain_identification",
+            definition=definition,
+        )
+
+    def get_cefr_prompt(self, word: str, definition: str) -> str:
+        """Generate prompt for CEFR level assessment."""
+        return self.render_template(
+            "cefr_assessment",
+            word=word,
+            definition=definition,
+        )
+
+    def get_grammar_patterns_prompt(self, definition: str, word_type: str) -> str:
+        """Generate prompt for grammar pattern extraction."""
+        return self.render_template(
+            "grammar_pattern_extraction",
+            definition=definition,
+            word_type=word_type,
+        )
+
+    def get_collocations_prompt(self, word: str, definition: str, word_type: str) -> str:
+        """Generate prompt for collocation identification."""
+        return self.render_template(
+            "collocation_identification",
+            word=word,
+            definition=definition,
+            word_type=word_type,
+        )
+
+    def get_usage_notes_prompt(self, word: str, definition: str) -> str:
+        """Generate prompt for usage note generation."""
+        return self.render_template(
+            "usage_note_generation",
+            word=word,
+            definition=definition,
+        )
+
+    def get_regional_variants_prompt(self, definition: str) -> str:
+        """Generate prompt for regional variant detection."""
+        return self.render_template(
+            "regional_variant_detection",
+            definition=definition,
+        )

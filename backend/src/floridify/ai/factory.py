@@ -10,7 +10,7 @@ import toml
 from ..utils.config import load_config
 from ..utils.logging import get_logger
 from .connector import OpenAIConnector
-from .synthesizer import DefinitionSynthesizer
+from .synthesizer import EnhancedDefinitionSynthesizer as DefinitionSynthesizer
 
 logger = get_logger(__name__)
 
@@ -18,8 +18,6 @@ logger = get_logger(__name__)
 _openai_connector: OpenAIConnector | None = None
 _definition_synthesizer: DefinitionSynthesizer | None = None
 
-
-# Configuration loading moved to utils.config
 
 
 def get_openai_connector(

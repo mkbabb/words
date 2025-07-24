@@ -7,7 +7,16 @@ import time
 from typing import Any
 
 from ..core.state_tracker import PipelineState, StateTracker, Stages
-from ..models import ProviderData
+from ..models import (
+    ProviderData, 
+    Word, 
+    Definition, 
+    Pronunciation, 
+    Etymology,
+    MeaningCluster,
+    Example,
+    ModelInfo,
+)
 from ..utils.logging import get_logger
 from .base import DictionaryConnector
 
@@ -69,7 +78,7 @@ class DictionaryComConnector(DictionaryConnector):
                     stage=Stages.PROVIDER_FETCH_COMPLETE,
                     progress=58,
                     message="Provider unavailable",
-                    metadata={"error": "Dictionary.com connector not implemented"}
+                    details={"error": "Dictionary.com connector not implemented"}
                 )
 
             return None
@@ -81,3 +90,56 @@ class DictionaryComConnector(DictionaryConnector):
             logger.error(f"Error in Dictionary.com stub for {word}: {e}")
 
             return None
+
+    async def extract_pronunciation(self, raw_data: dict[str, Any]) -> Pronunciation | None:
+        """Extract pronunciation from Dictionary.com data.
+
+        Args:
+            raw_data: Raw response from Dictionary.com API
+
+        Returns:
+            Pronunciation if found, None otherwise
+        """
+        # TODO: Implement when Dictionary.com API is available
+        # Expected format from Dictionary.com:
+        # - phonetic spelling
+        # - IPA notation
+        # - audio URLs
+        return None
+
+    async def extract_definitions(self, raw_data: dict[str, Any], word_id: str) -> list[Definition]:
+        """Extract definitions from Dictionary.com data.
+
+        Args:
+            raw_data: Raw response from Dictionary.com API
+            word_id: ID of the word these definitions belong to
+
+        Returns:
+            List of Definition objects
+        """
+        # TODO: Implement when Dictionary.com API is available
+        # Expected to extract:
+        # - Part of speech
+        # - Definition text
+        # - Examples
+        # - Synonyms/antonyms
+        # - Usage notes
+        # - Domain/register
+        return []
+
+    async def extract_etymology(self, raw_data: dict[str, Any]) -> Etymology | None:
+        """Extract etymology from Dictionary.com data.
+
+        Args:
+            raw_data: Raw response from Dictionary.com API
+
+        Returns:
+            Etymology if found, None otherwise
+        """
+        # TODO: Implement when Dictionary.com API is available
+        # Dictionary.com typically provides:
+        # - Origin language
+        # - Historical development
+        # - Root words
+        # - Date of first use
+        return None

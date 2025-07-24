@@ -23,6 +23,17 @@ from .models import (
     SuggestionsResponse,
     SynonymGenerationResponse,
     SynthesisResponse,
+    AntonymResponse,
+    EtymologyResponse,
+    WordFormResponse,
+    RegisterClassificationResponse,
+    DomainIdentificationResponse,
+    FrequencyBandResponse,
+    RegionalVariantResponse,
+    CEFRLevelResponse,
+    UsageNoteResponse,
+    CollocationResponse,
+    GrammarPatternResponse,
 )
 from .templates import PromptTemplateManager
 
@@ -467,4 +478,297 @@ class OpenAIConnector:
             return result
         except Exception as e:
             logger.error(f"❌ Fact generation failed for '{word}': {e}")
+            raise
+    
+    # Alias for router compatibility
+    async def _make_request(self, prompt: str, response_model: type[T], **kwargs: Any) -> T:
+        """Alias for _make_structured_request for backward compatibility."""
+        return await self._make_structured_request(prompt, response_model, **kwargs)
+
+    async def generate_antonyms(
+        self,
+        word: str,
+        definition: str,
+        word_type: str,
+    ) -> AntonymResponse:
+        """Generate antonyms for a definition.
+
+        Args:
+            word: The word
+            definition: The definition text
+            word_type: Part of speech
+
+        Returns:
+            AntonymResponse with list of antonyms
+        """
+        prompt = self.template_manager.get_antonym_prompt(
+            word=word,
+            definition=definition,
+            word_type=word_type,
+        )
+        
+        try:
+            result = await self._make_structured_request(prompt, AntonymResponse)
+            logger.info(f"Generated {len(result.antonyms)} antonyms for '{word}'")
+            return result
+        except Exception as e:
+            logger.error(f"Antonym generation failed for '{word}': {e}")
+            raise
+
+    async def extract_etymology(
+        self,
+        word: str,
+        provider_data: list[dict[str, Any]],
+    ) -> EtymologyResponse:
+        """Extract etymology from provider data.
+
+        Args:
+            word: The word
+            provider_data: Raw data from providers
+
+        Returns:
+            EtymologyResponse with etymology information
+        """
+        prompt = self.template_manager.get_etymology_prompt(
+            word=word,
+            provider_data=provider_data,
+        )
+        
+        try:
+            result = await self._make_structured_request(prompt, EtymologyResponse)
+            logger.info(f"Extracted etymology for '{word}' (origin: {result.origin_language})")
+            return result
+        except Exception as e:
+            logger.error(f"Etymology extraction failed for '{word}': {e}")
+            raise
+
+    async def identify_word_forms(
+        self,
+        word: str,
+        word_type: str,
+    ) -> WordFormResponse:
+        """Identify word forms (plural, past tense, etc.).
+
+        Args:
+            word: The word
+            word_type: Part of speech
+
+        Returns:
+            WordFormResponse with word forms
+        """
+        prompt = self.template_manager.get_word_forms_prompt(
+            word=word,
+            word_type=word_type,
+        )
+        
+        try:
+            result = await self._make_structured_request(prompt, WordFormResponse)
+            logger.info(f"Identified {len(result.forms)} word forms for '{word}'")
+            return result
+        except Exception as e:
+            logger.error(f"Word form identification failed for '{word}': {e}")
+            raise
+
+    async def assess_frequency_band(
+        self,
+        word: str,
+        definition: str,
+    ) -> FrequencyBandResponse:
+        """Assess frequency band (1-5) for a word.
+
+        Args:
+            word: The word
+            definition: The definition for context
+
+        Returns:
+            FrequencyBandResponse with band assessment
+        """
+        prompt = self.template_manager.get_frequency_prompt(
+            word=word,
+            definition=definition,
+        )
+        
+        try:
+            result = await self._make_structured_request(prompt, FrequencyBandResponse)
+            logger.info(f"Assessed frequency band {result.band} for '{word}'")
+            return result
+        except Exception as e:
+            logger.error(f"Frequency assessment failed for '{word}': {e}")
+            raise
+
+    async def classify_register(
+        self,
+        definition: str,
+    ) -> RegisterClassificationResponse:
+        """Classify register (formal, informal, etc.) of a definition.
+
+        Args:
+            definition: The definition text
+
+        Returns:
+            RegisterClassificationResponse with classification
+        """
+        prompt = self.template_manager.get_register_prompt(definition=definition)
+        
+        try:
+            result = await self._make_structured_request(prompt, RegisterClassificationResponse)
+            logger.info(f"Classified register as '{result.register}'")
+            return result
+        except Exception as e:
+            logger.error(f"Register classification failed: {e}")
+            raise
+
+    async def identify_domain(
+        self,
+        definition: str,
+    ) -> DomainIdentificationResponse:
+        """Identify domain/field of a definition.
+
+        Args:
+            definition: The definition text
+
+        Returns:
+            DomainIdentificationResponse with domain
+        """
+        prompt = self.template_manager.get_domain_prompt(definition=definition)
+        
+        try:
+            result = await self._make_structured_request(prompt, DomainIdentificationResponse)
+            logger.info(f"Identified domain as '{result.domain}'")
+            return result
+        except Exception as e:
+            logger.error(f"Domain identification failed: {e}")
+            raise
+
+    async def assess_cefr_level(
+        self,
+        word: str,
+        definition: str,
+    ) -> CEFRLevelResponse:
+        """Assess CEFR level (A1-C2) for a word.
+
+        Args:
+            word: The word
+            definition: The definition for context
+
+        Returns:
+            CEFRLevelResponse with level assessment
+        """
+        prompt = self.template_manager.get_cefr_prompt(
+            word=word,
+            definition=definition,
+        )
+        
+        try:
+            result = await self._make_structured_request(prompt, CEFRLevelResponse)
+            logger.info(f"Assessed CEFR level {result.level} for '{word}'")
+            return result
+        except Exception as e:
+            logger.error(f"CEFR assessment failed for '{word}': {e}")
+            raise
+
+    async def extract_grammar_patterns(
+        self,
+        definition: str,
+        word_type: str,
+    ) -> GrammarPatternResponse:
+        """Extract grammar patterns from a definition.
+
+        Args:
+            definition: The definition text
+            word_type: Part of speech
+
+        Returns:
+            GrammarPatternResponse with patterns
+        """
+        prompt = self.template_manager.get_grammar_patterns_prompt(
+            definition=definition,
+            word_type=word_type,
+        )
+        
+        try:
+            result = await self._make_structured_request(prompt, GrammarPatternResponse)
+            logger.info(f"Extracted {len(result.patterns)} grammar patterns")
+            return result
+        except Exception as e:
+            logger.error(f"Grammar pattern extraction failed: {e}")
+            raise
+
+    async def identify_collocations(
+        self,
+        word: str,
+        definition: str,
+        word_type: str,
+    ) -> CollocationResponse:
+        """Identify common collocations for a word.
+
+        Args:
+            word: The word
+            definition: The definition for context
+            word_type: Part of speech
+
+        Returns:
+            CollocationResponse with collocations
+        """
+        prompt = self.template_manager.get_collocations_prompt(
+            word=word,
+            definition=definition,
+            word_type=word_type,
+        )
+        
+        try:
+            result = await self._make_structured_request(prompt, CollocationResponse)
+            logger.info(f"Identified {len(result.collocations)} collocations for '{word}'")
+            return result
+        except Exception as e:
+            logger.error(f"Collocation identification failed for '{word}': {e}")
+            raise
+
+    async def generate_usage_notes(
+        self,
+        word: str,
+        definition: str,
+    ) -> UsageNoteResponse:
+        """Generate usage notes for a definition.
+
+        Args:
+            word: The word
+            definition: The definition text
+
+        Returns:
+            UsageNoteResponse with usage guidance
+        """
+        prompt = self.template_manager.get_usage_notes_prompt(
+            word=word,
+            definition=definition,
+        )
+        
+        try:
+            result = await self._make_structured_request(prompt, UsageNoteResponse)
+            logger.info(f"Generated {len(result.notes)} usage notes for '{word}'")
+            return result
+        except Exception as e:
+            logger.error(f"Usage note generation failed for '{word}': {e}")
+            raise
+
+    async def detect_regional_variants(
+        self,
+        definition: str,
+    ) -> RegionalVariantResponse:
+        """Detect regional variants for a definition.
+
+        Args:
+            definition: The definition text
+
+        Returns:
+            RegionalVariantResponse with regions
+        """
+        prompt = self.template_manager.get_regional_variants_prompt(definition=definition)
+        
+        try:
+            result = await self._make_structured_request(prompt, RegionalVariantResponse)
+            logger.info(f"Detected regional variants: {', '.join(result.regions)}")
+            return result
+        except Exception as e:
+            logger.error(f"Regional variant detection failed: {e}")
             raise

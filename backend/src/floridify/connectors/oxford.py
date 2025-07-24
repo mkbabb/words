@@ -9,7 +9,20 @@ from typing import Any
 import httpx
 
 from ..core.state_tracker import PipelineState, StateTracker
-from ..models import Definition, Examples, GeneratedExample, ProviderData
+from ..models import (
+    Definition, 
+    Examples, 
+    GeneratedExample, 
+    ProviderData,
+    Etymology,
+    Pronunciation,
+    Word,
+    Example,
+    MeaningCluster,
+    UsageNote,
+    GrammarPattern,
+)
+from ..constants import Language
 from ..utils.logging import get_logger
 from .base import DictionaryConnector
 
@@ -64,6 +77,18 @@ class OxfordConnector(DictionaryConnector):
         await self._enforce_rate_limit()
 
         try:
+            # Get or create Word document
+            from ..storage.mongodb import get_storage
+            storage = await get_storage()
+            word_obj = await storage.get_word(word)
+            if not word_obj:
+                word_obj = Word(
+                    text=word,
+                    normalized=word.lower(),
+                    language=Language.ENGLISH,
+                )
+                await word_obj.save()
+
             # Fetch both entries and pronunciation if available
             url = f"{self.base_url}/entries/en-us/{word.lower()}"
 
@@ -79,78 +104,25 @@ class OxfordConnector(DictionaryConnector):
             response.raise_for_status()
             data = response.json()
 
-            return self._parse_oxford_response(word, data)
+            return await self._parse_oxford_response(word, data, word_obj)
 
         except Exception as e:
             logger.error(f"Error fetching {word} from Oxford: {e}")
             return None
 
-    def _parse_oxford_response(self, word: str, data: dict[str, Any]) -> ProviderData:
-        """Parse Oxford API response.
+    async def _parse_oxford_response(self, word: str, data: dict[str, Any], word_obj: Word) -> ProviderData:
+        """Parse Oxford API response using new models.
 
         Args:
             word: The word being looked up
             data: Raw API response
+            word_obj: The Word document
 
         Returns:
             Parsed ProviderData
         """
-        definitions = []
-
-        try:
-            results = data.get("results", [])
-            if not results:
-                return ProviderData(provider_name=self.provider_name)
-
-            for result in results:
-                lexical_entries = result.get("lexicalEntries", [])
-
-                for lexical_entry in lexical_entries:
-                    # Map Oxford part of speech to our enum
-                    oxford_pos = lexical_entry.get("lexicalCategory", {}).get("id", "").lower()
-                    word_type = self._map_oxford_pos_to_word_type(oxford_pos)
-
-                    if not word_type:
-                        continue
-
-                    entries = lexical_entry.get("entries", [])
-
-                    for entry in entries:
-                        senses = entry.get("senses", [])
-
-                        for sense in senses:
-                            definition_texts = sense.get("definitions", [])
-
-                            for def_text in definition_texts:
-                                # Extract examples if available
-                                examples = Examples()
-
-                                oxford_examples = sense.get("examples", [])
-                                for example in oxford_examples:
-                                    example_text = example.get("text", "")
-                                    if example_text:
-                                        examples.generated.append(
-                                            GeneratedExample(
-                                                sentence=example_text,
-                                                regenerable=False,  # Oxford examples are real
-                                            )
-                                        )
-
-                                definitions.append(
-                                    Definition(
-                                        word_type=word_type,
-                                        definition=def_text,
-                                        examples=examples,
-                                        raw_metadata=sense,  # Store full sense data
-                                    )
-                                )
-
-        except Exception as e:
-            logger.error(f"Error parsing Oxford response for {word}: {e}")
-
-        return ProviderData(
-            provider_name=self.provider_name, definitions=definitions, raw_metadata=data
-        )
+        # Use base class method to normalize and save
+        return await self._normalize_response(data, word_obj)
 
     def _map_oxford_pos_to_word_type(self, oxford_pos: str) -> str | None:
         """Map Oxford part of speech to our word type string.
@@ -178,3 +150,186 @@ class OxfordConnector(DictionaryConnector):
     async def close(self) -> None:
         """Close the HTTP session."""
         await self.session.aclose()
+
+    async def extract_pronunciation(self, raw_data: dict[str, Any]) -> Pronunciation | None:
+        """Extract pronunciation from Oxford data.
+
+        Args:
+            raw_data: Raw response from Oxford API
+
+        Returns:
+            Pronunciation if found, None otherwise
+        """
+        try:
+            results = raw_data.get("results", [])
+            if not results:
+                return None
+
+            # Oxford includes pronunciations in lexical entries
+            for result in results:
+                lexical_entries = result.get("lexicalEntries", [])
+                for lexical_entry in lexical_entries:
+                    pronunciations = lexical_entry.get("pronunciations", [])
+                    if pronunciations:
+                        # Get first pronunciation
+                        pron = pronunciations[0]
+                        phonetic = pron.get("phoneticSpelling", "")
+                        
+                        # Oxford provides both British and American pronunciations
+                        ipa_british = None
+                        ipa_american = None
+                        
+                        for p in pronunciations:
+                            dialect = p.get("dialects", [])
+                            if "American English" in dialect:
+                                ipa_american = p.get("phoneticSpelling")
+                            elif "British English" in dialect:
+                                ipa_british = p.get("phoneticSpelling")
+                        
+                        return Pronunciation(
+                            word_id="",  # Will be set by base connector
+                            phonetic=phonetic,
+                            ipa_british=ipa_british,
+                            ipa_american=ipa_american,
+                            syllables=[],
+                            stress_pattern=None,
+                        )
+        except Exception as e:
+            logger.error(f"Error extracting pronunciation: {e}")
+        
+        return None
+
+    async def extract_definitions(self, raw_data: dict[str, Any], word_id: str) -> list[Definition]:
+        """Extract definitions from Oxford data.
+
+        Args:
+            raw_data: Raw response from Oxford API
+            word_id: ID of the word these definitions belong to
+
+        Returns:
+            List of Definition objects
+        """
+        definitions = []
+        meaning_order = 0
+
+        try:
+            results = raw_data.get("results", [])
+            if not results:
+                return definitions
+
+            for result in results:
+                lexical_entries = result.get("lexicalEntries", [])
+
+                for lexical_entry in lexical_entries:
+                    # Map Oxford part of speech to our enum
+                    oxford_pos = lexical_entry.get("lexicalCategory", {}).get("id", "").lower()
+                    word_type = self._map_oxford_pos_to_word_type(oxford_pos)
+
+                    if not word_type:
+                        continue
+
+                    entries = lexical_entry.get("entries", [])
+
+                    for entry in entries:
+                        senses = entry.get("senses", [])
+
+                        for sense_idx, sense in enumerate(senses):
+                            definition_texts = sense.get("definitions", [])
+
+                            for def_idx, def_text in enumerate(definition_texts):
+                                # Create meaning cluster
+                                meaning_cluster = MeaningCluster(
+                                    id=f"oxford_{word_type}_{sense_idx}_{def_idx}",
+                                    name=f"{word_type.title()} sense {sense_idx + 1}",
+                                    description=def_text[:100] + "..." if len(def_text) > 100 else def_text,
+                                    order=meaning_order,
+                                    relevance=0.9 - (sense_idx * 0.1),
+                                )
+                                meaning_order += 1
+
+                                # Extract domain and register
+                                domains = sense.get("domainClasses", [])
+                                domain = domains[0].get("text") if domains else None
+                                
+                                registers = sense.get("registers", [])
+                                register = None
+                                if registers:
+                                    reg_text = registers[0].get("text", "").lower()
+                                    if "formal" in reg_text:
+                                        register = "formal"
+                                    elif "informal" in reg_text:
+                                        register = "informal"
+                                    elif "slang" in reg_text:
+                                        register = "slang"
+
+                                # Create definition
+                                definition = Definition(
+                                    word_id=word_id,
+                                    part_of_speech=word_type,
+                                    text=def_text,
+                                    meaning_cluster=meaning_cluster,
+                                    sense_number=f"{sense_idx + 1}.{def_idx + 1}",
+                                    synonyms=[],
+                                    antonyms=[],
+                                    example_ids=[],
+                                    register=register,
+                                    domain=domain,
+                                )
+
+                                # Save definition to get ID
+                                await definition.save()
+
+                                # Extract and save examples
+                                oxford_examples = sense.get("examples", [])
+                                for example in oxford_examples:
+                                    example_text = example.get("text", "")
+                                    if example_text:
+                                        example_obj = Example(
+                                            definition_id=definition.id,
+                                            text=example_text,
+                                            type="literature",  # Oxford examples are from real usage
+                                        )
+                                        await example_obj.save()
+                                        definition.example_ids.append(example_obj.id)
+
+                                # Update definition with example IDs
+                                await definition.save()
+                                definitions.append(definition)
+
+        except Exception as e:
+            logger.error(f"Error extracting definitions: {e}")
+
+        return definitions
+
+    async def extract_etymology(self, raw_data: dict[str, Any]) -> Etymology | None:
+        """Extract etymology from Oxford data.
+
+        Args:
+            raw_data: Raw response from Oxford API
+
+        Returns:
+            Etymology if found, None otherwise
+        """
+        try:
+            results = raw_data.get("results", [])
+            if not results:
+                return None
+
+            for result in results:
+                lexical_entries = result.get("lexicalEntries", [])
+                for lexical_entry in lexical_entries:
+                    entries = lexical_entry.get("entries", [])
+                    for entry in entries:
+                        etymologies = entry.get("etymologies", [])
+                        if etymologies:
+                            # Oxford provides detailed etymology
+                            etym_text = etymologies[0]
+                            return Etymology(
+                                text=etym_text,
+                                origin_language=None,  # Could parse from text
+                                root_words=[],
+                            )
+        except Exception as e:
+            logger.error(f"Error extracting etymology: {e}")
+        
+        return None

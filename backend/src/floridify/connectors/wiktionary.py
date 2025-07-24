@@ -17,6 +17,13 @@ from ..models import (
     GeneratedExample,
     Pronunciation,
     ProviderData,
+    Etymology,
+    Word,
+    Example,
+    MeaningCluster,
+    WordForm,
+    GrammarPattern,
+    UsageNote,
 )
 from ..utils.logging import get_logger
 from ..core.state_tracker import PipelineState, StateTracker, Stages
@@ -138,6 +145,20 @@ class WiktionaryConnector(DictionaryConnector):
             if state_tracker:
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
 
+            # First, get or create the Word document
+            from ..storage.mongodb import get_storage
+            storage = await get_storage()
+            word_obj = await storage.get_word(word)
+            if not word_obj:
+                # Create new Word if doesn't exist
+                from ..constants import Language
+                word_obj = Word(
+                    text=word,
+                    normalized=word.lower(),
+                    language=Language.ENGLISH,
+                )
+                await word_obj.save()
+
             params = {
                 "action": "query",
                 "prop": "revisions",
@@ -216,7 +237,7 @@ class WiktionaryConnector(DictionaryConnector):
                     progress=55
                 )
 
-            result = self._parse_wiktionary_response(word, data)
+            result = await self._parse_wiktionary_response(word, data, word_obj)
 
             # Report completion
             if state_tracker:
@@ -235,8 +256,8 @@ class WiktionaryConnector(DictionaryConnector):
             logger.error(f"Error fetching {word} from Wiktionary: {e}")
             return None
 
-    def _parse_wiktionary_response(
-        self, word: str, data: dict[str, Any]
+    async def _parse_wiktionary_response(
+        self, word: str, data: dict[str, Any], word_obj: Word
     ) -> ProviderData | None:
         """Parse Wiktionary response comprehensively."""
         try:
@@ -247,29 +268,29 @@ class WiktionaryConnector(DictionaryConnector):
             content = pages[0]["revisions"][0]["slots"]["main"]["content"]
 
             # Extract all components comprehensively
-            extracted_data = self._extract_comprehensive_data(content)
+            extracted_data = await self._extract_comprehensive_data(content, word_obj)
 
-            return ProviderData(
-                provider_name=self.provider_name,
-                definitions=extracted_data.definitions,
-                raw_metadata={
-                    "wikitext_sample": content[:1000],
-                    "etymology": extracted_data.etymology,
-                    "pronunciation": (
-                        extracted_data.pronunciation.model_dump()
-                        if extracted_data.pronunciation
-                        else None
-                    ),
-                    "alternative_forms": extracted_data.alternative_forms,
-                    "related_terms": extracted_data.related_terms,
-                },
-            )
+            # Create raw metadata for base class to use
+            raw_metadata = {
+                "wikitext_sample": content[:1000],
+                "etymology": extracted_data.etymology,
+                "pronunciation": (
+                    extracted_data.pronunciation.model_dump()
+                    if extracted_data.pronunciation
+                    else None
+                ),
+                "alternative_forms": extracted_data.alternative_forms,
+                "related_terms": extracted_data.related_terms,
+            }
+
+            # Use base class method to normalize and save
+            return await self._normalize_response(raw_metadata, word_obj)
 
         except Exception as e:
             logger.error(f"Error parsing Wiktionary response for {word}: {e}")
             return None
 
-    def _extract_comprehensive_data(self, wikitext: str) -> WiktionaryExtractedData:
+    async def _extract_comprehensive_data(self, wikitext: str, word_obj: Word) -> WiktionaryExtractedData:
         """Extract all available data from wikitext using systematic parsing."""
         try:
             parsed = wtp.parse(wikitext)
@@ -280,7 +301,7 @@ class WiktionaryConnector(DictionaryConnector):
                 english_section = parsed
 
             # Extract all components
-            definitions = self._extract_definitions(english_section)
+            definitions = await self._extract_definitions_new(english_section, word_obj.id)
             etymology = self._extract_etymology(english_section)
             pronunciation = self._extract_pronunciation(english_section)
             alternative_forms = self._extract_alternative_forms(english_section)
@@ -311,9 +332,10 @@ class WiktionaryConnector(DictionaryConnector):
                 return section
         return None
 
-    def _extract_definitions(self, section: wtp.Section) -> list[Definition]:
-        """Extract definitions systematically using wtp structure."""
+    async def _extract_definitions_new(self, section: wtp.Section, word_id: str) -> list[Definition]:
+        """Extract definitions using new model structure."""
         definitions = []
+        meaning_order = 0
 
         for subsection in section.sections:
             if not subsection.title:
@@ -334,26 +356,57 @@ class WiktionaryConnector(DictionaryConnector):
             # Use wtp.WikiList to extract numbered definitions
             definition_texts = self._extract_wikilist_items(str(subsection))
 
-            for def_text in definition_texts:
+            for idx, def_text in enumerate(definition_texts):
                 if not def_text or len(def_text.strip()) < 5:
                     continue
 
                 # Extract components from definition
-                examples = self._extract_examples(def_text)
-                synonyms = self._extract_synonyms(def_text)
                 clean_def = self.cleaner.clean_text(def_text)
+                if not clean_def:
+                    continue
 
-                if clean_def:
-                    definitions.append(
-                        Definition(
-                            word_type=word_type,
-                            definition=clean_def,
-                            examples=examples,
-                            synonyms=synonyms,
-                        )
-                    )
+                # Create meaning cluster
+                meaning_cluster = MeaningCluster(
+                    id=f"wiktionary_{word_type}_{idx}",
+                    name=f"{word_type.title()} sense {idx + 1}",
+                    description=clean_def[:100] + "..." if len(clean_def) > 100 else clean_def,
+                    order=meaning_order,
+                    relevance=0.8 - (idx * 0.1),  # Decreasing relevance by order
+                )
+                meaning_order += 1
+
+                # Extract synonyms and antonyms
+                synonyms = self._extract_synonyms(def_text)
+                
+                # Create definition
+                definition = Definition(
+                    word_id=word_id,
+                    part_of_speech=word_type,
+                    text=clean_def,
+                    meaning_cluster=meaning_cluster,
+                    sense_number=f"{idx + 1}",
+                    synonyms=synonyms,
+                    antonyms=[],
+                    example_ids=[],
+                )
+                
+                # Save definition to get ID
+                await definition.save()
+                
+                # Extract and save examples
+                example_objs = await self._extract_examples_new(def_text, definition.id)
+                definition.example_ids = [ex.id for ex in example_objs]
+                await definition.save()  # Update with example IDs
+                
+                definitions.append(definition)
 
         return definitions
+
+    def _extract_definitions(self, section: wtp.Section) -> list[Definition]:
+        """Legacy definition extraction for compatibility."""
+        # This is kept for the WiktionaryExtractedData structure
+        # but actual saving happens in _extract_definitions_new
+        return []
 
     def _extract_wikilist_items(self, section_text: str) -> list[str]:
         """Extract numbered definition items from section text."""
@@ -371,9 +424,9 @@ class WiktionaryConnector(DictionaryConnector):
 
         return items
 
-    def _extract_examples(self, definition_text: str) -> Examples:
-        """Extract examples systematically from templates and patterns."""
-        examples = Examples()
+    async def _extract_examples_new(self, definition_text: str, definition_id: str) -> list[Example]:
+        """Extract and save examples using new model structure."""
+        examples = []
 
         try:
             parsed = wtp.parse(definition_text)
@@ -390,11 +443,23 @@ class WiktionaryConnector(DictionaryConnector):
                             example_text, preserve_structure=True
                         )
                         if clean_example and len(clean_example) > 10:
-                            examples.generated.append(
-                                GeneratedExample(
-                                    sentence=clean_example, regenerable=False
-                                )
+                            example = Example(
+                                definition_id=definition_id,
+                                text=clean_example,
+                                type="literature",  # Wiktionary examples are from real usage
                             )
+                            await example.save()
+                            examples.append(example)
+        except Exception as e:
+            logger.error(f"Error extracting examples: {e}")
+
+        return examples
+
+    def _extract_examples(self, definition_text: str) -> Examples:
+        """Legacy example extraction for compatibility."""
+        # Kept for compatibility but actual saving happens in _extract_examples_new
+        examples = Examples()
+        # ... (rest of the old implementation can be removed or simplified)
 
                 elif template_name.startswith("quote"):
                     # Quote templates
@@ -606,3 +671,83 @@ class WiktionaryConnector(DictionaryConnector):
     async def close(self) -> None:
         """Close HTTP client."""
         await self.http_client.close()
+
+    async def extract_pronunciation(self, raw_data: dict[str, Any]) -> Pronunciation | None:
+        """Extract pronunciation from Wiktionary data.
+
+        Args:
+            raw_data: Raw response metadata containing pronunciation info
+
+        Returns:
+            Pronunciation if found, None otherwise
+        """
+        if not raw_data or "pronunciation" not in raw_data:
+            return None
+        
+        pron_data = raw_data["pronunciation"]
+        if not pron_data:
+            return None
+        
+        # Create Pronunciation without word_id (will be set by base connector)
+        return Pronunciation(
+            word_id="",  # Will be set by base connector
+            phonetic=pron_data.get("phonetic", ""),
+            ipa_american=pron_data.get("ipa"),
+            syllables=[],
+            stress_pattern=None,
+        )
+
+    async def extract_definitions(self, raw_data: dict[str, Any], word_id: str) -> list[Definition]:
+        """Extract definitions from Wiktionary data.
+
+        Args:
+            raw_data: Raw response from Wiktionary (not used directly)
+            word_id: ID of the word these definitions belong to
+
+        Returns:
+            List of Definition objects
+        """
+        # Definitions are already extracted in the main parsing method
+        # This is called after the fact, so we return empty list
+        # The actual definitions are handled in _parse_wiktionary_response
+        return []
+
+    async def extract_etymology(self, raw_data: dict[str, Any]) -> Etymology | None:
+        """Extract etymology from Wiktionary data.
+
+        Args:
+            raw_data: Raw response metadata containing etymology
+
+        Returns:
+            Etymology if found, None otherwise
+        """
+        if not raw_data or "etymology" not in raw_data:
+            return None
+        
+        etym_text = raw_data["etymology"]
+        if not etym_text:
+            return None
+        
+        # Clean and structure etymology text
+        cleaned_text = self.cleaner.clean_text(etym_text)
+        
+        # Try to extract language of origin
+        origin_language = None
+        if "from" in cleaned_text.lower():
+            # Simple pattern matching for common cases
+            patterns = [
+                r"from (\w+) (?:language|word)",
+                r"borrowed from (\w+)",
+                r"derived from (\w+)",
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, cleaned_text, re.IGNORECASE)
+                if match:
+                    origin_language = match.group(1)
+                    break
+        
+        return Etymology(
+            text=cleaned_text,
+            origin_language=origin_language,
+            root_words=[],  # Could extract these with more sophisticated parsing
+        )

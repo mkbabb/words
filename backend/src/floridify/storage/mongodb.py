@@ -9,7 +9,20 @@ from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..list.models import WordList
-from ..models.models import DictionaryEntry, SynthesizedDictionaryEntry
+from ..models import (
+    Word,
+    Definition,
+    Example,
+    Fact,
+    Pronunciation,
+    ProviderData,
+    SynthesizedDictionaryEntry,
+    PhrasalExpression,
+    WordRelationship,
+    # Legacy models for migration
+    LegacyDictionaryEntry,
+    LegacySynthesizedDictionaryEntry,
+)
 from ..utils.config import get_database_config
 from ..utils.logging import get_logger
 
@@ -59,10 +72,25 @@ class MongoDBStorage:
         )
         database: Any = self.client[self.database_name]
 
-        # Initialize Beanie with our document models
+        # Initialize Beanie with all document models
         await init_beanie(
             database=database,
-            document_models=[DictionaryEntry, SynthesizedDictionaryEntry, WordList],
+            document_models=[
+                # New models
+                Word,
+                Definition,
+                Example,
+                Fact,
+                Pronunciation,
+                ProviderData,
+                SynthesizedDictionaryEntry,
+                PhrasalExpression,
+                WordRelationship,
+                WordList,
+                # Legacy models (for migration)
+                LegacyDictionaryEntry,
+                LegacySynthesizedDictionaryEntry,
+            ],
         )
 
         self._initialized = True
@@ -128,11 +156,11 @@ class MongoDBStorage:
             self.client = None
             self._initialized = False
 
-    async def save_entry(self, entry: DictionaryEntry) -> bool:
-        """Save a dictionary entry to MongoDB.
+    async def save_word(self, word: Word) -> bool:
+        """Save a word to MongoDB.
 
         Args:
-            entry: DictionaryEntry to save
+            word: Word to save
 
         Returns:
             True if successful, False otherwise
@@ -142,60 +170,80 @@ class MongoDBStorage:
 
         try:
             # Use Beanie's upsert functionality
-            existing = await DictionaryEntry.find_one(DictionaryEntry.word == entry.word)
+            existing = await Word.find_one(Word.text == word.text)
 
             if existing:
-                # Update existing entry
-                existing.pronunciation = entry.pronunciation
-                existing.provider_data.update(entry.provider_data)
-                existing.last_updated = datetime.now()
+                # Update existing word
+                existing.word_forms = word.word_forms
+                existing.offensive_flag = word.offensive_flag
+                existing.first_known_use = word.first_known_use
+                existing.updated_at = datetime.now()
+                existing.version += 1
                 await existing.save()
             else:
-                # Create new entry
-                await entry.create()
+                # Create new word
+                await word.create()
 
             return True
 
         except Exception as e:
-            logger.error(f"Error saving entry for {entry.word}: {e}")
+            logger.error(f"Error saving word {word.text}: {e}")
             return False
 
-    async def get_entry(self, word: str) -> DictionaryEntry | None:
-        """Retrieve a dictionary entry by word.
+    async def get_word(self, text: str) -> Word | None:
+        """Retrieve a word by text.
 
         Args:
-            word: The word to look up
+            text: The word text to look up
 
         Returns:
-            DictionaryEntry if found, None otherwise
+            Word if found, None otherwise
         """
         if not self._initialized:
             return None
 
         try:
-            return await DictionaryEntry.find_one(DictionaryEntry.word == word)
+            return await Word.find_one(Word.text == text)
         except Exception as e:
-            logger.error(f"Error retrieving entry for {word}: {e}")
+            logger.error(f"Error retrieving word {text}: {e}")
             return None
 
-    async def entry_exists(self, word: str) -> bool:
-        """Check if an entry exists for a word.
+    async def word_exists(self, text: str) -> bool:
+        """Check if a word exists.
 
         Args:
-            word: The word to check
+            text: The word text to check
 
         Returns:
-            True if entry exists, False otherwise
+            True if word exists, False otherwise
         """
         if not self._initialized:
             return False
 
         try:
-            count = await DictionaryEntry.find(DictionaryEntry.word == word).count()
+            count = await Word.find(Word.text == text).count()
             return count > 0
         except Exception as e:
-            logger.error(f"Error checking existence for {word}: {e}")
+            logger.error(f"Error checking existence for {text}: {e}")
             return False
+
+    async def get_word_definitions(self, word_id: str) -> list[Definition]:
+        """Get all definitions for a word.
+
+        Args:
+            word_id: The word ID
+
+        Returns:
+            List of definitions
+        """
+        if not self._initialized:
+            return []
+
+        try:
+            return await Definition.find(Definition.word_id == word_id).to_list()
+        except Exception as e:
+            logger.error(f"Error retrieving definitions for word {word_id}: {e}")
+            return []
 
 
 
@@ -227,11 +275,18 @@ async def get_storage() -> MongoDBStorage:
     return _storage
 
 
-async def get_synthesized_entry(word: str) -> SynthesizedDictionaryEntry | None:
-    """Get synthesized dictionary entry by word."""
+async def get_synthesized_entry(word_text: str) -> SynthesizedDictionaryEntry | None:
+    """Get synthesized dictionary entry by word text."""
     try:
         await _ensure_initialized()
-        return await SynthesizedDictionaryEntry.find_one(SynthesizedDictionaryEntry.word == word)
+        # First find the word
+        word = await Word.find_one(Word.text == word_text)
+        if not word:
+            return None
+        # Then find the synthesized entry
+        return await SynthesizedDictionaryEntry.find_one(
+            SynthesizedDictionaryEntry.word_id == word.id
+        )
     except Exception:
         return None
 
@@ -241,13 +296,19 @@ async def save_synthesized_entry(entry: SynthesizedDictionaryEntry) -> None:
     try:
         await _ensure_initialized()
         existing = await SynthesizedDictionaryEntry.find_one(
-            SynthesizedDictionaryEntry.word == entry.word
+            SynthesizedDictionaryEntry.word_id == entry.word_id
         )
 
         if existing:
-            existing.pronunciation = entry.pronunciation
-            existing.definitions = entry.definitions
-            existing.last_updated = entry.last_updated
+            # Update existing entry
+            existing.pronunciation_id = entry.pronunciation_id
+            existing.definition_ids = entry.definition_ids
+            existing.etymology = entry.etymology
+            existing.fact_ids = entry.fact_ids
+            existing.model_info = entry.model_info
+            existing.source_provider_data_ids = entry.source_provider_data_ids
+            existing.updated_at = datetime.now()
+            existing.version += 1
             await existing.save()
         else:
             await entry.create()

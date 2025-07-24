@@ -1,39 +1,57 @@
-"""Definition synthesizer for creating unified dictionary entries."""
+"""Enhanced definition synthesizer using new data models and functional pipeline."""
 
 from __future__ import annotations
 
-import time
-from datetime import datetime
+import asyncio
+from typing import Any
 
-from ..constants import DictionaryProvider
+from ..constants import DictionaryProvider, Language
+from ..core.state_tracker import Stages, StateTracker
 from ..models import (
     Definition,
-    Examples,
-    GeneratedExample,
+    Etymology,
+    Example,
+    MeaningCluster,
+    ModelInfo,
     Pronunciation,
     ProviderData,
     SynthesizedDictionaryEntry,
+    Word,
 )
-from ..storage.mongodb import (
-    _ensure_initialized,
-    get_synthesized_entry,
-    save_synthesized_entry,
-)
+from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger
-from ..core.state_tracker import StateTracker, Stages
 from .connector import OpenAIConnector
+from .synthesis_functions import (
+    assess_definition_cefr,
+    assess_definition_frequency,
+    classify_definition_register,
+    detect_regional_variants,
+    enhance_definition_antonyms,
+    extract_grammar_patterns,
+    generate_usage_notes,
+    identify_collocations,
+    identify_definition_domain,
+    synthesize_facts,
+    synthesize_word_forms,
+)
 
 logger = get_logger(__name__)
 
 
-class DefinitionSynthesizer:
-    """Synthesizes dictionary entries from multiple providers_data using AI."""
+class EnhancedDefinitionSynthesizer:
+    """Synthesizes dictionary entries using new models and parallel processing."""
 
     def __init__(
-        self, openai_connector: OpenAIConnector, examples_count: int = 2
+        self,
+        openai_connector: OpenAIConnector,
+        examples_count: int = 2,
+        facts_count: int = 3,
+        parallel_enhancement: bool = True,
     ) -> None:
         self.ai = openai_connector
         self.examples_count = examples_count
+        self.facts_count = facts_count
+        self.parallel_enhancement = parallel_enhancement
 
     async def synthesize_entry(
         self,
@@ -42,95 +60,390 @@ class DefinitionSynthesizer:
         force_refresh: bool = False,
         state_tracker: StateTracker | None = None,
     ) -> SynthesizedDictionaryEntry | None:
-        """Synthesize a complete dictionary entry from provider data using meaning clusters."""
+        """Synthesize a complete dictionary entry from provider data."""
+        
+        # Get or create Word document
+        storage = await get_storage()
+        word_obj = await storage.get_word(word)
+        if not word_obj:
+            word_obj = Word(
+                text=word,
+                normalized=word.lower(),
+                language=Language.ENGLISH,
+            )
+            await word_obj.save()
 
-        # Check if we already have a synthesized entry (unless force_refresh is True)
+        # Check for existing synthesized entry
         if not force_refresh:
-            existing = await get_synthesized_entry(word)
-            if existing is not None:
+            existing = await SynthesizedDictionaryEntry.find_one(
+                SynthesizedDictionaryEntry.word_id == word_obj.id
+            )
+            if existing:
+                logger.info(f"Using existing synthesized entry for '{word}'")
                 return existing
 
-        # Generate pronunciation if not available
-        pronunciation = await self._synthesize_pronunciation(word)
-
-        # Extract all definitions with their full Definition objects for clustering
-        all_definition_objects: list[Definition] = []
-        all_definition_tuples: list[tuple[str, str, str]] = []
-
+        # Extract all definitions from providers
+        all_definitions = []
+        provider_metadata = {}
+        
         for provider_data in providers_data:
-            for definition in provider_data.definitions:
-                all_definition_objects.append(definition)
-                all_definition_tuples.append(
-                    (
-                        provider_data.provider_name,
-                        definition.word_type,
-                        definition.definition,
-                    )
-                )
+            provider_metadata[provider_data.provider.value] = {
+                "definition_count": len(provider_data.definition_ids),
+                "has_pronunciation": provider_data.pronunciation_id is not None,
+                "has_etymology": provider_data.etymology is not None,
+            }
+            
+            # Load definitions
+            for def_id in provider_data.definition_ids:
+                definition = await Definition.get(def_id)
+                if definition:
+                    all_definitions.append(definition)
 
-        if not all_definition_objects:
+        if not all_definitions:
             logger.warning(f"No definitions found for '{word}'")
             return None
 
-        # Extract cluster mappings using AI
-        logger.info(
-            f"🔍 Analyzing {len(all_definition_objects)} definitions for cluster mappings"
-        )
-
+        # Cluster definitions
         if state_tracker:
             await state_tracker.update_stage(Stages.AI_CLUSTERING)
-
-        cluster_response = await self.ai.extract_cluster_mapping(
-            word, all_definition_tuples
+        
+        clustered_definitions = await self._cluster_definitions(
+            word_obj, all_definitions, state_tracker
         )
 
+        # Synthesize core components
         if state_tracker:
-            await state_tracker.update_stage(Stages.AI_CLUSTERING, progress=70)
+            await state_tracker.update_stage(Stages.AI_SYNTHESIS, progress=65)
 
-        # Update Definition objects with their cluster assignments
-        cluster_descriptions = {}
-        for cluster_mapping in cluster_response.cluster_mappings:
-            cluster_id = cluster_mapping.cluster_id
-            cluster_descriptions[cluster_id] = cluster_mapping.cluster_description
-            for idx in cluster_mapping.definition_indices:
-                if 0 <= idx < len(all_definition_objects):
-                    all_definition_objects[idx].meaning_cluster = cluster_id
+        # Synthesize pronunciation
+        pronunciation = await self._synthesize_pronunciation(
+            word_obj, providers_data
+        )
+
+        # Synthesize etymology
+        etymology = await self._synthesize_etymology(
+            word_obj, providers_data
+        )
 
         # Synthesize definitions for each cluster
         synthesized_definitions = await self._synthesize_definitions(
-            word=word,
-            clustered_definitions=all_definition_objects,
-            cluster_descriptions=cluster_descriptions,
-            state_tracker=state_tracker,
+            word_obj, clustered_definitions, state_tracker
         )
 
-        # Ensure MongoDB is initialized before creating the entry
-        await _ensure_initialized()
+        # Generate facts
+        facts = await synthesize_facts(
+            word_obj, synthesized_definitions, self.ai, self.facts_count
+        )
+
+        # Update word forms
+        word_forms = await synthesize_word_forms(word_obj, self.ai)
+        if word_forms:
+            word_obj.word_forms = word_forms
+            await word_obj.save()
 
         # Create synthesized entry
         entry = SynthesizedDictionaryEntry(
-            word=word,
-            pronunciation=pronunciation,
-            definitions=synthesized_definitions,
-            last_updated=datetime.now(),
+            word_id=word_obj.id,
+            pronunciation_id=pronunciation.id if pronunciation else None,
+            definition_ids=[d.id for d in synthesized_definitions],
+            etymology=etymology,
+            fact_ids=[f.id for f in facts],
+            model_info=ModelInfo(
+                name=self.ai.model_name,
+                generation_count=1,
+                confidence=0.9,  # TODO: Calculate from component confidences
+            ),
+            source_provider_data_ids=[pd.id for pd in providers_data],
         )
 
-        # Save to database
+        # Save entry
         if state_tracker:
-            await state_tracker.update_stage(Stages.STORAGE_SAVE)
+            await state_tracker.update_stage(Stages.STORAGE_SAVE, progress=90)
 
-        try:
-            await save_synthesized_entry(entry)
+        await entry.save()
+        logger.success(f"Created synthesized entry for '{word}' with {len(synthesized_definitions)} definitions")
 
-            if state_tracker:
-                await state_tracker.update_stage(Stages.STORAGE_SAVE, progress=95)
-        except Exception as e:
-            logger.error(f"Failed to save synthesized entry for '{word}': {e}")
-            # Still return the entry even if saving failed
-            if state_tracker:
-                await state_tracker.update_error(f"Storage failed: {str(e)}")
+        # Enhance definitions in parallel if enabled
+        if self.parallel_enhancement:
+            await self._parallel_enhance_definitions(
+                synthesized_definitions, word_obj, state_tracker
+            )
 
         return entry
+
+    async def _cluster_definitions(
+        self,
+        word: Word,
+        definitions: list[Definition],
+        state_tracker: StateTracker | None = None,
+    ) -> list[Definition]:
+        """Cluster definitions by meaning using AI."""
+        
+        # Prepare definition tuples for clustering
+        definition_tuples = []
+        for definition in definitions:
+            # Get provider name from provider data
+            provider_name = "unknown"
+            if definition.provider_data_id:
+                provider_data = await ProviderData.get(definition.provider_data_id)
+                if provider_data:
+                    provider_name = provider_data.provider.value
+            
+            definition_tuples.append((
+                provider_name,
+                definition.part_of_speech,
+                definition.text,
+            ))
+
+        # Extract cluster mappings
+        cluster_response = await self.ai.extract_cluster_mapping(
+            word.text, definition_tuples
+        )
+
+        # Apply cluster assignments
+        for cluster_mapping in cluster_response.cluster_mappings:
+            cluster = MeaningCluster(
+                id=cluster_mapping.cluster_id,
+                name=cluster_mapping.cluster_description,
+                description=cluster_mapping.cluster_description,
+                order=cluster_mapping.relevancy,
+                relevance=cluster_mapping.relevancy,
+            )
+            
+            for idx in cluster_mapping.definition_indices:
+                if 0 <= idx < len(definitions):
+                    definitions[idx].meaning_cluster = cluster
+
+        return definitions
+
+    async def _synthesize_pronunciation(
+        self,
+        word: Word,
+        providers_data: list[ProviderData],
+    ) -> Pronunciation | None:
+        """Synthesize pronunciation from providers or generate."""
+        
+        # Check providers for pronunciation
+        for provider_data in providers_data:
+            if provider_data.pronunciation_id:
+                pronunciation = await Pronunciation.get(provider_data.pronunciation_id)
+                if pronunciation:
+                    return pronunciation
+
+        # Generate if not found
+        try:
+            response = await self.ai.pronunciation(word.text)
+            pronunciation = Pronunciation(
+                word_id=word.id,
+                phonetic=response.phonetic,
+                ipa_american=response.ipa,
+                syllables=[],
+                stress_pattern=None,
+            )
+            await pronunciation.save()
+            return pronunciation
+        except Exception as e:
+            logger.error(f"Failed to generate pronunciation for {word.text}: {e}")
+            return None
+
+    async def _synthesize_etymology(
+        self,
+        word: Word,
+        providers_data: list[ProviderData],
+    ) -> Etymology | None:
+        """Synthesize etymology from providers."""
+        
+        # Collect etymology data
+        etymology_data = []
+        for provider_data in providers_data:
+            if provider_data.etymology:
+                etymology_data.append({
+                    "name": provider_data.provider.value,
+                    "etymology_text": provider_data.etymology.text,
+                })
+
+        if not etymology_data:
+            return None
+
+        try:
+            response = await self.ai.extract_etymology(word.text, etymology_data)
+            return Etymology(
+                text=response.text,
+                origin_language=response.origin_language,
+                root_words=response.root_words,
+                first_known_use=response.first_known_use,
+            )
+        except Exception as e:
+            logger.error(f"Failed to synthesize etymology for {word.text}: {e}")
+            return None
+
+    async def _synthesize_definitions(
+        self,
+        word: Word,
+        clustered_definitions: list[Definition],
+        state_tracker: StateTracker | None = None,
+    ) -> list[Definition]:
+        """Synthesize definitions by cluster."""
+        
+        # Group by cluster
+        clusters: dict[str, list[Definition]] = {}
+        for definition in clustered_definitions:
+            if definition.meaning_cluster:
+                cluster_id = definition.meaning_cluster.id
+                if cluster_id not in clusters:
+                    clusters[cluster_id] = []
+                clusters[cluster_id].append(definition)
+
+        synthesized_definitions = []
+        
+        # Process each cluster
+        for cluster_id, cluster_defs in clusters.items():
+            logger.info(f"Synthesizing cluster '{cluster_id}' with {len(cluster_defs)} definitions")
+            
+            # Synthesize using AI
+            synthesis_response = await self.ai.synthesize_definitions(
+                word=word.text,
+                definitions=cluster_defs,
+                meaning_cluster=cluster_id,
+            )
+
+            # Create new definitions from synthesis
+            for synth_def in synthesis_response.definitions:
+                # Generate examples
+                example_response = await self.ai.examples(
+                    word=word.text,
+                    word_type=synth_def.word_type,
+                    definition=synth_def.definition,
+                    count=self.examples_count,
+                )
+
+                # Create definition
+                definition = Definition(
+                    word_id=word.id,
+                    part_of_speech=synth_def.word_type,
+                    text=synth_def.definition,
+                    meaning_cluster=cluster_defs[0].meaning_cluster,  # Use cluster from source
+                    synonyms=synth_def.synonyms[:10],  # Limit synonyms
+                    antonyms=[],
+                    example_ids=[],
+                )
+                await definition.save()
+
+                # Create and save examples
+                for example_text in example_response.example_sentences:
+                    example = Example(
+                        definition_id=definition.id,
+                        text=example_text,
+                        type="generated",
+                        model_info=ModelInfo(
+                            name=self.ai.model_name,
+                            generation_count=1,
+                            confidence=example_response.confidence,
+                        ),
+                    )
+                    await example.save()
+                    definition.example_ids.append(example.id)
+
+                # Update definition with example IDs
+                await definition.save()
+                synthesized_definitions.append(definition)
+
+        return synthesized_definitions
+
+    async def _parallel_enhance_definitions(
+        self,
+        definitions: list[Definition],
+        word: Word,
+        state_tracker: StateTracker | None = None,
+    ) -> None:
+        """Enhance definitions with additional fields in parallel."""
+        
+        logger.info(f"Enhancing {len(definitions)} definitions in parallel")
+        
+        tasks = []
+        for definition in definitions:
+            # Antonyms
+            tasks.append(self._enhance_field(
+                definition, "antonyms",
+                enhance_definition_antonyms(definition, word.text, self.ai)
+            ))
+            
+            # CEFR level
+            tasks.append(self._enhance_field(
+                definition, "cefr_level",
+                assess_definition_cefr(definition, word.text, self.ai)
+            ))
+            
+            # Frequency band
+            tasks.append(self._enhance_field(
+                definition, "frequency_band",
+                assess_definition_frequency(definition, word.text, self.ai)
+            ))
+            
+            # Register
+            tasks.append(self._enhance_field(
+                definition, "register",
+                classify_definition_register(definition, self.ai)
+            ))
+            
+            # Domain
+            tasks.append(self._enhance_field(
+                definition, "domain",
+                identify_definition_domain(definition, self.ai)
+            ))
+            
+            # Grammar patterns
+            tasks.append(self._enhance_field(
+                definition, "grammar_patterns",
+                extract_grammar_patterns(definition, self.ai)
+            ))
+            
+            # Collocations
+            tasks.append(self._enhance_field(
+                definition, "collocations",
+                identify_collocations(definition, word.text, self.ai)
+            ))
+            
+            # Usage notes
+            tasks.append(self._enhance_field(
+                definition, "usage_notes",
+                generate_usage_notes(definition, word.text, self.ai)
+            ))
+            
+            # Regional variants
+            tasks.append(self._enhance_field(
+                definition, "region",
+                detect_regional_variants(definition, self.ai)
+            ))
+
+        # Execute all enhancements in parallel
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Count successes and failures
+        successes = sum(1 for r in results if r and not isinstance(r, Exception))
+        failures = sum(1 for r in results if isinstance(r, Exception))
+        
+        logger.info(f"Definition enhancement complete: {successes} successes, {failures} failures")
+        
+        if state_tracker:
+            await state_tracker.update_stage(Stages.AI_SYNTHESIS, progress=95)
+
+    async def _enhance_field(
+        self,
+        definition: Definition,
+        field_name: str,
+        enhancement_coro: Any,
+    ) -> bool:
+        """Enhance a single field of a definition."""
+        try:
+            result = await enhancement_coro
+            if result is not None:
+                setattr(definition, field_name, result)
+                await definition.save()
+                return True
+        except Exception as e:
+            logger.error(f"Failed to enhance {field_name}: {e}")
+        return False
 
     async def generate_fallback_entry(
         self,
@@ -139,268 +452,99 @@ class DefinitionSynthesizer:
         state_tracker: StateTracker | None = None,
     ) -> SynthesizedDictionaryEntry | None:
         """Generate a complete fallback entry using AI."""
-        logger.info(f"🔮 Starting AI fallback generation for '{word}'")
+        
+        logger.info(f"Generating AI fallback for '{word}'")
+        
+        # Get or create Word
+        storage = await get_storage()
+        word_obj = await storage.get_word(word)
+        if not word_obj:
+            word_obj = Word(
+                text=word,
+                normalized=word.lower(),
+                language=Language.ENGLISH,
+            )
+            await word_obj.save()
 
         if state_tracker:
             await state_tracker.update_stage(Stages.AI_FALLBACK)
 
-        # Generate fallback provider data
+        # Generate fallback definitions
         dictionary_entry = await self.ai.lookup_fallback(word)
+        
+        if not dictionary_entry or not dictionary_entry.provider_data:
+            logger.warning(f"No definitions generated for '{word}'")
+            return None
 
-        if dictionary_entry is None or dictionary_entry.provider_data is None:
-            logger.info(f"🚫 No valid definitions generated for '{word}'")
-            # Ensure MongoDB is initialized before creating the entry
-            await _ensure_initialized()
-            # Return minimal entry for nonsense words
-            return SynthesizedDictionaryEntry(
+        # Convert to provider data format
+        definitions = []
+        for ai_def in dictionary_entry.provider_data.definitions:
+            # Generate examples
+            example_response = await self.ai.examples(
                 word=word,
-                pronunciation=Pronunciation(),
-                last_updated=datetime.now(),
-            )
-
-        # Convert AI response to full provider data
-        definitions: list[Definition] = []
-        for definition in dictionary_entry.provider_data.definitions:
-            # Generate examples for fallback using configured count
-            examples_response = await self.ai.examples(
-                word=word,
-                word_type=definition.word_type,
-                definition=definition.definition,
+                word_type=ai_def.word_type,
+                definition=ai_def.definition,
                 count=self.examples_count,
             )
 
-            examples = Examples(
-                generated=[
-                    GeneratedExample(sentence=sentence)
-                    for sentence in examples_response.example_sentences
-                ]
+            # Create definition
+            definition = Definition(
+                word_id=word_obj.id,
+                part_of_speech=ai_def.word_type,
+                text=ai_def.definition,
+                meaning_cluster=MeaningCluster(
+                    id=f"ai_{ai_def.word_type}",
+                    name=f"{ai_def.word_type.title()} (AI)",
+                    description=ai_def.definition[:100],
+                    order=0,
+                    relevance=ai_def.relevancy,
+                ),
+                synonyms=ai_def.synonyms,
+                antonyms=[],
+                example_ids=[],
             )
+            await definition.save()
 
-            full_def = Definition(
-                word_type=definition.word_type,
-                definition=definition.definition,
-                examples=examples,
-            )
+            # Create examples
+            for example_text in example_response.example_sentences:
+                example = Example(
+                    definition_id=definition.id,
+                    text=example_text,
+                    type="generated",
+                    model_info=ModelInfo(
+                        name=self.ai.model_name,
+                        generation_count=1,
+                        confidence=example_response.confidence,
+                    ),
+                )
+                await example.save()
+                definition.example_ids.append(example.id)
 
-            definitions.append(full_def)
+            await definition.save()
+            definitions.append(definition)
 
+        # Create provider data
         provider_data = ProviderData(
-            provider_name=DictionaryProvider.AI_FALLBACK.value,
-            definitions=definitions,
-            last_updated=datetime.now(),
-            raw_metadata={
+            word_id=word_obj.id,
+            provider=DictionaryProvider.AI_FALLBACK,
+            definition_ids=[d.id for d in definitions],
+            pronunciation_id=None,
+            etymology=None,
+            raw_data={
                 "synthesis_confidence": dictionary_entry.confidence,
                 "model_name": self.ai.model_name,
             },
         )
+        await provider_data.save()
 
-        providers_data = [provider_data]
-
-        if state_tracker:
-            await state_tracker.update_stage(Stages.AI_FALLBACK, progress=90)
-
-        logger.success(
-            f"🎉 Successfully created AI fallback entry for '{word}' "
-            f"with {len(definitions)} definitions"
-        )
-
+        # Synthesize complete entry
         return await self.synthesize_entry(
             word=word,
-            providers_data=providers_data,
+            providers_data=[provider_data],
             force_refresh=force_refresh,
             state_tracker=state_tracker,
         )
 
-    async def _synthesize_definitions(
-        self,
-        word: str,
-        clustered_definitions: list[Definition],
-        cluster_descriptions: dict[str, str],
-        state_tracker: StateTracker | None = None,
-    ) -> list[Definition]:
-        """Synthesize definitions by processing each cluster and creating normalized definitions.
 
-        Args:
-            word: The word to synthesize definitions for.
-            clustered_definitions: List of Definition objects with meaning_cluster assigned.
-            cluster_descriptions: Mapping of cluster_id to human-readable descriptions.
-        """
-
-        if not clustered_definitions:
-            return []
-
-        synthesized_definitions: list[Definition] = []
-
-        # Group definitions by cluster
-        clusters: dict[str, list[Definition]] = {}
-        for definition in clustered_definitions:
-            cluster_id = definition.meaning_cluster
-            if cluster_id:
-                if cluster_id not in clusters:
-                    clusters[cluster_id] = []
-                clusters[cluster_id].append(definition)
-
-        # Process each cluster
-        total_clusters = len(clusters)
-        for i, (cluster_id, cluster_definitions) in enumerate(clusters.items()):
-            logger.info(
-                f"🧠 Synthesizing definitions for cluster '{cluster_id}' "
-                f"with {len(cluster_definitions)} definitions"
-            )
-            cluster_start = time.time()
-
-            if state_tracker:
-                # Calculate progressive synthesis progress (75-85%)
-                synthesis_progress = 75 + int((i / total_clusters) * 10)
-                await state_tracker.update_stage(Stages.AI_SYNTHESIS, progress=synthesis_progress)
-
-            try:
-                # Synthesize definitions for this cluster using full Definition objects
-                synthesis_response = await self.ai.synthesize_definitions(
-                    word=word,
-                    definitions=cluster_definitions,
-                    meaning_cluster=cluster_id,
-                )
-
-                cluster_duration = time.time() - cluster_start
-                logger.debug(
-                    f"✅ Cluster '{cluster_id}' synthesized in {cluster_duration:.2f}s "
-                    f"(confidence: {synthesis_response.confidence:.2f})"
-                )
-
-                if not synthesis_response.definitions:
-                    logger.warning(
-                        f"⚠️  No definitions synthesized for cluster '{cluster_id}'"
-                    )
-                    continue
-
-                # Create synthesized definitions for this cluster
-                for synthesized_def in synthesis_response.definitions:
-                    word_type = synthesized_def.word_type
-
-                    # Generate examples using configured count
-                    example_response = await self.ai.examples(
-                        word=word,
-                        word_type=word_type,
-                        definition=synthesized_def.definition,
-                        count=self.examples_count,
-                    )
-
-                    examples = Examples(
-                        generated=[
-                            GeneratedExample(sentence=sentence)
-                            for sentence in example_response.example_sentences
-                        ]
-                    )
-
-                    # Enhance synonyms if needed
-                    enhanced_synonyms = await self._enhance_synonyms(
-                        word=word,
-                        word_type=word_type,
-                        definition=synthesized_def.definition,
-                        existing_synonyms=synthesized_def.synonyms,
-                    )
-
-                    # Create the final synthesized definition
-                    final_def = Definition(
-                        word_type=word_type,
-                        definition=synthesized_def.definition,
-                        synonyms=enhanced_synonyms,
-                        examples=examples,
-                        meaning_cluster=cluster_id,
-                        relevancy=synthesized_def.relevancy,
-                        raw_metadata={
-                            "synthesis_confidence": synthesis_response.confidence,
-                            "example_confidence": example_response.confidence,
-                            "sources_used": synthesis_response.sources_used,
-                            "cluster_description": cluster_descriptions.get(
-                                cluster_id, ""
-                            ),
-                            "original_definition_count": len(cluster_definitions),
-                        },
-                    )
-
-                    synthesized_definitions.append(final_def)
-
-            except Exception as e:
-                cluster_duration = time.time() - cluster_start
-                logger.error(
-                    f"❌ Failed to synthesize cluster '{cluster_id}' after {cluster_duration:.2f}s: {e}"
-                )
-                # TODO: Add metrics logging
-                # log_metrics(
-                #     stage="cluster_synthesis_error",
-                #     cluster_id=cluster_id,
-                #     error=str(e),
-                #     duration=cluster_duration
-                # )
-                continue
-
-        logger.success(
-            f"✅ Successfully synthesized {len(synthesized_definitions)} definitions for '{word}'"
-        )
-        return synthesized_definitions
-
-    async def _enhance_synonyms(
-        self,
-        word: str,
-        word_type: str,
-        definition: str,
-        existing_synonyms: list[str],
-    ) -> list[str]:
-        """Enhance synonyms by augmenting existing list if needed."""
-
-        # If we already have at least 2 synonyms, don't augment
-        if len(existing_synonyms) >= 2:
-            return existing_synonyms
-
-        logger.info(f"🔗 Enhancing synonyms for '{word}' ({word_type})")
-
-        try:
-            # Generate synonyms using the existing prompt
-            synonym_response = await self.ai.synonyms(
-                word=word,
-                word_type=word_type,
-                definition=definition,
-                count=10,
-            )
-
-            # Extract just the words from the synonym candidates
-            generated_synonyms = [
-                candidate.word
-                for candidate in synonym_response.synonyms
-                if candidate.word.lower() != word.lower()
-            ]
-
-            # Combine and deduplicate
-            all_synonyms = existing_synonyms + generated_synonyms
-
-            # Remove duplicates while preserving order
-            unique_synonyms = []
-            seen = set()
-            for synonym in all_synonyms:
-                if synonym.lower() not in seen:
-                    unique_synonyms.append(synonym)
-                    seen.add(synonym.lower())
-
-            logger.success(
-                f"✨ Enhanced synonyms for '{word}': {len(unique_synonyms)} total synonyms"
-            )
-
-            return unique_synonyms
-
-        except Exception as e:
-            logger.error(f"Failed to enhance synonyms for '{word}': {e}")
-            return existing_synonyms
-
-    async def _synthesize_pronunciation(self, word: str) -> Pronunciation:
-        """Synthesize pronunciation from providers_data or generate with AI."""
-        try:
-            pronunciation_response = await self.ai.pronunciation(word)
-            return Pronunciation(
-                phonetic=pronunciation_response.phonetic,
-                ipa=pronunciation_response.ipa,
-            )
-        except Exception as e:
-            logger.error(f"Failed to generate pronunciation for {word}: {e}")
-            return Pronunciation(phonetic="", ipa=None)
+# Alias for backward compatibility
+DefinitionSynthesizer = EnhancedDefinitionSynthesizer
