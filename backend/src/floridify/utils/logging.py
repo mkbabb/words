@@ -85,8 +85,11 @@ def _configure_loguru() -> None:
     )
 
     # Add custom SUCCESS level for compatibility
-    if "SUCCESS" not in loguru_logger._core.levels:
+    try:
         loguru_logger.level("SUCCESS", no=25, color="<green><bold>")
+    except ValueError:
+        # Level already exists
+        pass
 
     _configured = True
 
@@ -188,7 +191,7 @@ def log_timing[T](func: Callable[..., T]) -> Callable[..., T]:
 
         func_logger.debug(f"⏱️  Starting {func_name}")
         try:
-            result = await func(*args, **kwargs)
+            result: T = await func(*args, **kwargs)  # type: ignore[misc]
             elapsed = time.perf_counter() - start_time
             func_logger.info(f"✅ {func_name} completed in {elapsed:.2f}s", duration=elapsed)
             return result
@@ -248,7 +251,7 @@ def log_stage(stage_name: str, emoji: str = "🔄") -> Callable[[Callable[..., T
             )
 
             try:
-                result = await func(*args, **kwargs)
+                result: T = await func(*args, **kwargs)  # type: ignore[misc]
                 stage_logger.info(f"✅ Stage '{stage_name}' completed successfully")
                 return result
             except Exception as e:

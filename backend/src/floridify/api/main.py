@@ -6,8 +6,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..utils.logging import setup_logging
-from .middleware import LoggingMiddleware, CacheHeadersMiddleware
-from .routers import batch, corpus, definitions, facts, health, lookup, search, suggestions, synonyms
+from .middleware import CacheHeadersMiddleware, LoggingMiddleware
+from .routers import (
+    atomic_updates,
+    batch,
+    corpus,
+    definitions,
+    facts,
+    health,
+    lookup,
+    search,
+    suggestions,
+    synonyms,
+    words,
+)
 
 # Configure logging for the application
 setup_logging("DEBUG")
@@ -47,3 +59,5 @@ app.include_router(facts.router, prefix="", tags=["facts"])
 app.include_router(definitions.router, prefix="/definitions", tags=["definitions"])
 app.include_router(batch.router, prefix="/batch", tags=["batch"])
 app.include_router(health.router, prefix="", tags=["health"])
+app.include_router(atomic_updates.router, prefix="/atomic", tags=["atomic"])
+app.include_router(words.router, prefix="/words", tags=["words"])

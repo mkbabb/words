@@ -22,7 +22,8 @@ from pydantic import ValidationError
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from floridify.api.models.responses import LookupResponse, SearchResponse
+from floridify.api.routers.lookup import LookupResponse
+from floridify.api.routers.search import SearchResponse
 
 
 class TestBackwardsCompatibility:

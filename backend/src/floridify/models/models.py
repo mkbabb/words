@@ -1,198 +1,182 @@
-"""Core data models for dictionary entries and related structures."""
+"""Enhanced core data models for dictionary entries."""
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from beanie import Document
 from pydantic import BaseModel, Field
 
+from ..constants import DictionaryProvider, Language
+from .base import BaseMetadata, Etymology, ModelInfo
+from .relationships import Collocation, GrammarPattern, MeaningCluster, UsageNote, WordForm
 
-class Pronunciation(BaseModel):
-    """Pronunciation data in multiple formats."""
 
-    phonetic: str = ""  # e.g. "en coulisses -> on koo-LEES"
-    ipa: str | None = None  # e.g. "/ɑːn kəˈliːs/"
+class Pronunciation(Document, BaseMetadata):
+    """Pronunciation with multi-format support."""
+    
+    word_id: str  # FK to Word
+    phonetic: str  # e.g., "on koo-LEES"
+    ipa_british: str | None = None  # British IPA
+    ipa_american: str | None = None  # American IPA
+    audio_file_ids: list[str] = []  # FK to AudioMedia documents
+    syllables: list[str] = []
+    stress_pattern: str | None = None  # Primary/secondary stress
+    
+    class Settings:
+        name = "pronunciations"
 
 
 class LiteratureSource(BaseModel):
-    """Metadata for literature sources."""
-
-    id: str
+    """Source metadata for literature examples."""
+    
     title: str
     author: str | None = None
-    text: str = ""
+    year: int | None = None
+    context: str | None = None  # Surrounding text for context
 
 
-class GeneratedExample(BaseModel):
-    """AI-generated modern usage example."""
-
-    sentence: str
-    regenerable: bool = True
-
-
-class LiteratureExample(BaseModel):
-    """Real-world usage from literature knowledge base."""
-
-    sentence: str
-    source: LiteratureSource
-
-
-class Examples(BaseModel):
-    """Container for different types of usage examples."""
-
-    generated: list[GeneratedExample] = Field(default_factory=list)
-    literature: list[LiteratureExample] = Field(default_factory=list)
-
-
-class Fact(BaseModel):
-    """Interesting fact about a word."""
-
-    content: str = Field(description="The fact content")
-    category: str = Field(
-        description="Category of fact (etymology, usage, cultural, etc.)"
-    )
-    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in fact accuracy")
-    generated_at: datetime = Field(default_factory=datetime.now)
-
-
-class Definition(BaseModel):
-    """Single word definition with bound synonyms and examples."""
-
-    word_type: str
-    definition: str
-    synonyms: list[str] = Field(default_factory=list)
-    examples: Examples = Field(default_factory=Examples)
-    meaning_cluster: str | None = None
-    raw_metadata: dict[str, Any] | None = None
-
-    # Enhanced metadata for comprehensive tracking
-    created_at: datetime = Field(
-        default_factory=datetime.now, description="When definition was created"
-    )
-    last_updated: datetime = Field(
-        default_factory=datetime.now, description="Last modification time"
-    )
-    accessed_at: datetime | None = Field(None, description="Last access time")
-    created_by: str | None = Field(
-        None, description="Creator attribution (ai-synthesis, user-edit, provider-sync)"
-    )
-    updated_by: str | None = Field(None, description="Last modifier attribution")
-    source_attribution: str | None = Field(
-        None, description="AI model or provider source (gpt-4, oxford-api, etc.)"
-    )
-    version: int = Field(1, ge=1, description="Version number for change tracking")
-    quality_score: float | None = Field(
-        None, ge=0.0, le=1.0, description="Quality/confidence score"
-    )
-    relevancy: float | None = Field(
-        None, ge=0.0, le=1.0, description="Relevancy score for meaning cluster ordering"
-    )
-    validation_status: str | None = Field(
-        None, description="Validation state (pending, verified, flagged)"
-    )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Extensible metadata"
-    )
-
-
-class ProviderData(BaseModel):
-    """Container for provider-specific definitions and metadata."""
-
-    provider_name: str
-    definitions: list[Definition] = Field(default_factory=list)
-    last_updated: datetime = Field(default_factory=datetime.now)
-    raw_metadata: dict[str, Any] | None = None
-
-    # Enhanced metadata
-    created_at: datetime = Field(
-        default_factory=datetime.now, description="When provider data was first created"
-    )
-    accessed_at: datetime | None = Field(
-        None, description="Last access time for provider data"
-    )
-    version: int = Field(1, ge=1, description="Provider data version")
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Extensible provider metadata"
-    )
-
-
-class DictionaryEntry(Document):
-    """Main entry point for word data - organized by provider for layered access."""
-
-    word: str
-    pronunciation: Pronunciation
-    provider_data: dict[str, ProviderData] = Field(default_factory=dict)
-    last_updated: datetime = Field(default_factory=datetime.now)
-
-    # Enhanced metadata
-    created_at: datetime = Field(
-        default_factory=datetime.now, description="When entry was first created"
-    )
-    accessed_at: datetime | None = Field(None, description="Last access time")
-    quality: float | None = Field(
-        None, ge=0.0, le=1.0, description="Overall entry quality score"
-    )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Extensible entry metadata"
-    )
-
+class Example(Document, BaseMetadata):
+    """Example storage with type discrimination."""
+    
+    definition_id: str  # FK to Definition
+    text: str
+    type: Literal["generated", "literature"]
+    
+    # Generated example fields
+    model_info: ModelInfo | None = None
+    context: str | None = None  # User prompt/context for generated
+    
+    # Literature example fields
+    source: LiteratureSource | None = None
+    
     class Settings:
-        name = "dictionary_entries"
+        name = "examples"
+
+
+class Fact(Document, BaseMetadata):
+    """Interesting fact about a word."""
+    
+    word_id: str  # FK to Word
+    content: str
+    category: Literal["etymology", "usage", "cultural", "linguistic", "historical"]
+    model_info: ModelInfo | None = None  # If AI-generated
+    source: str | None = None  # If from external source
+    
+    class Settings:
+        name = "facts"
+
+
+class Definition(Document, BaseMetadata):
+    """Single definition with examples and comprehensive linguistic data."""
+    
+    word_id: str  # FK to Word
+    part_of_speech: str  # noun, verb, adjective, etc.
+    text: str  # The definition text
+    meaning_cluster: MeaningCluster | None = None
+    sense_number: str | None = None  # e.g., "1a", "2b"
+    
+    # Examples and relationships
+    example_ids: list[str] = []  # FK to Example documents
+    synonyms: list[str] = []
+    antonyms: list[str] = []
+    
+    # Usage and context
+    language_register: Literal["formal", "informal", "neutral", "slang", "technical"] | None = None
+    domain: str | None = None  # medical, legal, computing
+    region: str | None = None  # US, UK, AU
+    usage_notes: list[UsageNote] = []
+    
+    # Grammar and patterns
+    grammar_patterns: list[GrammarPattern] = []
+    collocations: list[Collocation] = []
+    transitivity: Literal["transitive", "intransitive", "both"] | None = None
+    
+    # Educational metadata
+    cefr_level: Literal["A1", "A2", "B1", "B2", "C1", "C2"] | None = None
+    frequency_band: int | None = Field(None, ge=1, le=5)  # 1-5, Oxford 3000/5000 style
+    
+    # Media and provenance
+    image_ids: list[str] = []  # FK to ImageMedia documents
+    provider_data_id: str | None = None  # FK to ProviderData if from provider
+    
+    class Settings:
+        name = "definitions"
         indexes = [
-            "word.text",
-            [("word.text", "text")],
-            "last_updated",
-            "created_at",
-            "accessed_at",
-            "lookup_count",
-            "status",
+            "word_id",
+            "part_of_speech",
+            [("word_id", 1), ("part_of_speech", 1)]
         ]
 
 
-class SynthesizedDictionaryEntry(Document):
-    """Finalized dictionary entry with all necessary data for display.
+class ProviderData(Document, BaseMetadata):
+    """Raw data from a dictionary provider."""
+    
+    word_id: str  # FK to Word
+    provider: DictionaryProvider
+    definition_ids: list[str] = []  # FK to Definition documents
+    pronunciation_id: str | None = None  # FK to Pronunciation
+    etymology: Etymology | None = None
+    raw_data: dict[str, Any] | None = None  # Original API response
+    
+    class Settings:
+        name = "provider_data"
+        indexes = [
+            "word_id",
+            "provider",
+            [("word_id", 1), ("provider", 1)]
+        ]
 
-    The definitions herein are synthetic, aggregated at the word-type-meaning level
-    across providers.
 
-    For example, a word like "run" may have multiple definitions across providers,
-    but this entry synthesizes them into a single coherent structure for easy access.
-    """
+class Word(Document, BaseMetadata):
+    """Core word entity."""
+    
+    text: str
+    normalized: str  # Lowercase, no accents
+    language: Language = Language.ENGLISH
+    
+    # Word forms and variations
+    word_forms: list[WordForm] = []
+    homograph_number: int | None = None  # For identical spellings
+    
+    # Metadata
+    offensive_flag: bool = False
+    first_known_use: str | None = None  # Historical dating
+    
+    class Settings:
+        name = "words"
+        indexes = [
+            [("text", 1), ("language", 1)],
+            "normalized",
+            [("text", 1), ("homograph_number", 1)]
+        ]
 
-    word: str
-    pronunciation: Pronunciation
-    definitions: list[Definition] = Field(default_factory=list)
-    facts: list[Fact] = Field(default_factory=list)
-    last_updated: datetime = Field(default_factory=datetime.now)
 
-    provider_data: dict[str, ProviderData] = Field(default_factory=dict)
-
-    # Enhanced metadata
-    created_at: datetime = Field(
-        default_factory=datetime.now, description="When synthesized entry was created"
-    )
-    accessed_at: datetime | None = Field(None, description="Last access time")
-    model: str | None = Field(
-        None, description="AI model used for synthesis (e.g., gpt-4o)"
-    )
-    confidence: float | None = Field(
-        None, ge=0.0, le=1.0, description="Overall synthesis confidence score"
-    )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Extensible synthesis metadata"
-    )
-
+class SynthesizedDictionaryEntry(Document, BaseMetadata):
+    """AI-synthesized entry with full provenance."""
+    
+    word_id: str  # FK to Word
+    
+    # Synthesized content references
+    pronunciation_id: str | None = None  # FK to Pronunciation
+    definition_ids: list[str] = []  # FK to Definition documents
+    etymology: Etymology | None = None  # Embedded as it's lightweight
+    fact_ids: list[str] = []  # FK to Fact documents
+    
+    # Synthesis metadata
+    model_info: ModelInfo
+    source_provider_data_ids: list[str] = []  # FK to ProviderData documents
+    
+    # Access tracking
+    accessed_at: datetime | None = None
+    access_count: int = 0
+    
     class Settings:
         name = "synthesized_dictionary_entries"
         indexes = [
-            "word.text",
-            [("word.text", "text")],
-            "last_updated",
-            "created_at",
-            "accessed_at",
-            "lookup_count",
-            "status",
-            "synthesis_quality",
+            "word_id",
+            [("word_id", 1), ("version", -1)],
+            [("word_id", 1), ("model_info.generation_count", -1)],
+            [("word_id", 1), ("accessed_at", -1)]
         ]

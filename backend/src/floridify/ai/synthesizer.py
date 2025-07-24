@@ -76,7 +76,7 @@ class EnhancedDefinitionSynthesizer:
         # Check for existing synthesized entry
         if not force_refresh:
             existing = await SynthesizedDictionaryEntry.find_one(
-                SynthesizedDictionaryEntry.word_id == word_obj.id
+                SynthesizedDictionaryEntry.word_id == str(word_obj.id)
             )
             if existing:
                 logger.info(f"Using existing synthesized entry for '{word}'")
@@ -87,7 +87,7 @@ class EnhancedDefinitionSynthesizer:
         provider_metadata = {}
         
         for provider_data in providers_data:
-            provider_metadata[provider_data.provider.value] = {
+            provider_metadata[provider_data.provider] = {
                 "definition_count": len(provider_data.definition_ids),
                 "has_pronunciation": provider_data.pronunciation_id is not None,
                 "has_etymology": provider_data.etymology is not None,
@@ -143,17 +143,17 @@ class EnhancedDefinitionSynthesizer:
 
         # Create synthesized entry
         entry = SynthesizedDictionaryEntry(
-            word_id=word_obj.id,
-            pronunciation_id=pronunciation.id if pronunciation else None,
-            definition_ids=[d.id for d in synthesized_definitions],
+            word_id=str(word_obj.id),
+            pronunciation_id=str(pronunciation.id) if pronunciation else None,
+            definition_ids=[str(d.id) for d in synthesized_definitions],
             etymology=etymology,
-            fact_ids=[f.id for f in facts],
+            fact_ids=[str(f.id) for f in facts],
             model_info=ModelInfo(
                 name=self.ai.model_name,
                 generation_count=1,
                 confidence=0.9,  # TODO: Calculate from component confidences
             ),
-            source_provider_data_ids=[pd.id for pd in providers_data],
+            source_provider_data_ids=[str(pd.id) for pd in providers_data],
         )
 
         # Save entry
@@ -187,7 +187,7 @@ class EnhancedDefinitionSynthesizer:
             if definition.provider_data_id:
                 provider_data = await ProviderData.get(definition.provider_data_id)
                 if provider_data:
-                    provider_name = provider_data.provider.value
+                    provider_name = provider_data.provider
             
             definition_tuples.append((
                 provider_name,
@@ -206,7 +206,7 @@ class EnhancedDefinitionSynthesizer:
                 id=cluster_mapping.cluster_id,
                 name=cluster_mapping.cluster_description,
                 description=cluster_mapping.cluster_description,
-                order=cluster_mapping.relevancy,
+                order=int(cluster_mapping.relevancy),
                 relevance=cluster_mapping.relevancy,
             )
             
@@ -234,7 +234,7 @@ class EnhancedDefinitionSynthesizer:
         try:
             response = await self.ai.pronunciation(word.text)
             pronunciation = Pronunciation(
-                word_id=word.id,
+                word_id=str(word.id),
                 phonetic=response.phonetic,
                 ipa_american=response.ipa,
                 syllables=[],
@@ -258,7 +258,7 @@ class EnhancedDefinitionSynthesizer:
         for provider_data in providers_data:
             if provider_data.etymology:
                 etymology_data.append({
-                    "name": provider_data.provider.value,
+                    "name": provider_data.provider,
                     "etymology_text": provider_data.etymology.text,
                 })
 
@@ -319,20 +319,21 @@ class EnhancedDefinitionSynthesizer:
 
                 # Create definition
                 definition = Definition(
-                    word_id=word.id,
+                    word_id=str(word.id),
                     part_of_speech=synth_def.word_type,
                     text=synth_def.definition,
                     meaning_cluster=cluster_defs[0].meaning_cluster,  # Use cluster from source
                     synonyms=synth_def.synonyms[:10],  # Limit synonyms
                     antonyms=[],
                     example_ids=[],
+                    frequency_band=None,  # Will be enriched later
                 )
                 await definition.save()
 
                 # Create and save examples
                 for example_text in example_response.example_sentences:
                     example = Example(
-                        definition_id=definition.id,
+                        definition_id=str(definition.id),
                         text=example_text,
                         type="generated",
                         model_info=ModelInfo(
@@ -342,7 +343,7 @@ class EnhancedDefinitionSynthesizer:
                         ),
                     )
                     await example.save()
-                    definition.example_ids.append(example.id)
+                    definition.example_ids.append(str(example.id))
 
                 # Update definition with example IDs
                 await definition.save()
@@ -489,7 +490,7 @@ class EnhancedDefinitionSynthesizer:
 
             # Create definition
             definition = Definition(
-                word_id=word_obj.id,
+                word_id=str(word_obj.id),
                 part_of_speech=ai_def.word_type,
                 text=ai_def.definition,
                 meaning_cluster=MeaningCluster(
@@ -502,13 +503,14 @@ class EnhancedDefinitionSynthesizer:
                 synonyms=ai_def.synonyms,
                 antonyms=[],
                 example_ids=[],
+                frequency_band=None,  # Will be enriched later
             )
             await definition.save()
 
             # Create examples
             for example_text in example_response.example_sentences:
                 example = Example(
-                    definition_id=definition.id,
+                    definition_id=str(definition.id),
                     text=example_text,
                     type="generated",
                     model_info=ModelInfo(
@@ -518,16 +520,16 @@ class EnhancedDefinitionSynthesizer:
                     ),
                 )
                 await example.save()
-                definition.example_ids.append(example.id)
+                definition.example_ids.append(str(example.id))
 
             await definition.save()
             definitions.append(definition)
 
         # Create provider data
         provider_data = ProviderData(
-            word_id=word_obj.id,
+            word_id=str(word_obj.id),
             provider=DictionaryProvider.AI_FALLBACK,
-            definition_ids=[d.id for d in definitions],
+            definition_ids=[str(d.id) for d in definitions],
             pronunciation_id=None,
             etymology=None,
             raw_data={

@@ -1,21 +1,21 @@
 """Text processing utilities with spacy fallbacks."""
 
-from .processor import TextProcessor, ProcessingResult
-from .tokenizer import tokenize, sentence_tokenize, word_tokenize
-from .normalizer import normalize_text, lemmatize_word, basic_lemmatize
+from .normalizer import basic_lemmatize, lemmatize_word, normalize_text
+from .processor import ProcessingResult, TextProcessor
+from .tokenizer import sentence_tokenize, tokenize, word_tokenize
 from .utils import (
-    is_phrase, 
-    split_phrase, 
-    join_words, 
+    calculate_mwe_confidence,
+    detect_multiword_expressions,
     extract_phrases,
     find_hyphenated_phrases,
     find_quoted_phrases,
-    detect_multiword_expressions,
-    calculate_mwe_confidence,
     get_phrase_variants,
+    is_compound_word,
+    is_phrase,
+    join_words,
     normalize_phrase,
     phrase_word_count,
-    is_compound_word
+    split_phrase,
 )
 
 __all__ = [

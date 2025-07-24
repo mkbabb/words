@@ -9,7 +9,7 @@ from pathlib import Path
 
 from rich.console import Console
 
-from ..text import TextProcessor, lemmatize_word, basic_lemmatize, normalize_text
+from ..text import TextProcessor, basic_lemmatize, lemmatize_word
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)

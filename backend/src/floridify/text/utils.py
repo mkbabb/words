@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import re
-from typing import Any
 
-from .tokenizer import tokenize, word_tokenize
-from .normalizer import normalize_text
 from ..utils.logging import get_logger
+from .normalizer import normalize_text
+from .tokenizer import word_tokenize
 
 logger = get_logger(__name__)
 

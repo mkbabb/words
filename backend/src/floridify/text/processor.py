@@ -12,15 +12,15 @@ logger = get_logger(__name__)
 
 # Optional dependency handling
 try:
-    import spacy
-    from spacy.language import Language
+    import spacy  # type: ignore[import-not-found]
+    from spacy.language import Language  # type: ignore[import-not-found]
     SPACY_AVAILABLE = True
 except ImportError:
     SPACY_AVAILABLE = False
     Language = type('Language', (), {})
 
 try:
-    import nltk
+    import nltk  # type: ignore[import-not-found]
     NLTK_AVAILABLE = True
 except ImportError:
     NLTK_AVAILABLE = False
@@ -108,7 +108,7 @@ class SpacyProcessor:
 class NLTKProcessor:
     """NLTK-based text processor."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         if not NLTK_AVAILABLE:
             raise RuntimeError("NLTK not available")
         
@@ -122,8 +122,8 @@ class NLTKProcessor:
             nltk.download('wordnet', quiet=True)
             nltk.download('averaged_perceptron_tagger', quiet=True)
             
-            from nltk.tokenize import word_tokenize
-            from nltk.stem import WordNetLemmatizer
+            from nltk.stem import WordNetLemmatizer  # type: ignore[import-not-found]
+            from nltk.tokenize import word_tokenize  # type: ignore[import-not-found]
             
             self.word_tokenize = word_tokenize
             self.lemmatizer = WordNetLemmatizer()
@@ -139,14 +139,14 @@ class NLTKProcessor:
         if not self._available:
             return []
         
-        return self.word_tokenize(text.lower())
+        return list(self.word_tokenize(text.lower()))
     
     def lemmatize(self, word: str) -> str:
         """Lemmatize using NLTK."""
         if not self._available:
             return word
         
-        return self.lemmatizer.lemmatize(word.lower())
+        return str(self.lemmatizer.lemmatize(word.lower()))
     
     def is_available(self) -> bool:
         """Check if NLTK is available."""

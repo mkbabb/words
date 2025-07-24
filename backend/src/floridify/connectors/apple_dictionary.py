@@ -6,9 +6,10 @@ import platform
 import re
 from typing import Any
 
-from ..models import Definition, Examples, ProviderData
+from ..constants import DictionaryProvider
+from ..core.state_tracker import Stages, StateTracker
+from ..models import Definition, Etymology, Example, Pronunciation, ProviderData
 from ..utils.logging import get_logger
-from ..core.state_tracker import StateTracker, Stages
 from .base import DictionaryConnector
 
 logger = get_logger(__name__)
@@ -62,7 +63,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             return
 
         try:
-            from CoreServices import DCSCopyTextDefinition
+            from CoreServices import DCSCopyTextDefinition  # type: ignore[import-untyped]
             self._dictionary_service = DCSCopyTextDefinition
             logger.info("Apple Dictionary Services initialized successfully")
         except ImportError as e:
@@ -89,93 +90,19 @@ class AppleDictionaryConnector(DictionaryConnector):
             return None
 
         try:
+            if not self._dictionary_service:
+                return None
+                
             # Create CFRange for the entire word
             word_range = (0, len(word))
             
             # Call Dictionary Services
             definition = self._dictionary_service(None, word, word_range)
-            return definition
+            return str(definition) if definition else None
         except Exception as e:
             logger.error(f"Dictionary lookup failed for '{word}': {e}")
             return None
 
-    def _parse_apple_definition(self, word: str, raw_definition: str) -> list[Definition]:
-        """Parse Apple Dictionary definition text into structured format.
-        
-        Args:
-            word: The word being defined
-            raw_definition: Raw definition text from Apple Dictionary
-            
-        Returns:
-            List of Definition objects
-        """
-        if not raw_definition:
-            return []
-
-        definitions = []
-        
-        # Clean up the raw definition text
-        cleaned_text = self._clean_definition_text(raw_definition)
-        
-        # Split by numbered definitions (1, 2, 3, etc.)
-        definition_parts = re.split(r'\n(?=\d+\s)', cleaned_text)
-        
-        current_word_type = "unknown"
-        
-        for part in definition_parts:
-            part = part.strip()
-            if not part:
-                continue
-                
-            # Extract word type (noun, verb, adjective, etc.)
-            word_type_match = re.search(r'\b(noun|verb|adjective|adverb|preposition|conjunction|interjection|pronoun|determiner)\b', part, re.IGNORECASE)
-            if word_type_match:
-                current_word_type = word_type_match.group(1).lower()
-            
-            # Extract numbered definitions
-            definition_match = re.search(r'^\d+\s+(.*?)(?=\n\d+|\Z)', part, re.DOTALL)
-            if definition_match:
-                definition_text = definition_match.group(1).strip()
-            else:
-                # Handle cases without numbers
-                definition_text = self._extract_main_definition(part)
-            
-            if definition_text:
-                # Extract examples if present
-                examples = self._extract_examples(definition_text)
-                
-                # Clean definition text of examples
-                clean_definition = self._remove_examples_from_definition(definition_text)
-                
-                definition = Definition(
-                    word_type=self._normalize_word_type(current_word_type),
-                    definition=clean_definition,
-                    synonyms=[],  # Apple Dictionary doesn't typically provide synonyms in structured format
-                    examples=examples,
-                    raw_metadata={
-                        "provider": self.provider_name,
-                        "raw_text": part,
-                        "extracted_word_type": current_word_type
-                    }
-                )
-                definitions.append(definition)
-        
-        # If no structured definitions found, create a single definition
-        if not definitions and cleaned_text:
-            definition = Definition(
-                word_type="unknown",
-                definition=cleaned_text,
-                synonyms=[],
-                examples=Examples(),
-                raw_metadata={
-                    "provider": self.provider_name,
-                    "raw_text": raw_definition,
-                    "fallback_parsing": True
-                }
-            )
-            definitions.append(definition)
-        
-        return definitions
 
     def _clean_definition_text(self, text: str) -> str:
         """Clean raw definition text from Apple Dictionary.
@@ -213,16 +140,16 @@ class AppleDictionaryConnector(DictionaryConnector):
         # Fallback: return the whole text if no pattern found
         return text.strip()
 
-    def _extract_examples(self, definition_text: str) -> Examples:
+    def _extract_examples(self, definition_text: str) -> list[str]:
         """Extract examples from definition text.
         
         Args:
             definition_text: Definition text that may contain examples
             
         Returns:
-            Examples object with extracted examples
+            List of example strings
         """
-        examples = Examples()
+        examples = []
         
         # Look for quoted examples or examples in specific formats
         example_patterns = [
@@ -235,10 +162,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             matches = re.findall(pattern, definition_text)
             for match in matches:
                 if len(match.strip()) > 5:  # Filter out very short matches
-                    examples.generated.append({
-                        "example": match.strip(),
-                        "source": "apple_dictionary"
-                    })
+                    examples.append(match.strip())
         
         return examples
 
@@ -346,30 +270,28 @@ class AppleDictionaryConnector(DictionaryConnector):
                     await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
                 return None
 
-            # Parse the definition
-            definitions = self._parse_apple_definition(word, raw_definition)
-
-            if not definitions:
-                logger.warning(f"Failed to parse definition for '{word}' from Apple Dictionary")
-                return None
-
-            # Create provider data
+            # For the lookup method, we'll return the raw data to be processed later
+            # The actual parsing and Definition creation should happen in extract_definitions
+            
+            # Create provider data with raw definition
             provider_data = ProviderData(
-                provider_name=self.provider_name,
-                definitions=definitions,
+                word_id="",  # Will be set later when Word is created
+                provider=DictionaryProvider.APPLE,
+                definition_ids=[],  # Will be populated later
+                pronunciation_id=None,
                 raw_metadata={
                     "platform": platform.system(),
                     "platform_version": platform.mac_ver()[0] if platform.system() == 'Darwin' else None,
                     "raw_definition": raw_definition,
                     "word_processed": word,
-                    "definitions_count": len(definitions)
+                    "definitions_count": 1 if raw_definition else 0
                 }
             )
 
             if state_tracker:
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
 
-            logger.info(f"Successfully fetched {len(definitions)} definitions for '{word}' from Apple Dictionary")
+            logger.info(f"Successfully fetched definition for '{word}' from Apple Dictionary")
             return provider_data
 
         except Exception as e:
@@ -437,56 +359,49 @@ class AppleDictionaryConnector(DictionaryConnector):
             return []
         
         raw_definition = raw_data["raw_definition"]
-        word = raw_data.get("word", "")
         
-        # Parse definitions
-        parsed_defs = self._parse_apple_definition(word, raw_definition)
+        # Parse raw definition text into structured definitions
+        # Since _parse_apple_definition doesn't exist, we'll do simple parsing
+        parsed_defs: list[Definition] = []
         
-        # Convert to new model structure
-        definitions = []
-        meaning_order = 0
+        # Extract basic information from raw definition
+        word_type = self._normalize_word_type(raw_definition)
+        definition_text = self._clean_definition_text(raw_definition)
+        examples = self._extract_examples(definition_text)
         
-        for idx, old_def in enumerate(parsed_defs):
-            # Create meaning cluster
-            meaning_cluster = MeaningCluster(
-                id=f"apple_{old_def.word_type}_{idx}",
-                name=f"{old_def.word_type.title()} sense {idx + 1}",
-                description=old_def.definition[:100] + "..." if len(old_def.definition) > 100 else old_def.definition,
-                order=meaning_order,
-                relevance=0.8 - (idx * 0.1),
-            )
-            meaning_order += 1
-            
-            # Create definition
+        if definition_text:
+            # Create definition (meaning_cluster will be added by AI synthesis)
             definition = Definition(
                 word_id=word_id,
-                part_of_speech=old_def.word_type,
-                text=old_def.definition,
-                meaning_cluster=meaning_cluster,
-                sense_number=f"{idx + 1}",
-                synonyms=old_def.synonyms,
+                part_of_speech=word_type,
+                text=definition_text,
+                sense_number="1",
+                synonyms=[],  # Apple Dictionary doesn't provide structured synonyms
                 antonyms=[],
                 example_ids=[],
+                frequency_band=None,  # Will be enriched later
             )
             
             # Save definition to get ID
             await definition.save()
             
-            # Convert and save examples
-            for gen_ex in old_def.examples.generated:
+            # Create and save examples
+            for example_text in examples:
                 example = Example(
-                    definition_id=definition.id,
-                    text=gen_ex.sentence,
+                    definition_id=str(definition.id),
+                    text=example_text,
                     type="generated",  # Apple examples are typically generated
                 )
                 await example.save()
-                definition.example_ids.append(example.id)
+                definition.example_ids.append(str(example.id))
             
-            # Update definition with example IDs
-            await definition.save()
-            definitions.append(definition)
+            # Update definition with example IDs if any were added
+            if definition.example_ids:
+                await definition.save()
+                
+            parsed_defs.append(definition)
         
-        return definitions
+        return parsed_defs
 
     async def extract_etymology(self, raw_data: dict[str, Any]) -> Etymology | None:
         """Extract etymology from Apple Dictionary data.

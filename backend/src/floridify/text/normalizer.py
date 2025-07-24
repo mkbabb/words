@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from typing import Any
 
 try:
-    import contractions
+    import contractions  # type: ignore[import-not-found]
     CONTRACTIONS_AVAILABLE = True
 except ImportError:
     CONTRACTIONS_AVAILABLE = False
@@ -18,8 +17,8 @@ try:
 except ImportError:
     FTFY_AVAILABLE = False
 
-from .processor import get_text_processor
 from ..utils.logging import get_logger
+from .processor import get_text_processor
 
 logger = get_logger(__name__)
 
@@ -31,9 +30,15 @@ PUNCTUATION_PATTERN = re.compile(r'[^\w\s\'-]', re.UNICODE)
 # Translation table for character replacements (faster than regex)
 CHAR_TRANSLATION_TABLE = str.maketrans({
     # Hyphen variants
-    '–': '-', '—': '-', '‒': '-',
-    # Apostrophe variants  
-    '`': "'", '"': '"', '"': '"'
+    '\u2013': '-',  # En dash to hyphen
+    '\u2014': '-',  # Em dash to hyphen
+    '\u2012': '-',  # Figure dash to hyphen
+    # Apostrophe and quote variants  
+    '`': "'",       # Backtick to apostrophe
+    '\u201c': '"',  # Left double quotation mark to regular quote
+    '\u201d': '"',  # Right double quotation mark to regular quote
+    '\u2018': "'",  # Left single quotation mark to apostrophe
+    '\u2019': "'",  # Right single quotation mark to apostrophe
 })
 
 # Basic suffix rules for lemmatization fallback

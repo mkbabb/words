@@ -24,7 +24,7 @@ from src.floridify.utils.text_utils import (
     ensure_sentence_case,
 )
 
-from ...models import DictionaryEntry, SynthesizedDictionaryEntry
+from ...models import SynthesizedDictionaryEntry
 from ...search import SearchResult
 from ...search.constants import SearchMethod
 
@@ -66,7 +66,7 @@ console = Console()
 
 
 def format_word_display(
-    entry: DictionaryEntry, show_examples: bool = True, show_synonyms: bool = True
+    entry: SynthesizedDictionaryEntry, show_examples: bool = True, show_synonyms: bool = True
 ) -> Panel:
     """Create a beautiful display panel for a dictionary entry."""
     # TODO: Implement word display formatting
@@ -363,14 +363,9 @@ def _add_definition_content(content: Text, definitions: list[Definition], word: 
         content.append(f"  {clean_def}", style="white")
 
         # Examples with special formatting
-        for example in definition.examples.generated[:2]:  # Show 2 examples per definition
-            content.append("\n\n")
-
-            # Clean example text and ensure proper sentence case
-            clean_example = clean_markdown(example.sentence)
-            clean_example = ensure_sentence_case(clean_example)
-
-            _format_example_with_bold_word(content, clean_example, word)
+        # Note: Examples are stored separately in the new model structure
+        # This would need to be loaded asynchronously, which is not possible in this sync function
+        # For now, we'll skip examples in the CLI formatting
 
         # Synonyms (limit to 10)
         if definition.synonyms:

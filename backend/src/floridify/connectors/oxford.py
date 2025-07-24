@@ -8,21 +8,16 @@ from typing import Any
 
 import httpx
 
-from ..core.state_tracker import PipelineState, StateTracker
-from ..models import (
-    Definition, 
-    Examples, 
-    GeneratedExample, 
-    ProviderData,
-    Etymology,
-    Pronunciation,
-    Word,
-    Example,
-    MeaningCluster,
-    UsageNote,
-    GrammarPattern,
-)
 from ..constants import Language
+from ..core.state_tracker import StateTracker
+from ..models import (
+    Definition,
+    Etymology,
+    Example,
+    Pronunciation,
+    ProviderData,
+    Word,
+)
 from ..utils.logging import get_logger
 from .base import DictionaryConnector
 
@@ -209,8 +204,7 @@ class OxfordConnector(DictionaryConnector):
         Returns:
             List of Definition objects
         """
-        definitions = []
-        meaning_order = 0
+        definitions: list[Definition] = []
 
         try:
             results = raw_data.get("results", [])
@@ -237,15 +231,6 @@ class OxfordConnector(DictionaryConnector):
                             definition_texts = sense.get("definitions", [])
 
                             for def_idx, def_text in enumerate(definition_texts):
-                                # Create meaning cluster
-                                meaning_cluster = MeaningCluster(
-                                    id=f"oxford_{word_type}_{sense_idx}_{def_idx}",
-                                    name=f"{word_type.title()} sense {sense_idx + 1}",
-                                    description=def_text[:100] + "..." if len(def_text) > 100 else def_text,
-                                    order=meaning_order,
-                                    relevance=0.9 - (sense_idx * 0.1),
-                                )
-                                meaning_order += 1
 
                                 # Extract domain and register
                                 domains = sense.get("domainClasses", [])
@@ -262,18 +247,18 @@ class OxfordConnector(DictionaryConnector):
                                     elif "slang" in reg_text:
                                         register = "slang"
 
-                                # Create definition
+                                # Create definition (meaning_cluster will be added by AI synthesis)
                                 definition = Definition(
                                     word_id=word_id,
                                     part_of_speech=word_type,
                                     text=def_text,
-                                    meaning_cluster=meaning_cluster,
                                     sense_number=f"{sense_idx + 1}.{def_idx + 1}",
                                     synonyms=[],
                                     antonyms=[],
                                     example_ids=[],
-                                    register=register,
+                                    language_register=register,
                                     domain=domain,
+                                    frequency_band=None,
                                 )
 
                                 # Save definition to get ID
@@ -285,12 +270,12 @@ class OxfordConnector(DictionaryConnector):
                                     example_text = example.get("text", "")
                                     if example_text:
                                         example_obj = Example(
-                                            definition_id=definition.id,
+                                            definition_id=str(definition.id),
                                             text=example_text,
                                             type="literature",  # Oxford examples are from real usage
                                         )
                                         await example_obj.save()
-                                        definition.example_ids.append(example_obj.id)
+                                        definition.example_ids.append(str(example_obj.id))
 
                                 # Update definition with example IDs
                                 await definition.save()

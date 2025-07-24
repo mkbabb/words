@@ -96,7 +96,7 @@ class PhraseNormalizer:
                         normalized=normalized,
                         word_count=len(normalized.split()),
                         is_idiom='"' in text,  # Simple heuristic for quoted phrases
-                        language=self.language.value,  # Convert enum to string value
+                        language=self.language,
                     )
                 )
 

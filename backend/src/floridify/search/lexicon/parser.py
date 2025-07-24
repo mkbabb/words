@@ -31,7 +31,7 @@ def _create_phrase(
         normalized=normalized,
         word_count=len(normalized.split()),
         is_idiom=is_idiom,
-        language=language.value,
+        language=language,
     )
 
 

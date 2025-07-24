@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, HTTPException, Path
 from pydantic import BaseModel, Field
 
 from ...ai.factory import get_openai_connector
@@ -17,7 +17,7 @@ from ...ai.models import (
     UsageNoteResponse,
 )
 from ...caching import cached_api_call
-from ...storage import get_storage
+from ...storage.mongodb import get_synthesized_entry, save_synthesized_entry
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -61,8 +61,7 @@ async def update_definition(
 ) -> dict[str, Any]:
     """Update specific fields of a definition."""
     try:
-        storage = get_storage()
-        entry = await storage.get_synthesized_entry(word)
+        entry = await get_synthesized_entry(word)
         
         if not entry:
             raise HTTPException(status_code=404, detail=f"Word '{word}' not found")
@@ -82,7 +81,7 @@ async def update_definition(
                 setattr(definition, field, value)
         
         # Save updated entry
-        await storage.save_synthesized_entry(entry, force_refresh=True)
+        await save_synthesized_entry(entry)
         
         return {
             "status": "success",
@@ -99,12 +98,11 @@ async def update_definition(
 async def regenerate_examples(
     word: str = Path(..., description="The word"),
     index: int = Path(..., ge=0, description="Definition index"),
-    request: ExampleRegenerationRequest = ExampleRegenerationRequest(),
+    request: ExampleRegenerationRequest = ...,
 ) -> ExampleGenerationResponse:
     """Regenerate examples for a specific definition."""
     try:
-        storage = get_storage()
-        entry = await storage.get_synthesized_entry(word)
+        entry = await get_synthesized_entry(word)
         
         if not entry:
             raise HTTPException(status_code=404, detail=f"Word '{word}' not found")
@@ -120,19 +118,48 @@ async def regenerate_examples(
             word=word,
             word_type=definition.word_type,
             definition=definition.definition,
-            count=request.count,
-            context=request.context
+            count=request.count
         )
         
         # Update definition with new examples
-        definition.examples.generated.clear()
-        for example_text in response.example_sentences:
-            from ...models import GeneratedExample
-            definition.examples.generated.append(
-                GeneratedExample(sentence=example_text, regenerable=True)
-            )
+        # First, delete old generated examples
+        from ...models import Example, ModelInfo
+        if definition.example_ids:
+            # Remove old generated examples
+            old_examples = await Example.find(
+                Example.definition_id == definition.id,
+                Example.type == "generated"
+            ).to_list()
+            for example in old_examples:
+                await example.delete()
+            
+            # Remove their IDs from the definition
+            definition.example_ids = [
+                eid for eid in definition.example_ids 
+                if eid not in [ex.id for ex in old_examples]
+            ]
         
-        await storage.save_synthesized_entry(entry, force_refresh=True)
+        # Create new examples
+        new_example_ids = []
+        for example_text in response.example_sentences:
+            example = Example(
+                definition_id=str(definition.id),
+                text=example_text,
+                type="generated",
+                context=request.context
+            )
+            example.model_info = ModelInfo(
+                name=connector.model_name,
+                temperature=0.7,
+                generation_count=1
+            )
+            await example.insert()
+            new_example_ids.append(str(example.id))
+        
+        # Update definition with new example IDs
+        definition.example_ids.extend(new_example_ids)
+        
+        await save_synthesized_entry(entry)
         
         return response
         

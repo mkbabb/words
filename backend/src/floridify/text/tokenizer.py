@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import re
-from typing import Any
 
-from .processor import get_text_processor
 from ..utils.logging import get_logger
+from .processor import get_text_processor
 
 logger = get_logger(__name__)
 

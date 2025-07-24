@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from openai import AsyncOpenAI
 from pydantic import BaseModel
@@ -15,25 +15,25 @@ from ..utils.logging import get_logger, log_metrics
 from .models import (
     AnkiFillBlankResponse,
     AnkiMultipleChoiceResponse,
+    AntonymResponse,
+    CEFRLevelResponse,
     ClusterMappingResponse,
+    CollocationResponse,
     DictionaryEntryResponse,
+    DomainIdentificationResponse,
+    EtymologyResponse,
     ExampleGenerationResponse,
     FactGenerationResponse,
+    FrequencyBandResponse,
+    GrammarPatternResponse,
     PronunciationResponse,
+    RegionalVariantResponse,
+    RegisterClassificationResponse,
     SuggestionsResponse,
     SynonymGenerationResponse,
     SynthesisResponse,
-    AntonymResponse,
-    EtymologyResponse,
-    WordFormResponse,
-    RegisterClassificationResponse,
-    DomainIdentificationResponse,
-    FrequencyBandResponse,
-    RegionalVariantResponse,
-    CEFRLevelResponse,
     UsageNoteResponse,
-    CollocationResponse,
-    GrammarPatternResponse,
+    WordFormResponse,
 )
 from .templates import PromptTemplateManager
 
@@ -155,7 +155,7 @@ class OpenAIConnector:
                     f"in {total_duration:.2f}s (tokens: {token_usage.get('total_tokens', 'N/A')})"
                 )
 
-                return result
+                return cast(T, result)
 
             except Exception as e:
                 retry_count += 1

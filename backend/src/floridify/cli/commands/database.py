@@ -10,8 +10,8 @@ from rich.table import Table
 
 from ...constants import DictionaryProvider
 from ...models.models import (
-    DictionaryEntry,
     SynthesizedDictionaryEntry,
+    Word,
 )
 from ...storage.mongodb import MongoDBStorage
 from ..utils.formatting import format_error
@@ -73,7 +73,7 @@ async def _database_stats_async(detailed: bool, connection_string: str, database
         await storage.connect()
 
         # Get collection counts
-        total_words = await DictionaryEntry.count()
+        total_words = await Word.count()
         total_syntheses = await SynthesizedDictionaryEntry.count()
 
         # Overview statistics
@@ -135,7 +135,7 @@ async def _get_provider_coverage() -> dict[str, int]:
             {"$sort": {"count": -1}},
         ]
 
-        results = await DictionaryEntry.aggregate(pipeline).to_list()
+        results = await Word.aggregate(pipeline).to_list()
         return {item["_id"]: item["count"] for item in results}
 
     except Exception:
@@ -148,14 +148,18 @@ async def _get_quality_metrics() -> dict[str, str]:
         metrics = {}
 
         # Count entries with multiple providers
-        total_entries = await DictionaryEntry.count()
+        total_entries = await Word.count()
         if total_entries > 0:
             # Sample some entries to estimate coverage
-            sample_entries = await DictionaryEntry.find().limit(100).to_list()
+            sample_entries = await Word.find().limit(100).to_list()
 
             if sample_entries:
                 # Calculate average providers per word
-                total_providers = sum(len(entry.provider_data) for entry in sample_entries)
+                from ...models import ProviderData
+                total_providers = 0
+                for word in sample_entries:
+                    provider_count = await ProviderData.find(ProviderData.word_id == str(word.id)).count()
+                    total_providers += provider_count
                 avg_providers = total_providers / len(sample_entries)
                 metrics["Average providers per word"] = f"{avg_providers:.1f}"
 

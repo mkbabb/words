@@ -16,11 +16,11 @@ from typing import Any
 # Heavy ML dependencies - Comment out for lightweight deployment
 try:
     # Core semantic search dependencies (2025 best practices)
-    import faiss  # type: ignore[import-untyped] - Billion-scale vector similarity search
+    import faiss  # type: ignore[import-not-found]
     import numpy as np  # Core numerical computing
-    from sentence_transformers import SentenceTransformer  # type: ignore[import-untyped] - SOTA embeddings
-    from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import-untyped] - Traditional TF-IDF
-    from sklearn.metrics.pairwise import cosine_similarity  # type: ignore[import-untyped] - Similarity computation
+    from sentence_transformers import SentenceTransformer  # type: ignore[import-not-found]
+    from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import-not-found]
+    from sklearn.metrics.pairwise import cosine_similarity  # type: ignore[import-not-found]
     SEMANTIC_SEARCH_AVAILABLE = True
     
     # Default to recommended 2025 model: all-MiniLM-L6-v2 (384D, fast, accurate)
@@ -42,7 +42,7 @@ except ImportError:
     TfidfVectorizer = type('TfidfVectorizer', (), {})
     SentenceTransformer = type('SentenceTransformer', (), {})
     DEFAULT_SENTENCE_MODEL = "all-MiniLM-L6-v2"
-    def cosine_similarity(x, y): return []
+    def cosine_similarity(x: Any, y: Any) -> list[Any]: return []
 
 from ..utils.logging import get_logger
 from .constants import EmbeddingLevel

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -28,7 +29,7 @@ class HealthResponse(BaseModel):
     search_engine: str = Field(..., description="Search engine status")
     cache_hit_rate: float = Field(..., ge=0.0, le=1.0, description="Cache hit rate")
     uptime_seconds: int = Field(..., ge=0, description="Service uptime in seconds")
-    connection_pool: dict = Field(default_factory=dict, description="MongoDB connection pool stats")
+    connection_pool: dict[str, Any] = Field(default_factory=dict, description="MongoDB connection pool stats")
 
 
 @router.get("/health", response_model=HealthResponse)

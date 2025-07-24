@@ -5,38 +5,9 @@ from .base import AudioMedia, BaseMetadata, Etymology, ImageMedia, ModelInfo
 
 # Constants
 from .constants import LiteratureSourceType
-from .models import (
-    Definition as LegacyDefinition,
-)
-
-# Legacy models (kept temporarily for migration)
-from .models import (
-    DictionaryEntry as LegacyDictionaryEntry,
-)
-from .models import (
-    Examples as LegacyExamples,
-)
-from .models import (
-    GeneratedExample as LegacyGeneratedExample,
-)
-from .models import (
-    LiteratureExample as LegacyLiteratureExample,
-)
-from .models import (
-    LiteratureSource as LegacyLiteratureSource,
-)
-from .models import (
-    Pronunciation as LegacyPronunciation,
-)
-from .models import (
-    ProviderData as LegacyProviderData,
-)
-from .models import (
-    SynthesizedDictionaryEntry as LegacySynthesizedDictionaryEntry,
-)
 
 # Core document models
-from .models_v2 import (
+from .models import (
     Definition,
     Example,
     Fact,
@@ -86,14 +57,4 @@ __all__ = [
     "PhrasalExpression",
     # Constants
     "LiteratureSourceType",
-    # Legacy (for migration)
-    "LegacyDictionaryEntry",
-    "LegacyDefinition",
-    "LegacyExamples",
-    "LegacyGeneratedExample",
-    "LegacyLiteratureExample",
-    "LegacyLiteratureSource",
-    "LegacyPronunciation",
-    "LegacyProviderData",
-    "LegacySynthesizedDictionaryEntry",
 ]

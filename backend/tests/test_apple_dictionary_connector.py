@@ -13,7 +13,7 @@ from src.floridify.connectors.apple_dictionary import (
     ImportError,
     PlatformError,
 )
-from src.floridify.models.models import Definition, Examples, ProviderData
+from src.floridify.models.models import Definition, Example, ProviderData
 
 
 class TestAppleDictionaryConnector:
@@ -119,21 +119,20 @@ class TestAppleDictionaryConnector:
         # Test quoted examples
         definition_text = 'A fruit. "I ate an apple." Very tasty.'
         examples = connector._extract_examples(definition_text)
-        assert len(examples.generated) == 1
-        assert examples.generated[0]["example"] == "I ate an apple."
-        assert examples.generated[0]["source"] == "apple_dictionary"
+        assert len(examples) == 1
+        assert examples[0] == "I ate an apple."
 
         # Test examples after colons
         definition_text = "A fruit: The apple was red and juicy."
         examples = connector._extract_examples(definition_text)
-        assert len(examples.generated) == 1
-        assert "apple was red and juicy" in examples.generated[0]["example"]
+        assert len(examples) == 1
+        assert "apple was red and juicy" in examples[0]
 
         # Test e.g. examples
         definition_text = "A fruit, e.g., apple juice is delicious."
         examples = connector._extract_examples(definition_text)
-        assert len(examples.generated) == 1
-        assert "apple juice is delicious" in examples.generated[0]["example"]
+        assert len(examples) == 1
+        assert "apple juice is delicious" in examples[0]
 
     def test_remove_examples_from_definition(self) -> None:
         """Test example removal from definition text."""

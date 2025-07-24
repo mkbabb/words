@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from ..models import (
     Collocation,
@@ -12,6 +12,7 @@ from ..models import (
     Etymology,
     Fact,
     GrammarPattern,
+    ModelInfo,
     Pronunciation,
     UsageNote,
     Word,
@@ -37,13 +38,13 @@ async def synthesize_pronunciation(
     for provider in providers_data:
         if provider.get("pronunciation"):
             # TODO: Merge pronunciations from multiple sources
-            return provider["pronunciation"]
+            return cast(Pronunciation, provider["pronunciation"])
     
     # Generate pronunciation if none found
     try:
         response = await ai.pronunciation(word.text)
         pronunciation = Pronunciation(
-            word_id=word.id,
+            word_id=str(word.id),
             phonetic=response.phonetic,
             ipa_american=response.ipa,
             syllables=[],  # TODO: Extract syllables
@@ -102,8 +103,8 @@ async def synthesize_word_forms(
         response = await ai.identify_word_forms(word.text, word_type)
         return [
             WordForm(
-                form_type=form["form_type"],
-                text=form["text"],
+                form_type=str(form["form_type"]),
+                text=str(form["text"]),
             )
             for form in response.forms
         ]
@@ -176,8 +177,8 @@ async def classify_definition_register(
 ) -> str | None:
     """Classify register for a definition."""
     
-    if definition.register:
-        return definition.register
+    if definition.language_register:
+        return definition.language_register
     
     try:
         response = await ai.classify_register(definition.text)
@@ -248,9 +249,9 @@ async def identify_collocations(
         )
         return [
             Collocation(
-                text=coll["text"],
-                type=coll["type"],
-                frequency=coll["frequency"],
+                text=str(coll["text"]),
+                type=str(coll["type"]),
+                frequency=float(coll["frequency"]) if coll.get("frequency") is not None else None,
             )
             for coll in response.collocations
         ]
@@ -273,8 +274,8 @@ async def generate_usage_notes(
         response = await ai.generate_usage_notes(word, definition.text)
         return [
             UsageNote(
-                type=note["type"],
-                text=note["text"],
+                type=str(note["type"]),
+                text=str(note["text"]),
             )
             for note in response.notes
         ]
@@ -323,14 +324,20 @@ async def synthesize_facts(
             # Determine category from response
             category = response.categories[idx] if idx < len(response.categories) else "general"
             
+            # Ensure category is valid
+            valid_categories = ["general", "technical", "cultural", "scientific"]
+            if category not in valid_categories:
+                category = "general"
+                
             fact = Fact(
-                word_id=word.id,
+                word_id=str(word.id),
                 content=fact_text,
-                category=category,
-                model_info={
-                    "name": ai.model_name,
-                    "confidence": response.confidence,
-                },
+                category=category,  # type: ignore[arg-type]
+                model_info=ModelInfo(
+                    name=ai.model_name,
+                    confidence=response.confidence,
+                    generation_count=1,
+                ),
             )
             await fact.save()
             facts.append(fact)
@@ -402,7 +409,7 @@ async def enhance_synthesized_entry(
     # Word-level enhancements
     if "etymology" in components and (not entry.etymology or force):
         # TODO: Load provider data
-        provider_data = []
+        provider_data: list[dict[str, Any]] = []
         tasks.append(synthesize_etymology(word, provider_data, ai))
     
     if "word_forms" in components and (not word.word_forms or force):

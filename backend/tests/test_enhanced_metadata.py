@@ -7,9 +7,8 @@ from pydantic import ValidationError
 from floridify.models.models import (
     Definition,
     ProviderData,
-    DictionaryEntry,
     SynthesizedDictionaryEntry,
-    Examples,
+    Example,
     Pronunciation,
     Fact
 )

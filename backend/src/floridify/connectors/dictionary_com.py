@@ -3,19 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-import time
 from typing import Any
 
-from ..core.state_tracker import PipelineState, StateTracker, Stages
+from ..core.state_tracker import Stages, StateTracker
 from ..models import (
-    ProviderData, 
-    Word, 
-    Definition, 
-    Pronunciation, 
+    Definition,
     Etymology,
-    MeaningCluster,
-    Example,
-    ModelInfo,
+    Pronunciation,
+    ProviderData,
 )
 from ..utils.logging import get_logger
 from .base import DictionaryConnector

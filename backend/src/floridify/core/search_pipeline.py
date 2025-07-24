@@ -15,7 +15,6 @@ from ..utils.logging import (
     log_stage,
     log_timing,
 )
-from ..utils.text_utils import normalize_word
 
 if TYPE_CHECKING:
     pass

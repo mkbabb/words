@@ -7,10 +7,10 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any
 
-from ..models import ProviderData, Word, Definition, Pronunciation, Etymology
 from ..constants import DictionaryProvider
+from ..core.state_tracker import StateTracker
+from ..models import Definition, Etymology, Pronunciation, ProviderData, Word
 from ..utils.logging import get_logger
-from ..core.state_tracker import PipelineState, StateTracker
 
 logger = get_logger(__name__)
 
@@ -120,25 +120,25 @@ class DictionaryConnector(ABC):
         """
         # Extract components using abstract methods
         pronunciation = await self.extract_pronunciation(response_data)
-        definitions = await self.extract_definitions(response_data, word.id)
+        definitions = await self.extract_definitions(response_data, str(word.id))
         etymology = await self.extract_etymology(response_data)
         
         # Save pronunciation if found
         pronunciation_id = None
         if pronunciation:
-            pronunciation.word_id = word.id
+            pronunciation.word_id = str(word.id)
             await pronunciation.save()
-            pronunciation_id = pronunciation.id
+            pronunciation_id = str(pronunciation.id)
         
         # Save definitions and collect IDs
         definition_ids = []
         for definition in definitions:
             await definition.save()
-            definition_ids.append(definition.id)
+            definition_ids.append(str(definition.id))
         
         # Create provider data
         provider_data = ProviderData(
-            word_id=word.id,
+            word_id=str(word.id),
             provider=DictionaryProvider(self.provider_name),
             definition_ids=definition_ids,
             pronunciation_id=pronunciation_id,

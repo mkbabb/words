@@ -10,18 +10,15 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..list.models import WordList
 from ..models import (
-    Word,
     Definition,
     Example,
     Fact,
+    PhrasalExpression,
     Pronunciation,
     ProviderData,
     SynthesizedDictionaryEntry,
-    PhrasalExpression,
+    Word,
     WordRelationship,
-    # Legacy models for migration
-    LegacyDictionaryEntry,
-    LegacySynthesizedDictionaryEntry,
 )
 from ..utils.config import get_database_config
 from ..utils.logging import get_logger
@@ -87,9 +84,6 @@ class MongoDBStorage:
                 PhrasalExpression,
                 WordRelationship,
                 WordList,
-                # Legacy models (for migration)
-                LegacyDictionaryEntry,
-                LegacySynthesizedDictionaryEntry,
             ],
         )
 
@@ -134,7 +128,7 @@ class MongoDBStorage:
             return {"status": "disconnected"}
             
         try:
-            pool_options = self.client.options.pool_options
+            pool_options = self.client.options.pool_options  # type: ignore[attr-defined]
             return {
                 "status": "connected",
                 "max_pool_size": pool_options.max_pool_size,
@@ -272,6 +266,7 @@ async def _ensure_initialized() -> None:
 async def get_storage() -> MongoDBStorage:
     """Get the global MongoDB storage instance."""
     await _ensure_initialized()
+    assert _storage is not None, "Storage not initialized"
     return _storage
 
 
@@ -285,7 +280,7 @@ async def get_synthesized_entry(word_text: str) -> SynthesizedDictionaryEntry | 
             return None
         # Then find the synthesized entry
         return await SynthesizedDictionaryEntry.find_one(
-            SynthesizedDictionaryEntry.word_id == word.id
+            SynthesizedDictionaryEntry.word_id == str(word.id)
         )
     except Exception:
         return None

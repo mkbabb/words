@@ -162,7 +162,7 @@ class AppleDictionaryBatchExtractor:
         batch_results = await asyncio.gather(*tasks, return_exceptions=True)
         
         # Filter results and handle exceptions
-        valid_results = []
+        valid_results: list[ProviderData] = []
         for word, result in zip(words, batch_results):
             if isinstance(result, Exception):
                 logger.error(f"Failed to extract '{word}': {result}")
@@ -213,21 +213,20 @@ class AppleDictionaryBatchExtractor:
         
         try:
             # Create a synthesized entry with just the Apple Dictionary data
+            from ..models import ModelInfo
             entry = SynthesizedDictionaryEntry(
-                word=word,
-                definitions=[definition for definition in provider_data.definitions],
-                provider_data={"apple_dictionary": provider_data},
-                metadata={
-                    "extraction_method": "apple_dictionary_batch",
-                    "extracted_at": datetime.now().isoformat(),
-                    "definitions_count": len(provider_data.definitions)
-                }
+                word_id=provider_data.word_id,
+                definition_ids=provider_data.definition_ids,
+                model_info=ModelInfo(
+                    name="apple_dictionary_batch",
+                    generation_count=1,
+                    confidence=1.0,
+                ),
+                source_provider_data_ids=[str(provider_data.id)] if provider_data.id else [],
             )
             
             # Save to MongoDB
-            success = await self.mongodb.save_entry(entry)
-            if not success:
-                logger.warning(f"Failed to save '{word}' to MongoDB")
+            await entry.save()
                 
         except Exception as e:
             logger.error(f"Error saving '{word}' to MongoDB: {e}")
@@ -307,7 +306,7 @@ class AppleDictionaryBatchExtractor:
         
         # Read words from file
         words = []
-        with open(word_list_path, 'r', encoding='utf-8') as f:
+        with open(word_list_path, encoding='utf-8') as f:
             for line in f:
                 word = line.strip()
                 if word and not word.startswith('#'):  # Skip empty lines and comments

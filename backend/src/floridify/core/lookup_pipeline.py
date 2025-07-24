@@ -22,7 +22,7 @@ from ..utils.logging import (
     log_timing,
 )
 from .search_pipeline import find_best_match
-from .state_tracker import StateTracker, Stages
+from .state_tracker import Stages, StateTracker
 
 logger = get_logger(__name__)
 

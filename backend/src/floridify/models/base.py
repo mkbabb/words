@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
 

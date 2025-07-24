@@ -9,8 +9,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from ...core.lookup_pipeline import LookupPipeline
-from ...storage import get_storage
+from ...core.lookup_pipeline import lookup_word_pipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -29,9 +28,8 @@ class BatchRequest(BaseModel):
     """Batch request containing multiple operations."""
     
     operations: list[BatchOperation] = Field(
-        ..., 
-        min_items=1,
-        max_items=100,
+        min_length=1,
+        max_length=100,
         description="List of operations to execute"
     )
     parallel: bool = Field(
@@ -64,9 +62,8 @@ class BatchLookupRequest(BaseModel):
     """Batch word lookup request."""
     
     words: list[str] = Field(
-        ..., 
-        min_items=1,
-        max_items=50,
+        min_length=1,
+        max_length=50,
         description="Words to lookup"
     )
     providers: list[str] | None = None
@@ -86,9 +83,8 @@ class BatchDefinitionUpdateRequest(BaseModel):
     """Request for batch definition updates."""
     
     updates: list[BatchDefinitionUpdate] = Field(
-        ...,
-        min_items=1,
-        max_items=100
+        min_length=1,
+        max_length=100
     )
 
 
@@ -96,14 +92,13 @@ class BatchDefinitionUpdateRequest(BaseModel):
 async def batch_lookup(request: BatchLookupRequest) -> dict[str, Any]:
     """Perform batch word lookup."""
     try:
-        pipeline = LookupPipeline()
         results = {}
         errors = {}
         
         # Process lookups
         tasks = []
         for word in request.words:
-            task = pipeline.lookup(
+            task = lookup_word_pipeline(
                 word=word,
                 providers=request.providers,
                 languages=request.languages,
@@ -139,13 +134,13 @@ async def batch_lookup(request: BatchLookupRequest) -> dict[str, Any]:
 async def batch_update_definitions(request: BatchDefinitionUpdateRequest) -> dict[str, Any]:
     """Batch update multiple definitions."""
     try:
-        storage = get_storage()
         results = []
         
         for update in request.updates:
             try:
                 # Get entry
-                entry = await storage.get_synthesized_entry(update.word)
+                from ...storage.mongodb import get_synthesized_entry
+                entry = await get_synthesized_entry(update.word)
                 if not entry:
                     results.append({
                         "word": update.word,
@@ -172,7 +167,8 @@ async def batch_update_definitions(request: BatchDefinitionUpdateRequest) -> dic
                         setattr(definition, field, value)
                 
                 # Save
-                await storage.save_synthesized_entry(entry, force_refresh=True)
+                from ...storage.mongodb import save_synthesized_entry
+                await save_synthesized_entry(entry)
                 
                 results.append({
                     "word": update.word,
@@ -232,18 +228,22 @@ async def execute_batch(request: BatchRequest) -> BatchResponse:
             execute_operation(i, op) 
             for i, op in enumerate(request.operations)
         ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        gather_results = await asyncio.gather(*tasks, return_exceptions=True)
         
         # Convert exceptions to results
-        for i, result in enumerate(results):
+        results: list[BatchResult] = []
+        for i, result in enumerate(gather_results):
             if isinstance(result, Exception):
-                results[i] = BatchResult(
+                results.append(BatchResult(
                     index=i,
                     status=500,
                     error=str(result)
-                )
+                ))
+            else:
+                results.append(result)
     else:
         # Execute sequentially
+        results = []
         for i, op in enumerate(request.operations):
             result = await execute_operation(i, op)
             results.append(result)

@@ -274,7 +274,7 @@ class LexiconLanguageLoader:
                     text=line,
                     normalized=normalized,
                     word_count=len(normalized.split()),
-                    language=language.value,
+                    language=language,
                 )
                 phrases.append(phrase)
             else:
@@ -322,7 +322,7 @@ class LexiconLanguageLoader:
                     normalized=normalized,
                     word_count=len(normalized.split()),
                     is_idiom=True,
-                    language=language.value,
+                    language=language,
                 )
                 phrases.append(phrase)
 
@@ -366,7 +366,7 @@ class LexiconLanguageLoader:
                     text=word,
                     normalized=normalized,
                     word_count=len(normalized.split()),
-                    language=language.value,
+                    language=language,
                     frequency=frequency,
                 )
                 phrases.append(phrase)
@@ -396,7 +396,7 @@ class LexiconLanguageLoader:
                         text=key,
                         normalized=normalized,
                         word_count=len(normalized.split()),
-                        language=language.value,
+                        language=language,
                     )
                     phrases.append(phrase)
                 elif normalized:
@@ -425,7 +425,7 @@ class LexiconLanguageLoader:
                             text=item,
                             normalized=normalized,
                             word_count=len(normalized.split()),
-                            language=language.value,
+                            language=language,
                         )
                         phrases.append(phrase)
                     elif normalized:
@@ -488,7 +488,7 @@ class LexiconLanguageLoader:
                         normalized=normalized,
                         word_count=len(normalized.split()),
                         is_idiom=True,
-                        language=language.value,
+                        language=language,
                     )
                     phrases.append(phrase)
 
@@ -532,7 +532,7 @@ class LexiconLanguageLoader:
                                 normalized=normalized,
                                 word_count=len(normalized.split()),
                                 is_idiom=False,  # These are phrasal verbs, not idioms
-                                language=language.value,
+                                language=language,
                             )
                             phrases.append(phrase)
 
@@ -572,7 +572,7 @@ class LexiconLanguageLoader:
                         normalized=normalized,
                         word_count=len(normalized.split()),
                         is_idiom=True,  # Scraped expressions are typically idiomatic
-                        language=language.value,
+                        language=language,
                     )
                     phrases.append(phrase)
                 else:

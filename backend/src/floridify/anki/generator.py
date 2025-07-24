@@ -8,11 +8,11 @@ import time
 from pathlib import Path
 from typing import Any
 
-import genanki
+import genanki  # type: ignore[import-untyped]
 
 from ..ai.connector import OpenAIConnector
 from ..ai.templates import PromptTemplateManager as PromptLoader
-from ..models import Definition, DictionaryEntry, SynthesizedDictionaryEntry
+from ..models import Definition, SynthesizedDictionaryEntry
 from ..utils.logging import get_logger
 from .ankiconnect import AnkiDirectIntegration
 from .templates import AnkiCardTemplate, CardType
@@ -92,22 +92,15 @@ def render_template(template: str, fields: dict[str, Any]) -> str:
     return result
 
 
-def extract_definitions(entry: DictionaryEntry | SynthesizedDictionaryEntry) -> list[Definition]:
-    """Extract definitions from either DictionaryEntry or SynthesizedDictionaryEntry."""
-    if isinstance(entry, SynthesizedDictionaryEntry):
-        # SynthesizedDictionaryEntry has definitions directly
-        return entry.definitions
-
-    # DictionaryEntry has providers with definitions
-    ai_provider = entry.provider_data.get("ai_synthesis")
-    if ai_provider and ai_provider.definitions:
-        return ai_provider.definitions
-
-    # Collect definitions from all providers
+async def extract_definitions(entry: SynthesizedDictionaryEntry) -> list[Definition]:
+    """Extract definitions from SynthesizedDictionaryEntry."""
+    # Load definitions from IDs
+    from ..models import Definition
     definitions = []
-    for provider_data in entry.provider_data.values():
-        definitions.extend(provider_data.definitions)
-
+    for def_id in entry.definition_ids:
+        definition = await Definition.get(def_id)
+        if definition:
+            definitions.append(definition)
     return definitions
 
 
@@ -158,9 +151,30 @@ class AnkiCardGenerator:
         self.prompt_loader = prompt_loader or PromptLoader()
         self.direct_integration = AnkiDirectIntegration()
 
+    async def _load_generated_examples(self, definition: Definition, limit: int = 3) -> list[str]:
+        """Load generated examples for a definition.
+        
+        Args:
+            definition: Definition to load examples for
+            limit: Maximum number of examples to load
+            
+        Returns:
+            List of example texts
+        """
+        if not definition.example_ids:
+            return []
+            
+        from ..models import Example
+        examples = await Example.find(
+            Example.definition_id == str(definition.id),
+            Example.type == "generated"
+        ).limit(limit).to_list()
+        
+        return [ex.text for ex in examples]
+
     async def generate_cards(
         self,
-        entry: DictionaryEntry | SynthesizedDictionaryEntry,
+        entry: SynthesizedDictionaryEntry,
         card_types: list[CardType] | None = None,
         max_cards_per_type: int = 1,
         frequency: int = 1,
@@ -185,7 +199,7 @@ class AnkiCardGenerator:
             card_types = [CardType.BEST_DESCRIBES, CardType.FILL_IN_BLANK]
 
         # Extract definitions using helper function
-        definitions = extract_definitions(entry)
+        definitions = await extract_definitions(entry)
         if not definitions:
             logger.warning(f"📛 No definitions found for word: '{entry.word}'")
             return []
@@ -210,7 +224,7 @@ class AnkiCardGenerator:
         self,
         card_type: CardType,
         definition: Definition,
-        entry: DictionaryEntry | SynthesizedDictionaryEntry,
+        entry: SynthesizedDictionaryEntry,
         frequency: int = 1,
     ) -> AnkiCard | None:
         """Generate a card for a specific type using appropriate method."""
@@ -228,7 +242,7 @@ class AnkiCardGenerator:
 
     async def _generate_best_describes_card(
         self,
-        entry: DictionaryEntry | SynthesizedDictionaryEntry,
+        entry: SynthesizedDictionaryEntry,
         definition: Definition,
         frequency: int = 1,
     ) -> AnkiCard | None:
@@ -239,10 +253,9 @@ class AnkiCardGenerator:
             logger.debug(f"🧠 Generating best describes AI content for '{entry.word}'")
 
             # Prepare examples for the prompt
-            examples_text = ""
-            if definition.examples.generated:
-                examples_list = [ex.sentence for ex in definition.examples.generated[:3]]
-                examples_text = " | ".join(examples_list)
+            examples_list = await self._load_generated_examples(definition)
+            examples_text = " | ".join(examples_list) if examples_list else ""
+            if examples_list:
                 logger.debug(f"📝 Using {len(examples_list)} examples for context")
 
             # Generate multiple choice content using structured output
@@ -257,28 +270,26 @@ class AnkiCardGenerator:
             logger.debug(f"🤖 OpenAI best describes generation took {ai_elapsed:.2f}s")
 
             # Format examples - ensure exactly 3 examples by augmenting if needed
-            examples_text = ""
-            if definition.examples.generated:
-                examples_list = [ex.sentence for ex in definition.examples.generated[:3]]
+            # Reuse examples_list from above
+            
+            # If we have fewer than 3 examples, augment with AI generation using new count parameter
+            if len(examples_list) < 3:
+                needed_count = 3 - len(examples_list)
+                try:
+                    example_response = await self.openai_connector.examples(
+                        word=entry.word,
+                        word_type=definition.word_type,
+                        definition=definition.definition,
+                        count=needed_count,
+                    )
+                    if example_response.example_sentences:
+                        examples_list.extend(example_response.example_sentences[:needed_count])
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to generate additional examples for '{entry.word}': {e}"
+                    )
 
-                # If we have fewer than 3 examples, augment with AI generation using new count parameter
-                if len(examples_list) < 3:
-                    needed_count = 3 - len(examples_list)
-                    try:
-                        example_response = await self.openai_connector.examples(
-                            word=entry.word,
-                            word_type=definition.word_type,
-                            definition=definition.definition,
-                            count=needed_count,
-                        )
-                        if example_response.example_sentences:
-                            examples_list.extend(example_response.example_sentences[:needed_count])
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to generate additional examples for '{entry.word}': {e}"
-                        )
-
-                examples_text = "<br><br>".join(examples_list)
+            examples_text = "<br><br>".join(examples_list)
 
             synonyms_text = ""
             if definition.synonyms:
@@ -320,7 +331,7 @@ class AnkiCardGenerator:
 
     async def _generate_fill_blank_card(
         self,
-        entry: DictionaryEntry | SynthesizedDictionaryEntry,
+        entry: SynthesizedDictionaryEntry,
         definition: Definition,
         frequency: int = 1,
     ) -> AnkiCard | None:
@@ -331,10 +342,9 @@ class AnkiCardGenerator:
             logger.debug(f"📝 Generating fill-in-blank AI content for '{entry.word}'")
 
             # Prepare examples for the prompt
-            examples_text = ""
-            if definition.examples.generated:
-                examples_list = [ex.sentence for ex in definition.examples.generated[:3]]
-                examples_text = " | ".join(examples_list)
+            examples_list = await self._load_generated_examples(definition)
+            examples_text = " | ".join(examples_list) if examples_list else ""
+            if examples_list:
                 logger.debug(f"📚 Using {len(examples_list)} examples for context")
 
             # Generate fill-in-the-blank content using structured output
@@ -349,28 +359,26 @@ class AnkiCardGenerator:
             logger.debug(f"🤖 OpenAI fill-in-blank generation took {ai_elapsed:.2f}s")
 
             # Format examples - ensure exactly 3 examples by augmenting if needed
-            examples_text = ""
-            if definition.examples.generated:
-                examples_list = [ex.sentence for ex in definition.examples.generated[:3]]
+            # Reuse examples_list from above
+            
+            # If we have fewer than 3 examples, augment with AI generation using new count parameter
+            if len(examples_list) < 3:
+                needed_count = 3 - len(examples_list)
+                try:
+                    example_response = await self.openai_connector.examples(
+                        word=entry.word,
+                        word_type=definition.word_type,
+                        definition=definition.definition,
+                        count=needed_count,
+                    )
+                    if example_response.example_sentences:
+                        examples_list.extend(example_response.example_sentences[:needed_count])
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to generate additional examples for '{entry.word}': {e}"
+                    )
 
-                # If we have fewer than 3 examples, augment with AI generation using new count parameter
-                if len(examples_list) < 3:
-                    needed_count = 3 - len(examples_list)
-                    try:
-                        example_response = await self.openai_connector.examples(
-                            word=entry.word,
-                            word_type=definition.word_type,
-                            definition=definition.definition,
-                            count=needed_count,
-                        )
-                        if example_response.example_sentences:
-                            examples_list.extend(example_response.example_sentences[:needed_count])
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to generate additional examples for '{entry.word}': {e}"
-                        )
-
-                examples_text = "<br><br>".join(examples_list)
+            examples_text = "<br><br>".join(examples_list)
 
             synonyms_text = ""
             if definition.synonyms:

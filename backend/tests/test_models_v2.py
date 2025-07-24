@@ -70,7 +70,7 @@ async def test_definition_with_examples(db):
     
     # Create definition
     definition = Definition(
-        word_id=word.id,
+        word_id=str(word.id),
         part_of_speech="verb",
         text="to move quickly",
         meaning_cluster=MeaningCluster(
@@ -87,7 +87,7 @@ async def test_definition_with_examples(db):
     
     # Create examples
     example1 = Example(
-        definition_id=definition.id,
+        definition_id=str(definition.id),
         text="She runs every morning",
         type="generated",
         model_info=ModelInfo(
@@ -99,13 +99,13 @@ async def test_definition_with_examples(db):
     await example1.save()
     
     # Update definition with example ID
-    definition.example_ids.append(example1.id)
+    definition.example_ids.append(str(example1.id))
     await definition.save()
     
     # Verify relationships
     assert len(definition.example_ids) == 1
     retrieved_example = await Example.get(example1.id)
-    assert retrieved_example.definition_id == definition.id
+    assert retrieved_example.definition_id == str(definition.id)
 
 
 @pytest.mark.asyncio
@@ -116,7 +116,7 @@ async def test_provider_data_structure(db):
     
     # Create pronunciation
     pronunciation = Pronunciation(
-        word_id=word.id,
+        word_id=str(word.id),
         phonetic="heh-LOH",
         ipa_american="/həˈloʊ/",
         syllables=["hel", "lo"]
@@ -125,10 +125,10 @@ async def test_provider_data_structure(db):
     
     # Create provider data
     provider_data = ProviderData(
-        word_id=word.id,
+        word_id=str(word.id),
         provider=DictionaryProvider.WIKTIONARY,
         definition_ids=[],
-        pronunciation_id=pronunciation.id,
+        pronunciation_id=str(pronunciation.id),
         etymology=Etymology(
             text="From Old English",
             origin_language="Old English",
@@ -137,7 +137,7 @@ async def test_provider_data_structure(db):
     )
     await provider_data.save()
     
-    assert provider_data.pronunciation_id == pronunciation.id
+    assert provider_data.pronunciation_id == str(pronunciation.id)
     assert provider_data.etymology.origin_language == "Old English"
 
 
@@ -149,14 +149,14 @@ async def test_synthesized_entry_provenance(db):
     
     # Create components
     pronunciation = Pronunciation(
-        word_id=word.id,
+        word_id=str(word.id),
         phonetic="ig-ZAM-pul",
         ipa_american="/ɪɡˈzæmpəl/"
     )
     await pronunciation.save()
     
     definition = Definition(
-        word_id=word.id,
+        word_id=str(word.id),
         part_of_speech="noun",
         text="a representative form or pattern",
         meaning_cluster=MeaningCluster(
@@ -172,7 +172,7 @@ async def test_synthesized_entry_provenance(db):
     await definition.save()
     
     fact = Fact(
-        word_id=word.id,
+        word_id=str(word.id),
         content="The word 'example' comes from Latin",
         category="etymology",
         model_info=ModelInfo(name="gpt-4", confidence=0.9, generation_count=1)
@@ -181,15 +181,15 @@ async def test_synthesized_entry_provenance(db):
     
     # Create synthesized entry
     synth_entry = SynthesizedDictionaryEntry(
-        word_id=word.id,
-        pronunciation_id=pronunciation.id,
-        definition_ids=[definition.id],
+        word_id=str(word.id),
+        pronunciation_id=str(pronunciation.id),
+        definition_ids=[str(definition.id)],
         etymology=Etymology(
             text="From Latin exemplum",
             origin_language="Latin",
             root_words=["exemplum"]
         ),
-        fact_ids=[fact.id],
+        fact_ids=[str(fact.id)],
         model_info=ModelInfo(
             name="gpt-4",
             confidence=0.95,
@@ -200,7 +200,7 @@ async def test_synthesized_entry_provenance(db):
     await synth_entry.save()
     
     # Verify complete structure
-    assert synth_entry.word_id == word.id
+    assert synth_entry.word_id == str(word.id)
     assert len(synth_entry.definition_ids) == 1
     assert synth_entry.etymology.origin_language == "Latin"
     assert synth_entry.model_info.confidence == 0.95
@@ -213,7 +213,7 @@ async def test_definition_linguistic_fields(db):
     await word.save()
     
     definition = Definition(
-        word_id=word.id,
+        word_id=str(word.id),
         part_of_speech="verb",
         text="transfer possession of something",
         meaning_cluster=MeaningCluster(
@@ -244,7 +244,7 @@ async def test_definition_linguistic_fields(db):
     assert definition.transitivity == "transitive"
     assert definition.cefr_level == "A1"
     assert len(definition.grammar_patterns) == 1
-    assert definition.grammar_patterns[0]["pattern"] == "[Dn.n]"
+    assert definition.grammar_patterns[0].pattern == "[Dn.n]"
 
 
 @pytest.mark.asyncio
@@ -277,7 +277,7 @@ async def test_fact_categories(db):
     
     for category in categories:
         fact = Fact(
-            word_id=word.id,
+            word_id=str(word.id),
             content=f"Test fact about {category}",
             category=category,
             model_info=ModelInfo(name="gpt-4", confidence=0.8, generation_count=1)
@@ -286,7 +286,7 @@ async def test_fact_categories(db):
         facts.append(fact)
     
     # Retrieve all facts for word
-    retrieved_facts = await Fact.find(Fact.word_id == word.id).to_list()
+    retrieved_facts = await Fact.find(Fact.word_id == str(word.id)).to_list()
     assert len(retrieved_facts) == len(categories)
     
     retrieved_categories = {f.category for f in retrieved_facts}

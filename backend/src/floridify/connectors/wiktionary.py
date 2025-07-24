@@ -4,29 +4,22 @@ from __future__ import annotations
 
 import asyncio
 import re
-import time
 from dataclasses import dataclass
 from typing import Any
 
-import wikitextparser as wtp
+import wikitextparser as wtp  # type: ignore[import-untyped]
 
 from ..caching import get_cached_http_client
+from ..core.state_tracker import Stages, StateTracker
 from ..models import (
     Definition,
-    Examples,
-    GeneratedExample,
+    Etymology,
+    Example,
     Pronunciation,
     ProviderData,
-    Etymology,
     Word,
-    Example,
-    MeaningCluster,
-    WordForm,
-    GrammarPattern,
-    UsageNote,
 )
 from ..utils.logging import get_logger
-from ..core.state_tracker import PipelineState, StateTracker, Stages
 from .base import DictionaryConnector
 
 logger = get_logger(__name__)
@@ -301,9 +294,9 @@ class WiktionaryConnector(DictionaryConnector):
                 english_section = parsed
 
             # Extract all components
-            definitions = await self._extract_definitions_new(english_section, word_obj.id)
+            definitions = await self._extract_definitions(english_section, str(word_obj.id))
             etymology = self._extract_etymology(english_section)
-            pronunciation = self._extract_pronunciation(english_section)
+            pronunciation = self._extract_pronunciation(english_section, str(word_obj.id))
             alternative_forms = self._extract_alternative_forms(english_section)
             related_terms = self._extract_related_terms(english_section)
 
@@ -332,10 +325,9 @@ class WiktionaryConnector(DictionaryConnector):
                 return section
         return None
 
-    async def _extract_definitions_new(self, section: wtp.Section, word_id: str) -> list[Definition]:
+    async def _extract_definitions(self, section: wtp.Section, word_id: str) -> list[Definition]:
         """Extract definitions using new model structure."""
         definitions = []
-        meaning_order = 0
 
         for subsection in section.sections:
             if not subsection.title:
@@ -365,48 +357,33 @@ class WiktionaryConnector(DictionaryConnector):
                 if not clean_def:
                     continue
 
-                # Create meaning cluster
-                meaning_cluster = MeaningCluster(
-                    id=f"wiktionary_{word_type}_{idx}",
-                    name=f"{word_type.title()} sense {idx + 1}",
-                    description=clean_def[:100] + "..." if len(clean_def) > 100 else clean_def,
-                    order=meaning_order,
-                    relevance=0.8 - (idx * 0.1),  # Decreasing relevance by order
-                )
-                meaning_order += 1
-
                 # Extract synonyms and antonyms
                 synonyms = self._extract_synonyms(def_text)
                 
-                # Create definition
+                # Create definition (meaning_cluster will be added by AI synthesis)
                 definition = Definition(
                     word_id=word_id,
                     part_of_speech=word_type,
                     text=clean_def,
-                    meaning_cluster=meaning_cluster,
                     sense_number=f"{idx + 1}",
                     synonyms=synonyms,
                     antonyms=[],
                     example_ids=[],
+                    frequency_band=None,
                 )
                 
                 # Save definition to get ID
                 await definition.save()
                 
                 # Extract and save examples
-                example_objs = await self._extract_examples_new(def_text, definition.id)
-                definition.example_ids = [ex.id for ex in example_objs]
+                example_objs = await self._extract_examples(def_text, str(definition.id))
+                definition.example_ids = [str(ex.id) for ex in example_objs]
                 await definition.save()  # Update with example IDs
                 
                 definitions.append(definition)
 
         return definitions
 
-    def _extract_definitions(self, section: wtp.Section) -> list[Definition]:
-        """Legacy definition extraction for compatibility."""
-        # This is kept for the WiktionaryExtractedData structure
-        # but actual saving happens in _extract_definitions_new
-        return []
 
     def _extract_wikilist_items(self, section_text: str) -> list[str]:
         """Extract numbered definition items from section text."""
@@ -424,7 +401,7 @@ class WiktionaryConnector(DictionaryConnector):
 
         return items
 
-    async def _extract_examples_new(self, definition_text: str, definition_id: str) -> list[Example]:
+    async def _extract_examples(self, definition_text: str, definition_id: str) -> list[Example]:
         """Extract and save examples using new model structure."""
         examples = []
 
@@ -455,44 +432,6 @@ class WiktionaryConnector(DictionaryConnector):
 
         return examples
 
-    def _extract_examples(self, definition_text: str) -> Examples:
-        """Legacy example extraction for compatibility."""
-        # Kept for compatibility but actual saving happens in _extract_examples_new
-        examples = Examples()
-        # ... (rest of the old implementation can be removed or simplified)
-
-                elif template_name.startswith("quote"):
-                    # Quote templates
-                    for arg in template.arguments:
-                        if "text" in str(arg.name).lower() or not arg.name:
-                            quote_text = str(arg.value).strip()
-                            clean_quote = self.cleaner.clean_text(
-                                quote_text, preserve_structure=True
-                            )
-                            if clean_quote and len(clean_quote) > 15:
-                                examples.generated.append(
-                                    GeneratedExample(
-                                        sentence=clean_quote, regenerable=False
-                                    )
-                                )
-                                break
-
-        except Exception as e:
-            logger.debug(f"Error extracting examples: {e}")
-
-        # Fallback regex patterns for quotes
-        quote_patterns = [r'"([^"]{15,})"', r"'([^']{15,})'", r"''([^']{15,})''"]
-
-        for pattern in quote_patterns:
-            matches = re.findall(pattern, definition_text)
-            for match in matches:
-                clean_example = self.cleaner.clean_text(match, preserve_structure=True)
-                if clean_example and len(clean_example) > 10:
-                    examples.generated.append(
-                        GeneratedExample(sentence=clean_example, regenerable=False)
-                    )
-
-        return examples
 
     def _extract_synonyms(self, definition_text: str) -> list[str]:
         """Extract synonyms systematically from templates."""
@@ -530,7 +469,7 @@ class WiktionaryConnector(DictionaryConnector):
                 return self.cleaner.clean_text(etymology_text, preserve_structure=True)
         return None
 
-    def _extract_pronunciation(self, section: wtp.Section) -> Pronunciation | None:
+    def _extract_pronunciation(self, section: wtp.Section, word_id: str) -> Pronunciation | None:
         """Extract pronunciation comprehensively."""
         ipa = None
         phonetic = None
@@ -568,7 +507,11 @@ class WiktionaryConnector(DictionaryConnector):
                             break
 
             if ipa or phonetic:
-                return Pronunciation(phonetic=phonetic or "unknown", ipa=ipa)
+                return Pronunciation(
+                    word_id=word_id,
+                    phonetic=phonetic or "unknown",
+                    ipa_american=ipa
+                )
 
         except Exception as e:
             logger.debug(f"Error extracting pronunciation: {e}")
