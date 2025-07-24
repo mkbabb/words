@@ -11,6 +11,7 @@ from . import (
     search,
     suggestions,
     synonyms,
+    synthesis,
     words,
 )
 
@@ -25,5 +26,6 @@ __all__ = [
     "search",
     "suggestions",
     "synonyms",
+    "synthesis",
     "words",
 ]

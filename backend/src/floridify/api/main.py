@@ -18,6 +18,7 @@ from .routers import (
     search,
     suggestions,
     synonyms,
+    synthesis,
     words,
 )
 
@@ -61,3 +62,4 @@ app.include_router(batch.router, prefix="/batch", tags=["batch"])
 app.include_router(health.router, prefix="", tags=["health"])
 app.include_router(atomic_updates.router, prefix="/atomic", tags=["atomic"])
 app.include_router(words.router, prefix="/words", tags=["words"])
+app.include_router(synthesis.router, prefix="", tags=["synthesis"])

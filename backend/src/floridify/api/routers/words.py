@@ -1,192 +1,279 @@
-"""Word management endpoints with field selection."""
+"""Words API - Comprehensive CRUD operations."""
 
-from typing import Any
+from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from beanie import PydanticObjectId
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from ...constants import Language
-from ...models import Definition, Fact, Pronunciation, ProviderData, Word, WordForm
-from ...utils.logging import get_logger
-from ..middleware.field_selection import FieldSelector
+from floridify.api.core import (
+    ErrorResponse,
+    FieldSelection,
+    ListResponse,
+    PaginationParams,
+    ResourceResponse,
+    SortParams,
+    check_etag,
+    get_etag,
+    handle_api_errors,
+)
+from floridify.api.repositories import (
+    WordCreate,
+    WordFilter,
+    WordRepository,
+    WordUpdate,
+)
+from floridify.models.models import Language, Word
 
-logger = get_logger(__name__)
 router = APIRouter()
 
 
-class WordCreate(BaseModel):
-    """Create a new word."""
+def get_word_repo() -> WordRepository:
+    """Dependency to get word repository."""
+    return WordRepository()
+
+
+def get_pagination(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100)
+) -> PaginationParams:
+    """Get pagination parameters from query."""
+    return PaginationParams(offset=offset, limit=limit)
+
+
+def get_sort(
+    sort_by: str | None = Query(None),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$")
+) -> SortParams:
+    """Get sort parameters from query."""
+    return SortParams(sort_by=sort_by, sort_order=sort_order)
+
+
+def get_fields(
+    include: str | None = Query(None),
+    exclude: str | None = Query(None),
+    expand: str | None = Query(None)
+) -> FieldSelection:
+    """Get field selection from query."""
+    return FieldSelection(
+        include=set(include.split(",")) if include else None,
+        exclude=set(exclude.split(",")) if exclude else None,
+        expand=set(expand.split(",")) if expand else None,
+    )
+
+
+@router.get("", response_model=ListResponse[Word])
+@handle_api_errors
+async def list_words(
+    request: Request,
+    response: Response,
+    repo: WordRepository = Depends(get_word_repo),
+    pagination: PaginationParams = Depends(get_pagination),
+    sort: SortParams = Depends(get_sort),
+    fields: FieldSelection = Depends(get_fields),
+    # Filter parameters
+    text: str | None = Query(None),
+    text_pattern: str | None = Query(None),
+    language: Language | None = Query(None),
+    offensive_flag: bool | None = Query(None),
+    created_after: datetime | None = Query(None),
+    created_before: datetime | None = Query(None),
+) -> ListResponse[Word]:
+    """
+    List words with filtering, sorting, and pagination.
     
-    text: str = Field(..., min_length=1, max_length=100)
-    normalized: str | None = None
-    language: str = "en"
-    word_forms: list[dict[str, Any]] = []
-    offensive_flag: bool = False
-
-
-class WordUpdate(BaseModel):
-    """Update an existing word."""
+    Field selection:
+    - include: Comma-separated fields to include
+    - exclude: Comma-separated fields to exclude
+    - expand: Comma-separated related resources to expand
     
-    normalized: str | None = None
-    word_forms: list[dict[str, Any]] | None = None
-    offensive_flag: bool | None = None
-
-
-@router.get("/{word_id}")
-async def get_word(
-    word_id: str,
-    include: str | None = Query(None, description="Comma-separated fields to include"),
-    exclude: str | None = Query(None, description="Comma-separated fields to exclude"),
-    expand: str | None = Query(None, description="Comma-separated related fields to expand"),
-) -> dict[str, Any]:
-    """Get a word by ID with field selection."""
+    Filters:
+    - text: Exact text match
+    - text_pattern: Regex pattern for text
+    - language: Filter by language
+    - offensive_flag: Filter offensive words
+    - created_after/before: Date range filters
+    """
+    # Build filter
+    filter_params = WordFilter(
+        text=text,
+        text_pattern=text_pattern,
+        language=language,
+        offensive_flag=offensive_flag,
+        created_after=created_after,
+        created_before=created_before,
+    )
     
-    word = await Word.get(word_id)
-    if not word:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Word {word_id} not found"
-        )
+    # Get data
+    words, total = await repo.list(
+        filter_dict=filter_params.to_query(),
+        pagination=pagination,
+        sort=sort,
+    )
     
     # Apply field selection
-    selector = FieldSelector(include=include, exclude=exclude)
-    result = selector.select(word)
+    items = []
+    for word in words:
+        word_dict = word.model_dump()
+        word_dict = fields.apply_to_dict(word_dict)
+        
+        # Handle expansions
+        if fields.expand and "definitions" in fields.expand:
+            from floridify.api.repositories import DefinitionRepository
+            def_repo = DefinitionRepository()
+            definitions = await def_repo.find_by_word(str(word.id))
+            word_dict["definitions"] = [d.model_dump() for d in definitions]
+        
+        items.append(word_dict)
     
-    # Handle field expansion
-    if expand:
-        expand_fields = {f.strip() for f in expand.split(",") if f.strip()}
-        
-        if "definitions" in expand_fields:
-            definitions = await Definition.find(Definition.word_id == word_id).to_list()
-            result["definitions"] = [selector.select(d) for d in definitions]
-        
-        if "pronunciation" in expand_fields:
-            pronunciation = await Pronunciation.find_one(Pronunciation.word_id == word_id)
-            if pronunciation:
-                result["pronunciation"] = selector.select(pronunciation)
-        
-        if "facts" in expand_fields:
-            facts = await Fact.find(Fact.word_id == word_id).to_list()
-            result["facts"] = [selector.select(f) for f in facts]
+    # Build response
+    response_data = ListResponse(
+        items=items,
+        total=total,
+        offset=pagination.offset,
+        limit=pagination.limit,
+    )
     
-    return result
+    # Set ETag
+    etag = get_etag(response_data.model_dump())
+    response.headers["ETag"] = etag
+    
+    # Check if Not Modified
+    if check_etag(request, etag):
+        response.status_code = 304
+        return Response(status_code=304)
+    
+    return response_data
 
 
-@router.post("", response_model=dict)
-async def create_word(word_data: WordCreate) -> dict[str, Any]:
+@router.post("", response_model=ResourceResponse, status_code=201)
+@handle_api_errors
+async def create_word(
+    data: WordCreate,
+    repo: WordRepository = Depends(get_word_repo),
+) -> ResourceResponse:
     """Create a new word."""
-    
-    # Check if word exists
-    existing = await Word.find_one(Word.text == word_data.text)
+    # Check if word already exists
+    existing = await repo.find_by_text(data.text, data.language)
     if existing:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Word '{word_data.text}' already exists"
+            409,
+            detail=ErrorResponse(
+                error="Word already exists",
+                details=[{
+                    "field": "text",
+                    "message": f"Word '{data.text}' already exists in {data.language}",
+                    "code": "duplicate_word"
+                }]
+            ).model_dump()
         )
     
     # Create word
-    word = Word(
-        text=word_data.text,
-        normalized=word_data.normalized or word_data.text.lower(),
-        language=Language(word_data.language),
-        word_forms=[WordForm(**wf) for wf in word_data.word_forms],
-        offensive_flag=word_data.offensive_flag,
+    word = await repo.create(data)
+    
+    return ResourceResponse(
+        data=word.model_dump(),
+        links={
+            "self": f"/words/{word.id}",
+            "definitions": f"/words/{word.id}/definitions",
+        }
     )
-    await word.save()
-    
-    return {"id": str(word.id), "text": word.text}
 
 
-@router.patch("/{word_id}")
-async def update_word(
-    word_id: str,
-    updates: WordUpdate,
-    expected_version: int = Query(..., description="Expected version for optimistic locking"),
-) -> dict[str, Any]:
-    """Update a word with version checking."""
-    
-    word = await Word.get(word_id)
-    if not word:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Word {word_id} not found"
-        )
-    
-    # Check version
-    if word.version != expected_version:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Version mismatch: expected {expected_version}, got {word.version}"
-        )
-    
-    # Apply updates
-    update_dict = updates.model_dump(exclude_unset=True)
-    for field, value in update_dict.items():
-        setattr(word, field, value)
-    
-    word.version += 1
-    await word.save()
-    
-    return {"id": str(word.id), "version": word.version}
-
-
-@router.delete("/{word_id}")
-async def delete_word(word_id: str) -> dict[str, Any]:
-    """Delete a word and all related data."""
-    
-    word = await Word.get(word_id)
-    if not word:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Word {word_id} not found"
-        )
-    
-    # Delete related data
-    await Definition.find(Definition.word_id == word_id).delete()
-    await Pronunciation.find(Pronunciation.word_id == word_id).delete()
-    await Fact.find(Fact.word_id == word_id).delete()
-    await ProviderData.find(ProviderData.word_id == word_id).delete()
-    
-    # Delete word
-    await word.delete()
-    
-    return {"id": word_id, "deleted": True}
-
-
-@router.get("")
-async def list_words(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    language: str | None = Query(None),
-    search: str | None = Query(None, description="Search words by text"),
-    include: str | None = Query(None, description="Comma-separated fields to include"),
-    exclude: str | None = Query(None, description="Comma-separated fields to exclude"),
-) -> dict[str, Any]:
-    """List words with pagination and field selection."""
-    
-    # Build query
-    query: dict[str, Any] = {}
-    if language:
-        query["language"] = language
-    if search:
-        query["$or"] = [
-            {"text": {"$regex": search, "$options": "i"}},
-            {"normalized": {"$regex": search, "$options": "i"}},
-        ]
-    
-    # Get total count
-    total = await Word.find(query).count()
-    
-    # Get words with pagination
-    words = await Word.find(query).skip(skip).limit(limit).to_list()
+@router.get("/{word_id}", response_model=ResourceResponse)
+@handle_api_errors
+async def get_word(
+    word_id: PydanticObjectId,
+    request: Request,
+    response: Response,
+    repo: WordRepository = Depends(get_word_repo),
+    fields: FieldSelection = Depends(get_fields),
+) -> ResourceResponse:
+    """Get a single word by ID."""
+    # Get word with counts
+    word_data = await repo.get_with_counts(word_id)
     
     # Apply field selection
-    selector = FieldSelector(include=include, exclude=exclude)
-    items = [selector.select(word) for word in words]
+    word_data = fields.apply_to_dict(word_data)
     
-    return {
-        "items": items,
-        "total": total,
-        "skip": skip,
-        "limit": limit,
-    }
+    # Handle expansions
+    if fields.expand:
+        if "definitions" in fields.expand:
+            from floridify.api.repositories import DefinitionRepository
+            def_repo = DefinitionRepository()
+            definitions = await def_repo.find_by_word(str(word_id))
+            word_data["definitions"] = [d.model_dump() for d in definitions]
+    
+    # Build response
+    response_data = ResourceResponse(
+        data=word_data,
+        metadata={
+            "version": word_data.get("version", 1),
+            "last_modified": word_data.get("updated_at"),
+        },
+        links={
+            "self": f"/words/{word_id}",
+            "definitions": f"/words/{word_id}/definitions",
+            "facts": f"/words/{word_id}/facts",
+            "pronunciation": f"/words/{word_id}/pronunciation",
+        }
+    )
+    
+    # Set ETag
+    etag = get_etag(response_data.model_dump())
+    response.headers["ETag"] = etag
+    
+    # Check if Not Modified
+    if check_etag(request, etag):
+        return Response(status_code=304)
+    
+    return response_data
+
+
+@router.put("/{word_id}", response_model=ResourceResponse)
+@handle_api_errors
+async def update_word(
+    word_id: PydanticObjectId,
+    data: WordUpdate,
+    version: int | None = Query(None, description="Version for optimistic locking"),
+    repo: WordRepository = Depends(get_word_repo),
+) -> ResourceResponse:
+    """Update a word with optional optimistic locking."""
+    word = await repo.update(word_id, data, version)
+    
+    return ResourceResponse(
+        data=word.model_dump(),
+        metadata={
+            "version": word.version,
+            "updated_at": word.updated_at,
+        }
+    )
+
+
+@router.delete("/{word_id}", status_code=204)
+@handle_api_errors
+async def delete_word(
+    word_id: PydanticObjectId,
+    cascade: bool = Query(False, description="Delete related documents"),
+    repo: WordRepository = Depends(get_word_repo),
+) -> None:
+    """Delete a word, optionally with cascade."""
+    await repo.delete(word_id, cascade=cascade)
+
+
+@router.get("/search/{query}", response_model=ListResponse[Word])
+@handle_api_errors
+async def search_words(
+    query: str,
+    language: Language | None = Query(None),
+    limit: int = Query(10, ge=1, le=50),
+    repo: WordRepository = Depends(get_word_repo),
+) -> ListResponse[Word]:
+    """Search words by text pattern."""
+    words = await repo.search(query, language, limit)
+    
+    return ListResponse(
+        items=[w.model_dump() for w in words],
+        total=len(words),
+        offset=0,
+        limit=limit,
+    )
