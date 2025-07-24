@@ -73,7 +73,7 @@ class PromptTemplateManager:
             meaning_cluster=meaning_cluster,
         )
 
-    def get_example_prompt(
+    def get_generate_examples_prompt(
         self,
         word: str,
         word_type: str,
@@ -82,7 +82,7 @@ class PromptTemplateManager:
     ) -> str:
         """Generate example generation prompt."""
         return self.render_template(
-            "example_generation",
+            "generate_examples",
             word=word,
             definition=definition,
             word_type=word_type,
@@ -106,13 +106,24 @@ class PromptTemplateManager:
             word=word,
             definitions=definitions,
         )
+    
+    def get_meaning_cluster_single_prompt(
+        self, word: str, definition: str, word_type: str
+    ) -> str:
+        """Generate meaning cluster for a single definition."""
+        return self.render_template(
+            "meaning_cluster_single",
+            word=word,
+            definition=definition,
+            word_type=word_type,
+        )
 
-    def get_synonyms_prompt(
+    def get_generate_synonyms_prompt(
         self, word: str, definition: str, word_type: str, count: int = 10
     ) -> str:
         """Generate prompt for synonyms with balanced expressiveness."""
         return self.render_template(
-            "synonyms",
+            "generate_synonyms",
             word=word,
             definition=definition,
             word_type=word_type,
@@ -139,10 +150,10 @@ class PromptTemplateManager:
             previous_words=previous_words or [],
         )
 
-    def get_antonym_prompt(self, word: str, definition: str, word_type: str) -> str:
+    def get_generate_antonyms_prompt(self, word: str, definition: str, word_type: str) -> str:
         """Generate prompt for antonym generation."""
         return self.render_template(
-            "antonym_generation",
+            "generate_antonyms",
             word=word,
             definition=definition,
             word_type=word_type,

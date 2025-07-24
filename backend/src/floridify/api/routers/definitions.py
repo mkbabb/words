@@ -114,7 +114,7 @@ async def regenerate_examples(
         definition = entry.definitions[index]
         
         # Generate new examples
-        response = await connector.examples(
+        response = await connector.generate_examples(
             word=word,
             word_type=definition.word_type,
             definition=definition.definition,

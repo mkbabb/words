@@ -39,10 +39,6 @@ class DefinitionResponse(BaseModel):
         description="Definition of the word type.",
     )
 
-    synonyms: list[str] = Field(
-        default_factory=list,
-        description="List of synonyms for this definition, ordered by relevance and efflorescence.",
-    )
     
     relevancy: float = Field(
         default=1.0,
@@ -115,25 +111,6 @@ class SynthesisResponse(BaseModel):
     sources_used: list[str]
 
 
-class AnkiFillBlankResponse(BaseModel):
-    """Response for fill-in-the-blank flashcard generation."""
-
-    sentence: str = Field(description="Sentence with _____ where the word belongs")
-    choice_a: str = Field(description="First answer choice")
-    choice_b: str = Field(description="Second answer choice")
-    choice_c: str = Field(description="Third answer choice")
-    choice_d: str = Field(description="Fourth answer choice")
-    correct_choice: str = Field(description="Letter of correct answer (A, B, C, or D)")
-
-
-class AnkiMultipleChoiceResponse(BaseModel):
-    """Response for multiple choice flashcard generation."""
-
-    choice_a: str = Field(description="First answer choice")
-    choice_b: str = Field(description="Second answer choice")
-    choice_c: str = Field(description="Third answer choice")
-    choice_d: str = Field(description="Fourth answer choice")
-    correct_choice: str = Field(description="Letter of correct answer (A, B, C, or D)")
 
 
 class SynonymCandidate(BaseModel):
@@ -342,3 +319,64 @@ class ComprehensiveSynthesisResponse(BaseModel):
     facts: list[str] = Field(default_factory=list)
     overall_confidence: float = Field(ge=0.0, le=1.0)
     model_info: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExampleSynthesisResponse(BaseModel):
+    """Response for example sentence synthesis."""
+    
+    examples: list[str] = Field(
+        default_factory=list,
+        description="List of natural, contextual example sentences"
+    )
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class DefinitionSynthesisResponse(BaseModel):
+    """Response for definition text synthesis from clusters."""
+    
+    definition_text: str = Field(
+        description="Synthesized definition text combining clustered meanings"
+    )
+    part_of_speech: str = Field(
+        description="Part of speech for this definition cluster"
+    )
+    confidence: float = Field(ge=0.0, le=1.0)
+    sources_used: list[str] = Field(
+        default_factory=list,
+        description="Provider sources used in synthesis"
+    )
+
+
+class MeaningClusterResponse(BaseModel):
+    """Response for single definition meaning cluster generation."""
+    
+    cluster_id: str = Field(
+        description="Semantic cluster identifier for this definition"
+    )
+    cluster_description: str = Field(
+        description="Human-readable cluster description"
+    )
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+# Anki Models
+
+class AnkiFillBlankResponse(BaseModel):
+    """Response for fill-in-the-blank flashcard generation."""
+
+    sentence: str = Field(description="Sentence with _____ where the word belongs")
+    choice_a: str = Field(description="First answer choice")
+    choice_b: str = Field(description="Second answer choice")
+    choice_c: str = Field(description="Third answer choice")
+    choice_d: str = Field(description="Fourth answer choice")
+    correct_choice: str = Field(description="Letter of correct answer (A, B, C, or D)")
+
+
+class AnkiMultipleChoiceResponse(BaseModel):
+    """Response for multiple choice flashcard generation."""
+
+    choice_a: str = Field(description="First answer choice")
+    choice_b: str = Field(description="Second answer choice")
+    choice_c: str = Field(description="Third answer choice")
+    choice_d: str = Field(description="Fourth answer choice")
+    correct_choice: str = Field(description="Letter of correct answer (A, B, C, or D)")

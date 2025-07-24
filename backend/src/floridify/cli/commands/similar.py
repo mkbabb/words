@@ -89,7 +89,7 @@ async def _similar_async(
 
         # Generate synonyms using AI
         ai_connector = get_openai_connector()
-        synonym_response = await ai_connector.synonyms(
+        synonym_response = await ai_connector.generate_synonyms(
             word=word,
             definition=base_definition,
             word_type=word_type,

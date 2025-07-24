@@ -114,7 +114,9 @@ class OpenAIConnector:
 
                 # Make the API call
                 api_start = time.perf_counter()
-                response = await self.client.beta.chat.completions.parse(**request_params)
+                response = await self.client.beta.chat.completions.parse(
+                    **request_params
+                )
                 api_duration = time.perf_counter() - api_start
 
                 # Extract token usage
@@ -211,10 +213,12 @@ class OpenAIConnector:
             # Success logging handled by synthesizer context
             return result
         except Exception as e:
-            logger.error(f"❌ Definition synthesis failed for '{word}' ({meaning_cluster}): {e}")
+            logger.error(
+                f"❌ Definition synthesis failed for '{word}' ({meaning_cluster}): {e}"
+            )
             raise
 
-    async def examples(
+    async def generate_examples(
         self,
         word: str,
         word_type: str,
@@ -222,15 +226,25 @@ class OpenAIConnector:
         count: int = 1,
     ) -> ExampleGenerationResponse:
         """Generate modern usage examples."""
-        logger.debug(f"📝 Generating {count} example sentence(s) for '{word}' ({word_type})")
+        logger.debug(
+            f"📝 Generating {count} example sentence(s) for '{word}' ({word_type})"
+        )
 
-        prompt = self.template_manager.get_example_prompt(word, definition, word_type, count)
+        prompt = self.template_manager.get_generate_examples_prompt(
+            word, definition, word_type, count
+        )
 
         try:
-            result = await self._make_structured_request(prompt, ExampleGenerationResponse)
+            result = await self._make_structured_request(
+                prompt, ExampleGenerationResponse
+            )
             if result.example_sentences:
                 first_example = result.example_sentences[0]
-                truncated = first_example[:50] + "..." if len(first_example) > 50 else first_example
+                truncated = (
+                    first_example[:50] + "..."
+                    if len(first_example) > 50
+                    else first_example
+                )
                 logger.debug(f"✏️  Generated example for '{word}': \"{truncated}\"")
             return result
         except Exception as e:
@@ -250,7 +264,9 @@ class OpenAIConnector:
         prompt = self.template_manager.get_lookup_prompt(word)
 
         try:
-            result = await self._make_structured_request(prompt, DictionaryEntryResponse)
+            result = await self._make_structured_request(
+                prompt, DictionaryEntryResponse
+            )
 
             if result.provider_data is None:
                 logger.info(f"🚫 AI identified '{word}' as nonsense/invalid")
@@ -281,7 +297,9 @@ class OpenAIConnector:
         start_time = time.perf_counter()
         def_count = len(definitions)
 
-        logger.info(f"🔢 Extracting cluster mappings for '{word}' from {def_count} definitions")
+        logger.info(
+            f"🔢 Extracting cluster mappings for '{word}' from {def_count} definitions"
+        )
 
         prompt = self.template_manager.get_meaning_extraction_prompt(word, definitions)
 
@@ -290,7 +308,9 @@ class OpenAIConnector:
             duration = time.perf_counter() - start_time
 
             # Log detailed cluster information
-            total_defs_mapped = sum(len(cm.definition_indices) for cm in result.cluster_mappings)
+            total_defs_mapped = sum(
+                len(cm.definition_indices) for cm in result.cluster_mappings
+            )
             logger.success(
                 f"🧮 Extracted {len(result.cluster_mappings)} meaning clusters for '{word}' "
                 f"in {duration:.2f}s (mapped {total_defs_mapped}/{def_count} definitions)"
@@ -348,20 +368,22 @@ class OpenAIConnector:
             examples=examples or "",
         )
         try:
-            result = await self._make_structured_request(prompt, AnkiMultipleChoiceResponse)
+            result = await self._make_structured_request(
+                prompt, AnkiMultipleChoiceResponse
+            )
             logger.debug(f"Generated best describes card for '{word}'")
             return result
         except Exception as e:
             logger.error(f"❌ Best describes generation failed for '{word}': {e}")
             raise
 
-    async def synonyms(
+    async def generate_synonyms(
         self, word: str, definition: str, word_type: str, count: int = 10
     ) -> SynonymGenerationResponse:
         """Generate synonyms with efflorescence ranking."""
         logger.debug(f"🔗 Generating {count} synonyms for '{word}' ({word_type})")
 
-        prompt = self.template_manager.get_synonyms_prompt(
+        prompt = self.template_manager.get_generate_synonyms_prompt(
             word=word,
             definition=definition,
             word_type=word_type,
@@ -369,7 +391,9 @@ class OpenAIConnector:
         )
 
         try:
-            result = await self._make_structured_request(prompt, SynonymGenerationResponse)
+            result = await self._make_structured_request(
+                prompt, SynonymGenerationResponse
+            )
 
             synonym_count = len(result.synonyms)
             logger.success(
@@ -380,14 +404,6 @@ class OpenAIConnector:
             logger.error(f"❌ Synonym generation failed for '{word}': {e}")
             raise
 
-    @cached_api_call(
-        ttl_hours=24.0,  # Suggestions change slowly
-        key_func=lambda self, input_words, count: (
-            "suggestions",
-            tuple(sorted(input_words)) if input_words else None,
-            count,
-        ),
-    )
     async def suggestions(
         self, input_words: list[str] | None, count: int = 10
     ) -> SuggestionsResponse:
@@ -424,16 +440,6 @@ class OpenAIConnector:
             logger.error(f"❌ Suggestions generation failed: {e}")
             raise
 
-    @cached_api_call(
-        ttl_hours=48.0,  # Facts don't change frequently
-        key_func=lambda self, word, definition, count, previous_words: (
-            "facts",
-            word,
-            definition[:100],  # Truncate for cache key
-            count,
-            tuple(sorted(previous_words)) if previous_words else None,
-        ),
-    )
     async def generate_facts(
         self,
         word: str,
@@ -470,7 +476,9 @@ class OpenAIConnector:
             result = await self._make_structured_request(prompt, FactGenerationResponse)
 
             facts_count = len(result.facts)
-            categories_str = ", ".join(result.categories) if result.categories else "general"
+            categories_str = (
+                ", ".join(result.categories) if result.categories else "general"
+            )
             logger.success(
                 f"✨ Generated {facts_count} facts for '{word}' "
                 f"({categories_str}, confidence: {result.confidence:.1%})"
@@ -479,7 +487,6 @@ class OpenAIConnector:
         except Exception as e:
             logger.error(f"❌ Fact generation failed for '{word}': {e}")
             raise
-    
 
     async def generate_antonyms(
         self,
@@ -497,12 +504,12 @@ class OpenAIConnector:
         Returns:
             AntonymResponse with list of antonyms
         """
-        prompt = self.template_manager.get_antonym_prompt(
+        prompt = self.template_manager.get_generate_antonyms_prompt(
             word=word,
             definition=definition,
             word_type=word_type,
         )
-        
+
         try:
             result = await self._make_structured_request(prompt, AntonymResponse)
             logger.info(f"Generated {len(result.antonyms)} antonyms for '{word}'")
@@ -529,10 +536,12 @@ class OpenAIConnector:
             word=word,
             provider_data=provider_data,
         )
-        
+
         try:
             result = await self._make_structured_request(prompt, EtymologyResponse)
-            logger.info(f"Extracted etymology for '{word}' (origin: {result.origin_language})")
+            logger.info(
+                f"Extracted etymology for '{word}' (origin: {result.origin_language})"
+            )
             return result
         except Exception as e:
             logger.error(f"Etymology extraction failed for '{word}': {e}")
@@ -556,7 +565,7 @@ class OpenAIConnector:
             word=word,
             word_type=word_type,
         )
-        
+
         try:
             result = await self._make_structured_request(prompt, WordFormResponse)
             logger.info(f"Identified {len(result.forms)} word forms for '{word}'")
@@ -583,7 +592,7 @@ class OpenAIConnector:
             word=word,
             definition=definition,
         )
-        
+
         try:
             result = await self._make_structured_request(prompt, FrequencyBandResponse)
             logger.info(f"Assessed frequency band {result.band} for '{word}'")
@@ -605,9 +614,11 @@ class OpenAIConnector:
             RegisterClassificationResponse with classification
         """
         prompt = self.template_manager.get_register_prompt(definition=definition)
-        
+
         try:
-            result = await self._make_structured_request(prompt, RegisterClassificationResponse)
+            result = await self._make_structured_request(
+                prompt, RegisterClassificationResponse
+            )
             logger.info(f"Classified register as '{result.register}'")
             return result
         except Exception as e:
@@ -627,9 +638,11 @@ class OpenAIConnector:
             DomainIdentificationResponse with domain
         """
         prompt = self.template_manager.get_domain_prompt(definition=definition)
-        
+
         try:
-            result = await self._make_structured_request(prompt, DomainIdentificationResponse)
+            result = await self._make_structured_request(
+                prompt, DomainIdentificationResponse
+            )
             logger.info(f"Identified domain as '{result.domain}'")
             return result
         except Exception as e:
@@ -654,7 +667,7 @@ class OpenAIConnector:
             word=word,
             definition=definition,
         )
-        
+
         try:
             result = await self._make_structured_request(prompt, CEFRLevelResponse)
             logger.info(f"Assessed CEFR level {result.level} for '{word}'")
@@ -681,7 +694,7 @@ class OpenAIConnector:
             definition=definition,
             word_type=word_type,
         )
-        
+
         try:
             result = await self._make_structured_request(prompt, GrammarPatternResponse)
             logger.info(f"Extracted {len(result.patterns)} grammar patterns")
@@ -711,10 +724,12 @@ class OpenAIConnector:
             definition=definition,
             word_type=word_type,
         )
-        
+
         try:
             result = await self._make_structured_request(prompt, CollocationResponse)
-            logger.info(f"Identified {len(result.collocations)} collocations for '{word}'")
+            logger.info(
+                f"Identified {len(result.collocations)} collocations for '{word}'"
+            )
             return result
         except Exception as e:
             logger.error(f"Collocation identification failed for '{word}': {e}")
@@ -738,7 +753,7 @@ class OpenAIConnector:
             word=word,
             definition=definition,
         )
-        
+
         try:
             result = await self._make_structured_request(prompt, UsageNoteResponse)
             logger.info(f"Generated {len(result.notes)} usage notes for '{word}'")
@@ -759,10 +774,14 @@ class OpenAIConnector:
         Returns:
             RegionalVariantResponse with regions
         """
-        prompt = self.template_manager.get_regional_variants_prompt(definition=definition)
-        
+        prompt = self.template_manager.get_regional_variants_prompt(
+            definition=definition
+        )
+
         try:
-            result = await self._make_structured_request(prompt, RegionalVariantResponse)
+            result = await self._make_structured_request(
+                prompt, RegionalVariantResponse
+            )
             logger.info(f"Detected regional variants: {', '.join(result.regions)}")
             return result
         except Exception as e:

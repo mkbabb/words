@@ -276,7 +276,7 @@ class AnkiCardGenerator:
             if len(examples_list) < 3:
                 needed_count = 3 - len(examples_list)
                 try:
-                    example_response = await self.openai_connector.examples(
+                    example_response = await self.openai_connector.generate_examples(
                         word=entry.word,
                         word_type=definition.word_type,
                         definition=definition.definition,
@@ -365,7 +365,7 @@ class AnkiCardGenerator:
             if len(examples_list) < 3:
                 needed_count = 3 - len(examples_list)
                 try:
-                    example_response = await self.openai_connector.examples(
+                    example_response = await self.openai_connector.generate_examples(
                         word=entry.word,
                         word_type=definition.word_type,
                         definition=definition.definition,
