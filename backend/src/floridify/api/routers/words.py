@@ -6,12 +6,14 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from floridify.api.core import (
+    CacheInvalidator,
     ErrorResponse,
     FieldSelection,
     ListResponse,
     PaginationParams,
     ResourceResponse,
     SortParams,
+    cached_endpoint,
     check_etag,
     get_etag,
     handle_api_errors,
@@ -63,6 +65,7 @@ def get_fields(
 
 @router.get("", response_model=ListResponse[Word])
 @handle_api_errors
+@cached_endpoint(ttl=300, prefix="words:list")
 async def list_words(
     request: Request,
     response: Response,

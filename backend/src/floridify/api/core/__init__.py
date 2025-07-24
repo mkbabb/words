@@ -15,8 +15,22 @@ from .base import (
     get_etag,
     handle_api_errors,
 )
+from .cache import (
+    APICacheConfig,
+    CacheInvalidator,
+    ResponseCache,
+    cached_endpoint,
+    generate_cache_key,
+    get_cache_headers,
+)
+from .query import (
+    AggregationBuilder,
+    BulkOperationBuilder,
+    QueryOptimizer,
+)
 
 __all__ = [
+    # Base
     "ErrorDetail",
     "ErrorResponse", 
     "PaginationParams",
@@ -30,4 +44,15 @@ __all__ = [
     "handle_api_errors",
     "get_etag",
     "check_etag",
+    # Cache
+    "APICacheConfig",
+    "CacheInvalidator",
+    "ResponseCache",
+    "cached_endpoint",
+    "generate_cache_key",
+    "get_cache_headers",
+    # Query
+    "AggregationBuilder",
+    "BulkOperationBuilder", 
+    "QueryOptimizer",
 ]
