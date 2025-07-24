@@ -27,14 +27,12 @@ _search_engine: LanguageSearch | None = None
 
 async def get_search_engine(
     languages: list[Language] | None = None,
-    enable_semantic: bool = False,  # Ignored for compatibility
     force_rebuild: bool = False,
 ) -> LanguageSearch:
     """Get or create the global LanguageSearch singleton.
 
     Args:
         languages: Languages to support (defaults to English)
-        enable_semantic: Ignored for compatibility
         force_rebuild: Force rebuild of search indices
 
     Returns:
@@ -51,7 +49,7 @@ async def get_search_engine(
         or _search_engine.languages != target_languages
         or force_rebuild
     ):
-        _search_engine = await get_language_search(target_languages, enable_semantic)
+        _search_engine = await get_language_search(target_languages)
 
     return _search_engine
 

@@ -179,7 +179,7 @@ async def generate_collocations(
     connector = get_openai_connector()
     
     # Use template-based generation
-    response = await connector._make_request(
+    response = await connector._make_structured_request(
         prompt=f"Generate common collocations for '{word}' focusing on {', '.join(request.types)} combinations.",
         response_model=CollocationResponse,
         temperature=0.7
@@ -197,7 +197,7 @@ async def generate_grammar_patterns(
     """Generate grammar patterns for a definition."""
     connector = get_openai_connector()
     
-    response = await connector._make_request(
+    response = await connector._make_structured_request(
         prompt=f"Extract common grammar patterns for the word '{word}' including verb patterns, transitivity, and usage constructions.",
         response_model=GrammarPatternResponse,
         temperature=0.3
@@ -215,7 +215,7 @@ async def assess_cefr_level(
     """Assess CEFR level for a definition."""
     connector = get_openai_connector()
     
-    response = await connector._make_request(
+    response = await connector._make_structured_request(
         prompt=f"Assess the CEFR level (A1-C2) for the word '{word}' based on complexity, frequency, and typical learner progression.",
         response_model=CEFRLevelResponse,
         temperature=0.3
@@ -233,7 +233,7 @@ async def generate_usage_notes(
     """Generate usage notes and warnings."""
     connector = get_openai_connector()
     
-    response = await connector._make_request(
+    response = await connector._make_structured_request(
         prompt=f"Generate usage notes for '{word}' including common errors, regional differences, and register guidance.",
         response_model=UsageNoteResponse,
         temperature=0.5

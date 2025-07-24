@@ -7,7 +7,7 @@ from pathlib import Path
 from ..utils.config import load_config
 from ..utils.logging import get_logger
 from .connector import OpenAIConnector
-from .synthesizer import EnhancedDefinitionSynthesizer as DefinitionSynthesizer
+from .synthesizer import DefinitionSynthesizer
 
 logger = get_logger(__name__)
 
@@ -54,13 +54,6 @@ def get_openai_connector(
     return _openai_connector
 
 
-def create_openai_connector(config_path: str | Path | None = None) -> OpenAIConnector:
-    """Create OpenAI connector from configuration.
-
-    DEPRECATED: Use get_openai_connector() for singleton behavior.
-    This function is kept for backward compatibility.
-    """
-    return get_openai_connector(config_path)
 
 
 def get_definition_synthesizer(
@@ -89,15 +82,6 @@ def get_definition_synthesizer(
     return _definition_synthesizer
 
 
-def create_definition_synthesizer(
-    config_path: str | Path | None = None, examples_count: int = 2
-) -> DefinitionSynthesizer:
-    """Create definition synthesizer with OpenAI connector.
-
-    DEPRECATED: Use get_definition_synthesizer() for singleton behavior.
-    This function is kept for backward compatibility.
-    """
-    return get_definition_synthesizer(config_path, examples_count)
 
 
 def create_ai_system(

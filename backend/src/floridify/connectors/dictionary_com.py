@@ -1,4 +1,8 @@
-"""Dictionary.com connector stub."""
+"""Dictionary.com connector stub.
+
+TODO: This is a placeholder implementation that always returns None.
+      Implement actual Dictionary.com API integration or remove from providers.
+"""
 
 from __future__ import annotations
 

@@ -108,7 +108,6 @@ _language_search: LanguageSearch | None = None
 
 async def get_language_search(
     languages: list[Language] | None = None,
-    enable_semantic: bool = False,  # Ignored for compatibility
 ) -> LanguageSearch:
     """Get or create global language search instance."""
     global _language_search

@@ -38,7 +38,7 @@ from .synthesis_functions import (
 logger = get_logger(__name__)
 
 
-class EnhancedDefinitionSynthesizer:
+class DefinitionSynthesizer:
     """Synthesizes dictionary entries using new models and parallel processing."""
 
     def __init__(
@@ -52,6 +52,43 @@ class EnhancedDefinitionSynthesizer:
         self.examples_count = examples_count
         self.facts_count = facts_count
         self.parallel_enhancement = parallel_enhancement
+
+    def _calculate_confidence(
+        self,
+        has_pronunciation: bool,
+        definition_count: int,
+        has_etymology: bool,
+        fact_count: int,
+        provider_count: int,
+    ) -> float:
+        """Calculate confidence score based on completeness of data.
+        
+        Args:
+            has_pronunciation: Whether pronunciation data exists
+            definition_count: Number of definitions synthesized
+            has_etymology: Whether etymology data exists
+            fact_count: Number of facts generated
+            provider_count: Number of source providers
+            
+        Returns:
+            Confidence score between 0.0 and 1.0
+        """
+        weights = {
+            "pronunciation": 0.15,
+            "definitions": 0.35,
+            "etymology": 0.15,
+            "facts": 0.15,
+            "providers": 0.20,
+        }
+        
+        score = 0.0
+        score += weights["pronunciation"] if has_pronunciation else 0.0
+        score += weights["definitions"] * min(1.0, definition_count / 3.0)
+        score += weights["etymology"] if has_etymology else 0.0
+        score += weights["facts"] * min(1.0, fact_count / 2.0)
+        score += weights["providers"] * min(1.0, provider_count / 2.0)
+        
+        return round(min(1.0, score), 2)
 
     async def synthesize_entry(
         self,
@@ -151,7 +188,13 @@ class EnhancedDefinitionSynthesizer:
             model_info=ModelInfo(
                 name=self.ai.model_name,
                 generation_count=1,
-                confidence=0.9,  # TODO: Calculate from component confidences
+                confidence=self._calculate_confidence(
+                    has_pronunciation=bool(pronunciation),
+                    definition_count=len(synthesized_definitions),
+                    has_etymology=bool(etymology),
+                    fact_count=len(facts),
+                    provider_count=len(providers_data),
+                ),
             ),
             source_provider_data_ids=[str(pd.id) for pd in providers_data],
         )
@@ -548,5 +591,3 @@ class EnhancedDefinitionSynthesizer:
         )
 
 
-# Alias for backward compatibility
-DefinitionSynthesizer = EnhancedDefinitionSynthesizer

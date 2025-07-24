@@ -480,10 +480,6 @@ class OpenAIConnector:
             logger.error(f"❌ Fact generation failed for '{word}': {e}")
             raise
     
-    # Alias for router compatibility
-    async def _make_request(self, prompt: str, response_model: type[T], **kwargs: Any) -> T:
-        """Alias for _make_structured_request for backward compatibility."""
-        return await self._make_structured_request(prompt, response_model, **kwargs)
 
     async def generate_antonyms(
         self,

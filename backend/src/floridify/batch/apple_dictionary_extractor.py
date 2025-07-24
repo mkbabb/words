@@ -357,8 +357,8 @@ async def extract_common_words(
     Returns:
         List of ProviderData objects
     """
-    # This would integrate with the existing word frequency data
-    # For now, using a placeholder implementation
+    # TODO: Integrate with actual word frequency data from corpus/database
+    # This is placeholder data for testing
     common_words = [
         "apple", "banana", "car", "dog", "elephant", "fire", "green", "house",
         "ice", "jump", "king", "lion", "moon", "nice", "ocean", "peace",
