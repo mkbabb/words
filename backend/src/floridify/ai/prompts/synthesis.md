@@ -9,7 +9,7 @@
 ## Source Definitions
 
 {% for definition in definitions %}
-**Word Type**: {{ definition.word_type }}  
+**Part of Speech**: {{ definition.part_of_speech }}  
 **Definition**: {{ definition.definition }}  
 {% if definition.synonyms %}**Synonyms**: {{ definition.synonyms | join(', ') }}{% endif %}  
 {% if definition.examples and definition.examples.generated %}**Examples**:

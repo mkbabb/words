@@ -6,7 +6,7 @@ Create {{ count }} contemporary example sentences demonstrating proper word usag
 
 Word: {{ word }}
 Definition: {{ definition }}
-Word Type: {{ word_type }}
+Part of Speech: {{ part_of_speech }}
 Count: {{ count }}
 
 ## Requirements

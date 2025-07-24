@@ -188,8 +188,8 @@
                                     definition, index
                                 ) in cluster.definitions"
                                 :key="`${cluster.clusterId}-${index}`"
-                                :id="`${cluster.clusterId}-${definition.word_type}`"
-                                :data-word-type="`${cluster.clusterId}-${definition.word_type}`"
+                                :id="`${cluster.clusterId}-${definition.part_of_speech}`"
+                                :data-word-type="`${cluster.clusterId}-${definition.part_of_speech}`"
                                 class="space-y-3"
                             >
                                 <!-- Separator for all but first -->
@@ -200,7 +200,7 @@
 
                                 <div class="flex items-center gap-2">
                                     <span class="themed-word-type">
-                                        {{ definition.word_type }}
+                                        {{ definition.part_of_speech }}
                                     </span>
                                     <sup
                                         class="text-sm font-normal
@@ -554,11 +554,11 @@ const groupedDefinitions = computed(() => {
             // First, sort by word type (nouns first, verbs second, etc.)
             const aTypeOrder =
                 wordTypeOrder[
-                    a.word_type?.toLowerCase() as keyof typeof wordTypeOrder
+                    a.part_of_speech?.toLowerCase() as keyof typeof wordTypeOrder
                 ] || 999;
             const bTypeOrder =
                 wordTypeOrder[
-                    b.word_type?.toLowerCase() as keyof typeof wordTypeOrder
+                    b.part_of_speech?.toLowerCase() as keyof typeof wordTypeOrder
                 ] || 999;
 
             if (aTypeOrder !== bTypeOrder) {
@@ -634,7 +634,7 @@ const orderedWordTypes = computed(() => {
         // Group by word type within each cluster
         const wordTypeGroups = new Map<string, any[]>();
         cluster.definitions.forEach(def => {
-            const wordType = def.word_type;
+            const wordType = def.part_of_speech;
             if (!wordTypeGroups.has(wordType)) {
                 wordTypeGroups.set(wordType, []);
             }

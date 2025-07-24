@@ -31,8 +31,8 @@ class PronunciationResponse(BaseModel):
 class DefinitionResponse(BaseModel):
     """Clean definition model for AI responses without numpy arrays."""
 
-    word_type: str = Field(
-        description="Type of the word (noun, verb, etc.).",
+    part_of_speech: str = Field(
+        description="Part of speech of the word (noun, verb, etc.).",
     )
 
     definition: str = Field(

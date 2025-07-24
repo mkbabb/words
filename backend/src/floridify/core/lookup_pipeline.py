@@ -179,6 +179,7 @@ async def lookup_word_pipeline(
                 synthesized_entry = await _synthesize_with_ai(
                     word=best_match,
                     providers=providers_data,
+                    language=languages[0],  # Use first language for synthesis
                     force_refresh=force_refresh,
                     state_tracker=state_tracker,
                 )
@@ -254,7 +255,12 @@ async def _get_provider_definition(
     start_time = time.perf_counter()
 
     try:
-        connector: WiktionaryConnector | DictionaryComConnector | AppleDictionaryConnector | None = None
+        connector: (
+            WiktionaryConnector
+            | DictionaryComConnector
+            | AppleDictionaryConnector
+            | None
+        ) = None
 
         if provider == DictionaryProvider.WIKTIONARY:
             connector = WiktionaryConnector(force_refresh=force_refresh)
@@ -317,6 +323,7 @@ async def _get_provider_definition(
 async def _synthesize_with_ai(
     word: str,
     providers: list[ProviderData],
+    language: Language = Language.ENGLISH,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
 ) -> SynthesizedDictionaryEntry | None:
@@ -334,7 +341,11 @@ async def _synthesize_with_ai(
     try:
         synthesizer = get_definition_synthesizer()
         result = await synthesizer.synthesize_entry(
-            word, providers, force_refresh, state_tracker
+            word=word,
+            providers_data=providers,
+            language=language,
+            force_refresh=force_refresh,
+            state_tracker=state_tracker,
         )
 
         if result:

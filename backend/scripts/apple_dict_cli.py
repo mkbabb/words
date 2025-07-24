@@ -237,7 +237,7 @@ def lookup(
             for result in results:
                 console.print(f"\n[bold cyan]{result.definitions[0].definition if result.definitions else 'No definition found'}[/bold cyan]")
                 for i, definition in enumerate(result.definitions, 1):
-                    console.print(f"  {i}. [{definition.word_type}] {definition.definition}")
+                    console.print(f"  {i}. [{definition.part_of_speech}] {definition.definition}")
             
             console.print(f"\n[green]✓[/green] Lookup completed for {len(results)} words")
             

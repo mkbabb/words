@@ -263,7 +263,7 @@ class AnkiCardGenerator:
             ai_response = await self.openai_connector.generate_anki_best_describes(
                 word=entry.word,
                 definition=definition.definition,
-                word_type=definition.word_type,
+                part_of_speech=definition.part_of_speech,
                 examples=examples_text,
             )
             ai_elapsed = time.time() - ai_start_time
@@ -278,7 +278,7 @@ class AnkiCardGenerator:
                 try:
                     example_response = await self.openai_connector.generate_examples(
                         word=entry.word,
-                        word_type=definition.word_type,
+                        part_of_speech=definition.part_of_speech,
                         definition=definition.definition,
                         count=needed_count,
                     )
@@ -300,7 +300,7 @@ class AnkiCardGenerator:
             fields = {
                 "Word": entry.word,
                 "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word}/",
-                "WordType": definition.word_type,
+                "WordType": definition.part_of_speech,
                 "ChoiceA": ai_response.choice_a,
                 "ChoiceB": ai_response.choice_b,
                 "ChoiceC": ai_response.choice_c,
@@ -352,7 +352,7 @@ class AnkiCardGenerator:
             ai_response = await self.openai_connector.generate_anki_fill_blank(
                 word=entry.word,
                 definition=definition.definition,
-                word_type=definition.word_type,
+                part_of_speech=definition.part_of_speech,
                 examples=examples_text,
             )
             ai_elapsed = time.time() - ai_start_time
@@ -367,7 +367,7 @@ class AnkiCardGenerator:
                 try:
                     example_response = await self.openai_connector.generate_examples(
                         word=entry.word,
-                        word_type=definition.word_type,
+                        part_of_speech=definition.part_of_speech,
                         definition=definition.definition,
                         count=needed_count,
                     )
@@ -391,7 +391,7 @@ class AnkiCardGenerator:
                 "Word": entry.word,
                 "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word}/",
                 "SentenceWithBlank": ai_response.sentence,
-                "WordType": definition.word_type,
+                "WordType": definition.part_of_speech,
                 "ChoiceA": ai_response.choice_a,
                 "ChoiceB": ai_response.choice_b,
                 "ChoiceC": ai_response.choice_c,

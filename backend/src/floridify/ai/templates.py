@@ -76,7 +76,7 @@ class PromptTemplateManager:
     def get_generate_examples_prompt(
         self,
         word: str,
-        word_type: str,
+        part_of_speech: str,
         definition: str,
         count: int = 1,
     ) -> str:
@@ -85,7 +85,7 @@ class PromptTemplateManager:
             "generate_examples",
             word=word,
             definition=definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
             count=count,
         )
 
@@ -108,25 +108,25 @@ class PromptTemplateManager:
         )
     
     def get_meaning_cluster_single_prompt(
-        self, word: str, definition: str, word_type: str
+        self, word: str, definition: str, part_of_speech: str
     ) -> str:
         """Generate meaning cluster for a single definition."""
         return self.render_template(
             "meaning_cluster_single",
             word=word,
             definition=definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
         )
 
     def get_generate_synonyms_prompt(
-        self, word: str, definition: str, word_type: str, count: int = 10
+        self, word: str, definition: str, part_of_speech: str, count: int = 10
     ) -> str:
         """Generate prompt for synonyms with balanced expressiveness."""
         return self.render_template(
             "generate_synonyms",
             word=word,
             definition=definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
             count=count,
         )
 
@@ -150,13 +150,13 @@ class PromptTemplateManager:
             previous_words=previous_words or [],
         )
 
-    def get_generate_antonyms_prompt(self, word: str, definition: str, word_type: str) -> str:
+    def get_generate_antonyms_prompt(self, word: str, definition: str, part_of_speech: str) -> str:
         """Generate prompt for antonym generation."""
         return self.render_template(
             "generate_antonyms",
             word=word,
             definition=definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
         )
 
     def get_etymology_prompt(self, word: str, provider_data: list[dict[str, Any]]) -> str:
@@ -167,12 +167,12 @@ class PromptTemplateManager:
             provider_data=provider_data,
         )
 
-    def get_word_forms_prompt(self, word: str, word_type: str) -> str:
+    def get_word_forms_prompt(self, word: str, part_of_speech: str) -> str:
         """Generate prompt for word form generation."""
         return self.render_template(
             "word_form_generation",
             word=word,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
         )
 
     def get_frequency_prompt(self, word: str, definition: str) -> str:
@@ -205,21 +205,21 @@ class PromptTemplateManager:
             definition=definition,
         )
 
-    def get_grammar_patterns_prompt(self, definition: str, word_type: str) -> str:
+    def get_grammar_patterns_prompt(self, definition: str, part_of_speech: str) -> str:
         """Generate prompt for grammar pattern extraction."""
         return self.render_template(
             "grammar_pattern_extraction",
             definition=definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
         )
 
-    def get_collocations_prompt(self, word: str, definition: str, word_type: str) -> str:
+    def get_collocations_prompt(self, word: str, definition: str, part_of_speech: str) -> str:
         """Generate prompt for collocation identification."""
         return self.render_template(
             "collocation_identification",
             word=word,
             definition=definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
         )
 
     def get_usage_notes_prompt(self, word: str, definition: str) -> str:

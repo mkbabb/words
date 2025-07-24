@@ -20,7 +20,7 @@ class TestDefinitionMetadata:
     def test_definition_with_default_metadata(self):
         """Test Definition creation with default metadata values."""
         definition = Definition(
-            word_type="noun",
+            part_of_speech="noun",
             definition="A test definition"
         )
         
@@ -42,7 +42,7 @@ class TestDefinitionMetadata:
         custom_time = datetime(2023, 1, 1, 12, 0, 0)
         
         definition = Definition(
-            word_type="verb",
+            part_of_speech="verb",
             definition="A custom definition",
             created_at=custom_time,
             updated_at=custom_time,
@@ -67,7 +67,7 @@ class TestDefinitionMetadata:
         """Test version field validation (must be >= 1)."""
         with pytest.raises(ValidationError):
             Definition(
-                word_type="noun",
+                part_of_speech="noun",
                 definition="Test",
                 version=0
             )
@@ -76,7 +76,7 @@ class TestDefinitionMetadata:
         """Test quality_score field validation (0.0 to 1.0)."""
         # Valid range
         definition = Definition(
-            word_type="noun",
+            part_of_speech="noun",
             definition="Test",
             quality_score=0.5
         )
@@ -85,14 +85,14 @@ class TestDefinitionMetadata:
         # Invalid range
         with pytest.raises(ValidationError):
             Definition(
-                word_type="noun",
+                part_of_speech="noun",
                 definition="Test",
                 quality_score=1.5
             )
         
         with pytest.raises(ValidationError):
             Definition(
-                word_type="noun",
+                part_of_speech="noun",
                 definition="Test",
                 quality_score=-0.1
             )
@@ -101,13 +101,13 @@ class TestDefinitionMetadata:
         """Test that new metadata fields don't break existing functionality."""
         # Old-style creation should still work
         definition = Definition(
-            word_type="adjective",
+            part_of_speech="adjective",
             definition="Beautiful",
             synonyms=["pretty", "lovely"],
             meaning_cluster="beauty"
         )
         
-        assert definition.word_type == "adjective"
+        assert definition.part_of_speech == "adjective"
         assert definition.definition == "Beautiful"
         assert "pretty" in definition.synonyms
         assert definition.meaning_cluster == "beauty"
@@ -256,7 +256,7 @@ class TestBackwardsCompatibility:
     def test_old_style_definition_creation(self):
         """Test that old-style Definition creation still works."""
         definition = Definition(
-            word_type="noun",
+            part_of_speech="noun",
             definition="Legacy definition",
             synonyms=["synonym1", "synonym2"],
             examples=Examples(),
@@ -265,7 +265,7 @@ class TestBackwardsCompatibility:
         )
         
         # Old fields should work
-        assert definition.word_type == "noun"
+        assert definition.part_of_speech == "noun"
         assert definition.definition == "Legacy definition"
         assert len(definition.synonyms) == 2
         assert definition.meaning_cluster == "test_cluster"
@@ -280,7 +280,7 @@ class TestBackwardsCompatibility:
     def test_model_serialization(self):
         """Test that models can be serialized to dict (for API responses)."""
         definition = Definition(
-            word_type="noun",
+            part_of_speech="noun",
             definition="Test definition",
             created_by="ai-synthesis",
             quality_score=0.9
@@ -304,7 +304,7 @@ class TestBackwardsCompatibility:
     def test_model_deserialization(self):
         """Test that models can be created from dict (for API requests)."""
         data = {
-            "word_type": "verb",
+            "part_of_speech": "verb",
             "definition": "To test something",
             "synonyms": ["examine", "verify"],
             "created_by": "user-edit",
@@ -315,7 +315,7 @@ class TestBackwardsCompatibility:
         
         definition = Definition(**data)
         
-        assert definition.word_type == "verb"
+        assert definition.part_of_speech == "verb"
         assert definition.definition == "To test something"
         assert definition.created_by == "user-edit"
         assert definition.version == 2

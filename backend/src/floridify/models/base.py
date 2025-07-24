@@ -20,7 +20,7 @@ class ModelInfo(BaseModel):
     """AI model metadata for synthesized content."""
     
     name: str  # e.g., "gpt-4o", "gpt-3.5-turbo"
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     temperature: float = Field(ge=0.0, le=2.0, default=0.7)
     generation_count: int = Field(default=1, ge=1)  # Times regenerated
     last_generated: datetime = Field(default_factory=datetime.utcnow)

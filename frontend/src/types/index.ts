@@ -5,7 +5,7 @@ export interface Example {
 }
 
 export interface Definition {
-  word_type: string;
+  part_of_speech: string;
   definition: string;
   synonyms?: string[];
   antonyms?: string[];

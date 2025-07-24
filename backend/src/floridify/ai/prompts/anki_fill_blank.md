@@ -1,9 +1,9 @@
-# Create Fill-in-the-Blank Question for "{{ word }}" ({{ word_type }})
+# Create Fill-in-the-Blank Question for "{{ word }}" ({{ part_of_speech }})
 
 ## Word Information
 **Word**: {{ word }}
 **Definition**: {{ definition }}
-**Part of Speech**: {{ word_type }}
+**Part of Speech**: {{ part_of_speech }}
 {% if examples %}**Examples**: {{ examples }}{% endif %}
 
 Create a GRE-level fill-in-the-blank question that tests the student's ability to choose the correct word from four options.

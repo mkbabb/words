@@ -191,16 +191,16 @@ class AppleDictionaryConnector(DictionaryConnector):
         
         return text
 
-    def _normalize_word_type(self, word_type: str) -> str:
-        """Normalize word type to standard format.
+    def _normalize_part_of_speech(self, part_of_speech: str) -> str:
+        """Normalize part of speech to standard format.
         
         Args:
-            word_type: Raw word type from parsing
+            part_of_speech: Raw part of speech from parsing
             
         Returns:
-            Normalized word type
+            Normalized part of speech
         """
-        word_type = word_type.lower().strip()
+        part_of_speech = part_of_speech.lower().strip()
         
         # Normalize common variations
         normalizations = {
@@ -215,7 +215,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             "det": "determiner"
         }
         
-        return normalizations.get(word_type, word_type)
+        return normalizations.get(part_of_speech, part_of_speech)
 
     async def fetch_definition(
         self,
@@ -365,7 +365,7 @@ class AppleDictionaryConnector(DictionaryConnector):
         parsed_defs: list[Definition] = []
         
         # Extract basic information from raw definition
-        word_type = self._normalize_word_type(raw_definition)
+        part_of_speech = self._normalize_part_of_speech(raw_definition)
         definition_text = self._clean_definition_text(raw_definition)
         examples = self._extract_examples(definition_text)
         
@@ -373,7 +373,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             # Create definition (meaning_cluster will be added by AI synthesis)
             definition = Definition(
                 word_id=word_id,
-                part_of_speech=word_type,
+                part_of_speech=part_of_speech,
                 text=definition_text,
                 sense_number="1",
                 synonyms=[],  # Apple Dictionary doesn't provide structured synonyms

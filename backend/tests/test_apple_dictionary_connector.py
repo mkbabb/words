@@ -95,22 +95,22 @@ class TestAppleDictionaryConnector:
         cleaned = connector._clean_definition_text(text)
         assert "word with extra spaces" == cleaned
 
-    def test_normalize_word_type(self) -> None:
-        """Test word type normalization."""
+    def test_normalize_part_of_speech(self) -> None:
+        """Test part of speech normalization."""
         connector = AppleDictionaryConnector()
         
         # Test abbreviation normalization
-        assert connector._normalize_word_type("n") == "noun"
-        assert connector._normalize_word_type("v") == "verb"
-        assert connector._normalize_word_type("adj") == "adjective"
-        assert connector._normalize_word_type("adv") == "adverb"
+        assert connector._normalize_part_of_speech("n") == "noun"
+        assert connector._normalize_part_of_speech("v") == "verb"
+        assert connector._normalize_part_of_speech("adj") == "adjective"
+        assert connector._normalize_part_of_speech("adv") == "adverb"
         
         # Test full form passthrough
-        assert connector._normalize_word_type("noun") == "noun"
-        assert connector._normalize_word_type("verb") == "verb"
+        assert connector._normalize_part_of_speech("noun") == "noun"
+        assert connector._normalize_part_of_speech("verb") == "verb"
         
         # Test unknown type passthrough
-        assert connector._normalize_word_type("unknown") == "unknown"
+        assert connector._normalize_part_of_speech("unknown") == "unknown"
 
     def test_extract_examples(self) -> None:
         """Test example extraction from definition text."""

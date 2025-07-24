@@ -221,17 +221,17 @@ class OpenAIConnector:
     async def generate_examples(
         self,
         word: str,
-        word_type: str,
+        part_of_speech: str,
         definition: str,
         count: int = 1,
     ) -> ExampleGenerationResponse:
         """Generate modern usage examples."""
         logger.debug(
-            f"📝 Generating {count} example sentence(s) for '{word}' ({word_type})"
+            f"📝 Generating {count} example sentence(s) for '{word}' ({part_of_speech})"
         )
 
         prompt = self.template_manager.get_generate_examples_prompt(
-            word, definition, word_type, count
+            word, definition, part_of_speech, count
         )
 
         try:
@@ -292,7 +292,7 @@ class OpenAIConnector:
 
         Args:
             word: The word to extract mappings for.
-            definitions: list of: (provider, word_type, definition) tuples from providers.
+            definitions: list of: (provider, part_of_speech, definition) tuples from providers.
         """
         start_time = time.perf_counter()
         def_count = len(definitions)
@@ -338,14 +338,14 @@ class OpenAIConnector:
             raise
 
     async def generate_anki_fill_blank(
-        self, word: str, definition: str, word_type: str, examples: str | None = None
+        self, word: str, definition: str, part_of_speech: str, examples: str | None = None
     ) -> AnkiFillBlankResponse:
         """Generate fill-in-the-blank flashcard using structured output."""
         prompt = self.template_manager.render_template(
             "anki_fill_blank",
             word=word,
             definition=definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
             examples=examples or "",
         )
         try:
@@ -357,14 +357,14 @@ class OpenAIConnector:
             raise
 
     async def generate_anki_best_describes(
-        self, word: str, definition: str, word_type: str, examples: str | None = None
+        self, word: str, definition: str, part_of_speech: str, examples: str | None = None
     ) -> AnkiMultipleChoiceResponse:
         """Generate best describes flashcard using structured output."""
         prompt = self.template_manager.render_template(
             "anki_best_describes",
             word=word,
             definition=definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
             examples=examples or "",
         )
         try:
@@ -378,15 +378,15 @@ class OpenAIConnector:
             raise
 
     async def generate_synonyms(
-        self, word: str, definition: str, word_type: str, count: int = 10
+        self, word: str, definition: str, part_of_speech: str, count: int = 10
     ) -> SynonymGenerationResponse:
         """Generate synonyms with efflorescence ranking."""
-        logger.debug(f"🔗 Generating {count} synonyms for '{word}' ({word_type})")
+        logger.debug(f"🔗 Generating {count} synonyms for '{word}' ({part_of_speech})")
 
         prompt = self.template_manager.get_generate_synonyms_prompt(
             word=word,
             definition=definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
             count=count,
         )
 
@@ -492,14 +492,14 @@ class OpenAIConnector:
         self,
         word: str,
         definition: str,
-        word_type: str,
+        part_of_speech: str,
     ) -> AntonymResponse:
         """Generate antonyms for a definition.
 
         Args:
             word: The word
             definition: The definition text
-            word_type: Part of speech
+            part_of_speech: Part of speech
 
         Returns:
             AntonymResponse with list of antonyms
@@ -507,7 +507,7 @@ class OpenAIConnector:
         prompt = self.template_manager.get_generate_antonyms_prompt(
             word=word,
             definition=definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
         )
 
         try:
@@ -550,20 +550,20 @@ class OpenAIConnector:
     async def identify_word_forms(
         self,
         word: str,
-        word_type: str,
+        part_of_speech: str,
     ) -> WordFormResponse:
         """Identify word forms (plural, past tense, etc.).
 
         Args:
             word: The word
-            word_type: Part of speech
+            part_of_speech: Part of speech
 
         Returns:
             WordFormResponse with word forms
         """
         prompt = self.template_manager.get_word_forms_prompt(
             word=word,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
         )
 
         try:
@@ -679,20 +679,20 @@ class OpenAIConnector:
     async def extract_grammar_patterns(
         self,
         definition: str,
-        word_type: str,
+        part_of_speech: str,
     ) -> GrammarPatternResponse:
         """Extract grammar patterns from a definition.
 
         Args:
             definition: The definition text
-            word_type: Part of speech
+            part_of_speech: Part of speech
 
         Returns:
             GrammarPatternResponse with patterns
         """
         prompt = self.template_manager.get_grammar_patterns_prompt(
             definition=definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
         )
 
         try:
@@ -707,14 +707,14 @@ class OpenAIConnector:
         self,
         word: str,
         definition: str,
-        word_type: str,
+        part_of_speech: str,
     ) -> CollocationResponse:
         """Identify common collocations for a word.
 
         Args:
             word: The word
             definition: The definition for context
-            word_type: Part of speech
+            part_of_speech: Part of speech
 
         Returns:
             CollocationResponse with collocations
@@ -722,7 +722,7 @@ class OpenAIConnector:
         prompt = self.template_manager.get_collocations_prompt(
             word=word,
             definition=definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
         )
 
         try:

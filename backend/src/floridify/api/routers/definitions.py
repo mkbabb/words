@@ -74,7 +74,7 @@ async def update_definition(
         
         # Apply updates
         definition = entry.definitions[index]
-        update_dict = updates.dict(exclude_unset=True)
+        update_dict = updates.model_dump(exclude_unset=True)
         
         for field, value in update_dict.items():
             if hasattr(definition, field):
@@ -116,7 +116,7 @@ async def regenerate_examples(
         # Generate new examples
         response = await connector.generate_examples(
             word=word,
-            word_type=definition.word_type,
+            part_of_speech=definition.part_of_speech,
             definition=definition.definition,
             count=request.count
         )

@@ -1,9 +1,9 @@
-# Create Best Describes Question for "{{ word }}" ({{ word_type }})
+# Create Best Describes Question for "{{ word }}" ({{ part_of_speech }})
 
 ## Word Information
 **Word**: {{ word }}
 **Definition**: {{ definition }}
-**Part of Speech**: {{ word_type }}
+**Part of Speech**: {{ part_of_speech }}
 {% if examples %}**Examples**: {{ examples }}{% endif %}
 
 Create a GRE-level best describes question that asks "Which definition best describes the word '{{ word }}'?"

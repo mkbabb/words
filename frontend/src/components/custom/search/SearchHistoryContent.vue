@@ -76,7 +76,7 @@
                           :key="defIndex"
                           class="text-sm break-words"
                         >
-                          <span class="font-medium text-accent-foreground">{{ def.word_type }}</span>
+                          <span class="font-medium text-accent-foreground">{{ def.part_of_speech }}</span>
                           <span class="text-muted-foreground ml-2">{{ def.definition }}</span>
                         </div>
                       </div>

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Coroutine
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from ..core.state_tracker import StateTracker
@@ -133,22 +133,20 @@ async def synthesize_etymology(
 
 async def synthesize_word_forms(
     word: Word,
+    part_of_speech: str,
     ai: OpenAIConnector,
     state_tracker: StateTracker | None = None,
 ) -> list[WordForm]:
     """Generate word forms for a word."""
 
-    # Determine primary word type from definitions
-    # TODO: Get word type from most common definition
-    word_type = "noun"  # Default
-
+    # Determine primary part of speech from definitions
     try:
         if state_tracker:
             await state_tracker.update(
                 stage=Stages.AI_SYNTHESIS,
                 message=f"Generating word forms for {word.text}",
             )
-        response = await ai.identify_word_forms(word.text, word_type)
+        response = await ai.identify_word_forms(word.text, part_of_speech)
         return [
             WordForm(
                 form_type=form["form_type"],  # type: ignore[arg-type]
@@ -180,7 +178,7 @@ async def synthesize_antonyms(
         response = await ai.generate_antonyms(
             word=word,
             definition=definition.text,
-            word_type=definition.part_of_speech,
+            part_of_speech=definition.part_of_speech,
         )
         return response.antonyms
     except Exception as e:
@@ -330,7 +328,7 @@ async def identify_collocations(
         response = await ai.identify_collocations(
             word=word,
             definition=definition.text,
-            word_type=definition.part_of_speech,
+            part_of_speech=definition.part_of_speech,
         )
         return [
             Collocation(
@@ -473,7 +471,7 @@ async def synthesize_synonyms(
         response = await ai.generate_synonyms(
             word=word,
             definition=definition.text,
-            word_type=definition.part_of_speech,
+            part_of_speech=definition.part_of_speech,
             count=10,
         )
 
@@ -506,7 +504,7 @@ async def synthesize_examples(
         # Use the existing generate_examples method which uses templates
         response = await ai.generate_examples(
             word=word,
-            word_type=definition.part_of_speech,
+            part_of_speech=definition.part_of_speech,
             definition=definition.text,
             count=3,
         )
@@ -561,7 +559,7 @@ async def synthesize_definition_text(
             synth_def = response.definitions[0]
             return {
                 "definition_text": synth_def.definition,
-                "part_of_speech": synth_def.word_type,
+                "part_of_speech": synth_def.part_of_speech,
                 "sources_used": [
                     d.get("provider", "unknown") for d in clustered_definitions
                 ],
@@ -701,7 +699,7 @@ async def enhance_definitions_parallel(
     word: Word,
     ai: OpenAIConnector,
     components: set[str] | None = None,
-    force: bool = False,
+    force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
 ) -> None:
     """Enhance definitions with specified components in parallel.
@@ -720,6 +718,7 @@ async def enhance_definitions_parallel(
             "synonyms",
             "examples",
             "antonyms",
+            "word_forms",
             "cefr_level",
             "frequency_band",
             "register",
@@ -736,22 +735,34 @@ async def enhance_definitions_parallel(
 
     for definition in definitions:
         # Synonyms
-        if "synonyms" in components and (not definition.synonyms or force):
+        if "synonyms" in components and (not definition.synonyms or force_refresh):
             tasks.append(synthesize_synonyms(definition, word.text, ai, state_tracker))
             task_info.append((definition, "synonyms", len(tasks) - 1))
 
         # Examples
-        if "examples" in components and (not definition.example_ids or force):
+        if "examples" in components and (not definition.example_ids or force_refresh):
             tasks.append(synthesize_examples(definition, word.text, ai, state_tracker))
             task_info.append((definition, "examples", len(tasks) - 1))
 
         # Antonyms
-        if "antonyms" in components and (not definition.antonyms or force):
+        if "antonyms" in components and (not definition.antonyms or force_refresh):
             tasks.append(synthesize_antonyms(definition, word.text, ai, state_tracker))
             task_info.append((definition, "antonyms", len(tasks) - 1))
 
+        # Word forms
+        if "word_forms" in components and (not definition.word_forms or force_refresh):
+            # Use the part of speech from the definition
+            tasks.append(
+                synthesize_word_forms(
+                    definition.word, definition.part_of_speech, ai, state_tracker
+                )
+            )
+            task_info.append((definition, "word_forms", len(tasks) - 1))
+
         # CEFR Level
-        if "cefr_level" in components and (definition.cefr_level is None or force):
+        if "cefr_level" in components and (
+            definition.cefr_level is None or force_refresh
+        ):
             tasks.append(
                 assess_definition_cefr(definition, word.text, ai, state_tracker)
             )
@@ -759,7 +770,7 @@ async def enhance_definitions_parallel(
 
         # Frequency Band
         if "frequency_band" in components and (
-            definition.frequency_band is None or force
+            definition.frequency_band is None or force_refresh
         ):
             tasks.append(
                 assess_definition_frequency(definition, word.text, ai, state_tracker)
@@ -767,36 +778,44 @@ async def enhance_definitions_parallel(
             task_info.append((definition, "frequency_band", len(tasks) - 1))
 
         # Register
-        if "register" in components and (not definition.language_register or force):
+        if "register" in components and (
+            not definition.language_register or force_refresh
+        ):
             tasks.append(classify_definition_register(definition, ai, state_tracker))
             task_info.append((definition, "register", len(tasks) - 1))
 
         # Domain
-        if "domain" in components and (not definition.domain or force):
+        if "domain" in components and (not definition.domain or force_refresh):
             tasks.append(identify_definition_domain(definition, ai, state_tracker))
             task_info.append((definition, "domain", len(tasks) - 1))
 
         # Grammar Patterns
         if "grammar_patterns" in components and (
-            not definition.grammar_patterns or force
+            not definition.grammar_patterns or force_refresh
         ):
             tasks.append(extract_grammar_patterns(definition, ai, state_tracker))
             task_info.append((definition, "grammar_patterns", len(tasks) - 1))
 
         # Collocations
-        if "collocations" in components and (not definition.collocations or force):
+        if "collocations" in components and (
+            not definition.collocations or force_refresh
+        ):
             tasks.append(
                 identify_collocations(definition, word.text, ai, state_tracker)
             )
             task_info.append((definition, "collocations", len(tasks) - 1))
 
         # Usage Notes
-        if "usage_notes" in components and (not definition.usage_notes or force):
+        if "usage_notes" in components and (
+            not definition.usage_notes or force_refresh
+        ):
             tasks.append(generate_usage_notes(definition, word.text, ai, state_tracker))
             task_info.append((definition, "usage_notes", len(tasks) - 1))
 
         # Regional Variants
-        if "regional_variants" in components and (not definition.region or force):
+        if "regional_variants" in components and (
+            not definition.region or force_refresh
+        ):
             tasks.append(detect_regional_variants(definition, ai, state_tracker))
             task_info.append((definition, "regional_variants", len(tasks) - 1))
 
@@ -838,16 +857,14 @@ async def enhance_definitions_parallel(
             definition.example_ids.extend(example_ids)
         elif component == "antonyms" and isinstance(result, list):
             definition.antonyms = cast(list[str], result)
+        elif component == "word_forms" and isinstance(result, list):
+            definition.word_forms = cast(list[WordForm], result)
         elif component == "cefr_level" and isinstance(result, str):
-            definition.cefr_level = cast(
-                Literal['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], result
-            )
+            definition.cefr_level = result  # type: ignore
         elif component == "frequency_band" and isinstance(result, int):
             definition.frequency_band = result
         elif component == "register" and isinstance(result, str):
-            definition.language_register = cast(
-                Literal['formal', 'informal', 'neutral', 'slang', 'technical'], result
-            )
+            definition.language_register = result  # type: ignore
         elif component == "domain" and isinstance(result, str):
             definition.domain = result
         elif component == "grammar_patterns" and isinstance(result, list):
@@ -914,7 +931,7 @@ async def enhance_synthesized_entry(
         components = set(SYNTHESIS_COMPONENTS.keys())
 
     # Separate word-level and definition-level components
-    word_level_components = {"pronunciation", "etymology", "word_forms", "facts"}
+    word_level_components = {"pronunciation", "etymology", "facts"}
     definition_level_components = components - word_level_components
 
     # Load definitions if we need to enhance them
@@ -932,7 +949,7 @@ async def enhance_synthesized_entry(
             word=word,
             ai=ai,
             components=definition_level_components,
-            force=force,
+            force_refresh=force,
             state_tracker=state_tracker,
         )
 
@@ -956,10 +973,6 @@ async def enhance_synthesized_entry(
         )
         task_types.append("etymology")
 
-    if "word_forms" in components and (not word.word_forms or force):
-        word_tasks.append(synthesize_word_forms(word, ai, state_tracker))
-        task_types.append("word_forms")
-
     if "facts" in components and (not entry.fact_ids or force):
         word_tasks.append(
             generate_facts(word, definitions, ai, state_tracker=state_tracker)
@@ -981,8 +994,7 @@ async def enhance_synthesized_entry(
             elif task_type == "etymology" and isinstance(result, Etymology):
                 entry.etymology = result
             elif task_type == "word_forms" and isinstance(result, list):
-                word.word_forms = cast(list[WordForm], result)
-                await word.save()
+                entry.word_forms = cast(list[WordForm], result)
             elif task_type == "facts" and isinstance(result, list):
                 entry.fact_ids = [str(fact.id) for fact in cast(list[Fact], result)]
 

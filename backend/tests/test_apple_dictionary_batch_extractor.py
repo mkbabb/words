@@ -160,7 +160,7 @@ class TestAppleDictionaryBatchExtractor:
             provider_name="apple_dictionary",
             definitions=[
                 Definition(
-                    word_type="noun",
+                    part_of_speech="noun",
                     definition="test definition",
                     synonyms=[],
                     examples={}
@@ -217,7 +217,7 @@ class TestAppleDictionaryBatchExtractor:
         # Mock successful responses
         mock_provider_data = ProviderData(
             provider_name="apple_dictionary",
-            definitions=[Definition(word_type="noun", definition="test", synonyms=[], examples={})]
+            definitions=[Definition(part_of_speech="noun", definition="test", synonyms=[], examples={})]
         )
         
         words = ["word1", "word2", "word3"]
@@ -244,7 +244,7 @@ class TestAppleDictionaryBatchExtractor:
         
         mock_provider_data = ProviderData(
             provider_name="apple_dictionary",
-            definitions=[Definition(word_type="noun", definition="test", synonyms=[], examples={})]
+            definitions=[Definition(part_of_speech="noun", definition="test", synonyms=[], examples={})]
         )
         
         words = ["word1", "word2", "error_word"]
@@ -276,7 +276,7 @@ class TestAppleDictionaryBatchExtractor:
         
         mock_provider_data = ProviderData(
             provider_name="apple_dictionary",
-            definitions=[Definition(word_type="noun", definition="test", synonyms=[], examples={})]
+            definitions=[Definition(part_of_speech="noun", definition="test", synonyms=[], examples={})]
         )
         
         words = ["word1", "word2", "word3", "word4"]
@@ -303,7 +303,7 @@ class TestAppleDictionaryBatchExtractor:
         
         provider_data = ProviderData(
             provider_name="apple_dictionary",
-            definitions=[Definition(word_type="noun", definition="test", synonyms=[], examples={})]
+            definitions=[Definition(part_of_speech="noun", definition="test", synonyms=[], examples={})]
         )
         
         await extractor._save_to_mongodb("test", provider_data)
@@ -329,7 +329,7 @@ class TestAppleDictionaryBatchExtractor:
         
         provider_data = ProviderData(
             provider_name="apple_dictionary",
-            definitions=[Definition(word_type="noun", definition="test", synonyms=[], examples={})]
+            definitions=[Definition(part_of_speech="noun", definition="test", synonyms=[], examples={})]
         )
         
         # Should not raise exception, just log error
@@ -354,7 +354,7 @@ class TestAppleDictionaryBatchExtractor:
             
             provider_data = ProviderData(
                 provider_name="apple_dictionary",
-                definitions=[Definition(word_type="noun", definition="test", synonyms=[], examples={})]
+                definitions=[Definition(part_of_speech="noun", definition="test", synonyms=[], examples={})]
             )
             
             await extractor._save_results_to_file([provider_data])
@@ -391,7 +391,7 @@ class TestAppleDictionaryBatchExtractor:
             
             mock_provider_data = ProviderData(
                 provider_name="apple_dictionary",
-                definitions=[Definition(word_type="noun", definition="test", synonyms=[], examples={})]
+                definitions=[Definition(part_of_speech="noun", definition="test", synonyms=[], examples={})]
             )
             
             with patch.object(extractor, 'extract_word_list', return_value=[mock_provider_data]) as mock_extract:
@@ -452,7 +452,7 @@ class TestConvenienceFunctions:
             
             mock_provider_data = ProviderData(
                 provider_name="apple_dictionary",
-                definitions=[Definition(word_type="noun", definition="test", synonyms=[], examples={})]
+                definitions=[Definition(part_of_speech="noun", definition="test", synonyms=[], examples={})]
             )
             
             with patch('src.floridify.batch.apple_dictionary_extractor.AppleDictionaryBatchExtractor') as mock_extractor_class:
@@ -529,7 +529,7 @@ class TestAppleDictionaryBatchExtractorIntegration:
             definition = result.definitions[0]
             assert isinstance(definition, Definition)
             assert definition.definition
-            assert definition.word_type
+            assert definition.part_of_speech
         
         # Check final statistics
         assert extractor.stats.words_processed == len(test_words)

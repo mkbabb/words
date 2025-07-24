@@ -5,7 +5,7 @@ Generate {{ count }} relevant synonyms for the given word, balancing semantic ac
 ## Input Word
 **Word:** {{ word }}
 **Definition:** {{ definition }}
-**Word Type:** {{ word_type }}
+**Part of Speech:** {{ part_of_speech }}
 
 ## Instructions
 

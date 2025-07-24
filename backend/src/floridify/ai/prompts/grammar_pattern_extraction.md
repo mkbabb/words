@@ -1,6 +1,6 @@
 # Grammar Pattern Extraction
 
-Extract grammar patterns for the {{ word_type }} based on this definition:
+Extract grammar patterns for the {{ part_of_speech }} based on this definition:
 
 **Definition**: {{ definition }}
 

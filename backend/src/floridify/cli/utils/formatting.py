@@ -354,7 +354,7 @@ def _add_definition_content(content: Text, definitions: list[Definition], word: 
             content.append("\n\n")
 
         # Word type
-        content.append(f"{definition.word_type}", style="bold yellow")
+        content.append(f"{definition.part_of_speech}", style="bold yellow")
         content.append("\n")
 
         # Clean and format definition with proper sentence case

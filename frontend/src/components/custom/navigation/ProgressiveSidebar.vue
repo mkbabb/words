@@ -215,11 +215,11 @@ const sidebarSections = computed((): SidebarCluster[] => {
       cluster.maxRelevancy = definition.relevancy || 1.0
     }
 
-    const existingType = cluster.wordTypes.find(wt => wt.type === definition.word_type)
+    const existingType = cluster.wordTypes.find(wt => wt.type === definition.part_of_speech)
     if (existingType) {
       existingType.count++
     } else {
-      cluster.wordTypes.push({ type: definition.word_type, count: 1 })
+      cluster.wordTypes.push({ type: definition.part_of_speech, count: 1 })
     }
   })
 
@@ -246,7 +246,7 @@ const getDefinitionsForWordType = (clusterId: string, wordType: string) => {
   if (!entry?.definitions) return []
 
   return entry.definitions.filter(def => 
-    (def.meaning_cluster || 'default') === clusterId && def.word_type === wordType
+    (def.meaning_cluster || 'default') === clusterId && def.part_of_speech === wordType
   ).sort((a, b) => (b.relevancy || 1.0) - (a.relevancy || 1.0))
 }
 

@@ -1,6 +1,6 @@
 # Collocation Identification
 
-Identify common collocations for "{{ word }}" ({{ word_type }}) based on:
+Identify common collocations for "{{ word }}" ({{ part_of_speech }}) based on:
 
 **Definition**: {{ definition }}
 

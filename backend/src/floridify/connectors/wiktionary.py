@@ -335,14 +335,14 @@ class WiktionaryConnector(DictionaryConnector):
 
             section_title = subsection.title.strip().lower()
 
-            # Find matching word type
-            word_type = None
+            # Find matching part of speech
+            part_of_speech = None
             for pos_name, pos_enum in self.POS_MAPPINGS.items():
                 if pos_name in section_title:
-                    word_type = pos_enum
+                    part_of_speech = pos_enum
                     break
 
-            if not word_type:
+            if not part_of_speech:
                 continue
 
             # Use wtp.WikiList to extract numbered definitions
@@ -363,7 +363,7 @@ class WiktionaryConnector(DictionaryConnector):
                 # Create definition (meaning_cluster will be added by AI synthesis)
                 definition = Definition(
                     word_id=word_id,
-                    part_of_speech=word_type,
+                    part_of_speech=part_of_speech,
                     text=clean_def,
                     sense_number=f"{idx + 1}",
                     synonyms=synonyms,

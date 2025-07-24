@@ -1,6 +1,6 @@
 # Antonym Generation
 
-Generate antonyms for the word "{{ word }}" ({{ word_type }}) based on the following definition:
+Generate antonyms for the word "{{ word }}" ({{ part_of_speech }}) based on the following definition:
 
 **Definition**: {{ definition }}
 

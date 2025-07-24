@@ -119,14 +119,14 @@ class OxfordConnector(DictionaryConnector):
         # Use base class method to normalize and save
         return await self._normalize_response(data, word_obj)
 
-    def _map_oxford_pos_to_word_type(self, oxford_pos: str) -> str | None:
-        """Map Oxford part of speech to our word type string.
+    def _map_oxford_pos_to_part_of_speech(self, oxford_pos: str) -> str | None:
+        """Map Oxford part of speech to our part of speech string.
 
         Args:
             oxford_pos: Oxford API part of speech identifier
 
         Returns:
-            Corresponding word type string or None if not recognized
+            Corresponding part of speech string or None if not recognized
         """
         mapping = {
             "noun": "noun",
@@ -217,9 +217,9 @@ class OxfordConnector(DictionaryConnector):
                 for lexical_entry in lexical_entries:
                     # Map Oxford part of speech to our enum
                     oxford_pos = lexical_entry.get("lexicalCategory", {}).get("id", "").lower()
-                    word_type = self._map_oxford_pos_to_word_type(oxford_pos)
+                    part_of_speech = self._map_oxford_pos_to_part_of_speech(oxford_pos)
 
-                    if not word_type:
+                    if not part_of_speech:
                         continue
 
                     entries = lexical_entry.get("entries", [])
@@ -250,7 +250,7 @@ class OxfordConnector(DictionaryConnector):
                                 # Create definition (meaning_cluster will be added by AI synthesis)
                                 definition = Definition(
                                     word_id=word_id,
-                                    part_of_speech=word_type,
+                                    part_of_speech=part_of_speech,
                                     text=def_text,
                                     sense_number=f"{sense_idx + 1}.{def_idx + 1}",
                                     synonyms=[],

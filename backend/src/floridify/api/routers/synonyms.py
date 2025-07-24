@@ -61,7 +61,7 @@ async def _cached_synonyms(word: str, params: SynonymParams) -> SynonymResponse:
 
         # Use generic definition for now
         definition = f"The word '{word}'"
-        word_type = "word"
+        part_of_speech = "word"
 
         # Create OpenAI connector and generate synonyms
         # Get OpenAI connector singleton
@@ -69,7 +69,7 @@ async def _cached_synonyms(word: str, params: SynonymParams) -> SynonymResponse:
         ai_response = await connector.generate_synonyms(
             word=word,
             definition=definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
             count=params.max_results,
         )
 

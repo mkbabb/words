@@ -1,6 +1,6 @@
 # Word Form Generation
 
-Generate all standard word forms for "{{ word }}" ({{ word_type }}).
+Generate all standard word forms for "{{ word }}" ({{ part_of_speech }}).
 
 ## Requirements:
 1. Generate only grammatically correct forms

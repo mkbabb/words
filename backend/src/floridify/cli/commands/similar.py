@@ -81,18 +81,18 @@ async def _similar_async(
             console.print(format_warning(f"No definition found for '{word}'"))
             console.print("Using basic synonym generation without context.")
             base_definition = f"The word '{word}'"
-            word_type = "unknown"
+            part_of_speech = "unknown"
         else:
             # Use the first definition as context
             base_definition = entry.definitions[0].definition
-            word_type = entry.definitions[0].word_type
+            part_of_speech = entry.definitions[0].part_of_speech
 
         # Generate synonyms using AI
         ai_connector = get_openai_connector()
         synonym_response = await ai_connector.generate_synonyms(
             word=word,
             definition=base_definition,
-            word_type=word_type,
+            part_of_speech=part_of_speech,
             count=count,
         )
 
