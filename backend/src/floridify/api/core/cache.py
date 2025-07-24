@@ -1,10 +1,9 @@
 """Caching utilities for API responses."""
 
 import hashlib
-import json
-from datetime import datetime, timedelta
+from collections.abc import Callable
+from datetime import datetime
 from functools import wraps
-from typing import Any, Callable
 
 import orjson
 from fastapi import Request, Response

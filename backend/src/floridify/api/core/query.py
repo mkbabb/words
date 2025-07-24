@@ -6,7 +6,7 @@ from typing import Any
 
 from beanie import Document
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from pymongo import ASCENDING, DESCENDING, TEXT
+from pymongo import ASCENDING, DESCENDING
 
 from floridify.storage.mongodb import get_database
 from floridify.utils.logging import get_logger
@@ -116,7 +116,7 @@ class QueryOptimizer:
         start_time = time.time()
         
         # Enable profiling if needed
-        db = await self._get_db()
+        await self._get_db()
         
         yield
         

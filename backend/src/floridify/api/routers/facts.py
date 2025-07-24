@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 from floridify.ai.connector import get_openai_connector
 from floridify.ai.synthesis_functions import generate_facts
 from floridify.api.core import (
-    ErrorResponse,
     FieldSelection,
     ListResponse,
     PaginationParams,

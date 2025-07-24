@@ -3,18 +3,16 @@
 from typing import Any
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 
 from floridify.api.core import (
     BulkOperationBuilder,
-    ErrorResponse,
     handle_api_errors,
 )
 from floridify.api.repositories import (
     DefinitionRepository,
     ExampleRepository,
-    FactRepository,
     WordRepository,
 )
 from floridify.models.models import Definition, Example, Fact, Word

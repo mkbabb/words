@@ -6,7 +6,6 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from floridify.api.core import (
-    CacheInvalidator,
     ErrorResponse,
     FieldSelection,
     ListResponse,

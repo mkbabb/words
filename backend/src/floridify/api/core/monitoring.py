@@ -1,11 +1,11 @@
 """Performance monitoring utilities for API operations."""
 
-import asyncio
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
-from typing import Any, Callable
+from typing import Any
 
 from fastapi import Request, Response
 

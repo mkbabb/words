@@ -1,5 +1,7 @@
 """Examples API - CRUD operations for example sentences."""
 
+from typing import Any
+
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
@@ -7,7 +9,6 @@ from pydantic import BaseModel, Field
 from floridify.ai.connector import get_openai_connector
 from floridify.ai.synthesis_functions import synthesize_examples
 from floridify.api.core import (
-    ErrorResponse,
     FieldSelection,
     ListResponse,
     PaginationParams,
