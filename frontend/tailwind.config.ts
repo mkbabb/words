@@ -204,6 +204,12 @@ const config: Config = {
         'subtle': '0 2px 8px rgba(0, 0, 0, 0.04)',
         'glow': '0 0 20px rgba(var(--color-primary), 0.3)',
       },
+      backgroundImage: {
+        'paper-clean': 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.9" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%" height="100%" filter="url(%23noise)" opacity="0.03"/%3E%3C/svg%3E")',
+        'paper-aged': 'url("data:image/svg+xml,%3Csvg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.7" numOctaves="4" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%" height="100%" filter="url(%23noise)" opacity="0.05"/%3E%3C/svg%3E")',
+        'paper-handmade': 'url("data:image/svg+xml,%3Csvg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.5" numOctaves="5" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%" height="100%" filter="url(%23noise)" opacity="0.04"/%3E%3C/svg%3E")',
+        'paper-kraft': 'url("data:image/svg+xml,%3Csvg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.6" numOctaves="4" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%" height="100%" filter="url(%23noise)" opacity="0.06"/%3E%3C/svg%3E")',
+      },
     },
   },
   plugins: [
@@ -293,6 +299,31 @@ const config: Config = {
         },
         '.transition-bounce': {
           '@apply transition-all duration-600 ease-apple-bounce': {},
+        },
+        // Paper texture utilities
+        '.texture-paper-clean': {
+          backgroundImage: 'var(--paper-clean-texture), var(--texture-base, none)',
+        },
+        '.texture-paper-aged': {
+          backgroundImage: 'var(--paper-aged-texture), var(--texture-base, none)',
+        },
+        '.texture-paper-handmade': {
+          backgroundImage: 'var(--paper-handmade-texture), var(--texture-base, none)',
+        },
+        '.texture-paper-kraft': {
+          backgroundImage: 'var(--paper-kraft-texture), var(--texture-base, none)',
+        },
+        '.texture-subtle': {
+          mixBlendMode: 'multiply',
+          opacity: '0.03',
+        },
+        '.texture-medium': {
+          mixBlendMode: 'multiply',
+          opacity: '0.05',
+        },
+        '.texture-strong': {
+          mixBlendMode: 'multiply',
+          opacity: '0.08',
         },
       }
       addUtilities(newUtilities, ['responsive', 'hover'])

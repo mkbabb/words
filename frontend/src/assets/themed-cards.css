@@ -88,7 +88,7 @@
         background-color: var(--theme-gradient-start);
     }
 
-    /* Tiled gradient overlay system for natural metallic effect */
+    /* Tiled gradient overlay system for natural metallic effect with paper texture */
     .themed-card[data-theme]:not([data-theme='default'])::before {
         content: '';
         position: absolute;
@@ -99,6 +99,8 @@
         pointer-events: none;
         z-index: 0;
         background: 
+            /* Subtle paper texture overlay */
+            var(--paper-clean-texture),
             /* Primary metallic bands - repeating at fixed intervals */
             repeating-linear-gradient(
                 135deg,
@@ -590,7 +592,7 @@
     color: var(--theme-text);
 }
 
-/* Apply same tiled gradient system to hover cards */
+/* Apply same tiled gradient system to hover cards with paper texture */
 [data-theme]:not([data-theme='default']) .themed-hovercard::before {
     content: '';
     position: absolute;
@@ -601,6 +603,8 @@
     pointer-events: none;
     z-index: 0;
     background: 
+        /* Paper texture for hover cards */
+        var(--paper-clean-texture),
         /* Smaller scale for hover cards */
         repeating-linear-gradient(
             135deg,

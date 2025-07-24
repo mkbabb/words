@@ -129,5 +129,50 @@ export interface AppState {
 export const CARD_VARIANTS = ['default', 'gold', 'silver', 'bronze'] as const;
 export type CardVariant = typeof CARD_VARIANTS[number];
 
+// Texture system types
+export const TEXTURE_TYPES = ['clean', 'aged', 'handmade', 'kraft'] as const;
+export type TextureType = typeof TEXTURE_TYPES[number];
+
+export const TEXTURE_INTENSITIES = ['subtle', 'medium', 'strong'] as const;
+export type TextureIntensity = typeof TEXTURE_INTENSITIES[number];
+
+export interface TextureOptions {
+  type: TextureType;
+  intensity: TextureIntensity;
+  blendMode?: 'multiply' | 'overlay' | 'soft-light' | 'normal';
+  opacity?: number;
+}
+
+export interface TextureConfig {
+  enabled: boolean;
+  options: TextureOptions;
+  customCSS?: string;
+}
+
+export interface AnimationOptions {
+  speed: number;
+  delay: number;
+  easing: string;
+  autoplay: boolean;
+  loop: boolean;
+}
+
+export interface TypewriterOptions extends AnimationOptions {
+  cursorVisible: boolean;
+  cursorChar: string;
+  pauseOnPunctuation: number;
+}
+
+export interface HandwritingOptions extends AnimationOptions {
+  strokeWidth: number;
+  pressure: number;
+  style: 'pen' | 'pencil';
+}
+
+export interface LatexFillOptions extends AnimationOptions {
+  fillDirection: 'left-to-right' | 'top-to-bottom' | 'center-out';
+  mathMode: boolean;
+}
+
 // Re-export wordlist types
 export * from './wordlist';
