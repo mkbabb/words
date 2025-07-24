@@ -12,6 +12,7 @@ from .routers import (
     batch,
     corpus,
     definitions,
+    examples,
     facts,
     health,
     lookup,
@@ -58,6 +59,7 @@ app.include_router(synonyms.router, prefix="", tags=["synonyms"])
 app.include_router(suggestions.router, prefix="", tags=["suggestions"])
 app.include_router(facts.router, prefix="", tags=["facts"])
 app.include_router(definitions.router, prefix="/definitions", tags=["definitions"])
+app.include_router(examples.router, prefix="", tags=["examples"])
 app.include_router(batch.router, prefix="/batch", tags=["batch"])
 app.include_router(health.router, prefix="", tags=["health"])
 app.include_router(atomic_updates.router, prefix="/atomic", tags=["atomic"])
