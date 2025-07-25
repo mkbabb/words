@@ -6,14 +6,15 @@ import asyncio
 import platform
 import time
 
-from src.floridify.storage.mongodb import get_synthesized_entry
-
 from ..ai import get_definition_synthesizer
 from ..connectors.apple_dictionary import AppleDictionaryConnector
 from ..connectors.dictionary_com import DictionaryComConnector
+from ..connectors.oxford import OxfordConnector
 from ..connectors.wiktionary import WiktionaryConnector
 from ..constants import DictionaryProvider, Language
+from ..storage.mongodb import get_synthesized_entry
 from ..models.models import ProviderData, SynthesizedDictionaryEntry
+from ..utils.config import Config
 from ..utils.logging import (
     get_logger,
     log_metrics,
@@ -197,11 +198,7 @@ async def lookup_word_pipeline(
                         word=best_match,
                         ai_synthesis_time=ai_duration,
                         total_pipeline_time=time.perf_counter() - search_start,
-                        definition_count=(
-                            len(synthesized_entry.definitions)
-                            if synthesized_entry.definitions
-                            else 0
-                        ),
+                        definition_count=len(synthesized_entry.definition_ids),
                         provider_count=len(providers_data),
                     )
                     return synthesized_entry
@@ -265,11 +262,27 @@ async def _get_provider_definition(
         if provider == DictionaryProvider.WIKTIONARY:
             connector = WiktionaryConnector(force_refresh=force_refresh)
         elif provider == DictionaryProvider.OXFORD:
-            # Would need API credentials from config
-            logger.warning("Oxford provider requires API credentials")
-            return None
+            config = Config.from_file()
+            if not config.oxford.app_id or not config.oxford.api_key:
+                raise ValueError(
+                    "Oxford Dictionary API credentials not configured. "
+                    "Please update auth/config.toml with your Oxford app_id and api_key."
+                )
+            connector = OxfordConnector(
+                app_id=config.oxford.app_id,
+                api_key=config.oxford.api_key
+            )
         elif provider == DictionaryProvider.DICTIONARY_COM:
-            connector = DictionaryComConnector(force_refresh=force_refresh)
+            config = Config.from_file()
+            if not config.dictionary_com.authorization:
+                raise ValueError(
+                    "Dictionary.com API authorization not configured. "
+                    "Please update auth/config.toml with your Dictionary.com authorization token."
+                )
+            connector = DictionaryComConnector(
+                api_key=config.dictionary_com.authorization,
+                force_refresh=force_refresh
+            )
         elif provider == DictionaryProvider.APPLE_DICTIONARY:
             connector = AppleDictionaryConnector()
         else:

@@ -184,48 +184,51 @@ class DefinitionSynthesizer:
                     clusters[cluster_id] = []
                 clusters[cluster_id].append(definition)
 
-        synthesized_definitions = []
-
-        # Process each cluster
-        for cluster_id, cluster_defs in clusters.items():
+        # Create tasks for parallel synthesis
+        synthesis_tasks = []
+        
+        async def synthesize_cluster(cluster_id: str, cluster_defs: list[Definition]) -> Definition:
             logger.info(
                 f"Synthesizing cluster '{cluster_id}' with {len(cluster_defs)} definitions"
             )
-
-            # Convert definitions to dict format for synthesis
-            # Note: We don't have provider info on Definition model, so use "wiktionary" as default
+            
+            # Convert definitions to dict format
             def_dicts = [
                 {
                     "text": d.text,
                     "part_of_speech": d.part_of_speech,
-                    "provider": "wiktionary",  # Default provider since we don't track this on Definition
+                    "provider": "wiktionary",
                 }
                 for d in cluster_defs
             ]
-
-            # Synthesize definition text using modular function
+            
+            # Synthesize definition text
             synthesis_result = await synthesize_definition_text(
                 clustered_definitions=def_dicts,
                 word=word.text,
                 ai=self.ai,
                 state_tracker=state_tracker,
             )
-
-            # Create definition
+            
+            # Create and save definition
             definition = Definition(
                 word_id=str(word.id),
                 part_of_speech=synthesis_result["part_of_speech"],
                 text=synthesis_result["definition_text"],
-                meaning_cluster=cluster_defs[
-                    0
-                ].meaning_cluster,  # Use cluster from source
+                meaning_cluster=cluster_defs[0].meaning_cluster,
             )
             await definition.save()
-
-            # Update definition with synonyms and example IDs
-            await definition.save()
-            synthesized_definitions.append(definition)
-
+            return definition
+        
+        # Create tasks for all clusters
+        for cluster_id, cluster_defs in clusters.items():
+            task = synthesize_cluster(cluster_id, cluster_defs)
+            synthesis_tasks.append(task)
+        
+        # Execute all syntheses in parallel
+        import asyncio
+        synthesized_definitions = await asyncio.gather(*synthesis_tasks)
+        
         return synthesized_definitions
 
     async def generate_fallback_entry(

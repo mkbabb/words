@@ -29,7 +29,7 @@ class Collocation(BaseModel):
     """Common word combinations."""
     
     text: str
-    type: Literal["adjective", "verb", "noun", "adverb", "preposition"]
+    type: str  # Allow flexible collocation types like "adjective+noun", "verb+noun", etc.
     frequency: float = Field(ge=0.0, le=1.0)
 
 

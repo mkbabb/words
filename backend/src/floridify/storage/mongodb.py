@@ -20,7 +20,7 @@ from ..models import (
     Word,
     WordRelationship,
 )
-from ..utils.config import get_database_config
+from ..utils.config import Config
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -253,11 +253,10 @@ async def _ensure_initialized() -> None:
     global _storage
     if _storage is None:
         try:
-            # Get database configuration from environment + config file
-            mongodb_url, database_name = get_database_config()
-            
-            if not mongodb_url:
-                raise ValueError("MongoDB URL is None or empty")
+            # Get database configuration
+            config = Config.from_file()
+            mongodb_url = config.database.get_url()
+            database_name = config.database.name
             
             logger.info(f"Initializing MongoDB: {database_name} at {mongodb_url[:50]}...")
             

@@ -99,10 +99,6 @@ class OpenAIConnector:
         if self.temperature is not None:
             request_params["temperature"] = self.temperature
 
-        # Use structured outputs if available
-        if hasattr(self.client.beta.chat.completions, "parse"):
-            request_params["response_format"] = response_model
-
         while retry_count < max_retries:
             try:
                 # Log API call details
@@ -112,9 +108,10 @@ class OpenAIConnector:
                     f"prompt_length={len(prompt)}, retry={retry_count}"
                 )
 
-                # Make the API call
+                # Make the API call with structured output
                 api_start = time.perf_counter()
                 response = await self.client.beta.chat.completions.parse(
+                    response_format=response_model,
                     **request_params
                 )
                 api_duration = time.perf_counter() - api_start
@@ -138,18 +135,15 @@ class OpenAIConnector:
                     **token_usage,
                 )
 
-                if response.choices[0].message.parsed:
-                    result = response.choices[0].message.parsed
+                # Parse JSON response
+                content = response.choices[0].message.content
+                if content:
+                    result = response_model.model_validate_json(content)
                     # Store token usage on the result if it has that attribute
                     if hasattr(result, "token_usage"):
                         result.token_usage = token_usage
                 else:
-                    # Fallback to manual parsing
-                    content = response.choices[0].message.content
-                    if content:
-                        result = response_model.model_validate_json(content)
-                    else:
-                        raise ValueError("No content in response")
+                    raise ValueError("No content in response")
 
                 total_duration = time.perf_counter() - start_time
                 logger.info(
@@ -619,7 +613,7 @@ class OpenAIConnector:
             result = await self._make_structured_request(
                 prompt, RegisterClassificationResponse
             )
-            logger.info(f"Classified register as '{result.register}'")
+            logger.info(f"Classified register as '{result.language_register}'")
             return result
         except Exception as e:
             logger.error(f"Register classification failed: {e}")

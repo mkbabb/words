@@ -16,9 +16,9 @@ from rich.progress import (
 from rich.table import Table
 from rich.text import Text
 
-from src.floridify.constants import DictionaryProvider, Language
-from src.floridify.models.models import Definition
-from src.floridify.utils.text_utils import (
+from ...constants import DictionaryProvider, Language
+from ...models import Definition
+from ...utils.text_utils import (
     bold_word_in_text,
     clean_markdown,
     ensure_sentence_case,

@@ -6,8 +6,8 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from floridify.ai import get_openai_connector
-from floridify.ai.synthesis_functions import (
+from ...ai import get_openai_connector
+from ...ai.synthesis_functions import (
     assess_definition_cefr,
     assess_definition_frequency,
     classify_definition_register,
@@ -21,7 +21,7 @@ from floridify.ai.synthesis_functions import (
     synthesize_examples,
     synthesize_synonyms,
 )
-from floridify.api.core import (
+from ..core import (
     ErrorResponse,
     FieldSelection,
     ListResponse,
@@ -32,13 +32,13 @@ from floridify.api.core import (
     get_etag,
     handle_api_errors,
 )
-from floridify.api.repositories import (
+from ..repositories import (
     DefinitionCreate,
     DefinitionFilter,
     DefinitionRepository,
     DefinitionUpdate,
 )
-from floridify.models.models import Definition
+from ...models import Definition
 
 router = APIRouter()
 
@@ -142,15 +142,14 @@ async def list_definitions(
     )
     
     # Apply field selection and expansions
-    items = []
-    for definition in definitions:
-        if fields.expand and "examples" in fields.expand:
-            def_dict = await repo.get_with_examples(definition.id)
-        else:
-            def_dict = definition.model_dump()
-        
-        def_dict = fields.apply_to_dict(def_dict)
-        items.append(def_dict)
+    if fields.expand and "examples" in fields.expand:
+        # Use batch method to avoid N+1 queries
+        items = await repo.get_many_with_examples(definitions)
+    else:
+        items = [definition.model_dump() for definition in definitions]
+    
+    # Apply field selection to each item
+    items = [fields.apply_to_dict(item) for item in items]
     
     # Build response
     response_data = ListResponse(
@@ -329,7 +328,7 @@ async def regenerate_components(
         )
     
     # Get word for context
-    from floridify.models.models import Word
+    from ...models import Word
     word = await Word.get(definition.word_id)
     
     # Update components
@@ -337,7 +336,7 @@ async def regenerate_components(
     for component in request.components:
         if component == "examples":
             # Special handling for examples
-            from floridify.models.models import Example
+            from ...models import Example
             examples = await synthesize_examples(
                 definition, word.text, ai, count=3
             )
@@ -405,13 +404,29 @@ async def batch_regenerate_components(
     # Get AI connector
     ai = await get_openai_connector()
     
-    # Process definitions
-    results = await enhance_definitions_parallel(
-        definitions,
-        ai,
-        components=request.components,
-        force_refresh=request.force,
-    )
+    # Group definitions by word
+    from collections import defaultdict
+    definitions_by_word = defaultdict(list)
+    for definition in definitions:
+        definitions_by_word[definition.word_id].append(definition)
+    
+    # Process each word's definitions
+    all_results = {}
+    for word_id, word_definitions in definitions_by_word.items():
+        # Get the word
+        word = await Word.get(word_id)
+        if not word:
+            continue
+            
+        # Process definitions for this word
+        results = await enhance_definitions_parallel(
+            word_definitions,
+            word,
+            ai,
+            components=request.components,
+            force_refresh=request.force,
+        )
+        all_results[word_id] = results
     
     # Save all definitions
     for definition in definitions:
@@ -421,7 +436,7 @@ async def batch_regenerate_components(
     return {
         "processed": len(definitions),
         "components": list(request.components),
-        "results": results,
+        "results": all_results,
     }
 
 

@@ -6,9 +6,9 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from floridify.ai import get_openai_connector
-from floridify.ai.synthesis_functions import synthesize_examples
-from floridify.api.core import (
+from ...ai import get_openai_connector
+from ...ai.synthesis_functions import synthesize_examples
+from ..core import (
     FieldSelection,
     ListResponse,
     PaginationParams,
@@ -18,13 +18,13 @@ from floridify.api.core import (
     get_etag,
     handle_api_errors,
 )
-from floridify.api.repositories.example_repository import (
+from ..repositories.example_repository import (
     ExampleCreate,
     ExampleFilter,
     ExampleRepository,
     ExampleUpdate,
 )
-from floridify.models.models import Definition, Example, Word
+from ...models import Definition, Example, Word
 
 router = APIRouter(prefix="/examples", tags=["examples"])
 

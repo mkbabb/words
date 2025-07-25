@@ -9,7 +9,7 @@ import orjson
 from fastapi import Request, Response
 from pydantic import BaseModel
 
-from floridify.caching.cache_manager import CacheManager, get_cache_manager
+from ...caching.cache_manager import CacheManager, get_cache_manager
 
 
 class APICacheConfig(BaseModel):
@@ -72,7 +72,7 @@ def cached_endpoint(
             
             # Try to get from cache
             cache_manager = get_cache_manager()
-            cached_data = await cache_manager.get(cache_key)
+            cached_data = cache_manager.get((cache_key,))
             
             if cached_data:
                 # Parse cached response
@@ -116,10 +116,10 @@ def cached_endpoint(
                 "status_code": response.status_code,
             }
             
-            await cache_manager.set(
-                cache_key,
+            cache_manager.set(
+                (cache_key,),
                 orjson.dumps(cache_data).decode(),
-                ttl=config.ttl
+                ttl_seconds=config.ttl
             )
             
             # Set cache headers
@@ -146,10 +146,10 @@ class CacheInvalidator:
         
         # Store invalidation timestamp
         invalidation_key = f"invalidation:{pattern}"
-        await self.cache_manager.set(
-            invalidation_key,
+        self.cache_manager.set(
+            (invalidation_key,),
             datetime.utcnow().isoformat(),
-            ttl=86400  # Keep for 24 hours
+            ttl_seconds=86400  # Keep for 24 hours
         )
         
         return invalidated
@@ -226,7 +226,7 @@ class ResponseCache:
         self.cache_key = generate_cache_key(self.request, config, self.key_prefix)
         
         # Check cache
-        cached = await self.cache_manager.get(self.cache_key)
+        cached = self.cache_manager.get((self.cache_key,))
         if cached:
             self.response.headers["X-Cache"] = "HIT"
             return orjson.loads(cached)

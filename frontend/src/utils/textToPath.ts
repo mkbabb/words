@@ -53,14 +53,14 @@ export function generateHandwritingPath(text: string): { path: string; width: nu
       // Transform the path to the current position
       const transformedPath = letterData.path.replace(
         /([ML])(\d+),(\d+)/g,
-        (match, command, x, y) => `${command}${parseInt(x) + currentX},${y}`
+        (_, command, x, y) => `${command}${parseInt(x) + currentX},${y}`
       ).replace(
         /([QC])(\d+),(\d+)\s+(\d+),(\d+)/g,
-        (match, command, x1, y1, x2, y2) => 
+        (_, command, x1, y1, x2, y2) => 
           `${command}${parseInt(x1) + currentX},${y1} ${parseInt(x2) + currentX},${y2}`
       ).replace(
         /([QC])(\d+),(\d+)\s+(\d+),(\d+)\s+(\d+),(\d+)/g,
-        (match, command, x1, y1, x2, y2, x3, y3) => 
+        (_, command, x1, y1, x2, y2, x3, y3) => 
           `${command}${parseInt(x1) + currentX},${y1} ${parseInt(x2) + currentX},${y2} ${parseInt(x3) + currentX},${y3}`
       )
 

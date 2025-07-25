@@ -4,9 +4,9 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from floridify.ai import get_openai_connector
-from floridify.ai.synthesis_functions import generate_facts
-from floridify.api.core import (
+from ...ai import get_openai_connector
+from ...ai.synthesis_functions import generate_facts
+from ..core import (
     FieldSelection,
     ListResponse,
     PaginationParams,
@@ -16,15 +16,20 @@ from floridify.api.core import (
     get_etag,
     handle_api_errors,
 )
-from floridify.api.repositories.fact_repository import (
+from ..repositories.fact_repository import (
     FactCreate,
     FactFilter,
     FactRepository,
     FactUpdate,
 )
-from floridify.models.models import Fact, Word
+from ...models import Fact, Word
+from ...utils.sanitization import sanitize_mongodb_input
+from ..middleware.rate_limiting import ai_limiter, get_client_key
 
 router = APIRouter(prefix="/facts", tags=["facts"])
+
+# Allowed fact categories
+ALLOWED_CATEGORIES = {"etymology", "cultural", "linguistic", "historical", "usage", "technical"}
 
 
 def get_fact_repo() -> FactRepository:
@@ -92,6 +97,13 @@ async def list_facts(
     confidence_score_min: float | None = Query(None, ge=0, le=1),
 ) -> ListResponse[Fact]:
     """List facts with filtering and pagination."""
+    # Validate category if provided
+    if category and category not in ALLOWED_CATEGORIES:
+        raise HTTPException(
+            400,
+            f"Invalid category. Allowed categories: {', '.join(sorted(ALLOWED_CATEGORIES))}"
+        )
+    
     # Build filter
     filter_params = FactFilter(
         word_id=word_id,
@@ -226,11 +238,26 @@ async def delete_fact(
 @handle_api_errors
 async def generate_facts_for_word(
     word_id: str,
-    request: FactGenerationRequest,
+    fact_request: FactGenerationRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     repo: FactRepository = Depends(get_fact_repo),
 ) -> list[ResourceResponse]:
     """Generate interesting facts about a word."""
+    # Check AI rate limit (estimate ~1500 tokens per fact)
+    client_key = get_client_key(request)
+    allowed, headers = await ai_limiter.check_request_allowed(
+        client_key,
+        estimated_tokens=1500 * fact_request.count
+    )
+    
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="AI rate limit exceeded",
+            headers=headers,
+        )
+    
     # Get word
     word = await Word.get(word_id)
     if not word:
@@ -243,8 +270,8 @@ async def generate_facts_for_word(
     fact_data_list = await generate_facts(
         word,
         ai,
-        count=request.count,
-        context_words=request.context_words,
+        count=fact_request.count,
+        context_words=fact_request.context_words,
     )
     
     # Create fact documents
@@ -288,6 +315,13 @@ async def get_facts_by_category(
     repo: FactRepository = Depends(get_fact_repo),
 ) -> ListResponse[Fact]:
     """Get facts by category across all words."""
+    # Validate category against allowed list
+    if category not in ALLOWED_CATEGORIES:
+        raise HTTPException(
+            400, 
+            f"Invalid category. Allowed categories: {', '.join(sorted(ALLOWED_CATEGORIES))}"
+        )
+    
     facts = await repo.find_by_category(category, limit)
     
     return ListResponse(

@@ -1,137 +1,211 @@
-"""Centralized configuration loading with environment variable support."""
+"""Configuration management for Floridify."""
 
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import toml
 
-from ..config import Config
-from .paths import get_config_path, PROJECT_ROOT
+from .paths import get_project_root
 
 
-def load_config_dict(config_path: str | Path | None = None) -> dict[str, Any]:
-    """Load configuration from TOML file as dictionary.
+@dataclass
+class OpenAIConfig:
+    """OpenAI API configuration."""
+
+    api_key: str
+    model: str = "gpt-4o"
+    reasoning_effort: str = "high"
+    embedding_model: str = "text-embedding-3-large"
+
+
+@dataclass
+class OxfordConfig:
+    """Oxford Dictionary API configuration."""
+
+    app_id: str
+    api_key: str
+
+
+@dataclass
+class DictionaryComConfig:
+    """Dictionary.com API configuration."""
+
+    authorization: str
+
+
+@dataclass
+class RateLimits:
+    """Rate limiting configuration."""
+
+    oxford_rps: float = 10.0
+    dictionary_com_rps: float = 20.0
+    wiktionary_rps: float = 50.0
+    openai_bulk_max_concurrent: int = 5
+
+
+@dataclass
+class DatabaseConfig:
+    """Database configuration with environment-specific URLs."""
+
+    production_url: str = ""
+    development_url: str = ""
+    name: str = "floridify"
+    timeout: int = 30
+    max_pool_size: int = 100
     
-    Args:
-        config_path: Path to configuration file (defaults to auth/config.toml)
+    def get_url(self) -> str:
+        """Get appropriate database URL based on environment."""
         
-    Returns:
-        Configuration dictionary
-        
-    Raises:
-        FileNotFoundError: If configuration file doesn't exist
-    """
-    if config_path is None:
-        config_path = get_config_path()
-    else:
-        config_path = Path(config_path)
-    
-    if not config_path.exists():
-        raise FileNotFoundError(f"Configuration file not found: {config_path}")
-    
-    try:
-        with open(config_path, encoding="utf-8") as f:
-            return toml.load(f)
-    except Exception as e:
-        raise
-
-
-def load_config(config_path: str | Path | None = None) -> Config:
-    """Load structured configuration object.
-    
-    Args:
-        config_path: Path to configuration file (defaults to auth/config.toml)
-        
-    Returns:
-        Structured Config object
-        
-    Raises:
-        FileNotFoundError: If configuration file doesn't exist
-    """
-    return Config.from_file(config_path)
-
-
-def get_database_config() -> tuple[str, str]:
-    """Get database configuration with automatic environment detection.
-    
-    Detects environment based on:
-    - Running in Docker container (production/staging)
-    - Running on EC2 instance (production)
-    - Running locally (development with SSH tunnel)
-    
-    Returns:
-        Tuple of (mongodb_url, database_name)
-    """
-    try:
-        config_dict = load_config_dict()
-        if config_dict is None:
-            raise ValueError("load_config_dict returned None")
-        db_config = config_dict.get("database", {})
-        
-        # Detect environment
         is_docker = os.path.exists("/.dockerenv")
         is_ec2 = os.path.exists("/var/lib/cloud")
         is_production = is_ec2 or os.getenv("ENVIRONMENT") == "production"
         
-        # Get the base URL from config
-        mongodb_url = db_config.get("url")
-        database_name = db_config.get("name", "floridify")
-        
-        # Log environment detection
-        from ..utils.logging import get_logger
-        logger = get_logger(__name__)
-        logger.info(f"Environment detection: docker={is_docker}, ec2={is_ec2}, production={is_production}")
-        
-        # Modify URL based on environment
-        if mongodb_url:
-            # For local development, we need to use SSH tunnel
-            if not is_production:
-                # Replace production DocumentDB with localhost SSH tunnel
-                if "docdb" in mongodb_url and "amazonaws.com" in mongodb_url:
-                    # Extract username and password from URL
-                    import re
-                    match = re.search(r'mongodb://([^:]+):([^@]+)@', mongodb_url)
-                    if match:
-                        username = match.group(1)
-                        password = match.group(2)
-                        # Build local development URL with SSH tunnel
-                        # For SSH tunnel, we need to disable hostname verification since cert is for DocumentDB not localhost
-                        if is_docker:
-                            # Docker uses host.docker.internal to reach host's localhost
-                            mongodb_url = f"mongodb://{username}:{password}@host.docker.internal:27018/floridify?tls=true&tlsCAFile=/app/auth/rds-ca-2019-root.pem&retryWrites=false&directConnection=true&tlsAllowInvalidHostnames=true"
-                            logger.info("Using Docker development connection via host.docker.internal SSH tunnel on port 27018")
-                        else:
-                            # Native local development
-                            mongodb_url = f"mongodb://{username}:{password}@localhost:27018/floridify?tls=true&tlsCAFile={PROJECT_ROOT}/auth/rds-ca-2019-root.pem&retryWrites=false&directConnection=true&tlsAllowInvalidHostnames=true"
-                            logger.info("Using local development connection via SSH tunnel on port 27018")
-            else:
-                logger.info("Using production database configuration")
-        
-        if not mongodb_url:
-            raise ValueError(f"No MongoDB URL found for environment (docker={is_docker}, ec2={is_ec2}, production={is_production})")
-        
-        return mongodb_url, database_name
-        
-    except Exception as e:
-        # More detailed error logging
-        from ..utils.logging import get_logger
-        logger = get_logger(__name__)
-        logger.error(f"Failed to load database config: {type(e).__name__}: {e}")
-        logger.error("Stack trace:", exc_info=True)
-        
-        # Only use fallback for local development
-        if not os.path.exists("/.dockerenv") and not os.path.exists("/var/lib/cloud"):
-            logger.warning("Using localhost fallback for local development")
-            return "mongodb://localhost:27017", "floridify"
+        # Get the appropriate URL
+        if is_production:
+            url = self.production_url
         else:
-            # In Docker/production, we should fail fast
-            raise
+            # Development always uses SSH tunnel on host
+            url = self.development_url
+            
+        if not url:
+            raise ValueError(
+                f"No database URL configured for environment "
+                f"(production={is_production}, docker={is_docker}). "
+                f"Please check auth/config.toml"
+            )
+            
+        # For Docker, replace localhost with host.docker.internal
+        if is_docker and not is_production:
+            url = url.replace("localhost:", "host.docker.internal:")
+            
+        # Always add the cert path - it's at project_root/auth/
+        cert_path = get_project_root() / "auth" / "rds-ca-2019-root.pem"
+        if "?" in url:
+            url += f"&tlsCAFile={cert_path}"
+        else:
+            url += f"?tlsCAFile={cert_path}"
+            
+        return url
 
 
-def update_tls_path_in_url(url: str, new_path: str) -> str:
-    """Update the tlsCAFile path in a MongoDB URL."""
-    import re
-    return re.sub(r'tlsCAFile=[^&]+', f'tlsCAFile={new_path}', url)
+@dataclass
+class ProcessingConfig:
+    """Processing pipeline configuration."""
+
+    max_concurrent_words: int = 100
+    batch_size: int = 50
+    retry_attempts: int = 3
+    cache_ttl_hours: int = 24
+    verbose: bool = False
+
+
+@dataclass
+class Config:
+    """Main configuration class."""
+
+    openai: OpenAIConfig
+    oxford: OxfordConfig
+    dictionary_com: DictionaryComConfig
+    database: DatabaseConfig
+    rate_limits: RateLimits
+    processing: ProcessingConfig
+
+    @classmethod
+    def from_file(cls, config_path: str | Path | None = None) -> Config:
+        """Load configuration from TOML file.
+
+        Args:
+            config_path: Path to configuration file (defaults to auth/config.toml)
+
+        Returns:
+            Loaded configuration
+        """
+        if config_path is None:
+            # Get config path with environment override
+            env_path = os.getenv("FLORIDIFY_CONFIG_PATH")
+            if env_path:
+                config_path = Path(env_path)
+            else:
+                # Standard location
+                project_root = get_project_root()
+                config_path = project_root / "auth" / "config.toml"
+                
+                # In Docker, check alternative location
+                if os.path.exists("/.dockerenv") and not config_path.exists():
+                    docker_config = Path("/app/auth/config.toml")
+                    if docker_config.exists():
+                        config_path = docker_config
+        else:
+            config_path = Path(config_path)
+
+        if not config_path.exists():
+            raise FileNotFoundError(
+                f"Configuration file not found: {config_path}\n"
+                f"Please create {config_path} with your API keys and database configuration."
+            )
+
+        data = toml.load(config_path)
+
+        # Load configurations with defaults
+        openai_config = OpenAIConfig(
+            api_key=data.get("openai", {}).get("api_key", ""),
+            model=data.get("models", {}).get("openai_model", "gpt-4o"),
+            reasoning_effort=data.get("models", {}).get("reasoning_effort", "high"),
+            embedding_model=data.get("models", {}).get("embedding_model", "text-embedding-3-large"),
+        )
+
+        oxford_config = OxfordConfig(
+            app_id=data.get("oxford", {}).get("app_id", ""),
+            api_key=data.get("oxford", {}).get("api_key", ""),
+        )
+
+        dictionary_com_config = DictionaryComConfig(
+            authorization=data.get("dictionary_com", {}).get("authorization", "")
+        )
+
+        db_data = data.get("database", {})
+        database_config = DatabaseConfig(
+            production_url=db_data.get("production_url", ""),
+            development_url=db_data.get("development_url", ""),
+            name=db_data.get("name", "floridify"),
+            timeout=db_data.get("timeout", 30),
+            max_pool_size=db_data.get("max_pool_size", 100),
+        )
+
+        rate_limits = RateLimits(
+            oxford_rps=data.get("rate_limits", {}).get("oxford_rps", 10.0),
+            dictionary_com_rps=data.get("rate_limits", {}).get("dictionary_com_rps", 20.0),
+            wiktionary_rps=data.get("rate_limits", {}).get("wiktionary_rps", 50.0),
+            openai_bulk_max_concurrent=data.get("rate_limits", {}).get(
+                "openai_bulk_max_concurrent", 5
+            ),
+        )
+
+        processing = ProcessingConfig(
+            max_concurrent_words=data.get("processing", {}).get("max_concurrent_words", 100),
+            batch_size=data.get("processing", {}).get("batch_size", 50),
+            retry_attempts=data.get("processing", {}).get("retry_attempts", 3),
+            cache_ttl_hours=data.get("processing", {}).get("cache_ttl_hours", 24),
+            verbose=data.get("processing", {}).get("verbose", False),
+        )
+
+        config = cls(
+            openai=openai_config,
+            oxford=oxford_config,
+            dictionary_com=dictionary_com_config,
+            database=database_config,
+            rate_limits=rate_limits,
+            processing=processing,
+        )
+        
+        # Validate required fields
+        if not config.openai.api_key:
+            raise ValueError(
+                f"OpenAI API key missing in {config_path}\n"
+                f"Please update the 'api_key' field in the [openai] section."
+            )
+            
+        return config

@@ -5,7 +5,7 @@ from datetime import datetime
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from floridify.api.core import (
+from ..core import (
     ErrorResponse,
     FieldSelection,
     ListResponse,
@@ -17,13 +17,14 @@ from floridify.api.core import (
     get_etag,
     handle_api_errors,
 )
-from floridify.api.repositories import (
+from ..repositories import (
     WordCreate,
     WordFilter,
     WordRepository,
     WordUpdate,
 )
-from floridify.models.models import Language, Word
+from ...constants import Language
+from ...models import Word
 
 router = APIRouter()
 
@@ -120,7 +121,7 @@ async def list_words(
         
         # Handle expansions
         if fields.expand and "definitions" in fields.expand:
-            from floridify.api.repositories import DefinitionRepository
+            from ..repositories import DefinitionRepository
             def_repo = DefinitionRepository()
             definitions = await def_repo.find_by_word(str(word.id))
             word_dict["definitions"] = [d.model_dump() for d in definitions]
@@ -200,7 +201,7 @@ async def get_word(
     # Handle expansions
     if fields.expand:
         if "definitions" in fields.expand:
-            from floridify.api.repositories import DefinitionRepository
+            from ..repositories import DefinitionRepository
             def_repo = DefinitionRepository()
             definitions = await def_repo.find_by_word(str(word_id))
             word_data["definitions"] = [d.model_dump() for d in definitions]

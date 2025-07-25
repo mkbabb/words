@@ -14,7 +14,6 @@ class ExampleGenerationResponse(BaseModel):
     """Response from example generation."""
 
     example_sentences: list[str] = Field(
-        default_factory=list,
         description="List of high-quality example sentences.",
     )
     confidence: float
@@ -52,7 +51,6 @@ class ProviderDataResponse(BaseModel):
     """Clean definition model for AI responses without numpy arrays."""
 
     definitions: list[DefinitionResponse] = Field(
-        default_factory=list,
         description="Comprehensive list of definitions for this word across all word types.",
     )
 
@@ -93,7 +91,6 @@ class ClusterMappingResponse(BaseModel):
     word: str = Field(description="The word being analyzed")
 
     cluster_mappings: list[ClusterMapping] = Field(
-        default_factory=list,
         description="List of cluster mappings with their descriptions and indices",
     )
 
@@ -104,7 +101,6 @@ class SynthesisResponse(BaseModel):
     """Response from definition synthesis."""
 
     definitions: list[DefinitionResponse] = Field(
-        default_factory=list,
         description="Comprehensive list of definitions for this word across all word types.",
     )
     confidence: float
@@ -163,16 +159,22 @@ class FactGenerationResponse(BaseModel):
         ge=0.0, le=1.0, description="Overall confidence in fact accuracy and quality"
     )
     categories: list[str] = Field(
-        default_factory=list,
         description="Categories of facts generated (etymology, usage, cultural, etc.)",
     )
+
+
+class Collocation(BaseModel):
+    """A single collocation entry."""
+    
+    type: str = Field(description="Type of collocation (e.g., verb+noun, adjective+noun)")
+    phrase: str = Field(description="The collocation phrase")
+    frequency: float = Field(ge=0.0, le=1.0, description="Frequency score")
 
 
 class CollocationResponse(BaseModel):
     """Response for collocation generation."""
     
-    collocations: list[dict[str, str | float]] = Field(
-        default_factory=list,
+    collocations: list[Collocation] = Field(
         description="Common word combinations with type and frequency"
     )
     confidence: float = Field(ge=0.0, le=1.0)
@@ -182,11 +184,9 @@ class GrammarPatternResponse(BaseModel):
     """Response for grammar pattern extraction."""
     
     patterns: list[str] = Field(
-        default_factory=list,
         description="Common grammatical constructions (e.g., [Tn], sb/sth)"
     )
     descriptions: list[str] = Field(
-        default_factory=list,
         description="Human-readable descriptions of patterns"
     )
     confidence: float = Field(ge=0.0, le=1.0)
@@ -200,11 +200,17 @@ class CEFRLevelResponse(BaseModel):
     reasoning: str = Field(description="Explanation for the level assignment")
 
 
+class UsageNote(BaseModel):
+    """A single usage note."""
+    
+    type: str = Field(description="Type of usage note (e.g., register, formality, context)")
+    text: str = Field(description="The usage guidance text")
+
+
 class UsageNoteResponse(BaseModel):
     """Response for usage note generation."""
     
-    notes: list[dict[str, str]] = Field(
-        default_factory=list,
+    notes: list[UsageNote] = Field(
         description="Usage guidance with type and text"
     )
     confidence: float = Field(ge=0.0, le=1.0)
@@ -214,7 +220,7 @@ class AIGeneratedProviderData(ProviderData):
     """AI fallback provider data with quality indicators."""
 
     confidence_score: float
-    generation_timestamp: datetime = Field(default_factory=datetime.now)
+    generation_timestamp: datetime
     model_used: str
 
 
@@ -222,7 +228,6 @@ class AntonymResponse(BaseModel):
     """Response for antonym generation."""
     
     antonyms: list[str] = Field(
-        default_factory=list,
         description="List of antonyms for the definition"
     )
     confidence: float = Field(ge=0.0, le=1.0)
@@ -234,27 +239,33 @@ class EtymologyResponse(BaseModel):
     text: str = Field(description="Etymology text explaining word origin")
     origin_language: str | None = Field(None, description="Language of origin")
     root_words: list[str] = Field(
-        default_factory=list,
         description="Root words or morphemes"
     )
     first_known_use: str | None = Field(None, description="Date or period of first use")
     confidence: float = Field(ge=0.0, le=1.0)
 
 
+class WordForm(BaseModel):
+    """A single word form."""
+    
+    type: str = Field(description="Type of form (e.g., plural, past_tense, gerund)")
+    text: str = Field(description="The word form text")
+
+
 class WordFormResponse(BaseModel):
     """Response for word form generation."""
     
-    forms: list[dict[str, str]] = Field(
-        default_factory=list,
-        description="List of word forms with type and text"
-    )
+    forms: list[WordForm] = Field(description="List of word forms with type and text")
     confidence: float = Field(ge=0.0, le=1.0)
 
 
 class RegisterClassificationResponse(BaseModel):
     """Response for register classification."""
     
-    register: str = Field(
+    model_config = {"populate_by_name": True}  # Accept both field name and alias
+    
+    language_register: str = Field(
+        alias="register",
         description="Register level: formal, informal, neutral, slang, technical"
     )
     confidence: float = Field(ge=0.0, le=1.0)
@@ -287,7 +298,6 @@ class RegionalVariantResponse(BaseModel):
     """Response for regional variant detection."""
     
     regions: list[str] = Field(
-        default_factory=list,
         description="Regions where this usage is common (US, UK, AU, etc.)"
     )
     confidence: float = Field(ge=0.0, le=1.0)
@@ -296,36 +306,37 @@ class RegionalVariantResponse(BaseModel):
 class EnhancedDefinitionResponse(BaseModel):
     """Complete enhanced definition with all fields."""
     
+    model_config = {"populate_by_name": True}  # Accept both field name and alias
+    
     definition: DefinitionResponse
-    antonyms: list[str] = Field(default_factory=list)
-    register: str | None = None
-    domain: str | None = None
-    regions: list[str] = Field(default_factory=list)
-    cefr_level: str | None = None
-    frequency_band: int | None = None
-    grammar_patterns: list[dict[str, str]] = Field(default_factory=list)
-    collocations: list[dict[str, str | float]] = Field(default_factory=list)
-    usage_notes: list[dict[str, str]] = Field(default_factory=list)
+    antonyms: list[str]
+    language_register: str | None = Field(alias="register")
+    domain: str | None
+    regions: list[str]
+    cefr_level: str | None
+    frequency_band: int | None
+    grammar_patterns: list[dict[str, str]]
+    collocations: list[dict[str, str | float]]
+    usage_notes: list[dict[str, str]]
     confidence: float = Field(ge=0.0, le=1.0)
 
 
 class ComprehensiveSynthesisResponse(BaseModel):
     """Complete synthesis response with all components."""
     
-    pronunciation: PronunciationResponse | None = None
-    etymology: EtymologyResponse | None = None
-    word_forms: list[dict[str, str]] = Field(default_factory=list)
-    definitions: list[EnhancedDefinitionResponse] = Field(default_factory=list)
-    facts: list[str] = Field(default_factory=list)
+    pronunciation: PronunciationResponse | None
+    etymology: EtymologyResponse | None
+    word_forms: list[dict[str, str]]
+    definitions: list[EnhancedDefinitionResponse]
+    facts: list[str]
     overall_confidence: float = Field(ge=0.0, le=1.0)
-    model_info: dict[str, Any] = Field(default_factory=dict)
+    model_info: dict[str, Any]
 
 
 class ExampleSynthesisResponse(BaseModel):
     """Response for example sentence synthesis."""
     
     examples: list[str] = Field(
-        default_factory=list,
         description="List of natural, contextual example sentences"
     )
     confidence: float = Field(ge=0.0, le=1.0)
@@ -342,7 +353,6 @@ class DefinitionSynthesisResponse(BaseModel):
     )
     confidence: float = Field(ge=0.0, le=1.0)
     sources_used: list[str] = Field(
-        default_factory=list,
         description="Provider sources used in synthesis"
     )
 

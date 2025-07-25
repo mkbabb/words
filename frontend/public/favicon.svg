@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="8" fill="#1f2937"/>
-  <text x="16" y="22" text-anchor="middle" fill="white" font-family="serif" font-size="20" font-style="italic" font-weight="bold">F</text>
+  <rect width="32" height="32" rx="4" fill="white"/>
+  <g transform="translate(16, 16) scale(0.25) translate(-NaN, -NaN)">
+    
+  </g>
 </svg>

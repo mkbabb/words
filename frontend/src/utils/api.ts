@@ -6,8 +6,12 @@ import type {
   VocabularySuggestionsResponse,
 } from '@/types';
 
+// API versioning configuration
+const API_VERSION = 'v1';
+const API_BASE_URL = `/api/${API_VERSION}`;
+
 const api = axios.create({
-  baseURL: '/api',  // Clean API path - versioning handled by deployment
+  baseURL: API_BASE_URL,
   timeout: 60000, // 60 seconds (1 minute)
   headers: {
     'Content-Type': 'application/json',
@@ -125,7 +129,7 @@ export const dictionaryApi = {
       }
       
       // Use relative URL to ensure it goes through the Vite proxy
-      const url = `/api/lookup/${word}/stream${params.toString() ? '?' + params.toString() : ''}`;
+      const url = `${API_BASE_URL}/lookup/${word}/stream${params.toString() ? '?' + params.toString() : ''}`;
       
       console.log(`Opening SSE connection to: ${url}`);
       const eventSource = new EventSource(url);

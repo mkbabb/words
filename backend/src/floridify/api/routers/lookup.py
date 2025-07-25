@@ -8,7 +8,7 @@ import time
 from collections.abc import AsyncGenerator
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -17,8 +17,10 @@ from ...caching.decorators import cached_api_call
 from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, lookup_state_tracker
-from ...models.models import Definition, Pronunciation, Word
+from ...models import Definition, Example, Pronunciation, ProviderData, Word
 from ...utils.logging import get_logger
+from ...utils.sanitization import sanitize_mongodb_input, validate_word_input
+from ..middleware.rate_limiting import rate_limit, ai_limiter, get_client_key
 from .common import PipelineMetrics
 
 logger = get_logger(__name__)
@@ -26,6 +28,39 @@ router = APIRouter()
 
 
 # Models specific to lookup endpoints
+class DefinitionResponse(BaseModel):
+    """Definition with resolved references for API response."""
+    
+    # Core fields
+    created_at: datetime
+    updated_at: datetime
+    version: int
+    part_of_speech: str
+    text: str
+    meaning_cluster: dict[str, Any] | None = None
+    sense_number: str | None = None
+    
+    # Resolved references (not IDs)
+    word_forms: list[dict[str, Any]] = []
+    examples: list[dict[str, Any]] = []  # Resolved Example objects
+    
+    # Direct fields
+    synonyms: list[str] = []
+    antonyms: list[str] = []
+    language_register: str | None = None
+    domain: str | None = None
+    region: str | None = None
+    usage_notes: list[dict[str, Any]] = []
+    grammar_patterns: list[dict[str, Any]] = []
+    collocations: list[dict[str, Any]] = []
+    transitivity: str | None = None
+    cefr_level: str | None = None
+    frequency_band: int | None = None
+    
+    # Provider info (resolved, not IDs)
+    providers_data: list[ProviderData] = []  # All provider data sources
+    
+
 class LookupParams(BaseModel):
     """Parameters for word lookup endpoint."""
 
@@ -46,9 +81,9 @@ class LookupResponse(BaseModel):
     """Response for word lookup."""
 
     word: str = Field(..., description="The word that was looked up")
-    pronunciation: Pronunciation = Field(..., description="Pronunciation information")
-    definitions: list[Definition] = Field(
-        default_factory=list, description="Word definitions"
+    pronunciation: Pronunciation | None = Field(None, description="Pronunciation information")
+    definitions: list[DefinitionResponse] = Field(
+        default_factory=list, description="Word definitions with resolved examples"
     )
     last_updated: datetime = Field(..., description="When this entry was last updated")
     pipeline_metrics: PipelineMetrics | None = Field(
@@ -128,12 +163,54 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
     if not entry:
         return None
 
-    # Load definitions from IDs
+    # Load definitions from IDs and create DefinitionResponse objects
     definitions = []
-    for def_id in entry.definition_ids:
-        definition = await Definition.get(def_id)
-        if definition:
-            definitions.append(definition)
+    if entry.definition_ids:
+        # Load all provider data for this entry
+        all_providers_data = []
+        if entry.source_provider_data_ids:
+            for provider_id in entry.source_provider_data_ids:
+                provider_data = await ProviderData.get(provider_id)
+                if provider_data:
+                    all_providers_data.append(provider_data)
+        
+        for def_id in entry.definition_ids:
+            definition = await Definition.get(def_id)
+            if definition:
+                # Load examples
+                examples = []
+                if definition.example_ids:
+                    for example_id in definition.example_ids:
+                        example = await Example.get(example_id)
+                        if example:
+                            examples.append(example.model_dump())
+                
+                # Create DefinitionResponse
+                def_response = DefinitionResponse(
+                    created_at=definition.created_at,
+                    updated_at=definition.updated_at,
+                    version=definition.version,
+                    part_of_speech=definition.part_of_speech,
+                    text=definition.text,
+                    meaning_cluster=definition.meaning_cluster.model_dump() if definition.meaning_cluster else None,
+                    sense_number=definition.sense_number,
+                    word_forms=[wf.model_dump() for wf in definition.word_forms],
+                    examples=examples,
+                    synonyms=definition.synonyms,
+                    antonyms=definition.antonyms,
+                    language_register=definition.language_register,
+                    domain=definition.domain,
+                    region=definition.region,
+                    usage_notes=[un.model_dump() for un in definition.usage_notes],
+                    grammar_patterns=[gp.model_dump() for gp in definition.grammar_patterns],
+                    collocations=[c.model_dump() for c in definition.collocations],
+                    transitivity=definition.transitivity,
+                    cefr_level=definition.cefr_level,
+                    frequency_band=definition.frequency_band,
+                    providers_data=all_providers_data,  # Use the loaded provider data
+                )
+                
+                definitions.append(def_response)
     
     # Load pronunciation from ID
     pronunciation = None
@@ -182,6 +259,12 @@ async def lookup_word(
         Returns detailed entry with pronunciation, multiple meanings,
         examples, and AI-synthesized coherent definitions.
     """
+    # Sanitize and validate word input
+    try:
+        word = validate_word_input(word)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    
     start_time = time.perf_counter()
 
     try:
@@ -213,6 +296,13 @@ async def generate_lookup_events(
     params: LookupParams,
 ) -> AsyncGenerator[str, None]:
     """Generate SSE events for lookup pipeline progress."""
+    # Sanitize and validate word input
+    try:
+        word = validate_word_input(word)
+    except ValueError as e:
+        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        return
+    
     # Reset the state tracker
     lookup_state_tracker.reset()
 
@@ -285,12 +375,54 @@ async def _lookup_with_tracking(
         )
         return None
 
-    # Load definitions from IDs (same as cached path)
+    # Load definitions from IDs and create DefinitionResponse objects
     definitions = []
-    for def_id in entry.definition_ids:
-        definition = await Definition.get(def_id)
-        if definition:
-            definitions.append(definition)
+    if entry.definition_ids:
+        # Load all provider data for this entry
+        all_providers_data = []
+        if entry.source_provider_data_ids:
+            for provider_id in entry.source_provider_data_ids:
+                provider_data = await ProviderData.get(provider_id)
+                if provider_data:
+                    all_providers_data.append(provider_data)
+        
+        for def_id in entry.definition_ids:
+            definition = await Definition.get(def_id)
+            if definition:
+                # Load examples
+                examples = []
+                if definition.example_ids:
+                    for example_id in definition.example_ids:
+                        example = await Example.get(example_id)
+                        if example:
+                            examples.append(example.model_dump())
+                
+                # Create DefinitionResponse
+                def_response = DefinitionResponse(
+                    created_at=definition.created_at,
+                    updated_at=definition.updated_at,
+                    version=definition.version,
+                    part_of_speech=definition.part_of_speech,
+                    text=definition.text,
+                    meaning_cluster=definition.meaning_cluster.model_dump() if definition.meaning_cluster else None,
+                    sense_number=definition.sense_number,
+                    word_forms=[wf.model_dump() for wf in definition.word_forms],
+                    examples=examples,
+                    synonyms=definition.synonyms,
+                    antonyms=definition.antonyms,
+                    language_register=definition.language_register,
+                    domain=definition.domain,
+                    region=definition.region,
+                    usage_notes=[un.model_dump() for un in definition.usage_notes],
+                    grammar_patterns=[gp.model_dump() for gp in definition.grammar_patterns],
+                    collocations=[c.model_dump() for c in definition.collocations],
+                    transitivity=definition.transitivity,
+                    cefr_level=definition.cefr_level,
+                    frequency_band=definition.frequency_band,
+                    providers_data=all_providers_data,  # Use the loaded provider data
+                )
+                
+                definitions.append(def_response)
     
     # Load pronunciation from ID
     pronunciation = None
@@ -364,17 +496,38 @@ async def lookup_word_stream(
 
 @router.post("/lookup/{word}/regenerate-examples")
 async def regenerate_examples(
+    request: Request,
     word: str,
     definition_index: int = Query(..., description="Index of the definition"),
     count: int = Query(3, ge=1, le=10, description="Number of examples to generate"),
 ) -> dict:
     """Regenerate examples for a specific definition."""
-    from floridify.ai import get_openai_connector
-    from floridify.ai.synthesis_functions import synthesize_examples
-    from floridify.models.models import Definition, Example, SynthesizedDictionaryEntry, Word
+    from ...ai import get_openai_connector
+    from ...ai.synthesis_functions import synthesize_examples
+    from ...models import Definition, Example, SynthesizedDictionaryEntry, Word
+    
+    # Check AI rate limit (estimate ~2000 tokens for example generation)
+    client_key = get_client_key(request)
+    allowed, headers = await ai_limiter.check_request_allowed(
+        client_key,
+        estimated_tokens=2000 * count  # Estimate per example
+    )
+    
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="AI rate limit exceeded",
+            headers=headers,
+        )
+    
+    # Sanitize and validate word input
+    try:
+        clean_word = validate_word_input(word)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     
     # Get the word
-    word_obj = await Word.find_one({"text": word})
+    word_obj = await Word.find_one({"text": clean_word})
     if not word_obj:
         raise HTTPException(404, f"Word '{word}' not found")
     

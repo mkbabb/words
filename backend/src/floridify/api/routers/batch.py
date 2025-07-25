@@ -95,18 +95,20 @@ async def batch_lookup(request: BatchLookupRequest) -> dict[str, Any]:
         results = {}
         errors = {}
         
-        # Process lookups
+        # Process lookups - create actual async tasks for parallel execution
         tasks = []
         for word in request.words:
-            task = lookup_word_pipeline(
-                word=word,
-                providers=request.providers,
-                languages=request.languages,
-                force_refresh=request.force_refresh
+            task = asyncio.create_task(
+                lookup_word_pipeline(
+                    word=word,
+                    providers=request.providers,
+                    languages=request.languages,
+                    force_refresh=request.force_refresh
+                )
             )
             tasks.append((word, task))
         
-        # Execute in parallel
+        # Execute in parallel - await the already created tasks
         for word, task in tasks:
             try:
                 result = await task

@@ -6,8 +6,8 @@ from typing import Any
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
-from floridify.api.core.base import BaseRepository
-from floridify.models.models import Etymology, ModelInfo, SynthesizedDictionaryEntry
+from ..core.base import BaseRepository
+from ...models import Etymology, ModelInfo, SynthesizedDictionaryEntry
 
 
 class SynthesisCreate(BaseModel):

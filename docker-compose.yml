@@ -26,7 +26,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/.venv
-      - ./auth:/app/auth:ro
+      - ./auth:/app/auth
     # Development command with reload
     command: ["uvicorn", "src.floridify.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 

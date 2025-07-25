@@ -1,0 +1,29 @@
+:root {
+    --size: 128px;
+    --background: white;
+    --color: #1f2937;
+    --border-radius: 16px;
+    --font-size: 96px;
+    --vertical-offset: -16px;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    width: var(--size);
+    height: var(--size);
+    background: var(--background);
+    border-radius: var(--border-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.katex {
+    font-size: var(--font-size) !important;
+    color: var(--color);
+}
+
+.katex-display {
+    margin: 0 !important;
+}

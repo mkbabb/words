@@ -210,6 +210,32 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
         await doc.delete()
         return True
     
+    async def get_many(
+        self,
+        ids: builtins.list[PydanticObjectId | str]
+    ) -> builtins.list[T]:
+        """Get multiple documents by IDs efficiently."""
+        # Convert string IDs to ObjectId
+        object_ids = [
+            PydanticObjectId(id) if isinstance(id, str) else id 
+            for id in ids
+        ]
+        
+        # Fetch all documents in one query
+        docs = await self.model.find(
+            In(self.model.id, object_ids)
+        ).to_list()
+        
+        # Create a mapping for easy access
+        doc_map = {str(doc.id): doc for doc in docs}
+        
+        # Return in the same order as requested
+        return [
+            doc_map.get(str(id)) 
+            for id in ids 
+            if str(id) in doc_map
+        ]
+    
     async def batch_create(
         self,
         items: builtins.list[CreateSchema]

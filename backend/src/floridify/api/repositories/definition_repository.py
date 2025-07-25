@@ -6,8 +6,8 @@ from beanie import PydanticObjectId
 from beanie.operators import In
 from pydantic import BaseModel, Field
 
-from floridify.api.core.base import BaseRepository
-from floridify.models.models import (
+from ..core.base import BaseRepository
+from ...models import (
     Collocation,
     Definition,
     GrammarPattern,
@@ -165,7 +165,7 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
     
     async def _cascade_delete(self, definition: Definition) -> None:
         """Delete related documents when deleting a definition."""
-        from floridify.models.models import Example
+        from ...models import Example
         
         # Delete all examples for this definition
         if definition.example_ids:
@@ -173,7 +173,7 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
     
     async def get_with_examples(self, id: PydanticObjectId) -> dict[str, Any]:
         """Get definition with expanded examples."""
-        from floridify.models.models import Example
+        from ...models import Example
         
         definition = await self.get(id)
         definition_dict = definition.model_dump()
@@ -188,3 +188,37 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
             definition_dict["examples"] = []
         
         return definition_dict
+    
+    async def get_many_with_examples(self, definitions: list[Definition]) -> list[dict[str, Any]]:
+        """Get multiple definitions with expanded examples efficiently."""
+        from ...models import Example
+        
+        # Collect all example IDs
+        all_example_ids = []
+        for definition in definitions:
+            if definition.example_ids:
+                all_example_ids.extend(definition.example_ids)
+        
+        # Fetch all examples in one query
+        examples_map = {}
+        if all_example_ids:
+            examples = await Example.find(
+                In(Example.id, all_example_ids)
+            ).to_list()
+            examples_map = {str(ex.id): ex for ex in examples}
+        
+        # Build results with examples
+        results = []
+        for definition in definitions:
+            def_dict = definition.model_dump()
+            if definition.example_ids:
+                def_dict["examples"] = [
+                    examples_map[str(ex_id)].model_dump()
+                    for ex_id in definition.example_ids
+                    if str(ex_id) in examples_map
+                ]
+            else:
+                def_dict["examples"] = []
+            results.append(def_dict)
+        
+        return results

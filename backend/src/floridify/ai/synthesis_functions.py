@@ -149,8 +149,8 @@ async def synthesize_word_forms(
         response = await ai.identify_word_forms(word.text, part_of_speech)
         return [
             WordForm(
-                form_type=form["form_type"],  # type: ignore[arg-type]
-                text=str(form["text"]),
+                form_type=form.type,
+                text=form.text,
             )
             for form in response.forms
         ]
@@ -249,7 +249,7 @@ async def classify_definition_register(
                 stage=Stages.AI_SYNTHESIS, message="Classifying register for definition"
             )
         response = await ai.classify_register(definition.text)
-        return response.register
+        return response.language_register
     except Exception as e:
         logger.error(f"Failed to classify register: {e}")
         return None
@@ -332,13 +332,9 @@ async def identify_collocations(
         )
         return [
             Collocation(
-                text=str(coll["text"]),
-                type=coll["type"],  # type: ignore[arg-type]
-                frequency=(
-                    float(coll["frequency"])
-                    if coll.get("frequency") is not None
-                    else 0.0
-                ),
+                text=coll.phrase,
+                type=coll.type,
+                frequency=coll.frequency,
             )
             for coll in response.collocations
         ]
@@ -366,8 +362,8 @@ async def generate_usage_notes(
         response = await ai.generate_usage_notes(word, definition.text)
         return [
             UsageNote(
-                type=note["type"],  # type: ignore[arg-type]
-                text=str(note["text"]),
+                type=note.type,
+                text=note.text,
             )
             for note in response.notes
         ]
@@ -430,10 +426,18 @@ async def generate_facts(
                 else "general"
             )
 
-            # Ensure category is valid
-            valid_categories = ["general", "technical", "cultural", "scientific"]
-            if category not in valid_categories:
-                category = "general"
+            # Ensure category is valid - map to allowed Fact categories
+            category_mapping = {
+                "general": "usage",
+                "technical": "linguistic",
+                "scientific": "linguistic",
+                "cultural": "cultural",
+                "etymology": "etymology",
+                "historical": "historical",
+                "usage": "usage",
+                "linguistic": "linguistic"
+            }
+            category = category_mapping.get(category.lower(), "usage")
 
             fact = Fact(
                 word_id=str(word.id),
@@ -719,13 +723,13 @@ async def enhance_definitions_parallel(
             "synonyms",
             "examples",
             "antonyms",
-            "word_forms",
-            "cefr_level",
-            "frequency_band",
-            "register",
-            "domain",
-            "grammar_patterns",
-            "collocations",
+            # "word_forms",
+            # "cefr_level",
+            # "frequency_band",
+            # "register",
+            # "domain",
+            # "grammar_patterns",
+            # "collocations",  # Disabled by default to improve performance
             "usage_notes",
             "regional_variants",
         }
@@ -755,7 +759,7 @@ async def enhance_definitions_parallel(
             # Use the part of speech from the definition
             tasks.append(
                 synthesize_word_forms(
-                    definition.word, definition.part_of_speech, ai, state_tracker
+                    word, definition.part_of_speech, ai, state_tracker
                 )
             )
             task_info.append((definition, "word_forms", len(tasks) - 1))

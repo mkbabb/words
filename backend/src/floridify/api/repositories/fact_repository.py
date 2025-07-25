@@ -4,8 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from floridify.api.core.base import BaseRepository
-from floridify.models.models import Fact
+from ..core.base import BaseRepository
+from ...models import Fact
 
 
 class FactCreate(BaseModel):

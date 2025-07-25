@@ -6,16 +6,16 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 
-from floridify.api.core import (
+from ..core import (
     BulkOperationBuilder,
     handle_api_errors,
 )
-from floridify.api.repositories import (
+from ..repositories import (
     DefinitionRepository,
     ExampleRepository,
     WordRepository,
 )
-from floridify.models.models import Definition, Example, Fact, Word
+from ...models import Definition, Example, Fact, Word
 
 router = APIRouter(prefix="/batch/v2", tags=["batch-v2"])
 

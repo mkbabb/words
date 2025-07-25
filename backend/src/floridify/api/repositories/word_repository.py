@@ -7,8 +7,9 @@ from beanie import PydanticObjectId
 from beanie.operators import RegEx
 from pydantic import BaseModel, Field
 
-from floridify.api.core.base import BaseRepository
-from floridify.models.models import Language, Word
+from ..core.base import BaseRepository
+from ...constants import Language
+from ...models import Word
 
 
 class WordCreate(BaseModel):
@@ -110,7 +111,7 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
     
     async def _cascade_delete(self, word: Word) -> None:
         """Delete related documents when deleting a word."""
-        from floridify.models.models import (
+        from ...models import (
             Definition,
             Example,
             Fact,
@@ -129,7 +130,7 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
     
     async def get_with_counts(self, id: PydanticObjectId) -> dict[str, Any]:
         """Get word with related document counts."""
-        from floridify.models.models import Definition, Example, Fact
+        from ...models import Definition, Example, Fact
         
         word = await self.get(id)
         word_dict = word.model_dump()

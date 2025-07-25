@@ -18,6 +18,7 @@ from ..models import (
     ProviderData,
     Word,
 )
+from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger
 from .base import DictionaryConnector
 
@@ -73,7 +74,6 @@ class OxfordConnector(DictionaryConnector):
 
         try:
             # Get or create Word document
-            from ..storage.mongodb import get_storage
             storage = await get_storage()
             word_obj = await storage.get_word(word)
             if not word_obj:

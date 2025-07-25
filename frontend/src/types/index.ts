@@ -170,7 +170,7 @@ export interface HandwritingOptions extends AnimationOptions {
 }
 
 export interface LatexFillOptions extends AnimationOptions {
-  fillDirection: 'left-to-right' | 'top-to-bottom' | 'center-out';
+  fillDirection: 'left-to-right' | 'top-to-bottom' | 'center-out' | '3b1b-radial' | '3b1b-diamond' | '3b1b-morph';
   mathMode: boolean;
 }
 

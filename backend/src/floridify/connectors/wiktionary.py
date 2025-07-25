@@ -10,6 +10,7 @@ from typing import Any
 import wikitextparser as wtp  # type: ignore[import-untyped]
 
 from ..caching import get_cached_http_client
+from ..constants import Language
 from ..core.state_tracker import Stages, StateTracker
 from ..models import (
     Definition,
@@ -19,6 +20,7 @@ from ..models import (
     ProviderData,
     Word,
 )
+from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger
 from .base import DictionaryConnector
 
@@ -139,12 +141,10 @@ class WiktionaryConnector(DictionaryConnector):
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
 
             # First, get or create the Word document
-            from ..storage.mongodb import get_storage
             storage = await get_storage()
             word_obj = await storage.get_word(word)
             if not word_obj:
                 # Create new Word if doesn't exist
-                from ..constants import Language
                 word_obj = Word(
                     text=word,
                     normalized=word.lower(),

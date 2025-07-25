@@ -8,7 +8,7 @@
       <div class="controls-section">
         <label>
           Animation Style:
-          <select v-model="selectedStyle" @change="restartAnimation">
+          <select v-model="selectedStyle" @change="() => restartAnimation()">
             <option value="3b1b-radial">3b1b Radial (Circle Expand)</option>
             <option value="3b1b-diamond">3b1b Diamond</option>
             <option value="3b1b-morph">3b1b Morph (Ellipse)</option>

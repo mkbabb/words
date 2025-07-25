@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ...constants import DictionaryProvider
-from ...models.models import (
+from ...models import (
     SynthesizedDictionaryEntry,
     Word,
 )

@@ -8,8 +8,8 @@ from beanie import Document
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo import ASCENDING, DESCENDING
 
-from floridify.storage.mongodb import get_database
-from floridify.utils.logging import get_logger
+from ...storage.mongodb import get_database
+from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
 

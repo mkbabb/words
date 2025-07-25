@@ -502,33 +502,45 @@ const currentAnimationComponent = computed(() => {
 const currentAnimationProps = computed(() => {
     const word = entry.value?.word || '';
     
-    const baseProps = { 
-        text: word,
-        class: 'text-word-title',
-        customStyles: {
-            color: 'var(--color-foreground)',
-            // Add subtle texture overlay without making text transparent
-            position: 'relative',
-            textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-        }
+    const customStyles = {
+        color: 'var(--color-foreground)',
+        // Add subtle texture overlay without making text transparent
+        position: 'relative',
+        textShadow: '0 1px 2px rgba(0,0,0,0.1)'
     };
     
     switch (selectedAnimation.value) {
         case 'typewriter':
-            return { ...baseProps, speed: 300, cursor: true }; // 300ms between characters for slow, readable typing
+            return { 
+                text: word,
+                class: 'text-word-title',
+                customStyles,
+                speed: 300, 
+                cursor: true 
+            }; // 300ms between characters for slow, readable typing
         case 'handwriting':
-            return { ...baseProps, speed: 2, strokeWidth: 2 };
+            return { 
+                text: word,
+                class: 'text-word-title',
+                customStyles,
+                speed: 2, 
+                strokeWidth: 2 
+            };
         case 'latex':
             return { 
                 content: word,
                 class: 'text-word-title',
-                customStyles: baseProps.customStyles,
+                customStyles,
                 speed: 1.5, 
-                fillDirection: '3b1b-radial',
+                fillDirection: '3b1b-radial' as const,
                 mathMode: false
             };
         default:
-            return baseProps;
+            return { 
+                text: word,
+                class: 'text-word-title',
+                customStyles
+            };
     }
 });
 

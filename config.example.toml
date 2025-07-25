@@ -1,0 +1,48 @@
+# Floridify Configuration Example
+# Copy this file to auth/config.toml and update with your actual values
+
+[openai]
+api_key = "your-openai-api-key-here"
+# model = "gpt-4o"  # Optional, defaults to gpt-4o
+# reasoning_effort = "high"  # Optional, defaults to high
+# embedding_model = "text-embedding-3-large"  # Optional
+
+[oxford]
+app_id = "your-oxford-app-id"
+api_key = "your-oxford-api-key"
+
+[dictionary_com]
+authorization = "your-dictionary-com-authorization-token"
+
+[database]
+# Production connection (when running in EC2/VPC)
+production_url = "mongodb://username:password@your-docdb-cluster.amazonaws.com:27017/floridify?tls=true&retryWrites=false"
+
+# Development connection (via SSH tunnel to localhost:27018)
+development_url = "mongodb://username:password@localhost:27018/floridify?tls=true&retryWrites=false&tlsAllowInvalidHostnames=true&directConnection=true"
+
+# Database name
+name = "floridify"
+
+# Connection settings
+# timeout = 30  # Optional, defaults to 30
+# max_pool_size = 100  # Optional, defaults to 100
+
+[rate_limits]
+# oxford_rps = 10.0  # Optional, defaults to 10.0
+# dictionary_com_rps = 20.0  # Optional, defaults to 20.0
+# wiktionary_rps = 50.0  # Optional, defaults to 50.0
+# openai_bulk_max_concurrent = 5  # Optional, defaults to 5
+
+[processing]
+# max_concurrent_words = 100  # Optional, defaults to 100
+# batch_size = 50  # Optional, defaults to 50
+# retry_attempts = 3  # Optional, defaults to 3
+# cache_ttl_hours = 24  # Optional, defaults to 24
+# verbose = false  # Optional, defaults to false
+
+# Model configuration (referenced by openai section if not specified there)
+[models]
+# openai_model = "gpt-4o"
+# reasoning_effort = "high"
+# embedding_model = "text-embedding-3-large"
