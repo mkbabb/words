@@ -532,7 +532,7 @@ const currentAnimationProps = computed(() => {
                 class: 'text-word-title',
                 customStyles,
                 speed: 1.5, 
-                fillDirection: '3b1b-radial' as const,
+                fillDirection: 'center-out' as const,
                 mathMode: false
             };
         default:

@@ -24,8 +24,7 @@ class Pronunciation(Document, BaseMetadata):
 
     word_id: str  # FK to Word
     phonetic: str  # e.g., "on koo-LEES"
-    ipa_british: str | None = None  # British IPA
-    ipa_american: str | None = None  # American IPA
+    ipa: str  # American IPA
     audio_file_ids: list[str] = []  # FK to AudioMedia documents
     syllables: list[str] = []
     stress_pattern: str | None = None  # Primary/secondary stress
@@ -90,7 +89,9 @@ class Definition(Document, BaseMetadata):
     antonyms: list[str] = []
 
     # Usage and context
-    language_register: Literal["formal", "informal", "neutral", "slang", "technical"] | None = None
+    language_register: (
+        Literal["formal", "informal", "neutral", "slang", "technical"] | None
+    ) = None
     domain: str | None = None  # medical, legal, computing
     region: str | None = None  # US, UK, AU
     usage_notes: list[UsageNote] = []
@@ -102,7 +103,9 @@ class Definition(Document, BaseMetadata):
 
     # Educational metadata
     cefr_level: Literal["A1", "A2", "B1", "B2", "C1", "C2"] | None = None
-    frequency_band: int | None = Field(default=None, ge=1, le=5)  # 1-5, Oxford 3000/5000 style
+    frequency_band: int | None = Field(
+        default=None, ge=1, le=5
+    )  # 1-5, Oxford 3000/5000 style
 
     # Media and provenance
     image_ids: list[str] = []  # FK to ImageMedia documents

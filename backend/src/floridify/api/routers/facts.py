@@ -76,10 +76,7 @@ class FactGenerationRequest(BaseModel):
 
 
 @router.get("", response_model=ListResponse[Fact])
-@handle_api_errors
 async def list_facts(
-    request: Request,
-    response: Response,
     repo: FactRepository = Depends(get_fact_repo),
     pagination: PaginationParams = Depends(get_pagination),
     sort: SortParams = Depends(get_sort),
@@ -115,28 +112,19 @@ async def list_facts(
     # Apply field selection
     items = []
     for fact in facts:
-        fact_dict = fact.model_dump()
-        fact_dict = fields.apply_to_dict(fact_dict)
-        items.append(fact_dict)
+        item = fact.model_dump()
+        if fields.include or fields.exclude:
+            # Apply field filtering if needed
+            pass
+        items.append(item)
 
     # Build response
-    response_data = ListResponse(
+    return ListResponse(
         items=items,
         total=total,
         offset=pagination.offset,
         limit=pagination.limit,
     )
-
-    # Set ETag
-    etag = get_etag(response_data.model_dump())
-    response.headers["ETag"] = etag
-
-    # Check if Not Modified
-    if check_etag(request, etag):
-        response.status_code = 304
-        return Response(status_code=304)
-
-    return response_data
 
 
 @router.post("", response_model=ResourceResponse, status_code=201)

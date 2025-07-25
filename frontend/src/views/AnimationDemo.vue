@@ -46,10 +46,21 @@
         <!-- Basic Text Animation -->
         <div class="demo-card">
           <h3>Basic Text</h3>
-          <LatexFillText
+          <ThreeB1BText
+            v-if="selectedStyle.startsWith('3b1b')"
             ref="basicTextRef"
             content="E = mc²"
-            :fillDirection="selectedStyle"
+            :fillStyle="selectedStyle as any"
+            :speed="animationSpeed"
+            :autoplay="autoplay"
+            :loop="loop"
+            className="demo-text"
+          />
+          <LatexFillText
+            v-else
+            ref="basicTextRef"
+            content="E = mc²"
+            :fillDirection="selectedStyle as any"
             :speed="animationSpeed"
             :autoplay="autoplay"
             :loop="loop"
@@ -65,11 +76,25 @@
         <!-- Mathematical Expression -->
         <div class="demo-card">
           <h3>Mathematical Expression</h3>
-          <LatexFillText
+          <ThreeB1BText
+            v-if="selectedStyle.startsWith('3b1b')"
             ref="mathTextRef"
+            content=""
             :latexExpression="'\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}'"
             :mathMode="true"
-            :fillDirection="selectedStyle"
+            :fillStyle="selectedStyle as any"
+            :speed="animationSpeed"
+            :autoplay="autoplay"
+            :loop="loop"
+            className="demo-text math-text"
+          />
+          <LatexFillText
+            v-else
+            ref="mathTextRef"
+            content=""
+            :latexExpression="'\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}'"
+            :mathMode="true"
+            :fillDirection="selectedStyle as any"
             :speed="animationSpeed"
             :autoplay="autoplay"
             :loop="loop"
@@ -85,11 +110,25 @@
         <!-- Vector Notation -->
         <div class="demo-card">
           <h3>Vector Notation</h3>
-          <LatexFillText
+          <ThreeB1BText
+            v-if="selectedStyle.startsWith('3b1b')"
             ref="vectorTextRef"
+            content=""
             :latexExpression="'\\vec{v} = \\begin{pmatrix} x \\\\ y \\\\ z \\end{pmatrix}'"
             :mathMode="true"
-            :fillDirection="selectedStyle"
+            :fillStyle="selectedStyle as any"
+            :speed="animationSpeed"
+            :autoplay="autoplay"
+            :loop="loop"
+            className="demo-text math-text"
+          />
+          <LatexFillText
+            v-else
+            ref="vectorTextRef"
+            content=""
+            :latexExpression="'\\vec{v} = \\begin{pmatrix} x \\\\ y \\\\ z \\end{pmatrix}'"
+            :mathMode="true"
+            :fillDirection="selectedStyle as any"
             :speed="animationSpeed"
             :autoplay="autoplay"
             :loop="loop"
@@ -105,11 +144,25 @@
         <!-- Physics Equation -->
         <div class="demo-card">
           <h3>Physics Equation</h3>
-          <LatexFillText
+          <ThreeB1BText
+            v-if="selectedStyle.startsWith('3b1b')"
             ref="physicsTextRef"
+            content=""
             :latexExpression="'\\nabla \\times \\vec{B} = \\mu_0 \\vec{J} + \\mu_0 \\epsilon_0 \\frac{\\partial \\vec{E}}{\\partial t}'"
             :mathMode="true"
-            :fillDirection="selectedStyle"
+            :fillStyle="selectedStyle as any"
+            :speed="animationSpeed"
+            :autoplay="autoplay"
+            :loop="loop"
+            className="demo-text math-text"
+          />
+          <LatexFillText
+            v-else
+            ref="physicsTextRef"
+            content=""
+            :latexExpression="'\\nabla \\times \\vec{B} = \\mu_0 \\vec{J} + \\mu_0 \\epsilon_0 \\frac{\\partial \\vec{E}}{\\partial t}'"
+            :mathMode="true"
+            :fillDirection="selectedStyle as any"
             :speed="animationSpeed"
             :autoplay="autoplay"
             :loop="loop"
@@ -125,11 +178,25 @@
         <!-- Calculus -->
         <div class="demo-card">
           <h3>Calculus</h3>
-          <LatexFillText
+          <ThreeB1BText
+            v-if="selectedStyle.startsWith('3b1b')"
             ref="calculusTextRef"
+            content=""
             :latexExpression="'\\lim_{h \\to 0} \\frac{f(x+h) - f(x)}{h} = f\'(x)'"
             :mathMode="true"
-            :fillDirection="selectedStyle"
+            :fillStyle="selectedStyle as any"
+            :speed="animationSpeed"
+            :autoplay="autoplay"
+            :loop="loop"
+            className="demo-text math-text"
+          />
+          <LatexFillText
+            v-else
+            ref="calculusTextRef"
+            content=""
+            :latexExpression="'\\lim_{h \\to 0} \\frac{f(x+h) - f(x)}{h} = f\'(x)'"
+            :mathMode="true"
+            :fillDirection="selectedStyle as any"
             :speed="animationSpeed"
             :autoplay="autoplay"
             :loop="loop"
@@ -145,11 +212,25 @@
         <!-- Linear Algebra -->
         <div class="demo-card">
           <h3>Linear Algebra</h3>
-          <LatexFillText
+          <ThreeB1BText
+            v-if="selectedStyle.startsWith('3b1b')"
             ref="linearTextRef"
+            content=""
             :latexExpression="'A = \\begin{bmatrix} a_{11} & a_{12} \\\\ a_{21} & a_{22} \\end{bmatrix}'"
             :mathMode="true"
-            :fillDirection="selectedStyle"
+            :fillStyle="selectedStyle as any"
+            :speed="animationSpeed"
+            :autoplay="autoplay"
+            :loop="loop"
+            className="demo-text math-text"
+          />
+          <LatexFillText
+            v-else
+            ref="linearTextRef"
+            content=""
+            :latexExpression="'A = \\begin{bmatrix} a_{11} & a_{12} \\\\ a_{21} & a_{22} \\end{bmatrix}'"
+            :mathMode="true"
+            :fillDirection="selectedStyle as any"
             :speed="animationSpeed"
             :autoplay="autoplay"
             :loop="loop"
@@ -173,9 +254,17 @@
             class="comparison-item"
           >
             <h4>{{ getStyleName(style) }}</h4>
-            <LatexFillText
+            <ThreeB1BText
+              v-if="style.startsWith('3b1b')"
               :content="'∇²φ = 0'"
-              :fillDirection="style"
+              :fillStyle="style as any"
+              :speed="1.5"
+              :autoplay="false"
+            />
+            <LatexFillText
+              v-else
+              :content="'∇²φ = 0'"
+              :fillDirection="style as any"
               :speed="1.5"
               :autoplay="false"
               :loop="true"
@@ -192,6 +281,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import LatexFillText from '@/components/custom/text-animations/LatexFillText.vue'
+import ThreeB1BText from '@/components/custom/text-animations/ThreeB1BText.vue'
 
 // Animation refs
 const basicTextRef = ref()
@@ -202,7 +292,7 @@ const calculusTextRef = ref()
 const linearTextRef = ref()
 
 // Animation settings
-const selectedStyle = ref<string>('3b1b-radial')
+const selectedStyle = ref<'3b1b-radial' | '3b1b-diamond' | '3b1b-morph' | 'center-out' | 'left-to-right' | 'top-to-bottom'>('3b1b-radial')
 const animationSpeed = ref(1.5)
 const autoplay = ref(true)
 const loop = ref(false)

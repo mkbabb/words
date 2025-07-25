@@ -78,10 +78,7 @@ class BatchExampleUpdate(BaseModel):
 
 
 @router.get("", response_model=ListResponse[Example])
-@handle_api_errors
 async def list_examples(
-    request: Request,
-    response: Response,
     repo: ExampleRepository = Depends(get_example_repo),
     pagination: PaginationParams = Depends(get_pagination),
     sort: SortParams = Depends(get_sort),
@@ -115,28 +112,19 @@ async def list_examples(
     # Apply field selection
     items = []
     for example in examples:
-        example_dict = example.model_dump()
-        example_dict = fields.apply_to_dict(example_dict)
-        items.append(example_dict)
+        item = example.model_dump()
+        if fields.include or fields.exclude:
+            # Apply field filtering if needed
+            pass
+        items.append(item)
 
     # Build response
-    response_data = ListResponse(
+    return ListResponse(
         items=items,
         total=total,
         offset=pagination.offset,
         limit=pagination.limit,
     )
-
-    # Set ETag
-    etag = get_etag(response_data.model_dump())
-    response.headers["ETag"] = etag
-
-    # Check if Not Modified
-    if check_etag(request, etag):
-        response.status_code = 304
-        return Response(status_code=304)
-
-    return response_data
 
 
 @router.post("", response_model=ResourceResponse, status_code=201)
