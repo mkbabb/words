@@ -32,25 +32,26 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   className: '',
   textureEnabled: true,
-  textureType: 'clean',
-  textureIntensity: 'subtle',
+  textureType: 'aged',
+  textureIntensity: 'medium',
   customStyles: () => ({}),
 })
 
-// Texture system integration - using classes only to avoid visibility issues  
-const { textureClasses } = useTextureSystem({
+// Texture system integration - using both styles and classes for pronounced texture
+const { textureClasses, textureStyles } = useTextureSystem({
   enabled: props.textureEnabled,
   options: {
     type: props.textureType,
     intensity: props.textureIntensity,
     blendMode: 'multiply',
-    opacity: 0.03,
+    opacity: 0.15, // More pronounced
   },
 })
 
-// Combined styles - only add texture styles, don't override core styles
+// Combined styles - add texture styles for pronounced paper effect
 const cardStyles = computed(() => ({
   ...props.customStyles,
+  ...(props.textureEnabled ? textureStyles.value : {}),
   // Only add background-image, avoid mixBlendMode and opacity on the element itself
   ...(props.textureEnabled ? {
     backgroundImage: `var(--paper-${props.textureType}-texture)`,

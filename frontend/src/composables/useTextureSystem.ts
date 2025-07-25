@@ -11,7 +11,7 @@ export function useTextureSystem(initialConfig?: Partial<TextureConfig>) {
   const textureType = ref<TextureType>(initialConfig?.options?.type ?? 'clean')
   const textureIntensity = ref<TextureIntensity>(initialConfig?.options?.intensity ?? 'subtle')
   const blendMode = ref(initialConfig?.options?.blendMode ?? 'multiply')
-  const opacity = ref(initialConfig?.options?.opacity ?? 0.03)
+  const opacity = ref(initialConfig?.options?.opacity ?? 0.12)
 
   // Computed texture options
   const textureOptions = computed<TextureOptions>(() => ({
@@ -92,7 +92,7 @@ export function useTextureSystem(initialConfig?: Partial<TextureConfig>) {
     textureType.value = 'clean'
     textureIntensity.value = 'subtle'
     blendMode.value = 'multiply'
-    opacity.value = 0.03
+    opacity.value = 0.12
   }
 
   // Watch for changes and update CSS custom properties on document root
@@ -105,7 +105,7 @@ export function useTextureSystem(initialConfig?: Partial<TextureConfig>) {
         if (newConfig.enabled) {
           root.style.setProperty('--current-texture-type', newConfig.options.type)
           root.style.setProperty('--current-texture-intensity', newConfig.options.intensity)
-          root.style.setProperty('--current-texture-opacity', newConfig.options.opacity?.toString() || '0.03')
+          root.style.setProperty('--current-texture-opacity', newConfig.options.opacity?.toString() || '0.12')
           root.style.setProperty('--current-texture-blend-mode', newConfig.options.blendMode || 'multiply')
         } else {
           root.style.removeProperty('--current-texture-type')
@@ -155,7 +155,7 @@ export function useGlobalTextureSystem() {
         type: 'clean',
         intensity: 'subtle',
         blendMode: 'multiply',
-        opacity: 0.03,
+        opacity: 0.12,
       },
     })
   }

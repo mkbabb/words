@@ -17,7 +17,7 @@ from ...caching.decorators import cached_api_call
 from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, lookup_state_tracker
-from ...models.models import Definition, Pronunciation
+from ...models.models import Definition, Pronunciation, Word
 from ...utils.logging import get_logger
 from .common import PipelineMetrics
 
@@ -128,11 +128,27 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
     if not entry:
         return None
 
+    # Load definitions from IDs
+    definitions = []
+    for def_id in entry.definition_ids:
+        definition = await Definition.get(def_id)
+        if definition:
+            definitions.append(definition)
+    
+    # Load pronunciation from ID
+    pronunciation = None
+    if entry.pronunciation_id:
+        pronunciation = await Pronunciation.get(entry.pronunciation_id)
+    
+    # Load word
+    word_obj = await Word.get(entry.word_id)
+    word_text = word_obj.text if word_obj else "unknown"
+
     return LookupResponse(
-        word=entry.word,
-        pronunciation=entry.pronunciation,
-        definitions=entry.definitions,
-        last_updated=entry.last_updated,
+        word=word_text,
+        pronunciation=pronunciation,
+        definitions=definitions,
+        last_updated=entry.updated_at,  # Use updated_at from BaseMetadata
         pipeline_metrics=None,
     )
 
@@ -269,12 +285,28 @@ async def _lookup_with_tracking(
         )
         return None
 
+    # Load definitions from IDs (same as cached path)
+    definitions = []
+    for def_id in entry.definition_ids:
+        definition = await Definition.get(def_id)
+        if definition:
+            definitions.append(definition)
+    
+    # Load pronunciation from ID
+    pronunciation = None
+    if entry.pronunciation_id:
+        pronunciation = await Pronunciation.get(entry.pronunciation_id)
+    
+    # Load word
+    word_obj = await Word.get(entry.word_id)
+    word_text = word_obj.text if word_obj else "unknown"
+
     # Convert to response model
     result = LookupResponse(
-        word=entry.word,
-        pronunciation=entry.pronunciation,
-        definitions=entry.definitions,
-        last_updated=entry.last_updated,
+        word=word_text,
+        pronunciation=pronunciation,
+        definitions=definitions,
+        last_updated=entry.updated_at,  # Use updated_at from BaseMetadata
         pipeline_metrics=None,
     )
 
@@ -284,7 +316,7 @@ async def _lookup_with_tracking(
         progress=100,
         message=f"Found {len(result.definitions)} definitions", 
         is_complete=True,
-        details={"result": result.model_dump()}
+        details={"result": jsonable_encoder(result)}
     )
 
     return result

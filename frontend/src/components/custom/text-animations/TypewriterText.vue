@@ -22,7 +22,7 @@ import type { TextureType, TextureIntensity } from '@/types'
 interface Props {
   /** Text to animate */
   text: string
-  /** Animation speed (characters per second) */
+  /** Animation speed (milliseconds between characters) */
   speed?: number
   /** Delay before animation starts (ms) */
   delay?: number
@@ -52,7 +52,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   text: '',
-  speed: 50,
+  speed: 100, // 100ms between characters for readable typing
   delay: 0,
   autoplay: true,
   loop: false,

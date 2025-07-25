@@ -124,8 +124,8 @@ export const dictionaryApi = {
         languages.forEach(language => params.append('languages', language));
       }
       
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-      const url = `${baseUrl}/api/lookup/${word}/stream${params.toString() ? '?' + params.toString() : ''}`;
+      // Use relative URL to ensure it goes through the Vite proxy
+      const url = `/api/lookup/${word}/stream${params.toString() ? '?' + params.toString() : ''}`;
       
       console.log(`Opening SSE connection to: ${url}`);
       const eventSource = new EventSource(url);

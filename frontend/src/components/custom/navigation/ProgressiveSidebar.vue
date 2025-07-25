@@ -112,7 +112,7 @@
 import { computed, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores'
-import { cn, detectPartOfSpeech } from '@/utils'
+import { cn } from '@/utils'
 import { ShimmerText } from '@/components/custom/animation'
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui'
 
@@ -215,7 +215,7 @@ const sidebarSections = computed((): SidebarCluster[] => {
       cluster.maxRelevancy = definition.relevancy || 1.0
     }
 
-    const partOfSpeech = definition.part_of_speech || detectPartOfSpeech(definition.definition)
+    const partOfSpeech = definition.part_of_speech
     const existingType = cluster.partsOfSpeech.find(pos => pos.type === partOfSpeech)
     if (existingType) {
       existingType.count++
@@ -248,7 +248,7 @@ const getDefinitionsForPartOfSpeech = (clusterId: string, partOfSpeech: string) 
 
   return entry.definitions.filter(def => {
     const defCluster = def.meaning_cluster || 'default'
-    const defPartOfSpeech = def.part_of_speech || detectPartOfSpeech(def.definition)
+    const defPartOfSpeech = def.part_of_speech
     return defCluster === clusterId && defPartOfSpeech === partOfSpeech
   }).sort((a, b) => (b.relevancy || 1.0) - (a.relevancy || 1.0))
 }

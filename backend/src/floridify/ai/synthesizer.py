@@ -79,12 +79,33 @@ class DefinitionSynthesizer:
             logger.warning(f"No definitions found for '{word}'")
             return None
 
-        # Cluster definitions
+        # DEDUPLICATION: Remove exact duplicates before clustering
+        unique_definitions: list[Definition] = []
+        seen_definitions: set[tuple[str, str]] = set()
+
+        for definition in all_definitions:
+            # Create a key based on part of speech and normalized text
+            key = (
+                definition.part_of_speech,
+                definition.text.strip().lower()
+            )
+
+            if key not in seen_definitions:
+                seen_definitions.add(key)
+                unique_definitions.append(definition)
+            else:
+                logger.debug(f"Skipping duplicate definition: {definition.text[:50]}...")
+
+        logger.info(
+            f"Deduplicated {len(all_definitions)} definitions to {len(unique_definitions)} unique definitions for '{word}'"
+        )
+
+        # Cluster unique definitions
         if state_tracker:
             await state_tracker.update_stage(Stages.AI_CLUSTERING)
 
         clustered_definitions = await cluster_definitions(
-            word_obj, all_definitions, self.ai, state_tracker
+            word_obj, unique_definitions, self.ai, state_tracker
         )
 
         # Synthesize core components
@@ -172,11 +193,12 @@ class DefinitionSynthesizer:
             )
 
             # Convert definitions to dict format for synthesis
+            # Note: We don't have provider info on Definition model, so use "wiktionary" as default
             def_dicts = [
                 {
                     "text": d.text,
                     "part_of_speech": d.part_of_speech,
-                    "provider": d.provider_ids[0] if d.provider_ids else "unknown",
+                    "provider": "wiktionary",  # Default provider since we don't track this on Definition
                 }
                 for d in cluster_defs
             ]

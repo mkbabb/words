@@ -29,13 +29,6 @@
       />
     </div>
 
-    <!-- Animation overlay mask -->
-    <div
-      v-if="isAnimating"
-      ref="maskRef"
-      class="latex-mask"
-      :style="maskStyles"
-    />
   </div>
 </template>
 
@@ -71,8 +64,6 @@ interface Props {
   textureType?: TextureType
   /** Texture intensity */
   textureIntensity?: TextureIntensity
-  /** Background color for mask */
-  maskColor?: string
   /** Additional CSS classes */
   className?: string
   /** Additional CSS classes for LaTeX component */
@@ -94,7 +85,6 @@ const props = withDefaults(defineProps<Props>(), {
   textureEnabled: false,
   textureType: 'clean',
   textureIntensity: 'subtle',
-  maskColor: '',
   className: '',
   latexClasses: '',
   customStyles: () => ({}),
@@ -103,7 +93,6 @@ const props = withDefaults(defineProps<Props>(), {
 // Template refs
 const containerRef = ref<HTMLElement | null>(null)
 const contentRef = ref<HTMLElement | null>(null)
-const maskRef = ref<HTMLElement | null>(null)
 
 // Texture system (optional)
 const { textureStyles, textureClasses } = useTextureSystem({
@@ -147,20 +136,6 @@ const contentStyles = computed(() => ({
   zIndex: 2,
 }))
 
-const maskStyles = computed(() => {
-  const backgroundColor = props.maskColor || 'var(--color-background)'
-  
-  return {
-    position: 'absolute' as const,
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    backgroundColor,
-    zIndex: 3,
-    pointerEvents: 'none' as const,
-  }
-})
 
 // Format content for non-math mode
 const formattedContent = computed(() => {
@@ -205,9 +180,6 @@ defineExpose({
   align-items: center;
 }
 
-.latex-mask {
-  transition: transform 0.1s ease;
-}
 
 /* Enhanced styling for mathematical content */
 .latex-content :deep(.katex) {
@@ -220,12 +192,8 @@ defineExpose({
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-  .latex-mask {
-    display: none !important;
-  }
-  
   .latex-fill-container {
-    /* Show content immediately without animation */
+    clip-path: none !important;
   }
 }
 </style>

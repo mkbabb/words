@@ -20,7 +20,7 @@ export function useTypewriterAnimation(
   let cursorTimeline: gsap.core.Timeline | null = null
 
   const defaultOptions: TypewriterOptions = {
-    speed: 50, // characters per second
+    speed: 100, // milliseconds between characters (slower = higher number)
     delay: 0,
     autoplay: true,
     loop: false,
@@ -48,7 +48,7 @@ export function useTypewriterAnimation(
     })
 
     const chars = text.value.split('')
-    const charDuration = 1 / config.speed
+    const charDuration = config.speed / 1000 // Convert milliseconds to seconds for GSAP
 
     chars.forEach((char, index) => {
       timeline!.call(() => {
@@ -245,35 +245,32 @@ export function useLatexFillAnimation(
 
     await nextTick()
 
-    // Create mask for fill effect
-    const mask = document.createElement('div')
-    mask.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: var(--color-background);
-      z-index: 1;
-    `
+    // Use CSS clip-path for clean fill effect
+    const initialClipPath = getInitialClipPath(config.fillDirection)
+    const finalClipPath = getFinalClipPath(config.fillDirection)
 
-    element.style.position = 'relative'
-    element.appendChild(mask)
+    // Set initial state based on fill direction
+    const initialState = get3b1bInitialState(config.fillDirection)
+    const finalState = get3b1bFinalState(config.fillDirection)
+
+    gsap.set(element, {
+      clipPath: initialClipPath,
+      ...initialState
+    })
 
     timeline = gsap.timeline({
       paused: !config.autoplay,
       delay: config.delay / 1000,
       repeat: config.loop ? -1 : 0,
       onComplete: () => {
-        mask.remove()
+        gsap.set(element, { clipPath: 'none' })
         isAnimating.value = false
       },
     })
 
-    // Animate mask based on fill direction
-    const maskAnimation = getLatexMaskAnimation(mask, config.fillDirection)
-    timeline.to(mask, {
-      ...maskAnimation,
+    timeline.to(element, {
+      clipPath: finalClipPath,
+      ...finalState,
       duration: config.speed,
       ease: config.easing,
     })
@@ -283,16 +280,63 @@ export function useLatexFillAnimation(
     }
   }
 
-  const getLatexMaskAnimation = (mask: HTMLElement, direction: string) => {
+  const get3b1bInitialState = (direction: string) => {
+    switch (direction) {
+      case '3b1b-radial':
+      case '3b1b-diamond':
+        return { scale: 0.9, opacity: 0.8 }
+      case '3b1b-morph':
+        return { scale: 0.8, opacity: 0.7, filter: 'blur(4px)' }
+      default:
+        return {}
+    }
+  }
+
+  const get3b1bFinalState = (direction: string) => {
+    switch (direction) {
+      case '3b1b-radial':
+      case '3b1b-diamond':
+        return { scale: 1, opacity: 1 }
+      case '3b1b-morph':
+        return { scale: 1, opacity: 1, filter: 'blur(0px)' }
+      default:
+        return {}
+    }
+  }
+
+  const getInitialClipPath = (direction: string) => {
     switch (direction) {
       case 'top-to-bottom':
-        return { y: '100%' }
+        return 'inset(0 0 100% 0)'
       case 'center-out':
-        gsap.set(mask, { transformOrigin: 'center center', scaleX: 1, scaleY: 1 })
-        return { scaleX: 0, scaleY: 0 }
+        return 'inset(50% 50% 50% 50%)'
+      case '3b1b-radial':
+        return 'circle(0% at 50% 50%)'
+      case '3b1b-diamond':
+        return 'polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%)'
+      case '3b1b-morph':
+        return 'ellipse(0% 0% at 50% 50%)'
       case 'left-to-right':
       default:
-        return { x: '100%' }
+        return 'inset(0 100% 0 0)'
+    }
+  }
+
+  const getFinalClipPath = (direction: string) => {
+    switch (direction) {
+      case 'top-to-bottom':
+        return 'inset(0 0 0% 0)'
+      case 'center-out':
+        return 'inset(0% 0% 0% 0%)'
+      case '3b1b-radial':
+        return 'circle(150% at 50% 50%)'
+      case '3b1b-diamond':
+        return 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'
+      case '3b1b-morph':
+        return 'ellipse(100% 100% at 50% 50%)'
+      case 'left-to-right':
+      default:
+        return 'inset(0 0% 0 0)'
     }
   }
 

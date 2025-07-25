@@ -522,6 +522,7 @@ async def synthesize_examples(
         return []
 
 
+
 async def synthesize_definition_text(
     clustered_definitions: list[dict[str, Any]],
     word: str,

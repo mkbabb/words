@@ -334,7 +334,7 @@ async def _synthesize_with_ai(
 
     # Log provider data quality
     total_definitions = sum(
-        len(p.definitions) if p.definitions else 0 for p in providers
+        len(p.definition_ids) if p.definition_ids else 0 for p in providers
     )
     logger.debug(f"📊 Total definitions to synthesize: {total_definitions}")
 
@@ -350,7 +350,7 @@ async def _synthesize_with_ai(
 
         if result:
             logger.debug(
-                f"✅ AI synthesis complete: {len(result.definitions) if result.definitions else 0} "
+                f"✅ AI synthesis complete: {len(result.definition_ids) if result.definition_ids else 0} "
                 f"synthesized definitions"
             )
         else:
@@ -379,16 +379,16 @@ async def _ai_fallback_lookup(
         )
         duration = time.perf_counter() - start_time
 
-        if ai_entry and ai_entry.definitions:
+        if ai_entry and ai_entry.definition_ids:
             logger.info(
                 f"✅ AI fallback successful for '{word}': "
-                f"{len(ai_entry.definitions)} definitions generated in {duration:.2f}s"
+                f"{len(ai_entry.definition_ids)} definitions generated in {duration:.2f}s"
             )
 
             log_metrics(
                 word=word,
                 fallback_duration=duration,
-                definition_count=len(ai_entry.definitions),
+                definition_count=len(ai_entry.definition_ids),
                 is_fallback=True,
             )
 

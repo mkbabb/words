@@ -66,4 +66,3 @@ export function isValidWord(word: string): boolean {
   return /^[a-zA-Z\s-']+$/.test(word.trim()) && word.trim().length > 0;
 }
 
-export * from './detectPartOfSpeech';

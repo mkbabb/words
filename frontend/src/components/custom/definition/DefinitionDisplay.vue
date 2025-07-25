@@ -155,9 +155,20 @@
                 </div>
             </div>
             <!-- Header Section -->
-            <CardHeader>
+            <CardHeader class="relative">
                 <div class="flex items-center justify-between">
-                    <CardTitle class="themed-title transition-all duration-200">
+                    <CardTitle 
+                        class="themed-title transition-all duration-200"
+                        style="
+                            background-image: var(--paper-aged-texture);
+                            background-size: 100px 100px;
+                            background-repeat: repeat;
+                            background-clip: text;
+                            -webkit-background-clip: text;
+                            background-attachment: scroll;
+                            background-position: 0 0;
+                        "
+                    >
                         <!-- Animated Text Title -->
                         <component
                             :is="currentAnimationComponent"
@@ -270,7 +281,7 @@
 
                                 <div class="flex items-center gap-2">
                                     <span class="themed-part-of-speech">
-                                        {{ definition.part_of_speech || detectPartOfSpeech(definition.definition) }}
+                                        {{ definition.part_of_speech }}
                                     </span>
                                     <sup
                                         class="text-sm font-normal
@@ -435,7 +446,7 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAppStore } from '@/stores';
-import { cn, getHeatmapClass, detectPartOfSpeech } from '@/utils';
+import { cn, getHeatmapClass } from '@/utils';
 import { Button } from '@/components/ui';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ThemedCard } from '@/components/custom/card';
@@ -487,41 +498,73 @@ const currentAnimationComponent = computed(() => {
     }
 });
 
+
 const currentAnimationProps = computed(() => {
     const word = entry.value?.word || '';
+    
     const baseProps = { 
         text: word,
-        class: 'text-word-title'
+        class: 'text-word-title',
+        customStyles: {
+            color: 'var(--color-foreground)',
+            // Add subtle texture overlay without making text transparent
+            position: 'relative',
+            textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+        }
     };
     
     switch (selectedAnimation.value) {
         case 'typewriter':
-            return { ...baseProps, speed: 200, cursor: true }; // Slower, more readable speed
+            return { ...baseProps, speed: 300, cursor: true }; // 300ms between characters for slow, readable typing
         case 'handwriting':
-            return { ...baseProps, duration: 2000, strokeWidth: 2 };
+            return { ...baseProps, speed: 2, strokeWidth: 2 };
         case 'latex':
-            return { ...baseProps, fillDuration: 1500, strokeDuration: 800 };
+            return { 
+                content: word,
+                class: 'text-word-title',
+                customStyles: baseProps.customStyles,
+                speed: 1.5, 
+                fillDirection: '3b1b-radial',
+                mathMode: false
+            };
         default:
             return baseProps;
     }
 });
 
-// Animation cycling - run every 10 seconds
-let animationInterval: NodeJS.Timeout | null = null;
+// Animation cycling - run with random delay around 30 seconds
+let animationTimeout: NodeJS.Timeout | null = null;
 
-const startAnimationCycle = () => {
-    if (animationInterval) clearInterval(animationInterval);
+const getRandomDelay = () => {
+    // Random delay between 25-35 seconds
+    return 25000 + Math.random() * 10000;
+};
+
+const scheduleNextAnimation = () => {
+    if (animationTimeout) clearTimeout(animationTimeout);
     
-    animationInterval = setInterval(() => {
+    animationTimeout = setTimeout(() => {
         // Force re-render by updating key
         animationKey.value++;
-    }, 10000);
+        // Schedule the next animation
+        scheduleNextAnimation();
+    }, getRandomDelay());
+};
+
+const startAnimationCycle = () => {
+    // First animation after initial page load delay
+    if (animationTimeout) clearTimeout(animationTimeout);
+    
+    animationTimeout = setTimeout(() => {
+        animationKey.value++;
+        scheduleNextAnimation();
+    }, 5000); // Initial delay of 5 seconds
 };
 
 const stopAnimationCycle = () => {
-    if (animationInterval) {
-        clearInterval(animationInterval);
-        animationInterval = null;
+    if (animationTimeout) {
+        clearTimeout(animationTimeout);
+        animationTimeout = null;
     }
 };
 
@@ -636,12 +679,6 @@ const partOfSpeechOrder = {
 // Group and sort definitions by meaning cluster and relevancy
 const groupedDefinitions = computed(() => {
     if (!entry.value?.definitions) return [];
-
-    // Debug: Log the first definition to see its structure
-    if (entry.value.definitions.length > 0) {
-        console.log('First definition structure:', entry.value.definitions[0]);
-        console.log('part_of_speech value:', entry.value.definitions[0].part_of_speech);
-    }
 
     // Group definitions by meaning cluster
     const clusters = new Map<

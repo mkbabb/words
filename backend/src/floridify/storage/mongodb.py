@@ -64,7 +64,7 @@ class MongoDBStorage:
             connectTimeoutMS=10000,  # Connection timeout (10s)
             
             # Reliability Settings
-            retryWrites=True,        # Enable retry writes for transient failures
+            retryWrites=False,       # Disable retry writes for Docker MongoDB compatibility
             waitQueueTimeoutMS=5000, # Queue timeout for connection pool
         )
         database: Any = self.client[self.database_name]

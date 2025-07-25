@@ -266,6 +266,7 @@ class WiktionaryConnector(DictionaryConnector):
             # Create raw metadata for base class to use
             raw_metadata = {
                 "wikitext_sample": content[:1000],
+                "definitions": extracted_data.definitions,
                 "etymology": extracted_data.etymology,
                 "pronunciation": (
                     extracted_data.pronunciation.model_dump()
@@ -274,6 +275,8 @@ class WiktionaryConnector(DictionaryConnector):
                 ),
                 "alternative_forms": extracted_data.alternative_forms,
                 "related_terms": extracted_data.related_terms,
+                # Store definition count for debugging, not the actual objects
+                "definition_count": len(extracted_data.definitions),
             }
 
             # Use base class method to normalize and save
@@ -644,16 +647,14 @@ class WiktionaryConnector(DictionaryConnector):
         """Extract definitions from Wiktionary data.
 
         Args:
-            raw_data: Raw response from Wiktionary (not used directly)
+            raw_data: Raw response from Wiktionary containing extracted definitions
             word_id: ID of the word these definitions belong to
 
         Returns:
             List of Definition objects
         """
-        # Definitions are already extracted in the main parsing method
-        # This is called after the fact, so we return empty list
-        # The actual definitions are handled in _parse_wiktionary_response
-        return []
+        # Return the definitions that were already extracted and passed in raw_data
+        return raw_data.get("definitions", [])
 
     async def extract_etymology(self, raw_data: dict[str, Any]) -> Etymology | None:
         """Extract etymology from Wiktionary data.

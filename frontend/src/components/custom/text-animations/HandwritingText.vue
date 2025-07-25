@@ -56,13 +56,12 @@
 import { ref, computed, watch } from 'vue'
 import { useHandwritingAnimation } from '@/composables/useTextAnimations'
 import { useTextureSystem } from '@/composables/useTextureSystem'
+import { generateHandwritingPath } from '@/utils/textToPath'
 import type { TextureType, TextureIntensity } from '@/types'
 
 interface Props {
   /** Text to convert to handwriting animation */
   text: string
-  /** SVG path data for the handwriting */
-  pathData: string
   /** Animation speed multiplier */
   speed?: number
   /** Delay before animation starts (ms) */
@@ -77,9 +76,6 @@ interface Props {
   strokeWidth?: number
   /** Stroke pressure (opacity) */
   pressure?: number
-  /** SVG dimensions */
-  svgWidth?: number
-  svgHeight?: number
   /** Stroke color */
   strokeColor?: string
   /** Easing function */
@@ -98,7 +94,6 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   text: '',
-  pathData: '',
   speed: 1,
   delay: 0,
   autoplay: true,
@@ -106,8 +101,6 @@ const props = withDefaults(defineProps<Props>(), {
   writingStyle: 'pen',
   strokeWidth: 2,
   pressure: 0.8,
-  svgWidth: 300,
-  svgHeight: 100,
   strokeColor: 'currentColor',
   easing: 'none',
   textureEnabled: false,
@@ -119,6 +112,15 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Template refs
 const pathRef = ref<SVGPathElement | null>(null)
+
+// Generate path data from text
+const generatedPath = computed(() => {
+  return generateHandwritingPath(props.text)
+})
+
+const pathData = computed(() => generatedPath.value.path)
+const svgWidth = computed(() => generatedPath.value.width)  
+const svgHeight = computed(() => generatedPath.value.height)
 
 // Texture system (optional)
 const { textureStyles, textureClasses } = useTextureSystem({
@@ -179,8 +181,8 @@ const pathStyles = computed(() => {
   return baseStyles
 })
 
-// Watch for path data changes
-watch(() => props.pathData, () => {
+// Watch for text changes
+watch(() => props.text, () => {
   if (props.autoplay && pathRef.value) {
     restart()
   }

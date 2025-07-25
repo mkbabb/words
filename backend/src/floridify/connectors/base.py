@@ -136,14 +136,21 @@ class DictionaryConnector(ABC):
             await definition.save()
             definition_ids.append(str(definition.id))
         
-        # Create provider data
+        # Create and save provider data
+        # Filter out any non-serializable data from raw_data
+        safe_raw_data = {
+            k: v for k, v in response_data.items() 
+            if k != "definitions"  # Exclude definitions which may contain ObjectIds
+        }
+        
         provider_data = ProviderData(
             word_id=str(word.id),
             provider=DictionaryProvider(self.provider_name),
             definition_ids=definition_ids,
             pronunciation_id=pronunciation_id,
             etymology=etymology,
-            raw_data=response_data,
+            raw_data=safe_raw_data,
         )
+        await provider_data.save()
         
         return provider_data
