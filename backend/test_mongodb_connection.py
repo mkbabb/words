@@ -24,14 +24,15 @@ async def test_connection():
         config = Config.from_file()
         print(f"Environment: {os.environ.get('ENVIRONMENT', 'development')}")
         mongodb_url = config.database.get_url()
+        cert_path = config.database.cert_path
         print(f"MongoDB URL: {mongodb_url[:50]}...{mongodb_url[-30:]}")
-        print(f"Certificate path: {config.database.cert_path}")
+        print(f"Certificate path: {cert_path}")
         
         # Create client
         print("\nCreating MongoDB client...")
         client = AsyncIOMotorClient(
             mongodb_url,
-            tlsCAFile=str(config.database.cert_path) if config.database.cert_path else None,
+            tlsCAFile=str(cert_path),
             serverSelectionTimeoutMS=5000,  # 5 second timeout
         )
         

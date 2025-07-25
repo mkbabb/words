@@ -25,7 +25,7 @@ from .word_repository import WordCreate, WordFilter, WordRepository, WordUpdate
 __all__ = [
     "WordRepository",
     "WordCreate",
-    "WordUpdate", 
+    "WordUpdate",
     "WordFilter",
     "DefinitionRepository",
     "DefinitionCreate",

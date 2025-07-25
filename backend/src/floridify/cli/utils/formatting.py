@@ -17,16 +17,14 @@ from rich.table import Table
 from rich.text import Text
 
 from ...constants import DictionaryProvider, Language
-from ...models import Definition
+from ...models import Definition, SynthesizedDictionaryEntry
+from ...search import SearchResult
+from ...search.constants import SearchMethod
 from ...utils.text_utils import (
     bold_word_in_text,
     clean_markdown,
     ensure_sentence_case,
 )
-
-from ...models import SynthesizedDictionaryEntry
-from ...search import SearchResult
-from ...search.constants import SearchMethod
 
 # Unicode superscript mapping for meaning counters
 SUPERSCRIPT_MAP = {

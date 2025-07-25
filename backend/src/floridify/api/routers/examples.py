@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from ...ai import get_openai_connector
 from ...ai.synthesis_functions import synthesize_examples
+from ...models import Definition, Example, Word
 from ..core import (
     FieldSelection,
     ListResponse,
@@ -24,7 +25,6 @@ from ..repositories.example_repository import (
     ExampleRepository,
     ExampleUpdate,
 )
-from ...models import Definition, Example, Word
 
 router = APIRouter(prefix="/examples", tags=["examples"])
 
@@ -35,16 +35,14 @@ def get_example_repo() -> ExampleRepository:
 
 
 def get_pagination(
-    offset: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100)
+    offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=100)
 ) -> PaginationParams:
     """Get pagination parameters from query."""
     return PaginationParams(offset=offset, limit=limit)
 
 
 def get_sort(
-    sort_by: str | None = Query(None),
-    sort_order: str = Query("asc", pattern="^(asc|desc)$")
+    sort_by: str | None = Query(None), sort_order: str = Query("asc", pattern="^(asc|desc)$")
 ) -> SortParams:
     """Get sort parameters from query."""
     return SortParams(sort_by=sort_by, sort_order=sort_order)
@@ -53,7 +51,7 @@ def get_sort(
 def get_fields(
     include: str | None = Query(None),
     exclude: str | None = Query(None),
-    expand: str | None = Query(None)
+    expand: str | None = Query(None),
 ) -> FieldSelection:
     """Get field selection from query."""
     return FieldSelection(
@@ -65,7 +63,7 @@ def get_fields(
 
 class ExampleGenerationRequest(BaseModel):
     """Request for generating new examples."""
-    
+
     count: int = Field(3, ge=1, le=10, description="Number of examples to generate")
     style: str | None = Field(None, description="Style of examples (formal, casual, technical)")
     context: str | None = Field(None, description="Additional context for generation")
@@ -73,7 +71,7 @@ class ExampleGenerationRequest(BaseModel):
 
 class BatchExampleUpdate(BaseModel):
     """Batch update request for examples."""
-    
+
     example_ids: list[str] = Field(..., description="Example IDs to update")
     quality_scores: dict[str, float] | None = Field(None, description="Quality scores by ID")
     mark_regeneratable: bool | None = Field(None, description="Mark as regeneratable")
@@ -106,21 +104,21 @@ async def list_examples(
         has_literature_source=has_literature_source,
         quality_score_min=quality_score_min,
     )
-    
+
     # Get data
     examples, total = await repo.list(
         filter_dict=filter_params.to_query(),
         pagination=pagination,
         sort=sort,
     )
-    
+
     # Apply field selection
     items = []
     for example in examples:
         example_dict = example.model_dump()
         example_dict = fields.apply_to_dict(example_dict)
         items.append(example_dict)
-    
+
     # Build response
     response_data = ListResponse(
         items=items,
@@ -128,16 +126,16 @@ async def list_examples(
         offset=pagination.offset,
         limit=pagination.limit,
     )
-    
+
     # Set ETag
     etag = get_etag(response_data.model_dump())
     response.headers["ETag"] = etag
-    
+
     # Check if Not Modified
     if check_etag(request, etag):
         response.status_code = 304
         return Response(status_code=304)
-    
+
     return response_data
 
 
@@ -149,14 +147,14 @@ async def create_example(
 ) -> ResourceResponse:
     """Create a new example."""
     example = await repo.create(data)
-    
+
     return ResourceResponse(
         data=example.model_dump(),
         links={
             "self": f"/examples/{example.id}",
             "word": f"/words/{example.word_id}",
             "definition": f"/definitions/{example.definition_id}",
-        }
+        },
     )
 
 
@@ -172,10 +170,10 @@ async def get_example(
     """Get a single example by ID."""
     example = await repo.get(example_id)
     example_dict = example.model_dump()
-    
+
     # Apply field selection
     example_dict = fields.apply_to_dict(example_dict)
-    
+
     # Build response
     response_data = ResourceResponse(
         data=example_dict,
@@ -188,17 +186,17 @@ async def get_example(
             "self": f"/examples/{example_id}",
             "word": f"/words/{example.word_id}",
             "definition": f"/definitions/{example.definition_id}",
-        }
+        },
     )
-    
+
     # Set ETag
     etag = get_etag(response_data.model_dump())
     response.headers["ETag"] = etag
-    
+
     # Check if Not Modified
     if check_etag(request, etag):
         return Response(status_code=304)
-    
+
     return response_data
 
 
@@ -211,13 +209,13 @@ async def update_example(
 ) -> ResourceResponse:
     """Update an example."""
     example = await repo.update(example_id, data)
-    
+
     return ResourceResponse(
         data=example.model_dump(),
         metadata={
             "version": example.version,
             "updated_at": example.updated_at,
-        }
+        },
     )
 
 
@@ -243,14 +241,14 @@ async def generate_examples(
     definition = await Definition.get(definition_id)
     if not definition:
         raise HTTPException(404, "Definition not found")
-    
+
     word = await Word.get(definition.word_id)
     if not word:
         raise HTTPException(404, "Word not found")
-    
+
     # Get AI connector
     ai = await get_openai_connector()
-    
+
     # Generate examples
     example_data_list = await synthesize_examples(
         definition,
@@ -259,30 +257,30 @@ async def generate_examples(
         count=request.count,
         context=request.context,
     )
-    
+
     # Create example documents
     responses = []
     for example_data in example_data_list:
         example = Example(
-            word_id=definition.word_id,
-            definition_id=str(definition.id),
-            **example_data
+            word_id=definition.word_id, definition_id=str(definition.id), **example_data
         )
         await example.create()
-        
-        responses.append(ResourceResponse(
-            data=example.model_dump(),
-            links={
-                "self": f"/examples/{example.id}",
-                "word": f"/words/{example.word_id}",
-                "definition": f"/definitions/{example.definition_id}",
-            }
-        ))
-    
+
+        responses.append(
+            ResourceResponse(
+                data=example.model_dump(),
+                links={
+                    "self": f"/examples/{example.id}",
+                    "word": f"/words/{example.word_id}",
+                    "definition": f"/definitions/{example.definition_id}",
+                },
+            )
+        )
+
     # Update definition with new example IDs
     definition.example_ids.extend([str(ex.id) for ex in responses])
     await definition.save()
-    
+
     return responses
 
 
@@ -294,15 +292,12 @@ async def batch_update_examples(
 ) -> dict[str, Any]:
     """Batch update examples."""
     updated = 0
-    
+
     # Update quality scores if provided
     if request.quality_scores:
-        scores = [
-            (PydanticObjectId(id), score)
-            for id, score in request.quality_scores.items()
-        ]
+        scores = [(PydanticObjectId(id), score) for id, score in request.quality_scores.items()]
         updated = await repo.update_quality_scores(scores)
-    
+
     # Update regeneratable flag if provided
     if request.mark_regeneratable is not None:
         for example_id in request.example_ids:
@@ -311,7 +306,7 @@ async def batch_update_examples(
                 example.can_regenerate = request.mark_regeneratable
                 await example.save()
                 updated += 1
-    
+
     return {
         "updated": updated,
         "total": len(request.example_ids),

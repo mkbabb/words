@@ -90,9 +90,7 @@ class Definition(Document, BaseMetadata):
     antonyms: list[str] = []
 
     # Usage and context
-    language_register: (
-        Literal["formal", "informal", "neutral", "slang", "technical"] | None
-    ) = None
+    language_register: Literal["formal", "informal", "neutral", "slang", "technical"] | None = None
     domain: str | None = None  # medical, legal, computing
     region: str | None = None  # US, UK, AU
     usage_notes: list[UsageNote] = []

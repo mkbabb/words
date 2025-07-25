@@ -8,14 +8,14 @@ from pathlib import Path
 
 def get_project_root() -> Path:
     """Find project root by looking for both backend/ and auth/ directories.
-    
+
     Uses modern approach with environment variable override and marker file discovery.
     """
     # Environment override (12-factor app principle)
     env_root = os.getenv("FLORIDIFY_PROJECT_ROOT")
     if env_root:
         return Path(env_root).resolve()
-    
+
     # Check if we're in Docker
     is_docker = os.path.exists("/.dockerenv")
     if is_docker:
@@ -23,7 +23,7 @@ def get_project_root() -> Path:
         app_root = Path("/app")
         if (app_root / "auth").exists():
             return app_root
-    
+
     # Search upward from current file location
     current = Path(__file__).resolve().parent
     while current != current.parent:
@@ -34,8 +34,8 @@ def get_project_root() -> Path:
         if current.name == "backend" and (current.parent / "auth").exists():
             return current.parent
         current = current.parent
-    
-    # Fallback to current working directory search  
+
+    # Fallback to current working directory search
     current = Path.cwd()
     while current != current.parent:
         if (current / "backend").exists() and (current / "auth").exists():
@@ -43,7 +43,7 @@ def get_project_root() -> Path:
         if current.name == "backend" and (current.parent / "auth").exists():
             return current.parent
         current = current.parent
-    
+
     return Path.cwd()
 
 

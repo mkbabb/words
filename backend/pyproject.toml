@@ -48,6 +48,7 @@ dependencies = [
     "unicodedata2>=15.0.0", # Fast Unicode normalization
     "coolname>=2.2.0",
     "hishel>=0.1.0", # Modern HTTP caching client
+    "google-cloud-texttospeech>=2.16.0", # Google Cloud Text-to-Speech API
     "orjson>=3.10.0", # Fast JSON serialization
     # REST API framework
     "fastapi>=0.104.0",

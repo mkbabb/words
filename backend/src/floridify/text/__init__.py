@@ -20,7 +20,7 @@ from .utils import (
 
 __all__ = [
     "TextProcessor",
-    "ProcessingResult", 
+    "ProcessingResult",
     "tokenize",
     "sentence_tokenize",
     "word_tokenize",
@@ -28,7 +28,7 @@ __all__ = [
     "lemmatize_word",
     "basic_lemmatize",
     "is_phrase",
-    "split_phrase", 
+    "split_phrase",
     "join_words",
     "extract_phrases",
     "find_hyphenated_phrases",

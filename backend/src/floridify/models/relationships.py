@@ -10,24 +10,29 @@ from pydantic import BaseModel, Field
 
 class WordForm(BaseModel):
     """Word inflections and variations."""
-    
+
     form_type: Literal[
-        "plural", "past", "past_participle", "present_participle", 
-        "comparative", "superlative", "variant"
+        "plural",
+        "past",
+        "past_participle",
+        "present_participle",
+        "comparative",
+        "superlative",
+        "variant",
     ]
     text: str
 
 
 class GrammarPattern(BaseModel):
     """Grammar patterns and verb frames."""
-    
+
     pattern: str  # e.g., "[Tn]", "sb/sth"
     description: str | None = None
 
 
 class Collocation(BaseModel):
     """Common word combinations."""
-    
+
     text: str
     type: str  # Allow flexible collocation types like "adjective+noun", "verb+noun", etc.
     frequency: float = Field(ge=0.0, le=1.0)
@@ -35,14 +40,14 @@ class Collocation(BaseModel):
 
 class UsageNote(BaseModel):
     """Usage guidance and warnings."""
-    
+
     type: Literal["grammar", "confusion", "regional", "register", "error"]
     text: str
 
 
 class MeaningCluster(BaseModel):
     """Semantic grouping metadata."""
-    
+
     id: str
     name: str  # Human-readable cluster name
     description: str  # Brief description of this meaning
@@ -52,7 +57,7 @@ class MeaningCluster(BaseModel):
 
 class WordRelationship(Document):
     """Relationships between words."""
-    
+
     from_word_id: str
     to_word_id: str
     relationship_type: Literal[
@@ -60,10 +65,10 @@ class WordRelationship(Document):
     ]
     strength: float = Field(ge=0.0, le=1.0, default=1.0)
     context: str | None = None
-    
+
     class Settings:
         name = "word_relationships"
         indexes = [
             [("from_word_id", 1), ("relationship_type", 1)],
-            [("to_word_id", 1), ("relationship_type", 1)]
+            [("to_word_id", 1), ("relationship_type", 1)],
         ]

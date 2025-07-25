@@ -15,7 +15,7 @@ from .language import LanguageSearch
 from .lexicon import LexiconLanguageLoader, LexiconSourceConfig
 from .phrase import MultiWordExpression, PhraseNormalizer
 
-# Semantic search with graceful degradation when dependencies unavailable  
+# Semantic search with graceful degradation when dependencies unavailable
 from .semantic import SemanticSearch
 from .trie import TrieSearch
 

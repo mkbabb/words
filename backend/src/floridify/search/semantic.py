@@ -21,28 +21,31 @@ try:
     from sentence_transformers import SentenceTransformer  # type: ignore[import-not-found]
     from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import-not-found]
     from sklearn.metrics.pairwise import cosine_similarity  # type: ignore[import-not-found]
+
     SEMANTIC_SEARCH_AVAILABLE = True
-    
+
     # Default to recommended 2025 model: all-MiniLM-L6-v2 (384D, fast, accurate)
     DEFAULT_SENTENCE_MODEL = "all-MiniLM-L6-v2"
 except ImportError:
     SEMANTIC_SEARCH_AVAILABLE = False
     # Type hint stubs when libraries unavailable
-    np = type('numpy', (), {
-        'ndarray': type, 
-        'float32': float, 
-        'linalg': type('', (), {'norm': lambda x: 1.0})
-    })()
-    faiss = type('faiss', (), {
-        'Index': type, 
-        'IndexFlatIP': type, 
-        'IndexFlatL2': type,
-        'normalize_L2': lambda x: None
-    })()
-    TfidfVectorizer = type('TfidfVectorizer', (), {})
-    SentenceTransformer = type('SentenceTransformer', (), {})
+    np = type(
+        "numpy",
+        (),
+        {"ndarray": type, "float32": float, "linalg": type("", (), {"norm": lambda x: 1.0})},
+    )()
+    faiss = type(
+        "faiss",
+        (),
+        {"Index": type, "IndexFlatIP": type, "IndexFlatL2": type, "normalize_L2": lambda x: None},
+    )()
+    TfidfVectorizer = type("TfidfVectorizer", (), {})
+    SentenceTransformer = type("SentenceTransformer", (), {})
     DEFAULT_SENTENCE_MODEL = "all-MiniLM-L6-v2"
-    def cosine_similarity(x: Any, y: Any) -> list[Any]: return []
+
+    def cosine_similarity(x: Any, y: Any) -> list[Any]:
+        return []
+
 
 from ..utils.logging import get_logger
 from .constants import EmbeddingLevel
@@ -53,13 +56,13 @@ logger = get_logger(__name__)
 class SemanticSearch:
     """
     Modern semantic search using sentence transformers + FAISS (2025 best practices).
-    
+
     Implementation follows current research recommendations:
     - Primary: SentenceTransformer embeddings (384D, SOTA semantic understanding)
     - Fallback: Multi-level TF-IDF (character/subword/word for morphological similarity)
     - Storage: FAISS IndexFlatL2 for exact similarity search with L2 normalization
     - Caching: Persistent embedding storage with vocabulary hash validation
-    
+
     Performance optimizations:
     - Vector normalization for cosine similarity via inner product
     - Async processing for large vocabulary initialization
@@ -80,7 +83,9 @@ class SemanticSearch:
 
         # Check if semantic search is available
         if not SEMANTIC_SEARCH_AVAILABLE:
-            logger.warning("Semantic search initialized without ML libraries - functionality disabled")
+            logger.warning(
+                "Semantic search initialized without ML libraries - functionality disabled"
+            )
             return
 
         self.vector_dir.mkdir(parents=True, exist_ok=True)
@@ -88,7 +93,7 @@ class SemanticSearch:
         # Modern sentence transformer model (2025 best practices)
         self.sentence_model: SentenceTransformer | None = None
         self.model_name = DEFAULT_SENTENCE_MODEL
-        
+
         # Fallback TF-IDF components when sentence transformers unavailable
         self.char_vectorizer: TfidfVectorizer | None = None
         self.subword_vectorizer: TfidfVectorizer | None = None
@@ -126,10 +131,14 @@ class SemanticSearch:
         self.word_to_id = {word: i for i, word in enumerate(vocabulary)}
 
         if not SEMANTIC_SEARCH_AVAILABLE:
-            logger.warning(f"Semantic search disabled - {len(vocabulary)} words loaded but no embeddings created")
+            logger.warning(
+                f"Semantic search disabled - {len(vocabulary)} words loaded but no embeddings created"
+            )
             return
 
-        logger.info(f"Initializing modern semantic search with {len(vocabulary)} words using {self.model_name}")
+        logger.info(
+            f"Initializing modern semantic search with {len(vocabulary)} words using {self.model_name}"
+        )
 
         # Check if vocabulary has changed to avoid unnecessary rebuilding
         vocab_hash = hash(tuple(vocabulary))
@@ -170,17 +179,17 @@ class SemanticSearch:
 
     def _build_embeddings_sync(self) -> None:
         """Build embeddings synchronously following 2025 best practices."""
-        
+
         # Primary: Modern sentence transformer embeddings (SOTA semantic understanding)
         logger.debug(f"Building sentence transformer embeddings with {self.model_name}")
         try:
             self.sentence_model = SentenceTransformer(self.model_name)
             # Generate embeddings for entire vocabulary (batch processing)
             self.sentence_embeddings = self.sentence_model.encode(
-                self.vocabulary, 
+                self.vocabulary,
                 convert_to_numpy=True,
                 normalize_embeddings=True,  # L2 normalization for cosine similarity
-                show_progress_bar=False
+                show_progress_bar=False,
             )
             logger.debug(f"Generated {self.sentence_embeddings.shape} sentence embeddings")
         except Exception as e:
@@ -295,12 +304,12 @@ class SemanticSearch:
         # Build primary sentence transformer index (2025 best practices)
         if self.sentence_embeddings is not None:
             logger.debug("Building sentence transformer FAISS index (IndexFlatL2)")
-            
+
             # Use IndexFlatL2 with pre-normalized embeddings for exact cosine similarity
             self.sentence_index = faiss.IndexFlatL2(self.sentence_embeddings.shape[1])
             # Embeddings already normalized by sentence transformer
             self.sentence_index.add(self.sentence_embeddings.astype(np.float32))
-            
+
         # Build word index (TF-IDF fallback)
         if self.word_embeddings is not None:
             logger.debug("Building fallback word-level FAISS index")
@@ -352,7 +361,7 @@ class SemanticSearch:
             required_files = [
                 "metadata",
                 "char_vectorizer",
-                "subword_vectorizer", 
+                "subword_vectorizer",
                 "word_vectorizer",
             ]
             for file_key in required_files:
@@ -389,7 +398,7 @@ class SemanticSearch:
             # Load embeddings if they exist - sentence transformer + TF-IDF fallbacks
             if cache_paths["sentence_embeddings"].exists():
                 self.sentence_embeddings = np.load(cache_paths["sentence_embeddings"])
-                
+
             if cache_paths["char_embeddings"].exists():
                 self.char_embeddings = np.load(cache_paths["char_embeddings"])
 
@@ -402,7 +411,7 @@ class SemanticSearch:
             # Load FAISS indices if they exist - sentence transformer + TF-IDF fallbacks
             if cache_paths["sentence_index"].exists():
                 self.sentence_index = faiss.read_index(str(cache_paths["sentence_index"]))
-                
+
             if cache_paths["char_index"].exists():
                 self.char_index = faiss.read_index(str(cache_paths["char_index"]))
 
@@ -455,7 +464,7 @@ class SemanticSearch:
             # Save embeddings - sentence transformer + TF-IDF fallbacks
             if self.sentence_embeddings is not None:
                 np.save(cache_paths["sentence_embeddings"], self.sentence_embeddings)
-                
+
             if self.char_embeddings is not None:
                 np.save(cache_paths["char_embeddings"], self.char_embeddings)
 
@@ -468,7 +477,7 @@ class SemanticSearch:
             # Save FAISS indices - sentence transformer + TF-IDF fallbacks
             if self.sentence_index:
                 faiss.write_index(self.sentence_index, str(cache_paths["sentence_index"]))
-                
+
             if self.char_index:
                 faiss.write_index(self.char_index, str(cache_paths["char_index"]))
 
@@ -495,7 +504,9 @@ class SemanticSearch:
             List of (word, score) tuples sorted by similarity
         """
         if not SEMANTIC_SEARCH_AVAILABLE or not self.vocabulary:
-            logger.warning(f"Semantic search called for '{query}' but functionality disabled - returning empty results")
+            logger.warning(
+                f"Semantic search called for '{query}' but functionality disabled - returning empty results"
+            )
             return []
 
         query = query.strip().lower()
@@ -510,7 +521,9 @@ class SemanticSearch:
 
         # Primary: Sentence transformer search (70% weight - SOTA semantic understanding)
         if query_vectors["sentence"] is not None and self.sentence_index is not None:
-            sentence_results = await self._search_sentence_level(query_vectors["sentence"], max_results * 2)
+            sentence_results = await self._search_sentence_level(
+                query_vectors["sentence"], max_results * 2
+            )
             for word, score in sentence_results:
                 results[word] = results.get(word, 0.0) + score * 0.7  # 70% weight
 
@@ -547,15 +560,15 @@ class SemanticSearch:
     async def _get_query_embeddings(self, query: str) -> dict[str, np.ndarray | None]:
         """Get embeddings for a query using modern approach + TF-IDF fallbacks."""
         embeddings = {}
-        
+
         # Primary: Sentence transformer embedding (SOTA semantic understanding)
         if self.sentence_model:
             try:
                 sentence_vec = self.sentence_model.encode(
-                    [query], 
+                    [query],
                     convert_to_numpy=True,
                     normalize_embeddings=True,  # L2 normalization
-                    show_progress_bar=False
+                    show_progress_bar=False,
                 )
                 embeddings["sentence"] = sentence_vec[0] if sentence_vec.size > 0 else None
             except Exception as e:
@@ -614,12 +627,14 @@ class SemanticSearch:
         """Search using sentence transformer FAISS index (L2 distance)."""
         if not self.sentence_index:
             return []
-            
+
         # Query already normalized by sentence transformer
         query_norm = query_vector.reshape(1, -1).astype(np.float32)
 
         # Search using L2 distance (lower is better)
-        distances, indices = self.sentence_index.search(query_norm, min(max_results, len(self.vocabulary)))
+        distances, indices = self.sentence_index.search(
+            query_norm, min(max_results, len(self.vocabulary))
+        )
 
         # Convert L2 distances to similarity scores (higher is better)
         results = []
@@ -630,7 +645,7 @@ class SemanticSearch:
                 results.append((self.vocabulary[idx], float(similarity)))
 
         return results
-    
+
     async def _search_faiss_ip(
         self,
         query_vector: np.ndarray,
@@ -671,11 +686,13 @@ class SemanticSearch:
                 "vocabulary_coverage": self.sentence_embeddings.shape[0],
                 "normalized": True,
             }
-            stats["memory_usage"]["sentence_embeddings_mb"] = self.sentence_embeddings.nbytes / 1024 / 1024
-            
+            stats["memory_usage"]["sentence_embeddings_mb"] = (
+                self.sentence_embeddings.nbytes / 1024 / 1024
+            )
+
         if self.sentence_index is not None:
             stats["index_size"]["sentence_index"] = self.sentence_index.ntotal
-        
+
         # Character level stats (fallback)
         if self.char_embeddings is not None:
             stats["embedding_levels"]["character"] = {

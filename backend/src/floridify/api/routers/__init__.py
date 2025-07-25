@@ -2,6 +2,7 @@
 
 from . import (
     atomic_updates,
+    audio,
     batch,
     corpus,
     definitions,
@@ -17,6 +18,7 @@ from . import (
 
 __all__ = [
     "atomic_updates",
+    "audio",
     "batch",
     "corpus",
     "definitions",

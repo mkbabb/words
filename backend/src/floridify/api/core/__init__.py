@@ -32,7 +32,7 @@ from .query import (
 __all__ = [
     # Base
     "ErrorDetail",
-    "ErrorResponse", 
+    "ErrorResponse",
     "PaginationParams",
     "SortParams",
     "FieldSelection",
@@ -53,6 +53,6 @@ __all__ = [
     "get_cache_headers",
     # Query
     "AggregationBuilder",
-    "BulkOperationBuilder", 
+    "BulkOperationBuilder",
     "QueryOptimizer",
 ]

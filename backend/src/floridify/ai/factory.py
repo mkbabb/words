@@ -16,7 +16,6 @@ _openai_connector: OpenAIConnector | None = None
 _definition_synthesizer: DefinitionSynthesizer | None = None
 
 
-
 def get_openai_connector(
     config_path: str | Path | None = None,
     force_recreate: bool = False,
@@ -38,7 +37,7 @@ def get_openai_connector(
 
         api_key = config.openai.api_key
         model_name = config.openai.model
-        
+
         # Log configuration status (without exposing the key)
         logger.info(f"OpenAI model: {model_name}")
         logger.info(f"API key configured: {'Yes' if api_key and len(api_key) > 20 else 'No'}")
@@ -56,8 +55,6 @@ def get_openai_connector(
         logger.success("OpenAI connector singleton initialized")
 
     return _openai_connector
-
-
 
 
 def get_definition_synthesizer(
@@ -84,8 +81,6 @@ def get_definition_synthesizer(
         logger.success("Definition synthesizer singleton initialized")
 
     return _definition_synthesizer
-
-
 
 
 def create_ai_system(

@@ -17,16 +17,19 @@ logger = get_logger(__name__)
 
 class AppleDictionaryError(Exception):
     """Base exception for Apple Dictionary Service errors."""
+
     pass
 
 
 class PlatformError(AppleDictionaryError):
     """Raised when platform doesn't support Dictionary Services."""
+
     pass
 
 
 class ImportError(AppleDictionaryError):
     """Raised when required PyObjC modules cannot be imported."""
+
     pass
 
 
@@ -35,7 +38,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
     def __init__(self, rate_limit: float = 10.0) -> None:
         """Initialize Apple Dictionary connector.
-        
+
         Args:
             rate_limit: Maximum requests per second (default 10.0 for local API)
         """
@@ -51,7 +54,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
     def _check_platform_compatibility(self) -> bool:
         """Check if running on macOS (Darwin)."""
-        if platform.system() != 'Darwin':
+        if platform.system() != "Darwin":
             logger.warning(f"Apple Dictionary Services not available on {platform.system()}")
             return False
         return True
@@ -64,6 +67,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         try:
             from CoreServices import DCSCopyTextDefinition  # type: ignore[import-untyped]
+
             self._dictionary_service = DCSCopyTextDefinition
             logger.info("Apple Dictionary Services initialized successfully")
         except ImportError as e:
@@ -79,10 +83,10 @@ class AppleDictionaryConnector(DictionaryConnector):
 
     def _lookup_definition(self, word: str) -> str | None:
         """Look up definition using macOS Dictionary Services.
-        
+
         Args:
             word: The word to look up
-            
+
         Returns:
             Definition text or None if not found
         """
@@ -92,10 +96,10 @@ class AppleDictionaryConnector(DictionaryConnector):
         try:
             if not self._dictionary_service:
                 return None
-                
+
             # Create CFRange for the entire word
             word_range = (0, len(word))
-            
+
             # Call Dictionary Services
             definition = self._dictionary_service(None, word, word_range)
             return str(definition) if definition else None
@@ -103,118 +107,117 @@ class AppleDictionaryConnector(DictionaryConnector):
             logger.error(f"Dictionary lookup failed for '{word}': {e}")
             return None
 
-
     def _clean_definition_text(self, text: str) -> str:
         """Clean raw definition text from Apple Dictionary.
-        
+
         Args:
             text: Raw definition text
-            
+
         Returns:
             Cleaned definition text
         """
         # Remove pronunciation markers like |ˈæpəl|
-        text = re.sub(r'\|[^|]+\|', '', text)
-        
+        text = re.sub(r"\|[^|]+\|", "", text)
+
         # Remove extra whitespace and normalize
-        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r"\s+", " ", text)
         text = text.strip()
-        
+
         return text
 
     def _extract_main_definition(self, text: str) -> str:
         """Extract the main definition from a text block.
-        
+
         Args:
             text: Text block that may contain definition
-            
+
         Returns:
             Main definition text
         """
         # Look for text after word type indicators
-        pattern = r'(?:noun|verb|adjective|adverb|preposition|conjunction|interjection|pronoun|determiner)\s+(.*?)(?:\n|$)'
+        pattern = r"(?:noun|verb|adjective|adverb|preposition|conjunction|interjection|pronoun|determiner)\s+(.*?)(?:\n|$)"
         match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
         if match:
             return match.group(1).strip()
-        
+
         # Fallback: return the whole text if no pattern found
         return text.strip()
 
     def _extract_examples(self, definition_text: str) -> list[str]:
         """Extract examples from definition text.
-        
+
         Args:
             definition_text: Definition text that may contain examples
-            
+
         Returns:
             List of example strings
         """
         examples = []
-        
+
         # Look for quoted examples or examples in specific formats
         example_patterns = [
             r'"([^"]+)"',  # Quoted examples
-            r':\s*([A-Z][^.!?]*[.!?])',  # Examples after colons
-            r'e\.g\.(?:,)?\s*([^.!?]*[.!?])',  # Examples after "e.g."
+            r":\s*([A-Z][^.!?]*[.!?])",  # Examples after colons
+            r"e\.g\.(?:,)?\s*([^.!?]*[.!?])",  # Examples after "e.g."
         ]
-        
+
         for pattern in example_patterns:
             matches = re.findall(pattern, definition_text)
             for match in matches:
                 if len(match.strip()) > 5:  # Filter out very short matches
                     examples.append(match.strip())
-        
+
         return examples
 
     def _remove_examples_from_definition(self, definition_text: str) -> str:
         """Remove example text from definition to get clean definition.
-        
+
         Args:
             definition_text: Definition text with examples
-            
+
         Returns:
             Clean definition text without examples
         """
         # Remove quoted examples
-        text = re.sub(r'"[^"]*"', '', definition_text)
-        
+        text = re.sub(r'"[^"]*"', "", definition_text)
+
         # Remove examples after colons that look like sentences
-        text = re.sub(r':\s*[A-Z][^.!?]*[.!?]', '.', text)
-        
+        text = re.sub(r":\s*[A-Z][^.!?]*[.!?]", ".", text)
+
         # Remove "e.g." sections
-        text = re.sub(r'e\.g\.(?:,)?\s*[^.!?]*[.!?]', '', text, flags=re.IGNORECASE)
-        
+        text = re.sub(r"e\.g\.(?:,)?\s*[^.!?]*[.!?]", "", text, flags=re.IGNORECASE)
+
         # Clean up extra whitespace and punctuation
-        text = re.sub(r'\s+', ' ', text)
-        text = re.sub(r'\s*,\s*\.$', '.', text)  # Fix trailing comma-period
+        text = re.sub(r"\s+", " ", text)
+        text = re.sub(r"\s*,\s*\.$", ".", text)  # Fix trailing comma-period
         text = text.strip()
-        
+
         return text
 
     def _normalize_part_of_speech(self, part_of_speech: str) -> str:
         """Normalize part of speech to standard format.
-        
+
         Args:
             part_of_speech: Raw part of speech from parsing
-            
+
         Returns:
             Normalized part of speech
         """
         part_of_speech = part_of_speech.lower().strip()
-        
+
         # Normalize common variations
         normalizations = {
             "n": "noun",
-            "v": "verb", 
+            "v": "verb",
             "adj": "adjective",
             "adv": "adverb",
             "prep": "preposition",
             "conj": "conjunction",
             "interj": "interjection",
             "pron": "pronoun",
-            "det": "determiner"
+            "det": "determiner",
         }
-        
+
         return normalizations.get(part_of_speech, part_of_speech)
 
     async def fetch_definition(
@@ -260,7 +263,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
             # Look up the word
             raw_definition = self._lookup_definition(word.strip())
-            
+
             if state_tracker:
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_HTTP_PARSING)
 
@@ -272,7 +275,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
             # For the lookup method, we'll return the raw data to be processed later
             # The actual parsing and Definition creation should happen in extract_definitions
-            
+
             # Create provider data with raw definition
             provider_data = ProviderData(
                 word_id="",  # Will be set later when Word is created
@@ -281,11 +284,13 @@ class AppleDictionaryConnector(DictionaryConnector):
                 pronunciation_id=None,
                 raw_metadata={
                     "platform": platform.system(),
-                    "platform_version": platform.mac_ver()[0] if platform.system() == 'Darwin' else None,
+                    "platform_version": platform.mac_ver()[0]
+                    if platform.system() == "Darwin"
+                    else None,
                     "raw_definition": raw_definition,
                     "word_processed": word,
-                    "definitions_count": 1 if raw_definition else 0
-                }
+                    "definitions_count": 1 if raw_definition else 0,
+                },
             )
 
             if state_tracker:
@@ -303,17 +308,17 @@ class AppleDictionaryConnector(DictionaryConnector):
 
     def get_service_info(self) -> dict[str, Any]:
         """Get information about the Apple Dictionary service.
-        
+
         Returns:
             Dictionary with service information
         """
         return {
             "provider_name": self.provider_name,
             "platform": platform.system(),
-            "platform_version": platform.mac_ver()[0] if platform.system() == 'Darwin' else None,
+            "platform_version": platform.mac_ver()[0] if platform.system() == "Darwin" else None,
             "is_available": self._is_available(),
             "service_initialized": self._dictionary_service is not None,
-            "rate_limit": self.rate_limit
+            "rate_limit": self.rate_limit,
         }
 
     async def extract_pronunciation(self, raw_data: dict[str, Any]) -> Pronunciation | None:
@@ -327,14 +332,14 @@ class AppleDictionaryConnector(DictionaryConnector):
         """
         if "raw_definition" not in raw_data:
             return None
-        
+
         # Apple Dictionary includes IPA in format |ˈæpəl|
-        ipa_match = re.search(r'\|([^|]+)\|', raw_data["raw_definition"])
+        ipa_match = re.search(r"\|([^|]+)\|", raw_data["raw_definition"])
         if ipa_match:
             ipa = ipa_match.group(1)
             # Convert IPA to simple phonetic
             phonetic = self._ipa_to_phonetic(ipa)
-            
+
             return Pronunciation(
                 word_id="",  # Will be set by base connector
                 phonetic=phonetic,
@@ -342,7 +347,7 @@ class AppleDictionaryConnector(DictionaryConnector):
                 syllables=[],
                 stress_pattern=None,
             )
-        
+
         return None
 
     async def extract_definitions(self, raw_data: dict[str, Any], word_id: str) -> list[Definition]:
@@ -357,18 +362,18 @@ class AppleDictionaryConnector(DictionaryConnector):
         """
         if "raw_definition" not in raw_data:
             return []
-        
+
         raw_definition = raw_data["raw_definition"]
-        
+
         # Parse raw definition text into structured definitions
         # Since _parse_apple_definition doesn't exist, we'll do simple parsing
         parsed_defs: list[Definition] = []
-        
+
         # Extract basic information from raw definition
         part_of_speech = self._normalize_part_of_speech(raw_definition)
         definition_text = self._clean_definition_text(raw_definition)
         examples = self._extract_examples(definition_text)
-        
+
         if definition_text:
             # Create definition (meaning_cluster will be added by AI synthesis)
             definition = Definition(
@@ -381,10 +386,10 @@ class AppleDictionaryConnector(DictionaryConnector):
                 example_ids=[],
                 frequency_band=None,  # Will be enriched later
             )
-            
+
             # Save definition to get ID
             await definition.save()
-            
+
             # Create and save examples
             for example_text in examples:
                 example = Example(
@@ -394,13 +399,13 @@ class AppleDictionaryConnector(DictionaryConnector):
                 )
                 await example.save()
                 definition.example_ids.append(str(example.id))
-            
+
             # Update definition with example IDs if any were added
             if definition.example_ids:
                 await definition.save()
-                
+
             parsed_defs.append(definition)
-        
+
         return parsed_defs
 
     async def extract_etymology(self, raw_data: dict[str, Any]) -> Etymology | None:
@@ -416,16 +421,14 @@ class AppleDictionaryConnector(DictionaryConnector):
         # Look for patterns like "ORIGIN" or "Etymology:"
         if "raw_definition" not in raw_data:
             return None
-        
+
         text = raw_data["raw_definition"]
-        
+
         # Common etymology patterns
         etym_match = re.search(
-            r'(?:ORIGIN|Etymology:?|from)\s+(.+?)(?=\n|$)', 
-            text, 
-            re.IGNORECASE | re.MULTILINE
+            r"(?:ORIGIN|Etymology:?|from)\s+(.+?)(?=\n|$)", text, re.IGNORECASE | re.MULTILINE
         )
-        
+
         if etym_match:
             etym_text = etym_match.group(1).strip()
             return Etymology(
@@ -433,27 +436,27 @@ class AppleDictionaryConnector(DictionaryConnector):
                 origin_language=None,  # Could parse from text
                 root_words=[],
             )
-        
+
         return None
 
     def _ipa_to_phonetic(self, ipa: str) -> str:
         """Convert IPA notation to simple phonetic spelling."""
         # Basic IPA to phonetic mapping
         mappings = {
-            'æ': 'a',
-            'ə': 'uh',
-            'ɪ': 'i',
-            'ʊ': 'u',
-            'ɛ': 'e',
-            'ɔ': 'aw',
-            'ɑ': 'ah',
-            'ʌ': 'u',
-            'ˈ': '',  # Remove stress marks
-            'ˌ': '',
+            "æ": "a",
+            "ə": "uh",
+            "ɪ": "i",
+            "ʊ": "u",
+            "ɛ": "e",
+            "ɔ": "aw",
+            "ɑ": "ah",
+            "ʌ": "u",
+            "ˈ": "",  # Remove stress marks
+            "ˌ": "",
         }
-        
+
         phonetic = ipa
         for ipa_char, simple in mappings.items():
             phonetic = phonetic.replace(ipa_char, simple)
-        
+
         return phonetic

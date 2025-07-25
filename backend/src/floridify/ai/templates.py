@@ -106,7 +106,7 @@ class PromptTemplateManager:
             word=word,
             definitions=definitions,
         )
-    
+
     def get_meaning_cluster_single_prompt(
         self, word: str, definition: str, part_of_speech: str
     ) -> str:

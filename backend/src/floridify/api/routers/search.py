@@ -19,7 +19,7 @@ router = APIRouter()
 
 class SearchParams(BaseModel):
     """Parameters for search endpoint."""
-    
+
     language: Language = Field(default=Language.ENGLISH, description="Search language")
     max_results: int = Field(default=20, ge=1, le=100, description="Maximum results")
     min_score: float = Field(default=0.6, ge=0.0, le=1.0, description="Minimum score")
@@ -27,7 +27,7 @@ class SearchParams(BaseModel):
 
 class SearchResponseItem(BaseModel):
     """Single search result item."""
-    
+
     word: str = Field(..., description="Matched word")
     score: float = Field(..., ge=0.0, le=1.0, description="Relevance score")
     method: SearchMethod = Field(..., description="Search method used")
@@ -36,7 +36,7 @@ class SearchResponseItem(BaseModel):
 
 class SearchResponse(BaseModel):
     """Response for search query."""
-    
+
     query: str = Field(..., description="Original search query")
     results: list[SearchResponseItem] = Field(default_factory=list, description="Search results")
     total_found: int = Field(..., description="Total number of matches found")
@@ -53,7 +53,7 @@ def parse_search_params(
         language_enum = Language(language.lower())
     except ValueError:
         language_enum = Language.ENGLISH
-    
+
     return SearchParams(
         language=language_enum,
         max_results=max_results,
@@ -74,18 +74,18 @@ def parse_search_params(
 async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
     """Cached search implementation."""
     logger.info(f"Searching for '{query}' in {params.language.value}")
-    
+
     try:
         # Get language search instance
         language_search = await get_language_search(languages=[params.language])
-        
+
         # Perform search
         results = await language_search.search(
             query=query,
             max_results=params.max_results,
             min_score=params.min_score,
         )
-        
+
         # Convert to response format - optimized dictionary creation
         response_items = [
             SearchResponseItem(
@@ -96,14 +96,14 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
             )
             for result in results
         ]
-        
+
         return SearchResponse(
             query=query,
             results=response_items,
             total_found=len(results),
             language=params.language,
         )
-    
+
     except Exception as e:
         logger.error(f"Failed to search for '{query}': {e}")
         raise
@@ -116,16 +116,16 @@ async def search_words_query(
 ) -> SearchResponse:
     """Search for words using query parameter."""
     start_time = time.perf_counter()
-    
+
     try:
         result = await _cached_search(q, params)
-        
+
         # Log performance
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
         logger.info(f"Search completed: '{q}' -> {len(result.results)} results in {elapsed_ms}ms")
-        
+
         return result
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -140,16 +140,18 @@ async def search_words_path(
 ) -> SearchResponse:
     """Search for words using path parameter."""
     start_time = time.perf_counter()
-    
+
     try:
         result = await _cached_search(query, params)
-        
+
         # Log performance
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
-        logger.info(f"Search completed: '{query}' -> {len(result.results)} results in {elapsed_ms}ms")
-        
+        logger.info(
+            f"Search completed: '{query}' -> {len(result.results)} results in {elapsed_ms}ms"
+        )
+
         return result
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -165,23 +167,25 @@ async def get_search_suggestions(
 ) -> SearchResponse:
     """Get search suggestions for autocomplete (lower threshold)."""
     start_time = time.perf_counter()
-    
+
     # Override parameters for suggestions
     suggestion_params = SearchParams(
         language=params.language,
         max_results=limit,
         min_score=0.3,  # Lower threshold for suggestions
     )
-    
+
     try:
         result = await _cached_search(query, suggestion_params)
-        
+
         # Log performance
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
-        logger.info(f"Suggestions completed: '{query}' -> {len(result.results)} results in {elapsed_ms}ms")
-        
+        logger.info(
+            f"Suggestions completed: '{query}' -> {len(result.results)} results in {elapsed_ms}ms"
+        )
+
         return result
-    
+
     except Exception as e:
         logger.error(f"Suggestions failed for '{query}': {e}")
         raise HTTPException(status_code=500, detail=f"Internal error during suggestions: {str(e)}")

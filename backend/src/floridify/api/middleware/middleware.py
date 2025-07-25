@@ -90,53 +90,53 @@ class CacheHeadersMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         """Add appropriate cache headers based on endpoint."""
         response = await call_next(request)
-        
+
         # Only add cache headers for successful responses
         if response.status_code == 200:
             path = request.url.path
             query_params = str(request.query_params) if request.query_params else ""
-            
+
             # Generate ETag based on path and query parameters
             etag_data = f"{path}:{query_params}"
             etag = hashlib.md5(etag_data.encode()).hexdigest()[:16]
-            
+
             # Check for conditional requests
             if_none_match = request.headers.get("If-None-Match", "").strip('"')
             if if_none_match == etag:
                 # Client has current version - return 304 Not Modified
                 return Response(status_code=304, headers={"ETag": f'"{etag}"'})
-            
+
             # Set cache headers based on endpoint type
             if path.startswith("/api/v1/search"):
                 # Search results - cache for 1 hour
                 response.headers["Cache-Control"] = "public, max-age=3600"
                 response.headers["ETag"] = f'"{etag}"'
                 response.headers["Vary"] = "Accept-Encoding"
-                
+
             elif path.startswith("/api/v1/lookup"):
                 # Word definitions - cache for 30 minutes
                 response.headers["Cache-Control"] = "public, max-age=1800"
                 response.headers["ETag"] = f'"{etag}"'
                 response.headers["Vary"] = "Accept-Encoding"
-                
+
             elif path.startswith("/api/v1/suggestions"):
                 # Suggestions - cache for 2 hours (more stable)
                 response.headers["Cache-Control"] = "public, max-age=7200"
                 response.headers["ETag"] = f'"{etag}"'
                 response.headers["Vary"] = "Accept-Encoding"
-                
+
             elif path.startswith("/api/v1/synonyms"):
                 # Synonyms - cache for 6 hours (very stable)
                 response.headers["Cache-Control"] = "public, max-age=21600"
                 response.headers["ETag"] = f'"{etag}"'
                 response.headers["Vary"] = "Accept-Encoding"
-                
+
             elif path.startswith("/api/v1/health"):
                 # Health checks - no caching
                 response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
                 response.headers["Pragma"] = "no-cache"
                 response.headers["Expires"] = "0"
-            
+
             else:
                 # Default for other endpoints - short cache
                 response.headers["Cache-Control"] = "public, max-age=300"  # 5 minutes

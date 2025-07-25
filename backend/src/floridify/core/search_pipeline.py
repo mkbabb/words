@@ -44,11 +44,7 @@ async def get_search_engine(
     target_languages = languages or [Language.ENGLISH]
 
     # Check if we need to recreate
-    if (
-        _search_engine is None
-        or _search_engine.languages != target_languages
-        or force_rebuild
-    ):
+    if _search_engine is None or _search_engine.languages != target_languages or force_rebuild:
         _search_engine = await get_language_search(target_languages)
 
     return _search_engine
@@ -124,9 +120,7 @@ async def search_word_pipeline(
 
     except Exception as e:
         pipeline_time = time.perf_counter() - pipeline_start
-        logger.error(
-            f"❌ Search pipeline failed for '{word}' after {pipeline_time:.2f}s: {e}"
-        )
+        logger.error(f"❌ Search pipeline failed for '{word}' after {pipeline_time:.2f}s: {e}")
 
         log_metrics(
             word=word,

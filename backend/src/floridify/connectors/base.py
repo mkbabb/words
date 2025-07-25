@@ -27,9 +27,7 @@ class DictionaryConnector(ABC):
         self.rate_limit = rate_limit
         self._rate_limiter = asyncio.Semaphore(1)
         self._last_request_time = 0.0
-        self.progress_callback: Callable[[str, float, dict[str, Any]], None] | None = (
-            None
-        )
+        self.progress_callback: Callable[[str, float, dict[str, Any]], None] | None = None
 
     @property
     @abstractmethod
@@ -101,9 +99,7 @@ class DictionaryConnector(ABC):
 
             if time_since_last < min_interval:
                 wait_time = min_interval - time_since_last
-                logger.debug(
-                    f"Rate limiting: waiting {wait_time:.2f}s for {self.provider_name}"
-                )
+                logger.debug(f"Rate limiting: waiting {wait_time:.2f}s for {self.provider_name}")
                 await asyncio.sleep(wait_time)
 
             self._last_request_time = asyncio.get_event_loop().time()
@@ -122,27 +118,28 @@ class DictionaryConnector(ABC):
         pronunciation = await self.extract_pronunciation(response_data)
         definitions = await self.extract_definitions(response_data, str(word.id))
         etymology = await self.extract_etymology(response_data)
-        
+
         # Save pronunciation if found
         pronunciation_id = None
         if pronunciation:
             pronunciation.word_id = str(word.id)
             await pronunciation.save()
             pronunciation_id = str(pronunciation.id)
-        
+
         # Save definitions and collect IDs
         definition_ids = []
         for definition in definitions:
             await definition.save()
             definition_ids.append(str(definition.id))
-        
+
         # Create and save provider data
         # Filter out any non-serializable data from raw_data
         safe_raw_data = {
-            k: v for k, v in response_data.items() 
+            k: v
+            for k, v in response_data.items()
             if k != "definitions"  # Exclude definitions which may contain ObjectIds
         }
-        
+
         provider_data = ProviderData(
             word_id=str(word.id),
             provider=DictionaryProvider(self.provider_name),
@@ -152,5 +149,5 @@ class DictionaryConnector(ABC):
             raw_data=safe_raw_data,
         )
         await provider_data.save()
-        
+
         return provider_data

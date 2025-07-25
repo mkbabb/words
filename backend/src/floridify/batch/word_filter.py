@@ -6,8 +6,8 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
-import nltk  # type: ignore[import-not-found]
-from nltk.corpus import stopwords  # type: ignore[import-not-found]
+import nltk  # type: ignore[import-untyped]
+from nltk.corpus import stopwords  # type: ignore[import-untyped]
 
 from .word_normalizer import WordNormalizer
 

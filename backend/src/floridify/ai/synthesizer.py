@@ -85,10 +85,7 @@ class DefinitionSynthesizer:
 
         for definition in all_definitions:
             # Create a key based on part of speech and normalized text
-            key = (
-                definition.part_of_speech,
-                definition.text.strip().lower()
-            )
+            key = (definition.part_of_speech, definition.text.strip().lower())
 
             if key not in seen_definitions:
                 seen_definitions.add(key)
@@ -123,14 +120,10 @@ class DefinitionSynthesizer:
         )
 
         # Synthesize etymology
-        etymology = await synthesize_etymology(
-            word_obj, providers_data, self.ai, state_tracker
-        )
+        etymology = await synthesize_etymology(word_obj, providers_data, self.ai, state_tracker)
 
         # Generate facts
-        facts = await generate_facts(
-            word_obj, synthesized_definitions, self.ai, self.facts_count
-        )
+        facts = await generate_facts(word_obj, synthesized_definitions, self.ai, self.facts_count)
 
         # Create synthesized entry
         entry = SynthesizedDictionaryEntry(
@@ -186,12 +179,10 @@ class DefinitionSynthesizer:
 
         # Create tasks for parallel synthesis
         synthesis_tasks = []
-        
+
         async def synthesize_cluster(cluster_id: str, cluster_defs: list[Definition]) -> Definition:
-            logger.info(
-                f"Synthesizing cluster '{cluster_id}' with {len(cluster_defs)} definitions"
-            )
-            
+            logger.info(f"Synthesizing cluster '{cluster_id}' with {len(cluster_defs)} definitions")
+
             # Convert definitions to dict format
             def_dicts = [
                 {
@@ -201,7 +192,7 @@ class DefinitionSynthesizer:
                 }
                 for d in cluster_defs
             ]
-            
+
             # Synthesize definition text
             synthesis_result = await synthesize_definition_text(
                 clustered_definitions=def_dicts,
@@ -209,7 +200,7 @@ class DefinitionSynthesizer:
                 ai=self.ai,
                 state_tracker=state_tracker,
             )
-            
+
             # Create and save definition
             definition = Definition(
                 word_id=str(word.id),
@@ -219,16 +210,17 @@ class DefinitionSynthesizer:
             )
             await definition.save()
             return definition
-        
+
         # Create tasks for all clusters
         for cluster_id, cluster_defs in clusters.items():
             task = synthesize_cluster(cluster_id, cluster_defs)
             synthesis_tasks.append(task)
-        
+
         # Execute all syntheses in parallel
         import asyncio
+
         synthesized_definitions = await asyncio.gather(*synthesis_tasks)
-        
+
         return synthesized_definitions
 
     async def generate_fallback_entry(

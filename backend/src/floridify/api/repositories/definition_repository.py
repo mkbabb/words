@@ -6,7 +6,6 @@ from beanie import PydanticObjectId
 from beanie.operators import In
 from pydantic import BaseModel, Field
 
-from ..core.base import BaseRepository
 from ...models import (
     Collocation,
     Definition,
@@ -15,11 +14,12 @@ from ...models import (
     UsageNote,
     WordForm,
 )
+from ..core.base import BaseRepository
 
 
 class DefinitionCreate(BaseModel):
     """Schema for creating a definition."""
-    
+
     word_id: str
     part_of_speech: str
     text: str = Field(..., min_length=1)
@@ -38,7 +38,7 @@ class DefinitionCreate(BaseModel):
 
 class DefinitionUpdate(BaseModel):
     """Schema for updating a definition."""
-    
+
     part_of_speech: str | None = None
     text: str | None = Field(None, min_length=1)
     meaning_cluster: MeaningCluster | None = None
@@ -59,7 +59,7 @@ class DefinitionUpdate(BaseModel):
 
 class DefinitionFilter(BaseModel):
     """Filter parameters for definition queries."""
-    
+
     word_id: str | None = None
     part_of_speech: str | None = None
     language_register: str | None = None
@@ -67,146 +67,136 @@ class DefinitionFilter(BaseModel):
     cefr_level: str | None = None
     frequency_band: int | None = None
     has_examples: bool | None = None
-    
+
     def to_query(self) -> dict[str, Any]:
         """Convert to MongoDB query."""
         query = {}
-        
+
         if self.word_id:
             query["word_id"] = self.word_id
-        
+
         if self.part_of_speech:
             query["part_of_speech"] = self.part_of_speech
-        
+
         if self.language_register:
             query["language_register"] = self.language_register
-        
+
         if self.domain:
             query["domain"] = self.domain
-        
+
         if self.cefr_level:
             query["cefr_level"] = self.cefr_level
-        
+
         if self.frequency_band is not None:
             query["frequency_band"] = self.frequency_band
-        
+
         if self.has_examples is not None:
             if self.has_examples:
                 query["example_ids"] = {"$ne": []}
             else:
                 query["example_ids"] = []
-        
+
         return query
 
 
 class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, DefinitionUpdate]):
     """Repository for Definition CRUD operations."""
-    
+
     def __init__(self):
         super().__init__(Definition)
-    
+
     async def find_by_word(
-        self,
-        word_id: str,
-        part_of_speech: str | None = None
+        self, word_id: str, part_of_speech: str | None = None
     ) -> list[Definition]:
         """Find definitions for a word."""
         query = {"word_id": word_id}
         if part_of_speech:
             query["part_of_speech"] = part_of_speech
-        
+
         return await Definition.find(query).to_list()
-    
-    async def find_by_meaning_cluster(
-        self,
-        cluster_id: str
-    ) -> list[Definition]:
+
+    async def find_by_meaning_cluster(self, cluster_id: str) -> list[Definition]:
         """Find definitions in the same meaning cluster."""
-        return await Definition.find({
-            "meaning_cluster.cluster_id": cluster_id
-        }).to_list()
-    
+        return await Definition.find({"meaning_cluster.cluster_id": cluster_id}).to_list()
+
     async def update_components(
-        self,
-        id: PydanticObjectId,
-        components: dict[str, Any]
+        self, id: PydanticObjectId, components: dict[str, Any]
     ) -> Definition:
         """Update specific components of a definition."""
         definition = await self.get(id)
-        
+
         # Update individual components
         if "word_forms" in components:
             definition.word_forms = [WordForm(**wf) for wf in components["word_forms"]]
-        
+
         if "grammar_patterns" in components:
             definition.grammar_patterns = [
                 GrammarPattern(**gp) for gp in components["grammar_patterns"]
             ]
-        
+
         if "collocations" in components:
-            definition.collocations = [
-                Collocation(**col) for col in components["collocations"]
-            ]
-        
+            definition.collocations = [Collocation(**col) for col in components["collocations"]]
+
         if "usage_notes" in components:
-            definition.usage_notes = [
-                UsageNote(**un) for un in components["usage_notes"]
-            ]
-        
+            definition.usage_notes = [UsageNote(**un) for un in components["usage_notes"]]
+
         # Update scalar fields
-        for field in ["synonyms", "antonyms", "cefr_level", "frequency_band",
-                      "language_register", "domain", "region"]:
+        for field in [
+            "synonyms",
+            "antonyms",
+            "cefr_level",
+            "frequency_band",
+            "language_register",
+            "domain",
+            "region",
+        ]:
             if field in components:
                 setattr(definition, field, components[field])
-        
+
         definition.version += 1
         await definition.save()
         return definition
-    
+
     async def _cascade_delete(self, definition: Definition) -> None:
         """Delete related documents when deleting a definition."""
         from ...models import Example
-        
+
         # Delete all examples for this definition
         if definition.example_ids:
             await Example.find(In(Example.id, definition.example_ids)).delete()
-    
+
     async def get_with_examples(self, id: PydanticObjectId) -> dict[str, Any]:
         """Get definition with expanded examples."""
         from ...models import Example
-        
+
         definition = await self.get(id)
         definition_dict = definition.model_dump()
-        
+
         # Fetch and include examples
         if definition.example_ids:
-            examples = await Example.find(
-                In(Example.id, definition.example_ids)
-            ).to_list()
+            examples = await Example.find(In(Example.id, definition.example_ids)).to_list()
             definition_dict["examples"] = [ex.model_dump() for ex in examples]
         else:
             definition_dict["examples"] = []
-        
+
         return definition_dict
-    
+
     async def get_many_with_examples(self, definitions: list[Definition]) -> list[dict[str, Any]]:
         """Get multiple definitions with expanded examples efficiently."""
         from ...models import Example
-        
+
         # Collect all example IDs
         all_example_ids = []
         for definition in definitions:
             if definition.example_ids:
                 all_example_ids.extend(definition.example_ids)
-        
+
         # Fetch all examples in one query
         examples_map = {}
         if all_example_ids:
-            examples = await Example.find(
-                In(Example.id, all_example_ids)
-            ).to_list()
+            examples = await Example.find(In(Example.id, all_example_ids)).to_list()
             examples_map = {str(ex.id): ex for ex in examples}
-        
+
         # Build results with examples
         results = []
         for definition in definitions:
@@ -220,5 +210,5 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
             else:
                 def_dict["examples"] = []
             results.append(def_dict)
-        
+
         return results

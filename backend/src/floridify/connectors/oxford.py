@@ -105,7 +105,9 @@ class OxfordConnector(DictionaryConnector):
             logger.error(f"Error fetching {word} from Oxford: {e}")
             return None
 
-    async def _parse_oxford_response(self, word: str, data: dict[str, Any], word_obj: Word) -> ProviderData:
+    async def _parse_oxford_response(
+        self, word: str, data: dict[str, Any], word_obj: Word
+    ) -> ProviderData:
         """Parse Oxford API response using new models.
 
         Args:
@@ -169,18 +171,18 @@ class OxfordConnector(DictionaryConnector):
                         # Get first pronunciation
                         pron = pronunciations[0]
                         phonetic = pron.get("phoneticSpelling", "")
-                        
+
                         # Oxford provides both British and American pronunciations
                         ipa_british = None
                         ipa_american = None
-                        
+
                         for p in pronunciations:
                             dialect = p.get("dialects", [])
                             if "American English" in dialect:
                                 ipa_american = p.get("phoneticSpelling")
                             elif "British English" in dialect:
                                 ipa_british = p.get("phoneticSpelling")
-                        
+
                         return Pronunciation(
                             word_id="",  # Will be set by base connector
                             phonetic=phonetic,
@@ -191,7 +193,7 @@ class OxfordConnector(DictionaryConnector):
                         )
         except Exception as e:
             logger.error(f"Error extracting pronunciation: {e}")
-        
+
         return None
 
     async def extract_definitions(self, raw_data: dict[str, Any], word_id: str) -> list[Definition]:
@@ -231,11 +233,10 @@ class OxfordConnector(DictionaryConnector):
                             definition_texts = sense.get("definitions", [])
 
                             for def_idx, def_text in enumerate(definition_texts):
-
                                 # Extract domain and register
                                 domains = sense.get("domainClasses", [])
                                 domain = domains[0].get("text") if domains else None
-                                
+
                                 registers = sense.get("registers", [])
                                 register = None
                                 if registers:
@@ -316,5 +317,5 @@ class OxfordConnector(DictionaryConnector):
                             )
         except Exception as e:
             logger.error(f"Error extracting etymology: {e}")
-        
+
         return None

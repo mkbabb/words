@@ -37,7 +37,7 @@ class PhraseNormalizer:
     """
     Advanced phrase normalization using modern NLP libraries.
 
-    Leverages the text processing abstraction layer for robust processing 
+    Leverages the text processing abstraction layer for robust processing
     of phrases, idioms, and multi-word expressions.
     """
 
@@ -45,12 +45,12 @@ class PhraseNormalizer:
         """Initialize the advanced phrase normalizer with performance optimizations."""
         self.language = language
         self.text_processor = TextProcessor()
-        
+
         # Performance optimizations: cache frequently used functions (KISS)
         self._normalize = normalize_text
         self._extract_phrases = extract_phrases
         self._is_phrase = is_phrase
-        self._split_phrase = split_phrase  
+        self._split_phrase = split_phrase
         self._join_words = join_words
 
     def normalize(self, text: str) -> str:
@@ -86,7 +86,7 @@ class PhraseNormalizer:
 
         # Extract phrases using cached function for performance
         extracted_phrases = self._extract_phrases(text)
-        
+
         for phrase_text in extracted_phrases:
             normalized = self.normalize(phrase_text)
             if normalized:
@@ -101,7 +101,6 @@ class PhraseNormalizer:
                 )
 
         return phrases
-
 
     def is_phrase(self, text: str) -> bool:
         """

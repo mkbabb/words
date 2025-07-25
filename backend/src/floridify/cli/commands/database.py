@@ -156,9 +156,12 @@ async def _get_quality_metrics() -> dict[str, str]:
             if sample_entries:
                 # Calculate average providers per word
                 from ...models import ProviderData
+
                 total_providers = 0
                 for word in sample_entries:
-                    provider_count = await ProviderData.find(ProviderData.word_id == str(word.id)).count()
+                    provider_count = await ProviderData.find(
+                        ProviderData.word_id == str(word.id)
+                    ).count()
                     total_providers += provider_count
                 avg_providers = total_providers / len(sample_entries)
                 metrics["Average providers per word"] = f"{avg_providers:.1f}"

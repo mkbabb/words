@@ -55,40 +55,50 @@ class DatabaseConfig:
     name: str = "floridify"
     timeout: int = 30
     max_pool_size: int = 100
-    
+
     def get_url(self) -> str:
         """Get appropriate database URL based on environment."""
-        
+
         is_docker = os.path.exists("/.dockerenv")
         is_ec2 = os.path.exists("/var/lib/cloud")
         is_production = is_ec2 or os.getenv("ENVIRONMENT") == "production"
-        
+
         # Get the appropriate URL
         if is_production:
             url = self.production_url
         else:
             # Development always uses SSH tunnel on host
             url = self.development_url
-            
+
         if not url:
             raise ValueError(
                 f"No database URL configured for environment "
                 f"(production={is_production}, docker={is_docker}). "
                 f"Please check auth/config.toml"
             )
-            
+
         # For Docker, replace localhost with host.docker.internal
         if is_docker and not is_production:
             url = url.replace("localhost:", "host.docker.internal:")
-            
-        # Always add the cert path - it's at project_root/auth/
-        cert_path = get_project_root() / "auth" / "rds-ca-2019-root.pem"
-        if "?" in url:
-            url += f"&tlsCAFile={cert_path}"
-        else:
-            url += f"?tlsCAFile={cert_path}"
-            
+
         return url
+
+    @property
+    def cert_path(self) -> Path:
+        """Certificate path is always at project_root/auth/."""
+        return get_project_root() / "auth" / "rds-ca-2019-root.pem"
+
+
+@dataclass
+class GoogleCloudConfig:
+    """Google Cloud configuration."""
+
+    credentials_path: str | None = None
+    project_id: str | None = None
+    tts_american_voice: str = "en-US-Wavenet-D"
+    tts_british_voice: str = "en-GB-Wavenet-B"
+    tts_american_voice_female: str = "en-US-Wavenet-F"
+    tts_british_voice_female: str = "en-GB-Wavenet-A"
 
 
 @dataclass
@@ -112,6 +122,7 @@ class Config:
     database: DatabaseConfig
     rate_limits: RateLimits
     processing: ProcessingConfig
+    google_cloud: GoogleCloudConfig | None = None
 
     @classmethod
     def from_file(cls, config_path: str | Path | None = None) -> Config:
@@ -132,7 +143,7 @@ class Config:
                 # Standard location
                 project_root = get_project_root()
                 config_path = project_root / "auth" / "config.toml"
-                
+
                 # In Docker, check alternative location
                 if os.path.exists("/.dockerenv") and not config_path.exists():
                     docker_config = Path("/app/auth/config.toml")
@@ -192,6 +203,21 @@ class Config:
             verbose=data.get("processing", {}).get("verbose", False),
         )
 
+        # Load Google Cloud config if present
+        google_cloud = None
+        if "google_cloud" in data:
+            gc_data = data["google_cloud"]
+            google_cloud = GoogleCloudConfig(
+                credentials_path=gc_data.get("credentials_path"),
+                project_id=gc_data.get("project_id"),
+                tts_american_voice=gc_data.get("tts_american_voice", "en-US-Wavenet-D"),
+                tts_british_voice=gc_data.get("tts_british_voice", "en-GB-Wavenet-B"),
+                tts_american_voice_female=gc_data.get(
+                    "tts_american_voice_female", "en-US-Wavenet-F"
+                ),
+                tts_british_voice_female=gc_data.get("tts_british_voice_female", "en-GB-Wavenet-A"),
+            )
+
         config = cls(
             openai=openai_config,
             oxford=oxford_config,
@@ -199,13 +225,14 @@ class Config:
             database=database_config,
             rate_limits=rate_limits,
             processing=processing,
+            google_cloud=google_cloud,
         )
-        
+
         # Validate required fields
         if not config.openai.api_key:
             raise ValueError(
                 f"OpenAI API key missing in {config_path}\n"
                 f"Please update the 'api_key' field in the [openai] section."
             )
-            
+
         return config

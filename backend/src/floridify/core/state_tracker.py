@@ -17,11 +17,11 @@ logger = get_logger(__name__)
 
 class Stages:
     """Optimized stage constants with progress mapping."""
-    
+
     # Main pipeline stages with expected progress values
     START = "START"
     SEARCH_START = "SEARCH_START"
-    SEARCH_COMPLETE = "SEARCH_COMPLETE" 
+    SEARCH_COMPLETE = "SEARCH_COMPLETE"
     PROVIDER_FETCH_START = "PROVIDER_FETCH_START"
     PROVIDER_FETCH_COMPLETE = "PROVIDER_FETCH_COMPLETE"
     AI_CLUSTERING = "AI_CLUSTERING"
@@ -30,7 +30,7 @@ class Stages:
     STORAGE_SAVE = "STORAGE_SAVE"
     COMPLETE = "COMPLETE"
     ERROR = "ERROR"
-    
+
     # Provider sub-stages (rarely used by frontend)
     PROVIDER_FETCH_HTTP_CONNECTING = "PROVIDER_FETCH_HTTP_CONNECTING"
     PROVIDER_FETCH_HTTP_DOWNLOADING = "PROVIDER_FETCH_HTTP_DOWNLOADING"
@@ -38,7 +38,7 @@ class Stages:
     PROVIDER_FETCH_HTTP_PARSING = "PROVIDER_FETCH_HTTP_PARSING"
     PROVIDER_FETCH_HTTP_COMPLETE = "PROVIDER_FETCH_HTTP_COMPLETE"
     PROVIDER_FETCH_ERROR = "PROVIDER_FETCH_ERROR"
-    
+
     # Progress mapping for automatic progress calculation
     PROGRESS_MAP = {
         START: 5,
@@ -67,12 +67,8 @@ class PipelineState(BaseModel):
     timestamp: datetime = Field(
         default_factory=datetime.now, description="When this state was recorded"
     )
-    is_complete: bool = Field(
-        default=False, description="Whether the pipeline has completed"
-    )
-    error: str | None = Field(
-        default=None, description="Error message if pipeline failed"
-    )
+    is_complete: bool = Field(default=False, description="Whether the pipeline has completed")
+    error: str | None = Field(default=None, description="Error message if pipeline failed")
 
     def model_dump_optimized(self) -> dict[str, Any]:
         """Return optimized dict with only essential fields for frontend."""
@@ -80,21 +76,21 @@ class PipelineState(BaseModel):
             "stage": self.stage,
             "progress": self.progress,
         }
-        
+
         # Only include message if it differs from stage (avoid redundancy)
-        if self.message and self.message.lower() != self.stage.lower().replace('_', ' '):
+        if self.message and self.message.lower() != self.stage.lower().replace("_", " "):
             result["message"] = self.message
-            
+
         # Only include details for debugging or if explicitly needed
         if self.details:
             result["details"] = self.details
-            
+
         # Include completion/error states
         if self.is_complete:
             result["is_complete"] = True
         if self.error:
             result["error"] = self.error
-            
+
         return result
 
 
@@ -156,7 +152,9 @@ class StateTracker:
                 message=self._current_state.message,
             )
 
-    async def update_complete(self, stage: str = "COMPLETE", message: str = "Pipeline completed") -> None:
+    async def update_complete(
+        self, stage: str = "COMPLETE", message: str = "Pipeline completed"
+    ) -> None:
         """Optimized update for completion."""
         await self.update(stage=stage, progress=100, message=message, is_complete=True)
 

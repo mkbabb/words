@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from beanie import init_beanie
@@ -10,6 +11,7 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from ..list.models import WordList
 from ..models import (
+    AudioMedia,
     Definition,
     Example,
     Fact,
@@ -36,15 +38,18 @@ class MongoDBStorage:
         self,
         connection_string: str = "mongodb://localhost:27017",
         database_name: str = "floridify",
+        cert_path: Path | None = None,
     ) -> None:
         """Initialize MongoDB storage.
 
         Args:
             connection_string: MongoDB connection string
             database_name: Name of the database to use
+            cert_path: Path to TLS certificate file
         """
         self.connection_string = connection_string
         self.database_name = database_name
+        self.cert_path = cert_path
         self.client: AsyncIOMotorClient | None = None  # type: ignore[type-arg]
         self._initialized = False
 
@@ -53,19 +58,19 @@ class MongoDBStorage:
         # Optimized connection pool configuration for production performance
         self.client = AsyncIOMotorClient(
             self.connection_string,
+            # TLS Certificate
+            tlsCAFile=str(self.cert_path) if self.cert_path else None,
             # Connection Pool Settings
-            maxPoolSize=50,          # Increase max connections for concurrent load
-            minPoolSize=10,          # Maintain warm connections
-            maxIdleTimeMS=30000,     # Close idle connections after 30s
-            
+            maxPoolSize=50,  # Increase max connections for concurrent load
+            minPoolSize=10,  # Maintain warm connections
+            maxIdleTimeMS=30000,  # Close idle connections after 30s
             # Performance Settings
             serverSelectionTimeoutMS=3000,  # Fast server selection (3s)
-            socketTimeoutMS=20000,   # Socket timeout (20s)
+            socketTimeoutMS=20000,  # Socket timeout (20s)
             connectTimeoutMS=10000,  # Connection timeout (10s)
-            
             # Reliability Settings
-            retryWrites=False,       # Disable retry writes for Docker MongoDB compatibility
-            waitQueueTimeoutMS=5000, # Queue timeout for connection pool
+            retryWrites=False,  # Disable retry writes for Docker MongoDB compatibility
+            waitQueueTimeoutMS=5000,  # Queue timeout for connection pool
         )
         database: Any = self.client[self.database_name]
 
@@ -79,6 +84,7 @@ class MongoDBStorage:
                 Example,
                 Fact,
                 Pronunciation,
+                AudioMedia,
                 ProviderData,
                 SynthesizedDictionaryEntry,
                 PhrasalExpression,
@@ -92,16 +98,16 @@ class MongoDBStorage:
 
     async def ensure_healthy_connection(self) -> bool:
         """Ensure MongoDB connection is healthy and reconnect if needed.
-        
+
         Returns:
             True if connection is healthy, False otherwise
         """
         if not self.client:
             return False
-            
+
         try:
             # Ping the database to check connection health
-            await self.client.admin.command('ping')
+            await self.client.admin.command("ping")
             return True
         except Exception as e:
             logger.warning(f"MongoDB connection unhealthy: {e}")
@@ -120,13 +126,13 @@ class MongoDBStorage:
 
     def get_connection_pool_stats(self) -> dict[str, Any]:
         """Get connection pool statistics for monitoring.
-        
+
         Returns:
             Dictionary with connection pool statistics
         """
         if not self.client:
             return {"status": "disconnected"}
-            
+
         try:
             # Basic stats that should be available
             stats = {
@@ -134,15 +140,15 @@ class MongoDBStorage:
                 "initialized": self._initialized,
                 "database_name": self.database_name,
             }
-            
+
             # Try to get pool options if available
-            if hasattr(self.client, 'options') and hasattr(self.client.options, 'pool_options'):
+            if hasattr(self.client, "options") and hasattr(self.client.options, "pool_options"):
                 pool_options = self.client.options.pool_options  # type: ignore[attr-defined]
-                if hasattr(pool_options, 'max_pool_size'):
+                if hasattr(pool_options, "max_pool_size"):
                     stats["max_pool_size"] = pool_options.max_pool_size
-                if hasattr(pool_options, 'min_pool_size'):
+                if hasattr(pool_options, "min_pool_size"):
                     stats["min_pool_size"] = pool_options.min_pool_size
-            
+
             return stats
         except Exception as e:
             logger.debug(f"Could not get full pool stats: {e}")
@@ -245,8 +251,6 @@ class MongoDBStorage:
             return []
 
 
-
-
 # Helper functions for AI module
 async def _ensure_initialized() -> None:
     """Ensure MongoDB is initialized with environment-aware configuration."""
@@ -257,12 +261,12 @@ async def _ensure_initialized() -> None:
             config = Config.from_file()
             mongodb_url = config.database.get_url()
             database_name = config.database.name
-            
+            cert_path = config.database.cert_path
+
             logger.info(f"Initializing MongoDB: {database_name} at {mongodb_url[:50]}...")
-            
+
             _storage = MongoDBStorage(
-                connection_string=mongodb_url,
-                database_name=database_name
+                connection_string=mongodb_url, database_name=database_name, cert_path=cert_path
             )
             await _storage.connect()
             logger.info("MongoDB initialized successfully")

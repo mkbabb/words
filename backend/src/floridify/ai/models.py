@@ -38,7 +38,6 @@ class DefinitionResponse(BaseModel):
         description="Definition of the word type.",
     )
 
-    
     relevancy: float = Field(
         default=1.0,
         ge=0.0,
@@ -72,16 +71,13 @@ class ClusterMapping(BaseModel):
         description="List of definition indices (0-based) in this cluster"
     )
     confidence: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=1.0,
-        description="Confidence in this cluster mapping (0.0-1.0)"
+        default=1.0, ge=0.0, le=1.0, description="Confidence in this cluster mapping (0.0-1.0)"
     )
     relevancy: float = Field(
         default=1.0,
         ge=0.0,
         le=1.0,
-        description="How relevant this cluster is to common usage (0.0-1.0, where 1.0 is most commonly used meaning)"
+        description="How relevant this cluster is to common usage (0.0-1.0, where 1.0 is most commonly used meaning)",
     )
 
 
@@ -105,8 +101,6 @@ class SynthesisResponse(BaseModel):
     )
     confidence: float
     sources_used: list[str]
-
-
 
 
 class SynonymCandidate(BaseModel):
@@ -165,7 +159,7 @@ class FactGenerationResponse(BaseModel):
 
 class Collocation(BaseModel):
     """A single collocation entry."""
-    
+
     type: str = Field(description="Type of collocation (e.g., verb+noun, adjective+noun)")
     phrase: str = Field(description="The collocation phrase")
     frequency: float = Field(ge=0.0, le=1.0, description="Frequency score")
@@ -173,7 +167,7 @@ class Collocation(BaseModel):
 
 class CollocationResponse(BaseModel):
     """Response for collocation generation."""
-    
+
     collocations: list[Collocation] = Field(
         description="Common word combinations with type and frequency"
     )
@@ -182,19 +176,15 @@ class CollocationResponse(BaseModel):
 
 class GrammarPatternResponse(BaseModel):
     """Response for grammar pattern extraction."""
-    
-    patterns: list[str] = Field(
-        description="Common grammatical constructions (e.g., [Tn], sb/sth)"
-    )
-    descriptions: list[str] = Field(
-        description="Human-readable descriptions of patterns"
-    )
+
+    patterns: list[str] = Field(description="Common grammatical constructions (e.g., [Tn], sb/sth)")
+    descriptions: list[str] = Field(description="Human-readable descriptions of patterns")
     confidence: float = Field(ge=0.0, le=1.0)
 
 
 class CEFRLevelResponse(BaseModel):
     """Response for CEFR level assessment."""
-    
+
     level: str = Field(description="CEFR level (A1-C2)")
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str = Field(description="Explanation for the level assignment")
@@ -202,17 +192,15 @@ class CEFRLevelResponse(BaseModel):
 
 class UsageNote(BaseModel):
     """A single usage note."""
-    
+
     type: str = Field(description="Type of usage note (e.g., register, formality, context)")
     text: str = Field(description="The usage guidance text")
 
 
 class UsageNoteResponse(BaseModel):
     """Response for usage note generation."""
-    
-    notes: list[UsageNote] = Field(
-        description="Usage guidance with type and text"
-    )
+
+    notes: list[UsageNote] = Field(description="Usage guidance with type and text")
     confidence: float = Field(ge=0.0, le=1.0)
 
 
@@ -226,47 +214,42 @@ class AIGeneratedProviderData(ProviderData):
 
 class AntonymResponse(BaseModel):
     """Response for antonym generation."""
-    
-    antonyms: list[str] = Field(
-        description="List of antonyms for the definition"
-    )
+
+    antonyms: list[str] = Field(description="List of antonyms for the definition")
     confidence: float = Field(ge=0.0, le=1.0)
 
 
 class EtymologyResponse(BaseModel):
     """Response for etymology extraction."""
-    
+
     text: str = Field(description="Etymology text explaining word origin")
     origin_language: str | None = Field(None, description="Language of origin")
-    root_words: list[str] = Field(
-        description="Root words or morphemes"
-    )
+    root_words: list[str] = Field(description="Root words or morphemes")
     first_known_use: str | None = Field(None, description="Date or period of first use")
     confidence: float = Field(ge=0.0, le=1.0)
 
 
 class WordForm(BaseModel):
     """A single word form."""
-    
+
     type: str = Field(description="Type of form (e.g., plural, past_tense, gerund)")
     text: str = Field(description="The word form text")
 
 
 class WordFormResponse(BaseModel):
     """Response for word form generation."""
-    
+
     forms: list[WordForm] = Field(description="List of word forms with type and text")
     confidence: float = Field(ge=0.0, le=1.0)
 
 
 class RegisterClassificationResponse(BaseModel):
     """Response for register classification."""
-    
+
     model_config = {"populate_by_name": True}  # Accept both field name and alias
-    
+
     language_register: str = Field(
-        alias="register",
-        description="Register level: formal, informal, neutral, slang, technical"
+        alias="register", description="Register level: formal, informal, neutral, slang, technical"
     )
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str = Field(description="Explanation for classification")
@@ -274,40 +257,32 @@ class RegisterClassificationResponse(BaseModel):
 
 class DomainIdentificationResponse(BaseModel):
     """Response for domain identification."""
-    
-    domain: str | None = Field(
-        None,
-        description="Domain/field: medical, legal, computing, etc."
-    )
+
+    domain: str | None = Field(None, description="Domain/field: medical, legal, computing, etc.")
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str = Field(description="Explanation for identification")
 
 
 class FrequencyBandResponse(BaseModel):
     """Response for frequency band assessment."""
-    
-    band: int = Field(
-        ge=1, le=5,
-        description="Frequency band: 1 (most common) to 5 (least common)"
-    )
+
+    band: int = Field(ge=1, le=5, description="Frequency band: 1 (most common) to 5 (least common)")
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str = Field(description="Explanation for assessment")
 
 
 class RegionalVariantResponse(BaseModel):
     """Response for regional variant detection."""
-    
-    regions: list[str] = Field(
-        description="Regions where this usage is common (US, UK, AU, etc.)"
-    )
+
+    regions: list[str] = Field(description="Regions where this usage is common (US, UK, AU, etc.)")
     confidence: float = Field(ge=0.0, le=1.0)
 
 
 class EnhancedDefinitionResponse(BaseModel):
     """Complete enhanced definition with all fields."""
-    
+
     model_config = {"populate_by_name": True}  # Accept both field name and alias
-    
+
     definition: DefinitionResponse
     antonyms: list[str]
     language_register: str | None = Field(alias="register")
@@ -323,7 +298,7 @@ class EnhancedDefinitionResponse(BaseModel):
 
 class ComprehensiveSynthesisResponse(BaseModel):
     """Complete synthesis response with all components."""
-    
+
     pronunciation: PronunciationResponse | None
     etymology: EtymologyResponse | None
     word_forms: list[dict[str, str]]
@@ -335,41 +310,32 @@ class ComprehensiveSynthesisResponse(BaseModel):
 
 class ExampleSynthesisResponse(BaseModel):
     """Response for example sentence synthesis."""
-    
-    examples: list[str] = Field(
-        description="List of natural, contextual example sentences"
-    )
+
+    examples: list[str] = Field(description="List of natural, contextual example sentences")
     confidence: float = Field(ge=0.0, le=1.0)
 
 
 class DefinitionSynthesisResponse(BaseModel):
     """Response for definition text synthesis from clusters."""
-    
+
     definition_text: str = Field(
         description="Synthesized definition text combining clustered meanings"
     )
-    part_of_speech: str = Field(
-        description="Part of speech for this definition cluster"
-    )
+    part_of_speech: str = Field(description="Part of speech for this definition cluster")
     confidence: float = Field(ge=0.0, le=1.0)
-    sources_used: list[str] = Field(
-        description="Provider sources used in synthesis"
-    )
+    sources_used: list[str] = Field(description="Provider sources used in synthesis")
 
 
 class MeaningClusterResponse(BaseModel):
     """Response for single definition meaning cluster generation."""
-    
-    cluster_id: str = Field(
-        description="Semantic cluster identifier for this definition"
-    )
-    cluster_description: str = Field(
-        description="Human-readable cluster description"
-    )
+
+    cluster_id: str = Field(description="Semantic cluster identifier for this definition")
+    cluster_description: str = Field(description="Human-readable cluster description")
     confidence: float = Field(ge=0.0, le=1.0)
 
 
 # Anki Models
+
 
 class AnkiFillBlankResponse(BaseModel):
     """Response for fill-in-the-blank flashcard generation."""
@@ -390,3 +356,9 @@ class AnkiMultipleChoiceResponse(BaseModel):
     choice_c: str = Field(description="Third answer choice")
     choice_d: str = Field(description="Fourth answer choice")
     correct_choice: str = Field(description="Letter of correct answer (A, B, C, or D)")
+
+
+# Rebuild models with forward references
+ProviderDataResponse.model_rebuild()
+SynthesisResponse.model_rebuild()
+EnhancedDefinitionResponse.model_rebuild()

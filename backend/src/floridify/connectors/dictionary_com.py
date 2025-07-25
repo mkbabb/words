@@ -77,7 +77,7 @@ class DictionaryComConnector(DictionaryConnector):
                     stage=Stages.PROVIDER_FETCH_COMPLETE,
                     progress=58,
                     message="Provider unavailable",
-                    details={"error": "Dictionary.com connector not implemented"}
+                    details={"error": "Dictionary.com connector not implemented"},
                 )
 
             return None

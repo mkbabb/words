@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 if TYPE_CHECKING:
     from ..core.state_tracker import StateTracker
 
+from ..audio import AudioSynthesizer
 from ..core.state_tracker import Stages
 from ..models import (
     Collocation,
@@ -44,18 +45,74 @@ async def synthesize_pronunciation(
     """Synthesize pronunciation from provider data or generate if missing."""
 
     # Check if any provider has pronunciation
+    existing_pronunciation = None
     for provider in providers_data:
         if isinstance(provider, ProviderData):
             # ProviderData format
             if provider.pronunciation_id:
                 pronunciation = await Pronunciation.get(provider.pronunciation_id)
                 if pronunciation:
-                    return pronunciation
+                    existing_pronunciation = pronunciation
+                    break
         else:
             # Dict format
             if provider.get("pronunciation"):
-                # TODO: Merge pronunciations from multiple sources
-                return cast(Pronunciation, provider["pronunciation"])
+                existing_pronunciation = cast(Pronunciation, provider["pronunciation"])
+                break
+
+    # If we have existing pronunciation but it's incomplete, enhance it
+    if existing_pronunciation:
+        needs_update = False
+
+        # Check if we need to generate missing data
+        if not existing_pronunciation.phonetic or existing_pronunciation.phonetic == "unknown":
+            needs_update = True
+        if not existing_pronunciation.ipa_american and not existing_pronunciation.ipa_british:
+            needs_update = True
+
+        if needs_update:
+            try:
+                if state_tracker:
+                    await state_tracker.update(
+                        stage=Stages.AI_SYNTHESIS,
+                        message=f"Enhancing pronunciation for {word.text}",
+                    )
+                response = await ai.pronunciation(word.text)
+
+                # Update missing fields
+                if (
+                    not existing_pronunciation.phonetic
+                    or existing_pronunciation.phonetic == "unknown"
+                ):
+                    existing_pronunciation.phonetic = response.phonetic
+                if not existing_pronunciation.ipa_american and response.ipa:
+                    existing_pronunciation.ipa_american = response.ipa
+
+                await existing_pronunciation.save()
+
+                # Generate audio files if missing
+                if not existing_pronunciation.audio_file_ids:
+                    try:
+                        audio_synthesizer = AudioSynthesizer()
+                        audio_files = await audio_synthesizer.synthesize_pronunciation(
+                            existing_pronunciation, word.text
+                        )
+
+                        if audio_files:
+                            existing_pronunciation.audio_file_ids = [
+                                str(audio.id) for audio in audio_files
+                            ]
+                            await existing_pronunciation.save()
+                            logger.info(f"Generated {len(audio_files)} audio files for {word.text}")
+                    except Exception as audio_error:
+                        logger.warning(f"Failed to generate audio for {word.text}: {audio_error}")
+
+                return existing_pronunciation
+            except Exception as e:
+                logger.error(f"Failed to enhance pronunciation for {word.text}: {e}")
+                return existing_pronunciation
+        else:
+            return existing_pronunciation
 
     # Generate pronunciation if none found
     try:
@@ -65,14 +122,32 @@ async def synthesize_pronunciation(
                 message=f"Generating pronunciation for {word.text}",
             )
         response = await ai.pronunciation(word.text)
+
+        # Ensure we have both phonetic and IPA
         pronunciation = Pronunciation(
             word_id=str(word.id),
-            phonetic=response.phonetic,
-            ipa_american=response.ipa,
+            phonetic=response.phonetic if response.phonetic else None,
+            ipa_american=response.ipa if response.ipa else None,
             syllables=[],  # TODO: Extract syllables
             stress_pattern=None,
         )
         await pronunciation.save()
+
+        # Generate audio files
+        try:
+            audio_synthesizer = AudioSynthesizer()
+            audio_files = await audio_synthesizer.synthesize_pronunciation(pronunciation, word.text)
+
+            # Update pronunciation with audio file IDs
+            if audio_files:
+                pronunciation.audio_file_ids = [str(audio.id) for audio in audio_files]
+                await pronunciation.save()
+
+                logger.info(f"Generated {len(audio_files)} audio files for {word.text}")
+        except Exception as audio_error:
+            logger.warning(f"Failed to generate audio for {word.text}: {audio_error}")
+            # Continue without audio - not critical
+
         return pronunciation
     except Exception as e:
         logger.error(f"Failed to synthesize pronunciation for {word.text}: {e}")
@@ -420,11 +495,7 @@ async def generate_facts(
         facts = []
         for idx, fact_text in enumerate(response.facts):
             # Determine category from response
-            category = (
-                response.categories[idx]
-                if idx < len(response.categories)
-                else "general"
-            )
+            category = response.categories[idx] if idx < len(response.categories) else "general"
 
             # Ensure category is valid - map to allowed Fact categories
             category_mapping = {
@@ -435,7 +506,7 @@ async def generate_facts(
                 "etymology": "etymology",
                 "historical": "historical",
                 "usage": "usage",
-                "linguistic": "linguistic"
+                "linguistic": "linguistic",
             }
             category = category_mapping.get(category.lower(), "usage")
 
@@ -526,7 +597,6 @@ async def synthesize_examples(
         return []
 
 
-
 async def synthesize_definition_text(
     clustered_definitions: list[dict[str, Any]],
     word: str,
@@ -565,9 +635,7 @@ async def synthesize_definition_text(
             return {
                 "definition_text": synth_def.definition,
                 "part_of_speech": synth_def.part_of_speech,
-                "sources_used": [
-                    d.get("provider", "unknown") for d in clustered_definitions
-                ],
+                "sources_used": [d.get("provider", "unknown") for d in clustered_definitions],
             }
         else:
             return {
@@ -633,9 +701,7 @@ async def cluster_definitions(
             )
 
         # Extract cluster mappings
-        cluster_response = await ai.extract_cluster_mapping(
-            word.text, definition_tuples
-        )
+        cluster_response = await ai.extract_cluster_mapping(word.text, definition_tuples)
 
         # Apply cluster assignments
         for cluster_mapping in cluster_response.cluster_mappings:
@@ -757,35 +823,21 @@ async def enhance_definitions_parallel(
         # Word forms
         if "word_forms" in components and (not definition.word_forms or force_refresh):
             # Use the part of speech from the definition
-            tasks.append(
-                synthesize_word_forms(
-                    word, definition.part_of_speech, ai, state_tracker
-                )
-            )
+            tasks.append(synthesize_word_forms(word, definition.part_of_speech, ai, state_tracker))
             task_info.append((definition, "word_forms", len(tasks) - 1))
 
         # CEFR Level
-        if "cefr_level" in components and (
-            definition.cefr_level is None or force_refresh
-        ):
-            tasks.append(
-                assess_definition_cefr(definition, word.text, ai, state_tracker)
-            )
+        if "cefr_level" in components and (definition.cefr_level is None or force_refresh):
+            tasks.append(assess_definition_cefr(definition, word.text, ai, state_tracker))
             task_info.append((definition, "cefr_level", len(tasks) - 1))
 
         # Frequency Band
-        if "frequency_band" in components and (
-            definition.frequency_band is None or force_refresh
-        ):
-            tasks.append(
-                assess_definition_frequency(definition, word.text, ai, state_tracker)
-            )
+        if "frequency_band" in components and (definition.frequency_band is None or force_refresh):
+            tasks.append(assess_definition_frequency(definition, word.text, ai, state_tracker))
             task_info.append((definition, "frequency_band", len(tasks) - 1))
 
         # Register
-        if "register" in components and (
-            not definition.language_register or force_refresh
-        ):
+        if "register" in components and (not definition.language_register or force_refresh):
             tasks.append(classify_definition_register(definition, ai, state_tracker))
             task_info.append((definition, "register", len(tasks) - 1))
 
@@ -795,32 +847,22 @@ async def enhance_definitions_parallel(
             task_info.append((definition, "domain", len(tasks) - 1))
 
         # Grammar Patterns
-        if "grammar_patterns" in components and (
-            not definition.grammar_patterns or force_refresh
-        ):
+        if "grammar_patterns" in components and (not definition.grammar_patterns or force_refresh):
             tasks.append(extract_grammar_patterns(definition, ai, state_tracker))
             task_info.append((definition, "grammar_patterns", len(tasks) - 1))
 
         # Collocations
-        if "collocations" in components and (
-            not definition.collocations or force_refresh
-        ):
-            tasks.append(
-                identify_collocations(definition, word.text, ai, state_tracker)
-            )
+        if "collocations" in components and (not definition.collocations or force_refresh):
+            tasks.append(identify_collocations(definition, word.text, ai, state_tracker))
             task_info.append((definition, "collocations", len(tasks) - 1))
 
         # Usage Notes
-        if "usage_notes" in components and (
-            not definition.usage_notes or force_refresh
-        ):
+        if "usage_notes" in components and (not definition.usage_notes or force_refresh):
             tasks.append(generate_usage_notes(definition, word.text, ai, state_tracker))
             task_info.append((definition, "usage_notes", len(tasks) - 1))
 
         # Regional Variants
-        if "regional_variants" in components and (
-            not definition.region or force_refresh
-        ):
+        if "regional_variants" in components and (not definition.region or force_refresh):
             tasks.append(detect_regional_variants(definition, ai, state_tracker))
             task_info.append((definition, "regional_variants", len(tasks) - 1))
 
@@ -965,23 +1007,17 @@ async def enhance_synthesized_entry(
     if "pronunciation" in components and (not entry.pronunciation_id or force):
         # TODO: Load provider data for pronunciation
         pron_provider_data: list[dict[str, Any]] = []
-        word_tasks.append(
-            synthesize_pronunciation(word, pron_provider_data, ai, state_tracker)
-        )
+        word_tasks.append(synthesize_pronunciation(word, pron_provider_data, ai, state_tracker))
         task_types.append("pronunciation")
 
     if "etymology" in components and (not entry.etymology or force):
         # TODO: Load provider data for etymology
         etym_provider_data: list[dict[str, Any]] = []
-        word_tasks.append(
-            synthesize_etymology(word, etym_provider_data, ai, state_tracker)
-        )
+        word_tasks.append(synthesize_etymology(word, etym_provider_data, ai, state_tracker))
         task_types.append("etymology")
 
     if "facts" in components and (not entry.fact_ids or force):
-        word_tasks.append(
-            generate_facts(word, definitions, ai, state_tracker=state_tracker)
-        )
+        word_tasks.append(generate_facts(word, definitions, ai, state_tracker=state_tracker))
         task_types.append("facts")
 
     # Execute word-level tasks

@@ -96,6 +96,7 @@ async def extract_definitions(entry: SynthesizedDictionaryEntry) -> list[Definit
     """Extract definitions from SynthesizedDictionaryEntry."""
     # Load definitions from IDs
     from ..models import Definition
+
     definitions = []
     for def_id in entry.definition_ids:
         definition = await Definition.get(def_id)
@@ -153,23 +154,27 @@ class AnkiCardGenerator:
 
     async def _load_generated_examples(self, definition: Definition, limit: int = 3) -> list[str]:
         """Load generated examples for a definition.
-        
+
         Args:
             definition: Definition to load examples for
             limit: Maximum number of examples to load
-            
+
         Returns:
             List of example texts
         """
         if not definition.example_ids:
             return []
-            
+
         from ..models import Example
-        examples = await Example.find(
-            Example.definition_id == str(definition.id),
-            Example.type == "generated"
-        ).limit(limit).to_list()
-        
+
+        examples = (
+            await Example.find(
+                Example.definition_id == str(definition.id), Example.type == "generated"
+            )
+            .limit(limit)
+            .to_list()
+        )
+
         return [ex.text for ex in examples]
 
     async def generate_cards(
@@ -271,7 +276,7 @@ class AnkiCardGenerator:
 
             # Format examples - ensure exactly 3 examples by augmenting if needed
             # Reuse examples_list from above
-            
+
             # If we have fewer than 3 examples, augment with AI generation using new count parameter
             if len(examples_list) < 3:
                 needed_count = 3 - len(examples_list)
@@ -360,7 +365,7 @@ class AnkiCardGenerator:
 
             # Format examples - ensure exactly 3 examples by augmenting if needed
             # Reuse examples_list from above
-            
+
             # If we have fewer than 3 examples, augment with AI generation using new count parameter
             if len(examples_list) < 3:
                 needed_count = 3 - len(examples_list)

@@ -7,6 +7,7 @@ import json
 import time
 from collections.abc import AsyncGenerator
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
@@ -17,20 +18,51 @@ from ...caching.decorators import cached_api_call
 from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, lookup_state_tracker
-from ...models import Definition, Example, Pronunciation, ProviderData, Word
+from ...models import AudioMedia, Definition, Example, Pronunciation, ProviderData, Word
 from ...utils.logging import get_logger
-from ...utils.sanitization import sanitize_mongodb_input, validate_word_input
-from ..middleware.rate_limiting import rate_limit, ai_limiter, get_client_key
+from ...utils.sanitization import validate_word_input
+from ..middleware.rate_limiting import ai_limiter, get_client_key
 from .common import PipelineMetrics
 
 logger = get_logger(__name__)
 router = APIRouter()
 
 
+async def load_pronunciation_with_audio(pronunciation_id: str) -> dict[str, Any] | None:
+    """Load pronunciation with audio file information."""
+    if not pronunciation_id:
+        return None
+
+    pronunciation = await Pronunciation.get(pronunciation_id)
+    if not pronunciation:
+        return None
+
+    # Convert to dict and add audio files
+    pron_dict = pronunciation.model_dump(exclude={"id"})
+
+    # Load audio files if any
+    if pronunciation.audio_file_ids:
+        audio_files = []
+        for audio_id in pronunciation.audio_file_ids:
+            audio = await AudioMedia.get(audio_id)
+            if audio:
+                audio_dict = audio.model_dump(exclude={"id"})
+                # Convert file path to API URL
+                if audio_dict.get("url", "").startswith("/"):
+                    # Local file path - convert to API URL
+                    audio_dict["url"] = f"/api/v1/audio/files/{audio_id}"
+                audio_files.append(audio_dict)
+        pron_dict["audio_files"] = audio_files
+    else:
+        pron_dict["audio_files"] = []
+
+    return pron_dict
+
+
 # Models specific to lookup endpoints
 class DefinitionResponse(BaseModel):
     """Definition with resolved references for API response."""
-    
+
     # Core fields
     created_at: datetime
     updated_at: datetime
@@ -39,11 +71,11 @@ class DefinitionResponse(BaseModel):
     text: str
     meaning_cluster: dict[str, Any] | None = None
     sense_number: str | None = None
-    
+
     # Resolved references (not IDs)
     word_forms: list[dict[str, Any]] = []
     examples: list[dict[str, Any]] = []  # Resolved Example objects
-    
+
     # Direct fields
     synonyms: list[str] = []
     antonyms: list[str] = []
@@ -56,24 +88,20 @@ class DefinitionResponse(BaseModel):
     transitivity: str | None = None
     cefr_level: str | None = None
     frequency_band: int | None = None
-    
+
     # Provider info (resolved, not IDs)
-    providers_data: list[ProviderData] = []  # All provider data sources
-    
+    providers_data: list[dict[str, Any]] = []  # All provider data sources
+
 
 class LookupParams(BaseModel):
     """Parameters for word lookup endpoint."""
 
-    force_refresh: bool = Field(
-        default=False, description="Force refresh of cached data"
-    )
+    force_refresh: bool = Field(default=False, description="Force refresh of cached data")
     providers: list[DictionaryProvider] = Field(
         default=[DictionaryProvider.WIKTIONARY],
         description="Dictionary providers to use",
     )
-    languages: list[Language] = Field(
-        default=[Language.ENGLISH], description="Languages to query"
-    )
+    languages: list[Language] = Field(default=[Language.ENGLISH], description="Languages to query")
     no_ai: bool = Field(default=False, description="Skip AI synthesis")
 
 
@@ -81,7 +109,7 @@ class LookupResponse(BaseModel):
     """Response for word lookup."""
 
     word: str = Field(..., description="The word that was looked up")
-    pronunciation: Pronunciation | None = Field(None, description="Pronunciation information")
+    pronunciation: dict[str, Any] | None = Field(None, description="Pronunciation information")
     definitions: list[DefinitionResponse] = Field(
         default_factory=list, description="Word definitions with resolved examples"
     )
@@ -92,15 +120,9 @@ class LookupResponse(BaseModel):
 
 
 def parse_lookup_params(
-    force_refresh: bool = Query(
-        default=False, description="Force refresh of cached data"
-    ),
-    providers: list[str] = Query(
-        default=["wiktionary"], description="Dictionary providers"
-    ),
-    languages: list[str] = Query(
-        default=["en"], description="Languages to query"
-    ),
+    force_refresh: bool = Query(default=False, description="Force refresh of cached data"),
+    providers: list[str] = Query(default=["wiktionary"], description="Dictionary providers"),
+    languages: list[str] = Query(default=["en"], description="Languages to query"),
     no_ai: bool = Query(default=False, description="Skip AI synthesis"),
 ) -> LookupParams:
     """Parse and validate lookup parameters."""
@@ -173,7 +195,7 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
                 provider_data = await ProviderData.get(provider_id)
                 if provider_data:
                     all_providers_data.append(provider_data)
-        
+
         for def_id in entry.definition_ids:
             definition = await Definition.get(def_id)
             if definition:
@@ -183,8 +205,8 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
                     for example_id in definition.example_ids:
                         example = await Example.get(example_id)
                         if example:
-                            examples.append(example.model_dump())
-                
+                            examples.append(example.model_dump(exclude={"id"}))
+
                 # Create DefinitionResponse
                 def_response = DefinitionResponse(
                     created_at=definition.created_at,
@@ -192,7 +214,9 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
                     version=definition.version,
                     part_of_speech=definition.part_of_speech,
                     text=definition.text,
-                    meaning_cluster=definition.meaning_cluster.model_dump() if definition.meaning_cluster else None,
+                    meaning_cluster=definition.meaning_cluster.model_dump()
+                    if definition.meaning_cluster
+                    else None,
                     sense_number=definition.sense_number,
                     word_forms=[wf.model_dump() for wf in definition.word_forms],
                     examples=examples,
@@ -207,16 +231,16 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
                     transitivity=definition.transitivity,
                     cefr_level=definition.cefr_level,
                     frequency_band=definition.frequency_band,
-                    providers_data=all_providers_data,  # Use the loaded provider data
+                    providers_data=[
+                        pd.model_dump(exclude={"id"}) for pd in all_providers_data
+                    ],  # Convert to dict
                 )
-                
+
                 definitions.append(def_response)
-    
-    # Load pronunciation from ID
-    pronunciation = None
-    if entry.pronunciation_id:
-        pronunciation = await Pronunciation.get(entry.pronunciation_id)
-    
+
+    # Load pronunciation with audio files
+    pronunciation = await load_pronunciation_with_audio(entry.pronunciation_id)
+
     # Load word
     word_obj = await Word.get(entry.word_id)
     word_text = word_obj.text if word_obj else "unknown"
@@ -264,16 +288,14 @@ async def lookup_word(
         word = validate_word_input(word)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    
+
     start_time = time.perf_counter()
 
     try:
         result = await _cached_lookup(word, params)
 
         if not result:
-            raise HTTPException(
-                status_code=404, detail=f"No definition found for word: {word}"
-            )
+            raise HTTPException(status_code=404, detail=f"No definition found for word: {word}")
 
         # Log performance
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
@@ -286,9 +308,7 @@ async def lookup_word(
         raise
     except Exception as e:
         logger.error(f"Lookup failed for {word}: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Internal error during lookup: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Internal error during lookup: {str(e)}")
 
 
 async def generate_lookup_events(
@@ -302,7 +322,7 @@ async def generate_lookup_events(
     except ValueError as e:
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
         return
-    
+
     # Reset the state tracker
     lookup_state_tracker.reset()
 
@@ -319,15 +339,12 @@ async def generate_lookup_events(
                     while not queue.empty():
                         try:
                             pending_state = queue.get_nowait()
-                            if (
-                                not pending_state.is_complete
-                                and not pending_state.error
-                            ):
+                            if not pending_state.is_complete and not pending_state.error:
                                 yield f"event: progress\ndata: {json.dumps(pending_state.model_dump_optimized())}\n\n"
                         except asyncio.QueueEmpty:
                             break
                     # Emit the final complete event
-                    yield f'event: complete\ndata: {json.dumps(jsonable_encoder(state))}\n\n'
+                    yield f"event: complete\ndata: {json.dumps(jsonable_encoder(state))}\n\n"
                     break
                 elif state.error:
                     yield f'event: error\ndata: {{"error": "{state.error}"}}\n\n'
@@ -349,9 +366,7 @@ async def generate_lookup_events(
                 pass
 
 
-async def _lookup_with_tracking(
-    word: str, params: LookupParams
-) -> LookupResponse | None:
+async def _lookup_with_tracking(word: str, params: LookupParams) -> LookupResponse | None:
     """Perform lookup with state tracking."""
 
     await lookup_state_tracker.update_stage(Stages.START)
@@ -368,11 +383,8 @@ async def _lookup_with_tracking(
         state_tracker=lookup_state_tracker,
     )
 
-
     if not entry:
-        await lookup_state_tracker.update_complete(
-            message="Word not found"
-        )
+        await lookup_state_tracker.update_complete(message="Word not found")
         return None
 
     # Load definitions from IDs and create DefinitionResponse objects
@@ -385,7 +397,7 @@ async def _lookup_with_tracking(
                 provider_data = await ProviderData.get(provider_id)
                 if provider_data:
                     all_providers_data.append(provider_data)
-        
+
         for def_id in entry.definition_ids:
             definition = await Definition.get(def_id)
             if definition:
@@ -395,8 +407,8 @@ async def _lookup_with_tracking(
                     for example_id in definition.example_ids:
                         example = await Example.get(example_id)
                         if example:
-                            examples.append(example.model_dump())
-                
+                            examples.append(example.model_dump(exclude={"id"}))
+
                 # Create DefinitionResponse
                 def_response = DefinitionResponse(
                     created_at=definition.created_at,
@@ -404,7 +416,9 @@ async def _lookup_with_tracking(
                     version=definition.version,
                     part_of_speech=definition.part_of_speech,
                     text=definition.text,
-                    meaning_cluster=definition.meaning_cluster.model_dump() if definition.meaning_cluster else None,
+                    meaning_cluster=definition.meaning_cluster.model_dump()
+                    if definition.meaning_cluster
+                    else None,
                     sense_number=definition.sense_number,
                     word_forms=[wf.model_dump() for wf in definition.word_forms],
                     examples=examples,
@@ -419,16 +433,16 @@ async def _lookup_with_tracking(
                     transitivity=definition.transitivity,
                     cefr_level=definition.cefr_level,
                     frequency_band=definition.frequency_band,
-                    providers_data=all_providers_data,  # Use the loaded provider data
+                    providers_data=[
+                        pd.model_dump(exclude={"id"}) for pd in all_providers_data
+                    ],  # Convert to dict
                 )
-                
+
                 definitions.append(def_response)
-    
-    # Load pronunciation from ID
-    pronunciation = None
-    if entry.pronunciation_id:
-        pronunciation = await Pronunciation.get(entry.pronunciation_id)
-    
+
+    # Load pronunciation with audio files
+    pronunciation = await load_pronunciation_with_audio(entry.pronunciation_id)
+
     # Load word
     word_obj = await Word.get(entry.word_id)
     word_text = word_obj.text if word_obj else "unknown"
@@ -446,9 +460,9 @@ async def _lookup_with_tracking(
     await lookup_state_tracker.update(
         stage=Stages.COMPLETE,
         progress=100,
-        message=f"Found {len(result.definitions)} definitions", 
+        message=f"Found {len(result.definitions)} definitions",
         is_complete=True,
-        details={"result": jsonable_encoder(result)}
+        details={"result": jsonable_encoder(result)},
     )
 
     return result
@@ -505,76 +519,67 @@ async def regenerate_examples(
     from ...ai import get_openai_connector
     from ...ai.synthesis_functions import synthesize_examples
     from ...models import Definition, Example, SynthesizedDictionaryEntry, Word
-    
+
     # Check AI rate limit (estimate ~2000 tokens for example generation)
     client_key = get_client_key(request)
     allowed, headers = await ai_limiter.check_request_allowed(
         client_key,
-        estimated_tokens=2000 * count  # Estimate per example
+        estimated_tokens=2000 * count,  # Estimate per example
     )
-    
+
     if not allowed:
         raise HTTPException(
             status_code=429,
             detail="AI rate limit exceeded",
             headers=headers,
         )
-    
+
     # Sanitize and validate word input
     try:
         clean_word = validate_word_input(word)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    
+
     # Get the word
     word_obj = await Word.find_one({"text": clean_word})
     if not word_obj:
         raise HTTPException(404, f"Word '{word}' not found")
-    
+
     # Get synthesized entry
     entry = await SynthesizedDictionaryEntry.find_one({"word_id": str(word_obj.id)})
     if not entry:
         raise HTTPException(404, "No synthesized entry found for this word")
-    
+
     # Get the definition
     if definition_index >= len(entry.definition_ids):
         raise HTTPException(400, f"Invalid definition index: {definition_index}")
-    
+
     definition = await Definition.get(entry.definition_ids[definition_index])
     if not definition:
         raise HTTPException(404, "Definition not found")
-    
+
     # Get AI connector
-    ai = await get_openai_connector()
-    
+    ai = get_openai_connector()
+
     # Generate new examples
-    example_data_list = await synthesize_examples(
-        definition,
-        word,
-        ai,
-        count=count,
-    )
-    
+    example_data_list = await synthesize_examples(definition, word, ai)
+
     # Delete old examples
     if definition.example_ids:
         await Example.find({"_id": {"$in": definition.example_ids}}).delete()
-    
+
     # Create new examples
     new_examples = []
     for ex_data in example_data_list:
-        example = Example(
-            word_id=str(word_obj.id),
-            definition_id=str(definition.id),
-            **ex_data
-        )
+        example = Example(word_id=str(word_obj.id), definition_id=str(definition.id), **ex_data)
         await example.create()
         new_examples.append(example)
-    
+
     # Update definition with new example IDs
     definition.example_ids = [str(ex.id) for ex in new_examples]
     definition.version += 1
     await definition.save()
-    
+
     return {
         "success": True,
         "examples": [ex.model_dump() for ex in new_examples],

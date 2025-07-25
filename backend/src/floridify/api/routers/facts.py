@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from ...ai import get_openai_connector
 from ...ai.synthesis_functions import generate_facts
+from ...models import Fact, Word
 from ..core import (
     FieldSelection,
     ListResponse,
@@ -16,15 +17,13 @@ from ..core import (
     get_etag,
     handle_api_errors,
 )
+from ..middleware.rate_limiting import ai_limiter, get_client_key
 from ..repositories.fact_repository import (
     FactCreate,
     FactFilter,
     FactRepository,
     FactUpdate,
 )
-from ...models import Fact, Word
-from ...utils.sanitization import sanitize_mongodb_input
-from ..middleware.rate_limiting import ai_limiter, get_client_key
 
 router = APIRouter(prefix="/facts", tags=["facts"])
 
@@ -38,16 +37,14 @@ def get_fact_repo() -> FactRepository:
 
 
 def get_pagination(
-    offset: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100)
+    offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=100)
 ) -> PaginationParams:
     """Get pagination parameters from query."""
     return PaginationParams(offset=offset, limit=limit)
 
 
 def get_sort(
-    sort_by: str | None = Query(None),
-    sort_order: str = Query("asc", pattern="^(asc|desc)$")
+    sort_by: str | None = Query(None), sort_order: str = Query("asc", pattern="^(asc|desc)$")
 ) -> SortParams:
     """Get sort parameters from query."""
     return SortParams(sort_by=sort_by, sort_order=sort_order)
@@ -56,7 +53,7 @@ def get_sort(
 def get_fields(
     include: str | None = Query(None),
     exclude: str | None = Query(None),
-    expand: str | None = Query(None)
+    expand: str | None = Query(None),
 ) -> FieldSelection:
     """Get field selection from query."""
     return FieldSelection(
@@ -68,17 +65,14 @@ def get_fields(
 
 class FactGenerationRequest(BaseModel):
     """Request for generating facts about a word."""
-    
+
     count: int = Field(5, ge=1, le=10, description="Number of facts to generate")
     categories: list[str] | None = Field(
         None,
         description="Specific categories to focus on",
-        example=["etymology", "cultural", "linguistic", "historical"]
+        example=["etymology", "cultural", "linguistic", "historical"],
     )
-    context_words: list[str] | None = Field(
-        None,
-        description="Related words for context"
-    )
+    context_words: list[str] | None = Field(None, description="Related words for context")
 
 
 @router.get("", response_model=ListResponse[Fact])
@@ -100,10 +94,9 @@ async def list_facts(
     # Validate category if provided
     if category and category not in ALLOWED_CATEGORIES:
         raise HTTPException(
-            400,
-            f"Invalid category. Allowed categories: {', '.join(sorted(ALLOWED_CATEGORIES))}"
+            400, f"Invalid category. Allowed categories: {', '.join(sorted(ALLOWED_CATEGORIES))}"
         )
-    
+
     # Build filter
     filter_params = FactFilter(
         word_id=word_id,
@@ -111,21 +104,21 @@ async def list_facts(
         has_source=has_source,
         confidence_score_min=confidence_score_min,
     )
-    
+
     # Get data
     facts, total = await repo.list(
         filter_dict=filter_params.to_query(),
         pagination=pagination,
         sort=sort,
     )
-    
+
     # Apply field selection
     items = []
     for fact in facts:
         fact_dict = fact.model_dump()
         fact_dict = fields.apply_to_dict(fact_dict)
         items.append(fact_dict)
-    
+
     # Build response
     response_data = ListResponse(
         items=items,
@@ -133,16 +126,16 @@ async def list_facts(
         offset=pagination.offset,
         limit=pagination.limit,
     )
-    
+
     # Set ETag
     etag = get_etag(response_data.model_dump())
     response.headers["ETag"] = etag
-    
+
     # Check if Not Modified
     if check_etag(request, etag):
         response.status_code = 304
         return Response(status_code=304)
-    
+
     return response_data
 
 
@@ -154,13 +147,13 @@ async def create_fact(
 ) -> ResourceResponse:
     """Create a new fact."""
     fact = await repo.create(data)
-    
+
     return ResourceResponse(
         data=fact.model_dump(),
         links={
             "self": f"/facts/{fact.id}",
             "word": f"/words/{fact.word_id}",
-        }
+        },
     )
 
 
@@ -176,10 +169,10 @@ async def get_fact(
     """Get a single fact by ID."""
     fact = await repo.get(fact_id)
     fact_dict = fact.model_dump()
-    
+
     # Apply field selection
     fact_dict = fields.apply_to_dict(fact_dict)
-    
+
     # Build response
     response_data = ResourceResponse(
         data=fact_dict,
@@ -191,17 +184,17 @@ async def get_fact(
         links={
             "self": f"/facts/{fact_id}",
             "word": f"/words/{fact.word_id}",
-        }
+        },
     )
-    
+
     # Set ETag
     etag = get_etag(response_data.model_dump())
     response.headers["ETag"] = etag
-    
+
     # Check if Not Modified
     if check_etag(request, etag):
         return Response(status_code=304)
-    
+
     return response_data
 
 
@@ -214,13 +207,13 @@ async def update_fact(
 ) -> ResourceResponse:
     """Update a fact."""
     fact = await repo.update(fact_id, data)
-    
+
     return ResourceResponse(
         data=fact.model_dump(),
         metadata={
             "version": fact.version,
             "updated_at": fact.updated_at,
-        }
+        },
     )
 
 
@@ -247,25 +240,24 @@ async def generate_facts_for_word(
     # Check AI rate limit (estimate ~1500 tokens per fact)
     client_key = get_client_key(request)
     allowed, headers = await ai_limiter.check_request_allowed(
-        client_key,
-        estimated_tokens=1500 * fact_request.count
+        client_key, estimated_tokens=1500 * fact_request.count
     )
-    
+
     if not allowed:
         raise HTTPException(
             status_code=429,
             detail="AI rate limit exceeded",
             headers=headers,
         )
-    
+
     # Get word
     word = await Word.get(word_id)
     if not word:
         raise HTTPException(404, "Word not found")
-    
+
     # Get AI connector
     ai = await get_openai_connector()
-    
+
     # Generate facts
     fact_data_list = await generate_facts(
         word,
@@ -273,7 +265,7 @@ async def generate_facts_for_word(
         count=fact_request.count,
         context_words=fact_request.context_words,
     )
-    
+
     # Create fact documents
     responses = []
     for fact_data in fact_data_list:
@@ -287,7 +279,7 @@ async def generate_facts_for_word(
             category = "historical"
         elif "linguistic" in fact_data["text"].lower():
             category = "linguistic"
-        
+
         fact = Fact(
             word_id=str(word.id),
             text=fact_data["text"],
@@ -295,15 +287,17 @@ async def generate_facts_for_word(
             confidence_score=fact_data.get("confidence_score", 0.8),
         )
         await fact.create()
-        
-        responses.append(ResourceResponse(
-            data=fact.model_dump(),
-            links={
-                "self": f"/facts/{fact.id}",
-                "word": f"/words/{fact.word_id}",
-            }
-        ))
-    
+
+        responses.append(
+            ResourceResponse(
+                data=fact.model_dump(),
+                links={
+                    "self": f"/facts/{fact.id}",
+                    "word": f"/words/{fact.word_id}",
+                },
+            )
+        )
+
     return responses
 
 
@@ -318,12 +312,11 @@ async def get_facts_by_category(
     # Validate category against allowed list
     if category not in ALLOWED_CATEGORIES:
         raise HTTPException(
-            400, 
-            f"Invalid category. Allowed categories: {', '.join(sorted(ALLOWED_CATEGORIES))}"
+            400, f"Invalid category. Allowed categories: {', '.join(sorted(ALLOWED_CATEGORIES))}"
         )
-    
+
     facts = await repo.find_by_category(category, limit)
-    
+
     return ListResponse(
         items=[f.model_dump() for f in facts],
         total=len(facts),

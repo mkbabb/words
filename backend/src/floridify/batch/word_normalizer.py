@@ -60,7 +60,6 @@ class WordNormalizer:
 
         logger.info(f"WordNormalizer initialized with method: {method}")
 
-
     def _load_cache(self) -> None:
         """Load cached word mappings from file."""
         if self.cache_file and self.cache_file.exists():
@@ -98,39 +97,38 @@ class WordNormalizer:
         except Exception as e:
             console.print(f"[yellow]Could not save cache: {e}[/yellow]")
 
-
     def _normalize_word_internal(self, word: str) -> tuple[str, str]:
         """
         Internal word normalization using best available method.
-        
+
         Returns:
             Tuple of (normalized_word, normalization_type)
         """
         word = word.lower().strip()
-        
+
         # Skip if too short
         if len(word) < self.min_word_length:
             return word, "unchanged"
-        
+
         if self.method == "basic":
             # Use basic rule-based lemmatization
             normalized = basic_lemmatize(word)
             return normalized, "basic" if normalized != word else "unchanged"
-        
+
         # Use advanced text processing for lemmatization
         normalized = lemmatize_word(word)
-        
+
         if normalized != word:
             # Simple heuristic to determine normalization type
-            if word.endswith(('s', 'es', 'ies')):
+            if word.endswith(("s", "es", "ies")):
                 return normalized, "plural"
-            elif word.endswith(('ing', 'ed')):
+            elif word.endswith(("ing", "ed")):
                 return normalized, "verb_form"
-            elif word.endswith(('er', 'est', 'ly')):
+            elif word.endswith(("er", "est", "ly")):
                 return normalized, "adjective_form"
             else:
                 return normalized, "other_form"
-        
+
         return word, "unchanged"
 
     def normalize_word(self, word: str) -> tuple[str, str]:
@@ -263,9 +261,7 @@ class NormalizerPresets:
     def fast() -> WordNormalizer:
         """Fast normalization - basic rules for speed."""
         return WordNormalizer(
-            method="basic", 
-            cache_file=Path("./cache/word_normalizer_fast.json"), 
-            min_word_length=3
+            method="basic", cache_file=Path("./cache/word_normalizer_fast.json"), min_word_length=3
         )
 
     @staticmethod

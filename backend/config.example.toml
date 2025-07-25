@@ -1,0 +1,55 @@
+# Example configuration file for Floridify
+# Copy this to auth/config.toml and fill in your API keys
+
+[openai]
+api_key = "your-openai-api-key-here"
+
+[oxford]
+app_id = "your-oxford-app-id"
+api_key = "your-oxford-api-key"
+
+[dictionary_com]
+authorization = "your-dictionary-com-auth"
+
+[database]
+# Production MongoDB URL (e.g., MongoDB Atlas)
+production_url = "mongodb+srv://username:password@cluster.mongodb.net/floridify?retryWrites=true&w=majority"
+# Development MongoDB URL (local or SSH tunnel)
+development_url = "mongodb://localhost:27017/floridify"
+name = "floridify"
+timeout = 30
+max_pool_size = 100
+
+[models]
+openai_model = "gpt-4o"
+reasoning_effort = "high"
+embedding_model = "text-embedding-3-large"
+
+[rate_limits]
+oxford_rps = 10.0
+dictionary_com_rps = 20.0
+wiktionary_rps = 50.0
+openai_bulk_max_concurrent = 5
+
+[processing]
+max_concurrent_words = 100
+batch_size = 50
+retry_attempts = 3
+cache_ttl_hours = 24
+verbose = false
+
+# Google Cloud Text-to-Speech configuration (optional)
+[google_cloud]
+# Path to service account credentials JSON file
+# If not specified, will look for common filenames in auth/ directory
+credentials_path = "auth/google-cloud-credentials.json"
+
+# Google Cloud project ID (optional if set in credentials or environment)
+project_id = "your-project-id"
+
+# Voice settings for Text-to-Speech
+# See https://cloud.google.com/text-to-speech/docs/voices for available voices
+tts_american_voice = "en-US-Wavenet-D"        # Male voice
+tts_british_voice = "en-GB-Wavenet-B"         # Male voice
+tts_american_voice_female = "en-US-Wavenet-F" # Female voice
+tts_british_voice_female = "en-GB-Wavenet-A"  # Female voice
