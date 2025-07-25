@@ -300,30 +300,31 @@ const config: Config = {
         '.transition-bounce': {
           '@apply transition-all duration-600 ease-apple-bounce': {},
         },
-        // Paper texture utilities
+        // Paper texture utilities - visible textures that don't break elements
         '.texture-paper-clean': {
-          backgroundImage: 'var(--paper-clean-texture), var(--texture-base, none)',
+          backgroundImage: 'var(--paper-clean-texture)',
+          backgroundRepeat: 'repeat',
         },
         '.texture-paper-aged': {
-          backgroundImage: 'var(--paper-aged-texture), var(--texture-base, none)',
+          backgroundImage: 'var(--paper-aged-texture)',
+          backgroundRepeat: 'repeat',
         },
         '.texture-paper-handmade': {
-          backgroundImage: 'var(--paper-handmade-texture), var(--texture-base, none)',
+          backgroundImage: 'var(--paper-handmade-texture)',
+          backgroundRepeat: 'repeat',
         },
         '.texture-paper-kraft': {
-          backgroundImage: 'var(--paper-kraft-texture), var(--texture-base, none)',
+          backgroundImage: 'var(--paper-kraft-texture)',
+          backgroundRepeat: 'repeat',
         },
         '.texture-subtle': {
-          mixBlendMode: 'multiply',
-          opacity: '0.03',
+          backgroundSize: '60px 60px',
         },
         '.texture-medium': {
-          mixBlendMode: 'multiply',
-          opacity: '0.05',
+          backgroundSize: '80px 80px',
         },
         '.texture-strong': {
-          mixBlendMode: 'multiply',
-          opacity: '0.08',
+          backgroundSize: '100px 100px',
         },
       }
       addUtilities(newUtilities, ['responsive', 'hover'])

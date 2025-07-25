@@ -96,7 +96,6 @@ async def search_word_pipeline(
         # Get singleton search engine
         search_engine = await get_search_engine(
             languages=languages,
-            enable_semantic=semantic,
         )
 
         # Perform search

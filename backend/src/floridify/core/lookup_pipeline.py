@@ -375,7 +375,7 @@ async def _ai_fallback_lookup(
         start_time = time.perf_counter()
 
         ai_entry = await synthesizer.generate_fallback_entry(
-            word, force_refresh, state_tracker
+            word, Language.ENGLISH, force_refresh, state_tracker
         )
         duration = time.perf_counter() - start_time
 

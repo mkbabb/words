@@ -7,11 +7,11 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from floridify.ai.connector import get_openai_connector
+from floridify.ai import get_openai_connector
 from floridify.ai.synthesis_functions import enhance_synthesized_entry
 from floridify.ai.synthesizer import DefinitionSynthesizer
 from floridify.api.core import ErrorResponse, ResourceResponse, handle_api_errors
-from floridify.core.provider_fetcher import ProviderDataFetcher
+# from floridify.core.provider_fetcher import ProviderDataFetcher  # TODO: Module not found
 from floridify.core.state_tracker import StateTracker
 from floridify.models.models import (
     Definition,
@@ -113,17 +113,18 @@ async def synthesize_entry(
     
     # Initialize components
     ai = await get_openai_connector()
-    fetcher = ProviderDataFetcher()
+    # fetcher = ProviderDataFetcher()  # TODO: Module not found
     synthesizer = DefinitionSynthesizer(ai)
     tracker = StateTracker()
     
     # Fetch provider data
     tracker.update_state("fetching", "Fetching provider data")
-    provider_data_list = await fetcher.fetch_all_providers(
-        request.word,
-        providers=request.providers,
-        force_refresh=request.force_refresh,
-    )
+    # provider_data_list = await fetcher.fetch_all_providers(
+    #     request.word,
+    #     providers=request.providers,
+    #     force_refresh=request.force_refresh,
+    # )
+    provider_data_list = []  # TODO: Implement provider fetching
     
     if not provider_data_list:
         raise HTTPException(
@@ -360,12 +361,13 @@ async def refresh_provider_data(
         raise HTTPException(404, "Word not found")
     
     # Fetch fresh provider data
-    fetcher = ProviderDataFetcher()
-    provider_data_list = await fetcher.fetch_all_providers(
-        word,
-        providers=providers,
-        force_refresh=True,
-    )
+    # fetcher = ProviderDataFetcher()  # TODO: Module not found
+    # provider_data_list = await fetcher.fetch_all_providers(
+    #     word,
+    #     providers=providers,
+    #     force_refresh=True,
+    # )
+    provider_data_list = []  # TODO: Implement provider fetching
     
     # Update provider data records
     for provider_data in provider_data_list:

@@ -6,7 +6,7 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from floridify.ai.connector import get_openai_connector
+from floridify.ai import get_openai_connector
 from floridify.ai.synthesis_functions import (
     assess_definition_cefr,
     assess_definition_frequency,

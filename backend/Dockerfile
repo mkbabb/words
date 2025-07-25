@@ -70,6 +70,7 @@ COPY --from=builder /opt/rds-ca-bundle.pem /usr/local/share/rds-ca-bundle.pem
 RUN chmod 644 /usr/local/share/rds-ca-bundle.pem
 
 ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/src:$PYTHONPATH"
 
 # Install with dev dependencies
 RUN --mount=type=cache,target=/opt/uv-cache \
@@ -90,6 +91,7 @@ COPY --from=builder --chown=appuser:appuser /app /app
 
 # Set PATH
 ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/src:$PYTHONPATH"
 
 # Switch to non-root user
 USER appuser

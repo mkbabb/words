@@ -179,15 +179,15 @@
     }
 
     /* Themed elements within cards */
-    .themed-word-type {
+    .themed-part-of-speech {
         @apply rounded-md px-2 py-1 text-sm font-medium tracking-wider uppercase;
     }
 
-    [data-theme='default'] .themed-word-type {
+    [data-theme='default'] .themed-part-of-speech {
         @apply bg-secondary text-secondary-foreground;
     }
 
-    [data-theme]:not([data-theme='default']) .themed-word-type {
+    [data-theme]:not([data-theme='default']) .themed-part-of-speech {
         background-color: var(--theme-bg-subtle);
         color: var(--theme-text);
     }
@@ -647,10 +647,10 @@
 }
 
 /* Themed word type background for sidebar active state */
-[data-theme='default'] .themed-word-type-bg {
+[data-theme='default'] .themed-part-of-speech-bg {
     @apply bg-secondary;
 }
 
-[data-theme]:not([data-theme='default']) .themed-word-type-bg {
+[data-theme]:not([data-theme='default']) .themed-part-of-speech-bg {
     background-color: var(--theme-bg-subtle);
 }

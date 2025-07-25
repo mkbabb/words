@@ -31,7 +31,7 @@ class AnkiCardTemplate(BaseModel):
             <div class="word-header">
                 <h1 class="word">{{Word}}{{#FrequencyDisplay}}<sup class="frequency">{{FrequencyDisplay}}</sup>{{/FrequencyDisplay}}</h1>
                 <div class="pronunciation">{{Pronunciation}}</div>
-                <div class="word-type">{{WordType}}</div>
+                <div class="part-of-speech">{{PartOfSpeech}}</div>
             </div>
             
             <div class="question">
@@ -65,7 +65,7 @@ class AnkiCardTemplate(BaseModel):
             <div class="word-header">
                 <h1 class="word">{{Word}}{{#FrequencyDisplay}}<sup class="frequency">{{FrequencyDisplay}}</sup>{{/FrequencyDisplay}}</h1>
                 <div class="pronunciation">{{Pronunciation}}</div>
-                <div class="word-type">{{WordType}}</div>
+                <div class="part-of-speech">{{PartOfSpeech}}</div>
             </div>
             
             <div class="correct-answer">
@@ -131,7 +131,7 @@ class AnkiCardTemplate(BaseModel):
             font-weight: 400;
         }
         
-        .word-type {
+        .part-of-speech {
             font-size: 0.9em;
             color: #86868b;
             margin-top: 2px;
@@ -273,7 +273,7 @@ class AnkiCardTemplate(BaseModel):
             fields=[
                 "Word",
                 "Pronunciation",
-                "WordType",
+                "PartOfSpeech",
                 "ChoiceA",
                 "ChoiceB",
                 "ChoiceC",
@@ -295,7 +295,7 @@ class AnkiCardTemplate(BaseModel):
         <div class="card">
             <div class="word-header">
                 <div class="pronunciation">{{Pronunciation}}</div>
-                <div class="word-type">{{WordType}}</div>
+                <div class="part-of-speech">{{PartOfSpeech}}</div>
             </div>
             
             <div class="question">
@@ -332,7 +332,7 @@ class AnkiCardTemplate(BaseModel):
             <div class="word-header">
                 <h1 class="word">{{Word}}{{#FrequencyDisplay}}<sup class="frequency">{{FrequencyDisplay}}</sup>{{/FrequencyDisplay}}</h1>
                 <div class="pronunciation">{{Pronunciation}}</div>
-                <div class="word-type">{{WordType}}</div>
+                <div class="part-of-speech">{{PartOfSpeech}}</div>
             </div>
             
             <div class="correct-answer">
@@ -398,7 +398,7 @@ class AnkiCardTemplate(BaseModel):
             font-weight: 400;
         }
         
-        .word-type {
+        .part-of-speech {
             font-size: 0.9em;
             color: #86868b;
             margin-top: 2px;
@@ -512,7 +512,7 @@ class AnkiCardTemplate(BaseModel):
                 "Word",
                 "Pronunciation",
                 "SentenceWithBlank",
-                "WordType",
+                "PartOfSpeech",
                 "ChoiceA",
                 "ChoiceB",
                 "ChoiceC",

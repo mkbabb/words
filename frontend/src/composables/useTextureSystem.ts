@@ -49,7 +49,7 @@ export function useTextureSystem(initialConfig?: Partial<TextureConfig>) {
     return intensityMap[textureIntensity.value]
   })
 
-  // Generate CSS style object for components
+  // Generate CSS style object for components - fixed to not break visibility
   const textureStyles = computed(() => {
     if (!enabled.value) return {}
 
@@ -58,8 +58,9 @@ export function useTextureSystem(initialConfig?: Partial<TextureConfig>) {
       '--texture-opacity': opacity.value.toString(),
       '--texture-blend-mode': blendMode.value,
       backgroundImage: `var(${getTextureVariable.value})`,
-      mixBlendMode: blendMode.value,
-      opacity: opacity.value,
+      // Don't set mixBlendMode or opacity directly - let CSS classes handle it
+      backgroundSize: textureIntensity.value === 'subtle' ? '60px 60px' : 
+                     textureIntensity.value === 'medium' ? '80px 80px' : '100px 100px',
     }
   })
 

@@ -178,7 +178,7 @@ noun
         
         assert len(definitions) == 1
         definition = definitions[0]
-        assert definition.word_type == "noun"
+        assert definition.part_of_speech == "noun"
         assert "round fruit" in definition.definition
         assert definition.raw_metadata["provider"] == "apple_dictionary"
 
@@ -217,7 +217,7 @@ verb
         
         assert len(definitions) == 1
         definition = definitions[0]
-        assert definition.word_type == "unknown"
+        assert definition.part_of_speech == "unknown"
         assert definition.definition == "a type of fruit"
         assert definition.raw_metadata["provider"] == "apple_dictionary"
 
@@ -272,7 +272,7 @@ the round fruit of a tree of the rose family."""
             
             definition = result.definitions[0]
             assert isinstance(definition, Definition)
-            assert definition.word_type == "noun"
+            assert definition.part_of_speech == "noun"
             assert "round fruit" in definition.definition
 
     @pytest.mark.asyncio
@@ -388,7 +388,7 @@ class TestAppleDictionaryConnectorIntegration:
             definition = result.definitions[0]
             assert isinstance(definition, Definition)
             assert definition.definition
-            assert definition.word_type
+            assert definition.part_of_speech
             
             # Check metadata
             assert result.raw_metadata is not None

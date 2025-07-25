@@ -17,12 +17,23 @@ def find_project_root() -> Path:
     if env_root:
         return Path(env_root).resolve()
     
+    # Check if we're in Docker (auth directory is at /app/auth)
+    is_docker = os.path.exists("/.dockerenv")
+    if is_docker:
+        # In Docker, the backend is mounted at /app and auth at /app/auth
+        app_root = Path("/app")
+        if (app_root / "auth").exists():
+            return app_root
+    
     # Search upward from current file location for project root markers
     current = Path(__file__).resolve().parent
     while current != current.parent:
         # Look for the root that has both backend and auth directories
         if (current / "backend").exists() and (current / "auth").exists():
             return current
+        # Also check if we're inside backend and auth is a sibling
+        if current.name == "backend" and (current.parent / "auth").exists():
+            return current.parent
         current = current.parent
     
     # Fallback to current working directory search  
@@ -30,6 +41,9 @@ def find_project_root() -> Path:
     while current != current.parent:
         if (current / "backend").exists() and (current / "auth").exists():
             return current
+        # Also check if we're in backend directory
+        if current.name == "backend" and (current.parent / "auth").exists():
+            return current.parent
         current = current.parent
     
     return Path.cwd()
@@ -40,7 +54,21 @@ def get_config_path() -> Path:
     env_path = os.getenv("FLORIDIFY_CONFIG_PATH")
     if env_path:
         return Path(env_path)
-    return PROJECT_ROOT / "auth" / "config.toml"
+    
+    # Try standard location
+    config_path = PROJECT_ROOT / "auth" / "config.toml"
+    if config_path.exists():
+        return config_path
+    
+    # In Docker, auth might be directly in /app/auth
+    if os.path.exists("/.dockerenv"):
+        docker_config = Path("/app/auth/config.toml")
+        if docker_config.exists():
+            return docker_config
+    
+    # Return the standard path even if it doesn't exist
+    # (will trigger FileNotFoundError in load_config_dict)
+    return config_path
 
 
 def ensure_directories() -> None:

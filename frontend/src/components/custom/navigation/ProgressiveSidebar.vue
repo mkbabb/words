@@ -42,26 +42,26 @@
           />
         </button>
 
-        <!-- Word Type Sub-sections with HoverCards -->
+        <!-- Part of Speech Sub-sections with HoverCards -->
         <div class="ml-2 space-y-0">
           <HoverCard
-            v-for="wordType in cluster.wordTypes"
-            :key="`${cluster.clusterId}-${wordType.type}`"
+            v-for="partOfSpeech in cluster.partsOfSpeech"
+            :key="`${cluster.clusterId}-${partOfSpeech.type}`"
             :open-delay="200"
             :close-delay="100"
           >
             <HoverCardTrigger>
               <div
-                @click="scrollToWordType(cluster.clusterId, wordType.type)"
+                @click="scrollToPartOfSpeech(cluster.clusterId, partOfSpeech.type)"
                 :class="[
                   'flex w-full items-center justify-between cursor-pointer rounded-md px-2 py-0.5 transition-all duration-200',
-                  activeWordType === `${cluster.clusterId}-${wordType.type}`
-                    ? 'themed-word-type-bg text-foreground shadow-sm opacity-100 border border-primary/25'
+                  activePartOfSpeech === `${cluster.clusterId}-${partOfSpeech.type}`
+                    ? 'themed-part-of-speech-bg text-foreground shadow-sm opacity-100 border border-primary/25'
                     : 'opacity-60 hover:bg-muted/30 hover:opacity-100'
                 ]"
               >
-                <span class="themed-word-type text-xs">{{ wordType.type }}</span>
-                <span class="text-xs opacity-70">{{ wordType.count }}</span>
+                <span class="themed-part-of-speech text-xs">{{ partOfSpeech.type }}</span>
+                <span class="text-xs opacity-70">{{ partOfSpeech.count }}</span>
               </div>
             </HoverCardTrigger>
             <HoverCardContent 
@@ -76,11 +76,11 @@
                   <h4 class="themed-cluster-title text-sm font-semibold uppercase">
                     {{ cluster.clusterDescription }}
                   </h4>
-                  <span class="themed-word-type text-xs">{{ wordType.count }}</span>
+                  <span class="themed-part-of-speech text-xs">{{ partOfSpeech.count }}</span>
                 </div>
                 <div class="space-y-2">
                   <div
-                    v-for="(definition, idx) in getDefinitionsForWordType(cluster.clusterId, wordType.type).slice(0, 2)"
+                    v-for="(definition, idx) in getDefinitionsForPartOfSpeech(cluster.clusterId, partOfSpeech.type).slice(0, 2)"
                     :key="idx"
                     class="space-y-1"
                   >
@@ -89,8 +89,8 @@
                       "{{ (definition.examples.generated[0] || definition.examples.literature[0])?.sentence }}"
                     </div>
                   </div>
-                  <div v-if="getDefinitionsForWordType(cluster.clusterId, wordType.type).length > 2" class="text-xs opacity-60">
-                    +{{ getDefinitionsForWordType(cluster.clusterId, wordType.type).length - 2 }} more definitions
+                  <div v-if="getDefinitionsForPartOfSpeech(cluster.clusterId, partOfSpeech.type).length > 2" class="text-xs opacity-60">
+                    +{{ getDefinitionsForPartOfSpeech(cluster.clusterId, partOfSpeech.type).length - 2 }} more definitions
                   </div>
                 </div>
               </div>
@@ -112,7 +112,7 @@
 import { computed, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores'
-import { cn } from '@/utils'
+import { cn, detectPartOfSpeech } from '@/utils'
 import { ShimmerText } from '@/components/custom/animation'
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui'
 
@@ -121,9 +121,9 @@ const { selectedCardVariant } = storeToRefs(store)
 
 // Active tracking with hysteresis
 const activeCluster = ref<string>('')
-const activeWordType = ref<string>('')
+const activePartOfSpeech = ref<string>('')
 const pendingActiveCluster = ref<string>('')
-const pendingActiveWordType = ref<string>('')
+const pendingActivePartOfSpeech = ref<string>('')
 
 
 // Responsive behavior
@@ -157,10 +157,10 @@ const debounce = (func: Function, wait: number) => {
 
 // Intersection observers
 let clusterObservers: IntersectionObserver[] = []
-let wordTypeObservers: IntersectionObserver[] = []
+let partOfSpeechObservers: IntersectionObserver[] = []
 
-// Word type ordering for consistent display (same as DefinitionDisplay)
-const wordTypeOrder = {
+// Part of speech ordering for consistent display (same as DefinitionDisplay)
+const partOfSpeechOrder = {
   noun: 1,
   verb: 2,
   adjective: 3,
@@ -177,7 +177,7 @@ const wordTypeOrder = {
 type SidebarCluster = {
   clusterId: string
   clusterDescription: string
-  wordTypes: Array<{ type: string; count: number }>
+  partsOfSpeech: Array<{ type: string; count: number }>
   maxRelevancy: number
 }
 
@@ -203,7 +203,7 @@ const sidebarSections = computed((): SidebarCluster[] => {
       clusters.set(clusterId, {
         clusterId,
         clusterDescription,
-        wordTypes: [],
+        partsOfSpeech: [],
         maxRelevancy: definition.relevancy || 1.0
       })
     }
@@ -215,11 +215,12 @@ const sidebarSections = computed((): SidebarCluster[] => {
       cluster.maxRelevancy = definition.relevancy || 1.0
     }
 
-    const existingType = cluster.wordTypes.find(wt => wt.type === definition.part_of_speech)
+    const partOfSpeech = definition.part_of_speech || detectPartOfSpeech(definition.definition)
+    const existingType = cluster.partsOfSpeech.find(pos => pos.type === partOfSpeech)
     if (existingType) {
       existingType.count++
     } else {
-      cluster.wordTypes.push({ type: definition.part_of_speech, count: 1 })
+      cluster.partsOfSpeech.push({ type: partOfSpeech, count: 1 })
     }
   })
 
@@ -228,11 +229,11 @@ const sidebarSections = computed((): SidebarCluster[] => {
     (a, b) => b.maxRelevancy - a.maxRelevancy
   )
 
-  // Sort word types within each cluster - SAME AS DefinitionDisplay
+  // Sort parts of speech within each cluster - SAME AS DefinitionDisplay
   sortedClusters.forEach((cluster) => {
-    cluster.wordTypes.sort((a, b) => {
-      const aTypeOrder = wordTypeOrder[a.type?.toLowerCase() as keyof typeof wordTypeOrder] || 999
-      const bTypeOrder = wordTypeOrder[b.type?.toLowerCase() as keyof typeof wordTypeOrder] || 999
+    cluster.partsOfSpeech.sort((a, b) => {
+      const aTypeOrder = partOfSpeechOrder[a.type?.toLowerCase() as keyof typeof partOfSpeechOrder] || 999
+      const bTypeOrder = partOfSpeechOrder[b.type?.toLowerCase() as keyof typeof partOfSpeechOrder] || 999
       return aTypeOrder - bTypeOrder
     })
   })
@@ -240,14 +241,16 @@ const sidebarSections = computed((): SidebarCluster[] => {
   return sortedClusters
 })
 
-// Get definitions for a specific word type in a cluster
-const getDefinitionsForWordType = (clusterId: string, wordType: string) => {
+// Get definitions for a specific part of speech in a cluster
+const getDefinitionsForPartOfSpeech = (clusterId: string, partOfSpeech: string) => {
   const entry = store.currentEntry
   if (!entry?.definitions) return []
 
-  return entry.definitions.filter(def => 
-    (def.meaning_cluster || 'default') === clusterId && def.part_of_speech === wordType
-  ).sort((a, b) => (b.relevancy || 1.0) - (a.relevancy || 1.0))
+  return entry.definitions.filter(def => {
+    const defCluster = def.meaning_cluster || 'default'
+    const defPartOfSpeech = def.part_of_speech || detectPartOfSpeech(def.definition)
+    return defCluster === clusterId && defPartOfSpeech === partOfSpeech
+  }).sort((a, b) => (b.relevancy || 1.0) - (a.relevancy || 1.0))
 }
 
 // Check if we should show sidebar (desktop with enough space)
@@ -276,8 +279,8 @@ const scrollToCluster = (clusterId: string) => {
   }
 }
 
-const scrollToWordType = (clusterId: string, wordType: string) => {
-  const element = document.querySelector(`[data-word-type="${clusterId}-${wordType}"]`)
+const scrollToPartOfSpeech = (clusterId: string, partOfSpeech: string) => {
+  const element = document.querySelector(`[data-part-of-speech="${clusterId}-${partOfSpeech}"]`)
   if (element) {
     const elementRect = element.getBoundingClientRect()
     const offset = 80 // Add 80px margin from top
@@ -298,9 +301,9 @@ const updateActiveCluster = (clusterId: string) => {
   pendingActiveCluster.value = clusterId
 }
 
-const updateActiveWordType = (wordTypeKey: string) => {
-  activeWordType.value = wordTypeKey  
-  pendingActiveWordType.value = wordTypeKey
+const updateActivePartOfSpeech = (partOfSpeechKey: string) => {
+  activePartOfSpeech.value = partOfSpeechKey  
+  pendingActivePartOfSpeech.value = partOfSpeechKey
 }
 
 // Helper function to find best cluster based on element positions
@@ -328,9 +331,9 @@ const findBestClusterByPosition = () => {
   if (closestCluster) {
     const cluster = closestCluster as SidebarCluster
     updateActiveCluster(cluster.clusterId)
-    // Also set first word type of the cluster
-    if (cluster.wordTypes.length > 0) {
-      updateActiveWordType(`${cluster.clusterId}-${cluster.wordTypes[0].type}`)
+    // Also set first part of speech of the cluster
+    if (cluster.partsOfSpeech.length > 0) {
+      updateActivePartOfSpeech(`${cluster.clusterId}-${cluster.partsOfSpeech[0].type}`)
     }
   }
 }
@@ -341,8 +344,8 @@ const initializeActiveStates = () => {
 
   let bestCluster = ''
   let bestClusterScore = 0
-  let bestWordType = ''
-  let bestWordTypeScore = 0
+  let bestPartOfSpeech = ''
+  let bestPartOfSpeechScore = 0
 
   // Check each cluster's visibility
   sidebarSections.value.forEach((cluster) => {
@@ -361,18 +364,18 @@ const initializeActiveStates = () => {
         bestClusterScore = visibilityScore
       }
 
-      // Check word types within this cluster if it's the current best
+      // Check parts of speech within this cluster if it's the current best
       if (bestCluster === cluster.clusterId) {
-        cluster.wordTypes.forEach((wordType) => {
-          const wordTypeElements = document.querySelectorAll(`[data-word-type="${cluster.clusterId}-${wordType.type}"]`)
-          wordTypeElements.forEach((wtElement) => {
-            const wtRect = wtElement.getBoundingClientRect()
-            const wtVisibleHeight = Math.min(wtRect.bottom, viewportHeight) - Math.max(wtRect.top, 0)
-            const wtVisibilityScore = Math.max(0, wtVisibleHeight / wtRect.height)
+        cluster.partsOfSpeech.forEach((partOfSpeech) => {
+          const partOfSpeechElements = document.querySelectorAll(`[data-part-of-speech="${cluster.clusterId}-${partOfSpeech.type}"]`)
+          partOfSpeechElements.forEach((posElement) => {
+            const posRect = posElement.getBoundingClientRect()
+            const posVisibleHeight = Math.min(posRect.bottom, viewportHeight) - Math.max(posRect.top, 0)
+            const posVisibilityScore = Math.max(0, posVisibleHeight / posRect.height)
             
-            if (wtVisibilityScore > 0.3 && wtVisibilityScore > bestWordTypeScore) {
-              bestWordType = `${cluster.clusterId}-${wordType.type}`
-              bestWordTypeScore = wtVisibilityScore
+            if (posVisibilityScore > 0.3 && posVisibilityScore > bestPartOfSpeechScore) {
+              bestPartOfSpeech = `${cluster.clusterId}-${partOfSpeech.type}`
+              bestPartOfSpeechScore = posVisibilityScore
             }
           })
         })
@@ -385,8 +388,8 @@ const initializeActiveStates = () => {
     updateActiveCluster(bestCluster)
   }
   
-  if (bestWordType && bestWordTypeScore > 0.3) {
-    updateActiveWordType(bestWordType)
+  if (bestPartOfSpeech && bestPartOfSpeechScore > 0.3) {
+    updateActivePartOfSpeech(bestPartOfSpeech)
   }
 
   // Fallback: if no visible clusters, use robust position-based detection
@@ -394,11 +397,11 @@ const initializeActiveStates = () => {
     findBestClusterByPosition()
   }
   
-  // Ensure word type is set for active cluster if not already set
-  if (bestCluster && !bestWordType) {
+  // Ensure part of speech is set for active cluster if not already set
+  if (bestCluster && !bestPartOfSpeech) {
     const activeClusterData = sidebarSections.value.find(c => c.clusterId === bestCluster)
-    if (activeClusterData && activeClusterData.wordTypes.length > 0) {
-      updateActiveWordType(`${bestCluster}-${activeClusterData.wordTypes[0].type}`)
+    if (activeClusterData && activeClusterData.partsOfSpeech.length > 0) {
+      updateActivePartOfSpeech(`${bestCluster}-${activeClusterData.partsOfSpeech[0].type}`)
     }
   }
 }
@@ -409,16 +412,16 @@ const setupObservers = async () => {
 
   // Clear existing observers
   clusterObservers.forEach(observer => observer.disconnect())
-  wordTypeObservers.forEach(observer => observer.disconnect())
+  partOfSpeechObservers.forEach(observer => observer.disconnect())
   clusterObservers = []
-  wordTypeObservers = []
+  partOfSpeechObservers = []
 
   // Initialize active states based on current scroll position
   initializeActiveStates()
 
   // Track visible elements with scores
   const visibleClusters = new Map<string, number>()
-  const visibleWordTypes = new Map<string, number>()
+  const visiblePartsOfSpeech = new Map<string, number>()
   
   // Robust fallback function to set appropriate cluster based on scroll position
   const setFallbackCluster = () => {
@@ -428,28 +431,31 @@ const setupObservers = async () => {
     const lastCluster = sidebarSections.value[sidebarSections.value.length - 1]
     
     // Get precise scroll metrics
-    const scrollTop = Math.max(0, window.pageYOffset || document.documentElement.scrollTop)
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0
     const docHeight = document.documentElement.scrollHeight
     const clientHeight = document.documentElement.clientHeight
-    const maxScrollTop = Math.max(0, docHeight - clientHeight)
-    const scrollProgress = maxScrollTop > 0 ? scrollTop / maxScrollTop : 0
+    const maxScrollTop = docHeight - clientHeight
+    let scrollProgress = 0
+    if (maxScrollTop > 0) {
+      scrollProgress = scrollTop / maxScrollTop
+    }
     
     // Define bounds with hysteresis - more generous bottom threshold
     const topThreshold = 0.05  // Top 5% of document
     const bottomThreshold = 0.85  // Bottom 15% of document (more generous for last cluster)
     
     if (scrollProgress < topThreshold) {
-      // Near top - activate first cluster and its first word type
+      // Near top - activate first cluster and its first part of speech
       updateActiveCluster(firstCluster.clusterId)
-      if (firstCluster.wordTypes.length > 0) {
-        updateActiveWordType(`${firstCluster.clusterId}-${firstCluster.wordTypes[0].type}`)
+      if (firstCluster.partsOfSpeech.length > 0) {
+        updateActivePartOfSpeech(`${firstCluster.clusterId}-${firstCluster.partsOfSpeech[0].type}`)
       }
     } else if (scrollProgress > bottomThreshold || isAtDocumentBottom()) {
-      // Near bottom or at document bottom - activate last cluster and its last word type
+      // Near bottom or at document bottom - activate last cluster and its last part of speech
       updateActiveCluster(lastCluster.clusterId)
-      if (lastCluster.wordTypes.length > 0) {
-        const lastWordType = lastCluster.wordTypes[lastCluster.wordTypes.length - 1]
-        updateActiveWordType(`${lastCluster.clusterId}-${lastWordType.type}`)
+      if (lastCluster.partsOfSpeech.length > 0) {
+        const lastPartOfSpeech = lastCluster.partsOfSpeech[lastCluster.partsOfSpeech.length - 1]
+        updateActivePartOfSpeech(`${lastCluster.clusterId}-${lastPartOfSpeech.type}`)
       }
     } else {
       // Middle section - find best cluster based on actual element positions
@@ -485,12 +491,12 @@ const setupObservers = async () => {
             if (bestCluster && bestCluster[1] > 0.05) {
               updateActiveCluster(bestCluster[0])
               
-              // Reset word type when cluster changes
+              // Reset part of speech when cluster changes
               const clusterData = sidebarSections.value.find(c => c.clusterId === bestCluster[0])
-              if (clusterData && clusterData.wordTypes.length > 0) {
-                const currentWordType = activeWordType.value
-                if (!currentWordType.startsWith(bestCluster[0])) {
-                  updateActiveWordType(`${bestCluster[0]}-${clusterData.wordTypes[0].type}`)
+              if (clusterData && clusterData.partsOfSpeech.length > 0) {
+                const currentPartOfSpeech = activePartOfSpeech.value
+                if (!currentPartOfSpeech.startsWith(bestCluster[0])) {
+                  updateActivePartOfSpeech(`${bestCluster[0]}-${clusterData.partsOfSpeech[0].type}`)
                 }
               }
             }
@@ -505,18 +511,18 @@ const setupObservers = async () => {
               if (nextBest && nextBest[1] > 0.03) {
                 updateActiveCluster(nextBest[0])
                 
-                // Update word type for new cluster
+                // Update part of speech for new cluster
                 const clusterData = sidebarSections.value.find(c => c.clusterId === nextBest[0])
-                if (clusterData && clusterData.wordTypes.length > 0) {
-                  updateActiveWordType(`${nextBest[0]}-${clusterData.wordTypes[0].type}`)
+                if (clusterData && clusterData.partsOfSpeech.length > 0) {
+                  updateActivePartOfSpeech(`${nextBest[0]}-${clusterData.partsOfSpeech[0].type}`)
                 }
               } else {
                 // No visible clusters, check if we're at bottom and should activate last cluster
                 if (isAtDocumentBottom() && isLastCluster) {
                   updateActiveCluster(cluster.clusterId)
-                  if (cluster.wordTypes.length > 0) {
-                    const lastWordType = cluster.wordTypes[cluster.wordTypes.length - 1]
-                    updateActiveWordType(`${cluster.clusterId}-${lastWordType.type}`)
+                  if (cluster.partsOfSpeech.length > 0) {
+                    const lastPartOfSpeech = cluster.partsOfSpeech[cluster.partsOfSpeech.length - 1]
+                    updateActivePartOfSpeech(`${cluster.clusterId}-${lastPartOfSpeech.type}`)
                   }
                 } else {
                   // Use robust fallback
@@ -536,44 +542,45 @@ const setupObservers = async () => {
       clusterObservers.push(observer)
     }
 
-    // Word type observers with hysteresis
-    cluster.wordTypes.forEach((wordType) => {
-      const elements = document.querySelectorAll(`[data-word-type="${cluster.clusterId}-${wordType.type}"]`)
+    // Part of speech observers with hysteresis
+    cluster.partsOfSpeech.forEach((partOfSpeech) => {
+      const selector = `[data-part-of-speech="${cluster.clusterId}-${partOfSpeech.type}"]`
+      const elements = document.querySelectorAll(selector)
       elements.forEach((element) => {
         const observer = new IntersectionObserver(
           ([entry]) => {
-            const key = `${cluster.clusterId}-${wordType.type}`
+            const key = `${cluster.clusterId}-${partOfSpeech.type}`
             const ratio = entry.intersectionRatio
             
             if (entry.isIntersecting && ratio > 0.1) {
-              visibleWordTypes.set(key, ratio)
+              visiblePartsOfSpeech.set(key, ratio)
               
               // Only update if we're in the active cluster
               if (activeCluster.value === cluster.clusterId) {
-                const clusterWordTypes = Array.from(visibleWordTypes.entries())
+                const clusterPartsOfSpeech = Array.from(visiblePartsOfSpeech.entries())
                   .filter(([wt]) => wt.startsWith(cluster.clusterId))
                   .sort(([, a], [, b]) => b - a)
                 
-                if (clusterWordTypes.length > 0 && clusterWordTypes[0][1] > 0.15) {
-                  updateActiveWordType(clusterWordTypes[0][0])
+                if (clusterPartsOfSpeech.length > 0 && clusterPartsOfSpeech[0][1] > 0.15) {
+                  updateActivePartOfSpeech(clusterPartsOfSpeech[0][0])
                 }
               }
             } else {
-              visibleWordTypes.delete(key)
+              visiblePartsOfSpeech.delete(key)
               
-              // If this was the active word type, find next best in cluster
-              if (activeWordType.value === key && activeCluster.value === cluster.clusterId) {
-                const clusterWordTypes = Array.from(visibleWordTypes.entries())
+              // If this was the active part of speech, find next best in cluster
+              if (activePartOfSpeech.value === key && activeCluster.value === cluster.clusterId) {
+                const clusterPartsOfSpeech = Array.from(visiblePartsOfSpeech.entries())
                   .filter(([wt]) => wt.startsWith(cluster.clusterId))
                   .sort(([, a], [, b]) => b - a)
                 
-                if (clusterWordTypes.length > 0 && clusterWordTypes[0][1] > 0.1) {
-                  updateActiveWordType(clusterWordTypes[0][0])
+                if (clusterPartsOfSpeech.length > 0 && clusterPartsOfSpeech[0][1] > 0.1) {
+                  updateActivePartOfSpeech(clusterPartsOfSpeech[0][0])
                 } else {
-                  // No visible word types in cluster, set to first word type
+                  // No visible parts of speech in cluster, set to first part of speech
                   const clusterData = sidebarSections.value.find(c => c.clusterId === cluster.clusterId)
-                  if (clusterData && clusterData.wordTypes.length > 0) {
-                    updateActiveWordType(`${cluster.clusterId}-${clusterData.wordTypes[0].type}`)
+                  if (clusterData && clusterData.partsOfSpeech.length > 0) {
+                    updateActivePartOfSpeech(`${cluster.clusterId}-${clusterData.partsOfSpeech[0].type}`)
                   }
                 }
               }
@@ -585,7 +592,7 @@ const setupObservers = async () => {
           }
         )
         observer.observe(element)
-        wordTypeObservers.push(observer)
+        partOfSpeechObservers.push(observer)
       })
     })
   })
@@ -600,9 +607,9 @@ const handleScroll = debounce(() => {
     const lastCluster = sidebarSections.value[sidebarSections.value.length - 1]
     if (activeCluster.value !== lastCluster.clusterId) {
       updateActiveCluster(lastCluster.clusterId)
-      if (lastCluster.wordTypes.length > 0) {
-        const lastWordType = lastCluster.wordTypes[lastCluster.wordTypes.length - 1]
-        updateActiveWordType(`${lastCluster.clusterId}-${lastWordType.type}`)
+      if (lastCluster.partsOfSpeech.length > 0) {
+        const lastPartOfSpeech = lastCluster.partsOfSpeech[lastCluster.partsOfSpeech.length - 1]
+        updateActivePartOfSpeech(`${lastCluster.clusterId}-${lastPartOfSpeech.type}`)
       }
     }
   }
@@ -623,7 +630,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', checkShowSidebar)
   window.removeEventListener('scroll', handleScroll)
   clusterObservers.forEach(observer => observer.disconnect())
-  wordTypeObservers.forEach(observer => observer.disconnect())
+  partOfSpeechObservers.forEach(observer => observer.disconnect())
 })
 
 // Watch for definition changes to setup new observers

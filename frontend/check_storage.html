@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Storage</title>
+</head>
+<body>
+    <h1>Storage Data</h1>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+        
+        // Check localStorage
+        const sessionState = localStorage.getItem('session-state');
+        if (sessionState) {
+            const parsed = JSON.parse(sessionState);
+            output.textContent = JSON.stringify(parsed, null, 2);
+            
+            // Log the currentEntry part_of_speech values
+            if (parsed.currentEntry && parsed.currentEntry.definitions) {
+                console.log('Definitions:');
+                parsed.currentEntry.definitions.forEach((def, i) => {
+                    console.log(`Definition ${i}: part_of_speech = "${def.part_of_speech}"`);
+                });
+            }
+        } else {
+            output.textContent = 'No session-state in localStorage';
+        }
+    </script>
+</body>
+</html>

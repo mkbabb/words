@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from beanie import init_beanie
-from motor.motor_asyncio import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from ..list.models import WordList
 from ..models import (
@@ -128,20 +128,25 @@ class MongoDBStorage:
             return {"status": "disconnected"}
             
         try:
-            pool_options = self.client.options.pool_options  # type: ignore[attr-defined]
-            return {
+            # Basic stats that should be available
+            stats = {
                 "status": "connected",
-                "max_pool_size": pool_options.max_pool_size,
-                "min_pool_size": pool_options.min_pool_size,
-                "max_idle_time_ms": pool_options.max_idle_time_ms,
-                "server_selection_timeout_ms": pool_options.server_selection_timeout_ms,
-                "socket_timeout_ms": pool_options.socket_timeout_ms,
-                "connect_timeout_ms": pool_options.connect_timeout_ms,
                 "initialized": self._initialized,
+                "database_name": self.database_name,
             }
+            
+            # Try to get pool options if available
+            if hasattr(self.client, 'options') and hasattr(self.client.options, 'pool_options'):
+                pool_options = self.client.options.pool_options  # type: ignore[attr-defined]
+                if hasattr(pool_options, 'max_pool_size'):
+                    stats["max_pool_size"] = pool_options.max_pool_size
+                if hasattr(pool_options, 'min_pool_size'):
+                    stats["min_pool_size"] = pool_options.min_pool_size
+            
+            return stats
         except Exception as e:
-            logger.error(f"Error getting pool stats: {e}")
-            return {"status": "error", "error": str(e)}
+            logger.debug(f"Could not get full pool stats: {e}")
+            return {"status": "connected", "initialized": self._initialized}
 
     async def disconnect(self) -> None:
         """Disconnect from MongoDB."""
@@ -247,19 +252,25 @@ async def _ensure_initialized() -> None:
     """Ensure MongoDB is initialized with environment-aware configuration."""
     global _storage
     if _storage is None:
-        # Get database configuration from environment + config file
-        mongodb_url, database_name = get_database_config()
-        logger.info(f"Initializing MongoDB: {database_name} at {mongodb_url[:20]}...")
-        
-        _storage = MongoDBStorage(
-            connection_string=mongodb_url,
-            database_name=database_name
-        )
         try:
+            # Get database configuration from environment + config file
+            mongodb_url, database_name = get_database_config()
+            
+            if not mongodb_url:
+                raise ValueError("MongoDB URL is None or empty")
+            
+            logger.info(f"Initializing MongoDB: {database_name} at {mongodb_url[:50]}...")
+            
+            _storage = MongoDBStorage(
+                connection_string=mongodb_url,
+                database_name=database_name
+            )
             await _storage.connect()
             logger.info("MongoDB initialized successfully")
         except Exception as e:
-            logger.error(f"MongoDB initialization failed: {e}")
+            logger.error(f"MongoDB initialization failed: {type(e).__name__}: {e}")
+            logger.error("Stack trace:", exc_info=True)
+            _storage = None  # Reset storage on failure
             raise
 
 
@@ -268,6 +279,14 @@ async def get_storage() -> MongoDBStorage:
     await _ensure_initialized()
     assert _storage is not None, "Storage not initialized"
     return _storage
+
+
+async def get_database() -> AsyncIOMotorDatabase:
+    """Get the MongoDB database instance."""
+    storage = await get_storage()
+    if not storage.client:
+        raise RuntimeError("MongoDB client not initialized")
+    return storage.client[storage.database_name]
 
 
 async def get_synthesized_entry(word_text: str) -> SynthesizedDictionaryEntry | None:

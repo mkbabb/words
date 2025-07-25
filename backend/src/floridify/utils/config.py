@@ -9,7 +9,7 @@ from typing import Any
 import toml
 
 from ..config import Config
-from .paths import get_config_path
+from .paths import get_config_path, PROJECT_ROOT
 
 
 def load_config_dict(config_path: str | Path | None = None) -> dict[str, Any]:
@@ -32,8 +32,11 @@ def load_config_dict(config_path: str | Path | None = None) -> dict[str, Any]:
     if not config_path.exists():
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
     
-    with open(config_path, encoding="utf-8") as f:
-        return toml.load(f)
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            return toml.load(f)
+    except Exception as e:
+        raise
 
 
 def load_config(config_path: str | Path | None = None) -> Config:
@@ -52,33 +55,83 @@ def load_config(config_path: str | Path | None = None) -> Config:
 
 
 def get_database_config() -> tuple[str, str]:
-    """Get database configuration from config file with optional environment override.
+    """Get database configuration with automatic environment detection.
     
-    Priority order:
-    1. Environment variables (for local development override)
-    2. Configuration file values (production default)
-    3. Built-in defaults (fallback)
+    Detects environment based on:
+    - Running in Docker container (production/staging)
+    - Running on EC2 instance (production)
+    - Running locally (development with SSH tunnel)
     
     Returns:
         Tuple of (mongodb_url, database_name)
     """
-    # Allow environment variable override (mainly for local development)
-    mongodb_url = os.getenv("MONGODB_URL")
-    database_name = os.getenv("MONGODB_DATABASE")
-    
-    # Load from config file if not overridden
-    if mongodb_url is None or database_name is None:
-        try:
-            config = load_config()
-            if mongodb_url is None:
-                mongodb_url = config.database.url
-            if database_name is None:
-                database_name = config.database.name
-        except (FileNotFoundError, AttributeError):
-            # Final fallbacks
-            if mongodb_url is None:
-                mongodb_url = "mongodb://localhost:27017"
-            if database_name is None:
-                database_name = "floridify"
-    
-    return mongodb_url, database_name
+    try:
+        config_dict = load_config_dict()
+        if config_dict is None:
+            raise ValueError("load_config_dict returned None")
+        db_config = config_dict.get("database", {})
+        
+        # Detect environment
+        is_docker = os.path.exists("/.dockerenv")
+        is_ec2 = os.path.exists("/var/lib/cloud")
+        is_production = is_ec2 or os.getenv("ENVIRONMENT") == "production"
+        
+        # Get the base URL from config
+        mongodb_url = db_config.get("url")
+        database_name = db_config.get("name", "floridify")
+        
+        # Log environment detection
+        from ..utils.logging import get_logger
+        logger = get_logger(__name__)
+        logger.info(f"Environment detection: docker={is_docker}, ec2={is_ec2}, production={is_production}")
+        
+        # Modify URL based on environment
+        if mongodb_url:
+            # For local development, we need to use SSH tunnel
+            if not is_production:
+                # Replace production DocumentDB with localhost SSH tunnel
+                if "docdb" in mongodb_url and "amazonaws.com" in mongodb_url:
+                    # Extract username and password from URL
+                    import re
+                    match = re.search(r'mongodb://([^:]+):([^@]+)@', mongodb_url)
+                    if match:
+                        username = match.group(1)
+                        password = match.group(2)
+                        # Build local development URL with SSH tunnel
+                        # For SSH tunnel, we need to disable hostname verification since cert is for DocumentDB not localhost
+                        if is_docker:
+                            # Docker uses host.docker.internal to reach host's localhost
+                            mongodb_url = f"mongodb://{username}:{password}@host.docker.internal:27018/floridify?tls=true&tlsCAFile=/app/auth/rds-ca-2019-root.pem&retryWrites=false&directConnection=true&tlsAllowInvalidHostnames=true"
+                            logger.info("Using Docker development connection via host.docker.internal SSH tunnel on port 27018")
+                        else:
+                            # Native local development
+                            mongodb_url = f"mongodb://{username}:{password}@localhost:27018/floridify?tls=true&tlsCAFile={PROJECT_ROOT}/auth/rds-ca-2019-root.pem&retryWrites=false&directConnection=true&tlsAllowInvalidHostnames=true"
+                            logger.info("Using local development connection via SSH tunnel on port 27018")
+            else:
+                logger.info("Using production database configuration")
+        
+        if not mongodb_url:
+            raise ValueError(f"No MongoDB URL found for environment (docker={is_docker}, ec2={is_ec2}, production={is_production})")
+        
+        return mongodb_url, database_name
+        
+    except Exception as e:
+        # More detailed error logging
+        from ..utils.logging import get_logger
+        logger = get_logger(__name__)
+        logger.error(f"Failed to load database config: {type(e).__name__}: {e}")
+        logger.error("Stack trace:", exc_info=True)
+        
+        # Only use fallback for local development
+        if not os.path.exists("/.dockerenv") and not os.path.exists("/var/lib/cloud"):
+            logger.warning("Using localhost fallback for local development")
+            return "mongodb://localhost:27017", "floridify"
+        else:
+            # In Docker/production, we should fail fast
+            raise
+
+
+def update_tls_path_in_url(url: str, new_path: str) -> str:
+    """Update the tlsCAFile path in a MongoDB URL."""
+    import re
+    return re.sub(r'tlsCAFile=[^&]+', f'tlsCAFile={new_path}', url)

@@ -62,13 +62,13 @@ class TestBackwardsCompatibility:
         
         for definition in definitions:
             # Original required fields
-            assert "word_type" in definition
+            assert "part_of_speech" in definition
             assert "definition" in definition
             assert "synonyms" in definition
             assert "examples" in definition
             
             # Check types
-            assert isinstance(definition["word_type"], str)
+            assert isinstance(definition["part_of_speech"], str)
             assert isinstance(definition["definition"], str)
             assert isinstance(definition["synonyms"], list)
             assert isinstance(definition["examples"], dict)
@@ -385,7 +385,7 @@ class TestAPIClientSimulation:
                     "phonetic": data["pronunciation"]["phonetic"],
                     "definitions": [
                         {
-                            "type": d["word_type"],
+                            "type": d["part_of_speech"],
                             "meaning": d["definition"],
                             "synonyms": d["synonyms"]
                         }

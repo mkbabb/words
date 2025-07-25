@@ -4,7 +4,7 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from floridify.ai.connector import get_openai_connector
+from floridify.ai import get_openai_connector
 from floridify.ai.synthesis_functions import generate_facts
 from floridify.api.core import (
     FieldSelection,

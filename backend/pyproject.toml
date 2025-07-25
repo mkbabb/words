@@ -48,6 +48,7 @@ dependencies = [
     "unicodedata2>=15.0.0", # Fast Unicode normalization
     "coolname>=2.2.0",
     "hishel>=0.1.0", # Modern HTTP caching client
+    "orjson>=3.10.0", # Fast JSON serialization
     # REST API framework
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
@@ -57,7 +58,6 @@ dependencies = [
     # "scipy>=1.11.0",   # DISABLED - heavy scientific computing
     # "matplotlib>=3.8.0",  # DISABLED - heavy plotting library
     "psutil>=7.0.0",
-    "pyobjc-framework-coreservices>=11.1",
     "nltk>=3.9.1",
 ]
 

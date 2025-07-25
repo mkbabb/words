@@ -9,12 +9,13 @@ import orjson
 from fastapi import Request, Response
 from pydantic import BaseModel
 
-from floridify.caching.decorators import CacheConfig, CacheManager, get_cache_manager
+from floridify.caching.cache_manager import CacheManager, get_cache_manager
 
 
-class APICacheConfig(CacheConfig):
+class APICacheConfig(BaseModel):
     """Configuration for API response caching."""
     
+    ttl: int = 3600  # Default TTL in seconds
     include_headers: bool = False
     include_query_params: bool = True
     include_body: bool = True

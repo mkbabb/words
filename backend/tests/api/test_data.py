@@ -212,7 +212,7 @@ SAMPLE_LOOKUP_RESPONSE: dict[str, Any] = {
     },
     "definitions": [
         {
-            "word_type": "noun",
+            "part_of_speech": "noun",
             "definition": "The faculty of making fortunate discoveries by accident",
             "synonyms": ["chance", "fortune", "luck", "accident", "coincidence"],
             "examples": {

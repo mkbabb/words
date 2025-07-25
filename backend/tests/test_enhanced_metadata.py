@@ -178,7 +178,7 @@ class TestSynthesizedDictionaryEntryMetadata:
     def test_synthesized_entry_with_metadata(self):
         """Test SynthesizedDictionaryEntry creation with metadata."""
         pronunciation = Pronunciation(phonetic="test", ipa="/test/")
-        definition = Definition(word_type="noun", definition="Test definition")
+        definition = Definition(part_of_speech="noun", definition="Test definition")
         fact = Fact(
             content="Test fact", 
             category="etymology", 

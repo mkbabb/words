@@ -300,7 +300,7 @@ class AnkiCardGenerator:
             fields = {
                 "Word": entry.word,
                 "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word}/",
-                "WordType": definition.part_of_speech,
+                "PartOfSpeech": definition.part_of_speech,
                 "ChoiceA": ai_response.choice_a,
                 "ChoiceB": ai_response.choice_b,
                 "ChoiceC": ai_response.choice_c,
@@ -391,7 +391,7 @@ class AnkiCardGenerator:
                 "Word": entry.word,
                 "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word}/",
                 "SentenceWithBlank": ai_response.sentence,
-                "WordType": definition.part_of_speech,
+                "PartOfSpeech": definition.part_of_speech,
                 "ChoiceA": ai_response.choice_a,
                 "ChoiceB": ai_response.choice_b,
                 "ChoiceC": ai_response.choice_c,

@@ -30,7 +30,7 @@ class TestLookupEndpoint:
         
         # Validate definition structure
         for definition in data["definitions"]:
-            assert "word_type" in definition
+            assert "part_of_speech" in definition
             assert "definition" in definition
             assert "synonyms" in definition
             assert "examples" in definition
@@ -147,7 +147,7 @@ class TestLookupEndpoint:
             
             for definition in definitions:
                 # Required fields
-                assert "word_type" in definition
+                assert "part_of_speech" in definition
                 assert "definition" in definition
                 
                 # Optional but expected fields

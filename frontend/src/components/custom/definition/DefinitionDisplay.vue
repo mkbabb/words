@@ -12,6 +12,76 @@
 
         <!-- Main Card Content -->
         <ThemedCard :variant="selectedCardVariant" class="relative flex-1">
+            <!-- Animation Selector Dropdown - absolute positioned -->
+            <div v-if="isMounted" class="absolute top-2 right-20 z-40">
+                <div class="relative">
+                    <button
+                        @click="toggleAnimationDropdown"
+                        class="group mt-1 rounded-lg border-2 border-border
+                            bg-background/80 p-1.5 shadow-lg backdrop-blur-sm
+                            transition-all duration-200 hover:scale-110
+                            hover:bg-background focus:ring-0 focus:outline-none"
+                    >
+                        <ChevronLeft
+                            :size="14"
+                            :class="[
+                                'text-muted-foreground transition-transform duration-200 group-hover:text-foreground',
+                                showAnimationDropdown && 'rotate-90',
+                            ]"
+                        />
+                    </button>
+
+                    <Transition
+                        enter-active-class="transition-all duration-300 ease-apple-bounce"
+                        leave-active-class="transition-all duration-250 ease-out"
+                        enter-from-class="opacity-0 scale-95 -translate-y-2"
+                        enter-to-class="opacity-100 scale-100 translate-y-0"
+                        leave-from-class="opacity-100 scale-100 translate-y-0"
+                        leave-to-class="opacity-0 scale-95 -translate-y-2"
+                    >
+                        <div
+                            v-if="showAnimationDropdown"
+                            class="absolute top-full right-0 z-50 mt-4
+                                min-w-[140px] origin-top-right rounded-md border
+                                bg-popover text-popover-foreground shadow-md"
+                            @click.stop
+                        >
+                            <div class="p-1">
+                                <div class="px-2 py-1.5 text-sm font-semibold">
+                                    Text Animation
+                                </div>
+                                <div class="my-1 h-px bg-border"></div>
+
+                                <button
+                                    v-for="option in animationOptions"
+                                    :key="option.value"
+                                    @click="selectAnimation(option.value)"
+                                    :class="[
+                                        'flex w-full items-center rounded-sm px-2 py-1.5 text-sm',
+                                        'transition-colors hover:bg-accent hover:text-accent-foreground',
+                                        'focus:bg-accent focus:text-accent-foreground focus:outline-none',
+                                        selectedAnimation === option.value &&
+                                            'bg-accent text-accent-foreground',
+                                    ]"
+                                >
+                                    <div class="flex items-center gap-2">
+                                        <div
+                                            :class="[
+                                                'h-2 w-2 rounded-full border',
+                                                selectedAnimation === option.value
+                                                    ? 'border-primary bg-primary'
+                                                    : 'border-muted-foreground',
+                                            ]"
+                                        ></div>
+                                        {{ option.label }}
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </Transition>
+                </div>
+            </div>
+
             <!-- Card Theme Selector Dropdown - absolute positioned -->
             <div v-if="isMounted" class="absolute top-2 right-12 z-40">
                 <!-- Custom dropdown with controlled animations -->
@@ -88,12 +158,12 @@
             <CardHeader>
                 <div class="flex items-center justify-between">
                     <CardTitle class="themed-title transition-all duration-200">
-                        <ShimmerText
-                            :text="entry.word"
-                            text-class="text-word-title"
-                            :duration="600"
-                            :interval="1000"
-                            :random-delay="false"
+                        <!-- Animated Text Title -->
+                        <component
+                            :is="currentAnimationComponent"
+                            v-bind="currentAnimationProps"
+                            :key="`${selectedAnimation}-${animationKey}`"
+                            class="text-word-title"
                         />
                     </CardTitle>
                 </div>
@@ -189,7 +259,7 @@
                                 ) in cluster.definitions"
                                 :key="`${cluster.clusterId}-${index}`"
                                 :id="`${cluster.clusterId}-${definition.part_of_speech}`"
-                                :data-word-type="`${cluster.clusterId}-${definition.part_of_speech}`"
+                                :data-part-of-speech="`${cluster.clusterId}-${definition.part_of_speech}`"
                                 class="space-y-3"
                             >
                                 <!-- Separator for all but first -->
@@ -199,8 +269,8 @@
                                 />
 
                                 <div class="flex items-center gap-2">
-                                    <span class="themed-word-type">
-                                        {{ definition.part_of_speech }}
+                                    <span class="themed-part-of-speech">
+                                        {{ definition.part_of_speech || detectPartOfSpeech(definition.definition) }}
                                     </span>
                                     <sup
                                         class="text-sm font-normal
@@ -365,11 +435,11 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAppStore } from '@/stores';
-import { cn, getHeatmapClass } from '@/utils';
+import { cn, getHeatmapClass, detectPartOfSpeech } from '@/utils';
 import { Button } from '@/components/ui';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ThemedCard } from '@/components/custom/card';
-import { ShimmerText } from '@/components/custom/animation';
+import { TypewriterText, HandwritingText, LatexFillText } from '@/components/custom/text-animations';
 import { ProgressiveSidebar } from '@/components/custom/navigation';
 import { RefreshCw, ChevronLeft } from 'lucide-vue-next';
 import { 
@@ -393,8 +463,71 @@ const themeOptions = [
     { label: 'Gold', value: 'gold' },
 ];
 
+// Animation dropdown state
+const showAnimationDropdown = ref(false);
+const selectedAnimation = ref('typewriter');
+const animationKey = ref(0);
+const animationOptions = [
+    { label: 'Typewriter', value: 'typewriter' },
+    { label: 'Handwriting', value: 'handwriting' },
+    { label: 'LaTeX Fill', value: 'latex' },
+];
+
+// Animation component logic
+const currentAnimationComponent = computed(() => {
+    switch (selectedAnimation.value) {
+        case 'typewriter':
+            return TypewriterText;
+        case 'handwriting':
+            return HandwritingText;
+        case 'latex':
+            return LatexFillText;
+        default:
+            return TypewriterText;
+    }
+});
+
+const currentAnimationProps = computed(() => {
+    const word = entry.value?.word || '';
+    const baseProps = { 
+        text: word,
+        class: 'text-word-title'
+    };
+    
+    switch (selectedAnimation.value) {
+        case 'typewriter':
+            return { ...baseProps, speed: 200, cursor: true }; // Slower, more readable speed
+        case 'handwriting':
+            return { ...baseProps, duration: 2000, strokeWidth: 2 };
+        case 'latex':
+            return { ...baseProps, fillDuration: 1500, strokeDuration: 800 };
+        default:
+            return baseProps;
+    }
+});
+
+// Animation cycling - run every 10 seconds
+let animationInterval: NodeJS.Timeout | null = null;
+
+const startAnimationCycle = () => {
+    if (animationInterval) clearInterval(animationInterval);
+    
+    animationInterval = setInterval(() => {
+        // Force re-render by updating key
+        animationKey.value++;
+    }, 10000);
+};
+
+const stopAnimationCycle = () => {
+    if (animationInterval) {
+        clearInterval(animationInterval);
+        animationInterval = null;
+    }
+};
+
 onMounted(() => {
     isMounted.value = true;
+    startAnimationCycle();
 });
 
 // Remove unused props interface since we're using store state
@@ -486,8 +619,8 @@ const shouldShowSidebar = computed(() => {
     return hasMultipleClusters;
 });
 
-// Word type ordering for consistent display
-const wordTypeOrder = {
+// Part of speech ordering for consistent display
+const partOfSpeechOrder = {
     noun: 1,
     verb: 2,
     adjective: 3,
@@ -503,6 +636,12 @@ const wordTypeOrder = {
 // Group and sort definitions by meaning cluster and relevancy
 const groupedDefinitions = computed(() => {
     if (!entry.value?.definitions) return [];
+
+    // Debug: Log the first definition to see its structure
+    if (entry.value.definitions.length > 0) {
+        console.log('First definition structure:', entry.value.definitions[0]);
+        console.log('part_of_speech value:', entry.value.definitions[0].part_of_speech);
+    }
 
     // Group definitions by meaning cluster
     const clusters = new Map<
@@ -553,12 +692,12 @@ const groupedDefinitions = computed(() => {
         cluster.definitions.sort((a, b) => {
             // First, sort by word type (nouns first, verbs second, etc.)
             const aTypeOrder =
-                wordTypeOrder[
-                    a.part_of_speech?.toLowerCase() as keyof typeof wordTypeOrder
+                partOfSpeechOrder[
+                    a.part_of_speech?.toLowerCase() as keyof typeof partOfSpeechOrder
                 ] || 999;
             const bTypeOrder =
-                wordTypeOrder[
-                    b.part_of_speech?.toLowerCase() as keyof typeof wordTypeOrder
+                partOfSpeechOrder[
+                    b.part_of_speech?.toLowerCase() as keyof typeof partOfSpeechOrder
                 ] || 999;
 
             if (aTypeOrder !== bTypeOrder) {
@@ -616,51 +755,64 @@ const selectTheme = (theme: string) => {
     showThemeDropdown.value = false;
 };
 
+// Animation dropdown handlers
+const toggleAnimationDropdown = () => {
+    showAnimationDropdown.value = !showAnimationDropdown.value;
+};
+
+const selectAnimation = (animation: string) => {
+    selectedAnimation.value = animation;
+    showAnimationDropdown.value = false;
+    // Trigger immediate animation restart
+    animationKey.value++;
+};
+
 // Close dropdown when clicking outside
 const handleClickOutside = (event: Event) => {
-    if (showThemeDropdown.value) {
-        const target = event.target as Element;
-        if (!target.closest('.relative')) {
-            showThemeDropdown.value = false;
-        }
+    const target = event.target as Element;
+    if (showThemeDropdown.value && !target.closest('.relative')) {
+        showThemeDropdown.value = false;
+    }
+    if (showAnimationDropdown.value && !target.closest('.relative')) {
+        showAnimationDropdown.value = false;
     }
 };
 
-// Create a list of all word types in order for keyboard navigation
-const orderedWordTypes = computed(() => {
-    const wordTypes: Array<{clusterId: string, wordType: string, key: string}> = [];
+// Create a list of all parts of speech in order for keyboard navigation
+const orderedPartsOfSpeech = computed(() => {
+    const partsOfSpeech: Array<{clusterId: string, partOfSpeech: string, key: string}> = [];
     
     groupedDefinitions.value.forEach(cluster => {
-        // Group by word type within each cluster
-        const wordTypeGroups = new Map<string, any[]>();
+        // Group by part of speech within each cluster
+        const partOfSpeechGroups = new Map<string, any[]>();
         cluster.definitions.forEach(def => {
-            const wordType = def.part_of_speech;
-            if (!wordTypeGroups.has(wordType)) {
-                wordTypeGroups.set(wordType, []);
+            const partOfSpeech = def.part_of_speech;
+            if (!partOfSpeechGroups.has(partOfSpeech)) {
+                partOfSpeechGroups.set(partOfSpeech, []);
             }
-            wordTypeGroups.get(wordType)!.push(def);
+            partOfSpeechGroups.get(partOfSpeech)!.push(def);
         });
         
-        // Sort word types within cluster
-        const sortedWordTypes = Array.from(wordTypeGroups.keys()).sort(
-            (a, b) => (wordTypeOrder[a as keyof typeof wordTypeOrder] || 999) - 
-                      (wordTypeOrder[b as keyof typeof wordTypeOrder] || 999)
+        // Sort parts of speech within cluster
+        const sortedPartsOfSpeech = Array.from(partOfSpeechGroups.keys()).sort(
+            (a, b) => (partOfSpeechOrder[a as keyof typeof partOfSpeechOrder] || 999) - 
+                      (partOfSpeechOrder[b as keyof typeof partOfSpeechOrder] || 999)
         );
         
-        sortedWordTypes.forEach(wordType => {
-            wordTypes.push({
+        sortedPartsOfSpeech.forEach(partOfSpeech => {
+            partsOfSpeech.push({
                 clusterId: cluster.clusterId,
-                wordType,
-                key: `${cluster.clusterId}-${wordType}`
+                partOfSpeech,
+                key: `${cluster.clusterId}-${partOfSpeech}`
             });
         });
     });
     
-    return wordTypes;
+    return partsOfSpeech;
 });
 
-// Current word type index for keyboard navigation
-const currentWordTypeIndex = computed(() => {
+// Current part of speech index for keyboard navigation
+const currentPartOfSpeechIndex = computed(() => {
     // Simplified: always start from first word type
     return 0;
 });
@@ -672,31 +824,31 @@ const handleKeyDown = (event: KeyboardEvent) => {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
         
-        const currentIndex = currentWordTypeIndex.value;
+        const currentIndex = currentPartOfSpeechIndex.value;
         let nextIndex: number;
         
         if (event.key === 'ArrowDown') {
-            nextIndex = currentIndex < orderedWordTypes.value.length - 1 ? currentIndex + 1 : 0;
+            nextIndex = currentIndex < orderedPartsOfSpeech.value.length - 1 ? currentIndex + 1 : 0;
         } else {
-            nextIndex = currentIndex > 0 ? currentIndex - 1 : orderedWordTypes.value.length - 1;
+            nextIndex = currentIndex > 0 ? currentIndex - 1 : orderedPartsOfSpeech.value.length - 1;
         }
         
-        if (nextIndex >= 0 && nextIndex < orderedWordTypes.value.length) {
-            const nextWordType = orderedWordTypes.value[nextIndex];
-            scrollToWordType(nextWordType.clusterId, nextWordType.wordType);
+        if (nextIndex >= 0 && nextIndex < orderedPartsOfSpeech.value.length) {
+            const nextPartOfSpeech = orderedPartsOfSpeech.value[nextIndex];
+            scrollToPartOfSpeech(nextPartOfSpeech.clusterId, nextPartOfSpeech.partOfSpeech);
         }
     }
 };
 
-// Scroll to word type function (same as used in ProgressiveSidebar)
-const scrollToWordType = (clusterId: string, wordType: string) => {
-    const element = document.getElementById(`${clusterId}-${wordType}`);
+// Scroll to part of speech function (same as used in ProgressiveSidebar)
+const scrollToPartOfSpeech = (clusterId: string, partOfSpeech: string) => {
+    const element = document.getElementById(`${clusterId}-${partOfSpeech}`);
     if (element) {
         element.scrollIntoView({ 
             behavior: 'smooth', 
             block: 'center' 
         });
-        // Note: activeWordType functionality removed for KISS approach
+        // Note: activePartOfSpeech functionality removed for KISS approach
     }
 };
 
@@ -709,6 +861,7 @@ onMounted(() => {
 onUnmounted(() => {
     document.removeEventListener('click', handleClickOutside);
     document.removeEventListener('keydown', handleKeyDown);
+    stopAnimationCycle();
 });
 </script>
 

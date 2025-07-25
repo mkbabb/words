@@ -328,3 +328,71 @@ async def lookup_word_stream(
             "X-Accel-Buffering": "no",  # Disable nginx buffering
         },
     )
+
+
+@router.post("/lookup/{word}/regenerate-examples")
+async def regenerate_examples(
+    word: str,
+    definition_index: int = Query(..., description="Index of the definition"),
+    count: int = Query(3, ge=1, le=10, description="Number of examples to generate"),
+) -> dict:
+    """Regenerate examples for a specific definition."""
+    from floridify.ai import get_openai_connector
+    from floridify.ai.synthesis_functions import synthesize_examples
+    from floridify.models.models import Definition, Example, SynthesizedDictionaryEntry, Word
+    
+    # Get the word
+    word_obj = await Word.find_one({"text": word})
+    if not word_obj:
+        raise HTTPException(404, f"Word '{word}' not found")
+    
+    # Get synthesized entry
+    entry = await SynthesizedDictionaryEntry.find_one({"word_id": str(word_obj.id)})
+    if not entry:
+        raise HTTPException(404, "No synthesized entry found for this word")
+    
+    # Get the definition
+    if definition_index >= len(entry.definition_ids):
+        raise HTTPException(400, f"Invalid definition index: {definition_index}")
+    
+    definition = await Definition.get(entry.definition_ids[definition_index])
+    if not definition:
+        raise HTTPException(404, "Definition not found")
+    
+    # Get AI connector
+    ai = await get_openai_connector()
+    
+    # Generate new examples
+    example_data_list = await synthesize_examples(
+        definition,
+        word,
+        ai,
+        count=count,
+    )
+    
+    # Delete old examples
+    if definition.example_ids:
+        await Example.find({"_id": {"$in": definition.example_ids}}).delete()
+    
+    # Create new examples
+    new_examples = []
+    for ex_data in example_data_list:
+        example = Example(
+            word_id=str(word_obj.id),
+            definition_id=str(definition.id),
+            **ex_data
+        )
+        await example.create()
+        new_examples.append(example)
+    
+    # Update definition with new example IDs
+    definition.example_ids = [str(ex.id) for ex in new_examples]
+    definition.version += 1
+    await definition.save()
+    
+    return {
+        "success": True,
+        "examples": [ex.model_dump() for ex in new_examples],
+        "definition_id": str(definition.id),
+        "definition_version": definition.version,
+    }
