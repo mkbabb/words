@@ -62,7 +62,7 @@ class BatchPromise(Generic[T]):
                 logger.error(f"Failed to parse result for {self.request_id}: {e}")
                 self._future.set_exception(e)
     
-    def __await__(self):
+    def __await__(self) -> Any:
         return self._future.__await__()
     
     @property
@@ -125,7 +125,7 @@ class BatchAccumulator:
     def __init__(self, batch_name: str = "synthesis_batch"):
         self.batch_name = batch_name
         self.requests: list[BatchRequest] = []
-        self.promises: dict[str, BatchPromise] = {}
+        self.promises: dict[str, BatchPromise[Any]] = {}
         self.request_map: dict[str, int] = {}
         self._request_counter = 0
     
