@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,7 +30,7 @@ setup_logging("DEBUG")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> Any:
     """Initialize database and resources on startup, cleanup on shutdown."""
     # Startup
     try:
@@ -93,7 +94,7 @@ app.include_router(health.router, prefix="", tags=["health"])
 
 
 @app.get("/api")
-async def api_info():
+async def api_info() -> dict[str, Any]:
     """API version information."""
     return {
         "name": "Floridify Dictionary API",

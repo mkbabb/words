@@ -23,6 +23,7 @@ from ...ai.synthesis_functions import (
 )
 from ...models import Definition, Word
 from ..core import (
+    ErrorDetail,
     ErrorResponse,
     FieldSelection,
     ListResponse,
@@ -174,13 +175,14 @@ async def get_definition(
     response: Response,
     repo: DefinitionRepository = Depends(get_definition_repo),
     fields: FieldSelection = Depends(get_fields),
-) -> ResourceResponse:
+) -> Response | ResourceResponse:
     """Get a single definition by ID."""
     # Get definition with optional expansions
     if fields.expand and "examples" in fields.expand:
         definition_data = await repo.get_with_examples(definition_id)
     else:
-        definition = await repo.get(definition_id)
+        definition = await repo.get(definition_id, raise_on_missing=True)
+        assert definition is not None
         definition_data = definition.model_dump()
 
     # Apply field selection
@@ -299,11 +301,11 @@ async def regenerate_components(
             detail=ErrorResponse(
                 error="Invalid components",
                 details=[
-                    {
-                        "field": "components",
-                        "message": f"Invalid components: {invalid_components}",
-                        "code": "invalid_components",
-                    }
+                    ErrorDetail(
+                        field="components",
+                        message=f"Invalid components: {invalid_components}",
+                        code="invalid_components",
+                    )
                 ],
             ).model_dump(),
         )
@@ -318,11 +320,11 @@ async def regenerate_components(
             detail=ErrorResponse(
                 error="Word not found",
                 details=[
-                    {
-                        "field": "word_id",
-                        "message": f"Word with ID {definition.word_id} not found",
-                        "code": "word_not_found",
-                    }
+                    ErrorDetail(
+                        field="word_id",
+                        message=f"Word with ID {definition.word_id} not found",
+                        code="word_not_found",
+                    )
                 ],
             ).model_dump(),
         )
@@ -421,7 +423,7 @@ async def batch_regenerate_components(
         definitions_by_word[definition.word_id].append(definition)
 
     # Process each word's definitions
-    all_results = {}
+    all_results: dict[str, Any] = {}
     for word_id, word_definitions in definitions_by_word.items():
         # Get the word
         word = await Word.get(word_id)

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from ...constants import Language
 from ...models import Word
 from ..core import (
+    ErrorDetail,
     ErrorResponse,
     FieldSelection,
     ListResponse,
@@ -128,11 +129,11 @@ async def create_word(
             detail=ErrorResponse(
                 error="Word already exists",
                 details=[
-                    {
-                        "field": "text",
-                        "message": f"Word '{data.text}' already exists in {data.language}",
-                        "code": "duplicate_word",
-                    }
+                    ErrorDetail(
+                        field="text",
+                        message=f"Word '{data.text}' already exists in {data.language}",
+                        code="duplicate_word",
+                    )
                 ],
             ).model_dump(),
         )
@@ -157,7 +158,7 @@ async def get_word(
     response: Response,
     repo: WordRepository = Depends(get_word_repo),
     fields: FieldSelection = Depends(get_fields),
-) -> ResourceResponse:
+) -> Response | ResourceResponse:
     """Get a single word by ID."""
     # Get word with counts
     word_data = await repo.get_with_counts(word_id)

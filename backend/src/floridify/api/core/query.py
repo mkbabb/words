@@ -17,10 +17,10 @@ logger = get_logger(__name__)
 class QueryOptimizer:
     """Utilities for optimizing MongoDB queries."""
 
-    def __init__(self, db: AsyncIOMotorDatabase | None = None):
+    def __init__(self, db: AsyncIOMotorDatabase[Any] | None = None):
         self.db = db
 
-    async def _get_db(self) -> AsyncIOMotorDatabase:
+    async def _get_db(self) -> AsyncIOMotorDatabase[Any]:
         """Get database instance."""
         if not self.db:
             self.db = await get_database()
@@ -58,7 +58,7 @@ class QueryOptimizer:
             "recommendations": self._get_index_recommendations(stats),
         }
 
-    def _get_index_recommendations(self, stats: list[dict]) -> list[str]:
+    def _get_index_recommendations(self, stats: list[dict[str, Any]]) -> list[str]:
         """Generate index recommendations based on usage."""
         recommendations = []
 
@@ -115,7 +115,7 @@ class QueryOptimizer:
         return created
 
     @asynccontextmanager
-    async def profile_query(self, description: str = "Query"):
+    async def profile_query(self, description: str = "Query") -> Any:
         """Context manager for profiling queries."""
         start_time = time.time()
 
@@ -135,8 +135,8 @@ class QueryOptimizer:
 class AggregationBuilder:
     """Builder for complex MongoDB aggregation pipelines."""
 
-    def __init__(self):
-        self.pipeline = []
+    def __init__(self) -> None:
+        self.pipeline: list[dict[str, Any]] = []
 
     def match(self, query: dict[str, Any]) -> "AggregationBuilder":
         """Add match stage."""
@@ -203,7 +203,7 @@ class AggregationBuilder:
         self.pipeline.append({"$addFields": fields})
         return self
 
-    def facet(self, facets: dict[str, list]) -> "AggregationBuilder":
+    def facet(self, facets: dict[str, list[Any]]) -> "AggregationBuilder":
         """Add facet stage for multiple aggregations."""
         self.pipeline.append({"$facet": facets})
         return self
@@ -218,7 +218,7 @@ class BulkOperationBuilder:
 
     def __init__(self, model: type[Document]):
         self.model = model
-        self.operations = []
+        self.operations: list[dict[str, Any]] = []
 
     def insert_one(self, document: dict[str, Any]) -> "BulkOperationBuilder":
         """Add insert operation."""

@@ -153,9 +153,10 @@ async def get_fact(
     response: Response,
     repo: FactRepository = Depends(get_fact_repo),
     fields: FieldSelection = Depends(get_fields),
-) -> ResourceResponse:
+) -> Response | ResourceResponse:
     """Get a single fact by ID."""
-    fact = await repo.get(fact_id)
+    fact = await repo.get(fact_id, raise_on_missing=True)
+    assert fact is not None
     fact_dict = fact.model_dump()
 
     # Apply field selection

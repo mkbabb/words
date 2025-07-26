@@ -338,10 +338,9 @@ class DefinitionSynthesizer:
         logger.info(f"Regenerating components {components} for entry {entry_id}")
         
         if state_tracker:
-            state_tracker.update_stage(
-                Stages.ENHANCEMENT,
-                f"Regenerating {len(components)} components for {word.text}",
-                progress=0.0,
+            await state_tracker.update_stage(
+                Stages.AI_SYNTHESIS,
+                progress=0,
             )
         
         # Enhance definitions with force_refresh=True
@@ -358,10 +357,9 @@ class DefinitionSynthesizer:
         entry = await SynthesizedDictionaryEntry.get(entry_id)
         
         if state_tracker:
-            state_tracker.update_stage(
-                Stages.ENHANCEMENT,
-                f"Completed regeneration for {word.text}",
-                progress=100.0,
+            await state_tracker.update_stage(
+                Stages.COMPLETE,
+                progress=100,
             )
         
         logger.info(f"Successfully regenerated components for entry {entry_id}")

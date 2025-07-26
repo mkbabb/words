@@ -235,7 +235,7 @@ async def _get_provider_definition(
 
     try:
         connector: (
-            WiktionaryConnector | DictionaryComConnector | AppleDictionaryConnector | None
+            WiktionaryConnector | DictionaryComConnector | AppleDictionaryConnector | OxfordConnector | None
         ) = None
 
         if provider == DictionaryProvider.WIKTIONARY:

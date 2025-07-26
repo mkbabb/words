@@ -32,7 +32,7 @@ class AudioSynthesisConfig(BaseModel):
     british_voice_female: str = "en-GB-Wavenet-A"
 
     # Audio configuration
-    audio_encoding: texttospeech.AudioEncoding = texttospeech.AudioEncoding.MP3
+    audio_encoding: int = texttospeech.AudioEncoding.MP3
     speaking_rate: float = 1.0
     pitch: float = 0.0
     volume_gain_db: float = 0.0
