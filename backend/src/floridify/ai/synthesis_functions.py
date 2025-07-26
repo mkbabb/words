@@ -28,7 +28,9 @@ from ..models import (
     WordForm,
 )
 from ..utils.logging import get_logger
+from .constants import SynthesisComponent
 from .connector import OpenAIConnector
+from .constants import DEFAULT_ANTONYM_COUNT, DEFAULT_EXAMPLE_COUNT, DEFAULT_SYNONYM_COUNT
 
 logger = get_logger(__name__)
 
@@ -37,112 +39,123 @@ SynthesisFunc = Callable[..., Any]
 
 
 async def synthesize_pronunciation(
-    word: Word,
+    word: str,
     providers_data: list[dict[str, Any]] | list[ProviderData],
     ai: OpenAIConnector,
     state_tracker: StateTracker | None = None,
 ) -> Pronunciation | None:
-    """Synthesize pronunciation from provider data or generate if missing."""
+    """Synthesize pronunciation: enhance existing or create new."""
 
-    # Check if any provider has pronunciation
-    existing_pronunciation = None
+    # Find existing pronunciation
+    existing_pronunciation = await _find_existing_pronunciation(providers_data)
+
+    if existing_pronunciation:
+        return await _enhance_pronunciation(
+            existing_pronunciation, word, ai, state_tracker
+        )
+    else:
+        return await _create_pronunciation(word, ai, state_tracker)
+
+
+async def _find_existing_pronunciation(
+    providers_data: list[dict[str, Any]] | list[ProviderData],
+) -> Pronunciation | None:
+    """Find existing pronunciation from provider data."""
     for provider in providers_data:
         if isinstance(provider, ProviderData):
-            # ProviderData format
             if provider.pronunciation_id:
                 pronunciation = await Pronunciation.get(provider.pronunciation_id)
                 if pronunciation:
-                    existing_pronunciation = pronunciation
-                    break
+                    return pronunciation
         else:
-            # Dict format
             if provider.get("pronunciation"):
-                existing_pronunciation = cast(Pronunciation, provider["pronunciation"])
-                break
+                return cast(Pronunciation, provider["pronunciation"])
+    return None
 
-    # If we have existing pronunciation but it's incomplete, enhance it
-    if existing_pronunciation:
-        # Check if we need to generate missing data
-        if not existing_pronunciation.phonetic or not existing_pronunciation.ipa:
-            try:
-                if state_tracker:
-                    await state_tracker.update(
-                        stage=Stages.AI_SYNTHESIS,
-                        message=f"Enhancing pronunciation for {word.text}",
-                    )
-                response = await ai.pronunciation(word.text)
 
-                existing_pronunciation.phonetic = response.phonetic
-                existing_pronunciation.ipa = response.ipa
+async def _enhance_pronunciation(
+    pronunciation: Pronunciation,
+    word: str,
+    ai: OpenAIConnector,
+    state_tracker: StateTracker | None,
+) -> Pronunciation:
+    """Enhance existing pronunciation with missing data."""
+    needs_enhancement = not pronunciation.phonetic or not pronunciation.ipa
 
-                await existing_pronunciation.save()
+    if needs_enhancement:
+        try:
+            if state_tracker:
+                await state_tracker.update(
+                    stage=Stages.AI_SYNTHESIS,
+                    message=f"Enhancing pronunciation for {word}",
+                )
 
-                # Generate audio files if missing
-                if not existing_pronunciation.audio_file_ids:
-                    try:
-                        audio_synthesizer = AudioSynthesizer()
-                        audio_files = await audio_synthesizer.synthesize_pronunciation(
-                            existing_pronunciation, word.text
-                        )
+            response = await ai.pronunciation(word)
+            pronunciation.phonetic = response.phonetic
+            pronunciation.ipa = response.ipa
+            await pronunciation.save()
 
-                        if audio_files:
-                            existing_pronunciation.audio_file_ids = [
-                                str(audio.id) for audio in audio_files
-                            ]
-                            await existing_pronunciation.save()
-                            logger.info(
-                                f"Generated {len(audio_files)} audio files for {word.text}"
-                            )
-                    except Exception as audio_error:
-                        logger.warning(
-                            f"Failed to generate audio for {word.text}: {audio_error}"
-                        )
+        except Exception as e:
+            logger.error(f"Failed to enhance pronunciation for {word}: {e}")
 
-                return existing_pronunciation
-            except Exception as e:
-                logger.error(f"Failed to enhance pronunciation for {word.text}: {e}")
-                return existing_pronunciation
-        else:
-            return existing_pronunciation
+    # Generate audio if missing
+    if not pronunciation.audio_file_ids:
+        await _generate_audio_files(pronunciation, word)
 
-    # Generate pronunciation if none found
+    return pronunciation
+
+
+async def _create_pronunciation(
+    word: str, ai: OpenAIConnector, state_tracker: StateTracker | None
+) -> Pronunciation | None:
+    """Create new pronunciation from scratch."""
     try:
         if state_tracker:
             await state_tracker.update(
                 stage=Stages.AI_SYNTHESIS,
-                message=f"Generating pronunciation for {word.text}",
+                message=f"Generating pronunciation for {word}",
             )
-        response = await ai.pronunciation(word.text)
 
-        # Ensure we have both phonetic and IPA
+        response = await ai.pronunciation(word)
+
+        # Create Word object if we need word_id (assuming word parameter should be Word object)
+        word_obj = await Word.find_one(Word.text == word)
+        if not word_obj:
+            word_obj = Word(text=word, normalized=word.lower())
+            await word_obj.save()
+
         pronunciation = Pronunciation(
-            word_id=str(word.id),
+            word_id=str(word_obj.id),
             phonetic=response.phonetic,
             ipa=response.ipa,
         )
         await pronunciation.save()
 
         # Generate audio files
-        try:
-            audio_synthesizer = AudioSynthesizer()
-            audio_files = await audio_synthesizer.synthesize_pronunciation(
-                pronunciation, word.text
-            )
-
-            # Update pronunciation with audio file IDs
-            if audio_files:
-                pronunciation.audio_file_ids = [str(audio.id) for audio in audio_files]
-                await pronunciation.save()
-
-                logger.info(f"Generated {len(audio_files)} audio files for {word.text}")
-        except Exception as audio_error:
-            logger.warning(f"Failed to generate audio for {word.text}: {audio_error}")
-            # Continue without audio - not critical
+        await _generate_audio_files(pronunciation, word)
 
         return pronunciation
+
     except Exception as e:
-        logger.error(f"Failed to synthesize pronunciation for {word.text}: {e}")
+        logger.error(f"Failed to create pronunciation for {word}: {e}")
         return None
+
+
+async def _generate_audio_files(pronunciation: Pronunciation, word: str) -> None:
+    """Generate audio files for pronunciation."""
+    try:
+        audio_synthesizer = AudioSynthesizer()
+        audio_files = await audio_synthesizer.synthesize_pronunciation(
+            pronunciation, word
+        )
+
+        if audio_files:
+            pronunciation.audio_file_ids = [str(audio.id) for audio in audio_files]
+            await pronunciation.save()
+            logger.info(f"Generated {len(audio_files)} audio files for {word}")
+
+    except Exception as audio_error:
+        logger.warning(f"Failed to generate audio for {word}: {audio_error}")
 
 
 async def synthesize_etymology(
@@ -226,27 +239,52 @@ async def synthesize_word_forms(
 
 
 async def synthesize_antonyms(
-    definition: Definition,
     word: str,
+    definition: Definition,
     ai: OpenAIConnector,
+    count: int = 5,
+    force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
 ) -> list[str]:
-    """Generate antonyms for a definition."""
-
+    """Synthesize antonyms: enhance existing or generate new to reach target count."""
+    count = count or DEFAULT_ANTONYM_COUNT
+    
+    # Get existing antonyms (empty if force_refresh)
+    existing_antonyms = [] if force_refresh else (definition.antonyms or [])
+    
+    # If we already have enough antonyms, return them
+    if len(existing_antonyms) >= count:
+        return existing_antonyms[:count]
+    
+    # Calculate how many new antonyms we need
+    needed_count = count - len(existing_antonyms)
+    
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, message=f"Generating antonyms for {word}"
+                stage=Stages.AI_SYNTHESIS, 
+                message=f"Synthesizing {needed_count} new antonyms for {word} (total: {count})"
             )
-        response = await ai.generate_antonyms(
+        
+        response = await ai.synthesize_antonyms(
             word=word,
             definition=definition.text,
             part_of_speech=definition.part_of_speech,
+            existing_antonyms=existing_antonyms,
+            count=needed_count,
         )
-        return response.antonyms
+        
+        # Union existing and new antonyms, removing duplicates
+        all_antonyms = existing_antonyms.copy()
+        for antonym in response.antonyms:
+            if antonym not in all_antonyms:
+                all_antonyms.append(antonym)
+        
+        return all_antonyms[:count]
+        
     except Exception as e:
-        logger.error(f"Failed to generate antonyms: {e}")
-        return []
+        logger.error(f"Failed to synthesize antonyms: {e}")
+        return existing_antonyms
 
 
 async def assess_definition_cefr(
@@ -297,9 +335,6 @@ async def classify_definition_register(
 ) -> str | None:
     """Classify register for a definition."""
 
-    if definition.language_register:
-        return definition.language_register
-
     try:
         if state_tracker:
             await state_tracker.update(
@@ -312,44 +347,38 @@ async def classify_definition_register(
         return None
 
 
-async def identify_definition_domain(
+async def assess_definition_domain(
     definition: Definition,
     ai: OpenAIConnector,
     state_tracker: StateTracker | None = None,
 ) -> str | None:
     """Identify domain for a definition."""
 
-    if definition.domain:
-        return definition.domain
-
     try:
         if state_tracker:
             await state_tracker.update(
                 stage=Stages.AI_SYNTHESIS, message="Identifying domain for definition"
             )
-        response = await ai.identify_domain(definition.text)
+        response = await ai.assess_domain(definition.text)
         return response.domain
     except Exception as e:
         logger.error(f"Failed to identify domain: {e}")
         return None
 
 
-async def extract_grammar_patterns(
+async def assess_grammar_patterns(
     definition: Definition,
     ai: OpenAIConnector,
     state_tracker: StateTracker | None = None,
 ) -> list[GrammarPattern]:
     """Extract grammar patterns for a definition."""
 
-    if definition.grammar_patterns:
-        return definition.grammar_patterns
-
     try:
         if state_tracker:
             await state_tracker.update(
                 stage=Stages.AI_SYNTHESIS, message="Extracting grammar patterns"
             )
-        response = await ai.extract_grammar_patterns(
+        response = await ai.assess_grammar_patterns(
             definition.text,
             definition.part_of_speech,
         )
@@ -365,7 +394,7 @@ async def extract_grammar_patterns(
         return []
 
 
-async def identify_collocations(
+async def assess_collocations(
     definition: Definition,
     word: str,
     ai: OpenAIConnector,
@@ -373,16 +402,13 @@ async def identify_collocations(
 ) -> list[Collocation]:
     """Identify collocations for a definition."""
 
-    if definition.collocations:
-        return definition.collocations
-
     try:
         if state_tracker:
             await state_tracker.update(
                 stage=Stages.AI_SYNTHESIS,
                 message=f"Identifying collocations for {word}",
             )
-        response = await ai.identify_collocations(
+        response = await ai.assess_collocations(
             word=word,
             definition=definition.text,
             part_of_speech=definition.part_of_speech,
@@ -400,7 +426,7 @@ async def identify_collocations(
         return []
 
 
-async def generate_usage_notes(
+async def usage_note_generation(
     definition: Definition,
     word: str,
     ai: OpenAIConnector,
@@ -408,18 +434,15 @@ async def generate_usage_notes(
 ) -> list[UsageNote]:
     """Generate usage notes for a definition."""
 
-    if definition.usage_notes:
-        return definition.usage_notes
-
     try:
         if state_tracker:
             await state_tracker.update(
                 stage=Stages.AI_SYNTHESIS, message=f"Generating usage notes for {word}"
             )
-        response = await ai.generate_usage_notes(word, definition.text)
+        response = await ai.usage_note_generation(word, definition.text)
         return [
             UsageNote(
-                type=note.type,
+                type=note.type,  # type: ignore
                 text=note.text,
             )
             for note in response.notes
@@ -429,22 +452,19 @@ async def generate_usage_notes(
         return []
 
 
-async def detect_regional_variants(
+async def assess_regional_variants(
     definition: Definition,
     ai: OpenAIConnector,
     state_tracker: StateTracker | None = None,
 ) -> list[str]:
     """Detect regional variants for a definition."""
 
-    if definition.region:
-        return [definition.region]
-
     try:
         if state_tracker:
             await state_tracker.update(
                 stage=Stages.AI_SYNTHESIS, message="Detecting regional variants"
             )
-        response = await ai.detect_regional_variants(definition.text)
+        response = await ai.assess_regional_variants(definition.text)
         return response.regions
     except Exception as e:
         logger.error(f"Failed to detect regional variants: {e}")
@@ -516,63 +536,82 @@ async def generate_facts(
 
 
 async def synthesize_synonyms(
-    definition: Definition,
     word: str,
+    definition: Definition,
     ai: OpenAIConnector,
+    count: int = 10,
+    force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
 ) -> list[str]:
-    """Generate synonyms for a definition with efflorescence ranking."""
+    """Synthesize synonyms: enhance existing or generate new to reach target count."""
+    count = count or DEFAULT_SYNONYM_COUNT
+    
+    # Get existing synonyms (empty if force_refresh)
+    existing_synonyms = [] if force_refresh else (definition.synonyms or [])
+    
+    # If we already have enough synonyms, return them
+    if len(existing_synonyms) >= count:
+        return existing_synonyms[:count]
+    
+    # Calculate how many new synonyms we need
+    needed_count = count - len(existing_synonyms)
+    
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, message=f"Generating synonyms for {word}"
+                stage=Stages.AI_SYNTHESIS, 
+                message=f"Synthesizing {needed_count} new synonyms for {word} (total: {count})"
             )
 
-        # Use the existing generate_synonyms method which uses templates
-        response = await ai.generate_synonyms(
+        response = await ai.synthesize_synonyms(
             word=word,
             definition=definition.text,
             part_of_speech=definition.part_of_speech,
-            count=10,
+            existing_synonyms=existing_synonyms,
+            count=needed_count,
         )
 
-        # Extract just the words from the structured response
-        synonyms = [candidate.word for candidate in response.synonyms]
-
-        logger.info(f"Generated {len(synonyms)} synonyms for '{word}'")
-        return synonyms
+        # Union existing and new synonyms, removing duplicates
+        all_synonyms = existing_synonyms.copy()
+        for candidate in response.synonyms:
+            if candidate.word not in all_synonyms:
+                all_synonyms.append(candidate.word)
+        
+        logger.info(f"Synthesized {len(all_synonyms)} total synonyms for '{word}'")
+        return all_synonyms[:count]
 
     except Exception as e:
-        logger.error(f"Failed to generate synonyms: {e}")
+        logger.error(f"Failed to synthesize synonyms: {e}")
         if state_tracker:
-            await state_tracker.update_error(f"Synonym generation failed: {str(e)}")
-        return []
+            await state_tracker.update_error(f"Synonym synthesis failed: {str(e)}")
+        return existing_synonyms
 
 
-async def synthesize_examples(
-    definition: Definition,
+async def generate_examples(
     word: str,
+    definition: Definition,
     ai: OpenAIConnector,
+    count: int = 3,
     state_tracker: StateTracker | None = None,
 ) -> list[str]:
     """Generate contextual example sentences for a definition."""
+    count = count or DEFAULT_EXAMPLE_COUNT
+
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, message=f"Generating examples for {word}"
+                stage=Stages.AI_SYNTHESIS,
+                message=f"Generating {count} examples for {word}",
             )
 
-        # Use the existing generate_examples method which uses templates
         response = await ai.generate_examples(
             word=word,
             part_of_speech=definition.part_of_speech,
             definition=definition.text,
-            count=3,
+            count=count,
         )
 
-        # Extract the example sentences
         examples = response.example_sentences
-
         logger.info(f"Generated {len(examples)} examples for '{word}'")
         return examples
 
@@ -739,16 +778,16 @@ SYNTHESIS_COMPONENTS = {
     "facts": generate_facts,
     # Definition-level components
     "synonyms": synthesize_synonyms,
-    "examples": synthesize_examples,
+    "examples": generate_examples,
     "antonyms": synthesize_antonyms,
     "cefr_level": assess_definition_cefr,
     "frequency_band": assess_definition_frequency,
     "register": classify_definition_register,
-    "domain": identify_definition_domain,
-    "grammar_patterns": extract_grammar_patterns,
-    "collocations": identify_collocations,
-    "usage_notes": generate_usage_notes,
-    "regional_variants": detect_regional_variants,
+    "domain": assess_definition_domain,
+    "grammar_patterns": assess_grammar_patterns,
+    "collocations": assess_collocations,
+    "usage_notes": usage_note_generation,
+    "regional_variants": assess_regional_variants,
     # Synthesis utilities
     "definition_text": synthesize_definition_text,
     "cluster_definitions": cluster_definitions,
@@ -775,20 +814,7 @@ async def enhance_definitions_parallel(
     """
     # Default to all definition-level components
     if components is None:
-        components = {
-            "synonyms",
-            "examples",
-            "antonyms",
-            # "word_forms",
-            # "cefr_level",
-            # "frequency_band",
-            # "register",
-            # "domain",
-            # "grammar_patterns",
-            # "collocations",  # Disabled by default to improve performance
-            "usage_notes",
-            "regional_variants",
-        }
+        components = SynthesisComponent.default_components()
 
     # Build tasks for each definition and component
     tasks: list[Coroutine[Any, Any, Any]] = []
@@ -796,89 +822,101 @@ async def enhance_definitions_parallel(
 
     for definition in definitions:
         # Synonyms
-        if "synonyms" in components and (not definition.synonyms or force_refresh):
-            tasks.append(synthesize_synonyms(definition, word.text, ai, state_tracker))
-            task_info.append((definition, "synonyms", len(tasks) - 1))
+        if SynthesisComponent.SYNONYMS.value in components and (not definition.synonyms or force_refresh):
+            tasks.append(
+                synthesize_synonyms(
+                    word.text, definition, ai, force_refresh=force_refresh, state_tracker=state_tracker
+                )
+            )
+            task_info.append((definition, SynthesisComponent.SYNONYMS.value, len(tasks) - 1))
 
         # Examples
-        if "examples" in components and (not definition.example_ids or force_refresh):
-            tasks.append(synthesize_examples(definition, word.text, ai, state_tracker))
-            task_info.append((definition, "examples", len(tasks) - 1))
+        if SynthesisComponent.EXAMPLES.value in components and (not definition.example_ids or force_refresh):
+            tasks.append(
+                generate_examples(
+                    word.text, definition, ai, state_tracker=state_tracker
+                )
+            )
+            task_info.append((definition, SynthesisComponent.EXAMPLES.value, len(tasks) - 1))
 
         # Antonyms
-        if "antonyms" in components and (not definition.antonyms or force_refresh):
-            tasks.append(synthesize_antonyms(definition, word.text, ai, state_tracker))
-            task_info.append((definition, "antonyms", len(tasks) - 1))
+        if SynthesisComponent.ANTONYMS.value in components and (not definition.antonyms or force_refresh):
+            tasks.append(
+                synthesize_antonyms(
+                    word.text, definition, ai, force_refresh=force_refresh, state_tracker=state_tracker
+                )
+            )
+            task_info.append((definition, SynthesisComponent.ANTONYMS.value, len(tasks) - 1))
 
         # Word forms
-        if "word_forms" in components and (not definition.word_forms or force_refresh):
+        if SynthesisComponent.WORD_FORMS.value in components and (not definition.word_forms or force_refresh):
             # Use the part of speech from the definition
             tasks.append(
                 synthesize_word_forms(
                     word, definition.part_of_speech, ai, state_tracker
                 )
             )
-            task_info.append((definition, "word_forms", len(tasks) - 1))
+            task_info.append((definition, SynthesisComponent.WORD_FORMS.value, len(tasks) - 1))
 
         # CEFR Level
-        if "cefr_level" in components and (
+        if SynthesisComponent.CEFR_LEVEL.value in components and (
             definition.cefr_level is None or force_refresh
         ):
             tasks.append(
                 assess_definition_cefr(definition, word.text, ai, state_tracker)
             )
-            task_info.append((definition, "cefr_level", len(tasks) - 1))
+            task_info.append((definition, SynthesisComponent.CEFR_LEVEL.value, len(tasks) - 1))
 
         # Frequency Band
-        if "frequency_band" in components and (
+        if SynthesisComponent.FREQUENCY_BAND.value in components and (
             definition.frequency_band is None or force_refresh
         ):
             tasks.append(
                 assess_definition_frequency(definition, word.text, ai, state_tracker)
             )
-            task_info.append((definition, "frequency_band", len(tasks) - 1))
+            task_info.append((definition, SynthesisComponent.FREQUENCY_BAND.value, len(tasks) - 1))
 
         # Register
-        if "register" in components and (
+        if SynthesisComponent.REGISTER.value in components and (
             not definition.language_register or force_refresh
         ):
             tasks.append(classify_definition_register(definition, ai, state_tracker))
-            task_info.append((definition, "register", len(tasks) - 1))
+            task_info.append((definition, SynthesisComponent.REGISTER.value, len(tasks) - 1))
 
         # Domain
-        if "domain" in components and (not definition.domain or force_refresh):
-            tasks.append(identify_definition_domain(definition, ai, state_tracker))
-            task_info.append((definition, "domain", len(tasks) - 1))
+        if SynthesisComponent.DOMAIN.value in components and (not definition.domain or force_refresh):
+            tasks.append(assess_definition_domain(definition, ai, state_tracker))
+            task_info.append((definition, SynthesisComponent.DOMAIN.value, len(tasks) - 1))
 
         # Grammar Patterns
-        if "grammar_patterns" in components and (
+        if SynthesisComponent.GRAMMAR_PATTERNS.value in components and (
             not definition.grammar_patterns or force_refresh
         ):
-            tasks.append(extract_grammar_patterns(definition, ai, state_tracker))
-            task_info.append((definition, "grammar_patterns", len(tasks) - 1))
+            tasks.append(assess_grammar_patterns(definition, ai, state_tracker))
+            task_info.append((definition, SynthesisComponent.GRAMMAR_PATTERNS.value, len(tasks) - 1))
 
         # Collocations
-        if "collocations" in components and (
+        if SynthesisComponent.COLLOCATIONS.value in components and (
             not definition.collocations or force_refresh
         ):
             tasks.append(
-                identify_collocations(definition, word.text, ai, state_tracker)
+                assess_collocations(definition, word.text, ai, state_tracker)
             )
-            task_info.append((definition, "collocations", len(tasks) - 1))
+            task_info.append((definition, SynthesisComponent.COLLOCATIONS.value, len(tasks) - 1))
 
         # Usage Notes
-        if "usage_notes" in components and (
+        if SynthesisComponent.USAGE_NOTES.value in components and (
             not definition.usage_notes or force_refresh
         ):
-            tasks.append(generate_usage_notes(definition, word.text, ai, state_tracker))
-            task_info.append((definition, "usage_notes", len(tasks) - 1))
+            tasks.append(usage_note_generation(definition, word.text, ai, state_tracker))
+            task_info.append((definition, SynthesisComponent.USAGE_NOTES.value, len(tasks) - 1))
 
         # Regional Variants
-        if "regional_variants" in components and (
+        if SynthesisComponent.REGIONAL_VARIANTS.value in components and (
             not definition.region or force_refresh
         ):
-            tasks.append(detect_regional_variants(definition, ai, state_tracker))
-            task_info.append((definition, "regional_variants", len(tasks) - 1))
+            tasks.append(assess_regional_variants(definition, ai, state_tracker))
+            task_info.append((definition, SynthesisComponent.REGIONAL_VARIANTS.value, len(tasks) - 1))
 
     if not tasks:
         return

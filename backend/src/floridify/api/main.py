@@ -10,7 +10,7 @@ from ..storage.mongodb import get_storage
 from ..utils.logging import setup_logging
 from .middleware import CacheHeadersMiddleware, LoggingMiddleware
 from .routers import (
-    atomic_updates,
+    ai,
     audio,
     batch,
     corpus,
@@ -21,7 +21,6 @@ from .routers import (
     lookup,
     search,
     suggestions,
-    synonyms,
     words,
 )
 
@@ -79,13 +78,13 @@ API_V1_PREFIX = "/api/v1"
 app.include_router(lookup.router, prefix=API_V1_PREFIX, tags=["lookup"])
 app.include_router(search.router, prefix=API_V1_PREFIX, tags=["search"])
 app.include_router(corpus.router, prefix=API_V1_PREFIX, tags=["corpus"])
-app.include_router(synonyms.router, prefix=API_V1_PREFIX, tags=["synonyms"])
+# Old synonyms endpoint removed - now handled by /ai/synthesize/synonyms
 app.include_router(suggestions.router, prefix=API_V1_PREFIX, tags=["suggestions"])
+app.include_router(ai.router, prefix=API_V1_PREFIX, tags=["ai"])
 app.include_router(facts.router, prefix=API_V1_PREFIX, tags=["facts"])
 app.include_router(definitions.router, prefix=f"{API_V1_PREFIX}/definitions", tags=["definitions"])
 app.include_router(examples.router, prefix=API_V1_PREFIX, tags=["examples"])
 app.include_router(batch.router, prefix=f"{API_V1_PREFIX}/batch", tags=["batch"])
-app.include_router(atomic_updates.router, prefix=f"{API_V1_PREFIX}/atomic", tags=["atomic"])
 app.include_router(words.router, prefix=f"{API_V1_PREFIX}/words", tags=["words"])
 app.include_router(audio.router, prefix=API_V1_PREFIX, tags=["audio"])
 

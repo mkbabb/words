@@ -1,15 +1,21 @@
-"""Common models and utilities for API routers."""
+"""Common utilities for API routers."""
 
-from pydantic import BaseModel, Field
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import BaseModel
 
 
 class PipelineMetrics(BaseModel):
-    """Metrics for pipeline execution."""
-
-    start_time: float = Field(..., description="Pipeline start timestamp")
-    end_time: float = Field(..., description="Pipeline end timestamp")
-    duration_ms: float = Field(..., description="Total duration in milliseconds")
-    provider_count: int = Field(..., description="Number of providers queried")
-    definition_count: int = Field(..., description="Total definitions found")
-    ai_synthesis: bool = Field(..., description="Whether AI synthesis was used")
-    from_cache: bool = Field(..., description="Whether result was from cache")
+    """Metrics for pipeline operations."""
+    
+    total_time_ms: int = 0
+    steps_completed: int = 0
+    errors_count: int = 0
+    cache_hits: int = 0
+    cache_misses: int = 0
+    
+    def to_dict(self) -> dict[str, Any]:
+        """Convert metrics to dictionary."""
+        return self.model_dump()

@@ -116,7 +116,7 @@ class DefinitionSynthesizer:
 
         # Synthesize pronunciation
         pronunciation = await synthesize_pronunciation(
-            word_obj, providers_data, self.ai, state_tracker
+            word_obj.text, providers_data, self.ai, state_tracker
         )
 
         # Synthesize etymology
@@ -289,3 +289,80 @@ class DefinitionSynthesizer:
             await definition.delete()
 
         return synthesized_entry
+
+    async def regenerate_entry_components(
+        self,
+        entry_id: str,
+        components: set[str] | None = None,
+        state_tracker: StateTracker | None = None,
+    ) -> SynthesizedDictionaryEntry | None:
+        """Regenerate specific components of an existing synthesized dictionary entry.
+        
+        Args:
+            entry_id: ID of the existing synthesized dictionary entry
+            components: Set of component names to regenerate (uses default if None)
+            state_tracker: Optional progress tracking
+            
+        Returns:
+            Updated synthesized dictionary entry or None if not found
+        """
+        from .constants import SynthesisComponent
+        
+        # Fetch existing entry
+        entry = await SynthesizedDictionaryEntry.get(entry_id)
+        if not entry:
+            logger.error(f"Synthesized entry not found: {entry_id}")
+            return None
+            
+        # Get associated word
+        word = await Word.get(entry.word_id)
+        if not word:
+            logger.error(f"Word not found for entry: {entry.word_id}")
+            return None
+        
+        # Load existing definitions
+        definitions = []
+        for def_id in entry.definition_ids:
+            definition = await Definition.get(def_id)
+            if definition:
+                definitions.append(definition)
+        
+        if not definitions:
+            logger.error(f"No definitions found for entry: {entry_id}")
+            return None
+            
+        # Use default components if none specified
+        if components is None:
+            components = SynthesisComponent.default_components()
+        
+        logger.info(f"Regenerating components {components} for entry {entry_id}")
+        
+        if state_tracker:
+            state_tracker.update_stage(
+                Stages.ENHANCEMENT,
+                f"Regenerating {len(components)} components for {word.text}",
+                progress=0.0,
+            )
+        
+        # Enhance definitions with force_refresh=True
+        await enhance_definitions_parallel(
+            definitions=definitions,
+            word=word,
+            ai=self.ai,
+            components=components,
+            force_refresh=True,  # Force regeneration of all specified components
+            state_tracker=state_tracker,
+        )
+        
+        # Refresh entry from database to get updated data
+        entry = await SynthesizedDictionaryEntry.get(entry_id)
+        
+        if state_tracker:
+            state_tracker.update_stage(
+                Stages.ENHANCEMENT,
+                f"Completed regeneration for {word.text}",
+                progress=100.0,
+            )
+        
+        logger.info(f"Successfully regenerated components for entry {entry_id}")
+        return entry

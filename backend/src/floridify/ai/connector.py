@@ -319,7 +319,7 @@ class OpenAIConnector:
     ) -> AnkiFillBlankResponse:
         """Generate fill-in-the-blank flashcard using structured output."""
         prompt = self.template_manager.render_template(
-            "anki_fill_blank",
+            "misc/anki_fill_blank",
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
@@ -338,7 +338,7 @@ class OpenAIConnector:
     ) -> AnkiMultipleChoiceResponse:
         """Generate best describes flashcard using structured output."""
         prompt = self.template_manager.render_template(
-            "anki_best_describes",
+            "misc/anki_best_describes",
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
@@ -352,16 +352,17 @@ class OpenAIConnector:
             logger.error(f"❌ Best describes generation failed for '{word}': {e}")
             raise
 
-    async def generate_synonyms(
-        self, word: str, definition: str, part_of_speech: str, count: int = 10
+    async def synthesize_synonyms(
+        self, word: str, definition: str, part_of_speech: str, existing_synonyms: list[str], count: int = 10
     ) -> SynonymGenerationResponse:
         """Generate synonyms with efflorescence ranking."""
         logger.debug(f"🔗 Generating {count} synonyms for '{word}' ({part_of_speech})")
 
-        prompt = self.template_manager.get_generate_synonyms_prompt(
+        prompt = self.template_manager.get_synthesize_synonyms_prompt(
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
+            existing_synonyms=existing_synonyms,
             count=count,
         )
 
@@ -459,11 +460,13 @@ class OpenAIConnector:
             logger.error(f"❌ Fact generation failed for '{word}': {e}")
             raise
 
-    async def generate_antonyms(
+    async def synthesize_antonyms(
         self,
         word: str,
         definition: str,
         part_of_speech: str,
+        existing_antonyms: list[str],
+        count: int = 5,
     ) -> AntonymResponse:
         """Generate antonyms for a definition.
 
@@ -475,10 +478,12 @@ class OpenAIConnector:
         Returns:
             AntonymResponse with list of antonyms
         """
-        prompt = self.template_manager.get_generate_antonyms_prompt(
+        prompt = self.template_manager.get_synthesize_antonyms_prompt(
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
+            existing_antonyms=existing_antonyms,
+            count=count,
         )
 
         try:
@@ -592,7 +597,7 @@ class OpenAIConnector:
             logger.error(f"Register classification failed: {e}")
             raise
 
-    async def identify_domain(
+    async def assess_domain(
         self,
         definition: str,
     ) -> DomainIdentificationResponse:
@@ -641,7 +646,7 @@ class OpenAIConnector:
             logger.error(f"CEFR assessment failed for '{word}': {e}")
             raise
 
-    async def extract_grammar_patterns(
+    async def assess_grammar_patterns(
         self,
         definition: str,
         part_of_speech: str,
@@ -668,7 +673,7 @@ class OpenAIConnector:
             logger.error(f"Grammar pattern extraction failed: {e}")
             raise
 
-    async def identify_collocations(
+    async def assess_collocations(
         self,
         word: str,
         definition: str,
@@ -698,7 +703,7 @@ class OpenAIConnector:
             logger.error(f"Collocation identification failed for '{word}': {e}")
             raise
 
-    async def generate_usage_notes(
+    async def usage_note_generation(
         self,
         word: str,
         definition: str,
@@ -725,7 +730,7 @@ class OpenAIConnector:
             logger.error(f"Usage note generation failed for '{word}': {e}")
             raise
 
-    async def detect_regional_variants(
+    async def assess_regional_variants(
         self,
         definition: str,
     ) -> RegionalVariantResponse:

@@ -67,7 +67,7 @@ class PromptTemplateManager:
     ) -> str:
         """Generate synthesis prompt for definition aggregation using full Definition objects."""
         return self.render_template(
-            "synthesis",
+            "synthesize/definitions",
             word=word,
             definitions=definitions,
             meaning_cluster=meaning_cluster,
@@ -82,7 +82,7 @@ class PromptTemplateManager:
     ) -> str:
         """Generate example generation prompt."""
         return self.render_template(
-            "generate_examples",
+            "generate/examples",
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
@@ -91,18 +91,18 @@ class PromptTemplateManager:
 
     def get_pronunciation_prompt(self, word: str) -> str:
         """Generate pronunciation prompt."""
-        return self.render_template("pronunciation", word=word)
+        return self.render_template("synthesize/pronunciation", word=word)
 
     def get_lookup_prompt(self, word: str) -> str:
         """Generate lookup fallback prompt."""
-        return self.render_template("lookup", word=word)
+        return self.render_template("misc/lookup", word=word)
 
     def get_meaning_extraction_prompt(
         self, word: str, definitions: list[tuple[str, str, str]]
     ) -> str:
         """Generate meaning extraction prompt with cluster mapping."""
         return self.render_template(
-            "meaning_extraction",
+            "misc/meaning_extraction",
             word=word,
             definitions=definitions,
         )
@@ -118,22 +118,23 @@ class PromptTemplateManager:
             part_of_speech=part_of_speech,
         )
 
-    def get_generate_synonyms_prompt(
-        self, word: str, definition: str, part_of_speech: str, count: int = 10
+    def get_synthesize_synonyms_prompt(
+        self, word: str, definition: str, part_of_speech: str, existing_synonyms: list[str], count: int = 10
     ) -> str:
-        """Generate prompt for synonyms with balanced expressiveness."""
+        """Generate prompt for synonym synthesis with existing items."""
         return self.render_template(
-            "generate_synonyms",
+            "synthesize/synonyms",
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
+            existing_synonyms=existing_synonyms,
             count=count,
         )
 
     def get_suggestions_prompt(self, input_words: list[str] | None, count: int = 10) -> str:
         """Generate prompt for word suggestions based on input words."""
         return self.render_template(
-            "suggestions",
+            "misc/suggestions",
             input_words=input_words,
             count=count,
         )
@@ -143,26 +144,28 @@ class PromptTemplateManager:
     ) -> str:
         """Generate prompt for interesting facts about a word."""
         return self.render_template(
-            "fact_generation",
+            "generate/facts",
             word=word,
             definition=definition,
             count=count,
             previous_words=previous_words or [],
         )
 
-    def get_generate_antonyms_prompt(self, word: str, definition: str, part_of_speech: str) -> str:
-        """Generate prompt for antonym generation."""
+    def get_synthesize_antonyms_prompt(self, word: str, definition: str, part_of_speech: str, existing_antonyms: list[str], count: int = 5) -> str:
+        """Generate prompt for antonym synthesis."""
         return self.render_template(
-            "generate_antonyms",
+            "synthesize/antonyms",
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
+            existing_antonyms=existing_antonyms,
+            count=count,
         )
 
     def get_etymology_prompt(self, word: str, provider_data: list[dict[str, Any]]) -> str:
         """Generate prompt for etymology extraction."""
         return self.render_template(
-            "etymology_extraction",
+            "synthesize/etymology",
             word=word,
             provider_data=provider_data,
         )
@@ -170,7 +173,7 @@ class PromptTemplateManager:
     def get_word_forms_prompt(self, word: str, part_of_speech: str) -> str:
         """Generate prompt for word form generation."""
         return self.render_template(
-            "word_form_generation",
+            "generate/word_forms",
             word=word,
             part_of_speech=part_of_speech,
         )
@@ -178,7 +181,7 @@ class PromptTemplateManager:
     def get_frequency_prompt(self, word: str, definition: str) -> str:
         """Generate prompt for frequency band assessment."""
         return self.render_template(
-            "frequency_assessment",
+            "assess/frequency",
             word=word,
             definition=definition,
         )
@@ -186,21 +189,21 @@ class PromptTemplateManager:
     def get_register_prompt(self, definition: str) -> str:
         """Generate prompt for register classification."""
         return self.render_template(
-            "register_classification",
+            "assess/register",
             definition=definition,
         )
 
     def get_domain_prompt(self, definition: str) -> str:
         """Generate prompt for domain identification."""
         return self.render_template(
-            "domain_identification",
+            "assess/domain",
             definition=definition,
         )
 
     def get_cefr_prompt(self, word: str, definition: str) -> str:
         """Generate prompt for CEFR level assessment."""
         return self.render_template(
-            "cefr_assessment",
+            "assess/cefr",
             word=word,
             definition=definition,
         )
@@ -208,7 +211,7 @@ class PromptTemplateManager:
     def get_grammar_patterns_prompt(self, definition: str, part_of_speech: str) -> str:
         """Generate prompt for grammar pattern extraction."""
         return self.render_template(
-            "grammar_pattern_extraction",
+            "assess/grammar_patterns",
             definition=definition,
             part_of_speech=part_of_speech,
         )
@@ -216,7 +219,7 @@ class PromptTemplateManager:
     def get_collocations_prompt(self, word: str, definition: str, part_of_speech: str) -> str:
         """Generate prompt for collocation identification."""
         return self.render_template(
-            "collocation_identification",
+            "assess/collocations",
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
@@ -225,7 +228,7 @@ class PromptTemplateManager:
     def get_usage_notes_prompt(self, word: str, definition: str) -> str:
         """Generate prompt for usage note generation."""
         return self.render_template(
-            "usage_note_generation",
+            "misc/usage_note_generation",
             word=word,
             definition=definition,
         )
@@ -233,6 +236,6 @@ class PromptTemplateManager:
     def get_regional_variants_prompt(self, definition: str) -> str:
         """Generate prompt for regional variant detection."""
         return self.render_template(
-            "regional_variant_detection",
+            "assess/regional_variants",
             definition=definition,
         )

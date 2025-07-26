@@ -10,15 +10,15 @@ from ...ai import get_openai_connector
 from ...ai.synthesis_functions import (
     assess_definition_cefr,
     assess_definition_frequency,
+    assess_definition_domain,
+    assess_grammar_patterns,
+    assess_collocations,
+    assess_regional_variants,
     classify_definition_register,
-    detect_regional_variants,
     enhance_definitions_parallel,
-    extract_grammar_patterns,
-    generate_usage_notes,
-    identify_collocations,
-    identify_definition_domain,
+    usage_note_generation,
     synthesize_antonyms,
-    synthesize_examples,
+    generate_examples,
     synthesize_synonyms,
 )
 from ...models import Definition, Word
@@ -282,15 +282,15 @@ async def regenerate_components(
     component_functions = {
         "synonyms": synthesize_synonyms,
         "antonyms": synthesize_antonyms,
-        "examples": synthesize_examples,
+        "examples": generate_examples,
         "cefr_level": assess_definition_cefr,
         "frequency_band": assess_definition_frequency,
         "register": classify_definition_register,
-        "domain": identify_definition_domain,
-        "grammar_patterns": extract_grammar_patterns,
-        "collocations": identify_collocations,
-        "usage_notes": generate_usage_notes,
-        "regional_variants": detect_regional_variants,
+        "domain": assess_definition_domain,
+        "grammar_patterns": assess_grammar_patterns,
+        "collocations": assess_collocations,
+        "usage_notes": usage_note_generation,
+        "regional_variants": assess_regional_variants,
     }
 
     # Validate components
@@ -339,7 +339,7 @@ async def regenerate_components(
             # Special handling for examples
             from ...models import Example
 
-            examples = await synthesize_examples(definition, word.text, ai)
+            examples = await generate_examples(word.text, definition, ai)
             # Save examples
             example_docs = []
             for ex_data in examples:
@@ -353,7 +353,12 @@ async def regenerate_components(
         else:
             # Generate component
             func = component_functions[component]
-            result = await func(definition, word.text, ai)
+            
+            # Call with appropriate parameters based on function type
+            if component in ["synonyms", "antonyms"]:
+                result = await func(word.text, definition, ai, force_refresh=request.force)
+            else:
+                result = await func(definition, word.text, ai)
 
             # Map to definition fields
             if component == "cefr_level":

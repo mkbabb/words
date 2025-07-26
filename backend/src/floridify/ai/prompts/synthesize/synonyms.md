@@ -1,5 +1,26 @@
-# Synonym Generation with Balanced Expressiveness
+# Synonym Synthesis with Balanced Expressiveness
 
+{% if existing_synonyms and existing_synonyms|length > 0 %}
+Synthesize {{ count }} total synonyms for the given word, enhancing the existing list by adding {{ count - existing_synonyms|length }} new relevant synonyms. Balance semantic accuracy with linguistic beauty.
+
+## Input Word
+**Word:** {{ word }}
+**Definition:** {{ definition }}
+**Part of Speech:** {{ part_of_speech }}
+
+## Existing Synonyms
+The following synonyms are already known for this word:
+{% for synonym in existing_synonyms %}
+- {{ synonym }}
+{% endfor %}
+
+## Instructions
+
+Generate exactly {{ count - existing_synonyms|length }} NEW synonyms that:
+1. Do NOT duplicate any existing synonyms
+2. Complement the existing synonyms with different nuances
+3. Capture the word's meaning with fresh perspectives
+{% else %}
 Generate {{ count }} relevant synonyms for the given word, balancing semantic accuracy with linguistic beauty. Provide both common and expressive alternatives.
 
 ## Input Word
@@ -9,7 +30,10 @@ Generate {{ count }} relevant synonyms for the given word, balancing semantic ac
 
 ## Instructions
 
-Generate exactly {{ count }} synonyms that capture the word's meaning. Create a balanced mix:
+Generate exactly {{ count }} synonyms that capture the word's meaning.
+{% endif %}
+
+Create a balanced mix:
 
 **Distribution (approximate):**
 - 40% Common English synonyms (everyday usage)

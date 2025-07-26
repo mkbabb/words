@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from ...ai import get_openai_connector
-from ...ai.synthesis_functions import synthesize_examples
+from ...ai.synthesis_functions import generate_examples
 from ...models import Definition, Example, Word
 from ..core import (
     FieldSelection,
@@ -238,7 +238,7 @@ async def generate_examples(
     ai = await get_openai_connector()
 
     # Generate examples
-    example_data_list = await synthesize_examples(
+    example_data_list = await generate_examples(
         definition,
         word.text,
         ai,

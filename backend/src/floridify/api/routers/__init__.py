@@ -1,7 +1,7 @@
 """API routers."""
 
 from . import (
-    atomic_updates,
+    ai,
     audio,
     batch,
     corpus,
@@ -12,12 +12,11 @@ from . import (
     lookup,
     search,
     suggestions,
-    synonyms,
     words,
 )
 
 __all__ = [
-    "atomic_updates",
+    "ai",
     "audio",
     "batch",
     "corpus",
@@ -28,6 +27,5 @@ __all__ = [
     "lookup",
     "search",
     "suggestions",
-    "synonyms",
     "words",
 ]
