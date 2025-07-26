@@ -809,7 +809,6 @@ async def enhance_definitions_parallel(
     components: set[str] | None = None,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
-    batch_mode: bool = False,
 ) -> None:
     """Enhance definitions with specified components in parallel.
 
@@ -931,42 +930,8 @@ async def enhance_definitions_parallel(
     if not tasks:
         return
 
-    # Enable batch mode if requested
-    if batch_mode and not ai.batch_mode:
-        ai.enable_batch_mode()
-        logger.info(f"Enabled batch mode for {len(tasks)} enhancement tasks")
-
     # Execute all tasks in parallel
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    
-    # If in batch mode, execute the batch and wait for results
-    if ai.batch_mode:
-        logger.info(f"Executing batch with {ai.batch_size} accumulated requests")
-        
-        # Execute the batch
-        batch_result = await ai.execute_batch(
-            wait_for_completion=True,
-            timeout_minutes=30
-        )
-        
-        if batch_result["status"] != "completed":
-            logger.error(f"Batch execution failed: {batch_result}")
-            # All promises will be resolved with errors by the batch executor
-        else:
-            logger.info(f"Batch completed successfully: {batch_result['resolved']} requests resolved")
-        
-        # The results list now contains resolved promises
-        # Convert them to actual values
-        resolved_results = []
-        for r in results:
-            if hasattr(r, '__await__'):  # It's a promise
-                try:
-                    resolved_results.append(await r)
-                except Exception as e:
-                    resolved_results.append(e)
-            else:
-                resolved_results.append(r)
-        results = resolved_results
 
     # Process results and update definitions
     successes = 0

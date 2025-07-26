@@ -46,7 +46,6 @@ class DefinitionSynthesizer:
         language: Language = Language.ENGLISH,
         force_refresh: bool = False,
         state_tracker: StateTracker | None = None,
-        batch_mode: bool = False,
     ) -> SynthesizedDictionaryEntry | None:
         """Synthesize a complete dictionary entry from provider data."""
 
@@ -157,7 +156,6 @@ class DefinitionSynthesizer:
             ai=self.ai,
             force_refresh=force_refresh,
             state_tracker=state_tracker,
-            batch_mode=batch_mode,
         )
 
         return entry
