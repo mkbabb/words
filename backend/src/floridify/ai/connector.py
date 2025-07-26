@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from ..caching.decorators import cached_api_call
 from ..models import Definition
 from ..utils.logging import get_logger, log_metrics
+from .batch_support import BatchAccumulator, BatchExecutor, BatchPromise
 from .models import (
     AnkiFillBlankResponse,
     AnkiMultipleChoiceResponse,
@@ -54,18 +55,20 @@ class OpenAIConnector:
         embedding_model: str = "text-embedding-3-small",
         temperature: float | None = None,
         max_tokens: int = 1000,
+        batch_mode: bool = False,
     ) -> None:
         self.client = AsyncOpenAI(api_key=api_key)
-
+        self.api_key = api_key
         self.model_name = model_name
-
         self.embedding_model = embedding_model
-
         self.temperature = temperature
-
         self.max_tokens = max_tokens
-
         self.template_manager = PromptTemplateManager()
+        
+        # Batch mode support
+        self.batch_mode = batch_mode
+        self.batch_accumulator = BatchAccumulator() if batch_mode else None
+        self.batch_executor = BatchExecutor(self.client) if batch_mode else None
 
     @cached_api_call(
         ttl_hours=24.0,  # Cache OpenAI responses for 24 hours
@@ -83,8 +86,35 @@ class OpenAIConnector:
         prompt: str,
         response_model: type[T],
         **kwargs: Any,
+    ) -> T | BatchPromise[T]:
+        """Make a structured request to OpenAI with caching.
+        
+        In batch mode, returns a BatchPromise that will be resolved later.
+        In immediate mode, returns the parsed response directly.
+        """
+        # In batch mode, accumulate the request
+        if self.batch_mode and self.batch_accumulator:
+            return self.batch_accumulator.add_request(
+                prompt=prompt,
+                response_model=response_model,
+                model=self.model_name,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                **kwargs
+            )
+        
+        # Otherwise, execute immediately
+        return await self._execute_structured_request(
+            prompt, response_model, **kwargs
+        )
+    
+    async def _execute_structured_request(
+        self,
+        prompt: str,
+        response_model: type[T],
+        **kwargs: Any,
     ) -> T:
-        """Make a structured request to OpenAI with caching."""
+        """Execute a structured request immediately."""
         start_time = time.perf_counter()
         retry_count = 0
         max_retries = 3
@@ -802,3 +832,65 @@ class OpenAIConnector:
         except Exception as e:
             logger.error(f"Word suggestion failed: {e}")
             raise
+    
+    async def execute_batch(
+        self,
+        wait_for_completion: bool = True,
+        timeout_minutes: int = 30
+    ) -> dict[str, Any]:
+        """Execute all accumulated batch requests.
+        
+        Args:
+            wait_for_completion: Whether to wait for batch completion
+            timeout_minutes: Maximum time to wait for completion
+            
+        Returns:
+            Dictionary with batch execution results
+        """
+        if not self.batch_mode:
+            raise RuntimeError("Batch mode is not enabled")
+        
+        if not self.batch_accumulator or not self.batch_executor:
+            raise RuntimeError("Batch components not initialized")
+        
+        if self.batch_accumulator.is_empty:
+            return {"status": "empty", "message": "No requests accumulated"}
+        
+        logger.info(f"Executing batch with {self.batch_accumulator.size} requests")
+        
+        # Execute the batch
+        result = await self.batch_executor.execute_batch(
+            self.batch_accumulator,
+            wait_for_completion=wait_for_completion,
+            timeout_minutes=timeout_minutes
+        )
+        
+        # Clear accumulator after execution
+        self.batch_accumulator.clear()
+        
+        return result
+    
+    @property
+    def batch_size(self) -> int:
+        """Get the current number of accumulated batch requests."""
+        if self.batch_accumulator:
+            return self.batch_accumulator.size
+        return 0
+    
+    def enable_batch_mode(self) -> None:
+        """Enable batch mode for accumulating requests."""
+        if not self.batch_mode:
+            self.batch_mode = True
+            self.batch_accumulator = BatchAccumulator()
+            self.batch_executor = BatchExecutor(self.client)
+            logger.info("Batch mode enabled")
+    
+    def disable_batch_mode(self) -> None:
+        """Disable batch mode and clear any accumulated requests."""
+        if self.batch_mode:
+            self.batch_mode = False
+            if self.batch_accumulator:
+                self.batch_accumulator.clear()
+            self.batch_accumulator = None
+            self.batch_executor = None
+            logger.info("Batch mode disabled")
