@@ -192,22 +192,6 @@
                         }}
                     </span>
                     
-                    <!-- Provider Source Icons -->
-                    <div v-if="usedProviders.length > 0" class="flex items-center gap-1">
-                        <div
-                            v-for="provider in usedProviders"
-                            :key="provider"
-                            :title="`Source: ${getProviderDisplayName(provider)}`"
-                            class="flex h-5 w-5 items-center justify-center rounded-full bg-background/80 border border-border/50 shadow-sm hover:bg-accent/50 transition-colors"
-                        >
-                            <component 
-                                :is="getProviderIcon(provider)" 
-                                :size="12" 
-                                class="text-muted-foreground"
-                            />
-                        </div>
-                    </div>
-                    
                     <Button
                         variant="ghost"
                         size="sm"
@@ -221,6 +205,62 @@
                                 : 'Phonetic'
                         }}
                     </Button>
+                    
+                    <!-- Provider Source Icons -->
+                    <HoverCard v-if="usedProviders.length > 0">
+                        <HoverCardTrigger as-child>
+                            <div class="relative flex items-center ml-3 h-7 cursor-pointer"
+                                :style="{ width: `${Math.min(usedProviders.length, 2) * 20 + (usedProviders.length > 2 ? 8 : 0)}px` }">
+                                <!-- First provider (always visible) -->
+                                <div class="absolute flex h-7 w-7 items-center justify-center rounded-full bg-background border border-border/50 shadow-sm"
+                                    :style="{ left: '0px', zIndex: 3 }">
+                                    <component 
+                                        :is="getProviderIcon(usedProviders[0])" 
+                                        :size="16" 
+                                        class="text-muted-foreground"
+                                    />
+                                </div>
+                                
+                                <!-- Second provider (if exists) -->
+                                <div v-if="usedProviders.length > 1" 
+                                    class="absolute flex h-7 w-7 items-center justify-center rounded-full bg-background border border-border/50 shadow-sm"
+                                    :style="{ left: '12px', zIndex: 2 }">
+                                    <component 
+                                        :is="getProviderIcon(usedProviders[1])" 
+                                        :size="16" 
+                                        class="text-muted-foreground"
+                                    />
+                                </div>
+                                
+                                <!-- Plus indicator for additional providers -->
+                                <div v-if="usedProviders.length > 2" 
+                                    class="absolute flex h-6 w-6 items-center justify-center rounded-full bg-muted border border-border shadow-sm"
+                                    :style="{ left: '24px', zIndex: 1 }">
+                                    <span class="text-xs font-medium text-muted-foreground">+{{ usedProviders.length - 2 }}</span>
+                                </div>
+                            </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent class="w-auto max-w-xs p-2" side="top" align="center">
+                            <div class="space-y-1">
+                                <p class="text-xs font-medium text-muted-foreground mb-2">Dictionary Sources</p>
+                                <a
+                                    v-for="provider in usedProviders"
+                                    :key="provider"
+                                    :href="getProviderSearchUrl(provider, entry.word)"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                                >
+                                    <component 
+                                        :is="getProviderIcon(provider)" 
+                                        :size="14" 
+                                        class="flex-shrink-0"
+                                    />
+                                    <span class="text-xs">{{ getProviderDisplayName(provider) }}</span>
+                                </a>
+                            </div>
+                        </HoverCardContent>
+                    </HoverCard>
                 </div>
             </CardHeader>
 
@@ -449,6 +489,7 @@ import { useAppStore } from '@/stores';
 import { cn, getHeatmapClass } from '@/utils';
 import { Button } from '@/components/ui';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { ThemedCard } from '@/components/custom/card';
 import { TypewriterText, HandwritingText, LatexFillText } from '@/components/custom/text-animations';
 import { ProgressiveSidebar } from '@/components/custom/navigation';
@@ -611,32 +652,21 @@ const usedProviders = computed((): string[] => {
     if (!entry.value?.definitions) return [];
     
     const providers = new Set<string>();
+    
+    // Check providers_data array for each definition
     entry.value.definitions.forEach((def) => {
-        if (def.source_attribution) {
-            // Extract provider name from source attribution
-            const provider = extractProviderFromAttribution(def.source_attribution);
-            if (provider) {
-                providers.add(provider);
-            }
+        if (def.providers_data && Array.isArray(def.providers_data)) {
+            def.providers_data.forEach((providerData: any) => {
+                if (providerData.provider) {
+                    providers.add(providerData.provider);
+                }
+            });
         }
     });
     
     return Array.from(providers);
 });
 
-// Helper function to extract provider from source attribution
-function extractProviderFromAttribution(attribution: string): string | null {
-    if (!attribution) return null;
-    
-    const lower = attribution.toLowerCase();
-    if (lower.includes('wiktionary')) return 'wiktionary';
-    if (lower.includes('oxford')) return 'oxford';
-    if (lower.includes('dictionary.com') || lower.includes('dictionary_com')) return 'dictionary_com';
-    if (lower.includes('apple') || lower.includes('apple_dictionary')) return 'apple_dictionary';
-    if (lower.includes('ai') || lower.includes('gpt')) return 'ai_fallback';
-    
-    return null;
-}
 
 // Helper function to get provider display name
 function getProviderDisplayName(provider: string): string {
@@ -661,6 +691,19 @@ function getProviderIcon(provider: string): any {
     };
     return icons[provider] || RefreshCw;
 }
+
+// Helper function to get provider search URL
+function getProviderSearchUrl(provider: string, word: string): string {
+    const urls: Record<string, string> = {
+        wiktionary: `https://en.wiktionary.org/wiki/${encodeURIComponent(word)}`,
+        oxford: `https://www.oxfordlearnersdictionaries.com/definition/english/${encodeURIComponent(word)}`,
+        dictionary_com: `https://www.dictionary.com/browse/${encodeURIComponent(word)}`,
+        apple_dictionary: `dict://${encodeURIComponent(word)}`, // macOS Dictionary app URL scheme
+        ai_fallback: '#', // No external URL for AI
+    };
+    return urls[provider] || '#';
+}
+
 
 // Check if sidebar should be shown (same logic as ProgressiveSidebar)
 const shouldShowSidebar = computed(() => {

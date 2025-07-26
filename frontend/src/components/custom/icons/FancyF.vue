@@ -3,22 +3,24 @@
     ref="fancyFButton"
     :class="[
       'inline-flex items-baseline gap-0 cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 rounded-lg p-0',
-      clickable ? 'hover-lift' : ''
+      clickable ? 'hover-lift' : '',
+      !clickable && mode === 'suggestions' ? 'relative overflow-hidden' : ''
     ]"
     :disabled="!clickable"
     @click="handleClick"
-    :title="clickable ? (mode === 'dictionary' ? 'Switch to thesaurus mode' : 'Switch to dictionary mode') : undefined"
+    :title="clickable ? getTooltipText() : undefined"
   >
     <LaTeX
       ref="fancyFMain"
       :expression="'\\mathfrak{F}'"
       :class="[
-        ' font-bold transition-all duration-300',
+        'font-bold transition-all duration-300',
         {
           'text-lg': size === 'sm',
           'text-2xl': size === 'base',
           'text-3xl': size === 'lg',
-          'text-4xl': size === 'xl'
+          'text-4xl': size === 'xl',
+          'shimmer-text bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-400 bg-clip-text': !clickable && mode === 'suggestions'
         }
       ]"
     />
@@ -35,14 +37,15 @@
     >
       <LaTeX
         ref="fancyFSubscript"
-        :expression="`_{\\text{${mode === 'dictionary' ? 'd' : 't'}}}`"
+        :expression="`_{\\text{${getModeSubscript()}}}`"
         :class="[
-          ' transition-all duration-300',
+          'transition-all duration-300',
           {
             'text-xs': size === 'sm',
             'text-base': size === 'base',
             'text-lg': size === 'lg',
-            'text-xl': size === 'xl'
+            'text-xl': size === 'xl',
+            'shimmer-text bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-400 bg-clip-text': !clickable && mode === 'suggestions'
           }
         ]"
       />
@@ -56,7 +59,7 @@ import { gsap } from 'gsap';
 import { LaTeX } from '@/components/custom/latex';
 
 interface FancyFProps {
-  mode: 'dictionary' | 'thesaurus';
+  mode: 'dictionary' | 'thesaurus' | 'suggestions';
   size?: 'sm' | 'base' | 'lg' | 'xl';
   clickable?: boolean;
 }
@@ -109,6 +112,26 @@ const handleClick = () => {
   
   // Emit the toggle event
   emit('toggle-mode');
+};
+
+// Helper function to get mode subscript
+const getModeSubscript = () => {
+  switch (props.mode) {
+    case 'dictionary': return 'd';
+    case 'thesaurus': return 't';
+    case 'suggestions': return 'w';
+    default: return 'd';
+  }
+};
+
+// Helper function to get tooltip text
+const getTooltipText = () => {
+  switch (props.mode) {
+    case 'dictionary': return 'Switch to thesaurus mode';
+    case 'thesaurus': return 'Switch to dictionary mode';
+    case 'suggestions': return 'AI-generated word suggestions';
+    default: return '';
+  }
 };
 
 // Continuous subtle breathing animation when not clicked

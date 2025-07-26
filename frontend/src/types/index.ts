@@ -90,6 +90,19 @@ export interface ThesaurusEntry {
   confidence?: number;
 }
 
+export interface WordSuggestion {
+  word: string;
+  confidence: number;
+  efflorescence: number;
+  reasoning: string;
+  example_usage?: string;
+}
+
+export interface WordSuggestionResponse {
+  suggestions: WordSuggestion[];
+  query_type: string;
+  original_query: string;
+}
 
 export interface ApiResponse<T> {
   data: T;

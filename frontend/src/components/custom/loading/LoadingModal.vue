@@ -2,7 +2,7 @@
     <Modal v-model="modelValue" :close-on-backdrop="allowDismiss">
         <div class="flex flex-col items-center space-y-6 px-4">
             <AnimatedText
-                :text="word"
+                :text="displayText || word || ''"
                 text-class="text-6xl lg:text-8xl font-black pb-8"
                 :offset="0.15"
                 :show-dots="progress < 100"
@@ -15,6 +15,8 @@
                 :interactive="allowDismiss"
                 :current-stage="currentStage"
                 :stage-message="currentStageText"
+                :checkpoints="progressCheckpoints"
+                :mode="mode"
                 @progress-change="$emit('progress-change', $event)"
             />
 
@@ -45,10 +47,12 @@ import { LoadingProgress } from '@/components/custom/loading';
 
 interface Props {
     modelValue: boolean;
-    word: string;
+    word?: string;
+    displayText?: string;
     progress: number;
     currentStage: string;
     allowDismiss?: boolean;
+    mode?: 'lookup' | 'suggestions';
 }
 
 interface Emits {
@@ -58,6 +62,7 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
     allowDismiss: false,
+    mode: 'lookup',
 });
 
 const emit = defineEmits<Emits>();
@@ -85,7 +90,7 @@ const currentStageText = computed(() => {
         return 'Initializing...';
     }
 
-    const stageMessages: Record<string, string> = {
+    const lookupStageMessages: Record<string, string> = {
         // Main pipeline stages (uppercase from backend)
         START: 'Initializing lookup pipeline...',
         SEARCH_START: 'Beginning word search...',
@@ -98,18 +103,34 @@ const currentStageText = computed(() => {
         STORAGE_SAVE: 'Saving to knowledge base...',
         COMPLETE: 'Lookup complete!',
         complete: 'Lookup complete!', // Handle both cases
-        
-        // Provider-specific HTTP stages
-        PROVIDER_FETCH_HTTP_CONNECTING: 'Connecting to dictionary APIs...',
-        PROVIDER_FETCH_HTTP_DOWNLOADING: 'Downloading dictionary data...',
-        PROVIDER_FETCH_HTTP_RATE_LIMITED: 'Rate limited - waiting...',
-        PROVIDER_FETCH_HTTP_PARSING: 'Parsing provider responses...',
-        PROVIDER_FETCH_HTTP_COMPLETE: 'Provider fetch complete...',
-        PROVIDER_FETCH_ERROR: 'Provider error - retrying...',
-        
-        // Error state
-        error: 'An error occurred',
     };
+
+    const suggestionStageMessages: Record<string, string> = {
+        // AI suggestion stages
+        START: 'Understanding your query...',
+        QUERY_VALIDATION: 'Validating query intent...',
+        WORD_GENERATION: 'Generating word suggestions...',
+        SCORING: 'Evaluating word relevance...',
+        COMPLETE: 'Suggestions ready!',
+    };
+
+    // Add provider-specific stages to lookup messages
+    if (props.mode === 'lookup') {
+        Object.assign(lookupStageMessages, {
+            // Provider-specific HTTP stages
+            PROVIDER_FETCH_HTTP_CONNECTING: 'Connecting to dictionary APIs...',
+            PROVIDER_FETCH_HTTP_DOWNLOADING: 'Downloading dictionary data...',
+            PROVIDER_FETCH_HTTP_RATE_LIMITED: 'Rate limited - waiting...',
+            PROVIDER_FETCH_HTTP_PARSING: 'Parsing provider responses...',
+            PROVIDER_FETCH_HTTP_COMPLETE: 'Provider fetch complete...',
+            PROVIDER_FETCH_ERROR: 'Provider error - retrying...',
+            
+            // Error state
+            error: 'An error occurred',
+        });
+    }
+
+    const stageMessages = props.mode === 'suggestions' ? suggestionStageMessages : lookupStageMessages;
 
     // Return the mapped message if available, otherwise use the stage itself as a readable message
     const mappedMessage = stageMessages[props.currentStage];
@@ -134,7 +155,7 @@ const progressTextClass = computed(() => ({
 
 // Computed property for stage description
 const stageDescription = computed(() => {
-    const stageDescriptions: Record<string, string> = {
+    const lookupDescriptions: Record<string, string> = {
         // Main pipeline stages
         START: 'Setting up search engines, AI models, and database connections.',
         SEARCH_START: 'Searching exact matches, fuzzy matches, and semantic similarities.',
@@ -159,6 +180,17 @@ const stageDescription = computed(() => {
         // Error state
         error: 'Something went wrong. Please try again.',
     };
+
+    const suggestionDescriptions: Record<string, string> = {
+        // AI suggestion stages
+        START: 'Analyzing your descriptive query for semantic meaning.',
+        QUERY_VALIDATION: 'Ensuring your query seeks word suggestions.',
+        WORD_GENERATION: 'AI is finding the perfect words to match your description.',
+        SCORING: 'Ranking words by relevance and aesthetic quality.',
+        COMPLETE: 'Your curated word suggestions are ready!',
+    };
+    
+    const stageDescriptions = props.mode === 'suggestions' ? suggestionDescriptions : lookupDescriptions;
     
     return stageDescriptions[props.currentStage] || 'Processing your request...';
 });
@@ -167,6 +199,32 @@ const stageDescription = computed(() => {
 const modelValue = computed({
     get: () => props.modelValue,
     set: (value) => emit('update:modelValue', value),
+});
+
+// Define different checkpoints for lookup vs suggestions
+const progressCheckpoints = computed(() => {
+    if (props.mode === 'suggestions') {
+        return [
+            { progress: 5, label: 'Start' },
+            { progress: 20, label: 'Query Validation' },
+            { progress: 40, label: 'Word Generation' },
+            { progress: 80, label: 'Scoring' },
+            { progress: 100, label: 'Complete' },
+        ];
+    } else {
+        // Default lookup checkpoints
+        return [
+            { progress: 5, label: 'Start' },
+            { progress: 10, label: 'Search Start' },
+            { progress: 20, label: 'Search Complete' },
+            { progress: 25, label: 'Provider Fetch' },
+            { progress: 60, label: 'Providers Complete' },
+            { progress: 70, label: 'AI Clustering' },
+            { progress: 85, label: 'AI Synthesis' },
+            { progress: 95, label: 'Storage' },
+            { progress: 100, label: 'Complete' },
+        ];
+    }
 });
 </script>
 

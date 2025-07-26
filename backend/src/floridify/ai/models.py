@@ -199,6 +199,43 @@ class CollocationResponse(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
 
 
+class WordSuggestion(BaseModel):
+    """A word suggestion based on descriptive query."""
+
+    word: str = Field(description="The suggested word")
+    confidence: float = Field(
+        ge=0.0, le=1.0, description="Semantic match confidence"
+    )
+    efflorescence: float = Field(
+        ge=0.0, le=1.0, description="Beauty and memorability score"
+    )
+    reasoning: str = Field(
+        description="Why this word fits the query"
+    )
+    example_usage: str | None = Field(
+        None, description="Example sentence with word in context"
+    )
+
+
+class WordSuggestionResponse(BaseModel):
+    """Response for AI word suggestions from descriptive queries."""
+
+    suggestions: list[WordSuggestion] = Field(
+        description="Words matching the description, ranked by confidence then efflorescence"
+    )
+    query_type: str = Field(
+        description="Type of query (descriptive, fill-in-blank, characteristic-based)"
+    )
+    original_query: str = Field(description="The original user query")
+
+
+class QueryValidationResponse(BaseModel):
+    """Response for query validation."""
+
+    is_valid: bool = Field(description="Whether query seeks word suggestions")
+    reason: str = Field(description="Explanation of validation decision")
+
+
 class GrammarPatternResponse(BaseModel):
     """Response for grammar pattern extraction."""
 

@@ -15,7 +15,7 @@
                 @click="handleProgressBarInteraction"
             >
                 <div
-                    class="h-full rounded-full transition-all duration-500
+                    class="h-full rounded-full transition-[width] duration-300
                         ease-out"
                     :style="{
                         width: `${normalizedProgress}%`,
@@ -148,6 +148,7 @@ interface Props {
     interactive?: boolean;
     currentStage?: string;
     stageMessage?: string;
+    mode?: 'lookup' | 'suggestions';
 }
 
 // Ensure progress is a number
@@ -203,18 +204,30 @@ const rainbowGradient = computed(() => generateRainbowGradient(8));
 
 // Get descriptive text for checkpoint stages
 const getCheckpointDescription = (progress: number): string => {
-    const descriptions: Record<number, string> = {
-        5: 'Pipeline initialization and setup. Preparing search engines and AI processing systems.',
-        10: 'Beginning multi-method word search through dictionary indices and semantic databases.',
-        20: 'Search complete. Found best matching word across all available sources.',
-        25: 'Starting parallel fetches from dictionary providers (Wiktionary, Oxford, Dictionary.com).',
-        60: 'All provider data collected. Ready for AI processing and synthesis.',
-        70: 'AI analyzing and clustering definitions by semantic meaning to reduce redundancy.',
-        85: 'AI synthesizing comprehensive definitions from clustered meanings and generating examples.',
-        95: 'Saving processed entry to knowledge base and updating search indices for future lookups.',
-        100: 'Pipeline complete! Ready to display comprehensive word information with examples, synonyms, and pronunciation.',
-    };
-    return descriptions[progress] || 'Processing pipeline stage...';
+    if (props.mode === 'suggestions') {
+        const suggestionDescriptions: Record<number, string> = {
+            5: 'Initializing AI language models and preparing to analyze your descriptive query.',
+            20: 'Validating that your query is seeking word suggestions based on meaning or description.',
+            40: 'AI is creatively generating words that match your description, considering nuance and context.',
+            80: 'Evaluating and ranking suggestions by relevance, aesthetic quality, and semantic accuracy.',
+            100: 'Your curated word suggestions are ready! Each word includes confidence and efflorescence scores.',
+        };
+        return suggestionDescriptions[progress] || 'Processing your word suggestion request...';
+    } else {
+        // Default lookup descriptions
+        const lookupDescriptions: Record<number, string> = {
+            5: 'Pipeline initialization and setup. Preparing search engines and AI processing systems.',
+            10: 'Beginning multi-method word search through dictionary indices and semantic databases.',
+            20: 'Search complete. Found best matching word across all available sources.',
+            25: 'Starting parallel fetches from dictionary providers (Wiktionary, Oxford, Dictionary.com).',
+            60: 'All provider data collected. Ready for AI processing and synthesis.',
+            70: 'AI analyzing and clustering definitions by semantic meaning to reduce redundancy.',
+            85: 'AI synthesizing comprehensive definitions from clustered meanings and generating examples.',
+            95: 'Saving processed entry to knowledge base and updating search indices for future lookups.',
+            100: 'Pipeline complete! Ready to display comprehensive word information with examples, synonyms, and pronunciation.',
+        };
+        return lookupDescriptions[progress] || 'Processing pipeline stage...';
+    }
 };
 
 // Check if a checkpoint is currently active

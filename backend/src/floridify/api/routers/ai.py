@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from ...ai.constants import SynthesisComponent
@@ -567,6 +568,152 @@ async def detect_regional_variants(
     result = await connector.assess_regional_variants(request.definition)
     
     return result.model_dump()
+
+
+# New Word Suggestion Endpoints
+
+class QueryValidationRequest(BaseModel):
+    """Request for query validation."""
+    query: str = Field(..., min_length=1, max_length=200)
+
+
+class WordSuggestionRequest(BaseModel):
+    """Request for word suggestions from descriptive query."""
+    query: str = Field(..., min_length=1, max_length=200)
+    count: int = Field(10, ge=1, le=25)
+
+
+@router.post("/validate-query")
+async def validate_query(
+    request: QueryValidationRequest,
+    api_request: Request,
+) -> dict[str, Any]:
+    """Validate if query seeks word suggestions."""
+    client_key = get_client_key(api_request)
+    allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=100)
+    
+    if not allowed:
+        raise HTTPException(429, "AI rate limit exceeded", headers=headers)
+    
+    connector = get_openai_connector()
+    result = await connector.validate_query(request.query)
+    
+    return result.model_dump()
+
+
+@router.post("/suggest-words")
+async def suggest_words(
+    request: WordSuggestionRequest,
+    api_request: Request,
+) -> dict[str, Any]:
+    """Generate word suggestions from descriptive query."""
+    client_key = get_client_key(api_request)
+    allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=500)
+    
+    if not allowed:
+        raise HTTPException(429, "AI rate limit exceeded", headers=headers)
+    
+    # First validate the query
+    connector = get_openai_connector()
+    validation = await connector.validate_query(request.query)
+    
+    if not validation.is_valid:
+        raise HTTPException(400, f"Invalid query: {validation.reason}")
+    
+    # Generate suggestions
+    result = await connector.suggest_words(request.query, request.count)
+    
+    return result.model_dump()
+
+
+@router.get("/suggest-words/stream")
+async def suggest_words_stream(
+    query: str,
+    count: int = 12,
+    api_request: Request = None,
+) -> StreamingResponse:
+    """Generate word suggestions with streaming progress updates."""
+    from ...core.state_tracker import StateTracker
+    import asyncio
+    import json
+    
+    # Validate count parameter
+    if count < 1 or count > 25:
+        raise HTTPException(400, "Count must be between 1 and 25")
+    
+    client_key = get_client_key(api_request)
+    allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=500)
+    
+    if not allowed:
+        raise HTTPException(429, "AI rate limit exceeded", headers=headers)
+    
+    # Create state tracker for suggestions
+    state_tracker = StateTracker()
+    
+    async def generate_suggestion_events():
+        """Generate SSE events for suggestion pipeline."""
+        async with state_tracker.subscribe() as subscriber_queue:
+            
+            async def run_suggestion_pipeline():
+                """Run the suggestion pipeline with state tracking."""
+                try:
+                    await state_tracker.update_stage("START", progress=5)
+                    
+                    # Validate query
+                    await state_tracker.update_stage("QUERY_VALIDATION", progress=20)
+                    connector = get_openai_connector()
+                    validation = await connector.validate_query(query)
+                    
+                    if not validation.is_valid:
+                        await state_tracker.update_error(f"Invalid query: {validation.reason}")
+                        return
+                    
+                    # Generate words
+                    await state_tracker.update_stage("WORD_GENERATION", progress=40)
+                    # The connector will extract count from query if present
+                    result = await connector.suggest_words(query, count)
+                    
+                    # Score and rank
+                    await state_tracker.update_stage("SCORING", progress=80)
+                    
+                    # Complete - Only send one update with the result
+                    await state_tracker.update(
+                        stage="COMPLETE",
+                        progress=100,
+                        message="Suggestions generated",
+                        details=result.model_dump(),
+                        is_complete=True
+                    )
+                    
+                except Exception as e:
+                    await state_tracker.update_error(str(e))
+            
+            # Start pipeline in background
+            asyncio.create_task(run_suggestion_pipeline())
+            
+            # Stream state updates from the queue
+            try:
+                while True:
+                    state = await subscriber_queue.get()
+                    if state.is_complete:
+                        if state.error:
+                            yield f"event: error\ndata: {json.dumps({'error': state.error})}\n\n"
+                        else:
+                            yield f"event: complete\ndata: {json.dumps(state.details)}\n\n"
+                        break
+                    else:
+                        yield f"event: progress\ndata: {json.dumps(state.model_dump_optimized())}\n\n"
+            except asyncio.CancelledError:
+                pass
+    
+    return StreamingResponse(
+        generate_suggestion_events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 # Synthesize Endpoint

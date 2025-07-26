@@ -170,6 +170,10 @@ const config: Config = {
           '70%': { transform: 'scale(1.02)' },
           '100%': { transform: 'scale(1)' },
         },
+        'spin-slow': {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -190,6 +194,7 @@ const config: Config = {
         'scroll-shrink': 'scroll-shrink 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
         'icon-fade': 'icon-fade 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         'elastic-bounce': 'elastic-bounce 0.6s cubic-bezier(0.25, 0.1, 0.25, 1)',
+        'spin-slow': 'spin-slow 3s linear infinite',
       },
       transitionTimingFunction: {
         'out-expo': 'cubic-bezier(0.19, 1, 0.22, 1)',

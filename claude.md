@@ -25,8 +25,9 @@
 
 ## Development Environment
 
-**Server Management**: `./dev.sh` orchestrates concurrent frontend/backend development
-**Assumption**: Frontend (localhost:3000) and backend (localhost:8000) servers are running continuously
+**Server Management**: `./scripts/dev` orchestrates Docker-based development environment
+**Docker Containers**: Both frontend (localhost:3000) and backend (localhost:8000) run in Docker containers
+**Assumption**: Frontend and backend servers are running continuously via Docker
 **Restart Policy**: Never restart servers unless explicitly specified
 **Monitoring**: Listen to port activity for logging and status information
 **Browser Integration**: Leverage browserMCP for frontend state, logging, and debugging
@@ -56,7 +57,12 @@
 - Backend: `cd backend && uv venv && source .venv/bin/activate && uv sync`
 - Frontend: `cd frontend && npm install`
 
-**Development**: `./dev.sh` (runs both servers concurrently)
+**Development**: 
+- Docker mode (recommended): `./scripts/dev` (runs both servers in Docker containers)
+- Native mode: `./scripts/dev --native` (runs servers directly without Docker)
+- With logs: `./scripts/dev --logs` (starts containers and follows logs)
+- Rebuild images: `./scripts/dev --build` (rebuilds Docker images)
+
 **Testing**: Backend pytest, frontend Vitest
 **Quality**: MyPy + Ruff (backend), TypeScript + Prettier (frontend)
 

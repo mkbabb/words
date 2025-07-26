@@ -27,6 +27,7 @@ from .models import (
     FrequencyBandResponse,
     GrammarPatternResponse,
     PronunciationResponse,
+    QueryValidationResponse,
     RegionalVariantResponse,
     RegisterClassificationResponse,
     SuggestionsResponse,
@@ -34,6 +35,7 @@ from .models import (
     SynthesisResponse,
     UsageNoteResponse,
     WordFormResponse,
+    WordSuggestionResponse,
 )
 from .templates import PromptTemplateManager
 
@@ -750,4 +752,53 @@ class OpenAIConnector:
             return result
         except Exception as e:
             logger.error(f"Regional variant detection failed: {e}")
+            raise
+
+    async def validate_query(
+        self,
+        query: str,
+    ) -> QueryValidationResponse:
+        """Validate if query seeks word suggestions.
+
+        Args:
+            query: User's search query
+
+        Returns:
+            QueryValidationResponse with validation result
+        """
+        prompt = self.template_manager.get_query_validation_prompt(query=query)
+
+        try:
+            result = await self._make_structured_request(prompt, QueryValidationResponse)
+            logger.info(f"Query validation: {result.is_valid} - {result.reason}")
+            return result
+        except Exception as e:
+            logger.error(f"Query validation failed: {e}")
+            raise
+
+    async def suggest_words(
+        self,
+        query: str,
+        count: int = 10,
+    ) -> WordSuggestionResponse:
+        """Generate word suggestions from descriptive query.
+
+        Args:
+            query: Descriptive query for word suggestions
+            count: Number of suggestions to generate
+
+        Returns:
+            WordSuggestionResponse with ranked suggestions
+        """
+        prompt = self.template_manager.get_word_suggestion_prompt(
+            query=query,
+            count=count,
+        )
+
+        try:
+            result = await self._make_structured_request(prompt, WordSuggestionResponse)
+            logger.info(f"Generated {len(result.suggestions)} word suggestions")
+            return result
+        except Exception as e:
+            logger.error(f"Word suggestion failed: {e}")
             raise

@@ -15,6 +15,7 @@ import type {
   ThesaurusEntry,
   VocabularySuggestionsResponse,
   SimpleExample,
+  WordSuggestionResponse,
 } from '@/types';
 
 // API versioning configuration
@@ -370,6 +371,72 @@ export const dictionaryApi = {
       count: count || 2,
     });
     return response.data;
+  },
+
+  // Get AI word suggestions from descriptive query
+  async getAISuggestions(query: string, count: number = 12): Promise<WordSuggestionResponse> {
+    // Cap count at 25 (backend limit)
+    const cappedCount = Math.min(Math.max(count, 1), 25);
+    const response = await api.post('/ai/suggest-words', {
+      query,
+      count: cappedCount
+    });
+    return response.data;
+  },
+
+  // Get AI word suggestions with streaming progress
+  async getAISuggestionsStream(
+    query: string,
+    count: number = 12,
+    onProgress?: (stage: string, progress: number, message?: string) => void
+  ): Promise<WordSuggestionResponse> {
+    return new Promise((resolve, reject) => {
+      // Cap count at 25 (backend limit)
+      const cappedCount = Math.min(Math.max(count, 1), 25);
+      const params = new URLSearchParams({
+        query: query,
+        count: cappedCount.toString()
+      });
+      
+      const eventSource = new EventSource(
+        `${API_BASE_URL}/ai/suggest-words/stream?${params.toString()}`
+      );
+
+      // Handle progress events
+      eventSource.addEventListener('progress', (event) => {
+        const data = JSON.parse(event.data);
+        if (onProgress) {
+          onProgress(data.stage, data.progress, data.message);
+        }
+      });
+
+      // Handle completion
+      eventSource.addEventListener('complete', (event) => {
+        const data = JSON.parse(event.data);
+        eventSource.close();
+        resolve(data as WordSuggestionResponse);
+      });
+
+      // Handle errors
+      eventSource.addEventListener('error', (event: any) => {
+        if (event.data) {
+          const data = JSON.parse(event.data);
+          eventSource.close();
+          reject(new Error(data.error || 'Unknown error'));
+        } else {
+          eventSource.close();
+          reject(new Error('Connection error'));
+        }
+      });
+
+      // Connection timeout
+      setTimeout(() => {
+        if (eventSource.readyState === EventSource.CONNECTING) {
+          eventSource.close();
+          reject(new Error('Connection timeout'));
+        }
+      }, 5000);
+    });
   },
 
   // Health check

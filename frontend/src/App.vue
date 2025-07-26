@@ -5,12 +5,24 @@
         :style="appStyles"
     >
         <router-view />
+        <Toaster 
+            :theme="isDark ? 'dark' : 'light'"
+            position="top-right"
+            :toastOptions="{
+                style: {
+                    background: 'var(--color-background)',
+                    color: 'var(--color-foreground)',
+                    border: '1px solid var(--color-border)',
+                }
+            }"
+        />
     </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
 import { isDark } from '@/components/custom/dark-mode-toggle';
+import { Toaster } from 'vue-sonner';
 
 // Add subtle paper texture to main background - simplified approach
 

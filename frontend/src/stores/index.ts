@@ -9,6 +9,7 @@ import type {
     SearchResult,
     ThesaurusEntry,
     VocabularySuggestion,
+    WordSuggestionResponse,
 } from '@/types';
 import { dictionaryApi } from '@/utils/api';
 import { generateId, normalizeWord } from '@/utils';
@@ -21,24 +22,23 @@ export const useAppStore = defineStore('app', () => {
     const loadingProgress = ref(0);
     const loadingStage = ref('');
     const forceRefreshMode = ref(false);
+    const wordSuggestions = ref<WordSuggestionResponse | null>(null);
+    const isSuggestingWords = ref(false);
+    const suggestionsProgress = ref(0);
+    const suggestionsStage = ref('');
 
     // Persisted UI State with validation
     const uiState = useStorage(
         'ui-state',
         {
-            mode: 'dictionary' as const,
+            mode: 'dictionary' as 'dictionary' | 'thesaurus' | 'suggestions',
             pronunciationMode: 'phonetic' as const,
             sidebarOpen: false,
             sidebarCollapsed: true,
             selectedCardVariant: 'default' as const,
             // Enhanced SearchBar state
             searchMode: 'lookup' as const,
-            selectedSources: [
-                'wiktionary',
-                'oxford',
-                'dictionary_com',
-                'apple_dictionary',
-            ] as string[],
+            selectedSources: ['wiktionary'] as string[],
             selectedLanguages: ['en'] as string[],
             showControls: false,
             selectedWordlist: null as string | null,
@@ -67,11 +67,7 @@ export const useAppStore = defineStore('app', () => {
                         }
                         // Validate selected sources
                         if (!Array.isArray(parsed.selectedSources)) {
-                            parsed.selectedSources = [
-                                'wiktionary',
-                                'oxford',
-                                'dictionary_com',
-                            ];
+                            parsed.selectedSources = ['wiktionary'];
                         }
                         // Validate selected languages
                         if (!Array.isArray(parsed.selectedLanguages)) {
@@ -86,11 +82,7 @@ export const useAppStore = defineStore('app', () => {
                             sidebarCollapsed: true,
                             selectedCardVariant: 'default',
                             searchMode: 'lookup',
-                            selectedSources: [
-                                'wiktionary',
-                                'oxford',
-                                'dictionary_com',
-                            ],
+                            selectedSources: ['wiktionary'],
                             selectedLanguages: ['en'],
                             showControls: false,
                             selectedWordlist: null,
@@ -111,6 +103,8 @@ export const useAppStore = defineStore('app', () => {
         currentWord: null as string | null,
         currentEntry: null as SynthesizedDictionaryEntry | null,
         currentThesaurus: null as ThesaurusEntry | null,
+        isAIQuery: false,
+        aiQueryText: '',
     });
 
     // Create refs that sync with persisted state
@@ -371,28 +365,8 @@ export const useAppStore = defineStore('app', () => {
                         `Stage: ${stage}, Progress: ${progress}%, Message: ${message}`
                     );
 
-                    // Smooth progress interpolation
-                    const currentProgress = loadingProgress.value;
-                    const targetProgress = progress;
-                    
-                    // If progress is going backwards or jumping too far, set it directly
-                    if (targetProgress < currentProgress || targetProgress - currentProgress > 30) {
-                        loadingProgress.value = targetProgress;
-                    } else if (targetProgress > currentProgress) {
-                        // Animate progress smoothly
-                        const steps = Math.ceil((targetProgress - currentProgress) / 2);
-                        let step = 0;
-                        const interval = setInterval(() => {
-                            step++;
-                            loadingProgress.value = Math.min(
-                                currentProgress + (step * 2),
-                                targetProgress
-                            );
-                            if (loadingProgress.value >= targetProgress) {
-                                clearInterval(interval);
-                            }
-                        }, 50); // Update every 50ms for smooth animation
-                    }
+                    // Simple linear progress update
+                    loadingProgress.value = progress;
 
                     loadingStage.value = stage;
 
@@ -418,21 +392,16 @@ export const useAppStore = defineStore('app', () => {
             if (word !== suggestionsCache.value.lastWord) {
                 refreshVocabularySuggestions();
             }
-
-            loadingProgress.value = 70;
-            loadingStage.value = 'Finalizing...';
+            
+            // Auto-switch from suggestions mode to dictionary mode after successful lookup
+            if (mode.value === 'suggestions') {
+                mode.value = 'dictionary';
+            }
 
             // Also get thesaurus data
             if (mode.value === 'thesaurus') {
-                loadingStage.value = 'Loading synonyms...';
                 await getThesaurusData(word);
             }
-
-            loadingProgress.value = 100;
-            setTimeout(() => {
-                loadingProgress.value = 0;
-                loadingStage.value = '';
-            }, 300);
 
             // Reset force refresh mode after successful lookup
             if (shouldForceRefresh && forceRefreshMode.value) {
@@ -444,15 +413,49 @@ export const useAppStore = defineStore('app', () => {
             loadingStage.value = '';
         } finally {
             isSearching.value = false;
+            // Reset progress after a delay to show completion
+            setTimeout(() => {
+                loadingProgress.value = 0;
+                loadingStage.value = '';
+            }, 1000);
         }
     }
 
     async function getThesaurusData(word: string) {
         try {
-            const thesaurus = await dictionaryApi.getSynonyms(word);
-            currentThesaurus.value = thesaurus;
+            // If we already have the current entry, use its synonyms directly
+            if (currentEntry.value && currentEntry.value.word === word) {
+                const synonymsList: Array<{ word: string; score: number }> = [];
+                
+                // Collect synonyms from all definitions
+                currentEntry.value.definitions?.forEach((def) => {
+                    if (def.synonyms && Array.isArray(def.synonyms)) {
+                        def.synonyms.forEach((syn: string) => {
+                            // Avoid duplicates
+                            if (!synonymsList.some(s => s.word === syn)) {
+                                synonymsList.push({ word: syn, score: 0.8 });
+                            }
+                        });
+                    }
+                });
+                
+                currentThesaurus.value = {
+                    word: word,
+                    synonyms: synonymsList,
+                    confidence: 0.9
+                };
+            } else {
+                // Fallback to API call if we don't have the entry
+                const thesaurus = await dictionaryApi.getSynonyms(word);
+                currentThesaurus.value = thesaurus;
+            }
         } catch (error) {
             console.error('Thesaurus error:', error);
+            currentThesaurus.value = {
+                word: word,
+                synonyms: [],
+                confidence: 0
+            };
         }
     }
 
@@ -587,13 +590,23 @@ export const useAppStore = defineStore('app', () => {
     }
 
     function toggleMode() {
+        // If in suggestions mode, check if we have a last looked up word
+        if (mode.value === 'suggestions') {
+            // Only allow switching if we have a current entry (last looked up word)
+            if (currentEntry.value) {
+                mode.value = 'dictionary';
+                // The current entry already contains the last looked up word
+            }
+            // If no current entry, do nothing - can't switch modes
+            return;
+        }
+        
+        // Normal toggle between dictionary and thesaurus
         mode.value = mode.value === 'dictionary' ? 'thesaurus' : 'dictionary';
 
         // If we have a current word, fetch appropriate data
-        if (currentEntry.value) {
-            if (mode.value === 'thesaurus') {
-                getThesaurusData(currentEntry.value.word);
-            }
+        if (currentEntry.value && mode.value === 'thesaurus') {
+            getThesaurusData(currentEntry.value.word);
         }
     }
 
@@ -725,6 +738,48 @@ export const useAppStore = defineStore('app', () => {
     // Call initialization when store is created
     initializeVocabularySuggestions();
 
+    // Get AI word suggestions for descriptive queries
+    async function getAISuggestions(query: string, count: number = 12): Promise<WordSuggestionResponse | null> {
+        try {
+            isSuggestingWords.value = true;
+            suggestionsProgress.value = 0;
+            suggestionsStage.value = 'START';
+
+            // Use streaming API for real-time progress updates
+            const response = await dictionaryApi.getAISuggestionsStream(
+                query,
+                count,
+                (stage, progress, message) => {
+                    // Update progress and stage in real-time
+                    suggestionsStage.value = stage;
+                    suggestionsProgress.value = progress;
+                    
+                    // Log progress for debugging
+                    console.log(`AI Suggestions - Stage: ${stage}, Progress: ${progress}%, Message: ${message || ''}`);
+                }
+            );
+            
+            wordSuggestions.value = response;
+            
+            // Don't manually set progress - let the streaming handle it
+            
+            return response;
+        } catch (error) {
+            console.error('AI suggestions error:', error);
+            wordSuggestions.value = null;
+            suggestionsProgress.value = 0;
+            suggestionsStage.value = '';
+            throw error;
+        } finally {
+            isSuggestingWords.value = false;
+            // Reset progress after a delay to show completion
+            setTimeout(() => {
+                suggestionsProgress.value = 0;
+                suggestionsStage.value = '';
+            }, 1000);
+        }
+    }
+
     // Test function to manually update progress
     function testProgressUpdate() {
         console.log('Testing progress updates...');
@@ -775,6 +830,10 @@ export const useAppStore = defineStore('app', () => {
         forceRefreshMode,
         searchSelectedIndex,
         sessionState,
+        wordSuggestions,
+        isSuggestingWords,
+        suggestionsProgress,
+        suggestionsStage,
         // Enhanced SearchBar state
         searchMode,
         selectedSources,
@@ -815,5 +874,7 @@ export const useAppStore = defineStore('app', () => {
         // Regeneration functions
         regenerateExamples,
         regenerateAllExamples,
+        // AI functions
+        getAISuggestions,
     };
 });

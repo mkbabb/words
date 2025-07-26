@@ -38,7 +38,7 @@
                     leave-to-class="opacity-0 scale-95 -translate-x-8 -rotate-1"
                 >
                     <!-- Definition Content -->
-                    <div v-if="store.searchMode === 'lookup'" key="lookup">
+                    <div v-if="store.searchMode === 'lookup' && store.mode !== 'suggestions'" key="lookup">
                         <!-- Loading State -->
                         <div v-if="isSearching" class="space-y-8">
                             <DefinitionSkeleton />
@@ -52,6 +52,13 @@
                         <!-- Empty State -->
                         <div v-else class="py-16 text-center">
                             <!-- Empty state - no text -->
+                        </div>
+                    </div>
+
+                    <!-- Word Suggestions Content -->
+                    <div v-else-if="store.mode === 'suggestions'" key="suggestions">
+                        <div class="space-y-8">
+                            <WordSuggestionDisplay />
                         </div>
                     </div>
 
@@ -81,12 +88,22 @@
         </div>
     </div>
 
-    <!-- Loading Modal -->
+    <!-- Loading Modal for Lookup -->
     <LoadingModal
         v-model="isSearching"
         :word="store.searchQuery || 'searching'"
         :progress="store.loadingProgress"
         :current-stage="store.loadingStage"
+        mode="lookup"
+    />
+    
+    <!-- Loading Modal for AI Suggestions -->
+    <LoadingModal
+        v-model="store.isSuggestingWords"
+        :display-text="'Efflorescing'"
+        :progress="store.suggestionsProgress"
+        :current-stage="store.suggestionsStage"
+        mode="suggestions"
     />
 </template>
 
@@ -96,7 +113,7 @@ import { useAppStore } from '@/stores';
 import { useScroll } from '@vueuse/core';
 import { cn } from '@/utils';
 import { SearchBar } from '@/components/custom/search';
-import { DefinitionDisplay } from '@/components/custom/definition';
+import { DefinitionDisplay, WordSuggestionDisplay } from '@/components/custom/definition';
 import { DefinitionSkeleton } from '@/components/custom/definition';
 import { Sidebar } from '@/components/custom';
 import { LoadingModal } from '@/components/custom/loading';

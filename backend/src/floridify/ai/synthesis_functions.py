@@ -31,6 +31,7 @@ from ..utils.logging import get_logger
 from .constants import SynthesisComponent
 from .connector import OpenAIConnector
 from .constants import DEFAULT_ANTONYM_COUNT, DEFAULT_EXAMPLE_COUNT, DEFAULT_SYNONYM_COUNT
+from .models import QueryValidationResponse, WordSuggestionResponse
 
 logger = get_logger(__name__)
 
@@ -1114,3 +1115,20 @@ async def enhance_synthesized_entry(
         await state_tracker.update(
             stage=Stages.AI_SYNTHESIS, progress=100, message="Enhancement complete"
         )
+
+
+async def validate_query(
+    query: str,
+    ai: OpenAIConnector,
+) -> QueryValidationResponse:
+    """Validate if a query is seeking word suggestions."""
+    return await ai.validate_query(query)
+
+
+async def suggest_words(
+    query: str,
+    ai: OpenAIConnector,
+    count: int = 10,
+) -> WordSuggestionResponse:
+    """Generate word suggestions based on descriptive query."""
+    return await ai.suggest_words(query, count=count)

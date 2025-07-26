@@ -17,15 +17,49 @@
             <div
                 ref="searchBarElement"
                 :class="[
-                    'search-bar flex h-16 items-center gap-2 p-1',
+                    'search-bar flex items-center gap-2 p-1',
                     'border-2 border-border bg-background/20 backdrop-blur-3xl',
-                    'cartoon-shadow-sm rounded-2xl transition-all duration-200 ease-out',
+                    'cartoon-shadow-sm rounded-2xl transition-all duration-500 ease-out',
                     {
                         'cartoon-shadow-sm-hover': isContainerHovered,
                         'bg-background/30': isContainerHovered,
+                        'bg-gradient-to-br from-yellow-50/20 to-amber-50/20 dark:from-yellow-900/10 dark:to-amber-900/10': isAIQuery && !showErrorAnimation.value,
+                        'border-yellow-400/30 dark:border-yellow-600/30': isAIQuery && !showErrorAnimation.value,
+                        'shake-error': showErrorAnimation.value,
+                        'bg-gradient-to-br from-red-50/20 to-red-50/10 dark:from-red-900/20 dark:to-red-900/10': showErrorAnimation.value,
+                        'border-red-400/50 dark:border-red-600/50': showErrorAnimation.value,
                     },
                 ]"
+                :style="{
+                    height: `${searchBarHeight}px`,
+                }"
             >
+                <!-- Sparkle Indicator -->
+                <Transition
+                    enter-active-class="transition-all duration-500 ease-out"
+                    leave-active-class="transition-all duration-300 ease-in"
+                    enter-from-class="opacity-0 scale-0"
+                    enter-to-class="opacity-100 scale-100"
+                    leave-from-class="opacity-100 scale-100"
+                    leave-to-class="opacity-0 scale-0"
+                >
+                    <div
+                        v-if="showSparkle"
+                        class="absolute -top-3 -left-3 z-10 pointer-events-none"
+                    >
+                        <div class="relative">
+                            <Sparkles 
+                                :size="28" 
+                                class="text-yellow-400 dark:text-yellow-500 animate-pulse drop-shadow-lg fill-yellow-400 dark:fill-yellow-500"
+                            />
+                            <Sparkles 
+                                :size="28" 
+                                class="absolute inset-0 text-yellow-300 dark:text-yellow-600 opacity-50 animate-spin-slow fill-yellow-300 dark:fill-yellow-600"
+                            />
+                        </div>
+                    </div>
+                </Transition>
+
                 <!-- Mode Toggle - Fixed to left edge -->
                 <div
                     :class="[
@@ -42,7 +76,11 @@
                     <FancyF
                         :mode="mode"
                         size="lg"
-                        clickable
+                        :clickable="canToggleMode"
+                        :class="{ 
+                            'text-yellow-600 dark:text-yellow-400': isAIQuery,
+                            'opacity-50 cursor-not-allowed': !canToggleMode
+                        }"
                         @toggle-mode="handleModeToggle"
                     />
                 </div>
@@ -67,20 +105,26 @@
                     </div>
 
                     <!-- Main Search Input -->
-                    <input
+                    <textarea
                         ref="searchInput"
                         v-model="query"
                         :placeholder="placeholder"
                         :class="[
-                            'relative z-10 h-12 w-full overflow-hidden rounded-xl bg-transparent py-2 text-lg text-ellipsis whitespace-nowrap transition-all duration-300 ease-out outline-none placeholder:text-muted-foreground',
+                            'relative z-10 w-full rounded-xl bg-transparent text-lg transition-all duration-300 ease-out outline-none placeholder:text-muted-foreground resize-none',
                             'focus:ring-1 focus:ring-gray-300 dark:focus:ring-gray-600',
+                            'flex items-center leading-relaxed',
                         ]"
                         :style="{
                             paddingLeft: iconOpacity > 0.1 ? '1rem' : '1.5rem',
-                            paddingRight: iconOpacity > 0.1 ? '1rem' : '1.5rem',
-                            textAlign: iconOpacity < 0.3 ? 'center' : 'left',
+                            paddingRight: expandButtonVisible ? '3rem' : iconOpacity > 0.1 ? '1rem' : '1.5rem',
+                            paddingTop: '0.75rem',
+                            paddingBottom: '0.75rem',
+                            textAlign: iconOpacity < 0.3 && !isAIQuery ? 'center' : 'left',
+                            minHeight: `${textareaMinHeight}px`,
+                            lineHeight: '1.5',
                         }"
-                        @keydown.enter="handleEnter"
+                        rows="1"
+                        @keydown.enter.prevent="handleEnter"
                         @keydown.tab.prevent="handleAutocompleteAccept"
                         @keydown.space="handleSpaceKey"
                         @keydown.down.prevent="navigateResults(1)"
@@ -93,6 +137,25 @@
                         @input="handleInput"
                         @click="handleInputClick"
                     />
+                    
+                    <!-- Expand Button -->
+                    <Transition
+                        enter-active-class="transition-all duration-300 ease-out"
+                        leave-active-class="transition-all duration-200 ease-in"
+                        enter-from-class="opacity-0 scale-0"
+                        enter-to-class="opacity-100 scale-100"
+                        leave-from-class="opacity-100 scale-100"
+                        leave-to-class="opacity-0 scale-0"
+                    >
+                        <button
+                            v-if="expandButtonVisible"
+                            class="absolute right-2 bottom-2 p-1.5 rounded-lg hover:bg-accent/50 transition-colors"
+                            @click="openExpandModal"
+                            title="Expand for longer input"
+                        >
+                            <Maximize2 class="h-4 w-4 text-muted-foreground" />
+                        </button>
+                    </Transition>
                 </div>
 
                 <!-- Regenerate Button - Same size as hamburger -->
@@ -134,29 +197,6 @@
                                     'transform 700ms cubic-bezier(0.175, 0.885, 0.32, 1.4)',
                             }"
                         />
-                    </button>
-                </div>
-
-                <!-- Debug: Clear Storage Button -->
-                <div
-                    v-if="isDevelopment"
-                    :class="[
-                        'flex-shrink-0 overflow-hidden transition-all duration-300 ease-out',
-                    ]"
-                    :style="{
-                        opacity: iconOpacity,
-                        transform: `scale(${0.9 + iconOpacity * 0.1})`,
-                        pointerEvents: iconOpacity > 0.1 ? 'auto' : 'none',
-                        width: iconOpacity > 0.1 ? '48px' : '0px',
-                        marginLeft: iconOpacity > 0.1 ? '8px' : '0px',
-                    }"
-                >
-                    <button
-                        @click="clearAllStorage"
-                        class="flex h-12 w-12 items-center justify-center rounded-lg bg-red-500/10 text-red-500 transition-all duration-200 ease-out hover:bg-red-500/20"
-                        title="Clear all local storage (DEBUG)"
-                    >
-                        <Trash2 :size="20" />
                     </button>
                 </div>
 
@@ -281,6 +321,24 @@
                             </div>
                         </div>
 
+                        <!-- Settings Row (DEBUG) -->
+                        <div
+                            v-if="isDevelopment && store.searchMode === 'lookup'"
+                            class="border-t border-border/50 px-4 py-3"
+                        >
+                            <h3 class="mb-3 text-sm font-medium">Settings</h3>
+                            <div class="grid grid-cols-4 gap-2">
+                                <button
+                                    @click="clearAllStorage"
+                                    class="hover-lift flex items-center justify-center rounded-lg bg-red-500/10 p-2 text-red-500 transition-all duration-200 hover:bg-red-500/20"
+                                    title="Clear All Storage"
+                                >
+                                    <Trash2 :size="16" />
+                                </button>
+                                <!-- Add 3 more buttons here as needed -->
+                            </div>
+                        </div>
+
                         <!-- AI Suggestions -->
                         <div
                             v-if="
@@ -336,7 +394,7 @@
                         >
                             <!-- Loading State -->
                             <div
-                                v-if="isSearching && searchResults.length === 0"
+                                v-if="isSearching && searchResults.length === 0 && !isAIQuery"
                                 class="p-4"
                             >
                                 <div class="flex items-center gap-2">
@@ -429,7 +487,7 @@
                                 Type at least 2 characters to search...
                             </div>
                             <div
-                                v-else-if="!isSearching && query.length >= 2"
+                                v-else-if="!isSearching && query.length >= 2 && !isAIQuery"
                                 class="bg-background/50 p-4 text-center text-sm
                                     text-muted-foreground backdrop-blur-sm"
                             >
@@ -441,6 +499,79 @@
             </div>
         </div>
     </div>
+
+    <!-- Expanded Input Modal -->
+    <Teleport to="body">
+        <Transition
+            enter-active-class="transition-all duration-300 ease-out"
+            leave-active-class="transition-all duration-200 ease-in"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
+            <div
+                v-if="showExpandModal"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                @click="closeExpandModal"
+            >
+                <!-- Backdrop -->
+                <div class="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+                
+                <!-- Modal Content -->
+                <div
+                    class="relative w-full max-w-2xl rounded-2xl border-2 border-border bg-background/95 p-6 shadow-2xl backdrop-blur-xl"
+                    @click.stop
+                >
+                    <!-- Header -->
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="text-lg font-semibold">Describe what you're looking for</h3>
+                        <button
+                            class="rounded-lg p-2 hover:bg-accent/50 transition-colors"
+                            @click="closeExpandModal"
+                        >
+                            <X class="h-5 w-5" />
+                        </button>
+                    </div>
+                    
+                    <!-- Expanded Textarea -->
+                    <textarea
+                        ref="expandedTextarea"
+                        v-model="expandedQuery"
+                        class="w-full min-h-[200px] rounded-xl border border-border bg-background/50 p-4 text-lg outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                        placeholder="Examples:
+• Words that mean someone who's really dedicated to their craft
+• I need a word for someone who pays attention to every tiny detail
+• What's a good word for stubborn but in a mean way"
+                        @keydown.escape="closeExpandModal"
+                        @keydown.cmd.enter="submitExpandedQuery"
+                        @keydown.ctrl.enter="submitExpandedQuery"
+                    />
+                    
+                    <!-- Footer -->
+                    <div class="mt-4 flex items-center justify-between">
+                        <p class="text-sm text-muted-foreground">
+                            Press <kbd class="px-1.5 py-0.5 text-xs border rounded">⌘</kbd> + <kbd class="px-1.5 py-0.5 text-xs border rounded">Enter</kbd> to search
+                        </p>
+                        <div class="flex gap-2">
+                            <Button
+                                variant="outline"
+                                @click="closeExpandModal"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="default"
+                                @click="submitExpandedQuery"
+                            >
+                                Search
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+    </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -459,7 +590,7 @@ import type { SearchResult } from '@/types';
 import { Button } from '@/components/ui';
 import { FancyF, HamburgerIcon } from '@/components/custom/icons';
 import { BouncyToggle } from '@/components/custom/animation';
-import { RefreshCw, Languages, Globe, Trash2 } from 'lucide-vue-next';
+import { RefreshCw, Languages, Globe, Trash2, Maximize2, X, Sparkles } from 'lucide-vue-next';
 import {
     AppleIcon,
     WiktionaryIcon,
@@ -467,6 +598,7 @@ import {
     DictionaryIcon,
 } from '@/components/custom/icons';
 import { generateRainbowGradient } from '@/utils/animations';
+import { showError } from '@/plugins/toast';
 
 interface SearchBarProps {
     className?: string;
@@ -505,6 +637,76 @@ const isFocused = ref(false);
 const isShrunken = ref(false);
 const regenerateRotation = ref(0);
 const isInteractingWithSearchArea = ref(false);
+const isAIQuery = ref(store.sessionState.isAIQuery || false);
+const showSparkle = ref(store.sessionState.isAIQuery || false);
+const showErrorAnimation = ref(false);
+const searchBarHeight = ref(64); // Default height in pixels
+const textareaMinHeight = ref(48); // Minimum height for textarea
+const showExpandModal = ref(false);
+const expandedQuery = ref('');
+const expandButtonVisible = ref(false);
+// AI mode timer removed - immediate activation now
+
+// Helper to check if query should trigger AI mode
+const shouldTriggerAIMode = (queryText: string) => {
+    return queryText.length > 10 || queryText.split(' ').length - 1 > 2;
+};
+
+// Helper to extract word count from query
+const extractWordCount = (queryText: string): number => {
+    // Regular expression to match various number patterns:
+    // - Written numbers (one to twenty-five)
+    // - Numeric digits (1, 10, 25)
+    // - Common phrases like "a few" (3), "several" (5), "many" (10)
+    
+    // First try to match numeric digits
+    const numericMatch = queryText.match(/\b(\d+)\b/);
+    if (numericMatch) {
+        const count = parseInt(numericMatch[1], 10);
+        // Cap at 25 as requested (backend caps at 20)
+        return Math.min(Math.max(count, 1), 25);
+    }
+    
+    // Then try written numbers (ordered by length to prioritize compound numbers)
+    const writtenNumbers: Record<string, number> = {
+        'twenty-five': 25, 'twenty five': 25,
+        'twenty-four': 24, 'twenty four': 24,
+        'twenty-three': 23, 'twenty three': 23,
+        'twenty-two': 22, 'twenty two': 22,
+        'twenty-one': 21, 'twenty one': 21,
+        'twenty': 20, 'nineteen': 19, 'eighteen': 18, 'seventeen': 17,
+        'sixteen': 16, 'fifteen': 15, 'fourteen': 14, 'thirteen': 13,
+        'twelve': 12, 'eleven': 11, 'ten': 10, 'nine': 9, 'eight': 8,
+        'seven': 7, 'six': 6, 'five': 5, 'four': 4, 'three': 3, 'two': 2, 'one': 1
+    };
+    
+    const lowerQuery = queryText.toLowerCase();
+    // Sort by length descending to match longer patterns first
+    const sortedEntries = Object.entries(writtenNumbers).sort((a, b) => b[0].length - a[0].length);
+    
+    for (const [word, value] of sortedEntries) {
+        if (lowerQuery.includes(word)) {
+            return value;
+        }
+    }
+    
+    // Check for common phrases
+    if (lowerQuery.includes('a few') || lowerQuery.includes('few')) {
+        return 3;
+    }
+    if (lowerQuery.includes('several')) {
+        return 5;
+    }
+    if (lowerQuery.includes('many') || lowerQuery.includes('a lot') || lowerQuery.includes('lots')) {
+        return 10;
+    }
+    if (lowerQuery.includes('a couple') || lowerQuery.includes('couple')) {
+        return 2;
+    }
+    
+    // Default to 12 if no count specified
+    return 12;
+};
 
 // KISS dropdown state management
 const inputFocused = ref(false);
@@ -520,7 +722,8 @@ const scrollInflectionPoint = ref(0.25); // 25% of page height (configurable)
 const documentHeight = ref(0);
 
 // Refs
-const searchInput = ref<HTMLInputElement>();
+const searchInput = ref<HTMLTextAreaElement>();
+const expandedTextarea = ref<HTMLTextAreaElement>();
 const searchResultsContainer = ref<HTMLDivElement>();
 const resultRefs = reactive<(HTMLButtonElement | null)[]>([]);
 const searchContainer = ref<HTMLDivElement>();
@@ -531,6 +734,7 @@ const searchResultsDropdown = ref<HTMLDivElement>();
 // Timers
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 let scrollAnimationFrame: number | undefined;
+let globalEnterHandler: ((e: KeyboardEvent) => void) | undefined;
 
 // Scroll tracking
 const { y: scrollY } = useScroll(window);
@@ -540,6 +744,12 @@ const { escape } = useMagicKeys();
 
 // Computed
 const mode = computed(() => store.mode);
+const canToggleMode = computed(() => {
+    // Can always toggle if not in suggestions mode
+    if (mode.value !== 'suggestions') return true;
+    // In suggestions mode, can only toggle if we have a current entry (last looked up word)
+    return !!store.currentEntry;
+});
 const placeholder = computed(() =>
     mode.value === 'dictionary'
         ? 'Enter a word to define...'
@@ -547,12 +757,13 @@ const placeholder = computed(() =>
 );
 const rainbowGradient = computed(() => generateRainbowGradient(8));
 
-// KISS: Show search results dropdown when input focused AND query exists AND not doing definition lookup
+// KISS: Show search results dropdown when input focused AND query exists AND not doing definition lookup AND not in AI mode
 const shouldShowResults = computed(() => {
     return (
         inputFocused.value &&
         query.value.trim().length > 0 &&
-        !store.isSearching
+        !store.isSearching &&
+        !isAIQuery.value
     );
 });
 
@@ -829,8 +1040,9 @@ const handleBlur = () => {
 };
 
 const handleInput = (event: Event) => {
-    const input = event.target as HTMLInputElement;
+    const input = event.target as HTMLTextAreaElement;
     store.searchCursorPosition = input.selectionStart || 0;
+    resizeTextarea();
     performSearch();
 };
 
@@ -874,12 +1086,18 @@ const performSearch = () => {
     if (!query.value) {
         searchResults.value = [];
         isSearching.value = false;
+        isAIQuery.value = false;
+        showSparkle.value = false;
+        searchBarHeight.value = 64;
         return;
     }
 
     if (query.value.length < 2) {
         searchResults.value = [];
         isSearching.value = false;
+        isAIQuery.value = false;
+        showSparkle.value = false;
+        searchBarHeight.value = 64;
         return;
     }
 
@@ -893,6 +1111,24 @@ const performSearch = () => {
 
             if (store.sessionState) {
                 store.sessionState.searchResults = results;
+            }
+
+            // Activate AI mode immediately when no results and query meets criteria
+            if (results.length === 0 && shouldTriggerAIMode(query.value)) {
+                isAIQuery.value = true;
+                showSparkle.value = true;
+                // Persist AI query state
+                store.sessionState.isAIQuery = true;
+                store.sessionState.aiQueryText = query.value;
+                resizeTextarea(); // Recalculate height for AI mode
+            } else {
+                // Deactivate AI mode when results are found or query doesn't meet criteria
+                isAIQuery.value = false;
+                showSparkle.value = false;
+                // Clear persisted AI query state
+                store.sessionState.isAIQuery = false;
+                store.sessionState.aiQueryText = '';
+                resizeTextarea();
             }
         } catch (error) {
             console.error('Search error:', error);
@@ -921,6 +1157,52 @@ const handleEnter = async () => {
         nextTick(() => {
             searchInput.value?.blur();
         });
+        return;
+    }
+
+    // Handle AI query mode
+    if (isAIQuery.value && query.value) {
+        try {
+            // Extract count from query
+            const extractedCount = extractWordCount(query.value);
+            
+            // Start showing loading modal
+            const wordSuggestions = await store.getAISuggestions(query.value, extractedCount);
+            if (wordSuggestions && wordSuggestions.suggestions.length > 0) {
+                // Successfully got suggestions, switch to _w mode
+                store.wordSuggestions = wordSuggestions;
+                store.mode = 'suggestions'; // New mode for word suggestions
+                store.hasSearched = true;
+                // Keep the AI mode active - don't reset!
+                store.sessionState.aiQueryText = query.value;
+                nextTick(() => {
+                    searchInput.value?.blur();
+                });
+            } else {
+                // No suggestions found - show error animation
+                showErrorAnimation.value = true;
+                showError('No word suggestions found for this query');
+                // Remove animation class after animation completes
+                setTimeout(() => {
+                    showErrorAnimation.value = false;
+                }, 600);
+            }
+        } catch (error: any) {
+            console.error('AI suggestion error:', error);
+            // Show error animation
+            showErrorAnimation.value = true;
+            // Show error toast
+            const errorMessage = error.response?.data?.detail || error.message || 'Failed to get word suggestions';
+            showError(errorMessage);
+            // Remove animation class after animation completes
+            setTimeout(() => {
+                showErrorAnimation.value = false;
+            }, 600);
+            // Keep AI mode active even on error
+            // Clear persisted AI state
+            store.sessionState.isAIQuery = false;
+            store.sessionState.aiQueryText = '';
+        }
         return;
     }
 
@@ -1041,6 +1323,57 @@ const clearAllStorage = () => {
         // Reload the page to reset the app
         window.location.reload();
     }
+};
+
+// Auto-resize textarea
+const resizeTextarea = () => {
+    if (!searchInput.value) return;
+    
+    // Reset height to auto to get the natural height
+    searchInput.value.style.height = 'auto';
+    
+    // Get the scroll height (content height)
+    const scrollHeight = searchInput.value.scrollHeight;
+    
+    // Set the textarea height directly
+    searchInput.value.style.height = `${scrollHeight}px`;
+    
+    // Calculate new height for the container
+    const containerPadding = 16; // Total vertical padding
+    const newContainerHeight = scrollHeight + containerPadding;
+    
+    // Update search bar height with animation
+    if (!isAIQuery.value) {
+        searchBarHeight.value = Math.max(64, newContainerHeight);
+    } else {
+        searchBarHeight.value = Math.max(96, newContainerHeight); // Larger minimum for AI mode
+    }
+    
+    // Show expand button if text is getting long
+    expandButtonVisible.value = query.value.length > 50 || query.value.includes('\n');
+};
+
+// Modal methods
+const openExpandModal = () => {
+    expandedQuery.value = query.value;
+    showExpandModal.value = true;
+    nextTick(() => {
+        expandedTextarea.value?.focus();
+        expandedTextarea.value?.setSelectionRange(expandedQuery.value.length, expandedQuery.value.length);
+    });
+};
+
+const closeExpandModal = () => {
+    showExpandModal.value = false;
+    expandedQuery.value = '';
+};
+
+const submitExpandedQuery = () => {
+    query.value = expandedQuery.value;
+    closeExpandModal();
+    nextTick(() => {
+        handleEnter();
+    });
 };
 
 // Autocomplete logic
@@ -1195,6 +1528,13 @@ watch(searchResults, () => {
 
 watch(query, () => {
     updateAutocomplete();
+    nextTick(() => {
+        resizeTextarea();
+    });
+    // Update persisted AI query text if in AI mode
+    if (isAIQuery.value) {
+        store.sessionState.aiQueryText = query.value;
+    }
 });
 
 // Legacy shrink state handling (simplified)
@@ -1216,6 +1556,42 @@ onMounted(async () => {
 
     // Update on window resize
     window.addEventListener('resize', initializeDocumentHeight);
+    
+    // Restore AI query state if it was persisted
+    if (store.sessionState.isAIQuery) {
+        isAIQuery.value = true;
+        showSparkle.value = true;
+        // Restore the query text if it exists
+        if (store.sessionState.aiQueryText && !query.value) {
+            query.value = store.sessionState.aiQueryText;
+        }
+    }
+    
+    // Check if current query should be in AI mode
+    if (shouldTriggerAIMode(query.value) && !isAIQuery.value) {
+        // Do a search to verify no results
+        try {
+            const results = await store.search(query.value);
+            searchResults.value = results.slice(0, 8);
+            
+            if (results.length === 0) {
+                isAIQuery.value = true;
+                showSparkle.value = true;
+                store.sessionState.isAIQuery = true;
+                store.sessionState.aiQueryText = query.value;
+                nextTick(() => {
+                    resizeTextarea();
+                });
+            }
+        } catch (error) {
+            console.error('Search error on mount:', error);
+        }
+    }
+    
+    // Initial textarea sizing
+    nextTick(() => {
+        resizeTextarea();
+    });
 
     try {
         const history = await store.getHistoryBasedSuggestions();
@@ -1225,6 +1601,15 @@ onMounted(async () => {
     }
 
     document.addEventListener('click', handleClickOutside);
+    
+    // Global Enter key handler for unfocused search
+    globalEnterHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Enter' && !isFocused.value && query.value.trim()) {
+            e.preventDefault();
+            handleEnter();
+        }
+    };
+    window.addEventListener('keydown', globalEnterHandler);
 });
 
 // Cleanup
@@ -1235,6 +1620,9 @@ onUnmounted(() => {
     }
     document.removeEventListener('click', handleClickOutside);
     window.removeEventListener('resize', initializeDocumentHeight);
+    if (globalEnterHandler) {
+        window.removeEventListener('keydown', globalEnterHandler);
+    }
 });
 </script>
 

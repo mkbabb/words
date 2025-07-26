@@ -239,3 +239,18 @@ class PromptTemplateManager:
             "assess/regional_variants",
             definition=definition,
         )
+
+    def get_query_validation_prompt(self, query: str) -> str:
+        """Generate prompt for query validation."""
+        return self.render_template(
+            "misc/query_validation",
+            query=query,
+        )
+
+    def get_word_suggestion_prompt(self, query: str, count: int = 10) -> str:
+        """Generate prompt for word suggestions."""
+        return self.render_template(
+            "misc/word_suggestion",
+            query=query,
+            count=count,
+        )

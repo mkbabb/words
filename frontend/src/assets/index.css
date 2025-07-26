@@ -433,6 +433,22 @@
       0 16px 32px rgba(255, 255, 255, 0.08);
   }
 
+  /* Fira Code utility class */
+  .fira-code {
+    font-family: 'Fira Code', monospace;
+  }
+
+  /* Shake animation for errors */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+    20%, 40%, 60%, 80% { transform: translateX(4px); }
+  }
+
+  .shake-error {
+    animation: shake 0.5s ease-in-out;
+  }
+
   /* Reduced motion support */
   @media (prefers-reduced-motion: reduce) {
     * {
