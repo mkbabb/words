@@ -114,40 +114,75 @@ class DictionaryConnector(ABC):
         Returns:
             Normalized ProviderData
         """
-        # Extract components using abstract methods
-        pronunciation = await self.extract_pronunciation(response_data)
-        definitions = await self.extract_definitions(response_data, str(word.id))
-        etymology = await self.extract_etymology(response_data)
+        if not response_data:
+            logger.warning(f"Empty response data for word '{word.text}' from {self.provider_name}")
+            response_data = {}
 
-        # Save pronunciation if found
-        pronunciation_id = None
-        if pronunciation:
-            pronunciation.word_id = str(word.id)
-            await pronunciation.save()
-            pronunciation_id = str(pronunciation.id)
+        if not word or not word.id:
+            raise ValueError(f"Invalid word object provided to {self.provider_name}")
 
-        # Save definitions and collect IDs
-        definition_ids = []
-        for definition in definitions:
-            await definition.save()
-            definition_ids.append(str(definition.id))
+        try:
+            # Extract components using abstract methods with error handling
+            pronunciation = None
+            try:
+                pronunciation = await self.extract_pronunciation(response_data)
+            except Exception as e:
+                logger.warning(f"Failed to extract pronunciation from {self.provider_name} for '{word.text}': {e}")
 
-        # Create and save provider data
-        # Filter out any non-serializable data from raw_data
-        safe_raw_data = {
-            k: v
-            for k, v in response_data.items()
-            if k != "definitions"  # Exclude definitions which may contain ObjectIds
-        }
+            definitions = []
+            try:
+                definitions = await self.extract_definitions(response_data, str(word.id))
+            except Exception as e:
+                logger.warning(f"Failed to extract definitions from {self.provider_name} for '{word.text}': {e}")
 
-        provider_data = ProviderData(
-            word_id=str(word.id),
-            provider=DictionaryProvider(self.provider_name),
-            definition_ids=definition_ids,
-            pronunciation_id=pronunciation_id,
-            etymology=etymology,
-            raw_data=safe_raw_data,
-        )
-        await provider_data.save()
+            etymology = None
+            try:
+                etymology = await self.extract_etymology(response_data)
+            except Exception as e:
+                logger.warning(f"Failed to extract etymology from {self.provider_name} for '{word.text}': {e}")
 
-        return provider_data
+            # Save pronunciation if found
+            pronunciation_id = None
+            if pronunciation:
+                try:
+                    pronunciation.word_id = str(word.id)
+                    await pronunciation.save()
+                    pronunciation_id = str(pronunciation.id)
+                except Exception as e:
+                    logger.error(f"Failed to save pronunciation from {self.provider_name} for '{word.text}': {e}")
+
+            # Save definitions and collect IDs
+            definition_ids = []
+            for definition in definitions or []:
+                try:
+                    await definition.save()
+                    definition_ids.append(str(definition.id))
+                except Exception as e:
+                    logger.error(f"Failed to save definition from {self.provider_name} for '{word.text}': {e}")
+
+            # Create and save provider data
+            # Filter out any non-serializable data from raw_data
+            safe_raw_data = {
+                k: v
+                for k, v in response_data.items()
+                if k != "definitions" and v is not None  # Exclude definitions and None values
+            }
+
+            provider_data = ProviderData(
+                word_id=str(word.id),
+                provider=DictionaryProvider(self.provider_name),
+                definition_ids=definition_ids,
+                pronunciation_id=pronunciation_id,
+                etymology=etymology,
+                raw_data=safe_raw_data,
+            )
+            await provider_data.save()
+
+            logger.debug(f"Successfully normalized response from {self.provider_name} for '{word.text}': "
+                        f"{len(definition_ids)} definitions, pronunciation: {pronunciation_id is not None}")
+
+            return provider_data
+
+        except Exception as e:
+            logger.error(f"Failed to normalize response from {self.provider_name} for '{word.text}': {e}")
+            raise

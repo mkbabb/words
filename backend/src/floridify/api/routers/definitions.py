@@ -79,9 +79,7 @@ class ComponentRegenerationRequest(BaseModel):
     """Request for regenerating definition components."""
 
     components: set[str] = Field(
-        ...,
-        description="Components to regenerate",
-        example=["synonyms", "examples", "grammar_patterns"],
+        description="Components to regenerate"
     )
     force: bool = Field(False, description="Force regeneration even if data exists")
 
@@ -339,14 +337,22 @@ async def regenerate_components(
             # Special handling for examples
             from ...models import Example
 
-            examples = await generate_examples(word.text, definition, ai)
+            # Generate examples using AI connector
+            examples_response = await ai.generate_examples(
+                word=word.text,
+                part_of_speech=definition.part_of_speech,
+                definition=definition.text,
+                count=3
+            )
             # Save examples
             example_docs = []
-            for ex_data in examples:
+            for example_text in examples_response.example_sentences:
                 example = Example(
-                    word_id=definition.word_id, definition_id=str(definition.id), **ex_data
+                    definition_id=str(definition.id),
+                    text=example_text,
+                    type="generated"
                 )
-                await example.create()
+                await example.save()
                 example_docs.append(example)
             definition.example_ids = [str(ex.id) for ex in example_docs]
             updates["examples"] = [ex.model_dump() for ex in example_docs]

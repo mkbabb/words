@@ -70,7 +70,7 @@ class DefinitionFilter(BaseModel):
 
     def to_query(self) -> dict[str, Any]:
         """Convert to MongoDB query."""
-        query = {}
+        query: dict[str, Any] = {}
 
         if self.word_id:
             query["word_id"] = self.word_id
@@ -124,8 +124,7 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
     ) -> Definition:
         """Update specific components of a definition."""
         definition = await self.get(id, raise_on_missing=True)
-        if definition is None:
-            raise ValueError(f"Definition with id {id} not found")
+        assert definition is not None
 
         # Update individual components
         if "word_forms" in components:
@@ -172,8 +171,7 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         from ...models import Example
 
         definition = await self.get(id, raise_on_missing=True)
-        if definition is None:
-            raise ValueError(f"Definition with id {id} not found")
+        assert definition is not None
         definition_dict = definition.model_dump()
 
         # Fetch and include examples

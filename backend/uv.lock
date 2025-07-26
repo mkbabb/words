@@ -387,9 +387,13 @@ dev = [
     { name = "types-aiofiles" },
     { name = "types-beautifulsoup4" },
     { name = "types-click" },
+    { name = "types-editdistance" },
     { name = "types-lxml" },
+    { name = "types-orjson" },
+    { name = "types-psutil" },
     { name = "types-regex" },
     { name = "types-toml" },
+    { name = "types-xxhash" },
 ]
 
 [package.metadata]
@@ -446,9 +450,13 @@ dev = [
     { name = "types-aiofiles", specifier = ">=24.1.0.20250606" },
     { name = "types-beautifulsoup4", specifier = ">=4.12.0.20250516" },
     { name = "types-click", specifier = ">=7.1.8" },
+    { name = "types-editdistance", specifier = ">=0.8.0.20250401" },
     { name = "types-lxml", specifier = ">=2025.3.30" },
+    { name = "types-orjson", specifier = ">=3.6.2" },
+    { name = "types-psutil", specifier = ">=7.0.0.20250601" },
     { name = "types-regex", specifier = ">=2024.11.6.20250403" },
     { name = "types-toml", specifier = ">=0.10.8.20240310" },
+    { name = "types-xxhash", specifier = ">=3.0.5.2" },
 ]
 
 [[package]]
@@ -1615,6 +1623,15 @@ wheels = [
 ]
 
 [[package]]
+name = "types-editdistance"
+version = "0.8.0.20250401"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/53/dd/d50e0212ef591e30f2fea38f5f9b489dd08417bdd9d7be95616a6f27df99/types_editdistance-0.8.0.20250401.tar.gz", hash = "sha256:98f73c5c8f0c72cf9c5f1521c16fb546185a901df478f96b97b0f49df6d58675", size = 8086, upload-time = "2025-04-01T03:07:06.138Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c8/e9/edfedaf31035faf6cd1eeb275a826dd1b04abff60d11fa3757ac54e9b27b/types_editdistance-0.8.0.20250401-py3-none-any.whl", hash = "sha256:f405cfd881ca6c43d76a2698bef13178ed0711fc47f815db731e5c8946edc88c", size = 7438, upload-time = "2025-04-01T03:07:05.344Z" },
+]
+
+[[package]]
 name = "types-html5lib"
 version = "1.1.11.20250708"
 source = { registry = "https://pypi.org/simple" }
@@ -1639,6 +1656,24 @@ wheels = [
 ]
 
 [[package]]
+name = "types-orjson"
+version = "3.6.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8c/97/3f78cfdf663e5668e8b490d8c84d6de089d2d8dbad935f0dc43555d52a90/types-orjson-3.6.2.tar.gz", hash = "sha256:cf9afcc79a86325c7aff251790338109ed6f6b1bab09d2d4262dd18c85a3c638", size = 1999, upload-time = "2022-01-07T11:31:10.518Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/84/b34abd2d08381c5113e475908a1d79d27dc9a15f669213cee4ca03d1a891/types_orjson-3.6.2-py3-none-any.whl", hash = "sha256:22ee9a79236b6b0bfb35a0684eded62ad930a88a56797fa3c449b026cf7dbfe4", size = 2224, upload-time = "2022-01-07T11:31:09.271Z" },
+]
+
+[[package]]
+name = "types-psutil"
+version = "7.0.0.20250601"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c8/af/767b92be7de4105f5e2e87a53aac817164527c4a802119ad5b4e23028f7c/types_psutil-7.0.0.20250601.tar.gz", hash = "sha256:71fe9c4477a7e3d4f1233862f0877af87bff057ff398f04f4e5c0ca60aded197", size = 20297, upload-time = "2025-06-01T03:25:16.698Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8d/85/864c663a924a34e0d87bd10ead4134bb4ab6269fa02daaa5dd644ac478c5/types_psutil-7.0.0.20250601-py3-none-any.whl", hash = "sha256:0c372e2d1b6529938a080a6ba4a9358e3dfc8526d82fabf40c1ef9325e4ca52e", size = 23106, upload-time = "2025-06-01T03:25:15.386Z" },
+]
+
+[[package]]
 name = "types-regex"
 version = "2024.11.6.20250403"
 source = { registry = "https://pypi.org/simple" }
@@ -1654,6 +1689,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/86/47/3e4c75042792bff8e90d7991aa5c51812cc668828cc6cce711e97f63a607/types-toml-0.10.8.20240310.tar.gz", hash = "sha256:3d41501302972436a6b8b239c850b26689657e25281b48ff0ec06345b8830331", size = 4392, upload-time = "2024-03-10T02:18:37.518Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/da/a2/d32ab58c0b216912638b140ab2170ee4b8644067c293b170e19fba340ccc/types_toml-0.10.8.20240310-py3-none-any.whl", hash = "sha256:627b47775d25fa29977d9c70dc0cbab3f314f32c8d8d0c012f2ef5de7aaec05d", size = 4777, upload-time = "2024-03-10T02:18:36.568Z" },
+]
+
+[[package]]
+name = "types-xxhash"
+version = "3.0.5.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/47/c7/ba0d78fe75ea687a5b4cf57a25ad0c70f9070e70403cb3137ddfa438ccf7/types-xxhash-3.0.5.2.tar.gz", hash = "sha256:99f27f0af146beba2f108677d2b7980afe8ddf7359b445181bfc7139db76482e", size = 3402, upload-time = "2023-02-21T01:31:50.273Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/93/6ea40b120b592670e211f0ac06820109a2dd70e879d234ba1837eec7c6fe/types_xxhash-3.0.5.2-py3-none-any.whl", hash = "sha256:3e531728e168f64d7e8aa960a7633f4a6087e2875f349c2b962b2a66195eea50", size = 2781, upload-time = "2023-02-21T01:31:49.178Z" },
 ]
 
 [[package]]

@@ -183,11 +183,12 @@ class OxfordConnector(DictionaryConnector):
                             elif "British English" in dialect:
                                 ipa_british = p.get("phoneticSpelling")
 
+                        # Use American IPA as primary, fallback to British
+                        primary_ipa = ipa_american or ipa_british or phonetic or "unknown"
                         return Pronunciation(
                             word_id="",  # Will be set by base connector
-                            phonetic=phonetic,
-                            ipa_british=ipa_british,
-                            ipa_american=ipa_american,
+                            phonetic=phonetic if phonetic else "unknown",
+                            ipa=primary_ipa,
                             syllables=[],
                             stress_pattern=None,
                         )

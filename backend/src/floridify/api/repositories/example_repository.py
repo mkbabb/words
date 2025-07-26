@@ -43,7 +43,7 @@ class ExampleFilter(BaseModel):
 
     def to_query(self) -> dict[str, Any]:
         """Convert to MongoDB query."""
-        query = {}
+        query: dict[str, Any] = {}
 
         if self.word_id:
             query["word_id"] = self.word_id
@@ -72,7 +72,7 @@ class ExampleFilter(BaseModel):
 class ExampleRepository(BaseRepository[Example, ExampleCreate, ExampleUpdate]):
     """Repository for Example CRUD operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(Example)
 
     async def find_by_definition(
@@ -93,7 +93,7 @@ class ExampleRepository(BaseRepository[Example, ExampleCreate, ExampleUpdate]):
 
     async def find_regeneratable(self, definition_id: str | None = None) -> list[Example]:
         """Find examples that can be regenerated."""
-        query = {"can_regenerate": True}
+        query: dict[str, Any] = {"can_regenerate": True}
         if definition_id:
             query["definition_id"] = definition_id
 

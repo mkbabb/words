@@ -66,10 +66,11 @@ async def _cached_synonyms(word: str, params: SynonymParams) -> SynonymResponse:
         # Create OpenAI connector and generate synonyms
         # Get OpenAI connector singleton
         connector = get_openai_connector()
-        ai_response = await connector.generate_synonyms(
+        ai_response = await connector.synthesize_synonyms(
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
+            existing_synonyms=[],  # Empty existing synonyms
             count=params.max_results,
         )
 

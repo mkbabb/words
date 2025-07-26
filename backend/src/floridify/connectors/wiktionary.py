@@ -540,11 +540,14 @@ class WiktionaryConnector(DictionaryConnector):
 
             # Return pronunciation if we have any data
             if ipa_american or ipa_british or phonetic:
+                # Use American IPA as primary, fallback to British, then phonetic
+                primary_ipa = ipa_american or ipa_british or phonetic or "unknown"
                 return Pronunciation(
                     word_id=word_id,
-                    phonetic=phonetic if phonetic else None,
-                    ipa_american=ipa_american,
-                    ipa_british=ipa_british,
+                    phonetic=phonetic if phonetic else "unknown",
+                    ipa=primary_ipa,
+                    syllables=[],
+                    stress_pattern=None,
                 )
 
         except Exception as e:
@@ -671,12 +674,16 @@ class WiktionaryConnector(DictionaryConnector):
         ):
             phonetic = None
 
+        # Use American IPA as primary, fallback to British
+        ipa_american = pron_data.get("ipa_american")
+        ipa_british = pron_data.get("ipa_british")
+        primary_ipa = ipa_american or ipa_british or "unknown"
+
         # Create Pronunciation without word_id (will be set by base connector)
         return Pronunciation(
             word_id="",  # Will be set by base connector
-            phonetic=phonetic,
-            ipa_american=pron_data.get("ipa_american"),
-            ipa_british=pron_data.get("ipa_british"),
+            phonetic=phonetic if phonetic else "unknown",
+            ipa=primary_ipa,
             syllables=[],
             stress_pattern=None,
         )

@@ -6,9 +6,10 @@ import platform
 import re
 from typing import Any
 
-from ..constants import DictionaryProvider
+from ..constants import DictionaryProvider, Language
 from ..core.state_tracker import Stages, StateTracker
-from ..models import Definition, Etymology, Example, Pronunciation, ProviderData
+from ..models import Definition, Etymology, Example, Pronunciation, ProviderData, Word
+from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger
 from .base import DictionaryConnector
 
@@ -66,7 +67,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             return
 
         try:
-            from CoreServices import DCSCopyTextDefinition  # type: ignore[import-untyped]
+            from CoreServices import DCSCopyTextDefinition  # type: ignore[import-not-found]
 
             self._dictionary_service = DCSCopyTextDefinition
             logger.info("Apple Dictionary Services initialized successfully")
@@ -254,6 +255,17 @@ class AppleDictionaryConnector(DictionaryConnector):
             return None
 
         try:
+            # Get or create Word document
+            storage = await get_storage()
+            word_obj = await storage.get_word(word)
+            if not word_obj:
+                word_obj = Word(
+                    text=word,
+                    normalized=word.lower(),
+                    language=Language.ENGLISH,
+                )
+                await word_obj.save()
+
             # Enforce rate limiting
             await self._enforce_rate_limit()
 
@@ -276,22 +288,19 @@ class AppleDictionaryConnector(DictionaryConnector):
             # For the lookup method, we'll return the raw data to be processed later
             # The actual parsing and Definition creation should happen in extract_definitions
 
-            # Create provider data with raw definition
-            provider_data = ProviderData(
-                word_id="",  # Will be set later when Word is created
-                provider=DictionaryProvider.APPLE,
-                definition_ids=[],  # Will be populated later
-                pronunciation_id=None,
-                raw_metadata={
-                    "platform": platform.system(),
-                    "platform_version": platform.mac_ver()[0]
-                    if platform.system() == "Darwin"
-                    else None,
-                    "raw_definition": raw_definition,
-                    "word_processed": word,
-                    "definitions_count": 1 if raw_definition else 0,
-                },
-            )
+            # Create raw data for base class processing
+            raw_data = {
+                "platform": platform.system(),
+                "platform_version": platform.mac_ver()[0]
+                if platform.system() == "Darwin"
+                else None,
+                "raw_definition": raw_definition,
+                "word_processed": word,
+                "definitions_count": 1 if raw_definition else 0,
+            }
+
+            # Use base class method to normalize and save
+            provider_data = await self._normalize_response(raw_data, word_obj)
 
             if state_tracker:
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
@@ -343,7 +352,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             return Pronunciation(
                 word_id="",  # Will be set by base connector
                 phonetic=phonetic,
-                ipa_american=ipa,  # Apple typically uses American pronunciation
+                ipa=ipa,  # Apple typically provides American pronunciation
                 syllables=[],
                 stress_pattern=None,
             )
@@ -370,8 +379,16 @@ class AppleDictionaryConnector(DictionaryConnector):
         parsed_defs: list[Definition] = []
 
         # Extract basic information from raw definition
-        part_of_speech = self._normalize_part_of_speech(raw_definition)
+        # Default to noun if can't determine part of speech
+        try:
+            part_of_speech = self._normalize_part_of_speech(raw_definition)
+        except Exception:
+            part_of_speech = "noun"  # Default fallback
+        
         definition_text = self._clean_definition_text(raw_definition)
+        # If definition is empty, try extracting main definition
+        if not definition_text:
+            definition_text = self._extract_main_definition(raw_definition)
         examples = self._extract_examples(definition_text)
 
         if definition_text:

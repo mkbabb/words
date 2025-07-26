@@ -37,7 +37,7 @@ class FactFilter(BaseModel):
 
     def to_query(self) -> dict[str, Any]:
         """Convert to MongoDB query."""
-        query = {}
+        query: dict[str, Any] = {}
 
         if self.word_id:
             query["word_id"] = self.word_id
@@ -60,7 +60,7 @@ class FactFilter(BaseModel):
 class FactRepository(BaseRepository[Fact, FactCreate, FactUpdate]):
     """Repository for Fact CRUD operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(Fact)
 
     async def find_by_word(self, word_id: str, category: str | None = None) -> list[Fact]:
