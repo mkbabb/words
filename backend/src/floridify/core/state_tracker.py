@@ -106,13 +106,25 @@ class StateTracker:
     async def update(
         self,
         stage: str,
-        progress: int = 0,
+        progress: int | None = None,
         message: str = "",
         details: dict[str, Any] | None = None,
         is_complete: bool = False,
         error: str | None = None,
     ) -> None:
         """Update the current pipeline state and notify all subscribers."""
+        # Smart progress handling:
+        # 1. If progress is explicitly provided, use it
+        # 2. If stage has a mapped progress, use that
+        # 3. Otherwise maintain current progress
+        if progress is None:
+            if stage in Stages.PROGRESS_MAP:
+                progress = Stages.PROGRESS_MAP[stage]
+            elif self._current_state:
+                progress = self._current_state.progress
+            else:
+                progress = 0
+                
         state = PipelineState(
             stage=stage,
             progress=progress,
@@ -160,7 +172,11 @@ class StateTracker:
 
     async def update_error(self, error: str, stage: str = "ERROR") -> None:
         """Optimized update for errors."""
-        await self.update(stage=stage, error=error, is_complete=True)
+        # Maintain current progress or use stage progress if available
+        progress = self._current_state.progress if self._current_state else 0
+        if stage != "ERROR" and stage in Stages.PROGRESS_MAP:
+            progress = Stages.PROGRESS_MAP[stage]
+        await self.update(stage=stage, progress=progress, error=error, is_complete=True)
 
     async def get_states(self) -> AsyncGenerator[PipelineState, None]:
         """Get state updates as they occur."""

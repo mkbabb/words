@@ -9,8 +9,8 @@ from datetime import datetime
 from typing import Any, Generic, TypeVar
 
 from beanie import Document, PydanticObjectId
-from beanie.operators import In
 from beanie.odm.enums import SortDirection
+from beanie.operators import In
 from fastapi import HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 

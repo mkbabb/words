@@ -8,18 +8,18 @@ from pydantic import BaseModel, Field
 
 from ...ai import get_openai_connector
 from ...ai.synthesis_functions import (
-    assess_definition_cefr,
-    assess_definition_frequency,
-    assess_definition_domain,
-    assess_grammar_patterns,
     assess_collocations,
+    assess_definition_cefr,
+    assess_definition_domain,
+    assess_definition_frequency,
+    assess_grammar_patterns,
     assess_regional_variants,
     classify_definition_register,
     enhance_definitions_parallel,
-    usage_note_generation,
-    synthesize_antonyms,
     generate_examples,
+    synthesize_antonyms,
     synthesize_synonyms,
+    usage_note_generation,
 )
 from ...models import Definition, Word
 from ..core import (

@@ -28,9 +28,13 @@ from ..models import (
     WordForm,
 )
 from ..utils.logging import get_logger
-from .constants import SynthesisComponent
 from .connector import OpenAIConnector
-from .constants import DEFAULT_ANTONYM_COUNT, DEFAULT_EXAMPLE_COUNT, DEFAULT_SYNONYM_COUNT
+from .constants import (
+    DEFAULT_ANTONYM_COUNT,
+    DEFAULT_EXAMPLE_COUNT,
+    DEFAULT_SYNONYM_COUNT,
+    SynthesisComponent,
+)
 from .models import QueryValidationResponse, WordSuggestionResponse
 
 logger = get_logger(__name__)

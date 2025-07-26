@@ -1,19 +1,20 @@
 """FastAPI application for Floridify dictionary service."""
 
 from __future__ import annotations
+
 from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from ..storage.mongodb import get_storage
-from ..utils.logging import setup_logging
-from .middleware import CacheHeadersMiddleware, LoggingMiddleware
-from ..search.language import get_language_search
-from ..text.processor import get_text_processor
 from ..ai import get_definition_synthesizer, get_openai_connector
 from ..constants import Language
+from ..search.language import get_language_search
+from ..storage.mongodb import get_storage
+from ..text.processor import get_text_processor
+from ..utils.logging import setup_logging
+from .middleware import CacheHeadersMiddleware, LoggingMiddleware
 from .routers import (
     ai,
     audio,

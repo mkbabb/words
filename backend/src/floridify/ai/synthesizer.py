@@ -107,7 +107,7 @@ class DefinitionSynthesizer:
 
         # Synthesize core components
         if state_tracker:
-            await state_tracker.update_stage(Stages.AI_SYNTHESIS, progress=65)
+            await state_tracker.update_stage(Stages.AI_SYNTHESIS)
 
         # Synthesize definitions for each cluster
         synthesized_definitions = await self._synthesize_definitions(
@@ -142,7 +142,7 @@ class DefinitionSynthesizer:
 
         # Save entry
         if state_tracker:
-            await state_tracker.update_stage(Stages.STORAGE_SAVE, progress=90)
+            await state_tracker.update_stage(Stages.STORAGE_SAVE)
 
         await entry.save()
         logger.success(
@@ -340,7 +340,6 @@ class DefinitionSynthesizer:
         if state_tracker:
             await state_tracker.update_stage(
                 Stages.AI_SYNTHESIS,
-                progress=0,
             )
         
         # Enhance definitions with force_refresh=True
@@ -359,7 +358,6 @@ class DefinitionSynthesizer:
         if state_tracker:
             await state_tracker.update_stage(
                 Stages.COMPLETE,
-                progress=100,
             )
         
         logger.info(f"Successfully regenerated components for entry {entry_id}")

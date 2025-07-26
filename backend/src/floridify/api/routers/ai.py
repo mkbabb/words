@@ -10,9 +10,8 @@ from pydantic import BaseModel, Field
 
 from ...ai.constants import SynthesisComponent
 from ...ai.factory import get_definition_synthesizer, get_openai_connector
-from ...models import SynthesizedDictionaryEntry
 from ...utils.logging import get_logger
-from ..core import ResourceResponse, handle_api_errors
+from ..core import ResourceResponse
 from ..middleware.rate_limiting import ai_limiter, get_client_key
 
 logger = get_logger(__name__)
@@ -633,9 +632,10 @@ async def suggest_words_stream(
     api_request: Request = None,
 ) -> StreamingResponse:
     """Generate word suggestions with streaming progress updates."""
-    from ...core.state_tracker import StateTracker
     import asyncio
     import json
+
+    from ...core.state_tracker import StateTracker
     
     # Validate count parameter
     if count < 1 or count > 25:

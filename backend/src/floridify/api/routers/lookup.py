@@ -9,19 +9,18 @@ from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from ...caching.decorators import cached_api_call
+from ...caching.decorators import cached_api_call_with_dedup
 from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, lookup_state_tracker
 from ...models import AudioMedia, Definition, Example, Pronunciation, ProviderData, Word
 from ...utils.logging import get_logger
 from ...utils.sanitization import validate_word_input
-from ..middleware.rate_limiting import ai_limiter, get_client_key
 from .common import PipelineMetrics
 
 logger = get_logger(__name__)
@@ -158,7 +157,7 @@ def parse_lookup_params(
     )
 
 
-@cached_api_call(
+@cached_api_call_with_dedup(
     ttl_hours=1.0,
     key_func=lambda word, params: (
         "api_lookup",
@@ -167,6 +166,7 @@ def parse_lookup_params(
         tuple(params.providers),
         params.no_ai,
     ),
+    max_wait_time=30.0,  # Wait up to 30s for concurrent requests
 )
 async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | None:
     """Cached word lookup implementation."""

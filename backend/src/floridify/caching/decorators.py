@@ -9,6 +9,7 @@ from typing import Any, TypeVar
 
 from ..utils.logging import get_logger
 from .cache_manager import get_cache_manager
+# from .request_deduplicator import deduplicated  # TODO: Implement proper deduplication
 
 F = TypeVar("F", bound=Callable[..., Any])
 AF = TypeVar("AF", bound=Callable[..., Awaitable[Any]])
@@ -231,3 +232,8 @@ def lexicon_cache_key(*args: Any, **kwargs: Any) -> tuple[Any, ...]:
     source = kwargs.get("source", "default")
 
     return ("lexicon", language, source)
+
+
+# TODO: Implement proper request deduplication
+# For now, just use regular caching
+cached_api_call_with_dedup = cached_api_call

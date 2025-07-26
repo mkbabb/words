@@ -15,7 +15,6 @@ from ..core import (
     PaginationParams,
     ResourceResponse,
     SortParams,
-    cached_endpoint,
     check_etag,
     get_etag,
     handle_api_errors,
