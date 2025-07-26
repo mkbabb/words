@@ -202,11 +202,11 @@ def get_client_key(request: Request) -> str:
 class RateLimitedRoute(APIRoute):
     """Custom route class that adds rate limiting."""
 
-    def __init__(self, *args, rate_limiter: RateLimiter | None = None, **kwargs):
+    def __init__(self, *args: Any, rate_limiter: RateLimiter | None = None, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.rate_limiter = rate_limiter or general_limiter
 
-    def get_route_handler(self) -> Callable:
+    def get_route_handler(self) -> Callable[[Request], Any]:
         original_route_handler = super().get_route_handler()
 
         async def rate_limited_handler(request: Request) -> Response:
@@ -238,15 +238,15 @@ class RateLimitedRoute(APIRoute):
 def rate_limit(
     requests_per_minute: int = 60,
     requests_per_hour: int = 1000,
-) -> Callable:
+) -> Callable[[Any], Any]:
     """Decorator to add rate limiting to specific endpoints."""
     limiter = RateLimiter(
         requests_per_minute=requests_per_minute,
         requests_per_hour=requests_per_hour,
     )
 
-    def decorator(func: Callable) -> Callable:
-        async def wrapper(request: Request, *args, **kwargs):
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        async def wrapper(request: Request, *args: Any, **kwargs: Any) -> Any:
             client_key = get_client_key(request)
             allowed, headers = await limiter.check_rate_limit(client_key)
 

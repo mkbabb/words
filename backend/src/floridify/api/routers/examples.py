@@ -207,7 +207,7 @@ async def update_example(
     )
 
 
-@router.delete("/{example_id}", status_code=204)
+@router.delete("/{example_id}", status_code=204, response_model=None)
 @handle_api_errors
 async def delete_example(
     example_id: PydanticObjectId,

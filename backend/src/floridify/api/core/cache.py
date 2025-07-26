@@ -4,6 +4,7 @@ import hashlib
 from collections.abc import Callable
 from datetime import datetime
 from functools import wraps
+from typing import Any
 
 import orjson
 from fastapi import Request, Response
@@ -51,16 +52,16 @@ def generate_cache_key(request: Request, config: APICacheConfig, prefix: str = "
 
 def cached_endpoint(
     ttl: int = 3600, prefix: str = "api", config: APICacheConfig | None = None
-) -> Callable:
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator for caching API endpoints."""
     if config is None:
         config = APICacheConfig(ttl=ttl)
     else:
         config.ttl = ttl
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        async def wrapper(request: Request, response: Response, *args, **kwargs):
+        async def wrapper(request: Request, response: Response, *args: Any, **kwargs: Any) -> Any:
             # Generate cache key
             cache_key = generate_cache_key(request, config, prefix)
 
@@ -111,7 +112,7 @@ def cached_endpoint(
             }
 
             cache_manager.set(
-                (cache_key,), orjson.dumps(cache_data).decode(), ttl_seconds=config.ttl
+                (cache_key,), orjson.dumps(cache_data).decode(), ttl_hours=config.ttl/3600
             )
 
             # Set cache headers
@@ -142,7 +143,7 @@ class CacheInvalidator:
         self.cache_manager.set(
             (invalidation_key,),
             datetime.utcnow().isoformat(),
-            ttl_seconds=86400,  # Keep for 24 hours
+            ttl_hours=24.0,  # Keep for 24 hours
         )
 
         return invalidated
@@ -204,10 +205,10 @@ class ResponseCache:
         self.ttl = ttl
         self.key_prefix = key_prefix
         self.cache_manager = get_cache_manager()
-        self.cache_key = None
-        self.start_time = None
+        self.cache_key: str | None = None
+        self.start_time: datetime | None = None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Any:
         self.start_time = datetime.utcnow()
         config = APICacheConfig(ttl=self.ttl)
         self.cache_key = generate_cache_key(self.request, config, self.key_prefix)
@@ -221,8 +222,8 @@ class ResponseCache:
         self.response.headers["X-Cache"] = "MISS"
         return None
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is None and self.cache_key:
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if exc_type is None and self.cache_key and self.start_time:
             # Cache successful response
             elapsed = (datetime.utcnow() - self.start_time).total_seconds()
             self.response.headers["X-Response-Time"] = f"{elapsed:.3f}s"

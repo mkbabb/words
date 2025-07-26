@@ -205,7 +205,7 @@ async def update_fact(
     )
 
 
-@router.delete("/{fact_id}", status_code=204)
+@router.delete("/{fact_id}", status_code=204, response_model=None)
 @handle_api_errors
 async def delete_fact(
     fact_id: PydanticObjectId,

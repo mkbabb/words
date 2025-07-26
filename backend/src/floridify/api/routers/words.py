@@ -220,7 +220,7 @@ async def update_word(
     )
 
 
-@router.delete("/{word_id}", status_code=204)
+@router.delete("/{word_id}", status_code=204, response_model=None)
 @handle_api_errors
 async def delete_word(
     word_id: PydanticObjectId,

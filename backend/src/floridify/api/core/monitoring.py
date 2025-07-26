@@ -19,21 +19,21 @@ class PerformanceMetrics:
 
     _instance = None
 
-    def __new__(cls):
+    def __new__(cls) -> 'PerformanceMetrics':
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialize()
         return cls._instance
 
-    def _initialize(self):
+    def _initialize(self) -> None:
         """Initialize metrics storage."""
-        self.request_times = defaultdict(list)
-        self.cache_stats = defaultdict(int)
-        self.db_query_times = defaultdict(list)
-        self.error_counts = defaultdict(int)
+        self.request_times: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        self.cache_stats: dict[str, int] = defaultdict(int)
+        self.db_query_times: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        self.error_counts: dict[str, int] = defaultdict(int)
         self.start_time = datetime.utcnow()
 
-    def record_request(self, endpoint: str, duration: float, status_code: int):
+    def record_request(self, endpoint: str, duration: float, status_code: int) -> None:
         """Record request timing."""
         self.request_times[endpoint].append(
             {
@@ -47,15 +47,15 @@ class PerformanceMetrics:
         if len(self.request_times[endpoint]) > 1000:
             self.request_times[endpoint] = self.request_times[endpoint][-1000:]
 
-    def record_cache_hit(self, cache_type: str):
+    def record_cache_hit(self, cache_type: str) -> None:
         """Record cache hit."""
         self.cache_stats[f"{cache_type}_hits"] += 1
 
-    def record_cache_miss(self, cache_type: str):
+    def record_cache_miss(self, cache_type: str) -> None:
         """Record cache miss."""
         self.cache_stats[f"{cache_type}_misses"] += 1
 
-    def record_db_query(self, collection: str, operation: str, duration: float):
+    def record_db_query(self, collection: str, operation: str, duration: float) -> None:
         """Record database query timing."""
         key = f"{collection}:{operation}"
         self.db_query_times[key].append(
@@ -69,7 +69,7 @@ class PerformanceMetrics:
         if len(self.db_query_times[key]) > 500:
             self.db_query_times[key] = self.db_query_times[key][-500:]
 
-    def record_error(self, endpoint: str, error_type: str):
+    def record_error(self, endpoint: str, error_type: str) -> None:
         """Record error occurrence."""
         key = f"{endpoint}:{error_type}"
         self.error_counts[key] += 1
@@ -124,7 +124,7 @@ class PerformanceMetrics:
             "error_counts": dict(self.error_counts),
         }
 
-    def reset_stats(self):
+    def reset_stats(self) -> None:
         """Reset all statistics."""
         self._initialize()
 
@@ -134,7 +134,7 @@ metrics = PerformanceMetrics()
 
 
 @asynccontextmanager
-async def track_request_performance(request: Request, response: Response):
+async def track_request_performance(request: Request, response: Response) -> Any:
     """Context manager for tracking request performance."""
     start_time = time.time()
     endpoint = f"{request.method} {request.url.path}"
@@ -156,11 +156,11 @@ async def track_request_performance(request: Request, response: Response):
             logger.warning(f"Slow request: {endpoint} took {duration:.2f}s")
 
 
-def track_db_operation(collection: str, operation: str):
+def track_db_operation(collection: str, operation: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator for tracking database operation performance."""
 
-    def decorator(func: Callable) -> Callable:
-        async def wrapper(*args, **kwargs):
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             start_time = time.time()
 
             try:
@@ -183,10 +183,10 @@ class SlowQueryDetector:
 
     def __init__(self, threshold_ms: float = 100):
         self.threshold_ms = threshold_ms
-        self.slow_queries = []
+        self.slow_queries: list[dict[str, Any]] = []
 
     @asynccontextmanager
-    async def track(self, query_description: str):
+    async def track(self, query_description: str) -> Any:
         """Track a query execution."""
         start_time = time.time()
 
@@ -221,8 +221,8 @@ slow_query_detector = SlowQueryDetector()
 class RequestRateLimiter:
     """Simple in-memory rate limiter for API endpoints."""
 
-    def __init__(self):
-        self.requests = defaultdict(list)
+    def __init__(self) -> None:
+        self.requests: dict[str, list[datetime]] = defaultdict(list)
 
     async def check_rate_limit(self, key: str, max_requests: int, window_seconds: int) -> bool:
         """Check if request is within rate limit."""

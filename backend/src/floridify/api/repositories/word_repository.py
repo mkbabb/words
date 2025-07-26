@@ -44,7 +44,7 @@ class WordFilter(BaseModel):
 
     def to_query(self) -> dict[str, Any]:
         """Convert to MongoDB query."""
-        query = {}
+        query: dict[str, Any] = {}
 
         if self.text:
             query["text"] = self.text
@@ -52,13 +52,13 @@ class WordFilter(BaseModel):
             query["text"] = RegEx(self.text_pattern, "i")
 
         if self.language:
-            query["language"] = self.language
+            query["language"] = self.language.value  # Use enum value
 
         if self.offensive_flag is not None:
             query["offensive_flag"] = self.offensive_flag
 
         if self.created_after or self.created_before:
-            created_query = {}
+            created_query: dict[str, datetime] = {}
             if self.created_after:
                 created_query["$gte"] = self.created_after
             if self.created_before:
@@ -71,7 +71,7 @@ class WordFilter(BaseModel):
 class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
     """Repository for Word CRUD operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(Word)
 
     async def find_by_text(self, text: str, language: Language = Language.ENGLISH) -> Word | None:
@@ -82,15 +82,15 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
         self, normalized: str, language: Language = Language.ENGLISH
     ) -> list[Word]:
         """Find words by normalized form."""
-        return await Word.find({"normalized": normalized, "language": language}).to_list()
+        return await Word.find({"normalized": normalized, "language": language.value}).to_list()
 
     async def search(
         self, query: str, language: Language | None = None, limit: int = 10
     ) -> list[Word]:
         """Search words by text pattern."""
-        filter_dict = {"text": RegEx(f"^{query}", "i")}
+        filter_dict: dict[str, Any] = {"text": RegEx(f"^{query}", "i")}
         if language:
-            filter_dict["language"] = language
+            filter_dict["language"] = language.value
 
         return await Word.find(filter_dict).limit(limit).to_list()
 
@@ -117,7 +117,9 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
         """Get word with related document counts."""
         from ...models import Definition, Example, Fact
 
-        word = await self.get(id)
+        word = await self.get(id, raise_on_missing=True)
+        if word is None:
+            raise ValueError(f"Word with id {id} not found")
         word_dict = word.model_dump()
 
         # Add counts

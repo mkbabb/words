@@ -102,7 +102,7 @@ class DefinitionFilter(BaseModel):
 class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, DefinitionUpdate]):
     """Repository for Definition CRUD operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(Definition)
 
     async def find_by_word(
@@ -123,7 +123,9 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         self, id: PydanticObjectId, components: dict[str, Any]
     ) -> Definition:
         """Update specific components of a definition."""
-        definition = await self.get(id)
+        definition = await self.get(id, raise_on_missing=True)
+        if definition is None:
+            raise ValueError(f"Definition with id {id} not found")
 
         # Update individual components
         if "word_forms" in components:
@@ -169,7 +171,9 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         """Get definition with expanded examples."""
         from ...models import Example
 
-        definition = await self.get(id)
+        definition = await self.get(id, raise_on_missing=True)
+        if definition is None:
+            raise ValueError(f"Definition with id {id} not found")
         definition_dict = definition.model_dump()
 
         # Fetch and include examples

@@ -235,7 +235,7 @@ async def update_definition(
     )
 
 
-@router.delete("/{definition_id}", status_code=204)
+@router.delete("/{definition_id}", status_code=204, response_model=None)
 @handle_api_errors
 async def delete_definition(
     definition_id: PydanticObjectId,

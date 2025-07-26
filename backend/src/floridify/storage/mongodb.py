@@ -143,7 +143,7 @@ class MongoDBStorage:
 
             # Try to get pool options if available
             if hasattr(self.client, "options") and hasattr(self.client.options, "pool_options"):
-                pool_options = self.client.options.pool_options  # type: ignore[attr-defined]
+                pool_options = self.client.options.pool_options
                 if hasattr(pool_options, "max_pool_size"):
                     stats["max_pool_size"] = pool_options.max_pool_size
                 if hasattr(pool_options, "min_pool_size"):
@@ -284,7 +284,7 @@ async def get_storage() -> MongoDBStorage:
     return _storage
 
 
-async def get_database() -> AsyncIOMotorDatabase:
+async def get_database() -> AsyncIOMotorDatabase[Any]:
     """Get the MongoDB database instance."""
     storage = await get_storage()
     if not storage.client:

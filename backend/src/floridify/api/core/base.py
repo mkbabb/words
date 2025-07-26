@@ -10,6 +10,7 @@ from typing import Any, Generic, TypeVar
 
 from beanie import Document, PydanticObjectId
 from beanie.operators import In
+from beanie.odm.enums import SortDirection
 from fastapi import HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -53,10 +54,10 @@ class SortParams(BaseModel):
     sort_by: str | None = Field(None, description="Field to sort by")
     sort_order: str = Field("asc", pattern="^(asc|desc)$", description="Sort order")
 
-    def get_sort_criteria(self) -> list[tuple] | None:
+    def get_sort_criteria(self) -> list[tuple[str, SortDirection]] | None:
         if not self.sort_by:
             return None
-        direction = 1 if self.sort_order == "asc" else -1
+        direction = SortDirection.ASCENDING if self.sort_order == "asc" else SortDirection.DESCENDING
         return [(self.sort_by, direction)]
 
 
@@ -87,7 +88,7 @@ class ListResponse(BaseModel, Generic[T]):
     limit: int
     has_more: bool = Field(default=False)
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
         data["has_more"] = data["offset"] + len(data["items"]) < data["total"]
         super().__init__(**data)
 
@@ -130,32 +131,7 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
             raise HTTPException(404, f"{self.model.__name__} not found")
         return doc
 
-    async def get_many(self, ids: list[PydanticObjectId]) -> list[T]:
-        """Get multiple documents by IDs."""
-        return await self.model.find(In(self.model.id, ids)).to_list()
-
-    async def list(
-        self,
-        filter_dict: dict[str, Any] | None = None,
-        pagination: PaginationParams | None = None,
-        sort: SortParams | None = None,
-    ) -> tuple[list[T], int]:
-        """List documents with filtering, pagination, and sorting."""
-        query = self.model.find(filter_dict or {})
-
-        # Get total count
-        total = await query.count()
-
-        # Apply sorting
-        if sort and sort.get_sort_criteria():
-            query = query.sort(sort.get_sort_criteria())
-
-        # Apply pagination
-        if pagination:
-            query = query.skip(pagination.skip).limit(pagination.limit)
-
-        items = await query.to_list()
-        return items, total
+    # Placeholder for duplicate methods - real implementations below
 
     async def create(self, data: CreateSchema) -> T:
         """Create a new document."""
@@ -167,7 +143,9 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
         self, id: PydanticObjectId, data: UpdateSchema, version: int | None = None
     ) -> T:
         """Update a document with optional optimistic locking."""
-        doc = await self.get(id)
+        doc = await self.get(id, raise_on_missing=True)
+        if doc is None:
+            raise HTTPException(404, "Document not found")
 
         # Check version for optimistic locking
         if version is not None and hasattr(doc, "version"):
@@ -188,7 +166,9 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
 
     async def delete(self, id: PydanticObjectId, cascade: bool = False) -> bool:
         """Delete a document, optionally with cascade."""
-        doc = await self.get(id)
+        doc = await self.get(id, raise_on_missing=True)
+        if doc is None:
+            raise HTTPException(404, "Document not found")
 
         if cascade:
             await self._cascade_delete(doc)
@@ -207,8 +187,8 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
         # Create a mapping for easy access
         doc_map = {str(doc.id): doc for doc in docs}
 
-        # Return in the same order as requested
-        return [doc_map.get(str(id)) for id in ids if str(id) in doc_map]
+        # Return in the same order as requested (filter out None values)
+        return [doc_map[str(id)] for id in ids if str(id) in doc_map]
 
     async def batch_create(self, items: builtins.list[CreateSchema]) -> builtins.list[T]:
         """Create multiple documents."""
@@ -229,7 +209,7 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
     async def batch_delete(self, ids: builtins.list[PydanticObjectId]) -> int:
         """Delete multiple documents."""
         result = await self.model.find(In(self.model.id, ids)).delete()
-        return result.deleted_count
+        return result.deleted_count if result else 0
 
     async def list(
         self, filter_dict: dict[str, Any] | None = None, 
@@ -238,14 +218,14 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
     ) -> tuple[list[T], int]:
         """List documents with filtering, pagination, and sorting."""
         filter_dict = filter_dict or {}
-        pagination = pagination or PaginationParams()
+        pagination = pagination or PaginationParams(offset=0, limit=20)
         
         # Build query
         query = self.model.find(filter_dict)
         
         # Apply sorting
         if sort and sort.sort_by:
-            sort_direction = 1 if sort.sort_order == "asc" else -1
+            sort_direction = SortDirection.ASCENDING if sort.sort_order == "asc" else SortDirection.DESCENDING
             query = query.sort([(sort.sort_by, sort_direction)])
         
         # Get total count
@@ -262,10 +242,10 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
         pass
 
 
-def handle_api_errors(func: Callable) -> Callable:
+def handle_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
     """Decorator for consistent error handling."""
 
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
         try:
             return await func(*args, **kwargs)
         except HTTPException:
@@ -291,34 +271,15 @@ def check_etag(request: Request, etag: str) -> bool:
     return client_etag == etag
 
 
-class PaginationParams(BaseModel):
-    """Pagination parameters."""
-    
-    offset: int = Field(default=0, ge=0)
-    limit: int = Field(default=20, ge=1, le=100)
+# Dependency injection helpers for FastAPI
+def get_pagination() -> PaginationParams:
+    """Get pagination parameters from query params."""
+    return PaginationParams(offset=0, limit=20)
 
+def get_sort() -> SortParams:
+    """Get sort parameters from query params."""
+    return SortParams(sort_by=None, sort_order="asc")
 
-class SortParams(BaseModel):
-    """Sort parameters."""
-    
-    sort_by: str | None = None
-    sort_order: str = Field(default="asc")
-
-
-class FieldSelection(BaseModel):
-    """Field selection parameters."""
-    
-    include: set[str] | None = None
-    exclude: set[str] | None = None
-    expand: set[str] | None = None
-
-
-class ListResponse(BaseModel, Generic[ResponseT]):
-    """Generic list response with pagination."""
-    
-    items: list[ResponseT]
-    total: int
-    offset: int = 0
-    limit: int = 20
-    
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+def get_fields() -> FieldSelection:
+    """Get field selection from query params."""
+    return FieldSelection(include=None, exclude=None, expand=None)

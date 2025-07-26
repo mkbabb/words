@@ -44,7 +44,7 @@ class SynthesisFilter(BaseModel):
 
     def to_query(self) -> dict[str, Any]:
         """Convert to MongoDB query."""
-        query = {}
+        query: dict[str, Any] = {}
 
         if self.word_id:
             query["word_id"] = self.word_id
@@ -95,7 +95,7 @@ class SynthesisRepository(
 ):
     """Repository for SynthesizedDictionaryEntry CRUD operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(SynthesizedDictionaryEntry)
 
     async def find_by_word(self, word_id: str) -> SynthesizedDictionaryEntry | None:
@@ -104,7 +104,9 @@ class SynthesisRepository(
 
     async def get_component_status(self, entry_id: PydanticObjectId) -> ComponentStatus:
         """Get detailed component status for an entry."""
-        entry = await self.get(entry_id)
+        entry = await self.get(entry_id, raise_on_missing=True)
+        if entry is None:
+            raise ValueError(f"Entry with id {entry_id} not found")
 
         # Calculate completeness
         components = [
@@ -124,7 +126,7 @@ class SynthesisRepository(
             fact_count=len(entry.fact_ids),
             completeness_score=completeness,
             last_updated=entry.updated_at,
-            model_version=entry.model_info.model if entry.model_info else None,
+            model_version=getattr(entry.model_info, 'model', None) if entry.model_info else None,
         )
 
     async def find_incomplete(self, limit: int = 100) -> list[SynthesizedDictionaryEntry]:
@@ -146,7 +148,9 @@ class SynthesisRepository(
 
     async def update_access_info(self, entry_id: PydanticObjectId) -> None:
         """Update access timestamp and count."""
-        entry = await self.get(entry_id)
+        entry = await self.get(entry_id, raise_on_missing=True)
+        if entry is None:
+            raise ValueError(f"Entry with id {entry_id} not found")
         entry.accessed_at = datetime.utcnow()
         entry.access_count += 1
         await entry.save()

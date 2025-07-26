@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-import coolname  # type: ignore[import-not-found]
+import coolname  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 
 from ..utils.logging import get_logger
