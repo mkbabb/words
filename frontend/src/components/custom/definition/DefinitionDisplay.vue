@@ -280,7 +280,7 @@
                                 />
 
                                 <div class="flex items-center gap-2">
-                                    <span class="themed-part-of-speech">
+                                    <span class="text-lg font-semibold text-primary">
                                         {{ definition.part_of_speech }}
                                     </span>
                                     <sup
@@ -292,7 +292,7 @@
 
                                 <div class="border-l-2 border-accent pl-4">
                                     <p class="text-definition mb-2">
-                                        {{ definition.definition }}
+                                        {{ definition.text }}
                                     </p>
 
                                     <!-- Examples -->
@@ -459,6 +459,8 @@ import {
     OxfordIcon, 
     DictionaryIcon 
 } from '@/components/custom/icons';
+import type { Definition } from '@/types/api';
+import type { CardVariant } from '@/types';
 
 // Track mounting state for dropdown
 const isMounted = ref(false);
@@ -605,7 +607,7 @@ const mode = computed(() => store.mode);
 const pronunciationMode = computed(() => store.pronunciationMode);
 
 // Extract unique providers from definitions
-const usedProviders = computed(() => {
+const usedProviders = computed((): string[] => {
     if (!entry.value?.definitions) return [];
     
     const providers = new Set<string>();
@@ -649,7 +651,7 @@ function getProviderDisplayName(provider: string): string {
 }
 
 // Helper function to get provider icon component
-function getProviderIcon(provider: string) {
+function getProviderIcon(provider: string): any {
     const icons: Record<string, any> = {
         wiktionary: WiktionaryIcon,
         oxford: OxfordIcon,
@@ -666,7 +668,7 @@ const shouldShowSidebar = computed(() => {
 
     const clusters = new Set();
     entry.value.definitions.forEach((def) => {
-        clusters.add(def.meaning_cluster || 'default');
+        clusters.add(def.meaning_cluster?.id || 'default');
     });
 
     const hasMultipleClusters = clusters.size > 1;
@@ -675,7 +677,7 @@ const shouldShowSidebar = computed(() => {
 });
 
 // Part of speech ordering for consistent display
-const partOfSpeechOrder = {
+const partOfSpeechOrder: Record<string, number> = {
     noun: 1,
     verb: 2,
     adjective: 3,
@@ -688,30 +690,33 @@ const partOfSpeechOrder = {
     article: 10,
 };
 
+// Type for transformed definition with grouped examples
+interface TransformedDefinition extends Omit<Definition, 'examples'> {
+    examples: {
+        generated: Array<{ sentence: string; regenerable?: boolean; source?: string }>;
+        literature: Array<{ sentence: string; regenerable?: boolean; source?: string }>;
+    };
+    definition?: string; // Alias for text field used in templates
+}
+
+// Type for grouped definitions
+interface GroupedDefinition {
+    clusterId: string;
+    clusterDescription: string;
+    definitions: TransformedDefinition[];
+    maxRelevancy: number;
+}
+
 // Group and sort definitions by meaning cluster and relevancy
-const groupedDefinitions = computed(() => {
+const groupedDefinitions = computed((): GroupedDefinition[] => {
     if (!entry.value?.definitions) return [];
 
     // Group definitions by meaning cluster
-    const clusters = new Map<
-        string,
-        {
-            clusterId: string;
-            clusterDescription: string;
-            definitions: typeof entry.value.definitions;
-            maxRelevancy: number;
-        }
-    >();
+    const clusters = new Map<string, GroupedDefinition>();
 
     entry.value.definitions.forEach((definition) => {
-        const clusterId = definition.meaning_cluster || 'default';
-        const clusterDescription = definition.meaning_cluster
-            ? clusterId
-                  .replace(/_/g, ' ')
-                  .replace(/\b\w/g, (l) => l.toUpperCase())
-                  .replace(new RegExp(`\\b${entry.value?.word}\\b`, 'gi'), '')
-                  .trim()
-            : 'General';
+        const clusterId = definition.meaning_cluster?.id || 'default';
+        const clusterDescription = definition.meaning_cluster?.name || 'General';
 
         if (!clusters.has(clusterId)) {
             clusters.set(clusterId, {
@@ -723,7 +728,9 @@ const groupedDefinitions = computed(() => {
         }
 
         const cluster = clusters.get(clusterId)!;
-        cluster.definitions.push(definition);
+        // Cast definition since API transforms it
+        const transformedDef = definition as any as TransformedDefinition;
+        cluster.definitions.push(transformedDef);
 
         // Track highest relevancy in cluster for sorting
         if ((definition.relevancy || 1.0) > cluster.maxRelevancy) {
@@ -800,7 +807,7 @@ const toggleDropdown = () => {
 };
 
 const selectTheme = (theme: string) => {
-    store.selectedCardVariant = theme as any;
+    store.selectedCardVariant = theme as CardVariant;
     showThemeDropdown.value = false;
 };
 
@@ -828,12 +835,12 @@ const handleClickOutside = (event: Event) => {
 };
 
 // Create a list of all parts of speech in order for keyboard navigation
-const orderedPartsOfSpeech = computed(() => {
+const orderedPartsOfSpeech = computed((): Array<{clusterId: string, partOfSpeech: string, key: string}> => {
     const partsOfSpeech: Array<{clusterId: string, partOfSpeech: string, key: string}> = [];
     
     groupedDefinitions.value.forEach(cluster => {
         // Group by part of speech within each cluster
-        const partOfSpeechGroups = new Map<string, any[]>();
+        const partOfSpeechGroups = new Map<string, TransformedDefinition[]>();
         cluster.definitions.forEach(def => {
             const partOfSpeech = def.part_of_speech;
             if (!partOfSpeechGroups.has(partOfSpeech)) {
@@ -844,8 +851,8 @@ const orderedPartsOfSpeech = computed(() => {
         
         // Sort parts of speech within cluster
         const sortedPartsOfSpeech = Array.from(partOfSpeechGroups.keys()).sort(
-            (a, b) => (partOfSpeechOrder[a as keyof typeof partOfSpeechOrder] || 999) - 
-                      (partOfSpeechOrder[b as keyof typeof partOfSpeechOrder] || 999)
+            (a, b) => (partOfSpeechOrder[a] || 999) - 
+                      (partOfSpeechOrder[b] || 999)
         );
         
         sortedPartsOfSpeech.forEach(partOfSpeech => {

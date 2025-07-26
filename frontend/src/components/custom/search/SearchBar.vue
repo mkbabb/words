@@ -137,6 +137,29 @@
                     </button>
                 </div>
 
+                <!-- Debug: Clear Storage Button -->
+                <div
+                    v-if="isDevelopment"
+                    :class="[
+                        'flex-shrink-0 overflow-hidden transition-all duration-300 ease-out',
+                    ]"
+                    :style="{
+                        opacity: iconOpacity,
+                        transform: `scale(${0.9 + iconOpacity * 0.1})`,
+                        pointerEvents: iconOpacity > 0.1 ? 'auto' : 'none',
+                        width: iconOpacity > 0.1 ? '48px' : '0px',
+                        marginLeft: iconOpacity > 0.1 ? '8px' : '0px',
+                    }"
+                >
+                    <button
+                        @click="clearAllStorage"
+                        class="flex h-12 w-12 items-center justify-center rounded-lg bg-red-500/10 text-red-500 transition-all duration-200 ease-out hover:bg-red-500/20"
+                        title="Clear all local storage (DEBUG)"
+                    >
+                        <Trash2 :size="20" />
+                    </button>
+                </div>
+
                 <!-- Hamburger Button - Always visible -->
                 <div
                     :class="[
@@ -436,7 +459,7 @@ import type { SearchResult } from '@/types';
 import { Button } from '@/components/ui';
 import { FancyF, HamburgerIcon } from '@/components/custom/icons';
 import { BouncyToggle } from '@/components/custom/animation';
-import { RefreshCw, Languages, Globe } from 'lucide-vue-next';
+import { RefreshCw, Languages, Globe, Trash2 } from 'lucide-vue-next';
 import {
     AppleIcon,
     WiktionaryIcon,
@@ -473,6 +496,7 @@ const store = useAppStore();
 const query = ref(store.searchQuery || '');
 const autocompleteText = ref('');
 const searchResults = ref<SearchResult[]>([]);
+const isDevelopment = ref(import.meta.env.DEV);
 const isSearching = ref(false);
 const selectedIndex = ref(0);
 const aiSuggestions = ref<string[]>([]);
@@ -687,7 +711,14 @@ const containerStyle = computed(() => {
 });
 
 // Sources configuration
-const sources = [
+// Type safe sources configuration
+interface SourceConfig {
+    id: string;
+    name: string;
+    icon: typeof WiktionaryIcon | typeof OxfordIcon | typeof DictionaryIcon | typeof AppleIcon;
+}
+
+const sources: SourceConfig[] = [
     { id: 'wiktionary', name: 'Wiktionary', icon: WiktionaryIcon },
     { id: 'oxford', name: 'Oxford', icon: OxfordIcon },
     { id: 'dictionary_com', name: 'Dictionary.com', icon: DictionaryIcon },
@@ -695,7 +726,13 @@ const sources = [
 ];
 
 // Languages configuration with Lucide icons
-const languages = [
+interface LanguageConfig {
+    value: string;
+    label: string;
+    icon: typeof Globe | typeof Languages;
+}
+
+const languages: LanguageConfig[] = [
     { value: 'en', label: 'EN', icon: Globe },
     { value: 'fr', label: 'FR', icon: Languages },
     { value: 'es', label: 'ES', icon: Languages },
@@ -993,6 +1030,17 @@ const handleLanguageToggle = (languageCode: string) => {
 const handleModeToggle = () => {
     store.toggleMode();
     // Do not modify focus state when toggling mode
+};
+
+const clearAllStorage = () => {
+    if (confirm('This will clear all local storage including history and settings. Are you sure?')) {
+        // Clear localStorage
+        localStorage.clear();
+        // Clear sessionStorage
+        sessionStorage.clear();
+        // Reload the page to reset the app
+        window.location.reload();
+    }
 };
 
 // Autocomplete logic

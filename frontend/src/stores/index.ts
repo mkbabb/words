@@ -371,7 +371,28 @@ export const useAppStore = defineStore('app', () => {
                         `Stage: ${stage}, Progress: ${progress}%, Message: ${message}`
                     );
 
-                    loadingProgress.value = progress;
+                    // Smooth progress interpolation
+                    const currentProgress = loadingProgress.value;
+                    const targetProgress = progress;
+                    
+                    // If progress is going backwards or jumping too far, set it directly
+                    if (targetProgress < currentProgress || targetProgress - currentProgress > 30) {
+                        loadingProgress.value = targetProgress;
+                    } else if (targetProgress > currentProgress) {
+                        // Animate progress smoothly
+                        const steps = Math.ceil((targetProgress - currentProgress) / 2);
+                        let step = 0;
+                        const interval = setInterval(() => {
+                            step++;
+                            loadingProgress.value = Math.min(
+                                currentProgress + (step * 2),
+                                targetProgress
+                            );
+                            if (loadingProgress.value >= targetProgress) {
+                                clearInterval(interval);
+                            }
+                        }, 50); // Update every 50ms for smooth animation
+                    }
 
                     loadingStage.value = stage;
 
@@ -382,6 +403,9 @@ export const useAppStore = defineStore('app', () => {
                 }
             );
 
+            console.log('Setting currentEntry:', entry);
+            console.log('First definition:', entry.definitions?.[0]);
+            console.log('First definition part_of_speech:', entry.definitions?.[0]?.part_of_speech);
             currentEntry.value = entry;
 
             // Update current word in session

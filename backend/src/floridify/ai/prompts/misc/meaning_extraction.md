@@ -16,22 +16,22 @@ Create distinct meaning clusters where each cluster represents a fundamentally d
 
 For "bank":
 
-- cluster_id: "bank_financial", description: "Financial institutions and buildings", indices: [0, 3, 7]
-- cluster_id: "bank_geographic", description: "Edge of water bodies", indices: [1, 4]
-- cluster_id: "bank_arrangement", description: "Rows or arrangements of items", indices: [2, 5, 6]
+- cluster_id: "bank_finance", description: "Financial institutions", indices: [0, 3, 7]
+- cluster_id: "bank_water", description: "Water edges", indices: [1, 4]
+- cluster_id: "bank_rows", description: "Rows of items", indices: [2, 5, 6]
 
 For "run":
 
-- cluster_id: "run_movement", description: "Moving quickly on foot", indices: [0, 2, 8]
-- cluster_id: "run_operation", description: "Operating or managing something", indices: [1, 4, 9]
-- cluster_id: "run_flow", description: "Flowing like a liquid", indices: [3, 6]
+- cluster_id: "run_motion", description: "Quick movement", indices: [0, 2, 8]
+- cluster_id: "run_manage", description: "Operating systems", indices: [1, 4, 9]
+- cluster_id: "run_flow", description: "Liquid flow", indices: [3, 6]
 
 ## Output Structure
 
 Return a list of cluster mappings, where each mapping contains:
 
-1. **cluster_id**: Unique identifier using the format {EXACT_INPUT_NAME}\_{CLUSTER_NAME} (e.g., "bank_financial", "bank_geographic") -- the cluster names should be pithy, minimal, and pertinent. Short names are preferred.
-2. **cluster_description**: Human-readable description of this cluster
+1. **cluster_id**: Unique identifier using the format {EXACT_INPUT_NAME}\_{CLUSTER_NAME} (e.g., "bank_financial", "bank_geographic") -- the cluster names should be VERY SHORT (1-2 words max), minimal, and pithy. Prefer single words when possible (e.g., "bank_finance", "run_motion", "set_group").
+2. **cluster_description**: Brief human-readable description of this cluster (3-6 words max, e.g., "Financial institutions", "Movement and motion", "Groups or collections")
 3. **definition_indices**: List of definition indices (0-based) that belong to this cluster
 4. **confidence**: Overall confidence in the clustering (0.0-1.0)
 5. **relevancy**: How relevant this cluster is to common usage (0.0-1.0, where 1.0 is most commonly used meaning)

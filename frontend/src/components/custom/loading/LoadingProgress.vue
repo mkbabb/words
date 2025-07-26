@@ -163,8 +163,11 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
     checkpoints: () => [
         { progress: 5, label: 'Start' },
-        { progress: 20, label: 'Search' },
-        { progress: 60, label: 'Providers' },
+        { progress: 10, label: 'Search Start' },
+        { progress: 20, label: 'Search Complete' },
+        { progress: 25, label: 'Provider Fetch' },
+        { progress: 60, label: 'Providers Complete' },
+        { progress: 70, label: 'AI Clustering' },
         { progress: 85, label: 'AI Synthesis' },
         { progress: 95, label: 'Storage' },
         { progress: 100, label: 'Complete' },
@@ -202,9 +205,12 @@ const rainbowGradient = computed(() => generateRainbowGradient(8));
 const getCheckpointDescription = (progress: number): string => {
     const descriptions: Record<number, string> = {
         5: 'Pipeline initialization and setup. Preparing search engines and AI processing systems.',
-        20: 'Searching through multiple dictionary sources and semantic indices to find the best word matches.',
-        60: 'Fetching definitions from dictionary providers including Wiktionary, Oxford, and Dictionary.com in parallel.',
-        85: 'AI clustering and synthesis - grouping definitions by meaning and creating comprehensive entries.',
+        10: 'Beginning multi-method word search through dictionary indices and semantic databases.',
+        20: 'Search complete. Found best matching word across all available sources.',
+        25: 'Starting parallel fetches from dictionary providers (Wiktionary, Oxford, Dictionary.com).',
+        60: 'All provider data collected. Ready for AI processing and synthesis.',
+        70: 'AI analyzing and clustering definitions by semantic meaning to reduce redundancy.',
+        85: 'AI synthesizing comprehensive definitions from clustered meanings and generating examples.',
         95: 'Saving processed entry to knowledge base and updating search indices for future lookups.',
         100: 'Pipeline complete! Ready to display comprehensive word information with examples, synonyms, and pronunciation.',
     };

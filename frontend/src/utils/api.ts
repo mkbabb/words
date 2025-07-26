@@ -1,9 +1,20 @@
 import axios, { type AxiosResponse } from 'axios';
 import type {
-  SynthesizedDictionaryEntry,
+  LookupResponse,
+  SearchResponse,
   SearchResult,
+  DefinitionResponse,
+  Example,
+  AIResponse,
+  DictionaryProvider,
+  Language,
+} from '@/types/api';
+import type {
+  SynthesizedDictionaryEntry,
+  TransformedDefinition,
   ThesaurusEntry,
   VocabularySuggestionsResponse,
+  SimpleExample,
 } from '@/types';
 
 // API versioning configuration
@@ -67,7 +78,7 @@ export const dictionaryApi = {
       };
 
       const params = getSearchParams(query);
-      const response = await api.get(`/search`, {
+      const response = await api.get<SearchResponse>(`/search`, {
         params: {
           q: query,
           ...params,
@@ -80,12 +91,53 @@ export const dictionaryApi = {
     }
   },
 
+  // Transform flat examples array to grouped structure
+  transformDefinitionExamples(definition: DefinitionResponse): TransformedDefinition {
+    if (!definition.examples || !Array.isArray(definition.examples)) {
+      return {
+        ...definition,
+        definition: definition.text, // Add alias for compatibility
+        examples: {
+          generated: [],
+          literature: []
+        }
+      } as TransformedDefinition;
+    }
+
+    // Group examples by type
+    const grouped = {
+      generated: [] as SimpleExample[],
+      literature: [] as SimpleExample[]
+    };
+
+    definition.examples.forEach((example: Example) => {
+      if (example.type === 'generated') {
+        grouped.generated.push({
+          sentence: example.text,
+          regenerable: true
+        });
+      } else if (example.type === 'literature') {
+        grouped.literature.push({
+          sentence: example.text,
+          regenerable: false,
+          source: example.source?.title || 'Unknown source'
+        });
+      }
+    });
+
+    return {
+      ...definition,
+      definition: definition.text, // Add alias for compatibility
+      examples: grouped
+    } as TransformedDefinition;
+  },
+
   // Get word definition
   async getDefinition(
     word: string, 
     forceRefresh: boolean = false,
-    providers?: string[],
-    languages?: string[]
+    providers?: DictionaryProvider[],
+    languages?: Language[]
   ): Promise<SynthesizedDictionaryEntry> {
     const params = new URLSearchParams();
     if (forceRefresh) params.append('force_refresh', 'true');
@@ -100,18 +152,31 @@ export const dictionaryApi = {
       languages.forEach(language => params.append('languages', language));
     }
     
-    const response = await api.get(`/lookup/${word}`, {
+    const response = await api.get<LookupResponse>(`/lookup/${word}`, {
       params: Object.fromEntries(params.entries())
     });
-    return response.data;
+    
+    // Transform the response to match frontend expectations
+    const transformedDefinitions = response.data.definitions?.map((def: DefinitionResponse) => 
+      this.transformDefinitionExamples(def)
+    ) || [];
+    
+    // Add frontend-specific fields
+    return {
+      ...response.data,
+      definitions: transformedDefinitions,
+      lookup_count: 0,
+      regeneration_count: 0,
+      status: 'active'
+    } as SynthesizedDictionaryEntry;
   },
 
   // Get word definition with streaming progress
   async getDefinitionStream(
     word: string,
     forceRefresh: boolean = false,
-    providers?: string[],
-    languages?: string[],
+    providers?: DictionaryProvider[],
+    languages?: Language[],
     onProgress?: (stage: string, progress: number, message: string, details?: any) => void
   ): Promise<SynthesizedDictionaryEntry> {
     return new Promise((resolve, reject) => {
@@ -168,7 +233,22 @@ export const dictionaryApi = {
           
           // Extract the result from the details field, or fallback to direct data
           const result = data.details?.result || data;
-          resolve(result);
+          
+          // Transform definitions if present
+          const transformedDefinitions = result.definitions?.map((def: DefinitionResponse) => 
+            this.transformDefinitionExamples(def)
+          ) || [];
+          
+          // Add frontend-specific fields
+          const synthesizedEntry: SynthesizedDictionaryEntry = {
+            ...result,
+            definitions: transformedDefinitions,
+            lookup_count: 0,
+            regeneration_count: 0,
+            status: 'active'
+          };
+          
+          resolve(synthesizedEntry);
         } catch (e) {
           clearTimeout(connectionTimeout);
           eventSource.close();
@@ -207,8 +287,41 @@ export const dictionaryApi = {
 
   // Get synonyms/thesaurus data
   async getSynonyms(word: string): Promise<ThesaurusEntry> {
-    const response = await api.get(`/synonyms/${word}`);
-    return response.data;
+    // Use the new AI synthesis endpoint instead of deprecated synonyms endpoint
+    try {
+      // First, get the word definition to provide context
+      const lookupResponse = await api.get(`/lookup/${word}`);
+      if (!lookupResponse.data || !lookupResponse.data.definitions || lookupResponse.data.definitions.length === 0) {
+        throw new Error('No definitions found for word');
+      }
+
+      // Use the first definition for context
+      const firstDefinition = lookupResponse.data.definitions[0];
+      
+      // Call the new AI synthesis endpoint
+      const response = await api.post<AIResponse<{ synonyms: Array<{ word: string; score: number }>, confidence: number }>>('/ai/synthesize/synonyms', {
+        word: word,
+        definition: firstDefinition.text || firstDefinition.definition,
+        part_of_speech: firstDefinition.part_of_speech,
+        existing_synonyms: firstDefinition.synonyms || [],
+        count: 10
+      });
+
+      // Transform the response to match ThesaurusEntry format
+      return {
+        word: word,
+        synonyms: response.data.result.synonyms || [],
+        confidence: response.data.result.confidence || 0
+      };
+    } catch (error) {
+      console.error('Error fetching synonyms:', error);
+      // Fallback to empty thesaurus entry
+      return {
+        word: word,
+        synonyms: [],
+        confidence: 0
+      };
+    }
   },
 
   // Get search autocomplete suggestions (fallback since search endpoint removed)

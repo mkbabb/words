@@ -1,70 +1,63 @@
-export interface Example {
-  sentence: string;
-  regenerable?: boolean;
-  source?: string;
+// Frontend-specific types that extend or adapt backend types
+import type { 
+  LookupResponse, 
+  Definition as APIDefinition,
+  SearchResult as APISearchResult 
+} from './api';
+
+// Re-export backend-aligned types
+export { 
+  type Example,
+  type MeaningCluster,
+  type Definition,
+  type SearchResult,
+  type SearchMethod,
+  type Language,
+  type DictionaryProvider,
+  type LookupResponse,
+  type SearchResponse,
+  type Pronunciation,
+  type AudioFile,
+  type WordForm,
+  type UsageNote,
+  type GrammarPattern,
+  type Collocation,
+  type Etymology,
+  type ModelInfo,
+  type LiteratureSource
+} from './api';
+
+// Frontend version of Definition with transformed examples
+export interface TransformedDefinition extends Omit<APIDefinition, 'examples'> {
+  definition: string; // Alias for 'text' to maintain compatibility
+  examples: {
+    generated: SimpleExample[];
+    literature: SimpleExample[];
+  };
 }
 
-export interface Definition {
-  part_of_speech: string;
-  definition: string;
-  synonyms?: string[];
-  antonyms?: string[];
-  examples?: {
-    generated: Example[];
-    literature: Example[];
-  };
-  meaning_cluster?: string;
-  raw_metadata?: Record<string, any>;
-
-  // Enhanced metadata
-  created_at: string; // ISO date string
-  updated_at: string; // ISO date string
-  accessed_at?: string; // ISO date string
-  created_by?: string; // Creator attribution
-  updated_by?: string; // Last modifier attribution
-  source_attribution?: string; // AI model or provider source
-  version: number; // Version number for change tracking
-  quality_score?: number; // Quality/confidence score (0.0-1.0)
-  relevancy?: number; // Relevancy score for meaning cluster ordering (0.0-1.0)
-  validation_status?: string; // Validation state
-  metadata: Record<string, any>; // Extensible metadata
-}
-
-export interface SynthesizedDictionaryEntry {
-  word: string;
-  pronunciation?: {
-    ipa?: string;
-    phonetic?: string;
-  };
-  definitions: Definition[];
+export interface SynthesizedDictionaryEntry extends Omit<LookupResponse, 'definitions'> {
+  definitions: TransformedDefinition[];
   etymology?: string;
   frequency?: number;
-  last_updated?: string;
-
-  // Enhanced metadata
-  created_at: string; // ISO date string
-  accessed_at?: string; // ISO date string
-  synthesis_version?: string; // AI synthesis model version
-  synthesis_quality?: number; // Overall synthesis quality score (0.0-1.0)
-  definition_count: number; // Number of definitions synthesized
+  // Frontend-specific fields for UI state
   lookup_count: number; // Number of times accessed
   regeneration_count: number; // Number of times content was regenerated
   status: string; // Entry status (active, archived, flagged, needs_review)
-  metadata: Record<string, any>; // Extensible synthesis metadata
 }
 
-export interface SearchResult {
-  word: string;
-  score: number;
-  method: 'exact' | 'fuzzy' | 'semantic' | 'prefix' | 'hybrid';
-  is_phrase?: boolean;
+// Frontend display types
+export interface SimpleExample {
+  sentence: string;
+  regenerable?: boolean;
+  source?: string;
 }
 
 export interface SearchHistory {
   id: string;
   query: string;
   timestamp: Date;
-  results: SearchResult[];
+  results: APISearchResult[];
 }
 
 export interface LookupHistory {
@@ -94,6 +87,7 @@ export interface SynonymData {
 export interface ThesaurusEntry {
   word: string;
   synonyms: SynonymData[];
+  confidence?: number;
 }
 
 
@@ -113,7 +107,7 @@ export interface SearchState {
   query: string;
   isSearching: boolean;
   hasSearched: boolean;
-  results: SearchResult[];
+  results: APISearchResult[];
   currentEntry?: SynthesizedDictionaryEntry;
   mode: 'dictionary' | 'thesaurus';
 }

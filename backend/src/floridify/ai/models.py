@@ -66,7 +66,7 @@ class ClusterMapping(BaseModel):
     """A single cluster mapping entry."""
 
     cluster_id: str = Field(
-        description="Unique cluster identifier (e.g., 'bank_financial')"
+        description="Pithy unique cluster identifier (e.g., 'bank_financial') - always in the form {word}_{meaning_cluster}."
     )
     cluster_description: str = Field(
         description="Human-readable description of this cluster"

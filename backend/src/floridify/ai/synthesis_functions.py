@@ -734,9 +734,12 @@ async def cluster_definitions(
 
         # Apply cluster assignments
         for cluster_mapping in cluster_response.cluster_mappings:
+            # Extract short name from cluster_id (e.g., "bank_finance" -> "finance")
+            cluster_name = cluster_mapping.cluster_id.split('_')[-1].title() if '_' in cluster_mapping.cluster_id else cluster_mapping.cluster_id
+            
             cluster = MeaningCluster(
                 id=cluster_mapping.cluster_id,
-                name=cluster_mapping.cluster_description,
+                name=cluster_name,  # Short name extracted from ID
                 description=cluster_mapping.cluster_description,
                 order=int(cluster_mapping.relevancy),
                 relevance=cluster_mapping.relevancy,

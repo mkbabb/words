@@ -19,13 +19,17 @@
             />
 
             <!-- Stage Description Text -->
-            <div class="max-w-md text-center">
+            <div class="max-w-md text-center space-y-2">
                 <ShimmerText
                     :text="currentStageText"
                     text-class="text-xl font-semibold italic text-gray-800 dark:text-gray-100"
                     :class="progressTextClass"
                     :duration="3200"
                 />
+                <!-- Stage Sub-description -->
+                <p class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                    {{ stageDescription }}
+                </p>
             </div>
 
         </div>
@@ -127,6 +131,37 @@ const progressTextClass = computed(() => ({
     'animate-pulse': props.progress < 100,
     'text-green-600 dark:text-green-400': props.progress >= 100,
 }));
+
+// Computed property for stage description
+const stageDescription = computed(() => {
+    const stageDescriptions: Record<string, string> = {
+        // Main pipeline stages
+        START: 'Setting up search engines, AI models, and database connections.',
+        SEARCH_START: 'Searching exact matches, fuzzy matches, and semantic similarities.',
+        SEARCH_COMPLETE: 'Best match identified with confidence scoring.',
+        PROVIDER_FETCH_START: 'Connecting to multiple dictionary APIs simultaneously.',
+        PROVIDER_FETCH_COMPLETE: 'All available definitions have been retrieved.',
+        AI_CLUSTERING: 'Grouping similar meanings to eliminate redundancy.',
+        AI_SYNTHESIS: 'Creating comprehensive definitions with examples and usage notes.',
+        AI_FALLBACK: 'Generating definitions from AI knowledge when sources are unavailable.',
+        STORAGE_SAVE: 'Persisting results for faster future lookups.',
+        COMPLETE: 'Your word is ready to explore!',
+        complete: 'Your word is ready to explore!',
+        
+        // Provider-specific stages
+        PROVIDER_FETCH_HTTP_CONNECTING: 'Establishing secure connections to dictionary services.',
+        PROVIDER_FETCH_HTTP_DOWNLOADING: 'Retrieving raw definition data from providers.',
+        PROVIDER_FETCH_HTTP_RATE_LIMITED: 'Respecting API limits - brief pause required.',
+        PROVIDER_FETCH_HTTP_PARSING: 'Extracting structured data from provider responses.',
+        PROVIDER_FETCH_HTTP_COMPLETE: 'Provider data successfully processed.',
+        PROVIDER_FETCH_ERROR: 'Encountering issues - trying alternative sources.',
+        
+        // Error state
+        error: 'Something went wrong. Please try again.',
+    };
+    
+    return stageDescriptions[props.currentStage] || 'Processing your request...';
+});
 
 // Pass through the model value
 const modelValue = computed({

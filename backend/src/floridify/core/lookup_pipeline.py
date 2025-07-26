@@ -154,7 +154,7 @@ async def lookup_word_pipeline(
             logger.info(f"All providers failed, trying AI fallback for '{best_match}'")
             return await _ai_fallback_lookup(best_match, force_refresh, state_tracker)
         elif not providers_data:
-            logger.warning(f"All providers failed and AI is disabled for '{best_match}'")
+            logger.error(f"All providers failed and AI is disabled for '{best_match}'")
             return None
 
         # Synthesize with AI if enabled and we have provider data

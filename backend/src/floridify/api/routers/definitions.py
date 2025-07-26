@@ -109,8 +109,20 @@ async def list_definitions(
     frequency_band: int | None = Query(None, ge=1, le=5),
     has_examples: bool | None = Query(None),
 ) -> ListResponse[Definition]:
-    """
-    List definitions with filtering, sorting, and pagination.
+    """List definitions with advanced filtering.
+    
+    Query Parameters:
+        - word_id: Filter by word
+        - part_of_speech: Filter by POS
+        - language_register: formal/informal/neutral/slang/technical
+        - domain: Subject area
+        - cefr_level: A1-C2
+        - frequency_band: 1-5
+        - has_examples: Boolean filter
+        - Pagination: offset, limit, sort_by, sort_order
+    
+    Returns:
+        Paginated definition list.
     """
     # Build filter
     filter_params = DefinitionFilter(
@@ -154,7 +166,14 @@ async def create_definition(
     data: DefinitionCreate,
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
-    """Create a new definition."""
+    """Create definition entry.
+    
+    Body:
+        Complete definition data including text, POS, metadata.
+    
+    Returns:
+        Created definition with resource links.
+    """
     definition = await repo.create(data)
 
     return ResourceResponse(
@@ -176,7 +195,15 @@ async def get_definition(
     repo: DefinitionRepository = Depends(get_definition_repo),
     fields: FieldSelection = Depends(get_fields),
 ) -> Response | ResourceResponse:
-    """Get a single definition by ID."""
+    """Retrieve definition with optional expansions.
+    
+    Query Parameters:
+        - expand: 'examples' to include example data
+        - Field selection: include, exclude parameters
+    
+    Returns:
+        Definition with completeness score and ETag.
+    """
     # Get definition with optional expansions
     if fields.expand and "examples" in fields.expand:
         definition_data = await repo.get_with_examples(definition_id)
@@ -223,7 +250,17 @@ async def update_definition(
     version: int | None = Query(None, description="Version for optimistic locking"),
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
-    """Update a definition with optional optimistic locking."""
+    """Update definition with version control.
+    
+    Query Parameters:
+        - version: For optimistic locking
+    
+    Body:
+        Partial update fields.
+    
+    Errors:
+        409: Version conflict
+    """
     definition = await repo.update(definition_id, data, version)
 
     return ResourceResponse(
@@ -242,7 +279,11 @@ async def delete_definition(
     cascade: bool = Query(False, description="Delete related examples"),
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> None:
-    """Delete a definition, optionally with cascade."""
+    """Delete definition.
+    
+    Query Parameters:
+        - cascade: Delete related examples
+    """
     await repo.delete(definition_id, cascade=cascade)
 
 
@@ -253,21 +294,21 @@ async def regenerate_components(
     request: ComponentRegenerationRequest,
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
-    """
-    Regenerate specific components of a definition.
-
-    Available components:
-    - synonyms: Generate synonyms
-    - antonyms: Generate antonyms
-    - examples: Generate example sentences
-    - cefr_level: Assess CEFR difficulty level
-    - frequency_band: Assess frequency band
-    - register: Classify language register
-    - domain: Identify subject domain
-    - grammar_patterns: Extract grammar patterns
-    - collocations: Identify collocations
-    - usage_notes: Generate usage notes
-    - regional_variants: Detect regional variants
+    """AI-regenerate definition components.
+    
+    Body:
+        - components: Set of components to regenerate
+          Options: synonyms, antonyms, examples, cefr_level,
+          frequency_band, register, domain, grammar_patterns,
+          collocations, usage_notes, regional_variants
+        - force: Regenerate even if data exists
+    
+    Returns:
+        Updated definition with regenerated components.
+    
+    Errors:
+        400: Invalid component names
+        404: Definition or word not found
     """
     # Get definition
     definition = await repo.get(definition_id)
@@ -404,7 +445,17 @@ async def batch_regenerate_components(
     request: BatchComponentUpdate,
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> dict[str, Any]:
-    """Regenerate components for multiple definitions."""
+    """Batch AI-regenerate components.
+    
+    Body:
+        - definition_ids: List of definition IDs (max 100)
+        - components: Components to regenerate
+        - force: Force regeneration
+        - parallel: Process in parallel
+    
+    Returns:
+        Processing summary and results by word.
+    """
     # Get definitions
     definition_ids = [PydanticObjectId(id) for id in request.definition_ids]
     definitions = await repo.get_many(definition_ids)

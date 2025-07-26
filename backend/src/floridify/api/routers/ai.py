@@ -131,7 +131,16 @@ async def generate_pronunciation(
     api_request: Request,
     background_tasks: BackgroundTasks,
 ) -> dict[str, Any]:
-    """Generate pronunciation for a word."""
+    """AI-generate phonetic pronunciation.
+    
+    Body:
+        - word: Target word (1-100 chars)
+    
+    Returns:
+        Pronunciation data with phonetic spelling and IPA.
+    
+    Rate Limited: ~100 tokens
+    """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=100)
     
@@ -150,7 +159,17 @@ async def generate_suggestions(
     api_request: Request,
     background_tasks: BackgroundTasks,
 ) -> dict[str, Any]:
-    """Generate vocabulary suggestions."""
+    """AI-generate related vocabulary suggestions.
+    
+    Body:
+        - input_words: Seed words for context (optional, max 10)
+        - count: Number of suggestions (4-12, default: 10)
+    
+    Returns:
+        Suggested words with themes and difficulty levels.
+    
+    Rate Limited: ~200 tokens
+    """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=200)
     
@@ -169,7 +188,17 @@ async def generate_word_forms(
     api_request: Request,
     background_tasks: BackgroundTasks,
 ) -> dict[str, Any]:
-    """Generate word forms."""
+    """AI-identify morphological word forms.
+    
+    Body:
+        - word: Base word (1-100 chars)
+        - part_of_speech: Word class (noun, verb, etc.)
+    
+    Returns:
+        Inflected forms (plurals, tenses, etc.).
+    
+    Rate Limited: ~150 tokens
+    """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=150)
     
@@ -188,7 +217,17 @@ async def assess_frequency(
     api_request: Request,
     background_tasks: BackgroundTasks,
 ) -> dict[str, Any]:
-    """Assess frequency band."""
+    """AI-assess word frequency band (1-5).
+    
+    Body:
+        - word: Target word
+        - definition: Context definition
+    
+    Returns:
+        Frequency band (1=most common, 5=rare).
+    
+    Rate Limited: ~100 tokens
+    """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=100)
     
@@ -207,7 +246,17 @@ async def assess_cefr(
     api_request: Request,
     background_tasks: BackgroundTasks,
 ) -> dict[str, Any]:
-    """Assess CEFR level."""
+    """AI-assess CEFR difficulty level.
+    
+    Body:
+        - word: Target word
+        - definition: Context definition
+    
+    Returns:
+        CEFR level (A1-C2) with reasoning.
+    
+    Rate Limited: ~100 tokens
+    """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=100)
     
@@ -228,7 +277,20 @@ async def generate_synonyms(
     api_request: Request,
     background_tasks: BackgroundTasks,
 ) -> dict[str, Any]:
-    """Generate synonyms for a word with definition context."""
+    """AI-generate contextual synonyms.
+    
+    Body:
+        - word: Target word
+        - definition: Specific meaning context
+        - part_of_speech: Word class
+        - existing_synonyms: Already known (max 20)
+        - count: Desired count (1-20, default: 10)
+    
+    Returns:
+        Synonyms with relevance scores.
+    
+    Rate Limited: ~300 tokens
+    """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=300)
     
@@ -257,7 +319,20 @@ async def generate_antonyms(
     api_request: Request,
     background_tasks: BackgroundTasks,
 ) -> dict[str, Any]:
-    """Generate antonyms for a word with definition context."""
+    """AI-generate contextual antonyms.
+    
+    Body:
+        - word: Target word
+        - definition: Specific meaning context
+        - part_of_speech: Word class
+        - existing_antonyms: Already known (max 20)
+        - count: Desired count (1-10, default: 5)
+    
+    Returns:
+        Antonyms with confidence scores.
+    
+    Rate Limited: ~250 tokens
+    """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=250)
     
@@ -286,7 +361,19 @@ async def generate_examples(
     api_request: Request,
     background_tasks: BackgroundTasks,
 ) -> dict[str, Any]:
-    """Generate examples for a word with definition context."""
+    """AI-generate contextual example sentences.
+    
+    Body:
+        - word: Target word
+        - part_of_speech: Word class
+        - definition: Specific meaning
+        - count: Number of examples (1-10, default: 3)
+    
+    Returns:
+        Natural example sentences demonstrating usage.
+    
+    Rate Limited: ~400 tokens
+    """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=400)
     
@@ -314,7 +401,19 @@ async def generate_facts(
     api_request: Request,
     background_tasks: BackgroundTasks,
 ) -> dict[str, Any]:
-    """Generate facts for a word with definition context."""
+    """AI-generate interesting word facts.
+    
+    Body:
+        - word: Target word
+        - definition: Context
+        - count: Number of facts (1-10, default: 5)
+        - previous_words: Avoid repetition (optional)
+    
+    Returns:
+        Categorized facts (etymology, usage, cultural).
+    
+    Rate Limited: ~500 tokens
+    """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=500)
     
@@ -343,7 +442,16 @@ async def classify_register(
     api_request: Request,
     background_tasks: BackgroundTasks,
 ) -> dict[str, Any]:
-    """Classify language register."""
+    """AI-classify language register.
+    
+    Body:
+        - definition: Definition text
+    
+    Returns:
+        Register: formal/informal/neutral/slang/technical.
+    
+    Rate Limited: ~100 tokens
+    """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=100)
     

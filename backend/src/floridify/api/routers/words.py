@@ -76,8 +76,24 @@ async def list_words(
     created_after: datetime | None = Query(None),
     created_before: datetime | None = Query(None),
 ) -> ListResponse[Word]:
-    """
-    List words with filtering, sorting, and pagination.
+    """Retrieve paginated word list with filtering and sorting.
+    
+    Query Parameters:
+        - offset: Skip first N results (default: 0)
+        - limit: Maximum results to return (default: 20, max: 100)
+        - sort_by: Field to sort by (e.g., 'text', 'created_at')
+        - sort_order: Sort direction ('asc' or 'desc')
+        - text: Exact text match filter
+        - text_pattern: Partial text match filter
+        - language: Language code filter (e.g., 'en', 'es')
+        - offensive_flag: Filter by offensive content flag
+        - created_after/before: Date range filters
+    
+    Returns:
+        Paginated list with items, total count, offset, and limit.
+    
+    Example:
+        GET /api/v1/words?language=en&limit=10&sort_by=text
     """
     # Build filter
     filter_params = WordFilter(
@@ -120,7 +136,22 @@ async def create_word(
     data: WordCreate,
     repo: WordRepository = Depends(get_word_repo),
 ) -> ResourceResponse:
-    """Create a new word."""
+    """Create new word entry.
+    
+    Body:
+        - text: Word text (required)
+        - normalized: Normalized form (required)
+        - language: Language code (required)
+        - offensive_flag: Mark as offensive (optional)
+        - first_known_use: Historical first use (optional)
+    
+    Returns:
+        Created word with links to related resources.
+    
+    Errors:
+        409: Word already exists in specified language
+        422: Invalid input data
+    """
     # Check if word already exists
     existing = await repo.find_by_text(data.text, data.language)
     if existing:
@@ -159,7 +190,23 @@ async def get_word(
     repo: WordRepository = Depends(get_word_repo),
     fields: FieldSelection = Depends(get_fields),
 ) -> Response | ResourceResponse:
-    """Get a single word by ID."""
+    """Retrieve word details by ID.
+    
+    Path Parameters:
+        - word_id: MongoDB ObjectId of word
+    
+    Query Parameters:
+        - include: Comma-separated fields to include
+        - exclude: Comma-separated fields to exclude
+        - expand: Comma-separated relations to expand (e.g., 'definitions')
+    
+    Returns:
+        Word data with metadata and resource links.
+        
+    Headers:
+        - ETag: Entity tag for caching
+        - Returns 304 if If-None-Match matches current ETag
+    """
     # Get word with counts
     word_data = await repo.get_with_counts(word_id)
 
@@ -209,7 +256,24 @@ async def update_word(
     version: int | None = Query(None, description="Version for optimistic locking"),
     repo: WordRepository = Depends(get_word_repo),
 ) -> ResourceResponse:
-    """Update a word with optional optimistic locking."""
+    """Update word with optimistic concurrency control.
+    
+    Path Parameters:
+        - word_id: MongoDB ObjectId of word
+    
+    Query Parameters:
+        - version: Current version for optimistic locking (optional)
+    
+    Body:
+        Partial update fields (only provided fields are updated)
+    
+    Returns:
+        Updated word with new version number.
+    
+    Errors:
+        409: Version conflict (concurrent modification)
+        404: Word not found
+    """
     word = await repo.update(word_id, data, version)
 
     return ResourceResponse(
@@ -228,7 +292,20 @@ async def delete_word(
     cascade: bool = Query(False, description="Delete related documents"),
     repo: WordRepository = Depends(get_word_repo),
 ) -> None:
-    """Delete a word, optionally with cascade."""
+    """Delete word and optionally cascade to related documents.
+    
+    Path Parameters:
+        - word_id: MongoDB ObjectId of word
+    
+    Query Parameters:
+        - cascade: Delete related definitions, examples, facts (default: false)
+    
+    Returns:
+        204 No Content on success
+    
+    Errors:
+        404: Word not found
+    """
     await repo.delete(word_id, cascade=cascade)
 
 
@@ -240,7 +317,21 @@ async def search_words(
     limit: int = Query(10, ge=1, le=50),
     repo: WordRepository = Depends(get_word_repo),
 ) -> ListResponse[Word]:
-    """Search words by text pattern."""
+    """Search words by text pattern.
+    
+    Path Parameters:
+        - query: Search query text
+    
+    Query Parameters:
+        - language: Filter by language code
+        - limit: Maximum results (default: 10, max: 50)
+    
+    Returns:
+        List of matching words with relevance ordering.
+    
+    Example:
+        GET /api/v1/words/search/test?language=en&limit=5
+    """
     words = await repo.search(query, language, limit)
 
     return ListResponse(

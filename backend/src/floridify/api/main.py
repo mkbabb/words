@@ -10,6 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from ..storage.mongodb import get_storage
 from ..utils.logging import setup_logging
 from .middleware import CacheHeadersMiddleware, LoggingMiddleware
+from ..search.language import get_language_search
+from ..text.processor import get_text_processor
+from ..ai import get_definition_synthesizer, get_openai_connector
+from ..constants import Language
 from .routers import (
     ai,
     audio,
@@ -34,11 +38,27 @@ async def lifespan(app: FastAPI) -> Any:
     """Initialize database and resources on startup, cleanup on shutdown."""
     # Startup
     try:
+        # Initialize MongoDB storage
         storage = await get_storage()
         print("✅ MongoDB storage initialized successfully")
         
+        # Initialize language search engine (singleton)
+        language_search = await get_language_search([Language.ENGLISH])
+        print("✅ Language search engine initialized successfully")
+        
+        # Initialize text processor (singleton)
+        text_processor = get_text_processor()
+        print("✅ Text processor initialized successfully")
+        
+        # Initialize AI components (singletons)
+        ai_connector = get_openai_connector()
+        print("✅ OpenAI connector initialized successfully")
+        
+        definition_synthesizer = get_definition_synthesizer()
+        print("✅ Definition synthesizer initialized successfully")
+        
     except Exception as e:
-        print(f"❌ Database initialization failed: {e}")
+        print(f"❌ Application initialization failed: {e}")
         raise
     
     yield

@@ -23,7 +23,9 @@ class AudioSynthesisConfig(BaseModel):
 
     credentials_path: Path | None = None
     project_id: str | None = None
-    cache_dir: Path = Field(default_factory=lambda: get_project_root() / "data" / "audio_cache")
+    cache_dir: Path = Field(
+        default_factory=lambda: get_project_root() / "data" / "audio_cache"
+    )
 
     # Voice configuration
     american_voice: str = "en-US-Wavenet-D"  # Male voice
@@ -126,7 +128,9 @@ class AudioSynthesizer:
                 self._client = texttospeech.TextToSpeechClient()
         return self._client
 
-    def _generate_cache_key(self, text: str, voice_name: str, is_ssml: bool = False) -> str:
+    def _generate_cache_key(
+        self, text: str, voice_name: str, is_ssml: bool = False
+    ) -> str:
         """Generate a cache key for the audio file."""
         content = f"{text}:{voice_name}:{is_ssml}:{self.config.audio_encoding}:{self.config.speaking_rate}"
         return hashlib.md5(content.encode()).hexdigest()
@@ -281,7 +285,9 @@ class AudioSynthesizer:
             synthesis_text = word
 
             # Check cache
-            cache_key = self._generate_cache_key(synthesis_text, voice_name, is_ssml=False)
+            cache_key = self._generate_cache_key(
+                synthesis_text, voice_name, is_ssml=False
+            )
             cache_path = self._get_cache_path(cache_key)
 
             if cache_path.exists():
@@ -368,15 +374,8 @@ class AudioSynthesizer:
         audio_files: list[AudioMedia] = []
 
         # Generate American pronunciation if available
-        if pronunciation.ipa_american:
-            audio = await self.synthesize_ipa(pronunciation.ipa_american, accent="american")
-            if audio:
-                await audio.save()
-                audio_files.append(audio)
-
-        # Generate British pronunciation if available
-        if pronunciation.ipa_british:
-            audio = await self.synthesize_ipa(pronunciation.ipa_british, accent="british")
+        if pronunciation.ipa:
+            audio = await self.synthesize_ipa(pronunciation.ipa, accent="american")
             if audio:
                 await audio.save()
                 audio_files.append(audio)

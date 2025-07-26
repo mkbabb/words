@@ -84,7 +84,7 @@
                     :key="idx"
                     class="space-y-1"
                   >
-                    <p class="text-sm leading-relaxed themed-definition-text">{{ definition.definition }}</p>
+                    <p class="text-sm leading-relaxed themed-definition-text">{{ definition.definition || definition.text }}</p>
                     <div v-if="definition.examples?.generated?.[0] || definition.examples?.literature?.[0]" class="themed-example-text text-xs italic opacity-75">
                       "{{ (definition.examples.generated[0] || definition.examples.literature[0])?.sentence }}"
                     </div>
@@ -115,6 +115,7 @@ import { useAppStore } from '@/stores'
 import { cn } from '@/utils'
 import { ShimmerText } from '@/components/custom/animation'
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui'
+import type { Definition } from '@/types/api'
 
 const store = useAppStore()
 const { selectedCardVariant } = storeToRefs(store)
@@ -143,9 +144,9 @@ const isAtDocumentBottom = () => {
 }
 
 // Debounce helper
-const debounce = (func: Function, wait: number) => {
+const debounce = <T extends (...args: any[]) => any>(func: T, wait: number): ((...args: Parameters<T>) => void) => {
   let timeout: NodeJS.Timeout
-  return function executedFunction(...args: any[]) {
+  return function executedFunction(...args: Parameters<T>) {
     const later = () => {
       clearTimeout(timeout)
       func(...args)
@@ -160,7 +161,7 @@ let clusterObservers: IntersectionObserver[] = []
 let partOfSpeechObservers: IntersectionObserver[] = []
 
 // Part of speech ordering for consistent display (same as DefinitionDisplay)
-const partOfSpeechOrder = {
+const partOfSpeechOrder: Record<string, number> = {
   noun: 1,
   verb: 2,
   adjective: 3,
@@ -190,14 +191,8 @@ const sidebarSections = computed((): SidebarCluster[] => {
   const clusters = new Map<string, SidebarCluster>()
 
   entry.definitions.forEach((definition) => {
-    const clusterId = definition.meaning_cluster || 'default'
-    const clusterDescription = definition.meaning_cluster
-      ? clusterId
-          .replace(/_/g, ' ')
-          .replace(/\b\w/g, (l) => l.toUpperCase())
-          .replace(new RegExp(`\\b${entry.word}\\b`, 'gi'), '')
-          .trim()
-      : 'General'
+    const clusterId = definition.meaning_cluster?.id || 'default'
+    const clusterDescription = definition.meaning_cluster?.name || 'General'
 
     if (!clusters.has(clusterId)) {
       clusters.set(clusterId, {
@@ -232,8 +227,8 @@ const sidebarSections = computed((): SidebarCluster[] => {
   // Sort parts of speech within each cluster - SAME AS DefinitionDisplay
   sortedClusters.forEach((cluster) => {
     cluster.partsOfSpeech.sort((a, b) => {
-      const aTypeOrder = partOfSpeechOrder[a.type?.toLowerCase() as keyof typeof partOfSpeechOrder] || 999
-      const bTypeOrder = partOfSpeechOrder[b.type?.toLowerCase() as keyof typeof partOfSpeechOrder] || 999
+      const aTypeOrder = partOfSpeechOrder[a.type?.toLowerCase()] || 999
+      const bTypeOrder = partOfSpeechOrder[b.type?.toLowerCase()] || 999
       return aTypeOrder - bTypeOrder
     })
   })
@@ -241,16 +236,28 @@ const sidebarSections = computed((): SidebarCluster[] => {
   return sortedClusters
 })
 
+// Type for definition from API (already transformed by api.ts)
+interface TransformedDefinition extends Omit<Definition, 'examples'> {
+  examples?: {
+    generated: Array<{ sentence: string; regenerable?: boolean; source?: string }>;
+    literature: Array<{ sentence: string; regenerable?: boolean; source?: string }>;
+  };
+  definition?: string; // Alias for text field used in templates
+}
+
 // Get definitions for a specific part of speech in a cluster
-const getDefinitionsForPartOfSpeech = (clusterId: string, partOfSpeech: string) => {
+const getDefinitionsForPartOfSpeech = (clusterId: string, partOfSpeech: string): TransformedDefinition[] => {
   const entry = store.currentEntry
   if (!entry?.definitions) return []
 
   return entry.definitions.filter(def => {
-    const defCluster = def.meaning_cluster || 'default'
+    const defCluster = def.meaning_cluster?.id || 'default'
     const defPartOfSpeech = def.part_of_speech
     return defCluster === clusterId && defPartOfSpeech === partOfSpeech
-  }).sort((a, b) => (b.relevancy || 1.0) - (a.relevancy || 1.0))
+  }).sort((a, b) => (b.relevancy || 1.0) - (a.relevancy || 1.0)).map(def => ({
+    ...def,
+    definition: def.text // Map text to definition for template compatibility
+  })) as TransformedDefinition[]
 }
 
 // Check if we should show sidebar (desktop with enough space)
