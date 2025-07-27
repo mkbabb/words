@@ -27,13 +27,16 @@
 
             <!-- Content Area with Sidebar -->
             <div class="container mx-auto max-w-6xl">
-                <div class="flex gap-6">
+                <div class="flex gap-6 relative">
                     <!-- Progressive Sidebar (Sticky) -->
-                    <ProgressiveSidebar 
-                        v-if="shouldShowProgressiveSidebar" 
-                        class="hidden w-48 flex-shrink-0 xl:block sticky self-start"
-                        :style="{ top: isScrolled ? '5rem' : '6rem', zIndex: 30 }"
-                    />
+                    <div v-if="shouldShowProgressiveSidebar" class="hidden w-48 flex-shrink-0 xl:block">
+                        <div 
+                            class="sticky"
+                            :style="{ top: isScrolled ? '5rem' : '6rem', zIndex: 30 }"
+                        >
+                            <ProgressiveSidebar />
+                        </div>
+                    </div>
                     
                     <!-- Main Content -->
                     <div class="flex-1 max-w-5xl mx-auto">

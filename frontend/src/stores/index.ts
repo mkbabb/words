@@ -42,6 +42,9 @@ export const useAppStore = defineStore('app', () => {
             selectedLanguages: ['en'] as string[],
             showControls: false,
             selectedWordlist: null as string | null,
+            // Progressive sidebar state
+            sidebarActiveCluster: '',
+            sidebarActivePartOfSpeech: '',
         },
         undefined,
         {
@@ -197,6 +200,20 @@ export const useAppStore = defineStore('app', () => {
         get: () => uiState.value.selectedWordlist,
         set: (value) => {
             uiState.value.selectedWordlist = value;
+        },
+    });
+
+    const sidebarActiveCluster = computed({
+        get: () => uiState.value.sidebarActiveCluster,
+        set: (value) => {
+            uiState.value.sidebarActiveCluster = value;
+        },
+    });
+
+    const sidebarActivePartOfSpeech = computed({
+        get: () => uiState.value.sidebarActivePartOfSpeech,
+        set: (value) => {
+            uiState.value.sidebarActivePartOfSpeech = value;
         },
     });
 
@@ -874,6 +891,8 @@ export const useAppStore = defineStore('app', () => {
         selectedLanguages,
         showControls,
         selectedWordlist,
+        sidebarActiveCluster,
+        sidebarActivePartOfSpeech,
 
         // Computed
         searchState,

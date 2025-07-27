@@ -50,6 +50,11 @@
     background-image: var(--paper-clean-texture);
     background-attachment: fixed;
   }
+
+  /* Ensure sticky positioning works properly */
+  .sticky {
+    position: sticky !important;
+  }
 }
 
 @theme {

@@ -6,7 +6,7 @@
         <!-- Separator between clusters (not before first) -->
         <hr
             v-if="clusterIndex > 0 && totalClusters > 1"
-            class="my-6 border-border/30"
+            class="my-6 border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30"
         />
         
         <!-- Cluster header with gradient divider -->
