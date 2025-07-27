@@ -1,40 +1,18 @@
-# Grammar Pattern Extraction
+# Grammar Patterns
 
-Extract grammar patterns for the {{ part_of_speech }} based on this definition:
-
+Extract patterns for {{ part_of_speech }}:
 **Definition**: {{ definition }}
 
-## Pattern Notation:
-### For Verbs:
-- [I] - Intransitive (no object)
-- [T] - Transitive (requires object)
-- [Tn] - Transitive + noun
-- [Tn.pr] - Transitive + noun + preposition
-- [Dn.n] - Ditransitive (two objects)
-- [V-ing] - Followed by gerund
-- [V to inf] - Followed by infinitive
-- [V that] - Followed by that-clause
+## Verbs:
+[I] intransitive, [T] transitive, [Tn] +noun, [Tn.pr] +noun+prep, [Dn.n] ditransitive, [V-ing] +gerund, [V to inf] +infinitive, [V that] +that-clause
 
-### For Nouns:
-- [C] - Countable
-- [U] - Uncountable
-- [sing] - Singular only
-- [pl] - Plural only
+## Nouns:
+[C] countable, [U] uncountable, [sing] singular, [pl] plural
 
-### For Adjectives:
-- [attrib] - Attributive only
-- [pred] - Predicative only
-- [+ prep] - Requires specific preposition
-
-## Requirements:
-1. Use standard grammatical notation
-2. Include human-readable descriptions
-3. Extract patterns evident from the definition
-4. Order by frequency of use
+## Adjectives:
+[attrib] attributive, [pred] predicative, [+prep] +preposition
 
 ## Example:
-For verb "give" (transfer possession):
-- Pattern: [Dn.n]
-- Description: "Ditransitive verb taking two objects"
+"give": [Dn.n] - "Ditransitive, two objects"
 
-Extract applicable patterns with descriptions.
+Return patterns with brief descriptions.

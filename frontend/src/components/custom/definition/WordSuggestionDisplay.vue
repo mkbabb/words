@@ -90,14 +90,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRouter } from 'vue-router';
 import { useAppStore } from '@/stores';
-import type { WordSuggestion } from '@/types';
 import { ThemedCard } from '@/components/custom/card';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 
 const store = useAppStore();
-const router = useRouter();
 
 const wordSuggestions = computed(() => store.wordSuggestions);
 
@@ -112,21 +109,6 @@ const sortedSuggestions = computed(() => {
 });
 
 const originalQuery = computed(() => wordSuggestions.value?.original_query || '');
-
-const queryDescription = computed(() => {
-    if (!wordSuggestions.value) return '';
-    
-    switch (wordSuggestions.value.query_type) {
-        case 'descriptive':
-            return 'Words matching your description';
-        case 'fill-in-blank':
-            return 'Words to complete your sentence';
-        case 'characteristic-based':
-            return 'Words with similar characteristics';
-        default:
-            return 'Suggested words for your query';
-    }
-});
 
 function getCardVariant(index: number): 'default' | 'gold' | 'silver' | 'bronze' {
     if (index === 0) return 'gold';

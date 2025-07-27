@@ -29,7 +29,8 @@ export {
 
 // Frontend version of Definition with transformed examples
 export interface TransformedDefinition extends Omit<APIDefinition, 'examples'> {
-  definition: string; // Alias for 'text' to maintain compatibility
+  definition?: string; // Alias for 'text' to maintain compatibility
+  source?: string; // Added for provider tracking
   examples: {
     generated: SimpleExample[];
     literature: SimpleExample[];
@@ -82,6 +83,11 @@ export interface VocabularySuggestionsResponse {
 export interface SynonymData {
   word: string;
   score: number;
+  confidence?: number;
+  efflorescence_score?: number;
+  language_origin?: string;
+  part_of_speech?: string;
+  usage_note?: string;
 }
 
 export interface ThesaurusEntry {

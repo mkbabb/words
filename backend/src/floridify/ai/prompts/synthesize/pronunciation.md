@@ -1,24 +1,8 @@
-# Task: Generate Pronunciation Data
+# Pronunciation: {{ word }}
 
-Provide BOTH phonetic and IPA pronunciations for the given word. You MUST provide both forms.
+Generate phonetic + IPA:
 
-## Input
+**Phonetic**: hyphenated, CAPS for stress (e.g., koh-NISH-uhn)
+**IPA**: American English with stress marks (e.g., /kəˈnɪʃən/)
 
-Word: {{ word }}
-
-## Requirements
-
-- **Phonetic**: Readable approximation using common English spelling (e.g., "koh-NISH-uhn", "eg-ZAM-pul")
-    - Use hyphens to separate syllables
-    - Use CAPITAL letters for stressed syllables
-    - Use standard English letter combinations (th, sh, ch, etc.)
-- **IPA**: Standard International Phonetic Alphabet notation with slashes
-    - Use American English pronunciation standard
-    - Include stress marks where appropriate
-    - Example: /kəˈnɪʃən/, /ɪgˈzæmpəl/
-
-## Important
-
-- ALWAYS provide BOTH phonetic AND IPA pronunciations
-- Do NOT include file names, audio references, or paths
-- Handle foreign words and phrases appropriately
+Output both formats only. No paths/audio references.

@@ -1,48 +1,16 @@
-# Extract Distinct Meanings for "{{ word }}"
+# Cluster Meanings: {{ word }}
 
-Analyze all definitions and create a numerical mapping of distinct meaning clusters to definition IDs.
-
-## All Definitions
-
-{% for definition in definitions %}
-**ID {{ loop.index0 }}**: {{ definition[0] }} ({{ definition[1] }}) - {{ definition[2] }}
+## Definitions
+{% for d in definitions %}
+{{ loop.index0 }}: {{ d[0] }} ({{ d[1] }}) - {{ d[2] }}
 {% endfor %}
 
 ## Task
+Group by distinct meaning. Format:
+- cluster_id: {word}_{name} (1-2 words)
+- description: (3-6 words)
+- indices: [list]
+- confidence: 0-1
+- relevancy: 0-1
 
-Create distinct meaning clusters where each cluster represents a fundamentally different sense/meaning of the word. Then map each cluster to the specific definition IDs (0-based indexing) that belong to that cluster.
-
-## Examples
-
-For "bank":
-
-- cluster_id: "bank_finance", description: "Financial institutions", indices: [0, 3, 7]
-- cluster_id: "bank_water", description: "Water edges", indices: [1, 4]
-- cluster_id: "bank_rows", description: "Rows of items", indices: [2, 5, 6]
-
-For "run":
-
-- cluster_id: "run_motion", description: "Quick movement", indices: [0, 2, 8]
-- cluster_id: "run_manage", description: "Operating systems", indices: [1, 4, 9]
-- cluster_id: "run_flow", description: "Liquid flow", indices: [3, 6]
-
-## Output Structure
-
-Return a list of cluster mappings, where each mapping contains:
-
-1. **cluster_id**: Unique identifier using the format {EXACT_INPUT_NAME}\_{CLUSTER_NAME} (e.g., "bank_financial", "bank_geographic") -- the cluster names should be VERY SHORT (1-2 words max), minimal, and pithy. Prefer single words when possible (e.g., "bank_finance", "run_motion", "set_group").
-2. **cluster_description**: Brief human-readable description of this cluster (3-6 words max, e.g., "Financial institutions", "Movement and motion", "Groups or collections")
-3. **definition_indices**: List of definition indices (0-based) that belong to this cluster
-4. **confidence**: Overall confidence in the clustering (0.0-1.0)
-5. **relevancy**: How relevant this cluster is to common usage (0.0-1.0, where 1.0 is most commonly used meaning)
-
-## Guidelines
-
-- Only create separate clusters for truly distinct senses/meanings
-- **DO NOT** separate for minor variations of the same concept
-- Group related definitions together regardless of word type
-- Ensure every definition ID appears in exactly one cluster
-
-**CRITICAL: Avoid Duplicates**: For example, with "en coulisse" has definitions like "backstage" and "behind the scenes", etc: these should be in ONE cluster since they describe the same core concept.
-
-Return a structured response with the numerical mappings.
+Avoid duplicates. Each ID in one cluster only.

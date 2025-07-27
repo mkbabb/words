@@ -241,11 +241,19 @@ const searchBarElement = ref<HTMLDivElement>();
 const searchInputComponent = ref<any>();
 
 // Computed
-const placeholder = computed(() =>
-    state.mode === 'dictionary'
+const placeholder = computed(() => {
+    // First check searchMode for specific modes
+    if (state.searchMode === 'wordlist') {
+        return 'Enter words separated by spaces or commas...';
+    } else if (state.searchMode === 'stage') {
+        return 'Enter text for staging...';
+    }
+    
+    // Default to mode-based placeholders for lookup mode
+    return state.mode === 'dictionary'
         ? 'Enter a word to define...'
-        : 'Enter a word to find synonyms...'
-);
+        : 'Enter a word to find synonyms...';
+});
 
 const resultsContainerStyle = computed(() => ({
     paddingTop: '0px',
@@ -272,11 +280,6 @@ watch(() => props.shrinkPercentage, (newValue) => {
         });
     }
 }, { immediate: true });
-    computed(() => state.scrollProgress),
-    computed(() => state.isContainerHovered),
-    computed(() => state.isFocused),
-    computed(() => state.showControls || state.showResults)
-);
 
 // Create a computed ref for the search input element
 const searchInputRef = computed(() => searchInputComponent.value?.element);
@@ -424,6 +427,27 @@ const handleEnter = async () => {
     if (state.searchMode === 'stage' && state.query) {
         store.searchQuery = state.query;
         emit('stage-enter', state.query);
+        return;
+    }
+
+    // Handle wordlist mode
+    if (state.searchMode === 'wordlist' && state.query) {
+        // Parse the query as a list of words (space, comma, or newline separated)
+        const words = state.query
+            .split(/[,\\s\\n]+/)
+            .map(word => word.trim())
+            .filter(word => word.length > 0);
+        
+        if (words.length > 0) {
+            // Process wordlist - for now, just look up the first word
+            // TODO: Implement full wordlist processing
+            store.searchQuery = words[0];
+            store.hasSearched = true;
+            await store.getDefinition(words[0]);
+            
+            // You could emit a wordlist event here for future handling
+            // emit('wordlist-enter', words);
+        }
         return;
     }
 

@@ -1,15 +1,7 @@
 <template>
-    <div v-if="entry" class="relative flex gap-4">
-        <!-- Progressive Sidebar -->
-        <ProgressiveSidebar 
-            v-if="shouldShowSidebar" 
-            :groupedDefinitions="groupedDefinitions"
-            class="hidden w-48 flex-shrink-0 xl:block sticky top-4 self-start"
-            style="z-index: 40;"
-        />
-
+    <div v-if="entry" class="relative">
         <!-- Main Card -->
-        <ThemedCard :variant="store.selectedCardVariant" class="relative flex-1">
+        <ThemedCard :variant="store.selectedCardVariant" class="relative">
             <!-- Theme Selector -->
             <ThemeSelector 
                 v-model="store.selectedCardVariant"
@@ -33,6 +25,7 @@
 
             <!-- Mode Content -->
             <Transition
+                :key="`transition-${store.mode}`"
                 mode="out-in"
                 enter-active-class="transition-all duration-300 ease-apple-bounce"
                 leave-active-class="transition-all duration-200 ease-out"
@@ -81,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import { useAppStore } from '@/stores';
 import { CardContent } from '@/components/ui/card';
 import {
@@ -93,9 +86,7 @@ import {
     Etymology
 } from './components';
 import { ThemedCard } from '@/components/custom/card';
-import { ProgressiveSidebar } from '@/components/custom/navigation';
 import { useDefinitionGroups, useAnimationCycle, useProviders } from './composables';
-import type { TransformedDefinition } from '@/types';
 
 // Store
 const store = useAppStore();
@@ -114,15 +105,6 @@ const { groupedDefinitions } = useDefinitionGroups(entry);
 const { startCycle, stopCycle } = useAnimationCycle(() => animationKey.value++);
 const { usedProviders } = useProviders(entry);
 
-// Sidebar visibility
-const shouldShowSidebar = computed(() => {
-    if (!entry.value?.definitions) return false;
-    const clusters = new Set();
-    entry.value.definitions.forEach((def: TransformedDefinition) => {
-        clusters.add(def.meaning_cluster?.id || 'default');
-    });
-    return clusters.size > 1;
-});
 
 
 // Helpers
@@ -160,6 +142,14 @@ const handleKeyDown = (event: KeyboardEvent) => {
         }));
     }
 };
+
+// Watch mode changes to ensure thesaurus data is loaded
+watch(() => store.mode, async (newMode) => {
+    if (newMode === 'thesaurus' && entry.value) {
+        // Ensure thesaurus data is loaded when switching to thesaurus mode
+        await store.getThesaurusData(entry.value.word);
+    }
+});
 
 // Lifecycle
 onMounted(() => {

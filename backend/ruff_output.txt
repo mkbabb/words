@@ -1,0 +1,3167 @@
+scripts/analyze_corpus_optimization.py:12:1: UP035 `typing.Dict` is deprecated, use `dict` instead
+   |
+10 | from collections import Counter, defaultdict
+11 | from pathlib import Path
+12 | from typing import Dict, List, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+13 |
+14 | # Import available NLP libraries
+   |
+
+scripts/analyze_corpus_optimization.py:12:1: UP035 `typing.List` is deprecated, use `list` instead
+   |
+10 | from collections import Counter, defaultdict
+11 | from pathlib import Path
+12 | from typing import Dict, List, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+13 |
+14 | # Import available NLP libraries
+   |
+
+scripts/analyze_corpus_optimization.py:12:1: UP035 `typing.Set` is deprecated, use `set` instead
+   |
+10 | from collections import Counter, defaultdict
+11 | from pathlib import Path
+12 | from typing import Dict, List, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+13 |
+14 | # Import available NLP libraries
+   |
+
+scripts/analyze_corpus_optimization.py:12:1: UP035 `typing.Tuple` is deprecated, use `tuple` instead
+   |
+10 | from collections import Counter, defaultdict
+11 | from pathlib import Path
+12 | from typing import Dict, List, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+13 |
+14 | # Import available NLP libraries
+   |
+
+scripts/analyze_corpus_optimization.py:40:9: ANN204 Missing return type annotation for special method `__init__`
+   |
+38 |     """Analyzes word corpus for optimization opportunities."""
+39 |     
+40 |     def __init__(self):
+   |         ^^^^^^^^ ANN204
+41 |         self.setup_nlp_tools()
+   |
+   = help: Add return type annotation: `None`
+
+scripts/analyze_corpus_optimization.py:43:9: ANN201 Missing return type annotation for public function `setup_nlp_tools`
+   |
+41 |         self.setup_nlp_tools()
+42 |         
+43 |     def setup_nlp_tools(self):
+   |         ^^^^^^^^^^^^^^^ ANN201
+44 |         """Initialize NLP tools for analysis."""
+45 |         self.tools = {}
+   |
+   = help: Add return type annotation: `None`
+
+scripts/analyze_corpus_optimization.py:58:47: UP006 [*] Use `list` instead of `List` for type annotation
+   |
+56 |                 print("spaCy model not found. Install with: python -m spacy download en_core_web_sm")
+57 |                 
+58 |     def load_corpus(self, file_path: Path) -> List[str]:
+   |                                               ^^^^ UP006
+59 |         """Load words from corpus file."""
+60 |         with open(file_path, 'r', encoding='utf-8') as f:
+   |
+   = help: Replace with `list`
+
+scripts/analyze_corpus_optimization.py:60:30: UP015 [*] Unnecessary mode argument
+   |
+58 |     def load_corpus(self, file_path: Path) -> List[str]:
+59 |         """Load words from corpus file."""
+60 |         with open(file_path, 'r', encoding='utf-8') as f:
+   |                              ^^^ UP015
+61 |             return [line.strip().lower() for line in f if line.strip()]
+   |
+   = help: Remove mode argument
+
+scripts/analyze_corpus_optimization.py:63:53: UP006 [*] Use `list` instead of `List` for type annotation
+   |
+61 |             return [line.strip().lower() for line in f if line.strip()]
+62 |             
+63 |     def analyze_morphological_patterns(self, words: List[str]) -> Dict[str, any]:
+   |                                                     ^^^^ UP006
+64 |         """Analyze morphological patterns in the corpus."""
+65 |         analysis = {
+   |
+   = help: Replace with `list`
+
+scripts/analyze_corpus_optimization.py:63:67: UP006 [*] Use `dict` instead of `Dict` for type annotation
+   |
+61 |             return [line.strip().lower() for line in f if line.strip()]
+62 |             
+63 |     def analyze_morphological_patterns(self, words: List[str]) -> Dict[str, any]:
+   |                                                                   ^^^^ UP006
+64 |         """Analyze morphological patterns in the corpus."""
+65 |         analysis = {
+   |
+   = help: Replace with `dict`
+
+scripts/analyze_corpus_optimization.py:107:48: UP006 [*] Use `list` instead of `List` for type annotation
+    |
+105 |         return analysis
+106 |         
+107 |     def compare_reduction_methods(self, words: List[str], sample_size: int = 5000) -> Dict[str, any]:
+    |                                                ^^^^ UP006
+108 |         """Compare different reduction methods on a sample."""
+109 |         # Use sample for performance
+    |
+    = help: Replace with `list`
+
+scripts/analyze_corpus_optimization.py:107:87: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+105 |         return analysis
+106 |         
+107 |     def compare_reduction_methods(self, words: List[str], sample_size: int = 5000) -> Dict[str, any]:
+    |                                                                                       ^^^^ UP006
+108 |         """Compare different reduction methods on a sample."""
+109 |         # Use sample for performance
+    |
+    = help: Replace with `dict`
+
+scripts/batch_synthesis.py:57:9: ANN204 Missing return type annotation for special method `__init__`
+   |
+55 |     """Manages checkpoint state for batch synthesis."""
+56 |     
+57 |     def __init__(self, checkpoint_file: Path):
+   |         ^^^^^^^^ ANN204
+58 |         self.checkpoint_file = checkpoint_file
+59 |         self.processed_words: set[str] = set()
+   |
+   = help: Add return type annotation: `None`
+
+scripts/batch_synthesis.py:70:49: UP015 [*] Unnecessary mode argument
+   |
+68 |         if self.checkpoint_file.exists():
+69 |             try:
+70 |                 with open(self.checkpoint_file, 'r') as f:
+   |                                                 ^^^ UP015
+71 |                     data = json.load(f)
+72 |                     self.processed_words = set(data.get('processed_words', []))
+   |
+   = help: Remove mode argument
+
+scripts/batch_synthesis.py:118:40: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `frame`
+    |
+118 | def signal_handler(signum: int, frame: Any) -> None:
+    |                                        ^^^ ANN401
+119 |     """Handle shutdown signals gracefully."""
+120 |     global SHUTDOWN_REQUESTED
+    |
+
+scripts/batch_synthesis.py:185:14: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `task_id`
+    |
+183 |     state: BatchSynthesisState,
+184 |     progress: Progress,
+185 |     task_id: Any
+    |              ^^^ ANN401
+186 | ) -> None:
+187 |     """Process a batch of words with synthesis."""
+    |
+
+scripts/batch_synthesis.py:247:5: ANN201 Missing return type annotation for public function `main`
+    |
+246 | @app.command()
+247 | def main(
+    |     ^^^^ ANN201
+248 |     input_file: Path = typer.Argument(
+249 |         ..., 
+    |
+    = help: Add return type annotation: `None`
+
+scripts/batch_synthesis.py:279:27: UP015 [*] Unnecessary mode argument
+    |
+277 |         raise typer.Exit(1)
+278 |     
+279 |     with open(input_file, 'r') as f:
+    |                           ^^^ UP015
+280 |         all_words = [line.strip() for line in f if line.strip()]
+    |
+    = help: Remove mode argument
+
+scripts/batch_synthesis_enhanced.py:12:1: UP035 `typing.Dict` is deprecated, use `dict` instead
+   |
+10 | from datetime import datetime, timedelta
+11 | from pathlib import Path
+12 | from typing import Any, Dict, List, Optional, Set
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+13 |
+14 | from rich.console import Console
+   |
+
+scripts/batch_synthesis_enhanced.py:12:1: UP035 `typing.List` is deprecated, use `list` instead
+   |
+10 | from datetime import datetime, timedelta
+11 | from pathlib import Path
+12 | from typing import Any, Dict, List, Optional, Set
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+13 |
+14 | from rich.console import Console
+   |
+
+scripts/batch_synthesis_enhanced.py:12:1: UP035 `typing.Set` is deprecated, use `set` instead
+   |
+10 | from datetime import datetime, timedelta
+11 | from pathlib import Path
+12 | from typing import Any, Dict, List, Optional, Set
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+13 |
+14 | from rich.console import Console
+   |
+
+scripts/batch_synthesis_enhanced.py:65:19: UP006 [*] Use `list` instead of `List` for type annotation
+   |
+63 |     total_batches: int = 0
+64 |     
+65 |     failed_words: List[Dict[str, str]] = field(default_factory=list)
+   |                   ^^^^ UP006
+66 |     current_status: str = "Initializing"
+   |
+   = help: Replace with `list`
+
+scripts/batch_synthesis_enhanced.py:65:24: UP006 [*] Use `dict` instead of `Dict` for type annotation
+   |
+63 |     total_batches: int = 0
+64 |     
+65 |     failed_words: List[Dict[str, str]] = field(default_factory=list)
+   |                        ^^^^ UP006
+66 |     current_status: str = "Initializing"
+   |
+   = help: Replace with `dict`
+
+scripts/batch_synthesis_enhanced.py:82:43: UP045 [*] Use `X | None` for type annotations
+   |
+81 |     @property
+82 |     def estimated_time_remaining(self) -> Optional[timedelta]:
+   |                                           ^^^^^^^^^^^^^^^^^^^ UP045
+83 |         if self.words_per_minute > 0 and self.words_processed < self.total_words:
+84 |             remaining = self.total_words - self.words_processed
+   |
+   = help: Convert to `X | None`
+
+scripts/batch_synthesis_enhanced.py:99:22: UP006 [*] Use `set` instead of `Set` for type annotation
+    |
+ 97 | class Checkpoint:
+ 98 |     """Checkpoint data for recovery."""
+ 99 |     processed_words: Set[str]
+    |                      ^^^ UP006
+100 |     failed_words: List[Dict[str, str]]
+101 |     metrics: BatchMetrics
+    |
+    = help: Replace with `set`
+
+scripts/batch_synthesis_enhanced.py:100:19: UP006 [*] Use `list` instead of `List` for type annotation
+    |
+ 98 |     """Checkpoint data for recovery."""
+ 99 |     processed_words: Set[str]
+100 |     failed_words: List[Dict[str, str]]
+    |                   ^^^^ UP006
+101 |     metrics: BatchMetrics
+102 |     last_position: int
+    |
+    = help: Replace with `list`
+
+scripts/batch_synthesis_enhanced.py:100:24: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+ 98 |     """Checkpoint data for recovery."""
+ 99 |     processed_words: Set[str]
+100 |     failed_words: List[Dict[str, str]]
+    |                        ^^^^ UP006
+101 |     metrics: BatchMetrics
+102 |     last_position: int
+    |
+    = help: Replace with `dict`
+
+scripts/batch_synthesis_enhanced.py:109:9: ANN204 Missing return type annotation for special method `__init__`
+    |
+107 |     """Enhanced batch processor with checkpoint recovery and monitoring."""
+108 |     
+109 |     def __init__(
+    |         ^^^^^^^^ ANN204
+110 |         self,
+111 |         words_file: Path,
+    |
+    = help: Add return type annotation: `None`
+
+scripts/batch_synthesis_enhanced.py:124:31: UP006 [*] Use `set` instead of `Set` for type annotation
+    |
+123 |         self.metrics = BatchMetrics()
+124 |         self.processed_words: Set[str] = set()
+    |                               ^^^ UP006
+125 |         self.shutdown_requested = False
+    |
+    = help: Replace with `set`
+
+scripts/batch_synthesis_enhanced.py:131:9: ANN202 Missing return type annotation for private function `_handle_shutdown`
+    |
+129 |         signal.signal(signal.SIGTERM, self._handle_shutdown)
+130 |     
+131 |     def _handle_shutdown(self, signum, frame):
+    |         ^^^^^^^^^^^^^^^^ ANN202
+132 |         """Handle graceful shutdown."""
+133 |         console.print("\n[yellow]Shutdown requested. Finishing current batch...[/yellow]")
+    |
+    = help: Add return type annotation: `None`
+
+scripts/batch_synthesis_enhanced.py:131:32: ANN001 Missing type annotation for function argument `signum`
+    |
+129 |         signal.signal(signal.SIGTERM, self._handle_shutdown)
+130 |     
+131 |     def _handle_shutdown(self, signum, frame):
+    |                                ^^^^^^ ANN001
+132 |         """Handle graceful shutdown."""
+133 |         console.print("\n[yellow]Shutdown requested. Finishing current batch...[/yellow]")
+    |
+
+scripts/batch_synthesis_enhanced.py:131:40: ANN001 Missing type annotation for function argument `frame`
+    |
+129 |         signal.signal(signal.SIGTERM, self._handle_shutdown)
+130 |     
+131 |     def _handle_shutdown(self, signum, frame):
+    |                                        ^^^^^ ANN001
+132 |         """Handle graceful shutdown."""
+133 |         console.print("\n[yellow]Shutdown requested. Finishing current batch...[/yellow]")
+    |
+
+scripts/batch_synthesis_enhanced.py:136:40: UP045 [*] Use `X | None` for type annotations
+    |
+134 |         self.shutdown_requested = True
+135 |     
+136 |     async def load_checkpoint(self) -> Optional[int]:
+    |                                        ^^^^^^^^^^^^^ UP045
+137 |         """Load checkpoint if exists."""
+138 |         if self.checkpoint_file.exists():
+    |
+    = help: Convert to `X | None`
+
+scripts/batch_synthesis_enhanced.py:140:49: UP015 [*] Unnecessary mode argument
+    |
+138 |         if self.checkpoint_file.exists():
+139 |             try:
+140 |                 with open(self.checkpoint_file, "r") as f:
+    |                                                 ^^^ UP015
+141 |                     data = json.load(f)
+    |
+    = help: Remove mode argument
+
+scripts/batch_synthesis_enhanced.py:159:15: ANN201 Missing return type annotation for public function `save_checkpoint`
+    |
+157 |         return 0
+158 |     
+159 |     async def save_checkpoint(self, position: int):
+    |               ^^^^^^^^^^^^^^^ ANN201
+160 |         """Save current progress to checkpoint."""
+161 |         checkpoint_data = {
+    |
+    = help: Add return type annotation: `None`
+
+scripts/batch_synthesis_enhanced.py:177:35: UP006 [*] Use `list` instead of `List` for type annotation
+    |
+175 |             json.dump(checkpoint_data, f, indent=2)
+176 |     
+177 |     async def load_words(self) -> List[str]:
+    |                                   ^^^^ UP006
+178 |         """Load words from file, skipping already processed."""
+179 |         with open(self.words_file, "r") as f:
+    |
+    = help: Replace with `list`
+
+scripts/batch_synthesis_enhanced.py:179:36: UP015 [*] Unnecessary mode argument
+    |
+177 |     async def load_words(self) -> List[str]:
+178 |         """Load words from file, skipping already processed."""
+179 |         with open(self.words_file, "r") as f:
+    |                                    ^^^ UP015
+180 |             all_words = [line.strip() for line in f if line.strip()]
+    |
+    = help: Remove mode argument
+
+scripts/batch_synthesis_enhanced.py:203:42: UP006 [*] Use `list` instead of `List` for type annotation
+    |
+201 |         return input_cost + output_cost
+202 |     
+203 |     async def process_batch(self, words: List[str]) -> Dict[str, Any]:
+    |                                          ^^^^ UP006
+204 |         """Process a batch of words using the AI synthesis pipeline."""
+205 |         results = {"successful": [], "failed": []}
+    |
+    = help: Replace with `list`
+
+scripts/batch_synthesis_enhanced.py:203:56: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+201 |         return input_cost + output_cost
+202 |     
+203 |     async def process_batch(self, words: List[str]) -> Dict[str, Any]:
+    |                                                        ^^^^ UP006
+204 |         """Process a batch of words using the AI synthesis pipeline."""
+205 |         results = {"successful": [], "failed": []}
+    |
+    = help: Replace with `dict`
+
+scripts/batch_synthesis_enhanced.py:335:15: ANN201 Missing return type annotation for public function `run`
+    |
+333 |         )
+334 |     
+335 |     async def run(self):
+    |               ^^^ ANN201
+336 |         """Run the batch processing with monitoring."""
+337 |         # Load checkpoint
+    |
+    = help: Add return type annotation: `None`
+
+scripts/batch_synthesis_enhanced.py:458:9: ANN201 Missing return type annotation for public function `display_summary`
+    |
+456 |         self.display_summary()
+457 |     
+458 |     def display_summary(self):
+    |         ^^^^^^^^^^^^^^^ ANN201
+459 |         """Display final summary."""
+460 |         summary = Table(title="Batch Processing Summary", show_header=True)
+    |
+    = help: Add return type annotation: `None`
+
+scripts/batch_synthesis_enhanced.py:483:11: ANN201 Missing return type annotation for public function `main`
+    |
+483 | async def main():
+    |           ^^^^ ANN201
+484 |     """Main entry point."""
+485 |     import argparse
+    |
+    = help: Add return type annotation: `None`
+
+scripts/corpus_optimization_report.py:11:1: UP035 `typing.Dict` is deprecated, use `dict` instead
+   |
+ 9 | from pathlib import Path
+10 | from collections import Counter, defaultdict
+11 | from typing import Dict, List, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+12 | import json
+   |
+
+scripts/corpus_optimization_report.py:11:1: UP035 `typing.List` is deprecated, use `list` instead
+   |
+ 9 | from pathlib import Path
+10 | from collections import Counter, defaultdict
+11 | from typing import Dict, List, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+12 | import json
+   |
+
+scripts/corpus_optimization_report.py:11:1: UP035 `typing.Set` is deprecated, use `set` instead
+   |
+ 9 | from pathlib import Path
+10 | from collections import Counter, defaultdict
+11 | from typing import Dict, List, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+12 | import json
+   |
+
+scripts/corpus_optimization_report.py:11:1: UP035 `typing.Tuple` is deprecated, use `tuple` instead
+   |
+ 9 | from pathlib import Path
+10 | from collections import Counter, defaultdict
+11 | from typing import Dict, List, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+12 | import json
+   |
+
+scripts/corpus_optimization_report.py:15:37: UP006 [*] Use `list` instead of `List` for type annotation
+   |
+15 | def load_corpus(file_path: Path) -> List[str]:
+   |                                     ^^^^ UP006
+16 |     """Load words from corpus file."""
+17 |     with open(file_path, 'r', encoding='utf-8') as f:
+   |
+   = help: Replace with `list`
+
+scripts/corpus_optimization_report.py:17:26: UP015 [*] Unnecessary mode argument
+   |
+15 | def load_corpus(file_path: Path) -> List[str]:
+16 |     """Load words from corpus file."""
+17 |     with open(file_path, 'r', encoding='utf-8') as f:
+   |                          ^^^ UP015
+18 |         return [line.strip().lower() for line in f if line.strip()]
+   |
+   = help: Remove mode argument
+
+scripts/corpus_optimization_report.py:21:27: UP006 [*] Use `list` instead of `List` for type annotation
+   |
+21 | def analyze_corpus(words: List[str]) -> Dict:
+   |                           ^^^^ UP006
+22 |     """Comprehensive corpus analysis."""
+23 |     analysis = {
+   |
+   = help: Replace with `list`
+
+scripts/corpus_optimization_report.py:21:41: UP006 [*] Use `dict` instead of `Dict` for type annotation
+   |
+21 | def analyze_corpus(words: List[str]) -> Dict:
+   |                                         ^^^^ UP006
+22 |     """Comprehensive corpus analysis."""
+23 |     analysis = {
+   |
+   = help: Replace with `dict`
+
+scripts/corpus_optimization_report.py:55:48: UP006 [*] Use `dict` instead of `Dict` for type annotation
+   |
+55 | def calculate_optimization_potential(analysis: Dict) -> Dict:
+   |                                                ^^^^ UP006
+56 |     """Calculate potential corpus reduction using different strategies."""
+57 |     total_words = analysis['unique_words']
+   |
+   = help: Replace with `dict`
+
+scripts/corpus_optimization_report.py:55:57: UP006 [*] Use `dict` instead of `Dict` for type annotation
+   |
+55 | def calculate_optimization_potential(analysis: Dict) -> Dict:
+   |                                                         ^^^^ UP006
+56 |     """Calculate potential corpus reduction using different strategies."""
+57 |     total_words = analysis['unique_words']
+   |
+   = help: Replace with `dict`
+
+scripts/corpus_optimization_report.py:93:35: UP006 [*] Use `dict` instead of `Dict` for type annotation
+   |
+93 | def generate_recommendations() -> Dict:
+   |                                   ^^^^ UP006
+94 |     """Generate specific implementation recommendations."""
+95 |     return {
+   |
+   = help: Replace with `dict`
+
+scripts/corpus_optimization_report.py:249:5: ANN201 Missing return type annotation for public function `main`
+    |
+249 | def main():
+    |     ^^^^ ANN201
+250 |     """Generate comprehensive optimization report."""
+251 |     print("="*80)
+    |
+    = help: Add return type annotation: `None`
+
+scripts/corpus_optimization_strategy.py:14:1: UP035 `typing.Dict` is deprecated, use `dict` instead
+   |
+12 | from pathlib import Path
+13 | from collections import Counter, defaultdict
+14 | from typing import Dict, List, Set, Tuple, Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+15 |
+16 | # Add the backend src to path
+   |
+
+scripts/corpus_optimization_strategy.py:14:1: UP035 `typing.List` is deprecated, use `list` instead
+   |
+12 | from pathlib import Path
+13 | from collections import Counter, defaultdict
+14 | from typing import Dict, List, Set, Tuple, Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+15 |
+16 | # Add the backend src to path
+   |
+
+scripts/corpus_optimization_strategy.py:14:1: UP035 `typing.Set` is deprecated, use `set` instead
+   |
+12 | from pathlib import Path
+13 | from collections import Counter, defaultdict
+14 | from typing import Dict, List, Set, Tuple, Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+15 |
+16 | # Add the backend src to path
+   |
+
+scripts/corpus_optimization_strategy.py:14:1: UP035 `typing.Tuple` is deprecated, use `tuple` instead
+   |
+12 | from pathlib import Path
+13 | from collections import Counter, defaultdict
+14 | from typing import Dict, List, Set, Tuple, Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+15 |
+16 | # Add the backend src to path
+   |
+
+scripts/corpus_optimization_strategy.py:29:9: ANN204 Missing return type annotation for special method `__init__`
+   |
+27 |     """Comprehensive corpus optimization analysis and recommendations."""
+28 |     
+29 |     def __init__(self):
+   |         ^^^^^^^^ ANN204
+30 |         self.text_processor = get_text_processor()
+31 |         self.corpus_path = Path(__file__).parent.parent / "data/search/lexicons/sowpods_scrabble_words.txt"
+   |
+   = help: Add return type annotation: `None`
+
+scripts/corpus_optimization_strategy.py:32:21: UP006 [*] Use `list` instead of `List` for type annotation
+   |
+30 |         self.text_processor = get_text_processor()
+31 |         self.corpus_path = Path(__file__).parent.parent / "data/search/lexicons/sowpods_scrabble_words.txt"
+32 |         self.words: List[str] = []
+   |                     ^^^^ UP006
+33 |         self.analysis_results: Dict = {}
+   |
+   = help: Replace with `list`
+
+scripts/corpus_optimization_strategy.py:33:32: UP006 [*] Use `dict` instead of `Dict` for type annotation
+   |
+31 |         self.corpus_path = Path(__file__).parent.parent / "data/search/lexicons/sowpods_scrabble_words.txt"
+32 |         self.words: List[str] = []
+33 |         self.analysis_results: Dict = {}
+   |                                ^^^^ UP006
+34 |         
+35 |     def load_corpus(self) -> None:
+   |
+   = help: Replace with `dict`
+
+scripts/corpus_optimization_strategy.py:38:37: UP015 [*] Unnecessary mode argument
+   |
+36 |         """Load the SOWPODS corpus."""
+37 |         logger.info(f"Loading corpus from {self.corpus_path}")
+38 |         with open(self.corpus_path, 'r', encoding='utf-8') as f:
+   |                                     ^^^ UP015
+39 |             self.words = [line.strip().lower() for line in f if line.strip()]
+40 |         logger.info(f"Loaded {len(self.words):,} words")
+   |
+   = help: Remove mode argument
+
+scripts/corpus_optimization_strategy.py:42:46: UP006 [*] Use `dict` instead of `Dict` for type annotation
+   |
+40 |         logger.info(f"Loaded {len(self.words):,} words")
+41 |         
+42 |     def analyze_inflection_patterns(self) -> Dict[str, int]:
+   |                                              ^^^^ UP006
+43 |         """Analyze common inflection patterns in English."""
+44 |         patterns = {
+   |
+   = help: Replace with `dict`
+
+scripts/corpus_optimization_strategy.py:109:38: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+107 |         return patterns
+108 |         
+109 |     def estimate_base_forms(self) -> Dict[str, any]:
+    |                                      ^^^^ UP006
+110 |         """Estimate the number of unique base forms using various methods."""
+111 |         estimates = {}
+    |
+    = help: Replace with `dict`
+
+scripts/corpus_optimization_strategy.py:235:45: UP006 [*] Use `set` instead of `Set` for type annotation
+    |
+233 |         return original
+234 |         
+235 |     def frequency_based_clustering(self) -> Set[str]:
+    |                                             ^^^ UP006
+236 |         """Cluster words based on common patterns and frequency."""
+237 |         clusters = defaultdict(set)
+    |
+    = help: Replace with `set`
+
+scripts/corpus_optimization_strategy.py:402:11: ANN201 Missing return type annotation for public function `main`
+    |
+402 | async def main():
+    |           ^^^^ ANN201
+403 |     """Run the corpus optimization analysis."""
+404 |     strategy = CorpusOptimizationStrategy()
+    |
+    = help: Add return type annotation: `None`
+
+scripts/frequency_analyzer.py:15:1: UP035 `typing.Dict` is deprecated, use `dict` instead
+   |
+13 | from collections import defaultdict
+14 | from pathlib import Path
+15 | from typing import Dict, List, Optional, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+16 | from urllib.parse import urlparse
+   |
+
+scripts/frequency_analyzer.py:15:1: UP035 `typing.List` is deprecated, use `list` instead
+   |
+13 | from collections import defaultdict
+14 | from pathlib import Path
+15 | from typing import Dict, List, Optional, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+16 | from urllib.parse import urlparse
+   |
+
+scripts/frequency_analyzer.py:15:1: UP035 `typing.Set` is deprecated, use `set` instead
+   |
+13 | from collections import defaultdict
+14 | from pathlib import Path
+15 | from typing import Dict, List, Optional, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+16 | from urllib.parse import urlparse
+   |
+
+scripts/frequency_analyzer.py:15:1: UP035 `typing.Tuple` is deprecated, use `tuple` instead
+   |
+13 | from collections import defaultdict
+14 | from pathlib import Path
+15 | from typing import Dict, List, Optional, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+16 | from urllib.parse import urlparse
+   |
+
+scripts/frequency_analyzer.py:52:9: ANN204 Missing return type annotation for special method `__init__`
+   |
+50 |     """Configuration for a frequency data source."""
+51 |     
+52 |     def __init__(
+   |         ^^^^^^^^ ANN204
+53 |         self,
+54 |         name: str,
+   |
+   = help: Add return type annotation: `None`
+
+scripts/frequency_analyzer.py:59:20: UP045 [*] Use `X | None` for type annotations
+   |
+57 |         weight: float = 1.0,
+58 |         description: str = "",
+59 |         max_words: Optional[int] = None,
+   |                    ^^^^^^^^^^^^^ UP045
+60 |     ):
+61 |         self.name = name
+   |
+   = help: Convert to `X | None`
+
+scripts/frequency_analyzer.py:117:9: ANN204 Missing return type annotation for special method `__init__`
+    |
+115 |     """Analyzes word frequency from multiple sources and generates prioritized lists."""
+116 |     
+117 |     def __init__(self, data_dir: Path, output_dir: Path):
+    |         ^^^^^^^^ ANN204
+118 |         self.data_dir = data_dir
+119 |         self.output_dir = output_dir
+    |
+    = help: Add return type annotation: `None`
+
+scripts/frequency_analyzer.py:129:32: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+128 |         self.lemmatizer = WordNetLemmatizer()
+129 |         self.word_frequencies: Dict[str, float] = defaultdict(float)
+    |                                ^^^^ UP006
+130 |         self.source_data: Dict[str, Dict[str, int]] = {}
+131 |         self.lemma_map: Dict[str, Set[str]] = defaultdict(set)
+    |
+    = help: Replace with `dict`
+
+scripts/frequency_analyzer.py:130:27: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+128 |         self.lemmatizer = WordNetLemmatizer()
+129 |         self.word_frequencies: Dict[str, float] = defaultdict(float)
+130 |         self.source_data: Dict[str, Dict[str, int]] = {}
+    |                           ^^^^ UP006
+131 |         self.lemma_map: Dict[str, Set[str]] = defaultdict(set)
+    |
+    = help: Replace with `dict`
+
+scripts/frequency_analyzer.py:130:37: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+128 |         self.lemmatizer = WordNetLemmatizer()
+129 |         self.word_frequencies: Dict[str, float] = defaultdict(float)
+130 |         self.source_data: Dict[str, Dict[str, int]] = {}
+    |                                     ^^^^ UP006
+131 |         self.lemma_map: Dict[str, Set[str]] = defaultdict(set)
+    |
+    = help: Replace with `dict`
+
+scripts/frequency_analyzer.py:131:25: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+129 |         self.word_frequencies: Dict[str, float] = defaultdict(float)
+130 |         self.source_data: Dict[str, Dict[str, int]] = {}
+131 |         self.lemma_map: Dict[str, Set[str]] = defaultdict(set)
+    |                         ^^^^ UP006
+132 |         
+133 |     async def download_source(self, source: FrequencySource) -> Optional[Path]:
+    |
+    = help: Replace with `dict`
+
+scripts/frequency_analyzer.py:131:35: UP006 [*] Use `set` instead of `Set` for type annotation
+    |
+129 |         self.word_frequencies: Dict[str, float] = defaultdict(float)
+130 |         self.source_data: Dict[str, Dict[str, int]] = {}
+131 |         self.lemma_map: Dict[str, Set[str]] = defaultdict(set)
+    |                                   ^^^ UP006
+132 |         
+133 |     async def download_source(self, source: FrequencySource) -> Optional[Path]:
+    |
+    = help: Replace with `set`
+
+scripts/frequency_analyzer.py:133:65: UP045 [*] Use `X | None` for type annotations
+    |
+131 |         self.lemma_map: Dict[str, Set[str]] = defaultdict(set)
+132 |         
+133 |     async def download_source(self, source: FrequencySource) -> Optional[Path]:
+    |                                                                 ^^^^^^^^^^^^^^ UP045
+134 |         """Download frequency data from a source."""
+135 |         filename = Path(urlparse(source.url).path).name
+    |
+    = help: Convert to `X | None`
+
+scripts/frequency_analyzer.py:163:80: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+161 |             return None
+162 |     
+163 |     def parse_frequency_data(self, filepath: Path, source: FrequencySource) -> Dict[str, int]:
+    |                                                                                ^^^^ UP006
+164 |         """Parse frequency data based on source format."""
+165 |         frequencies = {}
+    |
+    = help: Replace with `dict`
+
+scripts/frequency_analyzer.py:228:61: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+226 |         return frequencies
+227 |     
+228 |     def process_literary_corpus(self, corpus_path: Path) -> Dict[str, int]:
+    |                                                             ^^^^ UP006
+229 |         """Process a literary corpus to extract word frequencies."""
+230 |         frequencies = defaultdict(int)
+    |
+    = help: Replace with `dict`
+
+scripts/frequency_analyzer.py:265:51: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+263 |         return dict(frequencies)
+264 |     
+265 |     def combine_frequencies(self, sources_weight: Dict[str, float]) -> Dict[str, float]:
+    |                                                   ^^^^ UP006
+266 |         """Combine frequencies from multiple sources with weights."""
+267 |         combined = defaultdict(float)
+    |
+    = help: Replace with `dict`
+
+scripts/frequency_analyzer.py:265:72: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+263 |         return dict(frequencies)
+264 |     
+265 |     def combine_frequencies(self, sources_weight: Dict[str, float]) -> Dict[str, float]:
+    |                                                                        ^^^^ UP006
+266 |         """Combine frequencies from multiple sources with weights."""
+267 |         combined = defaultdict(float)
+    |
+    = help: Replace with `dict`
+
+scripts/frequency_analyzer.py:291:48: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+289 |         return dict(combined)
+290 |     
+291 |     def generate_word_lists(self, frequencies: Dict[str, float], sizes: List[int]) -> Dict[int, List[str]]:
+    |                                                ^^^^ UP006
+292 |         """Generate word lists of various sizes."""
+293 |         # Sort by frequency
+    |
+    = help: Replace with `dict`
+
+scripts/frequency_analyzer.py:291:73: UP006 [*] Use `list` instead of `List` for type annotation
+    |
+289 |         return dict(combined)
+290 |     
+291 |     def generate_word_lists(self, frequencies: Dict[str, float], sizes: List[int]) -> Dict[int, List[str]]:
+    |                                                                         ^^^^ UP006
+292 |         """Generate word lists of various sizes."""
+293 |         # Sort by frequency
+    |
+    = help: Replace with `list`
+
+scripts/frequency_analyzer.py:291:87: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+289 |         return dict(combined)
+290 |     
+291 |     def generate_word_lists(self, frequencies: Dict[str, float], sizes: List[int]) -> Dict[int, List[str]]:
+    |                                                                                       ^^^^ UP006
+292 |         """Generate word lists of various sizes."""
+293 |         # Sort by frequency
+    |
+    = help: Replace with `dict`
+
+scripts/frequency_analyzer.py:291:97: UP006 [*] Use `list` instead of `List` for type annotation
+    |
+289 |         return dict(combined)
+290 |     
+291 |     def generate_word_lists(self, frequencies: Dict[str, float], sizes: List[int]) -> Dict[int, List[str]]:
+    |                                                                                                 ^^^^ UP006
+292 |         """Generate word lists of various sizes."""
+293 |         # Sort by frequency
+    |
+    = help: Replace with `list`
+
+scripts/frequency_analyzer.py:302:15: ANN201 Missing return type annotation for public function `analyze`
+    |
+300 |         return word_lists
+301 |     
+302 |     async def analyze(self, custom_weights: Optional[Dict[str, float]] = None):
+    |               ^^^^^^^ ANN201
+303 |         """Main analysis pipeline."""
+304 |         console.print("[bold cyan]Starting frequency analysis...[/bold cyan]\n")
+    |
+    = help: Add return type annotation: `None`
+
+scripts/frequency_analyzer.py:302:45: UP045 [*] Use `X | None` for type annotations
+    |
+300 |         return word_lists
+301 |     
+302 |     async def analyze(self, custom_weights: Optional[Dict[str, float]] = None):
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP045
+303 |         """Main analysis pipeline."""
+304 |         console.print("[bold cyan]Starting frequency analysis...[/bold cyan]\n")
+    |
+    = help: Convert to `X | None`
+
+scripts/frequency_analyzer.py:302:54: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+300 |         return word_lists
+301 |     
+302 |     async def analyze(self, custom_weights: Optional[Dict[str, float]] = None):
+    |                                                      ^^^^ UP006
+303 |         """Main analysis pipeline."""
+304 |         console.print("[bold cyan]Starting frequency analysis...[/bold cyan]\n")
+    |
+    = help: Replace with `dict`
+
+scripts/frequency_analyzer.py:376:9: ANN201 Missing return type annotation for public function `display_statistics`
+    |
+374 |         self.display_statistics(combined_frequencies, word_lists)
+375 |     
+376 |     def display_statistics(self, frequencies: Dict[str, float], word_lists: Dict[int, List[str]]):
+    |         ^^^^^^^^^^^^^^^^^^ ANN201
+377 |         """Display analysis statistics."""
+378 |         # Overall statistics
+    |
+    = help: Add return type annotation: `None`
+
+scripts/frequency_analyzer.py:376:47: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+374 |         self.display_statistics(combined_frequencies, word_lists)
+375 |     
+376 |     def display_statistics(self, frequencies: Dict[str, float], word_lists: Dict[int, List[str]]):
+    |                                               ^^^^ UP006
+377 |         """Display analysis statistics."""
+378 |         # Overall statistics
+    |
+    = help: Replace with `dict`
+
+scripts/frequency_analyzer.py:376:77: UP006 [*] Use `dict` instead of `Dict` for type annotation
+    |
+374 |         self.display_statistics(combined_frequencies, word_lists)
+375 |     
+376 |     def display_statistics(self, frequencies: Dict[str, float], word_lists: Dict[int, List[str]]):
+    |                                                                             ^^^^ UP006
+377 |         """Display analysis statistics."""
+378 |         # Overall statistics
+    |
+    = help: Replace with `dict`
+
+scripts/frequency_analyzer.py:376:87: UP006 [*] Use `list` instead of `List` for type annotation
+    |
+374 |         self.display_statistics(combined_frequencies, word_lists)
+375 |     
+376 |     def display_statistics(self, frequencies: Dict[str, float], word_lists: Dict[int, List[str]]):
+    |                                                                                       ^^^^ UP006
+377 |         """Display analysis statistics."""
+378 |         # Overall statistics
+    |
+    = help: Replace with `list`
+
+scripts/frequency_analyzer.py:418:9: ANN201 Missing return type annotation for public function `integrate_with_corpus_processor`
+    |
+416 |         console.print("\n", sample_table)
+417 |     
+418 |     def integrate_with_corpus_processor(self, corpus_processor_output: Path):
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ANN201
+419 |         """Integrate frequency data with existing corpus processor output."""
+420 |         console.print("\n[cyan]Integrating with corpus processor...[/cyan]")
+    |
+    = help: Add return type annotation: `None`
+
+scripts/frequency_analyzer.py:441:11: ANN201 Missing return type annotation for public function `main`
+    |
+441 | async def main():
+    |           ^^^^ ANN201
+442 |     """Main entry point."""
+443 |     import argparse
+    |
+    = help: Add return type annotation: `None`
+
+scripts/process_corpus.py:8:1: UP035 `typing.Dict` is deprecated, use `dict` instead
+   |
+ 6 | from collections import defaultdict
+ 7 | from pathlib import Path
+ 8 | from typing import Dict, List, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+ 9 |
+10 | import nltk
+   |
+
+scripts/process_corpus.py:8:1: UP035 `typing.List` is deprecated, use `list` instead
+   |
+ 6 | from collections import defaultdict
+ 7 | from pathlib import Path
+ 8 | from typing import Dict, List, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+ 9 |
+10 | import nltk
+   |
+
+scripts/process_corpus.py:8:1: UP035 `typing.Set` is deprecated, use `set` instead
+   |
+ 6 | from collections import defaultdict
+ 7 | from pathlib import Path
+ 8 | from typing import Dict, List, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+ 9 |
+10 | import nltk
+   |
+
+scripts/process_corpus.py:8:1: UP035 `typing.Tuple` is deprecated, use `tuple` instead
+   |
+ 6 | from collections import defaultdict
+ 7 | from pathlib import Path
+ 8 | from typing import Dict, List, Set, Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+ 9 |
+10 | import nltk
+   |
+
+scripts/process_corpus.py:38:9: ANN204 Missing return type annotation for special method `__init__`
+   |
+36 |     """Process word corpus with lemmatization and inflection mapping."""
+37 |     
+38 |     def __init__(self, corpus_path: Path, output_dir: Path):
+   |         ^^^^^^^^ ANN204
+39 |         self.corpus_path = corpus_path
+40 |         self.output_dir = output_dir
+   |
+   = help: Add return type annotation: `None`
+
+scripts/process_corpus.py:44:26: UP006 [*] Use `set` instead of `Set` for type annotation
+   |
+43 |         self.lemmatizer = WordNetLemmatizer()
+44 |         self.base_forms: Set[str] = set()
+   |                          ^^^ UP006
+45 |         self.inflection_map: Dict[str, List[str]] = defaultdict(list)
+46 |         self.stats = {
+   |
+   = help: Replace with `set`
+
+scripts/process_corpus.py:45:30: UP006 [*] Use `dict` instead of `Dict` for type annotation
+   |
+43 |         self.lemmatizer = WordNetLemmatizer()
+44 |         self.base_forms: Set[str] = set()
+45 |         self.inflection_map: Dict[str, List[str]] = defaultdict(list)
+   |                              ^^^^ UP006
+46 |         self.stats = {
+47 |             "total_words": 0,
+   |
+   = help: Replace with `dict`
+
+scripts/process_corpus.py:45:40: UP006 [*] Use `list` instead of `List` for type annotation
+   |
+43 |         self.lemmatizer = WordNetLemmatizer()
+44 |         self.base_forms: Set[str] = set()
+45 |         self.inflection_map: Dict[str, List[str]] = defaultdict(list)
+   |                                        ^^^^ UP006
+46 |         self.stats = {
+47 |             "total_words": 0,
+   |
+   = help: Replace with `list`
+
+scripts/process_corpus.py:65:44: UP006 [*] Use `tuple` instead of `Tuple` for type annotation
+   |
+63 |             return wordnet.NOUN
+64 |     
+65 |     def lemmatize_word(self, word: str) -> Tuple[str, str]:
+   |                                            ^^^^^ UP006
+66 |         """Lemmatize a word and determine inflection type."""
+67 |         word_lower = word.lower()
+   |
+   = help: Replace with `tuple`
+
+scripts/process_corpus.py:101:15: ANN201 Missing return type annotation for public function `process_corpus`
+    |
+ 99 |         return best_lemma, inflection_type
+100 |     
+101 |     async def process_corpus(self):
+    |               ^^^^^^^^^^^^^^ ANN201
+102 |         """Process the entire corpus with progress tracking."""
+103 |         # Load all words
+    |
+    = help: Add return type annotation: `None`
+
+scripts/process_corpus.py:105:37: UP015 [*] Unnecessary mode argument
+    |
+103 |         # Load all words
+104 |         console.print("[cyan]Loading corpus...[/cyan]")
+105 |         with open(self.corpus_path, "r") as f:
+    |                                     ^^^ UP015
+106 |             all_words = [line.strip() for line in f if line.strip()]
+    |
+    = help: Remove mode argument
+
+scripts/process_corpus.py:141:9: ANN201 Missing return type annotation for public function `save_results`
+    |
+139 |         )
+140 |     
+141 |     def save_results(self):
+    |         ^^^^^^^^^^^^ ANN201
+142 |         """Save processed corpus and mappings."""
+143 |         # Save base forms
+    |
+    = help: Add return type annotation: `None`
+
+scripts/process_corpus.py:163:9: ANN201 Missing return type annotation for public function `display_statistics`
+    |
+161 |         console.print(f"\n[green]Results saved to {self.output_dir}[/green]")
+162 |     
+163 |     def display_statistics(self):
+    |         ^^^^^^^^^^^^^^^^^^ ANN201
+164 |         """Display processing statistics."""
+165 |         # Create statistics table
+    |
+    = help: Add return type annotation: `None`
+
+scripts/process_corpus.py:203:11: ANN201 Missing return type annotation for public function `main`
+    |
+203 | async def main():
+    |           ^^^^ ANN201
+204 |     """Main entry point."""
+205 |     # Paths
+    |
+    = help: Add return type annotation: `None`
+
+src/floridify/ai/batch_processor.py:49:71: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+   |
+48 |     def add_request(
+49 |         self, prompt: str, response_model: type[BaseModel], **kwargs: Any
+   |                                                                       ^^^ ANN401
+50 |     ) -> asyncio.Future[Any]:
+51 |         """Add a request to the batch and return a future for the result."""
+   |
+
+src/floridify/ai/batch_processor.py:160:81: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `_wait_for_completion`
+    |
+158 |                 batch_file.unlink()
+159 |
+160 |     async def _wait_for_completion(self, batch_id: str, check_interval: int) -> Any:
+    |                                                                                 ^^^ ANN401
+161 |         """Wait for batch job to complete."""
+162 |         start_time = time.time()
+    |
+
+src/floridify/ai/batch_processor.py:206:9: ANN204 Missing return type annotation for special method `__init__`
+    |
+204 |     """Context manager for batch processing OpenAI requests."""
+205 |
+206 |     def __init__(self, connector: OpenAIConnector):
+    |         ^^^^^^^^ ANN204
+207 |         self.connector = connector
+208 |         self.collector = BatchCollector()
+    |
+    = help: Add return type annotation: `None`
+
+src/floridify/ai/batch_processor.py:222:69: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+220 |         # Create wrapper that collects requests
+221 |         def batch_wrapper(
+222 |             prompt: str, response_model: type[BaseModel], **kwargs: Any
+    |                                                                     ^^^ ANN401
+223 |         ) -> Any:
+224 |             # Add to batch and return future
+    |
+
+src/floridify/ai/batch_processor.py:223:14: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `batch_wrapper`
+    |
+221 |         def batch_wrapper(
+222 |             prompt: str, response_model: type[BaseModel], **kwargs: Any
+223 |         ) -> Any:
+    |              ^^^ ANN401
+224 |             # Add to batch and return future
+225 |             future = batch_context.collector.add_request(
+    |
+
+src/floridify/ai/batch_processor.py:239:62: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `_await_future`
+    |
+237 |         return self
+238 |
+239 |     async def _await_future(self, future: asyncio.Future) -> Any:
+    |                                                              ^^^ ANN401
+240 |         """Helper to await a future."""
+241 |         return await future
+    |
+
+src/floridify/ai/batch_processor.py:243:41: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `exc_type`
+    |
+241 |         return await future
+242 |
+243 |     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    |                                         ^^^ ANN401
+244 |         """Exit batch mode and execute collected requests."""
+245 |         logger.info(
+    |
+
+src/floridify/ai/batch_processor.py:243:55: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `exc_val`
+    |
+241 |         return await future
+242 |
+243 |     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    |                                                       ^^^ ANN401
+244 |         """Exit batch mode and execute collected requests."""
+245 |         logger.info(
+    |
+
+src/floridify/ai/batch_processor.py:243:68: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `exc_tb`
+    |
+241 |         return await future
+242 |
+243 |     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    |                                                                    ^^^ ANN401
+244 |         """Exit batch mode and execute collected requests."""
+245 |         logger.info(
+    |
+
+src/floridify/ai/connector.py:13:22: TC001 Move application import `..models.Definition` into a type-checking block
+   |
+12 | from ..caching.decorators import cached_api_call
+13 | from ..models import Definition
+   |                      ^^^^^^^^^^ TC001
+14 | from ..utils.logging import get_logger, log_metrics
+15 | from .models import (
+   |
+   = help: Move into type-checking block
+
+src/floridify/ai/connector.py:81:19: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+   |
+79 |         prompt: str,
+80 |         response_model: type[T],
+81 |         **kwargs: Any,
+   |                   ^^^ ANN401
+82 |     ) -> T:
+83 |         """Make a structured request to OpenAI with caching."""
+   |
+
+src/floridify/ai/connector.py:151:29: TC006 [*] Add quotes to type expression in `typing.cast()`
+    |
+149 |                 )
+150 |
+151 |                 return cast(T, result)
+    |                             ^ TC006
+152 |
+153 |             except Exception as e:
+    |
+    = help: Add quotes
+
+src/floridify/ai/factory.py:5:21: TC003 Move standard library import `pathlib.Path` into a type-checking block
+  |
+3 | from __future__ import annotations
+4 |
+5 | from pathlib import Path
+  |                     ^^^^ TC003
+6 |
+7 | from ..utils.config import Config
+  |
+  = help: Move into type-checking block
+
+src/floridify/ai/models.py:5:22: TC003 Move standard library import `datetime.datetime` into a type-checking block
+  |
+3 | from __future__ import annotations
+4 |
+5 | from datetime import datetime
+  |                      ^^^^^^^^ TC003
+6 | from typing import Any
+  |
+  = help: Move into type-checking block
+
+src/floridify/ai/synthesis_functions.py:32:24: TC001 Move application import `.connector.OpenAIConnector` into a type-checking block
+   |
+30 | from ..utils.logging import get_logger
+31 | from .batch_processor import batch_synthesis
+32 | from .connector import OpenAIConnector
+   |                        ^^^^^^^^^^^^^^^ TC001
+33 | from .constants import (
+34 |     DEFAULT_ANTONYM_COUNT,
+   |
+   = help: Move into type-checking block
+
+src/floridify/ai/synthesis_functions.py:39:21: TC001 Move application import `.models.QueryValidationResponse` into a type-checking block
+   |
+37 |     SynthesisComponent,
+38 | )
+39 | from .models import QueryValidationResponse, WordSuggestionResponse
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^ TC001
+40 |
+41 | logger = get_logger(__name__)
+   |
+   = help: Move into type-checking block
+
+src/floridify/ai/synthesis_functions.py:39:46: TC001 Move application import `.models.WordSuggestionResponse` into a type-checking block
+   |
+37 |     SynthesisComponent,
+38 | )
+39 | from .models import QueryValidationResponse, WordSuggestionResponse
+   |                                              ^^^^^^^^^^^^^^^^^^^^^^ TC001
+40 |
+41 | logger = get_logger(__name__)
+   |
+   = help: Move into type-checking block
+
+src/floridify/ai/synthesis_functions.py:78:29: TC006 [*] Add quotes to type expression in `typing.cast()`
+   |
+76 |         else:
+77 |             if provider.get("pronunciation"):
+78 |                 return cast(Pronunciation, provider["pronunciation"])
+   |                             ^^^^^^^^^^^^^ TC006
+79 |     return None
+   |
+   = help: Add quotes
+
+src/floridify/ai/synthesis_functions.py:961:40: TC006 [*] Add quotes to type expression in `typing.cast()`
+    |
+959 |         # Update the definition based on component type
+960 |         if component == SynthesisComponent.SYNONYMS and isinstance(result, list):
+961 |             definition.synonyms = cast(list[str], result)
+    |                                        ^^^^^^^^^ TC006
+962 |         elif component == SynthesisComponent.EXAMPLES and isinstance(result, list):
+963 |             # Create Example objects and save them
+    |
+    = help: Add quotes
+
+src/floridify/ai/synthesis_functions.py:965:38: TC006 [*] Add quotes to type expression in `typing.cast()`
+    |
+963 |             # Create Example objects and save them
+964 |             example_ids = []
+965 |             for example_text in cast(list[str], result):
+    |                                      ^^^^^^^^^ TC006
+966 |                 example = Example(
+967 |                     definition_id=str(definition.id),
+    |
+    = help: Add quotes
+
+src/floridify/ai/synthesis_functions.py:975:40: TC006 [*] Add quotes to type expression in `typing.cast()`
+    |
+973 |             definition.example_ids.extend(example_ids)
+974 |         elif component == SynthesisComponent.ANTONYMS and isinstance(result, list):
+975 |             definition.antonyms = cast(list[str], result)
+    |                                        ^^^^^^^^^ TC006
+976 |         elif component == SynthesisComponent.WORD_FORMS and isinstance(result, list):
+977 |             definition.word_forms = cast(list[WordForm], result)
+    |
+    = help: Add quotes
+
+src/floridify/ai/synthesis_functions.py:977:42: TC006 [*] Add quotes to type expression in `typing.cast()`
+    |
+975 |             definition.antonyms = cast(list[str], result)
+976 |         elif component == SynthesisComponent.WORD_FORMS and isinstance(result, list):
+977 |             definition.word_forms = cast(list[WordForm], result)
+    |                                          ^^^^^^^^^^^^^^ TC006
+978 |         elif component == SynthesisComponent.CEFR_LEVEL and isinstance(result, str):
+979 |             definition.cefr_level = result  # type: ignore
+    |
+    = help: Add quotes
+
+src/floridify/ai/synthesis_functions.py:987:48: TC006 [*] Add quotes to type expression in `typing.cast()`
+    |
+985 |             definition.domain = result
+986 |         elif component == SynthesisComponent.GRAMMAR_PATTERNS and isinstance(result, list):
+987 |             definition.grammar_patterns = cast(list[GrammarPattern], result)
+    |                                                ^^^^^^^^^^^^^^^^^^^^ TC006
+988 |         elif component == SynthesisComponent.COLLOCATIONS and isinstance(result, list):
+989 |             definition.collocations = cast(list[Collocation], result)
+    |
+    = help: Add quotes
+
+src/floridify/ai/synthesis_functions.py:989:44: TC006 [*] Add quotes to type expression in `typing.cast()`
+    |
+987 |             definition.grammar_patterns = cast(list[GrammarPattern], result)
+988 |         elif component == SynthesisComponent.COLLOCATIONS and isinstance(result, list):
+989 |             definition.collocations = cast(list[Collocation], result)
+    |                                            ^^^^^^^^^^^^^^^^^ TC006
+990 |         elif component == SynthesisComponent.USAGE_NOTES and isinstance(result, list):
+991 |             definition.usage_notes = cast(list[UsageNote], result)
+    |
+    = help: Add quotes
+
+src/floridify/ai/synthesis_functions.py:991:43: TC006 [*] Add quotes to type expression in `typing.cast()`
+    |
+989 |             definition.collocations = cast(list[Collocation], result)
+990 |         elif component == SynthesisComponent.USAGE_NOTES and isinstance(result, list):
+991 |             definition.usage_notes = cast(list[UsageNote], result)
+    |                                           ^^^^^^^^^^^^^^^ TC006
+992 |         elif component == SynthesisComponent.REGIONAL_VARIANTS:
+993 |             # Regional variants returns a list, take the first
+    |
+    = help: Add quotes
+
+src/floridify/ai/synthesis_functions.py:995:42: TC006 [*] Add quotes to type expression in `typing.cast()`
+    |
+993 |             # Regional variants returns a list, take the first
+994 |             if isinstance(result, list) and result:
+995 |                 definition.region = cast(str, result[0])
+    |                                          ^^^ TC006
+996 |             elif isinstance(result, str):
+997 |                 definition.region = result
+    |
+    = help: Add quotes
+
+src/floridify/ai/synthesis_functions.py:1116:41: TC006 [*] Add quotes to type expression in `typing.cast()`
+     |
+1114 |                 entry.etymology = result
+1115 |             elif task_type == SynthesisComponent.WORD_FORMS and isinstance(result, list):
+1116 |                 entry.word_forms = cast(list[WordForm], result)
+     |                                         ^^^^^^^^^^^^^^ TC006
+1117 |             elif task_type == SynthesisComponent.FACTS and isinstance(result, list):
+1118 |                 entry.fact_ids = [str(fact.id) for fact in cast(list[Fact], result)]
+     |
+     = help: Add quotes
+
+src/floridify/ai/synthesis_functions.py:1118:65: TC006 [*] Add quotes to type expression in `typing.cast()`
+     |
+1116 |                 entry.word_forms = cast(list[WordForm], result)
+1117 |             elif task_type == SynthesisComponent.FACTS and isinstance(result, list):
+1118 |                 entry.fact_ids = [str(fact.id) for fact in cast(list[Fact], result)]
+     |                                                                 ^^^^^^^^^^ TC006
+1119 |
+1120 |         # Save updated entry
+     |
+     = help: Add quotes
+
+src/floridify/ai/synthesizer.py:17:24: TC001 Move application import `.connector.OpenAIConnector` into a type-checking block
+   |
+15 | from ..utils.logging import get_logger
+16 | from .batch_processor import batch_synthesis
+17 | from .connector import OpenAIConnector
+   |                        ^^^^^^^^^^^^^^^ TC001
+18 | from .synthesis_functions import (
+19 |     cluster_definitions,
+   |
+   = help: Move into type-checking block
+
+src/floridify/ai/templates.py:57:61: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+   |
+55 |         )
+56 |
+57 |     def render_template(self, template_name: str, **kwargs: Any) -> str:
+   |                                                             ^^^ ANN401
+58 |         """Render a template with the given context."""
+59 |         template = self.env.get_template(template_name)
+   |
+
+src/floridify/anki/ankiconnect.py:50:45: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**params`
+   |
+48 |             return False
+49 |
+50 |     def invoke(self, action: str, **params: Any) -> Any:
+   |                                             ^^^ ANN401
+51 |         """Send command to AnkiConnect.
+   |
+
+src/floridify/anki/ankiconnect.py:50:53: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `invoke`
+   |
+48 |             return False
+49 |
+50 |     def invoke(self, action: str, **params: Any) -> Any:
+   |                                                     ^^^ ANN401
+51 |         """Send command to AnkiConnect.
+   |
+
+src/floridify/anki/ankiconnect.py:365:42: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `card`
+    |
+363 |             return False
+364 |
+365 |     def _ensure_model_exists(self, card: Any, model_name: str) -> bool:
+    |                                          ^^^ ANN401
+366 |         """Ensure a model exists for the given card type."""
+367 |         try:
+    |
+
+src/floridify/anki/generator.py:13:28: TC001 Move application import `..ai.connector.OpenAIConnector` into a type-checking block
+   |
+11 | import genanki  # type: ignore[import-untyped]
+12 |
+13 | from ..ai.connector import OpenAIConnector
+   |                            ^^^^^^^^^^^^^^^ TC001
+14 | from ..ai.templates import PromptTemplateManager as PromptLoader
+15 | from ..models import Definition, SynthesizedDictionaryEntry
+   |
+   = help: Move into type-checking block
+
+src/floridify/anki/generator.py:15:22: TC001 Move application import `..models.Definition` into a type-checking block
+   |
+13 | from ..ai.connector import OpenAIConnector
+14 | from ..ai.templates import PromptTemplateManager as PromptLoader
+15 | from ..models import Definition, SynthesizedDictionaryEntry
+   |                      ^^^^^^^^^^ TC001
+16 | from ..utils.logging import get_logger
+17 | from .ankiconnect import AnkiDirectIntegration
+   |
+   = help: Move into type-checking block
+
+src/floridify/anki/generator.py:15:34: TC001 Move application import `..models.SynthesizedDictionaryEntry` into a type-checking block
+   |
+13 | from ..ai.connector import OpenAIConnector
+14 | from ..ai.templates import PromptTemplateManager as PromptLoader
+15 | from ..models import Definition, SynthesizedDictionaryEntry
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ TC001
+16 | from ..utils.logging import get_logger
+17 | from .ankiconnect import AnkiDirectIntegration
+   |
+   = help: Move into type-checking block
+
+src/floridify/anki/generator.py:77:35: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `field_value`
+   |
+77 | def _field_has_value(field_value: Any) -> bool:
+   |                                   ^^^ ANN401
+78 |     """Check if a field has a meaningful value for conditional rendering."""
+79 |     if isinstance(field_value, list):
+   |
+
+src/floridify/api/core/base.py:5:8: TC003 Move standard library import `builtins` into a type-checking block
+  |
+3 | from __future__ import annotations
+4 |
+5 | import builtins
+  |        ^^^^^^^^ TC003
+6 | from abc import ABC, abstractmethod
+7 | from collections.abc import Callable
+  |
+  = help: Move into type-checking block
+
+src/floridify/api/core/base.py:7:29: TC003 Move standard library import `collections.abc.Callable` into a type-checking block
+  |
+5 | import builtins
+6 | from abc import ABC, abstractmethod
+7 | from collections.abc import Callable
+  |                             ^^^^^^^^ TC003
+8 | from datetime import datetime
+9 | from typing import Any, Generic, TypeVar
+  |
+  = help: Move into type-checking block
+
+src/floridify/api/core/base.py:80:31: UP046 Generic class `ListResponse` uses `Generic` subclass instead of type parameters
+   |
+80 | class ListResponse(BaseModel, Generic[T]):
+   |                               ^^^^^^^^^^ UP046
+81 |     """Standard list response with pagination metadata."""
+   |
+   = help: Use type parameters
+
+src/floridify/api/core/base.py:91:32: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**data`
+   |
+89 |     has_more: bool = Field(default=False)
+90 |
+91 |     def __init__(self, **data: Any) -> None:
+   |                                ^^^ ANN401
+92 |         data["has_more"] = data["offset"] + len(data["items"]) < data["total"]
+93 |         super().__init__(**data)
+   |
+
+src/floridify/api/core/base.py:121:27: UP046 Generic class `BaseRepository` uses `Generic` subclass instead of type parameters
+    |
+121 | class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP046
+122 |     """Base repository for CRUD operations."""
+    |
+    = help: Use type parameters
+
+src/floridify/api/core/base.py:124:9: ANN204 Missing return type annotation for special method `__init__`
+    |
+122 |     """Base repository for CRUD operations."""
+123 |
+124 |     def __init__(self, model: type[T]):
+    |         ^^^^^^^^ ANN204
+125 |         self.model = model
+    |
+    = help: Add return type annotation: `None`
+
+src/floridify/api/core/base.py:248:30: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+246 |     """Decorator for consistent error handling."""
+247 |
+248 |     async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                              ^^^ ANN401
+249 |         try:
+250 |             return await func(*args, **kwargs)
+    |
+
+src/floridify/api/core/base.py:248:45: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+246 |     """Decorator for consistent error handling."""
+247 |
+248 |     async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                             ^^^ ANN401
+249 |         try:
+250 |             return await func(*args, **kwargs)
+    |
+
+src/floridify/api/core/base.py:248:53: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `wrapper`
+    |
+246 |     """Decorator for consistent error handling."""
+247 |
+248 |     async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                                     ^^^ ANN401
+249 |         try:
+250 |             return await func(*args, **kwargs)
+    |
+
+src/floridify/api/core/base.py:259:20: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `data`
+    |
+259 | def get_etag(data: Any) -> str:
+    |                    ^^^ ANN401
+260 |     """Generate ETag for response data."""
+261 |     import hashlib
+    |
+
+src/floridify/api/core/cache.py:64:72: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+   |
+62 |     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+63 |         @wraps(func)
+64 |         async def wrapper(request: Request, response: Response, *args: Any, **kwargs: Any) -> Any:
+   |                                                                        ^^^ ANN401
+65 |             # Generate cache key
+66 |             cache_key = generate_cache_key(request, config, prefix)
+   |
+
+src/floridify/api/core/cache.py:64:87: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+   |
+62 |     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+63 |         @wraps(func)
+64 |         async def wrapper(request: Request, response: Response, *args: Any, **kwargs: Any) -> Any:
+   |                                                                                       ^^^ ANN401
+65 |             # Generate cache key
+66 |             cache_key = generate_cache_key(request, config, prefix)
+   |
+
+src/floridify/api/core/cache.py:64:95: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `wrapper`
+   |
+62 |     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+63 |         @wraps(func)
+64 |         async def wrapper(request: Request, response: Response, *args: Any, **kwargs: Any) -> Any:
+   |                                                                                               ^^^ ANN401
+65 |             # Generate cache key
+66 |             cache_key = generate_cache_key(request, config, prefix)
+   |
+
+src/floridify/api/core/cache.py:132:9: ANN204 Missing return type annotation for special method `__init__`
+    |
+130 |     """Utility for invalidating related caches."""
+131 |
+132 |     def __init__(self, cache_manager: CacheManager | None = None):
+    |         ^^^^^^^^ ANN204
+133 |         self.cache_manager = cache_manager or get_cache_manager()
+    |
+    = help: Add return type annotation: `None`
+
+src/floridify/api/core/cache.py:200:9: ANN204 Missing return type annotation for special method `__init__`
+    |
+198 |     """Context manager for response caching."""
+199 |
+200 |     def __init__(
+    |         ^^^^^^^^ ANN204
+201 |         self, request: Request, response: Response, ttl: int = 3600, key_prefix: str = "response"
+202 |     ):
+    |
+    = help: Add return type annotation: `None`
+
+src/floridify/api/core/cache.py:211:35: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `__aenter__`
+    |
+209 |         self.start_time: datetime | None = None
+210 |
+211 |     async def __aenter__(self) -> Any:
+    |                                   ^^^ ANN401
+212 |         self.start_time = datetime.utcnow()
+213 |         config = APICacheConfig(ttl=self.ttl)
+    |
+
+src/floridify/api/core/cache.py:225:41: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `exc_type`
+    |
+223 |         return None
+224 |
+225 |     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    |                                         ^^^ ANN401
+226 |         if exc_type is None and self.cache_key and self.start_time:
+227 |             # Cache successful response
+    |
+
+src/floridify/api/core/cache.py:225:55: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `exc_val`
+    |
+223 |         return None
+224 |
+225 |     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    |                                                       ^^^ ANN401
+226 |         if exc_type is None and self.cache_key and self.start_time:
+227 |             # Cache successful response
+    |
+
+src/floridify/api/core/cache.py:225:68: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `exc_tb`
+    |
+223 |         return None
+224 |
+225 |     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    |                                                                    ^^^ ANN401
+226 |         if exc_type is None and self.cache_key and self.start_time:
+227 |             # Cache successful response
+    |
+
+src/floridify/api/core/monitoring.py:137:78: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `track_request_performance`
+    |
+136 | @asynccontextmanager
+137 | async def track_request_performance(request: Request, response: Response) -> Any:
+    |                                                                              ^^^ ANN401
+138 |     """Context manager for tracking request performance."""
+139 |     start_time = time.time()
+    |
+
+src/floridify/api/core/monitoring.py:163:34: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+162 |     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+163 |         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                  ^^^ ANN401
+164 |             start_time = time.time()
+    |
+
+src/floridify/api/core/monitoring.py:163:49: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+162 |     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+163 |         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                                 ^^^ ANN401
+164 |             start_time = time.time()
+    |
+
+src/floridify/api/core/monitoring.py:163:57: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `wrapper`
+    |
+162 |     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+163 |         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                                         ^^^ ANN401
+164 |             start_time = time.time()
+    |
+
+src/floridify/api/core/monitoring.py:184:9: ANN204 Missing return type annotation for special method `__init__`
+    |
+182 |     """Utility for detecting and logging slow queries."""
+183 |
+184 |     def __init__(self, threshold_ms: float = 100):
+    |         ^^^^^^^^ ANN204
+185 |         self.threshold_ms = threshold_ms
+186 |         self.slow_queries: list[dict[str, Any]] = []
+    |
+    = help: Add return type annotation: `None`
+
+src/floridify/api/core/monitoring.py:189:54: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `track`
+    |
+188 |     @asynccontextmanager
+189 |     async def track(self, query_description: str) -> Any:
+    |                                                      ^^^ ANN401
+190 |         """Track a query execution."""
+191 |         start_time = time.time()
+    |
+
+src/floridify/api/core/query.py:20:9: ANN204 Missing return type annotation for special method `__init__`
+   |
+18 |     """Utilities for optimizing MongoDB queries."""
+19 |
+20 |     def __init__(self, db: AsyncIOMotorDatabase[Any] | None = None):
+   |         ^^^^^^^^ ANN204
+21 |         self.db = db
+   |
+   = help: Add return type annotation: `None`
+
+src/floridify/api/core/query.py:118:66: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `profile_query`
+    |
+117 |     @asynccontextmanager
+118 |     async def profile_query(self, description: str = "Query") -> Any:
+    |                                                                  ^^^ ANN401
+119 |         """Context manager for profiling queries."""
+120 |         start_time = time.time()
+    |
+
+src/floridify/api/core/query.py:174:26: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `_id`
+    |
+172 |         return self
+173 |
+174 |     def group(self, _id: Any, fields: dict[str, Any]) -> "AggregationBuilder":
+    |                          ^^^ ANN401
+175 |         """Add group stage."""
+176 |         group_stage = {"_id": _id}
+    |
+
+src/floridify/api/core/query.py:219:9: ANN204 Missing return type annotation for special method `__init__`
+    |
+217 |     """Builder for bulk operations."""
+218 |
+219 |     def __init__(self, model: type[Document]):
+    |         ^^^^^^^^ ANN204
+220 |         self.model = model
+221 |         self.operations: list[dict[str, Any]] = []
+    |
+    = help: Add return type annotation: `None`
+
+src/floridify/api/examples/deduplication_example.py:102:9: ANN204 Missing return type annotation for special method `__init__`
+    |
+100 |     """Example of manual deduplication for batch operations."""
+101 |     
+102 |     def __init__(self):
+    |         ^^^^^^^^ ANN204
+103 |         self._in_flight: dict[str, asyncio.Future[Any]] = {}
+104 |         self._lock = asyncio.Lock()
+    |
+    = help: Add return type annotation: `None`
+
+src/floridify/api/examples/update_endpoint_example.py:81:9: ANN204 Missing return type annotation for special method `__init__`
+   |
+79 |     """Example showing how to gradually migrate existing code."""
+80 |     
+81 |     def __init__(self, use_deduplication: bool = False):
+   |         ^^^^^^^^ ANN204
+82 |         self.use_deduplication = use_deduplication
+   |
+   = help: Add return type annotation: `None`
+
+src/floridify/api/examples/update_endpoint_example.py:107:5: ANN201 Missing return type annotation for public function `update_lookup_endpoint_example`
+    |
+106 | # Real-world example: Updating the existing lookup endpoint
+107 | def update_lookup_endpoint_example():
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ANN201
+108 |     """Shows the minimal changes needed to add deduplication."""
+    |
+    = help: Add return type annotation: `None`
+
+src/floridify/api/examples/update_endpoint_example.py:144:9: ANN204 Missing return type annotation for special method `__init__`
+    |
+142 |     """Track deduplication effectiveness."""
+143 |     
+144 |     def __init__(self):
+    |         ^^^^^^^^ ANN204
+145 |         self.total_requests = 0
+146 |         self.deduplicated_requests = 0
+    |
+    = help: Add return type annotation: `None`
+
+src/floridify/api/examples/update_endpoint_example.py:180:5: ANN201 Missing return type annotation for public function `custom_dedup_key_example`
+    |
+179 | # Example of custom key generation for complex scenarios
+180 | def custom_dedup_key_example():
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^ ANN201
+181 |     """Shows different key generation strategies."""
+    |
+    = help: Add return type annotation
+
+src/floridify/api/examples/update_endpoint_example.py:190:9: ANN202 Missing return type annotation for private function `selective_key`
+    |
+189 |     # 3. Key that ignores certain parameters
+190 |     def selective_key(word: str, include_etymology: bool = False, debug: bool = False):
+    |         ^^^^^^^^^^^^^ ANN202
+191 |         # Ignore debug flag in deduplication key
+192 |         return f"word:{word}:etymology:{include_etymology}"
+    |
+    = help: Add return type annotation: `str`
+
+src/floridify/api/examples/update_endpoint_example.py:195:9: ANN202 Missing return type annotation for private function `normalized_key`
+    |
+194 |     # 4. Key with normalized values
+195 |     def normalized_key(query: str, limit: int = 10):
+    |         ^^^^^^^^^^^^^^ ANN202
+196 |         # Normalize query to lowercase and cap limit
+197 |         return f"search:{query.lower()}:limit:{min(limit, 100)}"
+    |
+    = help: Add return type annotation: `str`
+
+src/floridify/api/examples/update_endpoint_example.py:200:9: ANN202 Missing return type annotation for private function `time_bucketed_key`
+    |
+199 |     # 5. Key for time-bucketed deduplication
+200 |     def time_bucketed_key(user_id: str, bucket_minutes: int = 5):
+    |         ^^^^^^^^^^^^^^^^^ ANN202
+201 |         # Deduplicate within time buckets
+202 |         import time
+    |
+    = help: Add return type annotation: `str`
+
+src/floridify/api/main.py:38:37: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `lifespan`
+   |
+37 | @asynccontextmanager
+38 | async def lifespan(app: FastAPI) -> Any:
+   |                                     ^^^ ANN401
+39 |     """Initialize database and resources on startup, cleanup on shutdown."""
+40 |     # Startup
+   |
+
+src/floridify/api/middleware/field_selection.py:53:9: ANN204 Missing return type annotation for special method `__init__`
+   |
+51 |     """Field selection helper for API endpoints."""
+52 |
+53 |     def __init__(self, include: str | None = None, exclude: str | None = None):
+   |         ^^^^^^^^ ANN204
+54 |         self.include = parse_field_param(include)
+55 |         self.exclude = parse_field_param(exclude)
+   |
+   = help: Add return type annotation: `None`
+
+src/floridify/api/middleware/middleware.py:8:29: TC003 Move standard library import `collections.abc.Awaitable` into a type-checking block
+   |
+ 6 | import time
+ 7 | import uuid
+ 8 | from collections.abc import Awaitable, Callable
+   |                             ^^^^^^^^^ TC003
+ 9 |
+10 | from fastapi import Request, Response
+   |
+   = help: Move into type-checking block
+
+src/floridify/api/middleware/middleware.py:8:40: TC003 Move standard library import `collections.abc.Callable` into a type-checking block
+   |
+ 6 | import time
+ 7 | import uuid
+ 8 | from collections.abc import Awaitable, Callable
+   |                                        ^^^^^^^^ TC003
+ 9 |
+10 | from fastapi import Request, Response
+   |
+   = help: Move into type-checking block
+
+src/floridify/api/middleware/rate_limiting.py:8:29: TC003 Move standard library import `collections.abc.Callable` into a type-checking block
+  |
+6 | import time
+7 | from collections import defaultdict
+8 | from collections.abc import Callable
+  |                             ^^^^^^^^ TC003
+9 | from typing import Any
+  |
+  = help: Move into type-checking block
+
+src/floridify/api/middleware/rate_limiting.py:18:9: ANN204 Missing return type annotation for special method `__init__`
+   |
+16 |     """Token bucket rate limiter implementation."""
+17 |
+18 |     def __init__(
+   |         ^^^^^^^^ ANN204
+19 |         self,
+20 |         requests_per_minute: int = 60,
+   |
+   = help: Add return type annotation: `None`
+
+src/floridify/api/middleware/rate_limiting.py:95:9: ANN204 Missing return type annotation for special method `__init__`
+   |
+93 |     """Specialized rate limiter for OpenAI API calls with token tracking."""
+94 |
+95 |     def __init__(
+   |         ^^^^^^^^ ANN204
+96 |         self,
+97 |         requests_per_minute: int = 50,
+   |
+   = help: Add return type annotation: `None`
+
+src/floridify/api/middleware/rate_limiting.py:205:31: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+203 |     """Custom route class that adds rate limiting."""
+204 |
+205 |     def __init__(self, *args: Any, rate_limiter: RateLimiter | None = None, **kwargs: Any) -> None:
+    |                               ^^^ ANN401
+206 |         super().__init__(*args, **kwargs)
+207 |         self.rate_limiter = rate_limiter or general_limiter
+    |
+
+src/floridify/api/middleware/rate_limiting.py:205:87: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+203 |     """Custom route class that adds rate limiting."""
+204 |
+205 |     def __init__(self, *args: Any, rate_limiter: RateLimiter | None = None, **kwargs: Any) -> None:
+    |                                                                                       ^^^ ANN401
+206 |         super().__init__(*args, **kwargs)
+207 |         self.rate_limiter = rate_limiter or general_limiter
+    |
+
+src/floridify/api/middleware/rate_limiting.py:249:52: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+248 |     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+249 |         async def wrapper(request: Request, *args: Any, **kwargs: Any) -> Any:
+    |                                                    ^^^ ANN401
+250 |             client_key = get_client_key(request)
+251 |             allowed, headers = await limiter.check_rate_limit(client_key)
+    |
+
+src/floridify/api/middleware/rate_limiting.py:249:67: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+248 |     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+249 |         async def wrapper(request: Request, *args: Any, **kwargs: Any) -> Any:
+    |                                                                   ^^^ ANN401
+250 |             client_key = get_client_key(request)
+251 |             allowed, headers = await limiter.check_rate_limit(client_key)
+    |
+
+src/floridify/api/middleware/rate_limiting.py:249:75: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `wrapper`
+    |
+248 |     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+249 |         async def wrapper(request: Request, *args: Any, **kwargs: Any) -> Any:
+    |                                                                           ^^^ ANN401
+250 |             client_key = get_client_key(request)
+251 |             allowed, headers = await limiter.check_rate_limit(client_key)
+    |
+
+src/floridify/api/routers/ai.py:653:15: ANN202 Missing return type annotation for private function `generate_suggestion_events`
+    |
+651 |     state_tracker = StateTracker()
+652 |     
+653 |     async def generate_suggestion_events():
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^ ANN202
+654 |         """Generate SSE events for suggestion pipeline."""
+655 |         async with state_tracker.subscribe() as subscriber_queue:
+    |
+    = help: Add return type annotation
+
+src/floridify/api/routers/ai.py:657:23: ANN202 Missing return type annotation for private function `run_suggestion_pipeline`
+    |
+655 |         async with state_tracker.subscribe() as subscriber_queue:
+656 |             
+657 |             async def run_suggestion_pipeline():
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^ ANN202
+658 |                 """Run the suggestion pipeline with state tracking."""
+659 |                 try:
+    |
+    = help: Add return type annotation: `None`
+
+src/floridify/api/routers/lookup.py:8:29: TC003 Move standard library import `collections.abc.AsyncGenerator` into a type-checking block
+   |
+ 6 | import json
+ 7 | import time
+ 8 | from collections.abc import AsyncGenerator
+   |                             ^^^^^^^^^^^^^^ TC003
+ 9 | from datetime import datetime
+10 | from typing import Any
+   |
+   = help: Move into type-checking block
+
+src/floridify/api/routers/lookup.py:9:22: TC003 Move standard library import `datetime.datetime` into a type-checking block
+   |
+ 7 | import time
+ 8 | from collections.abc import AsyncGenerator
+ 9 | from datetime import datetime
+   |                      ^^^^^^^^ TC003
+10 | from typing import Any
+   |
+   = help: Move into type-checking block
+
+src/floridify/api/routers/lookup.py:24:21: TC001 Move application import `.common.PipelineMetrics` into a type-checking block
+   |
+22 | from ...utils.logging import get_logger
+23 | from ...utils.sanitization import validate_word_input
+24 | from .common import PipelineMetrics
+   |                     ^^^^^^^^^^^^^^^ TC001
+25 |
+26 | logger = get_logger(__name__)
+   |
+   = help: Move into type-checking block
+
+src/floridify/api/routers/search.py:12:33: TC001 Move application import `...search.constants.SearchMethod` into a type-checking block
+   |
+10 | from ...caching.decorators import cached_api_call
+11 | from ...constants import Language
+12 | from ...search.constants import SearchMethod
+   |                                 ^^^^^^^^^^^^ TC001
+13 | from ...search.language import get_language_search
+14 | from ...utils.logging import get_logger
+   |
+   = help: Move into type-checking block
+
+src/floridify/audio/synthesizer.py:52:9: ANN204 Missing return type annotation for special method `__init__`
+   |
+50 |     """Synthesizes audio pronunciations using Google Cloud Text-to-Speech."""
+51 |
+52 |     def __init__(self, config: AudioSynthesisConfig | None = None):
+   |         ^^^^^^^^ ANN204
+53 |         """Initialize the audio synthesizer.
+   |
+   = help: Add return type annotation: `None`
+
+src/floridify/caching/cache_manager.py:21:31: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `value`
+   |
+19 |     """Cache entry with TTL support."""
+20 |
+21 |     def __init__(self, value: Any, ttl_seconds: float | None = None) -> None:
+   |                               ^^^ ANN401
+22 |         self.value = value
+23 |         self.created_at = time.time()
+   |
+
+src/floridify/caching/cache_manager.py:146:16: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `value`
+    |
+144 |         self,
+145 |         key_parts: tuple[Any, ...],
+146 |         value: Any,
+    |                ^^^ ANN401
+147 |         ttl_hours: float | None = None,
+148 |         use_file_cache: bool = False,
+    |
+
+src/floridify/caching/decorators.py:26:9: ANN204 Missing return type annotation for special method `__init__`
+   |
+24 |     """Manages in-flight requests to prevent duplicate executions."""
+25 |     
+26 |     def __init__(self, max_wait_time: float = 30.0, cleanup_interval: float = 60.0):
+   |         ^^^^^^^^ ANN204
+27 |         self._in_flight: dict[str, asyncio.Future[Any]] = {}
+28 |         self._lock = asyncio.Lock()
+   |
+   = help: Add return type annotation: `None`
+
+src/floridify/caching/decorators.py:37:16: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+   |
+35 |         key: str,
+36 |         func: Callable[..., Awaitable[Any]],
+37 |         *args: Any,
+   |                ^^^ ANN401
+38 |         **kwargs: Any,
+39 |     ) -> Any:
+   |
+
+src/floridify/caching/decorators.py:38:19: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+   |
+36 |         func: Callable[..., Awaitable[Any]],
+37 |         *args: Any,
+38 |         **kwargs: Any,
+   |                   ^^^ ANN401
+39 |     ) -> Any:
+40 |         """Execute function with deduplication."""
+   |
+
+src/floridify/caching/decorators.py:39:10: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `deduplicate`
+   |
+37 |         *args: Any,
+38 |         **kwargs: Any,
+39 |     ) -> Any:
+   |          ^^^ ANN401
+40 |         """Execute function with deduplication."""
+41 |         async with self._lock:
+   |
+
+src/floridify/caching/decorators.py:61:16: UP041 [*] Replace aliased errors with `TimeoutError`
+   |
+59 |         try:
+60 |             return await asyncio.wait_for(future, timeout=self._max_wait_time)
+61 |         except asyncio.TimeoutError:
+   |                ^^^^^^^^^^^^^^^^^^^^ UP041
+62 |             logger.warning(f"⏱️ Timeout waiting for request: {key}")
+63 |             raise HTTPException(status_code=504, detail="Request timeout")
+   |
+   = help: Replace `asyncio.TimeoutError` with builtin `TimeoutError`
+
+src/floridify/caching/decorators.py:70:16: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+   |
+68 |         future: asyncio.Future[Any],
+69 |         func: Callable[..., Awaitable[Any]],
+70 |         *args: Any,
+   |                ^^^ ANN401
+71 |         **kwargs: Any,
+72 |     ) -> None:
+   |
+
+src/floridify/caching/decorators.py:71:19: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+   |
+69 |         func: Callable[..., Awaitable[Any]],
+70 |         *args: Any,
+71 |         **kwargs: Any,
+   |                   ^^^ ANN401
+72 |     ) -> None:
+73 |         """Execute the actual function and set the future result."""
+   |
+
+src/floridify/caching/decorators.py:128:34: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+126 |     def decorator(func: AF) -> AF:
+127 |         @functools.wraps(func)
+128 |         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                  ^^^ ANN401
+129 |             cache_manager = get_cache_manager()
+    |
+
+src/floridify/caching/decorators.py:128:49: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+126 |     def decorator(func: AF) -> AF:
+127 |         @functools.wraps(func)
+128 |         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                                 ^^^ ANN401
+129 |             cache_manager = get_cache_manager()
+    |
+
+src/floridify/caching/decorators.py:128:57: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `wrapper`
+    |
+126 |     def decorator(func: AF) -> AF:
+127 |         @functools.wraps(func)
+128 |         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                                         ^^^ ANN401
+129 |             cache_manager = get_cache_manager()
+    |
+
+src/floridify/caching/decorators.py:195:33: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+193 |     def decorator(func: F) -> F:
+194 |         @functools.wraps(func)
+195 |         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                 ^^^ ANN401
+196 |             cache_manager = get_cache_manager()
+    |
+
+src/floridify/caching/decorators.py:195:48: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+193 |     def decorator(func: F) -> F:
+194 |         @functools.wraps(func)
+195 |         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                                ^^^ ANN401
+196 |             cache_manager = get_cache_manager()
+    |
+
+src/floridify/caching/decorators.py:195:56: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `sync_wrapper`
+    |
+193 |     def decorator(func: F) -> F:
+194 |         @functools.wraps(func)
+195 |         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                                        ^^^ ANN401
+196 |             cache_manager = get_cache_manager()
+    |
+
+src/floridify/caching/decorators.py:238:40: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+237 |         @functools.wraps(func)
+238 |         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                        ^^^ ANN401
+239 |             cache_manager = get_cache_manager()
+    |
+
+src/floridify/caching/decorators.py:238:55: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+237 |         @functools.wraps(func)
+238 |         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                                       ^^^ ANN401
+239 |             cache_manager = get_cache_manager()
+    |
+
+src/floridify/caching/decorators.py:238:63: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `async_wrapper`
+    |
+237 |         @functools.wraps(func)
+238 |         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                                               ^^^ ANN401
+239 |             cache_manager = get_cache_manager()
+    |
+
+src/floridify/caching/decorators.py:289:29: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+289 | def openai_cache_key(*args: Any, **kwargs: Any) -> tuple[Any, ...]:
+    |                             ^^^ ANN401
+290 |     """Generate cache key for OpenAI API calls."""
+291 |     # Extract common OpenAI parameters for cache key
+    |
+
+src/floridify/caching/decorators.py:289:44: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+289 | def openai_cache_key(*args: Any, **kwargs: Any) -> tuple[Any, ...]:
+    |                                            ^^^ ANN401
+290 |     """Generate cache key for OpenAI API calls."""
+291 |     # Extract common OpenAI parameters for cache key
+    |
+
+src/floridify/caching/decorators.py:303:27: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+303 | def http_cache_key(*args: Any, **kwargs: Any) -> tuple[Any, ...]:
+    |                           ^^^ ANN401
+304 |     """Generate cache key for HTTP requests."""
+305 |     # URL is typically the first argument
+    |
+
+src/floridify/caching/decorators.py:303:42: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+303 | def http_cache_key(*args: Any, **kwargs: Any) -> tuple[Any, ...]:
+    |                                          ^^^ ANN401
+304 |     """Generate cache key for HTTP requests."""
+305 |     # URL is typically the first argument
+    |
+
+src/floridify/caching/decorators.py:316:30: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+316 | def lexicon_cache_key(*args: Any, **kwargs: Any) -> tuple[Any, ...]:
+    |                              ^^^ ANN401
+317 |     """Generate cache key for lexicon operations."""
+318 |     # Include language and source information
+    |
+
+src/floridify/caching/decorators.py:316:45: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+316 | def lexicon_cache_key(*args: Any, **kwargs: Any) -> tuple[Any, ...]:
+    |                                             ^^^ ANN401
+317 |     """Generate cache key for lexicon operations."""
+318 |     # Include language and source information
+    |
+
+src/floridify/caching/decorators.py:340:34: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+338 |     def decorator(func: AF) -> AF:
+339 |         @functools.wraps(func)
+340 |         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                  ^^^ ANN401
+341 |             # Generate deduplication key
+342 |             key = key_func(*args, **kwargs)
+    |
+
+src/floridify/caching/decorators.py:340:49: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+338 |     def decorator(func: AF) -> AF:
+339 |         @functools.wraps(func)
+340 |         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                                 ^^^ ANN401
+341 |             # Generate deduplication key
+342 |             key = key_func(*args, **kwargs)
+    |
+
+src/floridify/caching/decorators.py:340:57: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `wrapper`
+    |
+338 |     def decorator(func: AF) -> AF:
+339 |         @functools.wraps(func)
+340 |         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                                         ^^^ ANN401
+341 |             # Generate deduplication key
+342 |             key = key_func(*args, **kwargs)
+    |
+
+src/floridify/caching/decorators.py:379:34: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+377 |     def decorator(func: AF) -> AF:
+378 |         @functools.wraps(func)
+379 |         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                  ^^^ ANN401
+380 |             cache_manager = get_cache_manager()
+    |
+
+src/floridify/caching/decorators.py:379:49: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+377 |     def decorator(func: AF) -> AF:
+378 |         @functools.wraps(func)
+379 |         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                                 ^^^ ANN401
+380 |             cache_manager = get_cache_manager()
+    |
+
+src/floridify/caching/decorators.py:379:57: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `wrapper`
+    |
+377 |     def decorator(func: AF) -> AF:
+378 |         @functools.wraps(func)
+379 |         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    |                                                         ^^^ ANN401
+380 |             cache_manager = get_cache_manager()
+    |
+
+src/floridify/caching/http_client.py:6:29: TC003 Move standard library import `collections.abc.Callable` into a type-checking block
+  |
+5 | import time
+6 | from collections.abc import Callable
+  |                             ^^^^^^^^ TC003
+7 | from pathlib import Path
+8 | from typing import Any
+  |
+  = help: Move into type-checking block
+
+src/floridify/caching/http_client.py:11:8: TC002 Move third-party import `httpx` into a type-checking block
+   |
+10 | import hishel
+11 | import httpx
+   |        ^^^^^ TC002
+12 |
+13 | from ..utils.logging import get_logger
+   |
+   = help: Move into type-checking block
+
+src/floridify/caching/http_client.py:62:19: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+   |
+60 |         force_refresh: bool | None = None,
+61 |         progress_callback: Callable[[str, dict[str, Any]], None] | None = None,
+62 |         **kwargs: Any,
+   |                   ^^^ ANN401
+63 |     ) -> httpx.Response:
+64 |         """Cached GET request.
+   |
+
+src/floridify/caching/http_client.py:143:19: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+141 |         self,
+142 |         url: str,
+143 |         **kwargs: Any,
+    |                   ^^^ ANN401
+144 |     ) -> httpx.Response:
+145 |         """Non-cached POST request.
+    |
+
+src/floridify/caching/http_client.py:166:19: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+164 |         ttl_hours: float | None = None,
+165 |         force_refresh: bool | None = None,
+166 |         **kwargs: Any,
+    |                   ^^^ ANN401
+167 |     ) -> bool:
+168 |         """Download file with caching.
+    |
+
+src/floridify/cli/commands/lookup.py:12:23: TC001 Move application import `...models.Definition` into a type-checking block
+   |
+10 | from ...constants import DictionaryProvider, Language
+11 | from ...core.lookup_pipeline import lookup_word_pipeline
+12 | from ...models import Definition
+   |                       ^^^^^^^^^^ TC001
+13 | from ...utils.logging import get_logger
+14 | from ..utils.formatting import (
+   |
+   = help: Move into type-checking block
+
+src/floridify/cli/commands/similar.py:14:26: TC001 Move application import `...ai.models.SynonymCandidate` into a type-checking block
+   |
+13 | from ...ai import get_openai_connector
+14 | from ...ai.models import SynonymCandidate, SynonymGenerationResponse
+   |                          ^^^^^^^^^^^^^^^^ TC001
+15 | from ...constants import DictionaryProvider, Language
+16 | from ...core.lookup_pipeline import lookup_word_pipeline
+   |
+   = help: Move into type-checking block
+
+src/floridify/cli/commands/similar.py:14:44: TC001 Move application import `...ai.models.SynonymGenerationResponse` into a type-checking block
+   |
+13 | from ...ai import get_openai_connector
+14 | from ...ai.models import SynonymCandidate, SynonymGenerationResponse
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^ TC001
+15 | from ...constants import DictionaryProvider, Language
+16 | from ...core.lookup_pipeline import lookup_word_pipeline
+   |
+   = help: Move into type-checking block
+
+src/floridify/cli/utils/formatting.py:19:26: TC001 Move application import `...constants.DictionaryProvider` into a type-checking block
+   |
+17 | from rich.text import Text
+18 |
+19 | from ...constants import DictionaryProvider, Language
+   |                          ^^^^^^^^^^^^^^^^^^ TC001
+20 | from ...models import Definition, SynthesizedDictionaryEntry
+21 | from ...search import SearchResult
+   |
+   = help: Move into type-checking block
+
+src/floridify/cli/utils/formatting.py:19:46: TC001 Move application import `...constants.Language` into a type-checking block
+   |
+17 | from rich.text import Text
+18 |
+19 | from ...constants import DictionaryProvider, Language
+   |                                              ^^^^^^^^ TC001
+20 | from ...models import Definition, SynthesizedDictionaryEntry
+21 | from ...search import SearchResult
+   |
+   = help: Move into type-checking block
+
+src/floridify/cli/utils/formatting.py:20:23: TC001 Move application import `...models.Definition` into a type-checking block
+   |
+19 | from ...constants import DictionaryProvider, Language
+20 | from ...models import Definition, SynthesizedDictionaryEntry
+   |                       ^^^^^^^^^^ TC001
+21 | from ...search import SearchResult
+22 | from ...search.constants import SearchMethod
+   |
+   = help: Move into type-checking block
+
+src/floridify/cli/utils/formatting.py:20:35: TC001 Move application import `...models.SynthesizedDictionaryEntry` into a type-checking block
+   |
+19 | from ...constants import DictionaryProvider, Language
+20 | from ...models import Definition, SynthesizedDictionaryEntry
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ TC001
+21 | from ...search import SearchResult
+22 | from ...search.constants import SearchMethod
+   |
+   = help: Move into type-checking block
+
+src/floridify/cli/utils/formatting.py:21:23: TC001 Move application import `...search.SearchResult` into a type-checking block
+   |
+19 | from ...constants import DictionaryProvider, Language
+20 | from ...models import Definition, SynthesizedDictionaryEntry
+21 | from ...search import SearchResult
+   |                       ^^^^^^^^^^^^ TC001
+22 | from ...search.constants import SearchMethod
+23 | from ...utils.text_utils import (
+   |
+   = help: Move into type-checking block
+
+src/floridify/connectors/base.py:7:29: TC003 Move standard library import `collections.abc.Callable` into a type-checking block
+  |
+5 | import asyncio
+6 | from abc import ABC, abstractmethod
+7 | from collections.abc import Callable
+  |                             ^^^^^^^^ TC003
+8 | from typing import Any
+  |
+  = help: Move into type-checking block
+
+src/floridify/connectors/base.py:11:34: TC001 Move application import `..core.state_tracker.StateTracker` into a type-checking block
+   |
+10 | from ..constants import DictionaryProvider
+11 | from ..core.state_tracker import StateTracker
+   |                                  ^^^^^^^^^^^^ TC001
+12 | from ..models import Definition, Etymology, Pronunciation, ProviderData, Word
+13 | from ..utils.logging import get_logger
+   |
+   = help: Move into type-checking block
+
+src/floridify/connectors/dictionary_com.py:14:5: TC001 Move application import `..models.Definition` into a type-checking block
+   |
+12 | from ..core.state_tracker import Stages, StateTracker
+13 | from ..models import (
+14 |     Definition,
+   |     ^^^^^^^^^^ TC001
+15 |     Etymology,
+16 |     Pronunciation,
+   |
+   = help: Move into type-checking block
+
+src/floridify/connectors/dictionary_com.py:15:5: TC001 Move application import `..models.Etymology` into a type-checking block
+   |
+13 | from ..models import (
+14 |     Definition,
+15 |     Etymology,
+   |     ^^^^^^^^^ TC001
+16 |     Pronunciation,
+17 |     ProviderData,
+   |
+   = help: Move into type-checking block
+
+src/floridify/connectors/dictionary_com.py:16:5: TC001 Move application import `..models.Pronunciation` into a type-checking block
+   |
+14 |     Definition,
+15 |     Etymology,
+16 |     Pronunciation,
+   |     ^^^^^^^^^^^^^ TC001
+17 |     ProviderData,
+18 | )
+   |
+   = help: Move into type-checking block
+
+src/floridify/connectors/dictionary_com.py:17:5: TC001 Move application import `..models.ProviderData` into a type-checking block
+   |
+15 |     Etymology,
+16 |     Pronunciation,
+17 |     ProviderData,
+   |     ^^^^^^^^^^^^ TC001
+18 | )
+19 | from ..utils.logging import get_logger
+   |
+   = help: Move into type-checking block
+
+src/floridify/connectors/oxford.py:6:29: TC003 Move standard library import `collections.abc.Callable` into a type-checking block
+  |
+5 | import asyncio
+6 | from collections.abc import Callable
+  |                             ^^^^^^^^ TC003
+7 | from typing import Any
+  |
+  = help: Move into type-checking block
+
+src/floridify/connectors/oxford.py:12:34: TC001 Move application import `..core.state_tracker.StateTracker` into a type-checking block
+   |
+11 | from ..constants import Language
+12 | from ..core.state_tracker import StateTracker
+   |                                  ^^^^^^^^^^^^ TC001
+13 | from ..models import (
+14 |     Definition,
+   |
+   = help: Move into type-checking block
+
+src/floridify/core/lookup_pipeline.py:15:29: TC001 Move application import `..models.models.ProviderData` into a type-checking block
+   |
+13 | from ..connectors.wiktionary import WiktionaryConnector
+14 | from ..constants import DictionaryProvider, Language
+15 | from ..models.models import ProviderData, SynthesizedDictionaryEntry
+   |                             ^^^^^^^^^^^^ TC001
+16 | from ..storage.mongodb import get_synthesized_entry
+17 | from ..utils.config import Config
+   |
+   = help: Move into type-checking block
+
+src/floridify/core/lookup_pipeline.py:15:43: TC001 Move application import `..models.models.SynthesizedDictionaryEntry` into a type-checking block
+   |
+13 | from ..connectors.wiktionary import WiktionaryConnector
+14 | from ..constants import DictionaryProvider, Language
+15 | from ..models.models import ProviderData, SynthesizedDictionaryEntry
+   |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^ TC001
+16 | from ..storage.mongodb import get_synthesized_entry
+17 | from ..utils.config import Config
+   |
+   = help: Move into type-checking block
+
+src/floridify/core/search_pipeline.py:9:27: TC001 Move application import `..search.core.SearchResult` into a type-checking block
+   |
+ 8 | from ..constants import Language
+ 9 | from ..search.core import SearchResult
+   |                           ^^^^^^^^^^^^ TC001
+10 | from ..search.language import LanguageSearch, get_language_search
+11 | from ..utils.logging import (
+   |
+   = help: Move into type-checking block
+
+src/floridify/core/search_pipeline.py:20:5: TC005 [*] Found empty type-checking block
+   |
+19 | if TYPE_CHECKING:
+20 |     pass
+   |     ^^^^ TC005
+21 |
+22 | logger = get_logger(__name__)
+   |
+   = help: Delete empty type-checking block
+
+src/floridify/core/state_tracker.py:6:29: TC003 Move standard library import `collections.abc.AsyncGenerator` into a type-checking block
+  |
+5 | import asyncio
+6 | from collections.abc import AsyncGenerator
+  |                             ^^^^^^^^^^^^^^ TC003
+7 | from contextlib import asynccontextmanager
+8 | from datetime import datetime
+  |
+  = help: Move into type-checking block
+
+src/floridify/list/parser.py:6:21: TC003 Move standard library import `pathlib.Path` into a type-checking block
+  |
+5 | import re
+6 | from pathlib import Path
+  |                     ^^^^ TC003
+7 | from typing import Any
+  |
+  = help: Move into type-checking block
+
+src/floridify/models/models.py:5:22: TC003 Move standard library import `datetime.datetime` into a type-checking block
+  |
+3 | from __future__ import annotations
+4 |
+5 | from datetime import datetime
+  |                      ^^^^^^^^ TC003
+6 | from typing import Any, Literal
+  |
+  = help: Move into type-checking block
+
+src/floridify/models/models.py:14:5: TC001 Move application import `.relationships.Collocation` into a type-checking block
+   |
+12 | from .base import BaseMetadata, Etymology, ModelInfo
+13 | from .relationships import (
+14 |     Collocation,
+   |     ^^^^^^^^^^^ TC001
+15 |     GrammarPattern,
+16 |     MeaningCluster,
+   |
+   = help: Move into type-checking block
+
+src/floridify/models/models.py:15:5: TC001 Move application import `.relationships.GrammarPattern` into a type-checking block
+   |
+13 | from .relationships import (
+14 |     Collocation,
+15 |     GrammarPattern,
+   |     ^^^^^^^^^^^^^^ TC001
+16 |     MeaningCluster,
+17 |     UsageNote,
+   |
+   = help: Move into type-checking block
+
+src/floridify/models/models.py:16:5: TC001 Move application import `.relationships.MeaningCluster` into a type-checking block
+   |
+14 |     Collocation,
+15 |     GrammarPattern,
+16 |     MeaningCluster,
+   |     ^^^^^^^^^^^^^^ TC001
+17 |     UsageNote,
+18 |     WordForm,
+   |
+   = help: Move into type-checking block
+
+src/floridify/models/models.py:17:5: TC001 Move application import `.relationships.UsageNote` into a type-checking block
+   |
+15 |     GrammarPattern,
+16 |     MeaningCluster,
+17 |     UsageNote,
+   |     ^^^^^^^^^ TC001
+18 |     WordForm,
+19 | )
+   |
+   = help: Move into type-checking block
+
+src/floridify/models/models.py:18:5: TC001 Move application import `.relationships.WordForm` into a type-checking block
+   |
+16 |     MeaningCluster,
+17 |     UsageNote,
+18 |     WordForm,
+   |     ^^^^^^^^ TC001
+19 | )
+   |
+   = help: Move into type-checking block
+
+src/floridify/search/core.py:17:27: TC001 Move application import `.lexicon.core.Lexicon` into a type-checking block
+   |
+15 | from .constants import SearchMethod
+16 | from .fuzzy import FuzzySearch
+17 | from .lexicon.core import Lexicon
+   |                           ^^^^^^^ TC001
+18 | from .phrase import PhraseNormalizer
+19 | from .trie import TrieSearch
+   |
+   = help: Move into type-checking block
+
+src/floridify/search/lexicon/language_loader.py:13:21: TC003 Move standard library import `pathlib.Path` into a type-checking block
+   |
+11 | import json
+12 | import pickle
+13 | from pathlib import Path
+   |                     ^^^^ TC003
+14 | from typing import Any
+   |
+   = help: Move into type-checking block
+
+src/floridify/search/lexicon/parser.py:15:26: TC001 Move application import `...constants.Language` into a type-checking block
+   |
+13 | from typing import Any
+14 |
+15 | from ...constants import Language
+   |                          ^^^^^^^^ TC001
+16 | from ...utils.logging import get_logger
+17 | from ..constants import LexiconFormat
+   |
+   = help: Move into type-checking block
+
+src/floridify/search/lexicon/parser.py:326:14: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `content`
+    |
+324 | def parse_content(
+325 |     lexicon_format: LexiconFormat | str,
+326 |     content: Any,
+    |              ^^^ ANN401
+327 |     language: Language,
+328 |     phrase_normalizer: PhraseNormalizer,
+    |
+
+src/floridify/search/lexicon/scrapers/default.py:18:52: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+   |
+18 | async def default_scraper(url: str = "", **kwargs: Any) -> httpx.Response:
+   |                                                    ^^^ ANN401
+19 |     """Default HTTP GET downloader with caching."""
+20 |     if not url:
+   |
+
+src/floridify/search/lexicon/scrapers/wikipedia_french_expressions.py:19:62: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+   |
+19 | async def scrape_french_expressions(url: str = "", **kwargs: Any) -> dict[str, Any]:
+   |                                                              ^^^ ANN401
+20 |     """
+21 |     Scrape French expressions from Wikipedia glossary page.
+   |
+
+src/floridify/search/semantic.py:13:21: TC003 Move standard library import `pathlib.Path` into a type-checking block
+   |
+11 | import hashlib
+12 | import pickle
+13 | from pathlib import Path
+   |                     ^^^^ TC003
+14 | from typing import Any
+   |
+   = help: Move into type-checking block
+
+src/floridify/search/semantic.py:46:30: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `x`
+   |
+44 |     DEFAULT_SENTENCE_MODEL = "all-MiniLM-L6-v2"
+45 |
+46 |     def cosine_similarity(x: Any, y: Any) -> list[Any]:
+   |                              ^^^ ANN401
+47 |         return []
+   |
+
+src/floridify/search/semantic.py:46:38: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `y`
+   |
+44 |     DEFAULT_SENTENCE_MODEL = "all-MiniLM-L6-v2"
+45 |
+46 |     def cosine_similarity(x: Any, y: Any) -> list[Any]:
+   |                                      ^^^ ANN401
+47 |         return []
+   |
+
+src/floridify/search/trie.py:11:21: TC003 Move standard library import `pathlib.Path` into a type-checking block
+   |
+10 | import pickle
+11 | from pathlib import Path
+   |                     ^^^^ TC003
+12 | from typing import Any
+   |
+   = help: Move into type-checking block
+
+src/floridify/storage/mongodb.py:6:21: TC003 Move standard library import `pathlib.Path` into a type-checking block
+  |
+5 | from datetime import datetime
+6 | from pathlib import Path
+  |                     ^^^^ TC003
+7 | from typing import Any
+  |
+  = help: Move into type-checking block
+
+src/floridify/text/processor.py:62:9: ANN204 Missing return type annotation for special method `__init__`
+   |
+60 |     """Spacy-based text processor."""
+61 |
+62 |     def __init__(self, model: str = "en_core_web_sm"):
+   |         ^^^^^^^^ ANN204
+63 |         if not SPACY_AVAILABLE:
+64 |             raise RuntimeError("Spacy not available")
+   |
+   = help: Add return type annotation: `None`
+
+src/floridify/text/processor.py:192:9: ANN204 Missing return type annotation for special method `__init__`
+    |
+190 |     """Main text processor with automatic fallbacks."""
+191 |
+192 |     def __init__(self, prefer_method: str = "auto"):
+    |         ^^^^^^^^ ANN204
+193 |         self.processors: list[TextProcessorProtocol] = []
+194 |         self._setup_processors(prefer_method)
+    |
+    = help: Add return type annotation: `None`
+
+src/floridify/utils/logging.py:104:9: ANN204 Missing return type annotation for special method `__init__`
+    |
+102 |     """Wrapper around loguru logger to provide compatible API with enhanced features."""
+103 |
+104 |     def __init__(self, name: str):
+    |         ^^^^^^^^ ANN204
+105 |         self._name = name
+106 |         self._logger = loguru_logger.bind(name=name)
+    |
+    = help: Add return type annotation: `None`
+
+src/floridify/utils/logging.py:108:39: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+106 |         self._logger = loguru_logger.bind(name=name)
+107 |
+108 |     def _with_context(self, **kwargs: Any) -> Any:
+    |                                       ^^^ ANN401
+109 |         """Add request context to log message."""
+110 |         context = request_context.get({})
+    |
+
+src/floridify/utils/logging.py:108:47: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `_with_context`
+    |
+106 |         self._logger = loguru_logger.bind(name=name)
+107 |
+108 |     def _with_context(self, **kwargs: Any) -> Any:
+    |                                               ^^^ ANN401
+109 |         """Add request context to log message."""
+110 |         context = request_context.get({})
+    |
+
+src/floridify/utils/logging.py:113:42: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+111 |         return self._logger.bind(**context, **kwargs)
+112 |
+113 |     def debug(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                          ^^^ ANN401
+114 |         """Log debug message with context."""
+115 |         self._with_context().opt(depth=1).debug(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:113:57: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+111 |         return self._logger.bind(**context, **kwargs)
+112 |
+113 |     def debug(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                                         ^^^ ANN401
+114 |         """Log debug message with context."""
+115 |         self._with_context().opt(depth=1).debug(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:117:41: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+115 |         self._with_context().opt(depth=1).debug(message, *args, **kwargs)
+116 |
+117 |     def info(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                         ^^^ ANN401
+118 |         """Log info message with context."""
+119 |         self._with_context().opt(depth=1).info(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:117:56: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+115 |         self._with_context().opt(depth=1).debug(message, *args, **kwargs)
+116 |
+117 |     def info(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                                        ^^^ ANN401
+118 |         """Log info message with context."""
+119 |         self._with_context().opt(depth=1).info(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:121:44: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+119 |         self._with_context().opt(depth=1).info(message, *args, **kwargs)
+120 |
+121 |     def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                            ^^^ ANN401
+122 |         """Log warning message with context."""
+123 |         self._with_context().opt(depth=1).warning(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:121:59: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+119 |         self._with_context().opt(depth=1).info(message, *args, **kwargs)
+120 |
+121 |     def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                                           ^^^ ANN401
+122 |         """Log warning message with context."""
+123 |         self._with_context().opt(depth=1).warning(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:125:41: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+123 |         self._with_context().opt(depth=1).warning(message, *args, **kwargs)
+124 |
+125 |     def warn(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                         ^^^ ANN401
+126 |         """Alias for warning (stdlib compatibility)."""
+127 |         self._with_context().opt(depth=1).warning(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:125:56: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+123 |         self._with_context().opt(depth=1).warning(message, *args, **kwargs)
+124 |
+125 |     def warn(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                                        ^^^ ANN401
+126 |         """Alias for warning (stdlib compatibility)."""
+127 |         self._with_context().opt(depth=1).warning(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:129:42: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+127 |         self._with_context().opt(depth=1).warning(message, *args, **kwargs)
+128 |
+129 |     def error(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                          ^^^ ANN401
+130 |         """Log error message with context."""
+131 |         self._with_context().opt(depth=1).error(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:129:57: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+127 |         self._with_context().opt(depth=1).warning(message, *args, **kwargs)
+128 |
+129 |     def error(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                                         ^^^ ANN401
+130 |         """Log error message with context."""
+131 |         self._with_context().opt(depth=1).error(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:133:45: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+131 |         self._with_context().opt(depth=1).error(message, *args, **kwargs)
+132 |
+133 |     def critical(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                             ^^^ ANN401
+134 |         """Log critical message with context."""
+135 |         self._with_context().opt(depth=1).critical(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:133:60: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+131 |         self._with_context().opt(depth=1).error(message, *args, **kwargs)
+132 |
+133 |     def critical(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                                            ^^^ ANN401
+134 |         """Log critical message with context."""
+135 |         self._with_context().opt(depth=1).critical(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:137:46: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+135 |         self._with_context().opt(depth=1).critical(message, *args, **kwargs)
+136 |
+137 |     def exception(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                              ^^^ ANN401
+138 |         """Log exception message with traceback."""
+139 |         self._with_context().opt(depth=1).exception(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:137:61: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+135 |         self._with_context().opt(depth=1).critical(message, *args, **kwargs)
+136 |
+137 |     def exception(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                                             ^^^ ANN401
+138 |         """Log exception message with traceback."""
+139 |         self._with_context().opt(depth=1).exception(message, *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:141:44: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+139 |         self._with_context().opt(depth=1).exception(message, *args, **kwargs)
+140 |
+141 |     def success(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                            ^^^ ANN401
+142 |         """Log success message with success prefix (preserved API)."""
+143 |         self._with_context().opt(depth=1).log("SUCCESS", f"✅ {message}", *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:141:59: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+139 |         self._with_context().opt(depth=1).exception(message, *args, **kwargs)
+140 |
+141 |     def success(self, message: str, *args: Any, **kwargs: Any) -> None:
+    |                                                           ^^^ ANN401
+142 |         """Log success message with success prefix (preserved API)."""
+143 |         self._with_context().opt(depth=1).log("SUCCESS", f"✅ {message}", *args, **kwargs)
+    |
+
+src/floridify/utils/logging.py:145:30: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+143 |         self._with_context().opt(depth=1).log("SUCCESS", f"✅ {message}", *args, **kwargs)
+144 |
+145 |     def bind(self, **kwargs: Any) -> "LoggerWrapper":
+    |                              ^^^ ANN401
+146 |         """Create logger with bound context."""
+147 |         wrapper = LoggerWrapper(self._name)
+    |
+
+src/floridify/utils/logging.py:185:36: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+184 |     @functools.wraps(func)
+185 |     async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+    |                                    ^^^ ANN401
+186 |         start_time = time.perf_counter()
+187 |         func_name = f"{func.__module__}.{func.__name__}"
+    |
+
+src/floridify/utils/logging.py:185:51: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+184 |     @functools.wraps(func)
+185 |     async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+    |                                                   ^^^ ANN401
+186 |         start_time = time.perf_counter()
+187 |         func_name = f"{func.__module__}.{func.__name__}"
+    |
+
+src/floridify/utils/logging.py:206:29: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+205 |     @functools.wraps(func)
+206 |     def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+    |                             ^^^ ANN401
+207 |         start_time = time.perf_counter()
+208 |         func_name = f"{func.__module__}.{func.__name__}"
+    |
+
+src/floridify/utils/logging.py:206:44: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+205 |     @functools.wraps(func)
+206 |     def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+    |                                            ^^^ ANN401
+207 |         start_time = time.perf_counter()
+208 |         func_name = f"{func.__module__}.{func.__name__}"
+    |
+
+src/floridify/utils/logging.py:227:21: TC006 [*] Add quotes to type expression in `typing.cast()`
+    |
+226 |     if asyncio.iscoroutinefunction(func):
+227 |         return cast(Callable[..., T], async_wrapper)
+    |                     ^^^^^^^^^^^^^^^^ TC006
+228 |     else:
+229 |         return cast(Callable[..., T], sync_wrapper)
+    |
+    = help: Add quotes
+
+src/floridify/utils/logging.py:229:21: TC006 [*] Add quotes to type expression in `typing.cast()`
+    |
+227 |         return cast(Callable[..., T], async_wrapper)
+228 |     else:
+229 |         return cast(Callable[..., T], sync_wrapper)
+    |                     ^^^^^^^^^^^^^^^^ TC006
+    |
+    = help: Add quotes
+
+src/floridify/utils/logging.py:237:40: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+235 |     def decorator(func: Callable[..., T]) -> Callable[..., T]:
+236 |         @functools.wraps(func)
+237 |         async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+    |                                        ^^^ ANN401
+238 |             # Use loguru with stage context
+239 |             stage_logger = loguru_logger.bind(
+    |
+
+src/floridify/utils/logging.py:237:55: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+235 |     def decorator(func: Callable[..., T]) -> Callable[..., T]:
+236 |         @functools.wraps(func)
+237 |         async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+    |                                                       ^^^ ANN401
+238 |             # Use loguru with stage context
+239 |             stage_logger = loguru_logger.bind(
+    |
+
+src/floridify/utils/logging.py:262:33: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+    |
+261 |         @functools.wraps(func)
+262 |         def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+    |                                 ^^^ ANN401
+263 |             # Use loguru with stage context
+264 |             stage_logger = loguru_logger.bind(
+    |
+
+src/floridify/utils/logging.py:262:48: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    |
+261 |         @functools.wraps(func)
+262 |         def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+    |                                                ^^^ ANN401
+263 |             # Use loguru with stage context
+264 |             stage_logger = loguru_logger.bind(
+    |
+
+src/floridify/utils/logging.py:287:25: TC006 [*] Add quotes to type expression in `typing.cast()`
+    |
+286 |         if asyncio.iscoroutinefunction(func):
+287 |             return cast(Callable[..., T], async_wrapper)
+    |                         ^^^^^^^^^^^^^^^^ TC006
+288 |         else:
+289 |             return cast(Callable[..., T], sync_wrapper)
+    |
+    = help: Add quotes
+
+src/floridify/utils/logging.py:289:25: TC006 [*] Add quotes to type expression in `typing.cast()`
+    |
+287 |             return cast(Callable[..., T], async_wrapper)
+288 |         else:
+289 |             return cast(Callable[..., T], sync_wrapper)
+    |                         ^^^^^^^^^^^^^^^^ TC006
+290 |
+291 |     return decorator
+    |
+    = help: Add quotes
+
+src/floridify/utils/logging.py:294:28: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**metrics`
+    |
+294 | def log_metrics(**metrics: Any) -> None:
+    |                            ^^^ ANN401
+295 |     """Log structured metrics with enhanced context."""
+296 |     metrics_str = " | ".join(f"{k}={v}" for k, v in metrics.items())
+    |
+
+src/floridify/utils/logging.py:363:36: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**context`
+    |
+363 | def set_request_context(**context: Any) -> None:
+    |                                    ^^^ ANN401
+364 |     """Set request-scoped context for all subsequent logs.
+    |
+
+src/floridify/utils/logging.py:389:48: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**metrics`
+    |
+389 | def log_performance(operation: str, **metrics: Any) -> None:
+    |                                                ^^^ ANN401
+390 |     """Log performance metrics with structured data.
+    |
+
+src/floridify/utils/sanitization.py:116:14: UP038 Use `X | Y` in `isinstance` call instead of `(X, Y)`
+    |
+114 |         if isinstance(value, str):
+115 |             sanitized[clean_key] = sanitize_mongodb_input(value)
+116 |         elif isinstance(value, (list, tuple)):
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP038
+117 |             sanitized[clean_key] = [
+118 |                 sanitize_mongodb_input(v) if isinstance(v, str) else v for v in value
+    |
+    = help: Convert to `X | Y`
+
+Found 315 errors.
+[*] 77 fixable with the `--fix` option (104 hidden fixes can be enabled with the `--unsafe-fixes` option).

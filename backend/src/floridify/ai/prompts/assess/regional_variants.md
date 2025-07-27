@@ -1,29 +1,21 @@
-# Regional Variant Detection
+# Regional Variants
 
-Analyze the following definition for regional usage patterns:
-
+Analyze regional usage:
 **Definition**: {{ definition }}
 
-## Region Codes:
-- US - United States
-- UK - United Kingdom  
-- AU - Australia
-- CA - Canada
-- IN - India
-- ZA - South Africa
-- IE - Ireland
-- NZ - New Zealand
+## Codes:
+US, UK, AU, CA, IN, ZA, IE, NZ
 
-## Detection Guidelines:
-1. Look for explicit regional markers in the definition
-2. Identify region-specific terminology or spelling
-3. Consider cultural or contextual clues
-4. Return empty list if universally used
-5. Include only regions where this specific usage is common
+## Rules:
+- Check regional markers
+- Region-specific terms/spelling
+- Cultural context
+- [] if universal
+- Only where commonly used
 
 ## Examples:
-- "A lift in a building" → ["UK", "AU", "IN"] (vs. elevator in US)
-- "The season between summer and winter" → ["US", "CA"] (fall vs. autumn)
-- "A sweet carbonated beverage" → [] (universal, though names vary)
+- "Lift in building" → ["UK", "AU", "IN"]
+- "Season after summer" → ["US", "CA"] (fall)
+- "Sweet carbonated drink" → []
 
-Identify regions where this definition's usage is common.
+Return regions or empty list.

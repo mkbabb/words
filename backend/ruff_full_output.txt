@@ -1,0 +1,7 @@
+error: unexpected argument '--show-source' found
+
+  tip: a similar argument exists: '--show-files'
+
+Usage: ruff check --select <RULE_CODE> --show-files <FILES>...
+
+For more information, try '--help'.

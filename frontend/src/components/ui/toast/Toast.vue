@@ -1,18 +1,13 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
+import { computed, type HTMLAttributes } from 'vue'
 import {
-  ToastAction,
-  ToastClose,
-  ToastDescription,
   ToastProvider,
   ToastRoot,
-  ToastTitle,
   ToastViewport,
   type ToastRootEmits,
   type ToastRootProps,
 } from 'radix-vue'
 import { cn } from '@/lib/utils'
-import { X } from 'lucide-vue-next'
 
 interface ToastProps extends ToastRootProps {
   class?: HTMLAttributes['class']
@@ -50,8 +45,6 @@ const delegatedProps = computed(() => {
       "
       @update:open="emits('update:open', $event)"
       @escapeKeyDown="emits('escapeKeyDown', $event)"
-      @pause="emits('pause', $event)"
-      @resume="emits('resume', $event)"
       @swipeStart="emits('swipeStart', $event)"
       @swipeMove="emits('swipeMove', $event)"
       @swipeEnd="emits('swipeEnd', $event)"

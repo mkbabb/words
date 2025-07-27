@@ -25,10 +25,20 @@
             <!-- Border separator (not sticky) -->
             <div class="border-b border-border/50 lg:my-6"></div>
 
-            <!-- Content Area -->
-            <div class="container mx-auto max-w-5xl">
-                <!-- Animated Content Cards -->
-                <Transition
+            <!-- Content Area with Sidebar -->
+            <div class="container mx-auto max-w-6xl">
+                <div class="flex gap-6">
+                    <!-- Progressive Sidebar (Sticky) -->
+                    <ProgressiveSidebar 
+                        v-if="shouldShowProgressiveSidebar" 
+                        class="hidden w-48 flex-shrink-0 xl:block sticky self-start"
+                        :style="{ top: isScrolled ? '5rem' : '6rem', zIndex: 30 }"
+                    />
+                    
+                    <!-- Main Content -->
+                    <div class="flex-1 max-w-5xl mx-auto">
+                        <!-- Animated Content Cards -->
+                        <Transition
                     mode="out-in"
                     enter-active-class="transition-all duration-300 ease-apple-bounce"
                     leave-active-class="transition-all duration-200 ease-out"
@@ -83,7 +93,9 @@
                             <StageTest ref="stageTestRef" />
                         </div>
                     </div>
-                </Transition>
+                        </Transition>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -118,6 +130,7 @@ import { DefinitionSkeleton } from '@/components/custom/definition';
 import { Sidebar } from '@/components/custom';
 import { LoadingModal } from '@/components/custom/loading';
 import { StageTest } from '@/components/custom/test';
+import { ProgressiveSidebar } from '@/components/custom/navigation';
 
 const store = useAppStore();
 
@@ -162,5 +175,19 @@ const searchBarClasses = computed(() => {
         'sticky top-0 z-40 transition-all duration-300 ease-out',
         isScrolled.value ? 'py-2' : 'py-4'
     );
+});
+
+// Should show progressive sidebar
+const shouldShowProgressiveSidebar = computed(() => {
+    // Only show in dictionary mode with a current entry
+    if (store.mode !== 'dictionary' || !currentEntry.value) return false;
+    
+    // Check if we have multiple clusters
+    const definitions = currentEntry.value.definitions;
+    if (!definitions || definitions.length === 0) return false;
+    
+    // Group by cluster to see if we have multiple
+    const clusters = new Set(definitions.map(d => d.meaning_cluster?.id || 'default'));
+    return clusters.size > 1;
 });
 </script>

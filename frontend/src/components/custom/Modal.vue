@@ -1,12 +1,9 @@
 <template>
   <Teleport to="body">
     <Transition
-      enter-active-class="transition-all duration-300 ease-out"
-      enter-from-class="opacity-0 scale-95 translate-y-4"
-      enter-to-class="opacity-100 scale-100 translate-y-0"
-      leave-active-class="transition-all duration-200 ease-in"
-      leave-from-class="opacity-100 scale-100 translate-y-0"
-      leave-to-class="opacity-0 scale-95 translate-y-4"
+      :css="false"
+      @enter="modalEnter"
+      @leave="modalLeave"
     >
       <div
         v-if="modelValue"
@@ -15,17 +12,17 @@
       >
         <!-- Backdrop with standard blue modal styling -->
         <div
+          ref="backdropRef"
           class="absolute inset-0 z-0"
           :class="[
             'bg-blue-900/20 dark:bg-blue-950/30',
             'backdrop-blur-md',
-            'transition-all duration-300',
             'transform-gpu',
           ]"
         />
         
         <!-- Clean modal container -->
-        <div class="relative z-30 w-full max-w-4xl p-4">
+        <div ref="contentRef" class="relative z-30 w-full max-w-4xl p-4">
           <div class="modal-content relative mx-auto max-w-3xl rounded-2xl bg-background/80 backdrop-blur-md shadow-2xl cartoon-shadow-lg border border-border/30 overflow-hidden">
             <div class="p-8 relative z-20">
               <slot />
@@ -38,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 interface Props {
   modelValue: boolean
@@ -55,6 +52,10 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>()
 
+// Refs for animation targets
+const backdropRef = ref<HTMLDivElement>()
+const contentRef = ref<HTMLDivElement>()
+
 const handleBackdropClick = (event: Event) => {
   if (!props.closeOnBackdrop) return
   
@@ -63,6 +64,64 @@ const handleBackdropClick = (event: Event) => {
   if (target.closest('.modal-content')) return
   
   emit('update:modelValue', false)
+}
+
+// Smooth enter animation
+const modalEnter = (_el: Element, done: () => void) => {
+  const backdrop = backdropRef.value
+  const content = contentRef.value
+  
+  if (!backdrop || !content) {
+    done()
+    return
+  }
+  
+  // Initial states
+  backdrop.style.opacity = '0'
+  content.style.opacity = '0'
+  content.style.transform = 'scale(0.95) translateY(20px)'
+  
+  // Force reflow
+  backdrop.offsetHeight
+  
+  // Animate
+  requestAnimationFrame(() => {
+    // Backdrop fades in first
+    backdrop.style.transition = 'opacity 200ms cubic-bezier(0.25, 0.1, 0.25, 1)'
+    backdrop.style.opacity = '1'
+    
+    // Content appears slightly after with spring-like easing
+    setTimeout(() => {
+      content.style.transition = 'all 300ms cubic-bezier(0.16, 1, 0.3, 1)'
+      content.style.opacity = '1'
+      content.style.transform = 'scale(1) translateY(0)'
+      
+      setTimeout(done, 300)
+    }, 50)
+  })
+}
+
+// Smooth leave animation
+const modalLeave = (_el: Element, done: () => void) => {
+  const backdrop = backdropRef.value
+  const content = contentRef.value
+  
+  if (!backdrop || !content) {
+    done()
+    return
+  }
+  
+  // Animate out with smooth easing
+  content.style.transition = 'all 200ms cubic-bezier(0.4, 0, 1, 1)'
+  content.style.opacity = '0'
+  content.style.transform = 'scale(0.97) translateY(10px)'
+  
+  // Backdrop fades out simultaneously
+  backdrop.style.transition = 'opacity 250ms cubic-bezier(0.4, 0, 1, 1)'
+  backdrop.style.opacity = '0'
+  
+  // Wait for the longest animation to complete
+  setTimeout(done, 250)
 }
 
 // Handle escape key

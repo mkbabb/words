@@ -597,7 +597,6 @@ export const useAppStore = defineStore('app', () => {
 
     function toggleMode() {
         // Store the current suggestions state if we're leaving suggestions mode
-        const wasInSuggestions = mode.value === 'suggestions';
         const hasSuggestionsData = !!wordSuggestions.value;
         
         // If in suggestions mode

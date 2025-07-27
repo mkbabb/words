@@ -1,0 +1,5 @@
+scripts/batch_synthesis_enhanced.py:550:17: error: '(' was never closed 
+[syntax]
+        asyncio.run(main()
+                    ^
+Found 1 error in 1 file (errors prevented further checking)
