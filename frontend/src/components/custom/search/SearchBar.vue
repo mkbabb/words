@@ -2,14 +2,12 @@
     <div
         ref="searchContainer"
         :class="[
-            'search-container relative z-50 origin-top',
-            'w-full',
-            'mx-auto',
+            'search-container relative z-50 origin-top w-full mx-auto',
             props.className,
         ]"
         :style="containerStyle"
-        @mouseenter="handleMouseEnterWrapper"
-        @mouseleave="handleMouseLeaveWrapper"
+        @mouseenter="handleMouseEnter"
+        @mouseleave="handleMouseLeave"
     >
         <!-- Main Layout -->
         <div class="pointer-events-auto relative overflow-visible pt-2 pl-2">
@@ -21,126 +19,69 @@
                     'border-2 border-border bg-background/20 backdrop-blur-3xl',
                     'cartoon-shadow-sm rounded-2xl transition-all duration-500 ease-out',
                     {
-                        'cartoon-shadow-sm-hover': isContainerHovered,
-                        'bg-background/30': isContainerHovered && !isAIQuery,
-                        'bg-yellow-50 dark:bg-yellow-900/10': isAIQuery && !showErrorAnimation.value,
-                        'border-yellow-400 dark:border-yellow-600/30': isAIQuery && !showErrorAnimation.value,
-                        'shake-error': showErrorAnimation.value,
-                        'bg-gradient-to-br from-red-50/20 to-red-50/10 dark:from-red-900/20 dark:to-red-900/10': showErrorAnimation.value,
-                        'border-red-400/50 dark:border-red-600/50': showErrorAnimation.value,
+                        'cartoon-shadow-sm-hover': state.isContainerHovered,
+                        'bg-background/30': state.isContainerHovered && !state.isAIQuery,
+                        'bg-yellow-50 dark:bg-yellow-900/10': state.isAIQuery && !state.showErrorAnimation,
+                        'border-yellow-400 dark:border-yellow-600/30': state.isAIQuery && !state.showErrorAnimation,
+                        'shake-error': state.showErrorAnimation,
+                        'bg-gradient-to-br from-red-50/20 to-red-50/10 dark:from-red-900/20 dark:to-red-900/10': state.showErrorAnimation,
+                        'border-red-400/50 dark:border-red-600/50': state.showErrorAnimation,
                     },
                 ]"
                 :style="{
-                    height: `${searchBarHeight}px`,
+                    height: `${state.searchBarHeight}px`,
                 }"
             >
                 <!-- Sparkle Indicator -->
-                <Transition
-                    enter-active-class="transition-all duration-500 ease-out"
-                    leave-active-class="transition-all duration-300 ease-in"
-                    enter-from-class="opacity-0 scale-0"
-                    enter-to-class="opacity-100 scale-100"
-                    leave-from-class="opacity-100 scale-100"
-                    leave-to-class="opacity-0 scale-0"
-                >
-                    <div
-                        v-if="showSparkle"
-                        class="absolute -top-2 -left-2 z-50 pointer-events-none"
-                    >
-                        <div class="relative">
-                            <Sparkles 
-                                :size="28" 
-                                class="text-amber-600 dark:text-amber-400 animate-pulse drop-shadow-lg fill-amber-600 dark:fill-amber-400"
-                            />
-                            <Sparkles 
-                                :size="28" 
-                                class="absolute inset-0 text-amber-300 dark:text-amber-600 opacity-50 animate-spin-slow fill-amber-300 dark:fill-amber-600"
-                            />
-                        </div>
-                    </div>
-                </Transition>
+                <SparkleIndicator :show="state.showSparkle" />
 
-                <!-- Mode Toggle - Fixed to left edge -->
-                <div
-                    :class="[
-                        'flex flex-shrink-0 items-center justify-center overflow-hidden transition-all duration-300 ease-out',
-                    ]"
-                    :style="{
-                        opacity: iconOpacity,
-                        transform: `scale(${0.9 + iconOpacity * 0.1})`,
-                        pointerEvents: iconOpacity > 0.1 ? 'auto' : 'none',
-                        width: iconOpacity > 0.1 ? '48px' : '0px',
-                        marginRight: iconOpacity > 0.1 ? '2px' : '0px',
-                    }"
-                >
-                    <FancyF
-                        :mode="mode"
-                        size="lg"
-                        :clickable="canToggleMode"
-                        :class="{ 
-                            'text-amber-950 dark:text-amber-300': isAIQuery,
-                            'opacity-50 cursor-not-allowed': !canToggleMode
-                        }"
-                        @toggle-mode="handleModeToggle"
-                    />
-                </div>
+                <!-- Mode Toggle -->
+                <ModeToggle
+                    v-model="state.mode"
+                    :can-toggle="canToggleMode"
+                    :opacity="iconOpacity"
+                    :ai-mode="state.isAIQuery"
+                />
 
-                <!-- Search Input Container with Autocomplete - Maximum space -->
+                <!-- Search Input Container with Autocomplete -->
                 <div class="relative max-w-none min-w-0 flex-1 flex-grow">
-                    <!-- Autocomplete Preview Text -->
-                    <div
-                        v-if="autocompleteText"
-                        :class="[
-                            'pointer-events-none absolute top-0 left-0 flex h-12 items-center text-lg transition-all duration-300 ease-out',
-                            'text-muted-foreground/50',
-                        ]"
-                        :style="{
-                            paddingLeft: iconOpacity > 0.1 ? '1rem' : '1.5rem',
-                            paddingRight: iconOpacity > 0.1 ? '1rem' : '1.5rem',
-                            textAlign: iconOpacity < 0.3 ? 'center' : 'left',
-                        }"
-                    >
-                        <span class="invisible">{{ query }}</span
-                        ><span>{{ autocompleteText.slice(query.length) }}</span>
-                    </div>
+                    <!-- Autocomplete Overlay -->
+                    <AutocompleteOverlay
+                        :query="state.query"
+                        :suggestion="state.autocompleteText"
+                        :padding-left="iconOpacity > 0.1 ? '1rem' : '1.5rem'"
+                        :padding-right="state.expandButtonVisible ? '3rem' : iconOpacity > 0.1 ? '1rem' : '1.5rem'"
+                        :text-align="iconOpacity < 0.3 && !state.isAIQuery ? 'center' : 'left'"
+                    />
 
                     <!-- Main Search Input -->
-                    <textarea
-                        ref="searchInput"
-                        v-model="query"
+                    <SearchInput
+                        ref="searchInputComponent"
+                        v-model="state.query"
                         :placeholder="placeholder"
-                        :class="[
-                            'relative z-10 w-full rounded-xl bg-transparent text-lg transition-all duration-300 ease-out outline-none placeholder:text-muted-foreground resize-none',
-                            'focus:ring-1 focus:ring-gray-300 dark:focus:ring-gray-600',
-                            'flex items-center leading-relaxed',
-                        ]"
+                        :text-align="iconOpacity < 0.3 && !state.isAIQuery ? 'center' : 'left'"
                         :style="{
                             paddingLeft: iconOpacity > 0.1 ? '1rem' : '1.5rem',
-                            paddingRight: expandButtonVisible ? '3rem' : iconOpacity > 0.1 ? '1rem' : '1.5rem',
+                            paddingRight: state.expandButtonVisible ? '3rem' : iconOpacity > 0.1 ? '1rem' : '1.5rem',
                             paddingTop: '0.75rem',
                             paddingBottom: '0.75rem',
-                            textAlign: iconOpacity < 0.3 && !isAIQuery ? 'center' : 'left',
-                            minHeight: `${textareaMinHeight}px`,
-                            lineHeight: '1.5',
                         }"
-                        rows="1"
-                        @keydown.enter.prevent="handleEnter"
-                        @keydown.tab.prevent="handleAutocompleteAccept"
-                        @keydown.space="handleSpaceKey"
-                        @keydown.down.prevent="navigateResults(1)"
-                        @keydown.up.prevent="navigateResults(-1)"
-                        @keydown.left="handleArrowKey"
-                        @keydown.right="handleArrowKey"
-                        @keydown.escape="handleEscape"
-                        @focus="handleFocusWrapper"
-                        @blur="handleBlurWrapper"
-                        @input="handleInput"
-                        @click="handleInputClick"
+                        @enter="handleEnter"
+                        @tab="acceptAutocomplete"
+                        @space="handleSpaceKey"
+                        @arrow-down="navigateResults(1)"
+                        @arrow-up="navigateResults(-1)"
+                        @arrow-left="handleArrowKey"
+                        @arrow-right="handleArrowKey"
+                        @escape="handleEscape"
+                        @focus="handleFocus"
+                        @blur="handleBlur"
+                        @input-click="handleInputClick"
                     />
                     
                     <!-- Expand Button -->
                     <button
-                        v-if="expandButtonVisible"
+                        v-if="state.expandButtonVisible"
                         class="absolute right-2 bottom-2 z-20 p-1 rounded-md bg-muted/50 
                             hover:bg-muted/80 hover:scale-105 transition-all duration-200
                             focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -151,452 +92,114 @@
                     </button>
                 </div>
 
-                <!-- Regenerate Button - Same size as hamburger -->
-                <div
-                    v-if="store.currentEntry && store.searchMode === 'lookup'"
-                    :class="[
-                        'flex flex-shrink-0 items-center justify-center overflow-hidden transition-all duration-300 ease-out',
-                    ]"
-                    :style="{
-                        opacity: iconOpacity,
-                        transform: `scale(${0.9 + iconOpacity * 0.1})`,
-                        pointerEvents: iconOpacity > 0.1 ? 'auto' : 'none',
-                        width: iconOpacity > 0.1 ? '48px' : '0px',
-                        marginLeft: iconOpacity > 0.1 ? '8px' : '0px',
-                    }"
-                >
-                    <button
-                        @click="handleForceRegenerate"
-                        @mouseenter="handleRegenerateHover"
-                        @mouseleave="handleRegenerateLeave"
-                        :class="[
-                            'flex h-12 w-12 items-center justify-center rounded-lg',
-                            store.forceRefreshMode
-                                ? 'bg-primary/20 text-primary'
-                                : '',
-                            'transition-all duration-200 ease-out hover:bg-muted/50',
-                        ]"
-                        :title="
-                            store.forceRefreshMode
-                                ? 'Force refresh mode ON - Next lookup will regenerate'
-                                : 'Toggle force refresh mode'
-                        "
-                    >
-                        <RefreshCw
-                            :size="20"
-                            :style="{
-                                transform: `rotate(${regenerateRotation}deg)`,
-                                transition:
-                                    'transform 700ms cubic-bezier(0.175, 0.885, 0.32, 1.4)',
-                            }"
-                        />
-                    </button>
-                </div>
+                <!-- Regenerate Button -->
+                <RegenerateButton
+                    v-if="store.currentEntry && state.searchMode === 'lookup'"
+                    :show-button="true"
+                    :opacity="iconOpacity"
+                    v-model:force-refresh-mode="state.forceRefreshMode"
+                    @regenerate="handleForceRegenerate"
+                />
 
-                <!-- Hamburger Button - Always visible -->
-                <div
-                    :class="[
-                        'flex-shrink-0 overflow-hidden transition-all duration-300 ease-out',
-                    ]"
-                    :style="{
-                        opacity: iconOpacity,
-                        transform: `scale(${0.9 + iconOpacity * 0.1})`,
-                        pointerEvents: iconOpacity > 0.1 ? 'auto' : 'none',
-                        width: iconOpacity > 0.1 ? '48px' : '0px',
-                        marginLeft: iconOpacity > 0.1 ? '8px' : '0px',
-                    }"
-                >
-                    <HamburgerIcon
-                        :is-open="showControls"
-                        @toggle="handleHamburgerClick"
-                    />
-                </div>
+                <!-- Hamburger Button -->
+                <HamburgerButton
+                    v-model="state.showControls"
+                    :opacity="iconOpacity"
+                    :show-regenerate-button="!!store.currentEntry && state.searchMode === 'lookup'"
+                />
 
                 <!-- Progress Bar -->
                 <div
                     v-if="store.loadingProgress > 0"
-                    class="absolute right-0 -bottom-2 left-0 h-2
-                        overflow-hidden"
+                    class="absolute right-0 -bottom-2 left-0 h-2 overflow-hidden"
                 >
                     <div
-                        class="h-full rounded-full transition-[width]
-                            duration-300"
+                        class="h-full rounded-full transition-[width] duration-300"
                         :style="{
                             width: `${store.loadingProgress}%`,
-                            background: rainbowGradient,
+                            background: generateRainbowGradient(8),
                         }"
                     />
                 </div>
             </div>
 
-            <!-- Dropdowns Container - Absolutely positioned to prevent content shifting -->
+            <!-- Dropdowns Container -->
             <div class="absolute top-full right-0 left-0 z-50 pt-2">
                 <!-- Controls Dropdown -->
-                <Transition
-                    enter-active-class="transition-all duration-300 ease-apple-bounce"
-                    leave-active-class="transition-all duration-300 ease-apple-bounce"
-                    enter-from-class="opacity-0 scale-95 -translate-y-4"
-                    enter-to-class="opacity-100 scale-100 translate-y-0"
-                    leave-from-class="opacity-100 scale-100 translate-y-0"
-                    leave-to-class="opacity-0 scale-95 -translate-y-4"
-                >
-                    <div
-                        v-if="showControls"
-                        ref="controlsDropdown"
-                        class="dropdown-element cartoon-shadow-sm mb-2
-                            origin-top overflow-hidden rounded-2xl border-2
-                            border-border bg-background/20 backdrop-blur-3xl"
-                        @mousedown.prevent
-                        @click="handleSearchAreaInteraction"
-                    >
-                        <!-- Search Mode Toggle -->
-                        <div class="border-border/50 px-4 py-3">
-                            <h3 class="mb-3 text-sm font-medium">Mode</h3>
-                            <BouncyToggle
-                                v-model="store.searchMode"
-                                :options="[
-                                    { label: 'Lookup', value: 'lookup' },
-                                    { label: 'Wordlist', value: 'wordlist' },
-                                    { label: 'Stage', value: 'stage' },
-                                ]"
-                            />
-                        </div>
+                <SearchControls
+                    :show="state.showControls"
+                    v-model:search-mode="state.searchMode"
+                    v-model:selected-sources="state.selectedSources"
+                    v-model:selected-languages="state.selectedLanguages"
+                    :ai-suggestions="state.aiSuggestions"
+                    :is-development="state.isDevelopment"
+                    @word-select="selectWord"
+                    @clear-storage="clearAllStorage"
+                    @interaction="handleSearchAreaInteraction"
+                />
 
-                        <!-- Sources (Lookup Mode) -->
-                        <div
-                            v-if="store.searchMode === 'lookup'"
-                            class="border-t border-border/50 px-4 py-3"
-                        >
-                            <h3 class="mb-3 text-sm font-medium">Sources</h3>
-                            <div class="flex flex-wrap gap-2">
-                                <button
-                                    v-for="source in sources"
-                                    :key="source.id"
-                                    @click="handleSourceToggle(source.id)"
-                                    :class="[
-                                        'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium',
-                                        store.selectedSources.includes(
-                                            source.id
-                                        )
-                                            ? 'bg-primary text-primary-foreground shadow-sm'
-                                            : 'bg-muted text-muted-foreground hover:bg-muted/80',
-                                    ]"
-                                >
-                                    <component :is="source.icon" :size="16" />
-                                    {{ source.name }}
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Languages (Lookup Mode) -->
-                        <div
-                            v-if="store.searchMode === 'lookup'"
-                            class="border-t border-border/50 px-4 py-3"
-                        >
-                            <h3 class="mb-3 text-sm font-medium">Languages</h3>
-                            <div class="flex flex-wrap gap-2">
-                                <button
-                                    v-for="language in languages"
-                                    :key="language.value"
-                                    @click="handleLanguageToggle(language.value)"
-                                    :class="[
-                                        'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium',
-                                        store.selectedLanguages.includes(
-                                            language.value
-                                        )
-                                            ? 'bg-primary text-primary-foreground shadow-sm'
-                                            : 'bg-muted text-muted-foreground hover:bg-muted/80',
-                                    ]"
-                                >
-                                    <component :is="language.icon" :size="16" />
-                                    {{ language.label }}
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Settings Row (DEBUG) -->
-                        <div
-                            v-if="isDevelopment && store.searchMode === 'lookup'"
-                            class="border-t border-border/50 px-4 py-3"
-                        >
-                            <h3 class="mb-3 text-sm font-medium">Settings</h3>
-                            <div class="grid grid-cols-4 gap-2">
-                                <button
-                                    @click="clearAllStorage"
-                                    class="hover-lift flex items-center justify-center rounded-lg bg-red-50 dark:bg-red-500/10 p-2 text-red-600 dark:text-red-500 transition-all duration-200 hover:bg-red-100 dark:hover:bg-red-500/20"
-                                    title="Clear All Storage"
-                                >
-                                    <Trash2 
-                                        :size="16" 
-                                        class="text-muted-foreground/70 transition-colors duration-200
-                                            hover:text-destructive dark:text-muted-foreground"
-                                    />
-                                </button>
-                                <!-- Add 3 more buttons here as needed -->
-                            </div>
-                        </div>
-
-                        <!-- AI Suggestions -->
-                        <div
-                            v-if="
-                                store.searchMode === 'lookup' &&
-                                aiSuggestions.length > 0
-                            "
-                            class="border-t border-border/50 px-4 py-3"
-                        >
-                            <div class="flex flex-col items-center gap-3">
-                                <div
-                                    class="flex flex-wrap items-center
-                                        justify-center gap-2"
-                                >
-                                    <Button
-                                        v-for="word in aiSuggestions"
-                                        :key="word"
-                                        variant="outline"
-                                        size="default"
-                                        class="hover-text-grow flex-shrink-0
-                                            text-sm whitespace-nowrap font-medium"
-                                        @click="selectWord(word)"
-                                    >
-                                        {{ word }}
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </Transition>
-
-                <!-- Search Results Container - positioned below controls when both visible -->
+                <!-- Search Results Container -->
                 <div
                     :style="resultsContainerStyle"
-                    :class="{ 'mt-2': showControls }"
+                    :class="{ 'mt-2': state.showControls }"
                 >
-                    <Transition
-                        enter-active-class="transition-all duration-300 ease-apple-bounce"
-                        leave-active-class="transition-all duration-250 ease-out"
-                        enter-from-class="opacity-0 scale-95 translate-y-4"
-                        enter-to-class="opacity-100 scale-100 translate-y-0"
-                        leave-from-class="opacity-100 scale-100 translate-y-0"
-                        leave-to-class="opacity-0 scale-95 translate-y-4"
-                    >
-                        <div
-                            v-if="showResults"
-                            ref="searchResultsDropdown"
-                            class="dropdown-element cartoon-shadow-sm origin-top
-                                overflow-hidden rounded-2xl border-2
-                                border-border bg-background/20
-                                backdrop-blur-3xl"
-                            @mousedown.prevent
-                            @click="handleSearchAreaInteraction"
-                        >
-                            <!-- Loading State -->
-                            <div
-                                v-if="isSearching && searchResults.length === 0 && !isAIQuery"
-                                class="p-4"
-                            >
-                                <div class="flex items-center gap-2">
-                                    <div class="flex gap-1">
-                                        <span
-                                            v-for="i in 3"
-                                            :key="i"
-                                            class="h-2 w-2 animate-bounce
-                                                rounded-full bg-primary/60"
-                                            :style="{
-                                                animationDelay: `${(i - 1) * 150}ms`,
-                                            }"
-                                        />
-                                    </div>
-                                    <span class="text-sm text-muted-foreground"
-                                        >Searching...</span
-                                    >
-                                </div>
-                            </div>
-
-                            <!-- Search Results -->
-                            <div
-                                v-else-if="searchResults.length > 0"
-                                ref="searchResultsContainer"
-                                class="max-h-64 overflow-y-auto bg-background/20
-                                    backdrop-blur-3xl"
-                            >
-                                <button
-                                    v-for="(result, index) in searchResults"
-                                    :key="result.word"
-                                    :ref="
-                                        (el) => {
-                                            if (el)
-                                                resultRefs[index] =
-                                                    el as HTMLButtonElement;
-                                        }
-                                    "
-                                    :class="[
-                                        'transition-smooth flex w-full items-center justify-between px-4 py-3 text-left duration-150',
-                                        'border-muted-foreground/50 active:scale-[0.98]',
-                                        index === selectedIndex
-                                            ? 'scale-[1.02] border-l-8 bg-accent/60 pl-4'
-                                            : 'border-l-0 pl-4',
-                                    ]"
-                                    @click="selectResult(result)"
-                                    @mouseenter="selectedIndex = index"
-                                >
-                                    <span
-                                        :class="[
-                                            'transition-smooth',
-                                            index === selectedIndex &&
-                                                'font-semibold text-primary',
-                                        ]"
-                                    >
-                                        {{ result.word }}
-                                    </span>
-                                    <div
-                                        class="flex items-center gap-2 text-xs"
-                                    >
-                                        <span
-                                            :class="[
-                                                'text-muted-foreground',
-                                                index === selectedIndex &&
-                                                    'font-semibold text-primary',
-                                            ]"
-                                        >
-                                            {{ result.method }}
-                                        </span>
-                                        <span
-                                            :class="[
-                                                'text-muted-foreground',
-                                                index === selectedIndex &&
-                                                    'font-semibold text-primary',
-                                            ]"
-                                        >
-                                            {{
-                                                Math.round(result.score * 100)
-                                            }}%
-                                        </span>
-                                    </div>
-                                </button>
-                            </div>
-
-                            <!-- No Results Messages -->
-                            <div
-                                v-else-if="!isSearching && query.length < 2"
-                                class="bg-background/50 p-4 text-center text-sm
-                                    text-muted-foreground backdrop-blur-sm"
-                            >
-                                Type at least 2 characters to search...
-                            </div>
-                            <div
-                                v-else-if="!isSearching && query.length >= 2 && !isAIQuery"
-                                class="bg-background/50 p-4 text-center text-sm
-                                    text-muted-foreground backdrop-blur-sm"
-                            >
-                                No matches found
-                            </div>
-                        </div>
-                    </Transition>
+                    <SearchResults
+                        :show="state.showResults"
+                        :results="state.searchResults"
+                        :loading="state.isSearching"
+                        v-model:selected-index="state.selectedIndex"
+                        :query="state.query"
+                        :ai-mode="state.isAIQuery"
+                        @select-result="selectResult"
+                        @interaction="handleSearchAreaInteraction"
+                    />
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Expanded Input Modal -->
-    <Teleport to="body">
-        <Transition
-            :css="false"
-            @enter="modalEnter"
-            @leave="modalLeave"
-        >
-            <div
-                v-if="showExpandModal"
-                class="fixed inset-0 z-[100] flex items-center justify-center p-4"
-                @click="closeExpandModal"
-            >
-                <!-- Backdrop -->
-                <div 
-                    ref="modalBackdrop"
-                    class="absolute inset-0 bg-black/60 backdrop-blur-sm" 
-                />
-                
-                <!-- Modal Content -->
-                <div
-                    ref="modalContent"
-                    class="relative w-full max-w-2xl rounded-2xl border-2 border-border bg-background p-6 shadow-2xl cartoon-shadow-lg"
-                    @click.stop
-                >
-                    <!-- Header -->
-                    <div class="mb-4 flex items-center justify-between">
-                        <h3 class="text-lg font-semibold">Describe what you're looking for</h3>
-                        <button
-                            class="rounded-lg p-2 hover:bg-accent/50 transition-colors"
-                            @click="closeExpandModal"
-                        >
-                            <X class="h-5 w-5" />
-                        </button>
-                    </div>
-                    
-                    <!-- Expanded Textarea -->
-                    <textarea
-                        ref="expandedTextarea"
-                        v-model="expandedQuery"
-                        class="w-full min-h-[200px] rounded-xl border border-border bg-background/50 p-4 text-lg outline-none focus:ring-2 focus:ring-primary/50 resize-none"
-                        placeholder="Examples:
-• Words that mean someone who's really dedicated to their craft
-• I need a word for someone who pays attention to every tiny detail
-• What's a good word for stubborn but in a mean way"
-                        @keydown.escape="closeExpandModal"
-                        @keydown.cmd.enter="submitExpandedQuery"
-                        @keydown.ctrl.enter="submitExpandedQuery"
-                    />
-                    
-                    <!-- Footer -->
-                    <div class="mt-4 flex items-center justify-between">
-                        <p class="text-sm text-muted-foreground">
-                            Press <kbd class="px-1.5 py-0.5 text-xs border rounded">⌘</kbd> + <kbd class="px-1.5 py-0.5 text-xs border rounded">Enter</kbd> to search
-                        </p>
-                        <div class="flex gap-2">
-                            <Button
-                                variant="outline"
-                                @click="closeExpandModal"
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                variant="default"
-                                @click="submitExpandedQuery"
-                            >
-                                Search
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </Transition>
-    </Teleport>
+    <ExpandModal
+        :show="state.showExpandModal"
+        :initial-query="state.query"
+        @close="closeExpandModal"
+        @submit="submitExpandedQuery"
+    />
+    
+    <!-- Debug Overlay (DEV only) -->
+    <div v-if="state.isDevelopment && false" class="fixed top-20 right-4 bg-black/80 text-white p-2 text-xs rounded z-50">
+        <div>Scroll: {{ (state.scrollProgress * 100).toFixed(0) }}%</div>
+        <div>Shrink: {{ (props.shrinkPercentage * 100).toFixed(0) }}%</div>
+        <div>Scale: {{ (1 - state.scrollProgress * 0.12).toFixed(2) }}</div>
+        <div>Opacity: {{ iconOpacity.toFixed(2) }}</div>
+    </div>
 </template>
 
 <script setup lang="ts">
-import {
-    ref,
-    computed,
-    onMounted,
-    onUnmounted,
-    nextTick,
-    watch,
-    reactive,
-} from 'vue';
-import { useScroll, useMagicKeys } from '@vueuse/core';
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '@/stores';
 import type { SearchResult } from '@/types';
-import { Button } from '@/components/ui';
-import { FancyF, HamburgerIcon } from '@/components/custom/icons';
-import { BouncyToggle } from '@/components/custom/animation';
-import { RefreshCw, Languages, Globe, Trash2, Maximize2, X, Sparkles } from 'lucide-vue-next';
-import {
-    AppleIcon,
-    WiktionaryIcon,
-    OxfordIcon,
-    DictionaryIcon,
-} from '@/components/custom/icons';
-import { generateRainbowGradient } from '@/utils/animations';
 import { showError } from '@/plugins/toast';
+import { Maximize2 } from 'lucide-vue-next';
+import { generateRainbowGradient } from '@/utils/animations';
+
+// Import components
+import SearchInput from './components/SearchInput.vue';
+import SparkleIndicator from './components/SparkleIndicator.vue';
+import ModeToggle from './components/ModeToggle.vue';
+import AutocompleteOverlay from './components/AutocompleteOverlay.vue';
+import SearchControls from './components/SearchControls.vue';
+import SearchResults from './components/SearchResults.vue';
+import RegenerateButton from './components/RegenerateButton.vue';
+import HamburgerButton from './components/HamburgerButton.vue';
+import ExpandModal from './components/ExpandModal.vue';
+
+// Import composables and utilities
+import { useSearchBarSharedState } from './composables/useSearchBarSharedState';
+import { useScrollAnimationSimple } from './composables/useScrollAnimationSimple';
+import { useAutocomplete } from './composables/useAutocomplete';
+import { shouldTriggerAIMode, extractWordCount } from './utils/ai-query';
+import { shouldShowExpandButton } from './utils/keyboard';
 
 interface SearchBarProps {
     className?: string;
@@ -605,7 +208,21 @@ interface SearchBarProps {
     scrollThreshold?: number;
 }
 
-// Define emits
+const props = withDefaults(defineProps<SearchBarProps>(), {
+    shrinkPercentage: 0,
+    hideDelay: 3000,
+    scrollThreshold: 100,
+});
+
+// Debug prop changes
+if (import.meta.env.DEV) {
+    watch(() => props.shrinkPercentage, (newVal, oldVal) => {
+        if (newVal !== oldVal) {
+            console.log('SearchBar prop changed:', { oldVal, newVal });
+        }
+    });
+}
+
 const emit = defineEmits<{
     focus: [];
     blur: [];
@@ -614,1075 +231,363 @@ const emit = defineEmits<{
     'stage-enter': [query: string];
 }>();
 
-const props = withDefaults(defineProps<SearchBarProps>(), {
-    shrinkPercentage: 0,
-    hideDelay: 3000,
-    scrollThreshold: 100,
-});
-
+// Store & State
 const store = useAppStore();
-
-// State
-const query = ref(store.searchQuery || '');
-const autocompleteText = ref('');
-const searchResults = ref<SearchResult[]>([]);
-const isDevelopment = ref(import.meta.env.DEV);
-const isSearching = ref(false);
-const selectedIndex = ref(0);
-const aiSuggestions = ref<string[]>([]);
-const isContainerHovered = ref(false);
-const isFocused = ref(false);
-const isShrunken = ref(false);
-const regenerateRotation = ref(0);
-const isInteractingWithSearchArea = ref(false);
-const isAIQuery = ref(store.sessionState.isAIQuery || false);
-const showSparkle = ref(store.sessionState.isAIQuery || false);
-const showErrorAnimation = ref(false);
-const searchBarHeight = ref(64); // Default height in pixels
-const textareaMinHeight = ref(48); // Minimum height for textarea
-const showExpandModal = ref(false);
-const expandedQuery = ref('');
-const expandButtonVisible = ref(false);
-// AI mode timer removed - immediate activation now
-
-// Helper to check if query should trigger AI mode
-const shouldTriggerAIMode = (queryText: string) => {
-    return queryText.length > 10 || queryText.split(' ').length - 1 > 2;
-};
-
-// Helper to extract word count from query
-const extractWordCount = (queryText: string): number => {
-    // Regular expression to match various number patterns:
-    // - Written numbers (one to twenty-five)
-    // - Numeric digits (1, 10, 25)
-    // - Common phrases like "a few" (3), "several" (5), "many" (10)
-    
-    // First try to match numeric digits
-    const numericMatch = queryText.match(/\b(\d+)\b/);
-    if (numericMatch) {
-        const count = parseInt(numericMatch[1], 10);
-        // Cap at 25 as requested (backend caps at 20)
-        return Math.min(Math.max(count, 1), 25);
-    }
-    
-    // Then try written numbers (ordered by length to prioritize compound numbers)
-    const writtenNumbers: Record<string, number> = {
-        'twenty-five': 25, 'twenty five': 25,
-        'twenty-four': 24, 'twenty four': 24,
-        'twenty-three': 23, 'twenty three': 23,
-        'twenty-two': 22, 'twenty two': 22,
-        'twenty-one': 21, 'twenty one': 21,
-        'twenty': 20, 'nineteen': 19, 'eighteen': 18, 'seventeen': 17,
-        'sixteen': 16, 'fifteen': 15, 'fourteen': 14, 'thirteen': 13,
-        'twelve': 12, 'eleven': 11, 'ten': 10, 'nine': 9, 'eight': 8,
-        'seven': 7, 'six': 6, 'five': 5, 'four': 4, 'three': 3, 'two': 2, 'one': 1
-    };
-    
-    const lowerQuery = queryText.toLowerCase();
-    // Sort by length descending to match longer patterns first
-    const sortedEntries = Object.entries(writtenNumbers).sort((a, b) => b[0].length - a[0].length);
-    
-    for (const [word, value] of sortedEntries) {
-        if (lowerQuery.includes(word)) {
-            return value;
-        }
-    }
-    
-    // Check for common phrases
-    if (lowerQuery.includes('a few') || lowerQuery.includes('few')) {
-        return 3;
-    }
-    if (lowerQuery.includes('several')) {
-        return 5;
-    }
-    if (lowerQuery.includes('many') || lowerQuery.includes('a lot') || lowerQuery.includes('lots')) {
-        return 10;
-    }
-    if (lowerQuery.includes('a couple') || lowerQuery.includes('couple')) {
-        return 2;
-    }
-    
-    // Default to 12 if no count specified
-    return 12;
-};
-
-// KISS dropdown state management
-const inputFocused = ref(false);
-const showControls = ref(false);
-const showResults = ref(false);
-
-// Simplified scroll tracking for continuous animations
-type SearchBarState = 'normal' | 'hovering' | 'focused';
-
-const currentState = ref<SearchBarState>('normal');
-const scrollProgress = ref(0); // 0-1 percentage of page height
-const scrollInflectionPoint = ref(0.25); // 25% of page height (configurable)
-const documentHeight = ref(0);
+const { state, iconOpacity, canToggleMode } = useSearchBarSharedState();
 
 // Refs
-const searchInput = ref<HTMLTextAreaElement>();
-const expandedTextarea = ref<HTMLTextAreaElement>();
-const searchResultsContainer = ref<HTMLDivElement>();
-const resultRefs = reactive<(HTMLButtonElement | null)[]>([]);
 const searchContainer = ref<HTMLDivElement>();
 const searchBarElement = ref<HTMLDivElement>();
-const controlsDropdown = ref<HTMLDivElement>();
-const searchResultsDropdown = ref<HTMLDivElement>();
-const modalBackdrop = ref<HTMLDivElement>();
-const modalContent = ref<HTMLDivElement>();
-
-// Timers
-let searchTimer: ReturnType<typeof setTimeout> | undefined;
-let scrollAnimationFrame: number | undefined;
-let globalEnterHandler: ((e: KeyboardEvent) => void) | undefined;
-
-// Scroll tracking
-const { y: scrollY } = useScroll(window);
-
-// Magic keys
-const { escape } = useMagicKeys();
+const searchInputComponent = ref<any>();
 
 // Computed
-const mode = computed(() => store.mode);
-const canToggleMode = computed(() => {
-    // Can always toggle if not in suggestions mode
-    if (mode.value !== 'suggestions') return true;
-    // In suggestions mode, can only toggle if we have a current entry (last looked up word)
-    return !!store.currentEntry;
-});
 const placeholder = computed(() =>
-    mode.value === 'dictionary'
+    state.mode === 'dictionary'
         ? 'Enter a word to define...'
         : 'Enter a word to find synonyms...'
 );
-const rainbowGradient = computed(() => generateRainbowGradient(8));
 
-// KISS: Show search results dropdown when input focused AND query exists AND not doing definition lookup AND not in AI mode
-const shouldShowResults = computed(() => {
-    return (
-        inputFocused.value &&
-        query.value.trim().length > 0 &&
-        !store.isSearching &&
-        !isAIQuery.value
-    );
-});
+const resultsContainerStyle = computed(() => ({
+    paddingTop: '0px',
+    transition: 'all 300ms cubic-bezier(0.25, 0.1, 0.25, 1)',
+}));
 
-// Independent positioning: results always at consistent location
-const resultsContainerStyle = computed(() => {
-    return {
-        paddingTop: '0px',
-        transition: 'all 300ms cubic-bezier(0.25, 0.1, 0.25, 1)',
-    };
-});
-
-// Sync reactive state with computed
-watch(shouldShowResults, (newVal) => {
-    showResults.value = newVal;
-});
-
-watch(
-    () => store.showControls,
-    (newVal) => {
-        showControls.value = newVal;
-    },
-    { immediate: true }
+// Scroll animation setup
+const { containerStyle, updateScrollState } = useScrollAnimationSimple(
+    computed(() => state.scrollProgress),
+    computed(() => state.isContainerHovered),
+    computed(() => state.isFocused),
+    computed(() => state.showControls || state.showResults)
 );
 
-// Simple state transitions for hover/focus only
-const transitionToState = (newState: SearchBarState) => {
-    if (currentState.value === newState) return;
-    currentState.value = newState;
-};
-
-// Simplified continuous scroll update without state machine jumps
-const updateScrollState = () => {
-    if (scrollAnimationFrame) return;
-
-    scrollAnimationFrame = requestAnimationFrame(() => {
-        const maxScroll = Math.max(
-            documentHeight.value - window.innerHeight,
-            1
-        );
-
-        // Don't engage scrolling behavior if there's nothing to scroll
-        if (maxScroll <= 10) {
-            scrollProgress.value = 0;
-            scrollAnimationFrame = undefined;
-            return;
-        }
-
-        // Simple continuous progress calculation
-        scrollProgress.value = Math.min(scrollY.value / maxScroll, 1);
-
-        // Update state for icon opacity and container styling
-        // Only change states for hover/focus, not based on scroll position
-        if (isFocused.value && currentState.value !== 'focused') {
-            transitionToState('focused');
-        } else if (
-            isContainerHovered.value &&
-            currentState.value !== 'hovering' &&
-            !isFocused.value
-        ) {
-            transitionToState('hovering');
-        } else if (
-            !isFocused.value &&
-            !isContainerHovered.value &&
-            (currentState.value === 'focused' ||
-                currentState.value === 'hovering')
-        ) {
-            transitionToState('normal');
-        }
-
-        scrollAnimationFrame = undefined;
-    });
-};
-
-// Computed opacity for smooth icon fade-out - continuous based on scroll progress
-const iconOpacity = computed(() => {
-    // Always full opacity when focused or hovered
-    if (isFocused.value || isContainerHovered.value) {
-        return 1;
+// Update scroll progress from prop
+watch(() => props.shrinkPercentage, (newValue) => {
+    state.scrollProgress = newValue;
+    // Debug logging
+    if (import.meta.env.DEV) {
+        console.log('SearchBar scroll update:', {
+            shrinkPercentage: newValue,
+            scrollProgress: state.scrollProgress,
+            containerStyle: containerStyle.value
+        });
     }
+}, { immediate: true });
+    computed(() => state.scrollProgress),
+    computed(() => state.isContainerHovered),
+    computed(() => state.isFocused),
+    computed(() => state.showControls || state.showResults)
+);
 
-    // Don't fade when either dropdown is showing
-    if (showControls.value || showResults.value) {
-        return 1;
-    }
+// Create a computed ref for the search input element
+const searchInputRef = computed(() => searchInputComponent.value?.element);
 
-    // Continuous fade based on scroll progress relative to inflection point
-    const progress = Math.min(
-        scrollProgress.value / scrollInflectionPoint.value,
-        1
-    );
-
-    // Start fading at 40% of the way to inflection point, fully hidden at 85%
-    const fadeStart = 0.4;
-    const fadeEnd = 0.85;
-
-    if (progress <= fadeStart) {
-        return 1; // Full opacity
-    } else if (progress >= fadeEnd) {
-        return 0.1; // Nearly hidden but still interactive
-    } else {
-        // Smooth cubic easing for natural fade
-        const fadeProgress = (progress - fadeStart) / (fadeEnd - fadeStart);
-        const easedProgress = 1 - Math.pow(1 - fadeProgress, 3); // Cubic ease-out
-        return 1 - easedProgress * 0.9; // Fade from 1 to 0.1
+// Autocomplete setup
+const { 
+    autocompleteText,
+    updateAutocomplete, 
+    acceptAutocomplete,
+    handleSpaceKey: handleAutocompleteSpaceKey,
+    handleArrowKey: handleAutocompleteArrowKey,
+    handleInputClick: handleAutocompleteInputClick
+} = useAutocomplete({
+    query: computed(() => state.query),
+    searchResults: computed(() => state.searchResults),
+    searchInput: searchInputRef,
+    onQueryUpdate: (newQuery: string) => {
+        state.query = newQuery;
     }
 });
 
-// Smooth style transitions with optimized max-width for mobile and desktop
-const containerStyle = computed(() => {
-    const progress = Math.min(
-        scrollProgress.value / scrollInflectionPoint.value,
-        1
-    );
+// Timers
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+let isInteractingWithSearchArea = false;
 
-    // Use smaller responsive widths for better desktop experience
-    const responsiveMaxWidth = 'min(32rem, calc(100vw - 2rem))';
-
-    // Focused/hovered states or dropdowns shown: full size but responsive
-    if (
-        isFocused.value ||
-        isContainerHovered.value ||
-        showControls.value ||
-        showResults.value
-    ) {
-        return {
-            maxWidth: responsiveMaxWidth,
-            transform: 'scale(1)',
-            opacity: '1',
-            transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-        };
-    }
-
-    // Smooth continuous shrinking based on scroll progress
-    const clampedProgress = Math.max(0, Math.min(progress, 1));
-
-    // Continuous scale transition from 1.0 to 0.88
-    const scale = 1 - clampedProgress * 0.12;
-
-    // Continuous opacity transition from 1.0 to 0.92
-    const opacity = 1 - clampedProgress * 0.08;
-
-    // Continuous width interpolation between responsiveMaxWidth and minWidth
-    // Parse the rem values to interpolate numerically
-    const maxWidthStart = 32; // 32rem
-    const maxWidthEnd = 24; // 24rem
-    const interpolatedWidth =
-        maxWidthStart - clampedProgress * (maxWidthStart - maxWidthEnd);
-    const currentMaxWidth = `min(${interpolatedWidth}rem, calc(100vw - ${2 + clampedProgress * 2}rem))`;
-
-    return {
-        maxWidth: currentMaxWidth,
-        transform: `scale(${scale})`,
-        opacity: opacity.toString(),
-        transition: 'all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-    };
+// Watch query for autocomplete
+watch(() => state.query, () => {
+    updateAutocomplete();
+    state.autocompleteText = autocompleteText.value;
+    state.expandButtonVisible = shouldShowExpandButton(state.isAIQuery, state.query.length, state.query.includes('\n'));
 });
 
-// Sources configuration
-// Type safe sources configuration
-interface SourceConfig {
-    id: string;
-    name: string;
-    icon: typeof WiktionaryIcon | typeof OxfordIcon | typeof DictionaryIcon | typeof AppleIcon;
-}
+// Watch search results for autocomplete
+watch(() => state.searchResults, () => {
+    state.selectedIndex = 0;
+    updateAutocomplete();
+    state.autocompleteText = autocompleteText.value;
+});
 
-const sources: SourceConfig[] = [
-    { id: 'wiktionary', name: 'Wiktionary', icon: WiktionaryIcon },
-    { id: 'oxford', name: 'Oxford', icon: OxfordIcon },
-    { id: 'dictionary_com', name: 'Dictionary.com', icon: DictionaryIcon },
-    { id: 'apple_dictionary', name: 'Apple Dictionary', icon: AppleIcon },
-];
-
-// Languages configuration with Lucide icons
-interface LanguageConfig {
-    value: string;
-    label: string;
-    icon: typeof Globe | typeof Languages;
-}
-
-const languages: LanguageConfig[] = [
-    { value: 'en', label: 'EN', icon: Globe },
-    { value: 'fr', label: 'FR', icon: Languages },
-    { value: 'es', label: 'ES', icon: Languages },
-    { value: 'de', label: 'DE', icon: Languages },
-    { value: 'it', label: 'IT', icon: Languages },
-];
-
-// Initialize document height for timeline calculations
-const initializeDocumentHeight = () => {
-    documentHeight.value = Math.max(
-        document.body.scrollHeight,
-        document.body.offsetHeight,
-        document.documentElement.clientHeight,
-        document.documentElement.scrollHeight,
-        document.documentElement.offsetHeight
-    );
-};
-
-// Simple hover management (no timers) with emit
-const handleMouseEnterWrapper = () => {
-    handleMouseEnter();
+// Event Handlers
+const handleMouseEnter = () => {
+    state.isContainerHovered = true;
     emit('mouseenter');
 };
 
-const handleMouseLeaveWrapper = () => {
-    handleMouseLeave();
+const handleMouseLeave = () => {
+    state.isContainerHovered = false;
     emit('mouseleave');
 };
 
-const handleMouseEnter = () => {
-    isContainerHovered.value = true;
-    if (!isFocused.value) {
-        transitionToState('hovering');
-    }
-};
-
-const handleMouseLeave = () => {
-    isContainerHovered.value = false;
-    if (!isFocused.value) {
-        transitionToState('normal');
-    }
-};
-
-const handleFocusWrapper = () => {
-    handleFocus();
-    emit('focus');
-};
-
-const handleBlurWrapper = () => {
-    handleBlur();
-    emit('blur');
-};
-
 const handleFocus = () => {
-    isFocused.value = true;
-    inputFocused.value = true; // KISS: Set input focused state
-
-    // Transition to focused state
-    transitionToState('focused');
-
-    if (
-        store.sessionState?.searchResults?.length > 0 &&
-        query.value.length >= 2
-    ) {
-        searchResults.value = store.sessionState.searchResults.slice(0, 8);
+    state.isFocused = true;
+    emit('focus');
+    
+    // Restore search results if available
+    if (store.sessionState?.searchResults?.length > 0 && state.query.length >= 2) {
+        state.searchResults = store.sessionState.searchResults.slice(0, 8);
     }
-
-    nextTick(() => {
-        if (searchInput.value && store.searchCursorPosition) {
-            const pos = Math.min(
-                store.searchCursorPosition,
-                query.value.length
-            );
-            searchInput.value.setSelectionRange(pos, pos);
-        }
-    });
 };
 
 const handleBlur = () => {
     setTimeout(() => {
-        if (isInteractingWithSearchArea.value) return;
-
-        isFocused.value = false;
-        inputFocused.value = false; // KISS: Clear input focused state
-
-        // KISS: Always hide results on blur (independent of controls)
-        showResults.value = false;
-        searchResults.value = [];
-        isSearching.value = false;
-
-        // Transition back to normal or hovering state
-        transitionToState(isContainerHovered.value ? 'hovering' : 'normal');
+        if (isInteractingWithSearchArea) return;
+        
+        state.isFocused = false;
+        emit('blur');
+        
+        // Hide results on blur
+        state.showResults = false;
+        state.searchResults = [];
+        state.isSearching = false;
     }, 150);
 };
 
-const handleInput = (event: Event) => {
-    const input = event.target as HTMLTextAreaElement;
-    store.searchCursorPosition = input.selectionStart || 0;
-    resizeTextarea();
-    performSearch();
+const handleInputClick = (event: MouseEvent) => {
+    handleSearchAreaInteraction();
+    handleAutocompleteInputClick(event);
 };
 
-// Independent close handlers
-const closeControls = () => {
-    store.showControls = false;
+const handleSearchAreaInteraction = () => {
+    isInteractingWithSearchArea = true;
+    setTimeout(() => {
+        isInteractingWithSearchArea = false;
+    }, 100);
 };
 
-const closeResults = () => {
-    showResults.value = false;
-    searchResults.value = [];
-    isSearching.value = false;
-};
-
-const handleClose = () => {
-    // Close both dropdowns independently
-    closeControls();
-    closeResults();
-};
-
-const handleEscape = () => {
-    if (showControls.value || showResults.value) {
-        handleClose();
-    } else {
-        // Nothing shown: blur input
-        searchInput.value?.blur();
-    }
-};
-
-// Watch for escape key
-watch(escape, (pressed) => {
-    if (pressed) {
-        handleEscape();
-    }
-});
-
+// Search functionality
 const performSearch = () => {
     clearTimeout(searchTimer);
-    store.searchQuery = query.value;
+    store.searchQuery = state.query;
 
-    if (!query.value) {
-        searchResults.value = [];
-        isSearching.value = false;
-        isAIQuery.value = false;
-        showSparkle.value = false;
-        searchBarHeight.value = 64;
+    if (!state.query || state.query.length < 2) {
+        state.searchResults = [];
+        state.isSearching = false;
+        state.isAIQuery = false;
+        state.showSparkle = false;
         return;
     }
 
-    if (query.value.length < 2) {
-        searchResults.value = [];
-        isSearching.value = false;
-        isAIQuery.value = false;
-        showSparkle.value = false;
-        searchBarHeight.value = 64;
-        return;
-    }
-
-    isSearching.value = true;
+    state.isSearching = true;
 
     searchTimer = setTimeout(async () => {
         try {
-            const results = await store.search(query.value);
-            searchResults.value = results.slice(0, 8);
-            selectedIndex.value = 0;
+            const results = await store.search(state.query);
+            state.searchResults = results.slice(0, 8);
+            state.selectedIndex = 0;
 
             if (store.sessionState) {
                 store.sessionState.searchResults = results;
             }
 
-            // Activate AI mode immediately when no results and query meets criteria
-            if (results.length === 0 && shouldTriggerAIMode(query.value)) {
-                isAIQuery.value = true;
-                showSparkle.value = true;
-                // Persist AI query state
+            // Activate AI mode
+            if (results.length === 0 && shouldTriggerAIMode(state.query)) {
+                state.isAIQuery = true;
+                state.showSparkle = true;
                 store.sessionState.isAIQuery = true;
-                store.sessionState.aiQueryText = query.value;
-                resizeTextarea(); // Recalculate height for AI mode
+                store.sessionState.aiQueryText = state.query;
             } else {
-                // Deactivate AI mode when results are found or query doesn't meet criteria
-                isAIQuery.value = false;
-                showSparkle.value = false;
-                // Clear persisted AI query state
+                state.isAIQuery = false;
+                state.showSparkle = false;
                 store.sessionState.isAIQuery = false;
                 store.sessionState.aiQueryText = '';
-                resizeTextarea();
             }
         } catch (error) {
             console.error('Search error:', error);
-            searchResults.value = [];
+            state.searchResults = [];
         } finally {
-            isSearching.value = false;
+            state.isSearching = false;
         }
     }, 200);
 };
 
+// Keyboard handlers
 const handleEnter = async () => {
     clearTimeout(searchTimer);
 
-    // If autocomplete is available, accept it
-    if (autocompleteText.value) {
-        await handleAutocompleteAccept();
-        return;
+    if (state.autocompleteText) {
+        const accepted = await acceptAutocomplete();
+        if (accepted) {
+            return;
+        }
     }
 
-    // Handle stage mode - run mock pipeline instead of definition lookup
-    if (store.searchMode === 'stage' && query.value) {
-        store.searchQuery = query.value;
-        // Emit event to trigger mock pipeline in stage controls
-        emit('stage-enter', query.value);
-        // Blur the input after stage mode enter
-        nextTick(() => {
-            searchInput.value?.blur();
-        });
+    // Handle stage mode
+    if (state.searchMode === 'stage' && state.query) {
+        store.searchQuery = state.query;
+        emit('stage-enter', state.query);
         return;
     }
 
     // Handle AI query mode
-    if (isAIQuery.value && query.value) {
+    if (state.isAIQuery && state.query) {
         try {
-            // Extract count from query
-            const extractedCount = extractWordCount(query.value);
+            const extractedCount = extractWordCount(state.query);
+            const wordSuggestions = await store.getAISuggestions(state.query, extractedCount);
             
-            // Start showing loading modal
-            const wordSuggestions = await store.getAISuggestions(query.value, extractedCount);
             if (wordSuggestions && wordSuggestions.suggestions.length > 0) {
-                // Successfully got suggestions, switch to _w mode
                 store.wordSuggestions = wordSuggestions;
-                store.mode = 'suggestions'; // New mode for word suggestions
+                state.mode = 'suggestions';
                 store.hasSearched = true;
-                // Keep the AI mode active - don't reset!
-                store.sessionState.aiQueryText = query.value;
-                nextTick(() => {
-                    searchInput.value?.blur();
-                });
+                store.sessionState.aiQueryText = state.query;
             } else {
-                // No suggestions found - show error animation
-                showErrorAnimation.value = true;
+                state.showErrorAnimation = true;
                 showError('No word suggestions found for this query');
-                // Remove animation class after animation completes
                 setTimeout(() => {
-                    showErrorAnimation.value = false;
+                    state.showErrorAnimation = false;
                 }, 600);
             }
         } catch (error: any) {
             console.error('AI suggestion error:', error);
-            // Show error animation
-            showErrorAnimation.value = true;
-            // Show error toast
-            const errorMessage = error.response?.data?.detail || error.message || 'Failed to get word suggestions';
-            showError(errorMessage);
-            // Remove animation class after animation completes
+            state.showErrorAnimation = true;
+            showError(error.message || 'Failed to get word suggestions');
             setTimeout(() => {
-                showErrorAnimation.value = false;
+                state.showErrorAnimation = false;
             }, 600);
-            // Keep AI mode active even on error
-            // Clear persisted AI state
-            store.sessionState.isAIQuery = false;
-            store.sessionState.aiQueryText = '';
         }
         return;
     }
 
-    if (searchResults.value.length > 0 && selectedIndex.value >= 0) {
-        await selectResult(searchResults.value[selectedIndex.value]);
-    } else if (query.value) {
-        isFocused.value = false;
-        store.searchQuery = query.value;
+    // Regular search
+    if (state.searchResults.length > 0 && state.selectedIndex >= 0) {
+        await selectResult(state.searchResults[state.selectedIndex]);
+    } else if (state.query) {
+        state.isFocused = false;
+        store.searchQuery = state.query;
         store.hasSearched = true;
-        await store.getDefinition(query.value);
+        await store.getDefinition(state.query);
     }
+};
+
+const handleEscape = () => {
+    if (state.showControls || state.showResults) {
+        state.showControls = false;
+        state.showResults = false;
+    } else {
+        // Blur input
+        state.isFocused = false;
+    }
+};
+
+const handleSpaceKey = (event: KeyboardEvent) => {
+    handleAutocompleteSpaceKey(event);
+};
+
+const handleArrowKey = (event: KeyboardEvent) => {
+    handleAutocompleteArrowKey(event);
+};
+
+const navigateResults = (direction: number) => {
+    if (state.searchResults.length === 0) return;
+    
+    state.selectedIndex = Math.max(
+        0,
+        Math.min(
+            state.searchResults.length - 1,
+            state.selectedIndex + direction
+        )
+    );
+    
+    store.searchSelectedIndex = state.selectedIndex;
 };
 
 const selectResult = async (result: SearchResult) => {
     clearTimeout(searchTimer);
-    query.value = result.word;
+    state.query = result.word;
     store.searchQuery = result.word;
-    // Don't immediately lose focus, let the natural blur handle it
-    searchResults.value = [];
+    state.searchResults = [];
     store.hasSearched = true;
     await store.getDefinition(result.word);
-    // Blur the input after selection
-    nextTick(() => {
-        searchInput.value?.blur();
-    });
 };
 
 const selectWord = (word: string) => {
-    query.value = word;
+    state.query = word;
     handleEnter();
-};
-
-const navigateResults = (direction: number) => {
-    if (searchResults.value.length === 0) return;
-
-    selectedIndex.value = Math.max(
-        0,
-        Math.min(
-            searchResults.value.length - 1,
-            selectedIndex.value + direction
-        )
-    );
-
-    store.searchSelectedIndex = selectedIndex.value;
-
-    // Scroll selected item into view
-    nextTick(() => {
-        const selectedElement = resultRefs[selectedIndex.value];
-        if (selectedElement && searchResultsContainer.value) {
-            selectedElement.scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest',
-            });
-        }
-    });
-};
-
-// Enhanced interaction handlers
-const handleSearchAreaInteraction = () => {
-    isInteractingWithSearchArea.value = true;
-    setTimeout(() => {
-        isInteractingWithSearchArea.value = false;
-    }, 100);
-};
-
-const handleHamburgerClick = () => {
-    store.toggleControls();
-    handleSearchAreaInteraction();
-};
-
-// iOS-style regenerate button handlers
-const handleRegenerateHover = () => {
-    // Gentle rotation on hover (like iOS)
-    regenerateRotation.value += 180;
-};
-
-const handleRegenerateLeave = () => {
-    // Return to original position
-    regenerateRotation.value -= 180;
 };
 
 const handleForceRegenerate = () => {
     handleSearchAreaInteraction();
-
-    // Toggle force refresh mode
-    store.forceRefreshMode = !store.forceRefreshMode;
-
-    // Full iOS-style rotation on click (360° + current)
-    regenerateRotation.value += 360;
-
-    // Restore focus to search input after toggling
-    nextTick(() => {
-        searchInput.value?.focus();
-    });
-};
-
-const handleSourceToggle = (sourceId: string) => {
-    store.toggleSource(sourceId);
-    // Don't restore focus - let user continue interacting with controls
-};
-
-const handleLanguageToggle = (languageCode: string) => {
-    store.toggleLanguage(languageCode);
-    // Don't restore focus - let user continue interacting with controls
-};
-
-const handleModeToggle = () => {
-    store.toggleMode();
-    // Do not modify focus state when toggling mode
+    state.forceRefreshMode = !state.forceRefreshMode;
 };
 
 const clearAllStorage = () => {
     if (confirm('This will clear all local storage including history and settings. Are you sure?')) {
-        // Clear localStorage
         localStorage.clear();
-        // Clear sessionStorage
         sessionStorage.clear();
-        // Reload the page to reset the app
         window.location.reload();
     }
 };
 
-// Auto-resize textarea
-const resizeTextarea = () => {
-    if (!searchInput.value) return;
-    
-    // Reset height to auto to get the natural height
-    searchInput.value.style.height = 'auto';
-    
-    // Get the scroll height (content height)
-    const scrollHeight = searchInput.value.scrollHeight;
-    
-    // Set the textarea height directly
-    searchInput.value.style.height = `${scrollHeight}px`;
-    
-    // Simple height calculation
-    const padding = 32; // Account for search bar padding
-    searchBarHeight.value = Math.max(64, scrollHeight + padding);
-    
-    // Show expand button for long text or AI queries
-    expandButtonVisible.value = isAIQuery.value || query.value.length > 80 || query.value.includes('\n');
-};
-
-// Modal methods
-const handleExpandClick = (event: Event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    openExpandModal();
-};
-
-const openExpandModal = () => {
-    expandedQuery.value = query.value;
-    showExpandModal.value = true;
-    nextTick(() => {
-        expandedTextarea.value?.focus();
-        expandedTextarea.value?.setSelectionRange(expandedQuery.value.length, expandedQuery.value.length);
-    });
+// Expand modal
+const handleExpandClick = () => {
+    state.showExpandModal = true;
 };
 
 const closeExpandModal = () => {
-    showExpandModal.value = false;
-    expandedQuery.value = '';
+    state.showExpandModal = false;
 };
 
-const submitExpandedQuery = () => {
-    query.value = expandedQuery.value;
-    closeExpandModal();
+const submitExpandedQuery = (query: string) => {
+    state.query = query;
+    state.showExpandModal = false;
     nextTick(() => {
         handleEnter();
     });
 };
 
-// Smooth modal animations
-const modalEnter = (el: Element, done: () => void) => {
-    const backdrop = modalBackdrop.value;
-    const content = modalContent.value;
-    
-    if (!backdrop || !content) {
-        done();
-        return;
-    }
-    
-    // Initial states
-    backdrop.style.opacity = '0';
-    content.style.opacity = '0';
-    content.style.transform = 'scale(0.97) translateY(10px)';
-    
-    // Force reflow
-    backdrop.offsetHeight;
-    
-    // Animate
-    requestAnimationFrame(() => {
-        // Backdrop fades in
-        backdrop.style.transition = 'opacity 200ms cubic-bezier(0.25, 0.1, 0.25, 1)';
-        backdrop.style.opacity = '1';
-        
-        // Content appears slightly after
-        setTimeout(() => {
-            content.style.transition = 'all 250ms cubic-bezier(0.16, 1, 0.3, 1)';
-            content.style.opacity = '1';
-            content.style.transform = 'scale(1) translateY(0)';
-            
-            setTimeout(done, 250);
-        }, 50);
-    });
-};
-
-const modalLeave = (el: Element, done: () => void) => {
-    const backdrop = modalBackdrop.value;
-    const content = modalContent.value;
-    
-    if (!backdrop || !content) {
-        done();
-        return;
-    }
-    
-    // Animate out
-    content.style.transition = 'all 200ms cubic-bezier(0.4, 0, 1, 1)';
-    content.style.opacity = '0';
-    content.style.transform = 'scale(0.97) translateY(10px)';
-    
-    backdrop.style.transition = 'opacity 200ms cubic-bezier(0.4, 0, 1, 1)';
-    backdrop.style.opacity = '0';
-    
-    setTimeout(done, 200);
-};
-
-// Autocomplete logic
-const updateAutocomplete = () => {
-    if (!query.value || query.value.length < 2 || !searchResults.value.length) {
-        autocompleteText.value = '';
-        return;
-    }
-
-    // Take the top match (highest score)
-    const topMatch = searchResults.value[0];
-
-    // Check if the top match starts with the current query (case insensitive)
-    const queryLower = query.value.toLowerCase();
-    const wordLower = topMatch.word.toLowerCase();
-
-    if (
-        wordLower.startsWith(queryLower) &&
-        topMatch.word.length > query.value.length
-    ) {
-        // Use the top match for completion
-        autocompleteText.value = topMatch.word;
-    } else {
-        // No suitable completion available
-        autocompleteText.value = '';
-    }
-};
-
-const handleAutocompleteAccept = async () => {
-    if (autocompleteText.value) {
-        query.value = autocompleteText.value;
-        store.searchQuery = autocompleteText.value;
-        isFocused.value = false;
-        searchResults.value = [];
-        store.hasSearched = true;
-        autocompleteText.value = '';
-        await store.getDefinition(query.value);
-    }
-};
-
-const fillAutocomplete = () => {
-    if (autocompleteText.value) {
-        query.value = autocompleteText.value;
-        store.searchQuery = autocompleteText.value;
-        autocompleteText.value = '';
-        // Move cursor to end
-        nextTick(() => {
-            if (searchInput.value) {
-                searchInput.value.setSelectionRange(
-                    query.value.length,
-                    query.value.length
-                );
-            }
-        });
-    }
-};
-
-const handleSpaceKey = (event: KeyboardEvent) => {
-    if (autocompleteText.value) {
-        event.preventDefault();
-        fillAutocomplete();
-        // Add the space after filling
-        nextTick(() => {
-            query.value += ' ';
-            store.searchQuery = query.value;
-        });
-    }
-};
-
-const handleInputClick = (_event: MouseEvent) => {
-    handleSearchAreaInteraction();
-
-    if (autocompleteText.value && searchInput.value) {
-        const input = searchInput.value;
-        const cursorPosition = input.selectionStart || 0;
-
-        // If cursor is positioned beyond the current query length (in ghost text area)
-        if (cursorPosition > query.value.length) {
-            fillAutocomplete();
-        }
-    }
-};
-
-const handleArrowKey = (event: KeyboardEvent) => {
-    if (autocompleteText.value && searchInput.value) {
-        const currentPosition = searchInput.value.selectionStart || 0;
-
-        // If it's a right arrow and we're at the end of the current text
-        if (
-            event.key === 'ArrowRight' &&
-            currentPosition === query.value.length
-        ) {
-            event.preventDefault();
-            fillAutocomplete();
-            return;
-        }
-
-        // Use nextTick to get the cursor position after the arrow key press for other cases
-        nextTick(() => {
-            if (searchInput.value) {
-                const cursorPosition = searchInput.value.selectionStart || 0;
-
-                // If cursor moves beyond the current query length (into ghost text area)
-                if (cursorPosition > query.value.length) {
-                    fillAutocomplete();
-                }
-            }
-        });
-    }
-};
-
-// Click outside handler
-const handleClickOutside = (event: Event) => {
-    if (isInteractingWithSearchArea.value) return;
-
-    const target = event.target as Element;
-    const searchContainer = target.closest('.search-container');
-
-    if (!searchContainer) {
-        // Click completely outside - close both
-        handleClose();
-        return;
-    }
-
-    // Check specific dropdown areas for targeted closing
-    const controlsArea = target.closest('[ref="controlsDropdown"]');
-    const resultsArea = target.closest('[ref="searchResultsDropdown"]');
-
-    if (!controlsArea && showControls.value) {
-        // Clicked outside controls but inside search container
-        closeControls();
-    }
-
-    if (!resultsArea && showResults.value) {
-        // Clicked outside results but inside search container
-        closeResults();
-    }
-};
-
-// Smooth scroll handling with debouncing
-watch(scrollY, () => {
-    // Use debounced update to prevent jittering
+// Update scroll state
+watch(() => props, () => {
     updateScrollState();
-});
+}, { deep: true });
 
-// Watchers for autocomplete
-watch(searchResults, () => {
-    selectedIndex.value = 0;
-    store.searchSelectedIndex = 0;
-    updateAutocomplete();
-});
-
-watch(query, () => {
-    updateAutocomplete();
-    nextTick(() => {
-        resizeTextarea();
-    });
-    // Update persisted AI query text if in AI mode
-    if (isAIQuery.value) {
-        store.sessionState.aiQueryText = query.value;
-    }
-});
-
-// Legacy shrink state handling (simplified)
-watch(
-    [() => props.shrinkPercentage, isContainerHovered],
-    ([shrinkPct, hovered]) => {
-        if (shrinkPct > 0 && !hovered) {
-            isShrunken.value = true;
-        } else if (shrinkPct === 0) {
-            isShrunken.value = false;
-        }
-    }
-);
-
-// Mounted
+// Initialize
 onMounted(async () => {
-    // Initialize document height for timeline calculations
-    initializeDocumentHeight();
-
-    // Update on window resize
-    window.addEventListener('resize', initializeDocumentHeight);
     
-    // Restore AI query state if it was persisted
-    if (store.sessionState.isAIQuery) {
-        isAIQuery.value = true;
-        showSparkle.value = true;
-        // Restore the query text if it exists
-        if (store.sessionState.aiQueryText && !query.value) {
-            query.value = store.sessionState.aiQueryText;
-        }
-    }
-    
-    // Check if current query should be in AI mode
-    if (shouldTriggerAIMode(query.value) && !isAIQuery.value) {
-        // Do a search to verify no results
-        try {
-            const results = await store.search(query.value);
-            searchResults.value = results.slice(0, 8);
-            
-            if (results.length === 0) {
-                isAIQuery.value = true;
-                showSparkle.value = true;
-                store.sessionState.isAIQuery = true;
-                store.sessionState.aiQueryText = query.value;
-                nextTick(() => {
-                    resizeTextarea();
-                });
-            }
-        } catch (error) {
-            console.error('Search error on mount:', error);
-        }
-    }
-    
-    // Initial textarea sizing
-    nextTick(() => {
-        resizeTextarea();
+    // Watch query changes
+    watch(() => state.query, () => {
+        performSearch();
     });
-
+    
+    // Show results when focused with query
+    watch([() => state.isFocused, () => state.query], ([focused, query]) => {
+        if (focused && query && query.length > 0 && !state.isAIQuery) {
+            state.showResults = true;
+        }
+    });
+    
+    // Restore AI state if persisted
+    if (store.sessionState.isAIQuery) {
+        state.isAIQuery = true;
+        state.showSparkle = true;
+        if (store.sessionState.aiQueryText && !state.query) {
+            state.query = store.sessionState.aiQueryText;
+        }
+    }
+    
+    // Get AI suggestions
     try {
         const history = await store.getHistoryBasedSuggestions();
-        aiSuggestions.value = history.slice(0, 4);
+        state.aiSuggestions = history.slice(0, 4);
     } catch {
-        aiSuggestions.value = [];
+        state.aiSuggestions = [];
     }
-
-    document.addEventListener('click', handleClickOutside);
-    
-    // Global Enter key handler for unfocused search
-    globalEnterHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Enter' && !isFocused.value && query.value.trim()) {
-            e.preventDefault();
-            handleEnter();
-        }
-    };
-    window.addEventListener('keydown', globalEnterHandler);
 });
 
 // Cleanup
 onUnmounted(() => {
     clearTimeout(searchTimer);
-    if (scrollAnimationFrame) {
-        cancelAnimationFrame(scrollAnimationFrame);
-    }
-    document.removeEventListener('click', handleClickOutside);
-    window.removeEventListener('resize', initializeDocumentHeight);
-    if (globalEnterHandler) {
-        window.removeEventListener('keydown', globalEnterHandler);
-    }
 });
 </script>
 
 <style scoped>
-/* Removed will-change to fix blur issues */
-
 /* Disable animations for reduced motion */
 @media (prefers-reduced-motion: reduce) {
     * {

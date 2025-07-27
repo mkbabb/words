@@ -1,10 +1,11 @@
 <template>
   <div 
-    class="themed-card themed-shadow-lg bg-background/95 backdrop-blur-sm rounded-lg p-2 space-y-0.5 relative z-20 overflow-visible"
+    class="themed-card themed-shadow-lg bg-background/95 backdrop-blur-sm rounded-lg p-2 space-y-0.5"
     :data-theme="selectedCardVariant || 'default'"
+    :style="{ height: 'fit-content', maxHeight: 'calc(100vh - 2rem)' }"
   >
     <!-- Navigation Sections -->
-    <nav class="space-y-0.5">
+    <nav class="space-y-0.5 overflow-y-auto overflow-x-hidden" style="max-height: calc(100vh - 4rem); scrollbar-width: thin;">
       <div
         v-for="(cluster, clusterIndex) in sidebarSections"
         :key="cluster.clusterId"
@@ -740,21 +741,27 @@ watch(() => store.currentEntry?.definitions, () => {
   }
 }
 
-/* Custom scrollbar for sidebar */
-::-webkit-scrollbar {
+/* Custom scrollbar for sidebar navigation */
+nav::-webkit-scrollbar {
   width: 4px;
 }
 
-::-webkit-scrollbar-track {
+nav::-webkit-scrollbar-track {
   background: transparent;
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--color-border);
+nav::-webkit-scrollbar-thumb {
+  background: hsl(var(--border) / 0.3);
   border-radius: 2px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-primary);
+nav::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.5);
+}
+
+/* Firefox scrollbar styling */
+nav {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border) / 0.3) transparent;
 }
 </style>
