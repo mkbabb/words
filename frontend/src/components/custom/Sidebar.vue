@@ -198,6 +198,7 @@
           </Transition>
           <SearchHistoryContent :collapsed="sidebarCollapsed" />
         </div>
+        
 
         <!-- User Section - locked to bottom -->
         <div class="border-border flex-shrink-0 border-t p-4">

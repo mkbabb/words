@@ -14,8 +14,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { useTypewriterAnimation } from '@/composables/useTextAnimations'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { gsap } from 'gsap'
 import { useTextureSystem } from '@/composables/useTextureSystem'
 import type { TextureType, TextureIntensity } from '@/types'
 
@@ -71,6 +71,13 @@ const props = withDefaults(defineProps<Props>(), {
 const textRef = ref<HTMLElement | null>(null)
 const textContent = ref(props.text)
 
+// Animation state
+const isAnimating = ref(false)
+const currentText = ref('')
+const cursorVisible = ref(true)
+let timeline: gsap.core.Timeline | null = null
+let cursorTimeline: gsap.core.Timeline | null = null
+
 // Texture system (optional)
 const { textureStyles, textureClasses } = useTextureSystem({
   enabled: props.textureEnabled,
@@ -82,24 +89,82 @@ const { textureStyles, textureClasses } = useTextureSystem({
   },
 })
 
-// Typewriter animation
-const {
-  isAnimating,
-  currentText,
-  startAnimation,
-  play,
-  pause,
-  restart,
-} = useTypewriterAnimation(textRef, textContent, {
-  speed: props.speed,
-  delay: props.delay,
-  autoplay: props.autoplay,
-  loop: props.loop,
-  easing: props.easing,
-  cursorVisible: props.cursorVisible,
-  cursorChar: props.cursorChar,
-  pauseOnPunctuation: props.pauseOnPunctuation,
-})
+// Typewriter animation logic
+const startAnimation = async () => {
+  if (!textRef.value || isAnimating.value) return
+
+  isAnimating.value = true
+  currentText.value = ''
+  
+  await nextTick()
+
+  // Create main timeline
+  timeline = gsap.timeline({
+    paused: !props.autoplay,
+    delay: props.delay / 1000,
+    repeat: props.loop ? -1 : 0,
+  })
+
+  const chars = textContent.value.split('')
+  const charDuration = props.speed / 1000 // Convert milliseconds to seconds for GSAP
+
+  chars.forEach((char, index) => {
+    timeline!.call(() => {
+      currentText.value = textContent.value.slice(0, index + 1)
+      if (textRef.value) {
+        textRef.value.textContent = currentText.value + (props.cursorVisible ? props.cursorChar : '')
+      }
+    })
+
+    // Add pause after punctuation
+    const isPunctuation = /[.!?,:;]/.test(char)
+    const delay = isPunctuation ? props.pauseOnPunctuation / 1000 : 0
+
+    timeline!.to({}, { duration: charDuration + delay })
+  })
+
+  // Remove cursor at end
+  timeline.call(() => {
+    if (textRef.value && props.cursorVisible) {
+      textRef.value.textContent = currentText.value
+    }
+    isAnimating.value = false
+  })
+
+  if (props.autoplay) {
+    timeline.play()
+  }
+}
+
+const startCursorBlink = () => {
+  if (!props.cursorVisible) return
+  
+  cursorTimeline = gsap.timeline({ repeat: -1, yoyo: true })
+  cursorTimeline.to(cursorVisible, { 
+    duration: 0.5, 
+    delay: 0.5,
+    onUpdate: () => {
+      if (textRef.value && isAnimating.value) {
+        const cursor = cursorVisible.value ? props.cursorChar : ''
+        textRef.value.textContent = currentText.value + cursor
+      }
+    }
+  })
+}
+
+const play = () => timeline?.play()
+const pause = () => timeline?.pause()
+const restart = () => {
+  timeline?.restart()
+  startAnimation()
+}
+
+const cleanup = () => {
+  timeline?.kill()
+  cursorTimeline?.kill()
+  timeline = null
+  cursorTimeline = null
+}
 
 // Display text (either current animated text or static text)
 const displayText = computed(() => {
@@ -116,6 +181,16 @@ const combinedStyles = computed(() => ({
   fontFamily: 'inherit',
   whiteSpace: 'pre-wrap',
 }))
+
+// Lifecycle hooks
+onMounted(() => {
+  if (props.autoplay) {
+    startAnimation()
+  }
+  startCursorBlink()
+})
+
+onUnmounted(cleanup)
 
 // Watch for text changes and restart animation
 watch(() => props.text, (newText) => {

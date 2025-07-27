@@ -24,7 +24,7 @@ class Pronunciation(Document, BaseMetadata):
 
     word_id: str  # FK to Word
     phonetic: str  # e.g., "on koo-LEES"
-    ipa: str  # American IPA
+    ipa: str = ""  # American IPA - default to empty string for backwards compatibility
     audio_file_ids: list[str] = []  # FK to AudioMedia documents
     syllables: list[str] = []
     stress_pattern: str | None = None  # Primary/secondary stress
