@@ -12,78 +12,9 @@
 
         <!-- Main Card Content -->
         <ThemedCard :variant="selectedCardVariant" class="relative flex-1">
-            <!-- Animation Selector Dropdown - absolute positioned -->
-            <div v-if="isMounted" class="absolute top-2 right-20 z-40">
-                <div class="relative">
-                    <button
-                        @click="toggleAnimationDropdown"
-                        class="group mt-1 rounded-lg border-2 border-border
-                            bg-background/80 p-1.5 shadow-lg backdrop-blur-sm
-                            transition-all duration-200 hover:scale-110
-                            hover:bg-background focus:ring-0 focus:outline-none"
-                    >
-                        <ChevronLeft
-                            :size="14"
-                            :class="[
-                                'text-muted-foreground transition-transform duration-200 group-hover:text-foreground',
-                                showAnimationDropdown && 'rotate-90',
-                            ]"
-                        />
-                    </button>
-
-                    <Transition
-                        enter-active-class="transition-all duration-300 ease-apple-bounce"
-                        leave-active-class="transition-all duration-250 ease-out"
-                        enter-from-class="opacity-0 scale-95 -translate-y-2"
-                        enter-to-class="opacity-100 scale-100 translate-y-0"
-                        leave-from-class="opacity-100 scale-100 translate-y-0"
-                        leave-to-class="opacity-0 scale-95 -translate-y-2"
-                    >
-                        <div
-                            v-if="showAnimationDropdown"
-                            class="absolute top-full right-0 z-50 mt-4
-                                min-w-[140px] origin-top-right rounded-md border
-                                bg-popover text-popover-foreground shadow-md"
-                            @click.stop
-                        >
-                            <div class="p-1">
-                                <div class="px-2 py-1.5 text-sm font-semibold">
-                                    Text Animation
-                                </div>
-                                <div class="my-1 h-px bg-border"></div>
-
-                                <button
-                                    v-for="option in animationOptions"
-                                    :key="option.value"
-                                    @click="selectAnimation(option.value)"
-                                    :class="[
-                                        'flex w-full items-center rounded-sm px-2 py-1.5 text-sm',
-                                        'transition-colors hover:bg-accent hover:text-accent-foreground',
-                                        'focus:bg-accent focus:text-accent-foreground focus:outline-none',
-                                        selectedAnimation === option.value &&
-                                            'bg-accent text-accent-foreground',
-                                    ]"
-                                >
-                                    <div class="flex items-center gap-2">
-                                        <div
-                                            :class="[
-                                                'h-2 w-2 rounded-full border',
-                                                selectedAnimation === option.value
-                                                    ? 'border-primary bg-primary'
-                                                    : 'border-muted-foreground',
-                                            ]"
-                                        ></div>
-                                        {{ option.label }}
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
-                    </Transition>
-                </div>
-            </div>
 
             <!-- Card Theme Selector Dropdown - absolute positioned -->
-            <div v-if="isMounted" class="absolute top-2 right-12 z-40">
+            <div v-if="isMounted" class="absolute top-2 right-2 z-40">
                 <!-- Custom dropdown with controlled animations -->
                 <div class="relative">
                     <button
@@ -174,7 +105,8 @@
                             :is="currentAnimationComponent"
                             v-bind="currentAnimationProps"
                             :key="`${selectedAnimation}-${animationKey}`"
-                            class="text-word-title"
+                            class="text-6xl md:text-7xl font-bold leading-tight pb-2"
+                            style="font-family: 'Fraunces', serif;"
                         />
                     </CardTitle>
                 </div>
@@ -184,7 +116,7 @@
                     v-if="entry.pronunciation"
                     class="flex items-center gap-3 pt-2"
                 >
-                    <span class="text-pronunciation">
+                    <span class="text-lg text-muted-foreground" style="font-family: 'Fira Code', monospace;">
                         {{
                             pronunciationMode === 'phonetic'
                                 ? entry.pronunciation.phonetic
@@ -265,7 +197,7 @@
             </CardHeader>
 
             <!-- Themed Gradient Divider -->
-            <div class="themed-hr -mt-2 -mb-2" />
+            <div class="themed-hr h-px mb-4" />
 
             <!-- Mode Content with Animation -->
             <Transition
@@ -284,24 +216,72 @@
                         class="grid gap-4"
                     >
                         <div
-                            v-for="cluster in groupedDefinitions"
+                            v-for="(cluster, clusterIndex) in groupedDefinitions"
                             :key="cluster.clusterId"
                             :data-cluster-id="cluster.clusterId"
-                            class="space-y-4"
+                            class="text-2xl space-y-1"
                         >
+                            <!-- Separator between clusters (not before first) -->
+                            <hr
+                                v-if="clusterIndex > 0 && groupedDefinitions.length > 1"
+                                class="my-6 border-border/30"
+                            />
+                            
                             <!-- Cluster header with gradient divider -->
                             <div
                                 v-if="groupedDefinitions.length > 1"
-                                class="mt-6 pb-2"
+                                :class="clusterIndex === 0 ? 'pb-3' : 'mt-0 pb-3'"
                             >
-                                <h4
-                                    class="themed-cluster-title text-base
-                                        font-bold tracking-wider uppercase"
-                                >
-                                    {{ cluster.clusterDescription }}
-                                </h4>
-                                <!-- Themed Gradient HR -->
-                                <!-- <div class="themed-hr h-px" /> -->
+                                <HoverCard :open-delay="600" :close-delay="100">
+                                    <HoverCardTrigger as-child>
+                                        <h4
+                                            class="text-sm font-semibold tracking-wide uppercase
+                                                inline-block px-3 py-1.5 rounded-md
+                                                bg-muted/30 border border-border/50
+                                                hover:bg-muted/50 hover:border-border
+                                                transition-all duration-200 cursor-help"
+                                        >
+                                            {{ formatClusterLabel(cluster.clusterId) }}
+                                        </h4>
+                                    </HoverCardTrigger>
+                                    <HoverCardContent 
+                                        :class="cn(
+                                            'themed-hovercard w-96 z-[80]',
+                                            selectedCardVariant !== 'default' ? 'themed-shadow-sm' : ''
+                                        )"
+                                        :data-theme="selectedCardVariant || 'default'"
+                                        side="top"
+                                        align="start"
+                                    >
+                                        <div class="space-y-4">
+                                            <div>
+                                                <h4 class="text-base font-semibold mb-2">{{ formatClusterLabel(cluster.clusterId) }}</h4>
+                                                <p class="text-sm text-muted-foreground mb-4">{{ cluster.clusterDescription }}</p>
+                                                <div class="space-y-2">
+                                                    <div class="flex justify-between items-center py-1.5 border-b border-border/30">
+                                                        <span class="text-sm text-muted-foreground">Cluster ID</span>
+                                                        <span class="text-sm font-mono">{{ cluster.clusterId }}</span>
+                                                    </div>
+                                                    <div class="flex justify-between items-center py-1.5 border-b border-border/30">
+                                                        <span class="text-sm text-muted-foreground">Relevance Score</span>
+                                                        <span class="text-sm font-medium">{{ Math.round((cluster.maxRelevancy || 1.0) * 100) }}%</span>
+                                                    </div>
+                                                    <div class="flex justify-between items-center py-1.5 border-b border-border/30">
+                                                        <span class="text-sm text-muted-foreground">Total Definitions</span>
+                                                        <span class="text-sm font-medium">{{ cluster.definitions.length }}</span>
+                                                    </div>
+                                                    <div v-if="cluster.definitions[0]?.meaning_cluster?.relevance" 
+                                                         class="flex justify-between items-center py-1.5">
+                                                        <span class="text-sm text-muted-foreground">Confidence</span>
+                                                        <span class="text-sm font-medium">{{ Math.round(cluster.definitions[0].meaning_cluster.relevance * 100) }}%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </HoverCardContent>
+                                </HoverCard>
+                                
+                                
                             </div>
 
                             <div
@@ -311,16 +291,16 @@
                                 :key="`${cluster.clusterId}-${index}`"
                                 :id="`${cluster.clusterId}-${definition.part_of_speech}`"
                                 :data-part-of-speech="`${cluster.clusterId}-${definition.part_of_speech}`"
-                                class="space-y-3"
+                                class="space-y-2"
                             >
                                 <!-- Separator for all but first -->
                                 <hr
                                     v-if="index > 0"
-                                    class="my-2 border-border"
+                                    class="my-6 border-border/50"
                                 />
 
                                 <div class="flex items-center gap-2">
-                                    <span class="text-lg font-semibold text-primary">
+                                    <span class="text-2xl font-semibold text-primary">
                                         {{ definition.part_of_speech }}
                                     </span>
                                     <sup
@@ -331,7 +311,7 @@
                                 </div>
 
                                 <div class="border-l-2 border-accent pl-4">
-                                    <p class="text-definition mb-2">
+                                    <p class="text-base leading-relaxed" style="font-family: 'Fraunces', serif;">
                                         {{ definition.text }}
                                     </p>
 
@@ -344,15 +324,15 @@
                                                 definition.examples.literature
                                                     .length > 0)
                                         "
-                                        class="mb-2 space-y-1"
+                                        class="mt-8 mb-6"
                                     >
                                         <!-- Examples header with regenerate button -->
                                         <div
-                                            class="mt-3 mb-1 flex items-center
+                                            class="mb-2 flex items-center
                                                 justify-between"
                                         >
                                             <span
-                                                class="text-sm tracking-wider
+                                                class="text-sm font-medium tracking-wide
                                                     text-muted-foreground
                                                     uppercase"
                                                 >Examples</span
@@ -393,19 +373,25 @@
                                             </button>
                                         </div>
 
-                                        <p
-                                            v-for="(
-                                                example, exIndex
-                                            ) in definition.examples.generated.concat(
-                                                definition.examples.literature
-                                            )"
-                                            :key="exIndex"
-                                            class="themed-example-text text-base
-                                                text-muted-foreground italic"
-                                            v-html="
-                                                `&quot;${formatExampleHTML(example.sentence, entry.word)}&quot;`
-                                            "
-                                        ></p>
+                                        <div class="space-y-3">
+                                            <p
+                                                v-for="(
+                                                    example, exIndex
+                                                ) in definition.examples.generated.concat(
+                                                    definition.examples.literature
+                                                )"
+                                                :key="exIndex"
+                                                class="text-base leading-relaxed
+                                                    text-gray-600 dark:text-gray-300 italic
+                                                    px-3 py-2 rounded-md
+                                                    border border-border/30 bg-muted/5
+                                                    hover:border-border/50 hover:bg-muted/10
+                                                    transition-all duration-200"
+                                                v-html="
+                                                    `&quot;${formatExampleHTML(example.sentence, entry.word)}&quot;`
+                                                "
+                                            ></p>
+                                        </div>
                                     </div>
 
                                     <!-- Synonyms -->
@@ -414,14 +400,16 @@
                                             definition.synonyms &&
                                             definition.synonyms.length > 0
                                         "
-                                        class="flex flex-wrap gap-1 pt-2"
+                                        class="flex flex-wrap gap-1.5 mt-5"
                                     >
                                         <!-- <span class="self-center pr-2 text-xs">Synonyms:</span> -->
                                         <span
                                             v-for="synonym in definition.synonyms"
                                             :key="synonym"
-                                            class="themed-synonym
-                                                cursor-pointer"
+                                            class="text-sm px-2 py-1 rounded-md
+                                                bg-muted/50 hover:bg-muted
+                                                text-foreground/80 hover:text-foreground
+                                                cursor-pointer transition-colors duration-200"
                                             @click="store.searchWord(synonym)"
                                         >
                                             {{ synonym }}
@@ -442,27 +430,83 @@
                             class="grid grid-cols-1 gap-3 md:grid-cols-2
                                 lg:grid-cols-3"
                         >
-                            <Card
+                            <HoverCard 
                                 v-for="synonym in thesaurusData.synonyms"
                                 :key="synonym.word"
-                                :class="
-                                    cn(
-                                        'cursor-pointer py-2 transition-all duration-300 hover:scale-105 hover:shadow-lg',
-                                        getHeatmapClass(synonym.score)
-                                    )
-                                "
-                                @click="store.searchWord(synonym.word)"
+                                :open-delay="400"
+                                :close-delay="100"
                             >
-                                <CardContent class="px-3 py-0.5">
-                                    <div class="font-medium">
-                                        {{ synonym.word }}
+                                <HoverCardTrigger as-child>
+                                    <Card
+                                        :class="
+                                            cn(
+                                                'cursor-pointer py-2 transition-all duration-300 hover:scale-105 hover:shadow-lg',
+                                                getHeatmapClass(synonym.score)
+                                            )
+                                        "
+                                        @click="store.searchWord(synonym.word)"
+                                    >
+                                        <CardContent class="px-3 py-0.5">
+                                            <div class="font-medium">
+                                                {{ synonym.word }}
+                                            </div>
+                                            <div class="text-sm opacity-75">
+                                                {{ Math.round(synonym.score * 100) }}%
+                                                similar
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </HoverCardTrigger>
+                                <HoverCardContent 
+                                    :class="cn(
+                                        'themed-hovercard w-80 z-[80]',
+                                        selectedCardVariant !== 'default' ? 'themed-shadow-sm' : ''
+                                    )"
+                                    :data-theme="selectedCardVariant || 'default'"
+                                    side="top"
+                                    align="center"
+                                >
+                                    <div class="space-y-3">
+                                        <div>
+                                            <h4 class="text-base font-semibold mb-3">{{ synonym.word }}</h4>
+                                        </div>
+                                        
+                                        <div class="space-y-2 text-sm">
+                                            <div class="flex justify-between items-center py-1 border-b border-border/30">
+                                                <span class="text-muted-foreground">Similarity Score</span>
+                                                <span class="font-medium">{{ Math.round(synonym.score * 100) }}%</span>
+                                            </div>
+                                            
+                                            <div v-if="synonym.confidence" class="flex justify-between items-center py-1 border-b border-border/30">
+                                                <span class="text-muted-foreground">Confidence</span>
+                                                <span class="font-medium">{{ Math.round(synonym.confidence * 100) }}%</span>
+                                            </div>
+                                            
+                                            <div v-if="synonym.efflorescence_score" class="flex justify-between items-center py-1 border-b border-border/30">
+                                                <span class="text-muted-foreground">Efflorescence</span>
+                                                <div class="flex items-center gap-1">
+                                                    <span class="font-medium">{{ synonym.efflorescence_score.toFixed(1) }}</span>
+                                                    <Sparkles class="h-3 w-3 text-amber-500" />
+                                                </div>
+                                            </div>
+                                            
+                                            <div v-if="synonym.language_origin" class="flex justify-between items-center py-1 border-b border-border/30">
+                                                <span class="text-muted-foreground">Origin</span>
+                                                <span class="font-medium">{{ synonym.language_origin }}</span>
+                                            </div>
+                                            
+                                            <div v-if="synonym.part_of_speech" class="flex justify-between items-center py-1">
+                                                <span class="text-muted-foreground">Part of Speech</span>
+                                                <span class="font-medium">{{ synonym.part_of_speech }}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div v-if="synonym.usage_note" class="pt-2 border-t border-border/30">
+                                            <p class="text-xs text-muted-foreground italic">{{ synonym.usage_note }}</p>
+                                        </div>
                                     </div>
-                                    <div class="text-sm opacity-75">
-                                        {{ Math.round(synonym.score * 100) }}%
-                                        similar
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                </HoverCardContent>
+                            </HoverCard>
                         </div>
                     </CardContent>
                 </div>
@@ -471,10 +515,10 @@
             <!-- Etymology -->
             <CardContent
                 v-if="entry && entry.etymology"
-                class="space-y-4 px-3 sm:px-6"
+                class="space-y-3 px-3 sm:px-6 mt-8"
             >
-                <h3 class="text-lg font-semibold">Etymology</h3>
-                <p class="text-base text-muted-foreground">
+                <h3 class="text-lg font-semibold tracking-wide">Etymology</h3>
+                <p class="text-base leading-relaxed text-muted-foreground">
                     {{ entry.etymology }}
                 </p>
             </CardContent>
@@ -491,7 +535,7 @@ import { Button } from '@/components/ui';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { ThemedCard } from '@/components/custom/card';
-import { TypewriterText, HandwritingText, LatexFillText } from '@/components/custom/text-animations';
+import { TypewriterText } from '@/components/custom/text-animations';
 import { ProgressiveSidebar } from '@/components/custom/navigation';
 import { RefreshCw, ChevronLeft } from 'lucide-vue-next';
 import { 
@@ -521,24 +565,11 @@ const themeOptions = [
 const showAnimationDropdown = ref(false);
 const selectedAnimation = ref('typewriter');
 const animationKey = ref(0);
-const animationOptions = [
-    { label: 'Typewriter', value: 'typewriter' },
-    { label: 'Handwriting', value: 'handwriting' },
-    { label: 'LaTeX Fill', value: 'latex' },
-];
 
 // Animation component logic
 const currentAnimationComponent = computed(() => {
-    switch (selectedAnimation.value) {
-        case 'typewriter':
-            return TypewriterText;
-        case 'handwriting':
-            return HandwritingText;
-        case 'latex':
-            return LatexFillText;
-        default:
-            return TypewriterText;
-    }
+    // Only typewriter is available
+    return TypewriterText;
 });
 
 
@@ -552,47 +583,22 @@ const currentAnimationProps = computed(() => {
         textShadow: '0 1px 2px rgba(0,0,0,0.1)'
     };
     
-    switch (selectedAnimation.value) {
-        case 'typewriter':
-            return { 
-                text: word,
-                class: 'text-word-title',
-                customStyles,
-                speed: 300, 
-                cursor: true 
-            }; // 300ms between characters for slow, readable typing
-        case 'handwriting':
-            return { 
-                text: word,
-                class: 'text-word-title',
-                customStyles,
-                speed: 2, 
-                strokeWidth: 2 
-            };
-        case 'latex':
-            return { 
-                content: word,
-                class: 'text-word-title',
-                customStyles,
-                speed: 1.5, 
-                fillDirection: 'center-out' as const,
-                mathMode: false
-            };
-        default:
-            return { 
-                text: word,
-                class: 'text-word-title',
-                customStyles
-            };
-    }
+    // Only typewriter animation available
+    return { 
+        text: word,
+        class: 'text-word-title',
+        customStyles,
+        speed: 300, 
+        cursor: true 
+    }; // 300ms between characters for slow, readable typing
 });
 
 // Animation cycling - run with random delay around 30 seconds
 let animationTimeout: NodeJS.Timeout | null = null;
 
 const getRandomDelay = () => {
-    // Random delay between 25-35 seconds
-    return 25000 + Math.random() * 10000;
+    // Random delay between 60-90 seconds (much less frequent)
+    return 60000 + Math.random() * 30000;
 };
 
 const scheduleNextAnimation = () => {
@@ -613,7 +619,7 @@ const startAnimationCycle = () => {
     animationTimeout = setTimeout(() => {
         animationKey.value++;
         scheduleNextAnimation();
-    }, 5000); // Initial delay of 5 seconds
+    }, 15000); // Initial delay of 15 seconds
 };
 
 const stopAnimationCycle = () => {
@@ -759,7 +765,7 @@ const groupedDefinitions = computed((): GroupedDefinition[] => {
 
     entry.value.definitions.forEach((definition) => {
         const clusterId = definition.meaning_cluster?.id || 'default';
-        const clusterDescription = definition.meaning_cluster?.name || 'General';
+        const clusterDescription = definition.meaning_cluster?.description || 'General';
 
         if (!clusters.has(clusterId)) {
             clusters.set(clusterId, {
@@ -815,6 +821,20 @@ const togglePronunciation = () => {
     store.togglePronunciation();
 };
 
+// Format cluster ID for display (e.g., "example_representative" -> "Representative")
+const formatClusterLabel = (clusterId: string): string => {
+    // Remove word prefix and get the cluster name part
+    const parts = clusterId.split('_');
+    if (parts.length > 1) {
+        // Get the cluster name part(s) after the word
+        const clusterName = parts.slice(1).join(' ');
+        // Capitalize first letter
+        return clusterName.charAt(0).toUpperCase() + clusterName.slice(1);
+    }
+    // Fallback for non-standard formats
+    return clusterId.charAt(0).toUpperCase() + clusterId.slice(1);
+};
+
 // Handle regenerating examples for a specific definition
 const handleRegenerateExamples = async (definitionIndex: number) => {
     if (regeneratingIndex.value !== null) return; // Already regenerating
@@ -854,17 +874,6 @@ const selectTheme = (theme: string) => {
     showThemeDropdown.value = false;
 };
 
-// Animation dropdown handlers
-const toggleAnimationDropdown = () => {
-    showAnimationDropdown.value = !showAnimationDropdown.value;
-};
-
-const selectAnimation = (animation: string) => {
-    selectedAnimation.value = animation;
-    showAnimationDropdown.value = false;
-    // Trigger immediate animation restart
-    animationKey.value++;
-};
 
 // Close dropdown when clicking outside
 const handleClickOutside = (event: Event) => {

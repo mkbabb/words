@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from ...caching import cached_api_call_with_dedup, deduplicated
+from ...caching import cached_api_call
 from ...utils.logging import get_logger
 
 router = APIRouter()
@@ -46,7 +46,7 @@ async def call_external_api(query: str) -> dict[str, Any]:
 
 # Example 1: Basic deduplication for database queries
 @router.get("/items/{item_id}")
-@deduplicated(key_func=lambda item_id: f"get_item:{item_id}")
+# @deduplicated(key_func=lambda item_id: f"get_item:{item_id}")
 async def get_item(item_id: str) -> dict[str, Any]:
     """Get item details with request deduplication.
     
@@ -69,7 +69,7 @@ async def get_item(item_id: str) -> dict[str, Any]:
 
 # Example 2: Deduplication with caching
 @router.get("/search")
-@cached_api_call_with_dedup(
+@cached_api_call(
     ttl_hours=0.5,  # Cache for 30 minutes
     key_func=lambda q: ("search", q),
 )

@@ -11,36 +11,73 @@
         class="space-y-0"
       >
         <!-- Cluster Section -->
-        <button
-          @click="scrollToCluster(cluster.clusterId)"
-          :class="[
-            'group flex w-full items-center rounded-md px-2 py-1 text-left text-sm transition-all duration-200',
-            activeCluster === cluster.clusterId
-              ? 'text-foreground font-bold'
-              : 'text-foreground/80 font-normal hover:bg-muted/50 hover:text-foreground'
-          ]"
-        >
-          <div class="flex-1 min-w-0 pr-2 overflow-hidden text-ellipsis whitespace-nowrap">
-            <ShimmerText 
-              v-if="activeCluster === cluster.clusterId"
-              :text="cluster.clusterDescription.toUpperCase()" 
-              text-class="themed-cluster-title text-left uppercase text-xs font-bold tracking-wider"
-              :duration="400"
-              :interval="15000"
-            />
-            <span 
-              v-else 
-              class="themed-cluster-title text-left uppercase text-xs font-bold tracking-wider"
-              :title="cluster.clusterDescription.toUpperCase()"
+        <HoverCard :open-delay="600" :close-delay="100">
+          <HoverCardTrigger as-child>
+            <button
+              @click="scrollToCluster(cluster.clusterId)"
+              :class="[
+                'group flex w-full items-center rounded-md px-2 py-1 text-left text-sm transition-all duration-200',
+                activeCluster === cluster.clusterId
+                  ? 'text-foreground font-bold'
+                  : 'text-foreground/80 font-normal hover:bg-muted/50 hover:text-foreground'
+              ]"
             >
-              {{ cluster.clusterDescription.toUpperCase() }}
-            </span>
-          </div>
-          <div
-            v-if="activeCluster === cluster.clusterId"
-            class="ml-2 h-1.5 w-1.5 rounded-full bg-primary animate-pulse flex-shrink-0"
-          />
-        </button>
+              <div class="flex-1 min-w-0 pr-2 overflow-hidden text-ellipsis whitespace-nowrap">
+                <ShimmerText 
+                  v-if="activeCluster === cluster.clusterId"
+                  :text="formatClusterLabel(cluster.clusterId).toUpperCase()" 
+                  text-class="themed-cluster-title text-left uppercase text-xs font-bold tracking-wider"
+                  :duration="400"
+                  :interval="15000"
+                />
+                <span 
+                  v-else 
+                  class="themed-cluster-title text-left uppercase text-xs font-bold tracking-wider"
+                >
+                  {{ formatClusterLabel(cluster.clusterId).toUpperCase() }}
+                </span>
+              </div>
+              <div
+                v-if="activeCluster === cluster.clusterId"
+                class="ml-2 h-1.5 w-1.5 rounded-full bg-primary animate-pulse flex-shrink-0"
+              />
+            </button>
+          </HoverCardTrigger>
+          <HoverCardContent 
+            :class="cn(
+              'themed-hovercard w-96 z-[80]',
+              selectedCardVariant !== 'default' ? 'themed-shadow-sm' : ''
+            )"
+            :data-theme="selectedCardVariant || 'default'"
+            side="right"
+            align="start"
+          >
+            <div class="space-y-4">
+              <div>
+                <h4 class="text-base font-semibold mb-2">{{ formatClusterLabel(cluster.clusterId) }}</h4>
+                <p class="text-sm text-muted-foreground mb-4">{{ cluster.clusterDescription }}</p>
+                <div class="space-y-2">
+                  <div class="flex justify-between items-center py-1.5 border-b border-border/30">
+                    <span class="text-sm text-muted-foreground">Cluster ID</span>
+                    <span class="text-sm font-mono">{{ cluster.clusterId }}</span>
+                  </div>
+                  <div class="flex justify-between items-center py-1.5 border-b border-border/30">
+                    <span class="text-sm text-muted-foreground">Relevance Score</span>
+                    <span class="text-sm font-medium">{{ Math.round((cluster.maxRelevancy || 1.0) * 100) }}%</span>
+                  </div>
+                  <div class="flex justify-between items-center py-1.5 border-b border-border/30">
+                    <span class="text-sm text-muted-foreground">Parts of Speech</span>
+                    <span class="text-sm font-medium">{{ cluster.partsOfSpeech.length }}</span>
+                  </div>
+                  <div class="flex justify-between items-center py-1.5">
+                    <span class="text-sm text-muted-foreground">Total Definitions</span>
+                    <span class="text-sm font-medium">{{ getTotalDefinitionsInCluster(cluster.clusterId) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </HoverCardContent>
+        </HoverCard>
 
         <!-- Part of Speech Sub-sections with HoverCards -->
         <div class="ml-2 space-y-0">
@@ -74,7 +111,7 @@
               <div class="space-y-3">
                 <div class="flex items-center justify-between">
                   <h4 class="themed-cluster-title text-sm font-semibold uppercase">
-                    {{ cluster.clusterDescription }}
+                    {{ formatClusterLabel(cluster.clusterId) }}
                   </h4>
                   <span class="themed-part-of-speech text-xs">{{ partOfSpeech.count }}</span>
                 </div>
@@ -246,6 +283,26 @@ interface TransformedDefinition extends Omit<Definition, 'examples'> {
 }
 
 // Get definitions for a specific part of speech in a cluster
+// Get total number of definitions in a cluster
+const getTotalDefinitionsInCluster = (clusterId: string): number => {
+  const cluster = sidebarSections.value.find(c => c.clusterId === clusterId)
+  return cluster ? cluster.partsOfSpeech.reduce((sum, pos) => sum + pos.count, 0) : 0
+}
+
+// Format cluster ID for display (e.g., "example_representative" -> "Representative")
+const formatClusterLabel = (clusterId: string): string => {
+  // Remove word prefix and get the cluster name part
+  const parts = clusterId.split('_')
+  if (parts.length > 1) {
+    // Get the cluster name part(s) after the word
+    const clusterName = parts.slice(1).join(' ')
+    // Capitalize first letter
+    return clusterName.charAt(0).toUpperCase() + clusterName.slice(1)
+  }
+  // Fallback for non-standard formats
+  return clusterId.charAt(0).toUpperCase() + clusterId.slice(1)
+}
+
 const getDefinitionsForPartOfSpeech = (clusterId: string, partOfSpeech: string): TransformedDefinition[] => {
   const entry = store.currentEntry
   if (!entry?.definitions) return []

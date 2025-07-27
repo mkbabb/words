@@ -14,7 +14,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from ...caching.decorators import cached_api_call_with_dedup
+from ...caching import cached_api_call_with_dedup
 from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, lookup_state_tracker
@@ -95,12 +95,16 @@ class DefinitionResponse(BaseModel):
 class LookupParams(BaseModel):
     """Parameters for word lookup endpoint."""
 
-    force_refresh: bool = Field(default=False, description="Force refresh of cached data")
+    force_refresh: bool = Field(
+        default=False, description="Force refresh of cached data"
+    )
     providers: list[DictionaryProvider] = Field(
         default=[DictionaryProvider.WIKTIONARY],
         description="Dictionary providers to use",
     )
-    languages: list[Language] = Field(default=[Language.ENGLISH], description="Languages to query")
+    languages: list[Language] = Field(
+        default=[Language.ENGLISH], description="Languages to query"
+    )
     no_ai: bool = Field(default=False, description="Skip AI synthesis")
 
 
@@ -108,7 +112,9 @@ class LookupResponse(BaseModel):
     """Response for word lookup."""
 
     word: str = Field(..., description="The word that was looked up")
-    pronunciation: dict[str, Any] | None = Field(None, description="Pronunciation information")
+    pronunciation: dict[str, Any] | None = Field(
+        None, description="Pronunciation information"
+    )
     definitions: list[DefinitionResponse] = Field(
         default_factory=list, description="Word definitions with resolved examples"
     )
@@ -119,8 +125,12 @@ class LookupResponse(BaseModel):
 
 
 def parse_lookup_params(
-    force_refresh: bool = Query(default=False, description="Force refresh of cached data"),
-    providers: list[str] = Query(default=["wiktionary"], description="Dictionary providers"),
+    force_refresh: bool = Query(
+        default=False, description="Force refresh of cached data"
+    ),
+    providers: list[str] = Query(
+        default=["wiktionary"], description="Dictionary providers"
+    ),
     languages: list[str] = Query(default=["en"], description="Languages to query"),
     no_ai: bool = Query(default=False, description="Skip AI synthesis"),
 ) -> LookupParams:
@@ -166,7 +176,7 @@ def parse_lookup_params(
         tuple(params.providers),
         params.no_ai,
     ),
-    max_wait_time=30.0,  # Wait up to 30s for concurrent requests
+    max_wait_time=60.0,  # Wait up to 60 seconds for AI synthesis
 )
 async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | None:
     """Cached word lookup implementation."""
@@ -214,9 +224,11 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
                     version=definition.version,
                     part_of_speech=definition.part_of_speech,
                     text=definition.text,
-                    meaning_cluster=definition.meaning_cluster.model_dump()
-                    if definition.meaning_cluster
-                    else None,
+                    meaning_cluster=(
+                        definition.meaning_cluster.model_dump()
+                        if definition.meaning_cluster
+                        else None
+                    ),
                     sense_number=definition.sense_number,
                     word_forms=[wf.model_dump() for wf in definition.word_forms],
                     examples=examples,
@@ -226,7 +238,9 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
                     domain=definition.domain,
                     region=definition.region,
                     usage_notes=[un.model_dump() for un in definition.usage_notes],
-                    grammar_patterns=[gp.model_dump() for gp in definition.grammar_patterns],
+                    grammar_patterns=[
+                        gp.model_dump() for gp in definition.grammar_patterns
+                    ],
                     collocations=[c.model_dump() for c in definition.collocations],
                     transitivity=definition.transitivity,
                     cefr_level=definition.cefr_level,
@@ -239,7 +253,9 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
                 definitions.append(def_response)
 
     # Load pronunciation with audio files
-    pronunciation = await load_pronunciation_with_audio(entry.pronunciation_id)
+    pronunciation = None
+    if entry.pronunciation_id is not None:
+        pronunciation = await load_pronunciation_with_audio(entry.pronunciation_id)
 
     # Load word
     word_obj = await Word.get(entry.word_id)
@@ -295,7 +311,9 @@ async def lookup_word(
         result = await _cached_lookup(word, params)
 
         if not result:
-            raise HTTPException(status_code=404, detail=f"No definition found for word: {word}")
+            raise HTTPException(
+                status_code=404, detail=f"No definition found for word: {word}"
+            )
 
         # Log performance
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
@@ -308,7 +326,9 @@ async def lookup_word(
         raise
     except Exception as e:
         logger.error(f"Lookup failed for {word}: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal error during lookup: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Internal error during lookup: {str(e)}"
+        )
 
 
 async def generate_lookup_events(
@@ -339,7 +359,10 @@ async def generate_lookup_events(
                     while not queue.empty():
                         try:
                             pending_state = queue.get_nowait()
-                            if not pending_state.is_complete and not pending_state.error:
+                            if (
+                                not pending_state.is_complete
+                                and not pending_state.error
+                            ):
                                 yield f"event: progress\ndata: {json.dumps(pending_state.model_dump_optimized())}\n\n"
                         except asyncio.QueueEmpty:
                             break
@@ -366,7 +389,9 @@ async def generate_lookup_events(
                 pass
 
 
-async def _lookup_with_tracking(word: str, params: LookupParams) -> LookupResponse | None:
+async def _lookup_with_tracking(
+    word: str, params: LookupParams
+) -> LookupResponse | None:
     """Perform lookup with state tracking."""
 
     await lookup_state_tracker.update_stage(Stages.START)
@@ -416,9 +441,11 @@ async def _lookup_with_tracking(word: str, params: LookupParams) -> LookupRespon
                     version=definition.version,
                     part_of_speech=definition.part_of_speech,
                     text=definition.text,
-                    meaning_cluster=definition.meaning_cluster.model_dump()
-                    if definition.meaning_cluster
-                    else None,
+                    meaning_cluster=(
+                        definition.meaning_cluster.model_dump()
+                        if definition.meaning_cluster
+                        else None
+                    ),
                     sense_number=definition.sense_number,
                     word_forms=[wf.model_dump() for wf in definition.word_forms],
                     examples=examples,
@@ -428,7 +455,9 @@ async def _lookup_with_tracking(word: str, params: LookupParams) -> LookupRespon
                     domain=definition.domain,
                     region=definition.region,
                     usage_notes=[un.model_dump() for un in definition.usage_notes],
-                    grammar_patterns=[gp.model_dump() for gp in definition.grammar_patterns],
+                    grammar_patterns=[
+                        gp.model_dump() for gp in definition.grammar_patterns
+                    ],
                     collocations=[c.model_dump() for c in definition.collocations],
                     transitivity=definition.transitivity,
                     cefr_level=definition.cefr_level,
@@ -441,7 +470,9 @@ async def _lookup_with_tracking(word: str, params: LookupParams) -> LookupRespon
                 definitions.append(def_response)
 
     # Load pronunciation with audio files
-    pronunciation = await load_pronunciation_with_audio(entry.pronunciation_id)
+    pronunciation = None
+    if entry.pronunciation_id:
+        pronunciation = await load_pronunciation_with_audio(entry.pronunciation_id)
 
     # Load word
     word_obj = await Word.get(entry.word_id)
@@ -506,5 +537,3 @@ async def lookup_word_stream(
             "X-Accel-Buffering": "no",  # Disable nginx buffering
         },
     )
-
-

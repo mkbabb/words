@@ -1,22 +1,23 @@
-import { toast } from 'vue-sonner'
+import { toast } from '@/components/ui/toast'
 
 export const showError = (message: string) => {
-  toast.error(message, {
-    duration: 5000,
-    className: 'bg-destructive text-destructive-foreground',
+  toast({
+    title: 'Error',
+    description: message,
+    variant: 'destructive',
   })
 }
 
 export const showSuccess = (message: string) => {
-  toast.success(message, {
-    duration: 3000,
-    className: 'bg-background text-foreground',
+  toast({
+    title: 'Success',
+    description: message,
   })
 }
 
 export const showInfo = (message: string) => {
-  toast.info(message, {
-    duration: 4000,
-    className: 'bg-background text-foreground',
+  toast({
+    title: 'Info',
+    description: message,
   })
 }

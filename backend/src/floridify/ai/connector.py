@@ -792,7 +792,15 @@ class OpenAIConnector:
         )
 
         try:
-            result = await self._make_structured_request(prompt, WordSuggestionResponse)
+            # Increase max_tokens for word suggestions based on count
+            # Each suggestion needs ~100-150 tokens, plus overhead
+            max_tokens = min(4000, 200 + (count * 150))
+            
+            result = await self._make_structured_request(
+                prompt, 
+                WordSuggestionResponse,
+                max_tokens=max_tokens
+            )
             logger.info(f"Generated {len(result.suggestions)} word suggestions")
             return result
         except Exception as e:

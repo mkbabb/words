@@ -102,35 +102,36 @@
             /* Subtle paper texture overlay */
             var(--paper-clean-texture),
             /* Primary metallic bands - repeating at fixed intervals */
-            repeating-linear-gradient(
-                135deg,
-                transparent 0px,
-                var(--theme-gradient-mid) 50px,
-                var(--theme-gradient-end) 100px,
-                var(--theme-gradient-mid) 150px,
-                transparent 200px
-            ),
+                repeating-linear-gradient(
+                    135deg,
+                    transparent 0px,
+                    var(--theme-gradient-mid) 50px,
+                    var(--theme-gradient-end) 100px,
+                    var(--theme-gradient-mid) 150px,
+                    transparent 200px
+                ),
             /* Secondary overlay for depth */
-            repeating-linear-gradient(
-                -45deg,
-                transparent 0px,
-                var(--theme-gradient-start) 80px,
-                var(--theme-gradient-mid) 160px,
-                transparent 240px
-            ),
+                repeating-linear-gradient(
+                    -45deg,
+                    transparent 0px,
+                    var(--theme-gradient-start) 80px,
+                    var(--theme-gradient-mid) 160px,
+                    transparent 240px
+                ),
             /* Base metallic gradient */
-            linear-gradient(
-                135deg,
-                var(--theme-gradient-start) 0%,
-                var(--theme-gradient-mid) 50%,
-                var(--theme-gradient-end) 100%
-            );
+                linear-gradient(
+                    135deg,
+                    var(--theme-gradient-start) 0%,
+                    var(--theme-gradient-mid) 50%,
+                    var(--theme-gradient-end) 100%
+                );
         opacity: 0.7;
         border-radius: inherit;
     }
 
     /* Ensure card content appears above the gradient overlay - exclude absolutely positioned elements */
-    .themed-card[data-theme]:not([data-theme='default']) > *:not([class*="absolute"]) {
+    .themed-card[data-theme]:not([data-theme='default'])
+        > *:not([class*='absolute']) {
         position: relative;
         z-index: 1;
     }
@@ -180,7 +181,7 @@
 
     /* Themed elements within cards */
     .themed-part-of-speech {
-        @apply rounded-md px-2 py-1 text-sm font-medium tracking-wider uppercase;
+        @apply rounded-md px-2 py-1 text-center text-sm font-medium tracking-wider lowercase;
     }
 
     [data-theme='default'] .themed-part-of-speech {
@@ -488,7 +489,6 @@
         }
     }
 
-
     /* Reduced motion support */
     @media (prefers-reduced-motion: reduce) {
         .themed-sparkle::before,
@@ -524,9 +524,9 @@
         /* Use theme() function for proper Tailwind color resolution */
         background: linear-gradient(
             to right,
-            transparent 20%,
+            transparent 10%,
             theme('colors.border') 50%,
-            transparent 80%
+            transparent 90%
         );
     }
 
@@ -537,9 +537,9 @@
     [data-theme='default'] .themed-hr {
         background: linear-gradient(
             to right,
-            transparent 20%,
+            transparent 10%,
             theme('colors.border') 50%,
-            transparent 80%
+            transparent 90%
         );
     }
 
@@ -547,36 +547,36 @@
     .dark [data-theme='default'] .themed-hr {
         background: linear-gradient(
             to right,
-            transparent 20%,
+            transparent 10%,
             rgb(255 255 255 / 0.4) 50%,
-            transparent 80%
+            transparent 90%
         );
     }
 
     [data-theme='gold'] .themed-hr {
         background: linear-gradient(
             to right,
-            transparent 20%,
+            transparent 10%,
             var(--theme-gradient-mid) 50%,
-            transparent 80%
+            transparent 90%
         );
     }
 
     [data-theme='silver'] .themed-hr {
         background: linear-gradient(
             to right,
-            transparent 20%,
+            transparent 10%,
             var(--theme-gradient-mid) 50%,
-            transparent 80%
+            transparent 90%
         );
     }
 
     [data-theme='bronze'] .themed-hr {
         background: linear-gradient(
             to right,
-            transparent 20%,
+            transparent 10%,
             var(--theme-gradient-mid) 50%,
-            transparent 80%
+            transparent 90%
         );
     }
 }
@@ -606,14 +606,14 @@
         /* Paper texture for hover cards */
         var(--paper-clean-texture),
         /* Smaller scale for hover cards */
-        repeating-linear-gradient(
-            135deg,
-            transparent 0px,
-            var(--theme-gradient-mid) 25px,
-            var(--theme-gradient-end) 50px,
-            var(--theme-gradient-mid) 75px,
-            transparent 100px
-        ),
+            repeating-linear-gradient(
+                135deg,
+                transparent 0px,
+                var(--theme-gradient-mid) 25px,
+                var(--theme-gradient-end) 50px,
+                var(--theme-gradient-mid) 75px,
+                transparent 100px
+            ),
         repeating-linear-gradient(
             -45deg,
             transparent 0px,

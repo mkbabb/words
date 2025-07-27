@@ -30,41 +30,41 @@ class SynthesisComponent(Enum):
     CLUSTER_DEFINITIONS = "cluster_definitions"
     
     @classmethod
-    def default_components(cls) -> set[str]:
+    def default_components(cls) -> set["SynthesisComponent"]:
         """Return default components for definition enhancement."""
         return {
-            cls.SYNONYMS.value,
-            cls.EXAMPLES.value,
-            cls.ANTONYMS.value,
-            cls.USAGE_NOTES.value,
-            cls.REGIONAL_VARIANTS.value,
+            cls.SYNONYMS,
+            cls.EXAMPLES,
+            cls.ANTONYMS,
+            cls.USAGE_NOTES,
+            cls.REGIONAL_VARIANTS,
         }
     
     @classmethod
-    def word_level_components(cls) -> set[str]:
+    def word_level_components(cls) -> set["SynthesisComponent"]:
         """Return components that apply to the entire word."""
         return {
-            cls.PRONUNCIATION.value,
-            cls.ETYMOLOGY.value,
-            cls.WORD_FORMS.value,
-            cls.FACTS.value,
+            cls.PRONUNCIATION,
+            cls.ETYMOLOGY,
+            cls.WORD_FORMS,
+            cls.FACTS,
         }
     
     @classmethod
-    def definition_level_components(cls) -> set[str]:
+    def definition_level_components(cls) -> set["SynthesisComponent"]:
         """Return components that apply to individual definitions."""
         return {
-            cls.SYNONYMS.value,
-            cls.EXAMPLES.value,
-            cls.ANTONYMS.value,
-            cls.CEFR_LEVEL.value,
-            cls.FREQUENCY_BAND.value,
-            cls.REGISTER.value,
-            cls.DOMAIN.value,
-            cls.GRAMMAR_PATTERNS.value,
-            cls.COLLOCATIONS.value,
-            cls.USAGE_NOTES.value,
-            cls.REGIONAL_VARIANTS.value,
+            cls.SYNONYMS,
+            cls.EXAMPLES,
+            cls.ANTONYMS,
+            cls.CEFR_LEVEL,
+            cls.FREQUENCY_BAND,
+            cls.REGISTER,
+            cls.DOMAIN,
+            cls.GRAMMAR_PATTERNS,
+            cls.COLLOCATIONS,
+            cls.USAGE_NOTES,
+            cls.REGIONAL_VARIANTS,
         }
 
 

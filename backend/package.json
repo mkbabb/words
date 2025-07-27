@@ -5,5 +5,10 @@
   "scripts": {
     "dev": "python scripts/run_api.py",
     "start": "python scripts/run_api.py"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "radix-vue": "^1.9.17",
+    "tailwind-merge": "^3.3.1"
   }
 }

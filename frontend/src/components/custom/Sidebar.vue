@@ -88,7 +88,7 @@
           <!-- Left unit: Floridify + @mbabb grouped together -->
           <div class="flex items-center gap-3">
             <FloridifyIcon :expanded="true" :mode="store.mode" clickable @toggle-mode="store.toggleMode()" />
-            <HoverCard :open-delay="0">
+            <HoverCard :open-delay="600">
               <HoverCardTrigger>
                 <Button variant="link" class="h-auto p-0 font-mono text-sm">@mbabb</Button>
               </HoverCardTrigger>

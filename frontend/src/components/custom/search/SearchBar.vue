@@ -12,19 +12,19 @@
         @mouseleave="handleMouseLeaveWrapper"
     >
         <!-- Main Layout -->
-        <div class="pointer-events-auto relative">
+        <div class="pointer-events-auto relative overflow-visible pt-2 pl-2">
             <!-- Search Bar -->
             <div
                 ref="searchBarElement"
                 :class="[
-                    'search-bar flex items-center gap-2 p-1',
+                    'search-bar flex items-center gap-2 p-1 relative overflow-visible',
                     'border-2 border-border bg-background/20 backdrop-blur-3xl',
                     'cartoon-shadow-sm rounded-2xl transition-all duration-500 ease-out',
                     {
                         'cartoon-shadow-sm-hover': isContainerHovered,
-                        'bg-background/30': isContainerHovered,
-                        'bg-gradient-to-br from-yellow-50/20 to-amber-50/20 dark:from-yellow-900/10 dark:to-amber-900/10': isAIQuery && !showErrorAnimation.value,
-                        'border-yellow-400/30 dark:border-yellow-600/30': isAIQuery && !showErrorAnimation.value,
+                        'bg-background/30': isContainerHovered && !isAIQuery,
+                        'bg-yellow-50 dark:bg-yellow-900/10': isAIQuery && !showErrorAnimation.value,
+                        'border-yellow-400 dark:border-yellow-600/30': isAIQuery && !showErrorAnimation.value,
                         'shake-error': showErrorAnimation.value,
                         'bg-gradient-to-br from-red-50/20 to-red-50/10 dark:from-red-900/20 dark:to-red-900/10': showErrorAnimation.value,
                         'border-red-400/50 dark:border-red-600/50': showErrorAnimation.value,
@@ -45,16 +45,16 @@
                 >
                     <div
                         v-if="showSparkle"
-                        class="absolute -top-3 -left-3 z-10 pointer-events-none"
+                        class="absolute -top-2 -left-2 z-50 pointer-events-none"
                     >
                         <div class="relative">
                             <Sparkles 
                                 :size="28" 
-                                class="text-yellow-400 dark:text-yellow-500 animate-pulse drop-shadow-lg fill-yellow-400 dark:fill-yellow-500"
+                                class="text-amber-600 dark:text-amber-400 animate-pulse drop-shadow-lg fill-amber-600 dark:fill-amber-400"
                             />
                             <Sparkles 
                                 :size="28" 
-                                class="absolute inset-0 text-yellow-300 dark:text-yellow-600 opacity-50 animate-spin-slow fill-yellow-300 dark:fill-yellow-600"
+                                class="absolute inset-0 text-amber-300 dark:text-amber-600 opacity-50 animate-spin-slow fill-amber-300 dark:fill-amber-600"
                             />
                         </div>
                     </div>
@@ -78,7 +78,7 @@
                         size="lg"
                         :clickable="canToggleMode"
                         :class="{ 
-                            'text-yellow-600 dark:text-yellow-400': isAIQuery,
+                            'text-amber-950 dark:text-amber-300': isAIQuery,
                             'opacity-50 cursor-not-allowed': !canToggleMode
                         }"
                         @toggle-mode="handleModeToggle"
@@ -139,23 +139,16 @@
                     />
                     
                     <!-- Expand Button -->
-                    <Transition
-                        enter-active-class="transition-all duration-300 ease-out"
-                        leave-active-class="transition-all duration-200 ease-in"
-                        enter-from-class="opacity-0 scale-0"
-                        enter-to-class="opacity-100 scale-100"
-                        leave-from-class="opacity-100 scale-100"
-                        leave-to-class="opacity-0 scale-0"
+                    <button
+                        v-if="expandButtonVisible"
+                        class="absolute right-2 bottom-2 z-20 p-1 rounded-md bg-muted/50 
+                            hover:bg-muted/80 hover:scale-105 transition-all duration-200
+                            focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        @click.stop="handleExpandClick"
+                        title="Expand for longer input"
                     >
-                        <button
-                            v-if="expandButtonVisible"
-                            class="absolute right-2 bottom-2 p-1.5 rounded-lg hover:bg-accent/50 transition-colors"
-                            @click="openExpandModal"
-                            title="Expand for longer input"
-                        >
-                            <Maximize2 class="h-4 w-4 text-muted-foreground" />
-                        </button>
-                    </Transition>
+                        <Maximize2 class="h-4 w-4 text-foreground/70 hover:text-foreground" />
+                    </button>
                 </div>
 
                 <!-- Regenerate Button - Same size as hamburger -->
@@ -330,10 +323,14 @@
                             <div class="grid grid-cols-4 gap-2">
                                 <button
                                     @click="clearAllStorage"
-                                    class="hover-lift flex items-center justify-center rounded-lg bg-red-500/10 p-2 text-red-500 transition-all duration-200 hover:bg-red-500/20"
+                                    class="hover-lift flex items-center justify-center rounded-lg bg-red-50 dark:bg-red-500/10 p-2 text-red-600 dark:text-red-500 transition-all duration-200 hover:bg-red-100 dark:hover:bg-red-500/20"
                                     title="Clear All Storage"
                                 >
-                                    <Trash2 :size="16" />
+                                    <Trash2 
+                                        :size="16" 
+                                        class="text-muted-foreground/70 transition-colors duration-200
+                                            hover:text-destructive dark:text-muted-foreground"
+                                    />
                                 </button>
                                 <!-- Add 3 more buttons here as needed -->
                             </div>
@@ -503,24 +500,25 @@
     <!-- Expanded Input Modal -->
     <Teleport to="body">
         <Transition
-            enter-active-class="transition-all duration-300 ease-out"
-            leave-active-class="transition-all duration-200 ease-in"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
+            :css="false"
+            @enter="modalEnter"
+            @leave="modalLeave"
         >
             <div
                 v-if="showExpandModal"
-                class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                class="fixed inset-0 z-[100] flex items-center justify-center p-4"
                 @click="closeExpandModal"
             >
                 <!-- Backdrop -->
-                <div class="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+                <div 
+                    ref="modalBackdrop"
+                    class="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+                />
                 
                 <!-- Modal Content -->
                 <div
-                    class="relative w-full max-w-2xl rounded-2xl border-2 border-border bg-background/95 p-6 shadow-2xl backdrop-blur-xl"
+                    ref="modalContent"
+                    class="relative w-full max-w-2xl rounded-2xl border-2 border-border bg-background p-6 shadow-2xl cartoon-shadow-lg"
                     @click.stop
                 >
                     <!-- Header -->
@@ -730,6 +728,8 @@ const searchContainer = ref<HTMLDivElement>();
 const searchBarElement = ref<HTMLDivElement>();
 const controlsDropdown = ref<HTMLDivElement>();
 const searchResultsDropdown = ref<HTMLDivElement>();
+const modalBackdrop = ref<HTMLDivElement>();
+const modalContent = ref<HTMLDivElement>();
 
 // Timers
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1338,22 +1338,21 @@ const resizeTextarea = () => {
     // Set the textarea height directly
     searchInput.value.style.height = `${scrollHeight}px`;
     
-    // Calculate new height for the container
-    const containerPadding = 16; // Total vertical padding
-    const newContainerHeight = scrollHeight + containerPadding;
+    // Simple height calculation
+    const padding = 32; // Account for search bar padding
+    searchBarHeight.value = Math.max(64, scrollHeight + padding);
     
-    // Update search bar height with animation
-    if (!isAIQuery.value) {
-        searchBarHeight.value = Math.max(64, newContainerHeight);
-    } else {
-        searchBarHeight.value = Math.max(96, newContainerHeight); // Larger minimum for AI mode
-    }
-    
-    // Show expand button if text is getting long
-    expandButtonVisible.value = query.value.length > 50 || query.value.includes('\n');
+    // Show expand button for long text or AI queries
+    expandButtonVisible.value = isAIQuery.value || query.value.length > 80 || query.value.includes('\n');
 };
 
 // Modal methods
+const handleExpandClick = (event: Event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    openExpandModal();
+};
+
 const openExpandModal = () => {
     expandedQuery.value = query.value;
     showExpandModal.value = true;
@@ -1374,6 +1373,61 @@ const submitExpandedQuery = () => {
     nextTick(() => {
         handleEnter();
     });
+};
+
+// Smooth modal animations
+const modalEnter = (el: Element, done: () => void) => {
+    const backdrop = modalBackdrop.value;
+    const content = modalContent.value;
+    
+    if (!backdrop || !content) {
+        done();
+        return;
+    }
+    
+    // Initial states
+    backdrop.style.opacity = '0';
+    content.style.opacity = '0';
+    content.style.transform = 'scale(0.97) translateY(10px)';
+    
+    // Force reflow
+    backdrop.offsetHeight;
+    
+    // Animate
+    requestAnimationFrame(() => {
+        // Backdrop fades in
+        backdrop.style.transition = 'opacity 200ms cubic-bezier(0.25, 0.1, 0.25, 1)';
+        backdrop.style.opacity = '1';
+        
+        // Content appears slightly after
+        setTimeout(() => {
+            content.style.transition = 'all 250ms cubic-bezier(0.16, 1, 0.3, 1)';
+            content.style.opacity = '1';
+            content.style.transform = 'scale(1) translateY(0)';
+            
+            setTimeout(done, 250);
+        }, 50);
+    });
+};
+
+const modalLeave = (el: Element, done: () => void) => {
+    const backdrop = modalBackdrop.value;
+    const content = modalContent.value;
+    
+    if (!backdrop || !content) {
+        done();
+        return;
+    }
+    
+    // Animate out
+    content.style.transition = 'all 200ms cubic-bezier(0.4, 0, 1, 1)';
+    content.style.opacity = '0';
+    content.style.transform = 'scale(0.97) translateY(10px)';
+    
+    backdrop.style.transition = 'opacity 200ms cubic-bezier(0.4, 0, 1, 1)';
+    backdrop.style.opacity = '0';
+    
+    setTimeout(done, 200);
 };
 
 // Autocomplete logic

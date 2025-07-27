@@ -13,6 +13,7 @@ from ..models import (
 )
 from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger
+from .batch_processor import batch_synthesis
 from .connector import OpenAIConnector
 from .synthesis_functions import (
     cluster_definitions,
@@ -35,7 +36,8 @@ class DefinitionSynthesizer:
         examples_count: int = 2,
         facts_count: int = 3,
     ) -> None:
-        self.ai = openai_connector
+        # Wrap connector for batch logging
+        self.ai = openai_connector  # wrap_connector_for_logging(openai_connector)
         self.examples_count = examples_count
         self.facts_count = facts_count
 
@@ -156,6 +158,137 @@ class DefinitionSynthesizer:
             ai=self.ai,
             force_refresh=force_refresh,
             state_tracker=state_tracker,
+        )
+        
+        # Report batch analysis removed - simple_batch_logger not available
+
+        return entry
+    
+    async def synthesize_entry_batch(
+        self,
+        word: str,
+        providers_data: list[ProviderData],
+        language: Language = Language.ENGLISH,
+        force_refresh: bool = False,
+        state_tracker: StateTracker | None = None,
+    ) -> SynthesizedDictionaryEntry | None:
+        """Synthesize a complete dictionary entry using batch processing.
+        
+        This method is optimized for bulk processing with 50% cost reduction
+        through OpenAI's Batch API. Use this when processing multiple words.
+        """
+        
+        # Get or create Word document
+        storage = await get_storage()
+        word_obj = await storage.get_word(word)
+        if not word_obj:
+            word_obj = Word(text=word, normalized=word.lower(), language=language)
+            await word_obj.save()
+
+        # Check for existing synthesized entry
+        if not force_refresh:
+            existing = await SynthesizedDictionaryEntry.find_one(
+                SynthesizedDictionaryEntry.word_id == str(word_obj.id)
+            )
+            if existing:
+                logger.info(f"Using existing synthesized entry for '{word}'")
+                return existing
+
+        # Extract all definitions from providers
+        all_definitions: list[Definition] = []
+
+        for provider_data in providers_data:
+            # Load definitions
+            for def_id in provider_data.definition_ids:
+                definition = await Definition.get(def_id)
+                if definition:
+                    all_definitions.append(definition)
+
+        if not all_definitions:
+            logger.warning(f"No definitions found for '{word}'")
+            return None
+
+        # DEDUPLICATION: Remove exact duplicates before clustering
+        unique_definitions: list[Definition] = []
+        seen_definitions: set[tuple[str, str]] = set()
+
+        for definition in all_definitions:
+            # Create a key based on part of speech and normalized text
+            key = (definition.part_of_speech, definition.text.strip().lower())
+
+            if key not in seen_definitions:
+                seen_definitions.add(key)
+                unique_definitions.append(definition)
+            else:
+                logger.debug(f"Skipping duplicate definition: {definition.text[:50]}...")
+
+        logger.info(
+            f"Deduplicated {len(all_definitions)} definitions to {len(unique_definitions)} unique definitions for '{word}'"
+        )
+
+        # Batch all synthesis operations together
+        logger.info("🔵 Starting batch synthesis for bulk processing")
+        async with batch_synthesis(self.ai):
+            # Cluster unique definitions
+            if state_tracker:
+                await state_tracker.update_stage(Stages.AI_CLUSTERING)
+            
+            clustered_definitions = await cluster_definitions(
+                word_obj, unique_definitions, self.ai, state_tracker
+            )
+
+            # Synthesize core components
+            if state_tracker:
+                await state_tracker.update_stage(Stages.AI_SYNTHESIS)
+
+            # Synthesize definitions for each cluster
+            synthesized_definitions = await self._synthesize_definitions(
+                word_obj, clustered_definitions, state_tracker
+            )
+
+            # Synthesize pronunciation
+            pronunciation = await synthesize_pronunciation(
+                word_obj.text, providers_data, self.ai, state_tracker
+            )
+
+            # Synthesize etymology
+            etymology = await synthesize_etymology(word_obj, providers_data, self.ai, state_tracker)
+
+            # Generate facts
+            facts = await generate_facts(word_obj, synthesized_definitions, self.ai, self.facts_count)
+
+        # Create synthesized entry
+        entry = SynthesizedDictionaryEntry(
+            word_id=str(word_obj.id),
+            pronunciation_id=str(pronunciation.id) if pronunciation else None,
+            definition_ids=[str(d.id) for d in synthesized_definitions],
+            etymology=etymology,
+            fact_ids=[str(f.id) for f in facts],
+            model_info=ModelInfo(
+                name=self.ai.model_name,
+                generation_count=1,
+                confidence=0,  # Will be set later
+            ),
+            source_provider_data_ids=[str(pd.id) for pd in providers_data],
+        )
+
+        # Save entry
+        if state_tracker:
+            await state_tracker.update_stage(Stages.STORAGE_SAVE)
+
+        await entry.save()
+        logger.success(
+            f"Created synthesized entry for '{word}' with {len(synthesized_definitions)} definitions (batch mode)"
+        )
+
+        # Enhance and synthesize definitions
+        await enhance_definitions_parallel(
+            definitions=synthesized_definitions,
+            word=word_obj,
+            ai=self.ai,
+            force_refresh=force_refresh,
+            state_tracker=state_tracker,
+            batch_mode=True,
         )
 
         return entry

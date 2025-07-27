@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from ...caching import cached_api_call, cached_api_call_with_dedup
+from ...caching import cached_api_call
 from ...utils.logging import get_logger
 
 router = APIRouter()
@@ -33,14 +33,13 @@ async def lookup_word_old(word: str, params: dict[str, Any]) -> dict[str, Any]:
 
 
 # AFTER: Updated endpoint with caching AND deduplication
-@cached_api_call_with_dedup(
+@cached_api_call(
     ttl_hours=1.0,
     key_func=lambda word, params: (
         "api_lookup_new",
         word,
         params.get("force_refresh", False),
     ),
-    max_wait_time=30.0,  # Wait up to 30 seconds for in-flight requests
 )
 async def lookup_word_new(word: str, params: dict[str, Any]) -> dict[str, Any]:
     """Updated implementation with caching and deduplication.
@@ -96,7 +95,7 @@ class MigrationExample:
         # ... implementation ...
         return {"word": word, "cached_only": True}
     
-    @cached_api_call_with_dedup(ttl_hours=1.0)
+    @cached_api_call(ttl_hours=1.0)
     async def _lookup_with_dedup(self, word: str) -> dict[str, Any]:
         """New implementation with deduplication."""
         logger.info(f"Lookup (cache + dedup): {word}")
@@ -121,7 +120,7 @@ def update_lookup_endpoint_example():
     # )
     
     # Updated code (just change the decorator name and add max_wait_time):
-    # @cached_api_call_with_dedup(
+    # @cached_api_call(
     #     ttl_hours=1.0,
     #     key_func=lambda word, params: (
     #         "api_lookup",

@@ -428,12 +428,18 @@ export const useAppStore = defineStore('app', () => {
                 const synonymsList: Array<{ word: string; score: number }> = [];
                 
                 // Collect synonyms from all definitions
-                currentEntry.value.definitions?.forEach((def) => {
+                currentEntry.value.definitions?.forEach((def, index) => {
                     if (def.synonyms && Array.isArray(def.synonyms)) {
-                        def.synonyms.forEach((syn: string) => {
+                        def.synonyms.forEach((syn: string, synIndex) => {
                             // Avoid duplicates
                             if (!synonymsList.some(s => s.word === syn)) {
-                                synonymsList.push({ word: syn, score: 0.8 });
+                                // Generate varying scores based on definition order and synonym position
+                                // Primary definitions get higher base scores
+                                const baseScore = 0.9 - (index * 0.1);
+                                // Earlier synonyms in the list are typically more relevant
+                                const positionPenalty = synIndex * 0.02;
+                                const score = Math.max(0.5, Math.min(0.95, baseScore - positionPenalty));
+                                synonymsList.push({ word: syn, score });
                             }
                         });
                     }
@@ -590,7 +596,11 @@ export const useAppStore = defineStore('app', () => {
     }
 
     function toggleMode() {
-        // If in suggestions mode, check if we have a last looked up word
+        // Store the current suggestions state if we're leaving suggestions mode
+        const wasInSuggestions = mode.value === 'suggestions';
+        const hasSuggestionsData = !!wordSuggestions.value;
+        
+        // If in suggestions mode
         if (mode.value === 'suggestions') {
             // Only allow switching if we have a current entry (last looked up word)
             if (currentEntry.value) {
@@ -601,10 +611,20 @@ export const useAppStore = defineStore('app', () => {
             return;
         }
         
-        // Normal toggle between dictionary and thesaurus
-        mode.value = mode.value === 'dictionary' ? 'thesaurus' : 'dictionary';
+        // If in dictionary/thesaurus and we have suggestions data, allow cycling through all modes
+        if (mode.value === 'dictionary') {
+            mode.value = 'thesaurus';
+        } else if (mode.value === 'thesaurus') {
+            // If we have suggestions data, go back to suggestions mode
+            if (hasSuggestionsData) {
+                mode.value = 'suggestions';
+            } else {
+                // Otherwise cycle back to dictionary
+                mode.value = 'dictionary';
+            }
+        }
 
-        // If we have a current word, fetch appropriate data
+        // If we have a current word and switching to thesaurus, fetch data
         if (currentEntry.value && mode.value === 'thesaurus') {
             getThesaurusData(currentEntry.value.word);
         }
@@ -634,6 +654,11 @@ export const useAppStore = defineStore('app', () => {
 
     // Enhanced SearchBar functions
     function toggleSearchMode() {
+        // Don't allow mode switching during active search
+        if (isSearching.value || isSuggestingWords.value) {
+            return;
+        }
+        
         // Cycle through modes: lookup -> wordlist -> stage -> lookup
         if (searchMode.value === 'lookup') {
             searchMode.value = 'wordlist';
@@ -641,6 +666,16 @@ export const useAppStore = defineStore('app', () => {
             searchMode.value = 'stage';
         } else {
             searchMode.value = 'lookup';
+        }
+        
+        // Reset suggestion mode when changing search modes
+        if (mode.value === 'suggestions' && searchMode.value !== 'lookup') {
+            // Only reset if we don't have a current entry to fall back to
+            if (!currentEntry.value) {
+                reset();
+            } else {
+                mode.value = 'dictionary';
+            }
         }
     }
 
