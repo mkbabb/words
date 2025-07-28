@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Simplified deployment script for Floridify
-# Deploys by SSHing to server and running Docker commands
+# Enhanced deployment script for Floridify
+# Deploys by SSHing to server, syncing secrets, and running Docker commands
 
 set -e
 
@@ -50,11 +50,36 @@ test_ssh() {
     fi
 }
 
+# Sync secrets and configuration files
+sync_secrets() {
+    print_status "Syncing secrets and configuration files..."
+    
+    # Check if local auth directory exists
+    if [ ! -d "./auth" ]; then
+        print_error "Local auth directory not found. Please ensure ./auth exists with config.toml"
+        exit 1
+    fi
+    
+    # Check if local .env.production exists
+    if [ ! -f "./.env.production" ]; then
+        print_error "Local .env.production file not found. Please ensure .env.production exists"
+        exit 1
+    fi
+    
+    print_info "Syncing auth directory..."
+    scp -o StrictHostKeyChecking=no -r ./auth $EC2_USER@$EC2_HOST:~/floridify/
+    
+    print_info "Syncing .env.production file..."
+    scp -o StrictHostKeyChecking=no ./.env.production $EC2_USER@$EC2_HOST:~/floridify/.env
+    
+    print_status "✓ Secrets and configuration synced successfully"
+}
+
 # Deploy on server
 deploy_on_server() {
     print_status "Deploying on server..."
     
-    ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << ENDSSH
+    ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'ENDSSH'
         set -e  # Exit on error
         
         # Check if floridify directory exists, if not clone it
@@ -69,27 +94,20 @@ deploy_on_server() {
         echo "Pulling latest code..."
         git pull origin master
         
-        # Make sure auth directory exists and has config
+        # Verify that secrets were synced properly
         if [ ! -f ~/floridify/auth/config.toml ]; then
-            echo "Error: auth/config.toml not found on server"
-            echo "Please ensure auth/config.toml exists at ~/floridify/auth/config.toml"
+            echo "Error: auth/config.toml not found on server after sync"
+            echo "Please check the sync_secrets step"
             exit 1
         fi
         
-        # Create .env file
-        cat > .env << ENV_EOF
-# Production Environment
-DOMAIN=$DOMAIN
-CERTBOT_EMAIL=$CERTBOT_EMAIL
-ENVIRONMENT=production
-LOG_LEVEL=INFO
-BUILD_TARGET=production
-BACKEND_CORS_ORIGINS=["https://$DOMAIN","https://www.$DOMAIN"]
-FRONTEND_PORT=3001
-VITE_API_URL=https://$DOMAIN/api
-VITE_APP_TITLE=Floridify
-AWS_REGION=us-east-1
-ENV_EOF
+        if [ ! -f ~/floridify/.env ]; then
+            echo "Error: .env file not found on server after sync"
+            echo "Please check the sync_secrets step"
+            exit 1
+        fi
+        
+        echo "✓ Configuration files verified"
         
         # Run the setup script if available
         if [ -f ./scripts/setup ]; then
@@ -144,6 +162,9 @@ main() {
     # Test SSH connection
     test_ssh
     
+    # Sync secrets and configuration
+    sync_secrets
+    
     # Deploy on server
     deploy_on_server
     
@@ -158,16 +179,18 @@ main() {
 
 # Help message
 if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    echo "Floridify Simple Deployment Script"
+    echo "Floridify Enhanced Deployment Script"
     echo ""
     echo "Deploys to EC2 by:"
-    echo "  1. SSHing to the server"
-    echo "  2. Pulling latest code from GitHub"
-    echo "  3. Building and running Docker containers"
+    echo "  1. Testing SSH connection to the server"
+    echo "  2. Syncing local auth/ directory and .env.production to server"
+    echo "  3. Pulling latest code from GitHub"
+    echo "  4. Building and running Docker containers with SSL profile"
     echo ""
     echo "Prerequisites:"
     echo "  - SSH access to EC2 instance"
-    echo "  - auth/config.toml must exist on server at ~/floridify/auth/config.toml"
+    echo "  - Local auth/ directory with config.toml"
+    echo "  - Local .env.production file"
     echo "  - Docker and Docker Compose installed on server"
     echo ""
     echo "Environment Variables:"
@@ -175,6 +198,10 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  EC2_USER       - EC2 username (default: ubuntu)"
     echo "  DOMAIN         - Domain name (default: words.babb.dev)"
     echo "  CERTBOT_EMAIL  - Email for SSL certificates (default: mike@babb.dev)"
+    echo ""
+    echo "Files synced to server:"
+    echo "  ./auth/        -> ~/floridify/auth/"
+    echo "  ./.env.production -> ~/floridify/.env"
     echo ""
     echo "Usage:"
     echo "  ./scripts/deploy"
