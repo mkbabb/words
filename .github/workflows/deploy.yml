@@ -89,6 +89,10 @@ jobs:
           DICTIONARY_COM_AUTH: ${{ secrets.DICTIONARY_COM_AUTH }}
           GITHUB_ACTIONS: true
         run: |
+          # Note: If this fails with SSH connection timeout, the EC2 security group
+          # needs to be updated to allow SSH from GitHub Actions runners.
+          # GitHub Actions uses dynamic IP ranges that change frequently.
+          # See: https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#ip-addresses
           chmod +x ./scripts/deploy
           ./scripts/deploy
       
