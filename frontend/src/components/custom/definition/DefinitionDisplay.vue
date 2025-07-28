@@ -86,8 +86,8 @@
             </CardContent>
 
             <!-- Etymology -->
-            <div v-if="entry.etymology" data-cluster-id="etymology">
-                <Etymology :etymology="entry.etymology" />
+            <div v-if="normalizedEtymology" data-cluster-id="etymology">
+                <Etymology :etymology="normalizedEtymology" />
             </div>
             
             <!-- Synth Entry ID (for debugging) -->
@@ -115,6 +115,7 @@ import {
 } from './components';
 import { ThemedCard } from '@/components/custom/card';
 import { useDefinitionGroups, useAnimationCycle, useProviders } from './composables';
+import { normalizeEtymology } from '@/utils/guards';
 
 // Store
 const store = useAppStore();
@@ -127,6 +128,10 @@ const showThemeDropdown = ref(false);
 
 // Computed properties
 const entry = computed(() => store.currentEntry);
+
+const normalizedEtymology = computed(() => {
+    return normalizeEtymology(entry.value?.etymology);
+});
 
 const firstImage = computed(() => {
     let image = null;

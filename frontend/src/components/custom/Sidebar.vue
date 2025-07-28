@@ -49,7 +49,6 @@
 import { computed } from 'vue';
 import { useAppStore } from '@/stores';
 import { cn } from '@/utils';
-import { ChevronLeft } from 'lucide-vue-next';
 import SidebarHeader from './sidebar/SidebarHeader.vue';
 import SidebarContent from './sidebar/SidebarContent.vue';
 import SidebarFooter from './sidebar/SidebarFooter.vue';

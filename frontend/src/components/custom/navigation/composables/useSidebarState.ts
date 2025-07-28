@@ -2,6 +2,7 @@ import { computed } from 'vue';
 import { useAppStore } from '@/stores';
 import { useDefinitionGroups } from '@/components/custom/definition/composables';
 import { PART_OF_SPEECH_ORDER } from '@/components/custom/definition/constants';
+import { normalizeEtymology } from '@/utils/guards';
 import type { SidebarCluster } from '../types';
 
 export function useSidebarState() {
@@ -40,7 +41,8 @@ export function useSidebarState() {
         });
         
         // Add etymology section if available
-        if (entry.value?.etymology?.text) {
+        const normalizedEtymology = normalizeEtymology(entry.value?.etymology);
+        if (normalizedEtymology?.text) {
             sections.push({
                 clusterId: 'etymology',
                 clusterDescription: 'Word origin and history',

@@ -109,13 +109,6 @@ deploy_on_server() {
         
         echo "✓ Configuration files verified"
         
-        # Run the setup script if available
-        if [ -f ./scripts/setup ]; then
-            echo "Running setup script..."
-            chmod +x ./scripts/setup
-            ./scripts/setup
-        fi
-        
         # Build and deploy with Docker Compose
         echo "Building and deploying with Docker Compose..."
         docker compose -f docker-compose.yml -f docker-compose.prod.yml build
