@@ -2,7 +2,7 @@
     <component
         :is="animationComponent"
         v-bind="animationProps"
-        class="pb-2 text-6xl leading-tight font-bold md:text-7xl"
+        class="pb-2 text-[clamp(1.5rem,10vw,4.5rem)] leading-tight font-bold"
         style="font-family: 'Fraunces', serif"
     />
 </template>

@@ -47,12 +47,12 @@
                         <!-- Animated Content Cards -->
                         <Transition
                     mode="out-in"
-                    enter-active-class="transition-all duration-300 ease-apple-bounce"
-                    leave-active-class="transition-all duration-200 ease-out"
-                    enter-from-class="opacity-0 scale-95 translate-x-8 rotate-1"
+                    enter-active-class="transition-all duration-500 ease-apple-spring"
+                    leave-active-class="transition-all duration-250 ease-apple-bounce-in"
+                    enter-from-class="opacity-0 scale-90 translate-x-12 rotate-2"
                     enter-to-class="opacity-100 scale-100 translate-x-0 rotate-0"
                     leave-from-class="opacity-100 scale-100 translate-x-0 rotate-0"
-                    leave-to-class="opacity-0 scale-95 -translate-x-8 -rotate-1"
+                    leave-to-class="opacity-0 scale-90 -translate-x-12 -rotate-2"
                 >
                     <!-- Definition Content -->
                     <div v-if="store.searchMode === 'lookup' && store.mode !== 'suggestions'" key="lookup">
@@ -160,15 +160,11 @@ watch(() => route.name, async (routeName) => {
     if (routeName === 'Definition' && route.params.word) {
         const word = route.params.word as string;
         store.mode = 'dictionary';
-        store.searchQuery = word;
-        store.hasSearched = true;
-        await store.getDefinition(word);
+        await store.searchWord(word);
     } else if (routeName === 'Thesaurus' && route.params.word) {
         const word = route.params.word as string;
         store.mode = 'thesaurus';
-        store.searchQuery = word;
-        store.hasSearched = true;
-        await store.getDefinition(word);
+        await store.searchWord(word);
     }
 }, { immediate: true });
 
@@ -219,32 +215,32 @@ const shouldShowProgressiveSidebar = computed(() => {
 </script>
 
 <style scoped>
-/* Progressive sidebar slide animation */
+/* Progressive sidebar slide animation - Apple-style bounce */
 .sidebar-slide-enter-active {
-    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1); /* ease-apple-bounce */
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* apple-spring */
 }
 
 .sidebar-slide-leave-active {
-    transition: all 0.25s ease-out;
+    transition: all 0.3s cubic-bezier(0.6, -0.28, 0.735, 0.045); /* apple-bounce-in */
 }
 
 .sidebar-slide-enter-from {
     opacity: 0;
-    transform: translateX(-20px);
+    transform: translateX(-30px) scale(0.95);
 }
 
 .sidebar-slide-enter-to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateX(0) scale(1);
 }
 
 .sidebar-slide-leave-from {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateX(0) scale(1);
 }
 
 .sidebar-slide-leave-to {
     opacity: 0;
-    transform: translateX(-20px);
+    transform: translateX(-30px) scale(0.95);
 }
 </style>

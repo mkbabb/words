@@ -198,7 +198,8 @@
                     <HamburgerIcon
                         :is-open="state.showControls"
                         :ai-mode="state.isAIQuery"
-                        @toggle="state.showControls = !state.showControls"
+                        @toggle="toggleControls"
+                        @mousedown.prevent
                     />
                 </div>
 
@@ -243,9 +244,10 @@
                 <!-- Search Results Container -->
                 <div
                     :style="resultsContainerStyle"
-                    :class="{ 'mt-2': state.showControls }"
+                    class="transition-all duration-350 ease-apple-spring"
                 >
                     <SearchResults
+                        ref="searchResultsComponent"
                         :show="state.showResults"
                         :results="state.searchResults"
                         :loading="state.isSearching"
@@ -270,7 +272,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { useMagicKeys, whenever } from '@vueuse/core';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '@/stores';
@@ -289,7 +291,7 @@ import SearchResults from './components/SearchResults.vue';
 import ExpandModal from './components/ExpandModal.vue';
 
 // Import composables and utilities
-import { useSearchBarSharedState } from './composables/useSearchBarSharedState';
+import { useSearchBarUI } from './composables/useSearchBarUI';
 import { useScrollAnimationSimple } from './composables/useScrollAnimationSimple';
 import { useAutocomplete } from './composables/useAutocomplete';
 import { shouldTriggerAIMode, extractWordCount } from './utils/ai-query';
@@ -331,15 +333,84 @@ const emit = defineEmits<{
 // Store & State
 const store = useAppStore();
 const router = useRouter();
-const { state, iconOpacity, canToggleMode } = useSearchBarSharedState();
+const { uiState, iconOpacity } = useSearchBarUI();
+
+// Reactive references for template use
+const state = reactive({
+    // Store state (computed)
+    get query() { return store.searchQuery; },
+    set query(value) { store.searchQuery = value; },
+    get searchResults() { return store.searchResults; },
+    set searchResults(value) { store.searchResults = value; },
+    get showResults() { return store.showSearchResults; },
+    set showResults(value) { store.showSearchResults = value; },
+    get isFocused() { return store.isSearchBarFocused; },
+    set isFocused(value) { store.isSearchBarFocused = value; },
+    get isSearching() { return store.isSearching; },
+    set isSearching(_) { /* readonly */ },
+    get isAIQuery() { return store.isAIQuery; },
+    set isAIQuery(value) { store.isAIQuery = value; },
+    get showSparkle() { return store.showSparkle; },
+    set showSparkle(value) { store.showSparkle = value; },
+    get showErrorAnimation() { return store.showErrorAnimation; },
+    set showErrorAnimation(value) { store.showErrorAnimation = value; },
+    get selectedIndex() { return store.searchSelectedIndex; },
+    set selectedIndex(value) { store.searchSelectedIndex = value; },
+    get showControls() { return store.showSearchControls; },
+    set showControls(value) { store.showSearchControls = value; },
+    get mode() { return store.mode; },
+    set mode(value) { store.mode = value; },
+    get searchMode() { return store.searchMode; },
+    set searchMode(value) { store.searchMode = value; },
+    get autocompleteText() { return store.autocompleteText; },
+    set autocompleteText(value) { store.autocompleteText = value; },
+    get selectedSources() { return store.selectedSources; },
+    set selectedSources(value) { store.selectedSources = value; },
+    get selectedLanguages() { return store.selectedLanguages; },
+    set selectedLanguages(value) { store.selectedLanguages = value; },
+    get noAI() { return store.noAI; },
+    set noAI(value) { store.noAI = value; },
+    get forceRefreshMode() { return store.forceRefreshMode; },
+    set forceRefreshMode(value) { store.forceRefreshMode = value; },
+    
+    // UI state (local)
+    get isContainerHovered() { return uiState.isContainerHovered; },
+    set isContainerHovered(value) { uiState.isContainerHovered = value; },
+    get showExpandModal() { return uiState.showExpandModal; },
+    set showExpandModal(value) { uiState.showExpandModal = value; },
+    get scrollProgress() { return uiState.scrollProgress; },
+    set scrollProgress(value) { uiState.scrollProgress = value; },
+    get searchBarHeight() { return uiState.searchBarHeight; },
+    set searchBarHeight(value) { uiState.searchBarHeight = value; },
+    get expandButtonVisible() { return uiState.expandButtonVisible; },
+    set expandButtonVisible(value) { uiState.expandButtonVisible = value; },
+    get isDevelopment() { return uiState.isDevelopment; },
+    get aiSuggestions() { return store.aiSuggestions; },
+    set aiSuggestions(value) { store.aiSuggestions = value; },
+});
+
+const canToggleMode = computed(() => {
+    const hasWordQuery = !!store.currentEntry;
+    const hasSuggestionQuery = !!store.wordSuggestions;
+    
+    if (!hasWordQuery && !hasSuggestionQuery) return false;
+    if (hasSuggestionQuery && !hasWordQuery) return false;
+    return true;
+});
 
 // Refs
 const searchContainer = ref<HTMLDivElement>();
 const searchBarElement = ref<HTMLDivElement>();
 const searchInputComponent = ref<any>();
+const searchResultsComponent = ref<any>();
 
 // Computed
 const placeholder = computed(() => {
+    // Hide placeholder when scrolled
+    if (state.scrollProgress > 0.3) {
+        return '';
+    }
+    
     // First check searchMode for specific modes
     if (state.searchMode === 'wordlist') {
         return 'Enter words separated by spaces or commas...';
@@ -349,13 +420,14 @@ const placeholder = computed(() => {
 
     // Default to mode-based placeholders for lookup mode
     return state.mode === 'dictionary'
-        ? 'Definitions'
-        : 'Synonyms';
+        ? 'definitions'
+        : 'synonyms';
 });
 
 const resultsContainerStyle = computed(() => ({
     paddingTop: '0px',
-    transition: 'all 300ms cubic-bezier(0.25, 0.1, 0.25, 1)',
+    marginTop: state.showControls ? '0.5rem' : '0px',
+    transition: 'all 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275)',
 }));
 
 // Scroll animation setup
@@ -497,6 +569,14 @@ const handleSearchAreaInteraction = () => {
 // Search functionality
 const performSearch = () => {
     clearTimeout(searchTimer);
+    
+    // Skip search if this is a direct lookup from sidebar/controls
+    if (store.isDirectLookup) {
+        state.searchResults = [];
+        state.showResults = false;
+        return;
+    }
+    
     store.searchQuery = state.query;
 
     if (!state.query || state.query.length < 2) {
@@ -573,15 +653,13 @@ const handleEnter = async () => {
         if (words.length > 0) {
             // Process wordlist - for now, just look up the first word
             // TODO: Implement full wordlist processing
-            store.searchQuery = words[0];
-            store.hasSearched = true;
-            state.showResults = false;
             
             // Navigate to appropriate route based on mode
             const routeName = state.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
             router.push({ name: routeName, params: { word: words[0] } });
             
-            await store.getDefinition(words[0]);
+            // Use searchWord for direct lookup
+            await store.searchWord(words[0]);
 
             // You could emit a wordlist event here for future handling
             // emit('wordlist-enter', words);
@@ -625,16 +703,12 @@ const handleEnter = async () => {
     if (state.searchResults.length > 0 && state.selectedIndex >= 0) {
         await selectResult(state.searchResults[state.selectedIndex]);
     } else if (state.query) {
-        state.isFocused = false;
-        state.showResults = false;
-        store.searchQuery = state.query;
-        store.hasSearched = true;
-        
         // Navigate to appropriate route based on mode
         const routeName = state.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
         router.push({ name: routeName, params: { word: state.query } });
         
-        await store.getDefinition(state.query);
+        // Use searchWord for direct lookup
+        await store.searchWord(state.query);
     }
 };
 
@@ -651,13 +725,21 @@ const handleShiftEnter = async () => {
 };
 
 const handleEscape = () => {
-    if (state.showControls || state.showResults) {
+    if (state.showControls) {
+        // First priority: hide controls
         state.showControls = false;
+    } else if (state.showResults) {
+        // Second priority: hide results
         state.showResults = false;
     } else {
-        // Blur input
+        // Finally: blur input
         state.isFocused = false;
     }
+};
+
+const toggleControls = () => {
+    state.showControls = !state.showControls;
+    // Don't hide results when toggling controls
 };
 
 const handleSpaceKey = (event: KeyboardEvent) => {
@@ -680,26 +762,46 @@ const navigateResults = (direction: number) => {
     );
 
     store.searchSelectedIndex = state.selectedIndex;
+    
+    // Scroll the selected item into view with improved logic
+    nextTick(() => {
+        const container = searchResultsComponent.value?.container;
+        const selectedElement = searchResultsComponent.value?.resultRefs?.[state.selectedIndex];
+        
+        if (!container || !selectedElement) return;
+        
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = selectedElement.getBoundingClientRect();
+        
+        // Calculate if element is outside visible area
+        const isAbove = elementRect.top < containerRect.top;
+        const isBelow = elementRect.bottom > containerRect.bottom;
+        
+        if (isAbove || isBelow) {
+            // Use different block positioning based on direction
+            const block = direction > 0 ? 'end' : 'start';
+            selectedElement.scrollIntoView({
+                behavior: 'smooth',
+                block: block
+            });
+        }
+    });
 };
 
 const selectResult = async (result: SearchResult) => {
     clearTimeout(searchTimer);
-    state.query = result.word;
-    store.searchQuery = result.word;
-    state.searchResults = [];
-    state.showResults = false;
-    store.hasSearched = true;
     
     // Navigate to appropriate route based on mode
     const routeName = state.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
     router.push({ name: routeName, params: { word: result.word } });
     
-    await store.getDefinition(result.word);
+    // Use searchWord for direct lookup (sets isDirectLookup flag)
+    await store.searchWord(result.word);
 };
 
-const selectWord = (word: string) => {
-    state.query = word;
-    handleEnter();
+const selectWord = async (word: string) => {
+    // Use store's searchWord for direct lookup (sets isDirectLookup flag)
+    await store.searchWord(word);
 };
 
 const handleForceRegenerate = () => {
@@ -816,6 +918,17 @@ onMounted(async () => {
     // Watch for AI mode changes from store
     watch(
         () => store.sessionState?.isAIQuery,
+        (isAI) => {
+            if (isAI !== state.isAIQuery) {
+                state.isAIQuery = isAI;
+                state.showSparkle = isAI;
+            }
+        }
+    );
+    
+    // Also watch the store's isAIQuery ref directly for immediate updates
+    watch(
+        () => store.isAIQuery,
         (isAI) => {
             if (isAI !== state.isAIQuery) {
                 state.isAIQuery = isAI;

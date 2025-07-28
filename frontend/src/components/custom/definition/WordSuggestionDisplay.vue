@@ -13,7 +13,7 @@
                     <HoverCardTrigger as-child>
                         <ThemedCard
                             :variant="getCardVariant(index)"
-                            class="group relative cursor-pointer transition-all duration-300 hover:scale-[1.02]"
+                            class="group relative cursor-pointer transition-all duration-500 ease-apple-spring hover:scale-[1.03]"
                             @click="handleWordClick(suggestion.word)"
                         >
                             <div class="p-3">
@@ -129,12 +129,10 @@ function formatExampleUsage(example: string): string {
 }
 
 async function handleWordClick(word: string) {
-    // Update the search query
-    store.searchQuery = word;
-    // Look up the word (this will set currentEntry)
-    await store.getDefinition(word);
     // After successful lookup, smoothly transition to dictionary mode
     store.mode = 'dictionary';
+    // Use searchWord for direct lookup (sets isDirectLookup flag)
+    await store.searchWord(word);
 }
 </script>
 

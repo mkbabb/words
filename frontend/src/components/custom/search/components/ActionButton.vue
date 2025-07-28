@@ -2,9 +2,10 @@
     <button
         :class="[
             'group relative flex items-center justify-center',
-            'rounded-xl p-3 transition-all duration-200',
+            'rounded-xl p-4 sm:p-3.5 transition-all duration-200',
             'hover:scale-105 active:scale-95',
             'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/50',
+            'min-w-[3.5rem] sm:min-w-[3rem]',
             variantClasses
         ]"
         v-bind="$attrs"

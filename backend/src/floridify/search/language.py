@@ -108,14 +108,23 @@ _language_search: LanguageSearch | None = None
 
 async def get_language_search(
     languages: list[Language] | None = None,
+    force_rebuild: bool = False,
 ) -> LanguageSearch:
-    """Get or create global language search instance."""
+    """Get or create global language search instance.
+    
+    Args:
+        languages: Languages to support (defaults to English)
+        force_rebuild: Force rebuild of search indices and re-download lexicons
+    
+    Returns:
+        Initialized LanguageSearch instance
+    """
     global _language_search
 
-    # Create or recreate if languages changed
+    # Create or recreate if languages changed or force rebuild requested
     target_languages = languages or [Language.ENGLISH]
-    if _language_search is None or _language_search.languages != target_languages:
-        _language_search = LanguageSearch(languages=target_languages)
+    if _language_search is None or _language_search.languages != target_languages or force_rebuild:
+        _language_search = LanguageSearch(languages=target_languages, force_rebuild=force_rebuild)
         await _language_search.initialize()
 
     return _language_search

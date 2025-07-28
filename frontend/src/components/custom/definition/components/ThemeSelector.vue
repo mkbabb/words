@@ -16,8 +16,8 @@
             </button>
 
             <Transition
-                enter-active-class="transition-all duration-300 ease-apple-bounce"
-                leave-active-class="transition-all duration-250 ease-out"
+                enter-active-class="transition-all duration-400 ease-apple-spring"
+                leave-active-class="transition-all duration-250 ease-apple-bounce-in"
                 enter-from-class="opacity-0 scale-95 -translate-y-2"
                 enter-to-class="opacity-100 scale-100 translate-y-0"
                 leave-from-class="opacity-100 scale-100 translate-y-0"

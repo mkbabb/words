@@ -84,6 +84,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
+import { useRouter } from 'vue-router';
 import { useAppStore } from '@/stores';
 import { FileText } from 'lucide-vue-next';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -100,6 +101,7 @@ interface Props {
 defineProps<Props>();
 
 const store = useAppStore();
+const router = useRouter();
 const { recentLookups, aiQueryHistory } = storeToRefs(store);
 
 // Combine lookups and AI queries for collapsed view
@@ -146,17 +148,24 @@ const currentView = computed(() => {
 
 const handleCollapsedWordClick = async (word: string) => {
     store.searchQuery = word;
+    
+    // Navigate to appropriate route based on current mode
+    const routeName = store.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+    router.push({ name: routeName, params: { word } });
+    
     await store.searchWord(word);
 };
 
 const handleCollapsedAIClick = async (query: string) => {
-    // Set query and enable AI mode
-    store.searchQuery = query;
+    // Set AI mode first
     store.sessionState.isAIQuery = true;
     store.sessionState.aiQueryText = query;
     store.mode = 'suggestions';
     
-    // Trigger AI suggestions search
+    // Navigate to home to display suggestions
+    router.push({ name: 'Home' });
+    
+    // Trigger AI suggestions search (will set isDirectLookup flag)
     try {
         // Extract word count from the query (default to 12)
         const wordCount = extractWordCount(query);
@@ -165,6 +174,8 @@ const handleCollapsedAIClick = async (query: string) => {
         if (results && results.suggestions.length > 0) {
             store.wordSuggestions = results;
             store.hasSearched = true;
+            // Set searchQuery after successful AI suggestions to avoid triggering search
+            store.searchQuery = query;
         }
     } catch (error) {
         console.error('Error getting AI suggestions:', error);

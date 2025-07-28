@@ -79,7 +79,7 @@ const modalEnter = (_el: Element, done: () => void) => {
   // Initial states
   backdrop.style.opacity = '0'
   content.style.opacity = '0'
-  content.style.transform = 'scale(0.95) translateY(20px)'
+  content.style.transform = 'scale(0.9) translateY(30px) rotate(0.5deg)'
   
   // Force reflow
   backdrop.offsetHeight
@@ -87,16 +87,16 @@ const modalEnter = (_el: Element, done: () => void) => {
   // Animate
   requestAnimationFrame(() => {
     // Backdrop fades in first
-    backdrop.style.transition = 'opacity 200ms cubic-bezier(0.25, 0.1, 0.25, 1)'
+    backdrop.style.transition = 'opacity 250ms cubic-bezier(0.25, 0.1, 0.25, 1)'
     backdrop.style.opacity = '1'
     
     // Content appears slightly after with spring-like easing
     setTimeout(() => {
-      content.style.transition = 'all 300ms cubic-bezier(0.16, 1, 0.3, 1)'
+      content.style.transition = 'all 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275)'
       content.style.opacity = '1'
-      content.style.transform = 'scale(1) translateY(0)'
+      content.style.transform = 'scale(1) translateY(0) rotate(0)'
       
-      setTimeout(done, 300)
+      setTimeout(done, 400)
     }, 50)
   })
 }
@@ -126,9 +126,9 @@ const modalLeave = (el: Element, done: () => void) => {
   
   // Animate out with smooth easing
   requestAnimationFrame(() => {
-    content.style.transition = 'all 200ms cubic-bezier(0.4, 0, 1, 1)'
+    content.style.transition = 'all 250ms cubic-bezier(0.6, -0.28, 0.735, 0.045)'
     content.style.opacity = '0'
-    content.style.transform = 'scale(0.97) translateY(10px)'
+    content.style.transform = 'scale(0.95) translateY(20px) rotate(-0.5deg)'
     
     // Backdrop fades out simultaneously
     backdrop.style.transition = 'opacity 250ms cubic-bezier(0.4, 0, 1, 1)'

@@ -1,11 +1,11 @@
 <template>
     <Transition
-        enter-active-class="transition-all duration-300 ease-apple-bounce"
-        leave-active-class="transition-all duration-300 ease-apple-bounce"
-        enter-from-class="opacity-0 scale-95 -translate-y-4"
-        enter-to-class="opacity-100 scale-100 translate-y-0"
-        leave-from-class="opacity-100 scale-100 translate-y-0"
-        leave-to-class="opacity-0 scale-95 -translate-y-4"
+        enter-active-class="transition-all duration-350 ease-apple-elastic"
+        leave-active-class="transition-all duration-200 ease-apple-bounce-in"
+        enter-from-class="opacity-0 scale-90 -translate-y-6 -rotate-1"
+        enter-to-class="opacity-100 scale-100 translate-y-0 rotate-0"
+        leave-from-class="opacity-100 scale-100 translate-y-0 rotate-0"
+        leave-to-class="opacity-0 scale-90 -translate-y-6 -rotate-1"
     >
         <div
             v-if="show"
@@ -43,12 +43,12 @@
                         @keydown.enter.stop.prevent="toggleSource(source.id)"
                         :disabled="noAI && selectedSources.length > 0 && !selectedSources.includes(source.id)"
                         :class="[
-                            'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200',
+                            'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-apple-spring',
                             selectedSources.includes(source.id)
-                                ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
+                                ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:scale-[1.05] active:scale-[0.97]'
                                 : noAI && selectedSources.length > 0
                                     ? 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed'
-                                    : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                                    : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03] active:scale-[0.98]',
                         ]"
                     >
                         <component :is="source.icon" :size="16" />
@@ -70,10 +70,10 @@
                         @click="toggleLanguage(language.value)"
                         @keydown.enter.stop.prevent="toggleLanguage(language.value)"
                         :class="[
-                            'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200',
+                            'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-apple-spring',
                             selectedLanguages.includes(language.value)
-                                ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                                ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:scale-[1.05] active:scale-[0.97]'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03] active:scale-[0.98]',
                         ]"
                     >
                         <component :is="language.icon" :size="16" />
@@ -104,20 +104,18 @@
                 v-if="searchMode === 'lookup' && aiSuggestions.length > 0"
                 class="border-t border-border/50 px-4 py-3"
             >
-                <div class="flex flex-col items-center gap-3">
-                    <div class="flex flex-wrap items-center justify-center gap-2">
-                        <Button
-                            v-for="word in aiSuggestions"
-                            :key="word"
-                            variant="outline"
-                            size="default"
-                            class="hover-text-grow flex-shrink-0 text-sm whitespace-nowrap font-medium"
-                            @click="$emit('word-select', word)"
-                            @keydown.enter.stop="$emit('word-select', word)"
-                        >
-                            {{ word }}
-                        </Button>
-                    </div>
+                <div class="flex flex-wrap items-center justify-center gap-2">
+                    <Button
+                        v-for="word in aiSuggestions"
+                        :key="word"
+                        variant="outline"
+                        size="default"
+                        class="hover-text-grow flex-shrink-0 text-sm whitespace-nowrap font-medium bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20 hover:border-yellow-500/30"
+                        @click="$emit('word-select', word)"
+                        @keydown.enter.stop="$emit('word-select', word)"
+                    >
+                        {{ word }}
+                    </Button>
                 </div>
             </div>
         </div>

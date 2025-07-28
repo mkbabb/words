@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import time
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ...caching.decorators import cached_api_call
 from ...constants import Language
+from ...core.search_pipeline import get_search_engine, reset_search_engine
 from ...search.constants import SearchMethod
 from ...search.language import get_language_search
 from ...utils.logging import get_logger
@@ -41,6 +43,28 @@ class SearchResponse(BaseModel):
     results: list[SearchResponseItem] = Field(default_factory=list, description="Search results")
     total_found: int = Field(..., description="Total number of matches found")
     language: Language = Field(..., description="Language searched")
+
+
+class RebuildIndexRequest(BaseModel):
+    """Request for rebuilding search index."""
+    
+    languages: list[Language] = Field(
+        default=[Language.ENGLISH],
+        description="Languages to rebuild (defaults to English)"
+    )
+    force_download: bool = Field(
+        default=True,
+        description="Force re-download of lexicon sources"
+    )
+
+
+class RebuildIndexResponse(BaseModel):
+    """Response for index rebuild operation."""
+    
+    status: str = Field(..., description="Rebuild status")
+    languages: list[Language] = Field(..., description="Languages rebuilt")
+    statistics: dict[str, Any] = Field(default_factory=dict, description="Index statistics")
+    message: str = Field(..., description="Status message")
 
 
 def parse_search_params(
@@ -189,3 +213,50 @@ async def get_search_suggestions(
     except Exception as e:
         logger.error(f"Suggestions failed for '{query}': {e}")
         raise HTTPException(status_code=500, detail=f"Internal error during suggestions: {str(e)}")
+
+
+@router.post("/search/rebuild-index", response_model=RebuildIndexResponse)
+async def rebuild_search_index(
+    request: RebuildIndexRequest = RebuildIndexRequest()
+) -> RebuildIndexResponse:
+    """
+    Rebuild the search index for specified languages.
+    
+    This endpoint will:
+    1. Clear the existing search engine singleton
+    2. Re-download lexicon sources if force_download is True
+    3. Rebuild all search indices (trie, fuzzy, semantic)
+    4. Return statistics about the rebuilt index
+    """
+    logger.info(f"Rebuilding search index for languages: {[lang.value for lang in request.languages]}")
+    start_time = time.perf_counter()
+    
+    try:
+        # Reset the search engine singleton
+        await reset_search_engine()
+        
+        # Rebuild with force_rebuild flag
+        search_engine = await get_search_engine(
+            languages=request.languages,
+            force_rebuild=request.force_download
+        )
+        
+        # Get statistics from the rebuilt engine
+        stats = search_engine.get_stats()
+        
+        elapsed_time = time.perf_counter() - start_time
+        logger.info(f"Search index rebuilt successfully in {elapsed_time:.2f}s")
+        
+        return RebuildIndexResponse(
+            status="success",
+            languages=request.languages,
+            statistics=stats,
+            message=f"Search index rebuilt successfully in {elapsed_time:.2f}s"
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to rebuild search index: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to rebuild search index: {str(e)}"
+        )

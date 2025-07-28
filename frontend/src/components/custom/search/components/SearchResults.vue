@@ -1,11 +1,11 @@
 <template>
     <Transition
-        enter-active-class="transition-all duration-300 ease-apple-bounce"
-        leave-active-class="transition-all duration-250 ease-out"
-        enter-from-class="opacity-0 scale-95 translate-y-4"
-        enter-to-class="opacity-100 scale-100 translate-y-0"
-        leave-from-class="opacity-100 scale-100 translate-y-0"
-        leave-to-class="opacity-0 scale-95 translate-y-4"
+        enter-active-class="transition-all duration-350 ease-apple-elastic"
+        leave-active-class="transition-all duration-200 ease-apple-bounce-in"
+        enter-from-class="opacity-0 scale-90 translate-y-6 rotate-1"
+        enter-to-class="opacity-100 scale-100 translate-y-0 rotate-0"
+        leave-from-class="opacity-100 scale-100 translate-y-0 rotate-0"
+        leave-to-class="opacity-0 scale-90 translate-y-6 rotate-1"
     >
         <div
             v-if="show"
@@ -45,11 +45,11 @@
                     :key="result.word"
                     :ref="(el) => setResultRef(el as HTMLButtonElement, index)"
                     :class="[
-                        'flex w-full items-center justify-between px-4 py-3 text-left transition-all duration-150',
-                        'border-muted-foreground/50 active:scale-[0.98]',
+                        'flex w-full items-center justify-between px-4 py-3 text-left transition-all duration-300 ease-apple-spring',
+                        'border-muted-foreground/50 active:scale-[0.97]',
                         index === selectedIndex
-                            ? 'scale-[1.02] border-l-8 bg-accent/60 pl-4'
-                            : 'border-l-0 pl-4 hover:bg-accent/20',
+                            ? 'scale-[1.02] border-l-8 bg-accent/60 pl-4 shadow-md'
+                            : 'border-l-0 pl-4 hover:bg-accent/20 hover:scale-[1.01]',
                     ]"
                     @click="$emit('select-result', result)"
                     @mouseenter="selectedIndex = index"

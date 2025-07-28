@@ -58,17 +58,16 @@ async def scrape_french_expressions(url: str = "", **kwargs: Any) -> dict[str, A
         if dd:
             definition = dd.get_text().strip()
 
-        # Only include multi-word expressions
-        if len(expression_text.split()) > 1:
-            expressions.append(
-                {
-                    "expression": expression_text,
-                    "definition": definition,
-                    "source": "wikipedia_glossary",
-                }
-            )
+        # Include all words and expressions
+        expressions.append(
+            {
+                "expression": expression_text,
+                "definition": definition,
+                "source": "wikipedia_glossary",
+            }
+        )
 
-    logger.info(f"Extracted {len(expressions)} French expressions")
+    logger.info(f"Extracted {len(expressions)} French words and expressions")
 
     return {
         "data": expressions,

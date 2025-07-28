@@ -1,8 +1,8 @@
-// Export all search-related composables
-export { useSearchBarState } from './useSearchBarState'
-export { useAutocomplete } from './useAutocomplete'
-export { useKeyboardNavigation } from './useKeyboardNavigation'
-export { useScrollAnimation } from './useScrollAnimation'
+// Export focused SearchBar composables
+export { useSearchBarUI } from './useSearchBarUI'
+export { useSearchBarKeyboard } from './useSearchBarKeyboard'
+export { useSearchBarScroll } from './useSearchBarScroll'
 
-// Re-export types
-export type { SearchBarState, SearchMode } from './useSearchBarState'
+// Export utility composables
+export { useAutocomplete } from './useAutocomplete'
+export { useScrollAnimationSimple } from './useScrollAnimationSimple'

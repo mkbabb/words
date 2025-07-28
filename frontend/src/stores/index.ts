@@ -22,6 +22,18 @@ export const useAppStore = defineStore('app', () => {
     const loadingProgress = ref(0);
     const loadingStage = ref('');
     const forceRefreshMode = ref(false);
+    
+    // SearchBar UI state (not persisted)
+    const showSearchResults = ref(false);
+    const searchSelectedIndex = ref(0);
+    const isSearchBarFocused = ref(false);
+    const showSearchControls = ref(false);
+    const isAIQuery = ref(false);
+    const showSparkle = ref(false);
+    const showErrorAnimation = ref(false);
+    const autocompleteText = ref('');
+    const aiSuggestions = ref<string[]>([]);
+    const isDirectLookup = ref(false);
     const wordSuggestions = computed({
         get: () => sessionState.value.wordSuggestions,
         set: (value) => {
@@ -273,12 +285,6 @@ export const useAppStore = defineStore('app', () => {
         },
     });
 
-    const searchSelectedIndex = computed({
-        get: () => sessionState.value.searchSelectedIndex,
-        set: (value) => {
-            sessionState.value.searchSelectedIndex = value;
-        },
-    });
 
     const theme = useStorage('theme', 'light');
 
@@ -376,11 +382,30 @@ export const useAppStore = defineStore('app', () => {
         if (!query.trim()) return;
 
         const normalizedQuery = normalizeWord(query);
+        
+        // Set direct lookup flag to prevent search triggering
+        isDirectLookup.value = true;
         searchQuery.value = normalizedQuery;
         hasSearched.value = true;
+        
+        // Reset AI mode when doing a direct word lookup
+        isAIQuery.value = false;
+        showSparkle.value = false;
+        sessionState.value.isAIQuery = false;
+        sessionState.value.aiQueryText = '';
+        
+        // Hide search dropdown when performing word lookup
+        searchResults.value = [];
+        sessionState.value.searchResults = [];
+        showSearchResults.value = false;
 
         // Direct lookup - no need for intermediate search
         await getDefinition(normalizedQuery);
+        
+        // Reset direct lookup flag after a short delay
+        setTimeout(() => {
+            isDirectLookup.value = false;
+        }, 100);
     }
 
     // Search for word suggestions (used by SearchBar)
@@ -726,6 +751,7 @@ export const useAppStore = defineStore('app', () => {
         mode.value = 'dictionary';
     }
 
+
     // Enhanced SearchBar functions
     function toggleSearchMode() {
         // Don't allow mode switching during active search
@@ -850,6 +876,14 @@ export const useAppStore = defineStore('app', () => {
     // Get AI word suggestions for descriptive queries
     async function getAISuggestions(query: string, count: number = 12): Promise<WordSuggestionResponse | null> {
         try {
+            // Set direct lookup flag for AI suggestions
+            isDirectLookup.value = true;
+            
+            // Hide search dropdown when getting AI suggestions
+            searchResults.value = [];
+            sessionState.value.searchResults = [];
+            showSearchResults.value = false;
+            
             isSuggestingWords.value = true;
             suggestionsProgress.value = 0;
             suggestionsStage.value = 'START';
@@ -887,6 +921,11 @@ export const useAppStore = defineStore('app', () => {
             
             // Don't manually set progress - let the streaming handle it
             
+            // Reset direct lookup flag
+            setTimeout(() => {
+                isDirectLookup.value = false;
+            }, 100);
+            
             return response;
         } catch (error) {
             console.error('AI suggestions error:', error);
@@ -900,6 +939,7 @@ export const useAppStore = defineStore('app', () => {
             setTimeout(() => {
                 suggestionsProgress.value = 0;
                 suggestionsStage.value = '';
+                isDirectLookup.value = false;
             }, 1000);
         }
     }
@@ -953,12 +993,22 @@ export const useAppStore = defineStore('app', () => {
         loadingStage,
         searchCursorPosition,
         forceRefreshMode,
-        searchSelectedIndex,
         sessionState,
         wordSuggestions,
         isSuggestingWords,
         suggestionsProgress,
         suggestionsStage,
+        // SearchBar UI state
+        showSearchResults,
+        isSearchBarFocused,
+        showSearchControls,
+        isAIQuery,
+        showSparkle,
+        showErrorAnimation,
+        autocompleteText,
+        aiSuggestions,
+        searchSelectedIndex,
+        isDirectLookup,
         // Enhanced SearchBar state
         searchMode,
         selectedSources,

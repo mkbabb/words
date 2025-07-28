@@ -45,7 +45,7 @@ async def get_search_engine(
 
     # Check if we need to recreate
     if _search_engine is None or _search_engine.languages != target_languages or force_rebuild:
-        _search_engine = await get_language_search(target_languages)
+        _search_engine = await get_language_search(target_languages, force_rebuild=force_rebuild)
 
     return _search_engine
 

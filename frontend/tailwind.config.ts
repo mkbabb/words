@@ -197,11 +197,26 @@ const config: Config = {
         'spin-slow': 'spin-slow 3s linear infinite',
       },
       transitionTimingFunction: {
-        'out-expo': 'cubic-bezier(0.19, 1, 0.22, 1)',
-        'in-out-expo': 'cubic-bezier(0.87, 0, 0.13, 1)',
-        'bounce-spring': 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+        // Primary Apple-like easings
+        'apple-default': 'cubic-bezier(0.25, 0.1, 0.25, 1)',
         'apple-smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
-        'apple-bounce': 'cubic-bezier(0.25, 0.1, 0.25, 1)',
+        'apple-spring': 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+        
+        // Directional easings
+        'apple-ease-in': 'cubic-bezier(0.42, 0, 1, 1)',
+        'apple-ease-out': 'cubic-bezier(0, 0, 0.58, 1)',
+        
+        // Specialized easings
+        'apple-elastic': 'cubic-bezier(0.68, -0.6, 0.32, 1.6)',
+        'apple-bounce-in': 'cubic-bezier(0.6, -0.28, 0.735, 0.045)',
+        'apple-bounce-out': 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+      },
+      transitionDuration: {
+        '150': '150ms',  // Micro-interactions
+        '250': '250ms',  // Fast transitions
+        '350': '350ms',  // Normal transitions
+        '500': '500ms',  // Smooth transitions
+        '700': '700ms',  // Slow transitions
       },
       boxShadow: {
         'card': '0 4px 12px rgba(0, 0, 0, 0.08)',
@@ -221,23 +236,37 @@ const config: Config = {
     animate,
     function({ addUtilities, matchUtilities, theme }) {
       const newUtilities = {
+        // Standardized hover effects
         '.hover-lift': {
-          '@apply transition-all duration-200 hover:scale-[1.02] hover:brightness-95': {},
+          '@apply transition-all duration-250 ease-apple-default hover:scale-[1.02]': {},
         },
-        '.hover-lift-sm': {
-          '@apply transition-all duration-200 hover:scale-[1.01] hover:brightness-97': {},
+        '.hover-lift-md': {
+          '@apply transition-all duration-250 ease-apple-default hover:scale-[1.05]': {},
         },
-        '.hover-text-grow': {
-          '@apply transition-[font-size] duration-200 hover:text-[1.02em]': {},
+        '.hover-lift-lg': {
+          '@apply transition-all duration-250 ease-apple-default hover:scale-[1.1]': {},
         },
         '.hover-shadow-lift': {
-          '@apply transition-shadow duration-200 hover:shadow-card-hover': {},
+          '@apply transition-shadow duration-250 ease-apple-smooth hover:shadow-card-hover': {},
         },
         '.focus-ring': {
           '@apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background': {},
         },
+        // Standardized transition utilities
+        '.transition-micro': {
+          '@apply transition-all duration-150 ease-apple-smooth': {},
+        },
+        '.transition-fast': {
+          '@apply transition-all duration-250 ease-apple-default': {},
+        },
+        '.transition-normal': {
+          '@apply transition-all duration-350 ease-apple-default': {},
+        },
         '.transition-smooth': {
-          '@apply transition-all duration-200 ease-in-out': {},
+          '@apply transition-all duration-500 ease-apple-smooth': {},
+        },
+        '.transition-spring': {
+          '@apply transition-all duration-350 ease-apple-spring': {},
         },
         '.delay-0': {
           'animation-delay': '0ms',
@@ -263,7 +292,7 @@ const config: Config = {
         },
         // Transition utilities for show/hide
         '.transition-visibility': {
-          '@apply transition-[opacity,transform] duration-300': {},
+          '@apply transition-[opacity,transform] duration-350 ease-apple-default': {},
         },
         '.show': {
           '@apply opacity-100 scale-100 translate-y-0': {},
@@ -279,16 +308,16 @@ const config: Config = {
         },
         // Scroll-based animation states
         '.scroll-shrunk': {
-          '@apply transform-gpu': {},
+          '@apply transform-gpu transition-all duration-350 ease-apple-spring': {},
           transform: 'scale(0.85)',
           opacity: '0.9',
-          maxWidth: '18rem', // ~288px - mobile friendly
+          maxWidth: '18rem',
         },
         '.scroll-normal': {
-          '@apply transform-gpu': {},
+          '@apply transform-gpu transition-all duration-350 ease-apple-spring': {},
           transform: 'scale(1)',
           opacity: '1',
-          maxWidth: '24rem', // ~384px - desktop friendly
+          maxWidth: '24rem',
         },
         '.icons-hidden': {
           '@apply opacity-0 pointer-events-none': {},
@@ -298,12 +327,9 @@ const config: Config = {
           '@apply opacity-100 pointer-events-auto': {},
           transform: 'scale(1)',
         },
-        // Smooth transitions for scroll animations
-        '.transition-scroll': {
-          '@apply transition-all duration-300 ease-apple-smooth': {},
-        },
-        '.transition-bounce': {
-          '@apply transition-all duration-600 ease-apple-bounce': {},
+        // Active states
+        '.active-scale': {
+          '@apply active:scale-[0.97] active:transition-transform active:duration-150': {},
         },
         // Paper texture utilities - visible textures that don't break elements
         '.texture-paper-clean': {

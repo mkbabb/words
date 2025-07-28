@@ -102,6 +102,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
+import { useRouter } from 'vue-router';
 import { useAppStore } from '@/stores';
 import { Accordion } from '@/components/ui/accordion';
 import { Book, Search, Wand2 } from 'lucide-vue-next';
@@ -113,6 +114,7 @@ import VocabularySuggestionItem from './VocabularySuggestionItem.vue';
 import type { SynthesizedDictionaryEntry } from '@/types';
 
 const store = useAppStore();
+const router = useRouter();
 const { recentLookups, vocabularySuggestions, recentSearches, aiQueryHistory } = storeToRefs(store);
 
 // Computed property to format AI query history for display
@@ -144,6 +146,11 @@ const getFirstDefinition = (entry: SynthesizedDictionaryEntry): string => {
 
 const handleLookupClick = async (lookup: SynthesizedDictionaryEntry) => {
     store.searchQuery = lookup.word;
+    
+    // Navigate to appropriate route based on mode
+    const routeName = store.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+    router.push({ name: routeName, params: { word: lookup.word } });
+    
     await store.searchWord(lookup.word);
     // Close mobile sidebar if open
     if (store.sidebarOpen) {
@@ -153,6 +160,13 @@ const handleLookupClick = async (lookup: SynthesizedDictionaryEntry) => {
 
 const handleSuggestionClick = async (suggestion: { word: string }) => {
     store.searchQuery = suggestion.word;
+    
+    // Switch to dictionary mode for word lookup (vocab suggestions are word lookups)
+    store.mode = 'dictionary';
+    
+    // Navigate to Definition route
+    router.push({ name: 'Definition', params: { word: suggestion.word } });
+    
     await store.searchWord(suggestion.word);
     // Close mobile sidebar if open
     if (store.sidebarOpen) {
@@ -161,22 +175,13 @@ const handleSuggestionClick = async (suggestion: { word: string }) => {
 };
 
 
-const handleSearchClick = (search: { query: string }) => {
-    // Set the search query
-    store.searchQuery = search.query;
+const handleSearchClick = async (search: { query: string }) => {
+    // Navigate to appropriate route based on mode
+    const routeName = store.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+    router.push({ name: routeName, params: { word: search.query } });
     
-    // If there's a current entry that matches this query, ensure it's set
-    if (store.currentEntry && store.currentEntry.word.toLowerCase() === search.query.toLowerCase()) {
-        // Current entry already matches
-    } else {
-        // Check if we have this word in recent lookups
-        const matchingLookup = recentLookups.value.find(
-            lookup => lookup.word.toLowerCase() === search.query.toLowerCase()
-        );
-        if (matchingLookup) {
-            store.currentEntry = matchingLookup.entry;
-        }
-    }
+    // Use the centralized searchWord action which handles dropdown hiding
+    await store.searchWord(search.query);
     
     // Close mobile sidebar if open
     if (store.sidebarOpen) {
@@ -185,13 +190,15 @@ const handleSearchClick = (search: { query: string }) => {
 };
 
 const handleAISuggestionClick = async (suggestion: { query: string }) => {
-    // Set query and enable AI mode
-    store.searchQuery = suggestion.query;
+    // Set AI mode first
     store.sessionState.isAIQuery = true;
     store.sessionState.aiQueryText = suggestion.query;
     store.mode = 'suggestions';
     
-    // Trigger AI suggestions search
+    // Navigate to home to display suggestions
+    router.push({ name: 'Home' });
+    
+    // Trigger AI suggestions search (will set isDirectLookup flag)
     try {
         // Extract word count from the query (default to 12)
         const wordCount = extractWordCount(suggestion.query);
@@ -200,6 +207,8 @@ const handleAISuggestionClick = async (suggestion: { query: string }) => {
         if (results && results.suggestions.length > 0) {
             store.wordSuggestions = results;
             store.hasSearched = true;
+            // Set searchQuery after successful AI suggestions to avoid triggering search
+            store.searchQuery = suggestion.query;
         }
     } catch (error) {
         console.error('Error getting AI suggestions:', error);

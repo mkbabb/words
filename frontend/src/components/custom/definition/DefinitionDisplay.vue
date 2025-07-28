@@ -248,18 +248,18 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* Mode switch transitions */
+/* Mode switch transitions - Apple-style with bounce */
 .mode-switch-enter-active {
-    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1); /* ease-apple-bounce */
+    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* apple-spring */
 }
 
 .mode-switch-leave-active {
-    transition: all 0.2s ease-out;
+    transition: all 0.25s cubic-bezier(0.6, -0.28, 0.735, 0.045); /* apple-bounce-in */
 }
 
 .mode-switch-enter-from {
     opacity: 0;
-    transform: scale(0.95) translateX(20px) rotate(1deg);
+    transform: scale(0.9) translateX(30px) rotate(2deg);
 }
 
 .mode-switch-enter-to {
@@ -274,7 +274,7 @@ onUnmounted(() => {
 
 .mode-switch-leave-to {
     opacity: 0;
-    transform: scale(0.95) translateX(-20px) rotate(-1deg);
+    transform: scale(0.9) translateX(-30px) rotate(-2deg);
 }
 
 /* Themed gradients and hover effects */

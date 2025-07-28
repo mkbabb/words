@@ -1,5 +1,5 @@
 <template>
-    <div class="flex gap-3 items-center">
+    <div class="flex items-center justify-evenly w-full">
         <!-- Sidebar Toggle (Mobile Only) -->
         <HoverCard v-if="isMobile" :open-delay="200" :close-delay="100">
             <HoverCardTrigger as-child>
@@ -7,7 +7,7 @@
                     @click="$emit('toggle-sidebar')"
                     variant="default"
                 >
-                    <PanelLeft :size="18" />
+                    <PanelLeft :size="20" />
                 </ActionButton>
             </HoverCardTrigger>
             <HoverCardContent class="w-auto p-2" side="top">
@@ -24,7 +24,7 @@
                     :variant="!noAI ? 'primary' : 'default'"
                 >
                     <Wand2 
-                        :size="18" 
+                        :size="20" 
                         :class="[
                             'transition-all duration-300',
                             aiAnimating && 'animate-sparkle'
@@ -46,7 +46,7 @@
                     :variant="forceRefreshMode ? 'primary' : 'default'"
                 >
                     <RefreshCw 
-                        :size="18" 
+                        :size="20" 
                         :class="[
                             'transition-all duration-300',
                             'group-hover:rotate-180',
@@ -68,7 +68,7 @@
                     variant="danger"
                 >
                     <Trash2 
-                        :size="18" 
+                        :size="20" 
                         :class="[
                             'transition-all duration-300',
                             trashAnimating && 'animate-wiggle'

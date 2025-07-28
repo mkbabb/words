@@ -3,7 +3,7 @@
         <div class="flex flex-col items-center space-y-6 px-4">
             <AnimatedText
                 :text="displayText || word || ''"
-                text-class="text-4xl lg:text-6xl font-black pb-8"
+                text-class="text-[clamp(1.5rem,8vw,3.75rem)] font-black pb-8"
                 :offset="0.15"
                 :show-dots="progress < 100"
                 :force-single-line="true"
@@ -24,7 +24,7 @@
             <div class="max-w-md text-center space-y-2">
                 <ShimmerText
                     :text="currentStageText"
-                    text-class="text-xl font-semibold italic text-gray-800 dark:text-gray-100"
+                    text-class="text-[clamp(1rem,4vw,1.25rem)] font-semibold italic text-gray-800 dark:text-gray-100"
                     :class="progressTextClass"
                     :duration="3200"
                 />
