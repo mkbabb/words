@@ -18,33 +18,33 @@ export function formatExampleHTML(example: string, word: string): string {
 export function getHeatmapClass(score: number): string {
     if (score >= 0.9) {
         return cn(
-            'bg-gradient-to-br from-green-500 to-green-600',
-            'text-white',
-            'border-green-600'
+            'bg-gradient-to-br from-green-300 to-green-400',
+            'text-green-900 dark:text-white',
+            'border-green-400'
         );
     } else if (score >= 0.8) {
         return cn(
-            'bg-gradient-to-br from-green-400 to-green-500',
-            'text-white',
-            'border-green-500'
+            'bg-gradient-to-br from-emerald-300 to-emerald-400',
+            'text-emerald-900 dark:text-white',
+            'border-emerald-400'
         );
     } else if (score >= 0.7) {
         return cn(
-            'bg-gradient-to-br from-yellow-400 to-yellow-500',
-            'text-white',
-            'border-yellow-500'
+            'bg-gradient-to-br from-yellow-300 to-yellow-400',
+            'text-yellow-900 dark:text-white',
+            'border-yellow-400'
         );
     } else if (score >= 0.6) {
         return cn(
-            'bg-gradient-to-br from-orange-400 to-orange-500',
-            'text-white',
-            'border-orange-500'
+            'bg-gradient-to-br from-orange-300 to-orange-400',
+            'text-orange-900 dark:text-white',
+            'border-orange-400'
         );
     } else {
         return cn(
-            'bg-gradient-to-br from-red-400 to-red-500',
-            'text-white',
-            'border-red-500'
+            'bg-gradient-to-br from-rose-300 to-rose-400',
+            'text-rose-900 dark:text-white',
+            'border-rose-400'
         );
     }
 }

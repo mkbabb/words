@@ -35,7 +35,7 @@
             <p
                 v-for="(example, index) in [...examples.generated, ...examples.literature]"
                 :key="index"
-                class="text-base leading-relaxed text-gray-600 dark:text-gray-300 italic px-3 py-2 rounded-md border border-border/30 bg-muted/5 hover:border-border/50 hover:bg-muted/10 transition-all duration-200"
+                class="text-base leading-relaxed text-foreground italic px-3 py-2 rounded-md border border-border/30 bg-muted/5 hover:border-border/50 hover:bg-muted/10 transition-all duration-200"
                 v-html="`&quot;${formatExampleHTML(example.sentence, word)}&quot;`"
             />
         </div>

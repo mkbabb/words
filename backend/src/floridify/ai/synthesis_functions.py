@@ -527,7 +527,7 @@ async def generate_facts(
                 content=fact_text,
                 category=category,  # type: ignore[arg-type]
                 model_info=ModelInfo(
-                    name=ai.model_name,
+                    name=ai.last_model_used,  # Use the actual model that was used
                     confidence=response.confidence,
                     generation_count=1,
                 ),
@@ -967,6 +967,11 @@ async def enhance_definitions_parallel(
                     definition_id=str(definition.id),
                     text=example_text,
                     type="generated",
+                    model_info=ModelInfo(
+                        name=ai.last_model_used,  # Track the model used
+                        confidence=1.0,  # Examples don't have confidence in response
+                        generation_count=1,
+                    ),
                 )
                 await example.save()
                 example_ids.append(str(example.id))

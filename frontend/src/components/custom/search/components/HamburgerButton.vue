@@ -14,6 +14,7 @@
     >
         <HamburgerIcon
             :is-open="modelValue"
+            :ai-mode="aiMode"
             @toggle="modelValue = !modelValue"
         />
     </div>
@@ -25,6 +26,7 @@ import { HamburgerIcon } from '@/components/custom/icons';
 interface HamburgerButtonProps {
     opacity: number;
     showRegenerateButton?: boolean;
+    aiMode?: boolean;
     // Animation parameters
     minScale?: number;
     maxScale?: number;
@@ -36,6 +38,7 @@ interface HamburgerButtonProps {
 
 const props = withDefaults(defineProps<HamburgerButtonProps>(), {
     showRegenerateButton: false,
+    aiMode: false,
     minScale: 0.9,
     maxScale: 1.0,
     opacityThreshold: 0.1,

@@ -151,7 +151,7 @@ const modalEnter = (_el: Element, done: () => void) => {
     });
 };
 
-const modalLeave = (_el: Element, done: () => void) => {
+const modalLeave = (el: Element, done: () => void) => {
     const backdrop = modalBackdrop.value;
     const content = modalContent.value;
     
@@ -160,13 +160,28 @@ const modalLeave = (_el: Element, done: () => void) => {
         return;
     }
     
-    // Animate out
-    content.style.transition = 'all 200ms cubic-bezier(0.4, 0, 1, 1)';
-    content.style.opacity = '0';
-    content.style.transform = 'scale(0.97) translateY(10px)';
+    // Force current styles to be computed
+    const currentBackdropOpacity = window.getComputedStyle(backdrop).opacity;
+    const currentContentOpacity = window.getComputedStyle(content).opacity;
+    const currentContentTransform = window.getComputedStyle(content).transform;
     
-    backdrop.style.transition = 'opacity 200ms cubic-bezier(0.4, 0, 1, 1)';
-    backdrop.style.opacity = '0';
+    // Set current state explicitly
+    backdrop.style.opacity = currentBackdropOpacity;
+    content.style.opacity = currentContentOpacity;
+    content.style.transform = currentContentTransform;
+    
+    // Force reflow
+    void el.offsetHeight;
+    
+    // Animate out
+    requestAnimationFrame(() => {
+        content.style.transition = 'all 200ms cubic-bezier(0.4, 0, 1, 1)';
+        content.style.opacity = '0';
+        content.style.transform = 'scale(0.97) translateY(10px)';
+        
+        backdrop.style.transition = 'opacity 200ms cubic-bezier(0.4, 0, 1, 1)';
+        backdrop.style.opacity = '0';
+    });
     
     setTimeout(done, 200);
 };

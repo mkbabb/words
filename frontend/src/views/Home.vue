@@ -29,9 +29,13 @@
             <div class="container mx-auto max-w-6xl">
                 <div class="flex gap-6 relative">
                     <!-- Progressive Sidebar (Sticky) -->
-                    <div v-if="shouldShowProgressiveSidebar" class="hidden w-48 flex-shrink-0 xl:block">
+                    <div 
+                        class="hidden xl:block transition-all duration-300 ease-out"
+                        :class="shouldShowProgressiveSidebar ? 'w-48 opacity-100' : 'w-0 opacity-0'"
+                    >
                         <div 
-                            class="sticky"
+                            v-if="shouldShowProgressiveSidebar"
+                            class="sticky w-48"
                             :style="{ top: isScrolled ? '5rem' : '6rem', zIndex: 30 }"
                         >
                             <ProgressiveSidebar />
@@ -39,7 +43,7 @@
                     </div>
                     
                     <!-- Main Content -->
-                    <div class="flex-1 max-w-5xl mx-auto">
+                    <div :class="['flex-1 max-w-5xl mx-auto', store.mode === 'suggestions' ? 'px-4 sm:px-2' : '']">
                         <!-- Animated Content Cards -->
                         <Transition
                     mode="out-in"
@@ -194,3 +198,34 @@ const shouldShowProgressiveSidebar = computed(() => {
     return clusters.size > 1;
 });
 </script>
+
+<style scoped>
+/* Progressive sidebar slide animation */
+.sidebar-slide-enter-active {
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1); /* ease-apple-bounce */
+}
+
+.sidebar-slide-leave-active {
+    transition: all 0.25s ease-out;
+}
+
+.sidebar-slide-enter-from {
+    opacity: 0;
+    transform: translateX(-20px);
+}
+
+.sidebar-slide-enter-to {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.sidebar-slide-leave-from {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.sidebar-slide-leave-to {
+    opacity: 0;
+    transform: translateX(-20px);
+}
+</style>

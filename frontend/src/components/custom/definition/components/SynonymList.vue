@@ -6,7 +6,7 @@
         <span
             v-for="synonym in synonyms"
             :key="synonym"
-            class="text-sm px-2 py-1 rounded-md bg-muted/50 hover:bg-muted text-foreground/80 hover:text-foreground cursor-pointer transition-colors duration-200"
+            class="text-sm px-2 py-1 rounded-md bg-muted/50 hover:bg-muted text-foreground/80 hover:text-foreground cursor-pointer transition-all duration-200 border border-border/50 hover:border-border"
             @click="$emit('synonym-click', synonym)"
         >
             {{ synonym }}

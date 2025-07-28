@@ -5,7 +5,7 @@
     >
         <div
             v-if="thesaurusData.synonyms.length > 0"
-            class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
+            class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
         >
             <HoverCard 
                 v-for="synonym in thesaurusData.synonyms"
@@ -16,18 +16,17 @@
                 <HoverCardTrigger as-child>
                     <Card
                         :class="cn(
-                            'cursor-pointer py-2 transition-all duration-300 hover:scale-105 hover:shadow-lg',
+                            'cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-md overflow-hidden h-full',
                             getHeatmapClass(synonym.score)
                         )"
                         @click="$emit('word-click', synonym.word)"
                     >
-                        <CardContent class="px-3 py-0.5">
-                            <div class="font-medium">
+                        <CardContent class="px-2 py-1">
+                            <div class="font-medium text-sm truncate">
                                 {{ synonym.word }}
                             </div>
-                            <div class="text-sm opacity-75">
+                            <div class="text-xs opacity-75">
                                 {{ Math.round(synonym.score * 100) }}%
-                                similar
                             </div>
                         </CardContent>
                     </Card>

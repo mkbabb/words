@@ -72,10 +72,12 @@
             </div>
 
             <!-- Original Query Reference -->
-            <div class="mt-8 text-center">
-                <p class="fira-code text-sm italic text-muted-foreground/70">
-                    {{ originalQuery }}
-                </p>
+            <div class="mt-8 flex justify-center">
+                <div class="rounded-lg border border-border bg-muted/30 px-4 py-3">
+                    <p class="fira-code text-sm italic text-muted-foreground">
+                        "{{ originalQuery }}"
+                    </p>
+                </div>
             </div>
         </div>
 

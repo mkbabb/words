@@ -19,8 +19,15 @@
             @mouseleave="handleLeave"
             :class="[
                 'flex h-12 w-12 items-center justify-center rounded-lg',
-                'transition-all duration-200 ease-out hover:bg-muted/50',
-                forceRefreshMode ? 'bg-primary/20 text-primary' : ''
+                'transition-all duration-200 ease-out',
+                aiMode
+                    ? 'hover:bg-amber-100/60 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                    : 'hover:bg-muted/50',
+                forceRefreshMode && aiMode
+                    ? 'bg-amber-200/60 text-amber-800 dark:bg-amber-800/40 dark:text-amber-200'
+                    : forceRefreshMode
+                    ? 'bg-primary/20 text-primary'
+                    : ''
             ]"
             :title="
                 forceRefreshMode
@@ -46,6 +53,7 @@ import { RefreshCw } from 'lucide-vue-next';
 interface RegenerateButtonProps {
     showButton: boolean;
     opacity: number;
+    aiMode?: boolean;
     // Animation parameters
     minScale?: number;
     maxScale?: number;
@@ -56,6 +64,7 @@ interface RegenerateButtonProps {
 }
 
 const props = withDefaults(defineProps<RegenerateButtonProps>(), {
+    aiMode: false,
     minScale: 0.9,
     maxScale: 1.0,
     opacityThreshold: 0.1,

@@ -135,7 +135,7 @@ class DefinitionSynthesizer:
             etymology=etymology,
             fact_ids=[str(f.id) for f in facts],
             model_info=ModelInfo(
-                name=self.ai.model_name,
+                name=self.ai.last_model_used,  # Use the actual model that was used
                 generation_count=1,
                 confidence=0,  # Will be set later
             ),
@@ -265,7 +265,7 @@ class DefinitionSynthesizer:
             etymology=etymology,
             fact_ids=[str(f.id) for f in facts],
             model_info=ModelInfo(
-                name=self.ai.model_name,
+                name=self.ai.last_model_used,  # Use the actual model that was used
                 generation_count=1,
                 confidence=0,  # Will be set later
             ),

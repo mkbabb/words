@@ -8,7 +8,16 @@ export function useProviders(entry: ComputedRef<SynthesizedDictionaryEntry | nul
         const providers = new Set<string>();
         
         entry.value.definitions.forEach((def) => {
-            if (def.source) {
+            // Check providers_data array for each definition
+            if (def.providers_data && Array.isArray(def.providers_data)) {
+                def.providers_data.forEach((providerData: any) => {
+                    if (providerData.provider) {
+                        providers.add(providerData.provider);
+                    }
+                });
+            }
+            // Fallback to source if providers_data is not available
+            else if (def.source) {
                 providers.add(def.source);
             }
         });

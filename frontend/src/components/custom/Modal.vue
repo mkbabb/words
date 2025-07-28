@@ -102,7 +102,7 @@ const modalEnter = (_el: Element, done: () => void) => {
 }
 
 // Smooth leave animation
-const modalLeave = (_el: Element, done: () => void) => {
+const modalLeave = (el: Element, done: () => void) => {
   const backdrop = backdropRef.value
   const content = contentRef.value
   
@@ -111,14 +111,29 @@ const modalLeave = (_el: Element, done: () => void) => {
     return
   }
   
-  // Animate out with smooth easing
-  content.style.transition = 'all 200ms cubic-bezier(0.4, 0, 1, 1)'
-  content.style.opacity = '0'
-  content.style.transform = 'scale(0.97) translateY(10px)'
+  // Force current styles to be computed
+  const currentBackdropOpacity = window.getComputedStyle(backdrop).opacity
+  const currentContentOpacity = window.getComputedStyle(content).opacity
+  const currentContentTransform = window.getComputedStyle(content).transform
   
-  // Backdrop fades out simultaneously
-  backdrop.style.transition = 'opacity 250ms cubic-bezier(0.4, 0, 1, 1)'
-  backdrop.style.opacity = '0'
+  // Set current state explicitly
+  backdrop.style.opacity = currentBackdropOpacity
+  content.style.opacity = currentContentOpacity
+  content.style.transform = currentContentTransform
+  
+  // Force reflow
+  void el.offsetHeight
+  
+  // Animate out with smooth easing
+  requestAnimationFrame(() => {
+    content.style.transition = 'all 200ms cubic-bezier(0.4, 0, 1, 1)'
+    content.style.opacity = '0'
+    content.style.transform = 'scale(0.97) translateY(10px)'
+    
+    // Backdrop fades out simultaneously
+    backdrop.style.transition = 'opacity 250ms cubic-bezier(0.4, 0, 1, 1)'
+    backdrop.style.opacity = '0'
+  })
   
   // Wait for the longest animation to complete
   setTimeout(done, 250)

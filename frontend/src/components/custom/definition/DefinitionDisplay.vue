@@ -21,51 +21,58 @@
                 @toggle-pronunciation="store.togglePronunciation"
             />
 
-            <div class="themed-hr h-px mb-4" />
+            <!-- Gradient Separator -->
+            <hr class="my-4 border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30" />
 
             <!-- Mode Content -->
-            <Transition
-                :key="`transition-${store.mode}`"
-                mode="out-in"
-                enter-active-class="transition-all duration-300 ease-apple-bounce"
-                leave-active-class="transition-all duration-200 ease-out"
-                enter-from-class="opacity-0 scale-95 translate-x-8 rotate-1"
-                enter-to-class="opacity-100 scale-100 translate-x-0 rotate-0"
-                leave-from-class="opacity-100 scale-100 translate-x-0 rotate-0"
-                leave-to-class="opacity-0 scale-95 -translate-x-8 -rotate-1"
-            >
-                <CardContent :key="store.mode" class="space-y-4">
-                    <!-- Dictionary Mode -->
-                    <template v-if="store.mode === 'dictionary'">
-                        <DefinitionCluster
-                            v-for="(cluster, clusterIndex) in groupedDefinitions"
-                            :key="cluster.clusterId"
-                            :cluster="cluster"
-                            :clusterIndex="clusterIndex"
-                            :totalClusters="groupedDefinitions.length"
-                            :cardVariant="store.selectedCardVariant"
-                        >
-                            <DefinitionItem
-                                v-for="(definition, defIndex) in cluster.definitions"
-                                :key="`${cluster.clusterId}-${defIndex}`"
-                                :definition="definition"
-                                :definitionIndex="getGlobalDefinitionIndex(clusterIndex, defIndex)"
-                                :isRegenerating="regeneratingIndex === getGlobalDefinitionIndex(clusterIndex, defIndex)"
-                                @regenerate="handleRegenerateExamples"
-                                @searchWord="store.searchWord"
-                            />
-                        </DefinitionCluster>
-                    </template>
+            <CardContent class="space-y-4">
+                <Transition
+                    name="mode-switch"
+                    mode="out-in"
+                >
+                    <!-- Wrapper div with key that changes on mode switch -->
+                    <div :key="store.mode" class="space-y-4">
+                        <!-- Dictionary Mode -->
+                        <template v-if="store.mode === 'dictionary'">
+                            <DefinitionCluster
+                                v-for="(cluster, clusterIndex) in groupedDefinitions"
+                                :key="cluster.clusterId"
+                                :cluster="cluster"
+                                :clusterIndex="clusterIndex"
+                                :totalClusters="groupedDefinitions.length"
+                                :cardVariant="store.selectedCardVariant"
+                            >
+                                <DefinitionItem
+                                    v-for="(definition, defIndex) in cluster.definitions"
+                                    :key="`${cluster.clusterId}-${defIndex}`"
+                                    :definition="definition"
+                                    :definitionIndex="getGlobalDefinitionIndex(clusterIndex, defIndex)"
+                                    :isRegenerating="regeneratingIndex === getGlobalDefinitionIndex(clusterIndex, defIndex)"
+                                    @regenerate="handleRegenerateExamples"
+                                    @searchWord="store.searchWord"
+                                />
+                            </DefinitionCluster>
+                        </template>
 
-                    <!-- Thesaurus Mode -->
-                    <ThesaurusView
-                        v-else-if="store.mode === 'thesaurus'"
-                        :thesaurusData="store.currentThesaurus"
-                        :cardVariant="store.selectedCardVariant"
-                        @word-click="store.searchWord"
-                    />
-                </CardContent>
-            </Transition>
+                        <!-- Thesaurus Mode -->
+                        <template v-else-if="store.mode === 'thesaurus'">
+                            <ThesaurusView
+                                :thesaurusData="store.currentThesaurus"
+                                :cardVariant="store.selectedCardVariant"
+                                @word-click="store.searchWord"
+                            />
+                        </template>
+
+                        <!-- AI Suggestions Mode -->
+                        <template v-else-if="store.mode === 'suggestions'">
+                            <!-- This mode is handled by WordSuggestionDisplay in Home.vue -->
+                            <div class="text-center text-muted-foreground">
+                                Switching to suggestions mode...
+                            </div>
+                        </template>
+                    </div>
+                </Transition>
+            </CardContent>
 
             <!-- Etymology -->
             <Etymology v-if="entry.etymology" :etymology="entry.etymology" />
@@ -143,8 +150,13 @@ const handleKeyDown = (event: KeyboardEvent) => {
     }
 };
 
-// Watch mode changes to ensure thesaurus data is loaded
-watch(() => store.mode, async (newMode) => {
+// Watch mode changes to ensure thesaurus data is loaded and trigger animations
+watch(() => store.mode, async (newMode, oldMode) => {
+    // Trigger animation by incrementing key
+    if (oldMode && newMode !== oldMode) {
+        animationKey.value++;
+    }
+    
     if (newMode === 'thesaurus' && entry.value) {
         // Ensure thesaurus data is loaded when switching to thesaurus mode
         await store.getThesaurusData(entry.value.word);
@@ -165,6 +177,35 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Mode switch transitions */
+.mode-switch-enter-active {
+    transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1); /* ease-apple-bounce */
+}
+
+.mode-switch-leave-active {
+    transition: all 0.2s ease-out;
+}
+
+.mode-switch-enter-from {
+    opacity: 0;
+    transform: scale(0.95) translateX(20px) rotate(1deg);
+}
+
+.mode-switch-enter-to {
+    opacity: 1;
+    transform: scale(1) translateX(0) rotate(0);
+}
+
+.mode-switch-leave-from {
+    opacity: 1;
+    transform: scale(1) translateX(0) rotate(0);
+}
+
+.mode-switch-leave-to {
+    opacity: 0;
+    transform: scale(0.95) translateX(-20px) rotate(-1deg);
+}
+
 /* Themed gradients and hover effects */
 .themed-hr {
     background: linear-gradient(

@@ -1,17 +1,16 @@
 Query: {{ query }}
 
-Find words capturing query essence. Prioritize:
-- Semantic accuracy
-- Beauty/memorability
-- Esoteric options
+Find exactly {{ count }} words that best capture the query's essence. Bias towards words that are beautiful, efflorescent, memorable, and semantically relevant.
 
-Count: Use larger of user-specified or {{ count }} (max 25)
-Quality > quantity. Only confidence > 0.7.
+Requirements:
+1. Words must semantically match the query with confidence > 0.7
+2. For text/passage queries: extract words FROM the text, not words ABOUT it
+3. Provide brief, focused reasoning without superfluity
+4. Reasoning must **ALWAYS** be in English
+5. If the query contains an example usage, fill in the example_usage field with a relevant example
 
-For text queries: words FROM text, not ABOUT it.
-
-Return per word:
-- **confidence**: 0-1 (semantic match)
-- **efflorescence**: 0-1 (beauty)
-- **reasoning**: why it fits
-- **example_usage**: if applicable
+Return for each word:
+- **confidence**: 0-1 (semantic match strength)
+- **efflorescence**: 0-1 (word beauty/memorability)
+- **reasoning**: concise explanation (max 2 sentences) -- ALWAYS in English
+- **example_usage**: if helpful (optional) -- ALWAYS in English

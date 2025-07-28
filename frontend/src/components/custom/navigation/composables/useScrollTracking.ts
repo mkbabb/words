@@ -26,7 +26,7 @@ export function useScrollTracking({
     const observer = ref<IntersectionObserver | null>(null);
     
     // Scroll state
-    const { y, directions } = useScroll(window);
+    const { y } = useScroll(window);
     const lastScrollY = ref(0);
     const scrollDirection = ref<'up' | 'down' | 'idle'>('idle');
     const lastActiveUpdate = ref(0);

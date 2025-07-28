@@ -48,7 +48,7 @@ const state = reactive({
     expandButtonVisible: false,
     
     // Selected options
-    selectedSources: ['wiktionary', 'oxford', 'dictionary_com', 'apple_dictionary'],
+    selectedSources: ['wiktionary'],
     selectedLanguages: ['en'],
     
     // Dev mode
@@ -95,6 +95,36 @@ export function useSearchBarSharedState() {
     if (!state._initialized) {
         state.mode = store.mode as 'dictionary' | 'thesaurus' | 'suggestions';
         state.searchMode = (store.searchMode || 'lookup') as SearchMode;
+        state.forceRefreshMode = store.forceRefreshMode;
+        state.selectedSources = store.selectedSources || ['wiktionary'];
+        state.selectedLanguages = store.selectedLanguages || ['en'];
+        
+        // Restore persisted search state
+        if (store.searchQuery) {
+            state.query = store.searchQuery;
+        }
+        if (store.sessionState?.isAIQuery) {
+            state.isAIQuery = true;
+            state.showSparkle = true;
+            // Use aiQueryText if available, otherwise use searchQuery
+            if (store.sessionState.aiQueryText) {
+                state.query = store.sessionState.aiQueryText;
+            }
+        }
+        
+        // Validate persisted mode - ensure it's valid for current state
+        if (state.mode === 'suggestions' && (!store.wordSuggestions || !store.wordSuggestions.suggestions?.length)) {
+            // Can't be in suggestions mode without suggestions, fall back to dictionary
+            state.mode = 'dictionary';
+            store.mode = 'dictionary';
+        } else if ((state.mode === 'dictionary' || state.mode === 'thesaurus') && !store.currentEntry) {
+            // Can't be in dictionary/thesaurus mode without a current entry
+            if (store.wordSuggestions && store.wordSuggestions.suggestions?.length > 0) {
+                state.mode = 'suggestions';
+                store.mode = 'suggestions';
+            }
+        }
+        
         state._initialized = true;
     }
     
@@ -145,6 +175,44 @@ export function useSearchBarSharedState() {
             state.searchMode = newMode;
         }
     });
+    
+    // Watch for changes in local forceRefreshMode and sync to store
+    watch(() => state.forceRefreshMode, (newMode) => {
+        if (store.forceRefreshMode !== newMode) {
+            store.forceRefreshMode = newMode;
+        }
+    });
+    
+    // Watch for changes in store forceRefreshMode and sync to local state
+    watch(() => store.forceRefreshMode, (newMode) => {
+        if (state.forceRefreshMode !== newMode) {
+            state.forceRefreshMode = newMode;
+        }
+    });
+    
+    // Watch for changes in local selectedSources and sync to store
+    watch(() => state.selectedSources, (newSources) => {
+        store.selectedSources = newSources;
+    }, { deep: true });
+    
+    // Watch for changes in store selectedSources and sync to local state
+    watch(() => store.selectedSources, (newSources) => {
+        if (JSON.stringify(state.selectedSources) !== JSON.stringify(newSources)) {
+            state.selectedSources = newSources;
+        }
+    }, { deep: true });
+    
+    // Watch for changes in local selectedLanguages and sync to store
+    watch(() => state.selectedLanguages, (newLanguages) => {
+        store.selectedLanguages = newLanguages;
+    }, { deep: true });
+    
+    // Watch for changes in store selectedLanguages and sync to local state
+    watch(() => store.selectedLanguages, (newLanguages) => {
+        if (JSON.stringify(state.selectedLanguages) !== JSON.stringify(newLanguages)) {
+            state.selectedLanguages = newLanguages;
+        }
+    }, { deep: true });
     
     return {
         state,

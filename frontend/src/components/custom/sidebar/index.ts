@@ -1,0 +1,13 @@
+export { default as SidebarSection } from './SidebarSection.vue';
+export { default as GoldenSidebarSection } from './GoldenSidebarSection.vue';
+export { default as RecentItem } from './RecentItem.vue';
+export { default as RecentItemWithHover } from './RecentItemWithHover.vue';
+export { default as SidebarRecentItem } from './SidebarRecentItem.vue';
+export { default as RecentLookupItem } from './RecentLookupItem.vue';
+export { default as RecentSearchItem } from './RecentSearchItem.vue';
+export { default as VocabularySuggestionItem } from './VocabularySuggestionItem.vue';
+export { default as SidebarLookupView } from './SidebarLookupView.vue';
+export { default as SidebarWordListView } from './SidebarWordListView.vue';
+export { default as SidebarHeader } from './SidebarHeader.vue';
+export { default as SidebarContent } from './SidebarContent.vue';
+export { default as SidebarFooter } from './SidebarFooter.vue';

@@ -19,14 +19,12 @@
                 {{ pronunciationMode === 'phonetic' ? pronunciation.phonetic : pronunciation.ipa }}
             </span>
             
-            <Button
-                variant="ghost"
-                size="sm"
+            <button
                 @click="$emit('toggle-pronunciation')"
-                class="h-6 px-2 py-1 text-xs transition-all duration-200 hover:opacity-80"
+                class="h-6 px-2 py-1 text-xs transition-all duration-200 rounded-md bg-muted/50 hover:bg-muted border border-border/50 hover:border-border text-foreground/80 hover:text-foreground min-w-[60px] text-center"
             >
                 {{ pronunciationMode === 'phonetic' ? 'IPA' : 'Phonetic' }}
-            </Button>
+            </button>
             
             <!-- Provider Source Icons -->
             <ProviderIcons

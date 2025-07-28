@@ -22,7 +22,12 @@ export const useAppStore = defineStore('app', () => {
     const loadingProgress = ref(0);
     const loadingStage = ref('');
     const forceRefreshMode = ref(false);
-    const wordSuggestions = ref<WordSuggestionResponse | null>(null);
+    const wordSuggestions = computed({
+        get: () => sessionState.value.wordSuggestions,
+        set: (value) => {
+            sessionState.value.wordSuggestions = value || null;
+        },
+    });
     const isSuggestingWords = ref(false);
     const suggestionsProgress = ref(0);
     const suggestionsStage = ref('');
@@ -45,6 +50,12 @@ export const useAppStore = defineStore('app', () => {
             // Progressive sidebar state
             sidebarActiveCluster: '',
             sidebarActivePartOfSpeech: '',
+            // Accordion states for different views
+            sidebarAccordionState: {
+                lookup: [] as string[],
+                wordlist: [] as string[],
+                stage: [] as string[]
+            },
         },
         undefined,
         {
@@ -76,6 +87,14 @@ export const useAppStore = defineStore('app', () => {
                         if (!Array.isArray(parsed.selectedLanguages)) {
                             parsed.selectedLanguages = ['en'];
                         }
+                        // Validate accordion state
+                        if (!parsed.sidebarAccordionState || typeof parsed.sidebarAccordionState !== 'object') {
+                            parsed.sidebarAccordionState = {
+                                lookup: [],
+                                wordlist: [],
+                                stage: []
+                            };
+                        }
                         return parsed;
                     } catch {
                         return {
@@ -89,6 +108,13 @@ export const useAppStore = defineStore('app', () => {
                             selectedLanguages: ['en'],
                             showControls: false,
                             selectedWordlist: null,
+                            sidebarActiveCluster: '',
+                            sidebarActivePartOfSpeech: '',
+                            sidebarAccordionState: {
+                                lookup: [],
+                                wordlist: [],
+                                stage: []
+                            },
                         };
                     }
                 },
@@ -108,6 +134,7 @@ export const useAppStore = defineStore('app', () => {
         currentThesaurus: null as ThesaurusEntry | null,
         isAIQuery: false,
         aiQueryText: '',
+        wordSuggestions: null as WordSuggestionResponse | null,
     });
 
     // Create refs that sync with persisted state
@@ -202,6 +229,13 @@ export const useAppStore = defineStore('app', () => {
             uiState.value.selectedWordlist = value;
         },
     });
+    
+    const sidebarAccordionState = computed({
+        get: () => uiState.value.sidebarAccordionState,
+        set: (value) => {
+            uiState.value.sidebarAccordionState = value;
+        },
+    });
 
     const sidebarActiveCluster = computed({
         get: () => uiState.value.sidebarActiveCluster,
@@ -240,6 +274,9 @@ export const useAppStore = defineStore('app', () => {
 
     // Lookup history (persisted) - main source for suggestions and tiles
     const lookupHistory = useStorage<LookupHistory[]>('lookup-history', []);
+    
+    // AI Query history (persisted) - for Recent AI Suggestions
+    const aiQueryHistory = useStorage<Array<{ query: string; timestamp: string }>>('ai-query-history', []);
 
     // Persisted suggestions cache
     const suggestionsCache = useStorage('suggestions-cache', {
@@ -812,6 +849,21 @@ export const useAppStore = defineStore('app', () => {
             
             wordSuggestions.value = response;
             
+            // Add to AI query history
+            const existingIndex = aiQueryHistory.value.findIndex(item => item.query === query);
+            if (existingIndex >= 0) {
+                // Move existing query to front
+                aiQueryHistory.value.splice(existingIndex, 1);
+            }
+            aiQueryHistory.value.unshift({
+                query,
+                timestamp: new Date().toISOString()
+            });
+            // Keep only last 10 AI queries
+            if (aiQueryHistory.value.length > 10) {
+                aiQueryHistory.value = aiQueryHistory.value.slice(0, 10);
+            }
+            
             // Don't manually set progress - let the streaming handle it
             
             return response;
@@ -870,6 +922,7 @@ export const useAppStore = defineStore('app', () => {
         theme,
         searchHistory,
         lookupHistory,
+        aiQueryHistory,
         vocabularySuggestions,
         isLoadingSuggestions,
         sidebarOpen,
@@ -893,6 +946,7 @@ export const useAppStore = defineStore('app', () => {
         selectedWordlist,
         sidebarActiveCluster,
         sidebarActivePartOfSpeech,
+        sidebarAccordionState,
 
         // Computed
         searchState,

@@ -64,18 +64,10 @@ class PromptTemplateManager:
         word: str,
         definitions: list[Definition],
         meaning_cluster: str | None = None,
-        optimized: bool = True,
     ) -> str:
         """Generate synthesis prompt for definition aggregation using full Definition objects."""
-        template_name = "synthesize/definitions_optimized" if optimized else "synthesize/definitions"
-        
-        # If using optimized template, prepare definitions with minimal data
-        if optimized:
-            from .definition_serializer import prepare_definitions_for_synthesis
-            definitions = prepare_definitions_for_synthesis(definitions)
-            
         return self.render_template(
-            template_name,
+            "synthesize/definitions",
             word=word,
             definitions=definitions,
             meaning_cluster=meaning_cluster,
@@ -87,12 +79,10 @@ class PromptTemplateManager:
         part_of_speech: str,
         definition: str,
         count: int = 1,
-        optimized: bool = True,
     ) -> str:
         """Generate example generation prompt."""
-        template_name = "generate/examples_optimized" if optimized else "generate/examples"
         return self.render_template(
-            template_name,
+            "generate/examples",
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
@@ -108,12 +98,11 @@ class PromptTemplateManager:
         return self.render_template("misc/lookup", word=word)
 
     def get_meaning_extraction_prompt(
-        self, word: str, definitions: list[tuple[str, str, str]], optimized: bool = True
+        self, word: str, definitions: list[tuple[str, str, str]]
     ) -> str:
         """Generate meaning extraction prompt with cluster mapping."""
-        template_name = "misc/meaning_extraction_optimized" if optimized else "misc/meaning_extraction"
         return self.render_template(
-            template_name,
+            "misc/meaning_extraction",
             word=word,
             definitions=definitions,
         )
@@ -130,12 +119,11 @@ class PromptTemplateManager:
         )
 
     def get_synthesize_synonyms_prompt(
-        self, word: str, definition: str, part_of_speech: str, existing_synonyms: list[str], count: int = 10, optimized: bool = True
+        self, word: str, definition: str, part_of_speech: str, existing_synonyms: list[str], count: int = 10
     ) -> str:
         """Generate prompt for synonym synthesis with existing items."""
-        template_name = "synthesize/synonyms_optimized" if optimized else "synthesize/synonyms"
         return self.render_template(
-            template_name,
+            "synthesize/synonyms",
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
@@ -182,20 +170,18 @@ class PromptTemplateManager:
             provider_data=provider_data,
         )
 
-    def get_word_forms_prompt(self, word: str, part_of_speech: str, optimized: bool = True) -> str:
+    def get_word_forms_prompt(self, word: str, part_of_speech: str) -> str:
         """Generate prompt for word form generation."""
-        template_name = "generate/word_forms_optimized" if optimized else "generate/word_forms"
         return self.render_template(
-            template_name,
+            "generate/word_forms",
             word=word,
             part_of_speech=part_of_speech,
         )
 
-    def get_frequency_prompt(self, word: str, definition: str, optimized: bool = True) -> str:
+    def get_frequency_prompt(self, word: str, definition: str) -> str:
         """Generate prompt for frequency band assessment."""
-        template_name = "assess/frequency_optimized" if optimized else "assess/frequency"
         return self.render_template(
-            template_name,
+            "assess/frequency",
             word=word,
             definition=definition,
         )
@@ -239,11 +225,10 @@ class PromptTemplateManager:
             part_of_speech=part_of_speech,
         )
 
-    def get_usage_notes_prompt(self, word: str, definition: str, optimized: bool = True) -> str:
+    def get_usage_notes_prompt(self, word: str, definition: str) -> str:
         """Generate prompt for usage note generation."""
-        template_name = "misc/usage_note_generation_optimized" if optimized else "misc/usage_note_generation"
         return self.render_template(
-            template_name,
+            "misc/usage_note_generation",
             word=word,
             definition=definition,
         )

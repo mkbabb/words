@@ -34,7 +34,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { formatClusterLabel } from '@/components/custom/definition/utils';
 import { useSidebarNavigation } from '../composables/useSidebarNavigation';
 
 interface Props {

@@ -6,7 +6,7 @@
         :disabled="disabled"
         :style="{
             minHeight: `${minHeight}px`,
-            lineHeight: '1.5',
+            lineHeight: '1.4',
             ...style
         }"
         :class="[
@@ -85,8 +85,19 @@ const resizeTextarea = () => {
     // Get the scroll height (content height)
     const scrollHeight = textareaRef.value.scrollHeight;
     
+    // In AI mode, allow full expansion; otherwise limit to reasonable height
+    const maxHeight = props.aiMode ? 400 : 200;
+    const finalHeight = Math.min(scrollHeight, maxHeight);
+    
     // Set the textarea height directly
-    textareaRef.value.style.height = `${scrollHeight}px`;
+    textareaRef.value.style.height = `${finalHeight}px`;
+    
+    // Add scrollbar if content exceeds max height
+    if (scrollHeight > maxHeight) {
+        textareaRef.value.style.overflowY = 'auto';
+    } else {
+        textareaRef.value.style.overflowY = 'hidden';
+    }
 };
 
 const handleInput = (event: Event) => {
@@ -109,6 +120,8 @@ const handleBlur = () => {
 watch(modelValue, () => {
     nextTick(() => {
         resizeTextarea();
+        // Double-check resize for edge cases (like AI mode text from sidebar)
+        setTimeout(resizeTextarea, 0);
     });
 });
 

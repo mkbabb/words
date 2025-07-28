@@ -40,7 +40,7 @@ export function useActiveTracking({
                 const posId = `${cluster.clusterId}-${pos.type}`;
                 const posElements = document.querySelectorAll(`[data-part-of-speech="${posId}"]`);
                 
-                posElements.forEach((element, index) => {
+                posElements.forEach((element) => {
                     // Track all elements but use the same ID for all instances of a part of speech
                     // This way, if any instance is visible, the part of speech is considered active
                     trackElement(element, posId, 1, cluster.clusterId);

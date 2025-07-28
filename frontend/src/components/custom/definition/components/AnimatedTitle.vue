@@ -10,7 +10,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { TypewriterText } from '@/components/custom/text-animations';
+import { TypewriterText } from '@/components/custom/typewriter';
 
 interface AnimatedTitleProps {
     text: string;
@@ -43,10 +43,13 @@ const animationProps = computed(() => {
     
     return { 
         text: props.text,
-        class: 'text-word-title themed-title transition-all duration-200',
-        customStyles,
-        speed: 300, // 300ms between characters for slow, readable typing
-        cursor: true 
+        mode: 'human', // Use human-like typing mode (first animation will be expert)
+        baseSpeed: 150, // Faster base speed
+        variance: 0.4, // Less variance for more consistent speed
+        errorRate: 0.015, // Occasional typos (reduced)
+        cursorBlink: true,
+        startDelay: 50,
+        loop: false // No looping for title animations
     };
 });
 </script>

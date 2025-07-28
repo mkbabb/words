@@ -8,7 +8,7 @@
         <!-- Separator for definitions within same cluster -->
         <hr
             v-if="isSeparatorNeeded"
-            class="my-6 border-border/50"
+            class="my-2 border-border/50"
         />
 
         <div class="flex items-center gap-2">

@@ -2,7 +2,7 @@
     <div
         ref="searchContainer"
         :class="[
-            'search-container relative z-50 origin-top w-full mx-auto',
+            'search-container relative z-50 mx-auto w-full origin-top',
             props.className,
         ]"
         :style="containerStyle"
@@ -10,26 +10,43 @@
         @mouseleave="handleMouseLeave"
     >
         <!-- Main Layout -->
-        <div class="pointer-events-auto relative overflow-visible pt-2 pl-2">
+        <div class="pointer-events-auto relative overflow-visible pt-2 px-2 pb-0">
             <!-- Search Bar -->
             <div
                 ref="searchBarElement"
                 :class="[
-                    'search-bar flex items-center gap-2 p-1 relative overflow-visible',
-                    'border-2 border-border bg-background/20 backdrop-blur-3xl',
+                    'search-bar relative flex items-center gap-2 overflow-visible px-1 py-0.5',
                     'cartoon-shadow-sm rounded-2xl transition-all duration-500 ease-out',
+                    state.isAIQuery && !state.showErrorAnimation
+                        ? 'border-2 border-amber-500 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-950/30 backdrop-blur-sm'
+                        : state.showErrorAnimation
+                        ? 'border-2 border-red-400/50 dark:border-red-600/50 bg-gradient-to-br from-red-50/20 to-red-50/10 dark:from-red-900/20 dark:to-red-900/10'
+                        : 'border-2 border-border bg-background/20 backdrop-blur-3xl',
                     {
                         'cartoon-shadow-sm-hover': state.isContainerHovered,
-                        'bg-background/30': state.isContainerHovered && !state.isAIQuery,
-                        'bg-yellow-50 dark:bg-yellow-900/10': state.isAIQuery && !state.showErrorAnimation,
-                        'border-yellow-400 dark:border-yellow-600/30': state.isAIQuery && !state.showErrorAnimation,
+                        'bg-background/30':
+                            state.isContainerHovered && !state.isAIQuery,
                         'shake-error': state.showErrorAnimation,
-                        'bg-gradient-to-br from-red-50/20 to-red-50/10 dark:from-red-900/20 dark:to-red-900/10': state.showErrorAnimation,
-                        'border-red-400/50 dark:border-red-600/50': state.showErrorAnimation,
                     },
                 ]"
                 :style="{
-                    height: `${state.searchBarHeight}px`,
+                    height: state.isAIQuery
+                        ? 'auto'
+                        : `${state.searchBarHeight}px`,
+                    minHeight: state.isAIQuery
+                        ? `${state.searchBarHeight}px`
+                        : undefined,
+                    maxHeight: state.isAIQuery
+                        ? '420px'
+                        : undefined,
+                    overflowY: state.isAIQuery
+                        ? 'visible'
+                        : 'visible',
+                    borderColor: state.isAIQuery && !state.showErrorAnimation
+                        ? '#fbbf24'
+                        : state.showErrorAnimation
+                        ? '#f87171'
+                        : undefined,
                 }"
             >
                 <!-- Sparkle Indicator -->
@@ -50,8 +67,18 @@
                         :query="state.query"
                         :suggestion="state.autocompleteText"
                         :padding-left="iconOpacity > 0.1 ? '1rem' : '1.5rem'"
-                        :padding-right="state.expandButtonVisible ? '3rem' : iconOpacity > 0.1 ? '1rem' : '1.5rem'"
-                        :text-align="iconOpacity < 0.3 && !state.isAIQuery ? 'center' : 'left'"
+                        :padding-right="
+                            state.expandButtonVisible
+                                ? '3rem'
+                                : iconOpacity > 0.1
+                                  ? '1rem'
+                                  : '1.5rem'
+                        "
+                        :text-align="
+                            iconOpacity < 0.3 && !state.isAIQuery
+                                ? 'center'
+                                : 'left'
+                        "
                     />
 
                     <!-- Main Search Input -->
@@ -59,10 +86,19 @@
                         ref="searchInputComponent"
                         v-model="state.query"
                         :placeholder="placeholder"
-                        :text-align="iconOpacity < 0.3 && !state.isAIQuery ? 'center' : 'left'"
+                        :ai-mode="state.isAIQuery"
+                        :text-align="
+                            iconOpacity < 0.3 && !state.isAIQuery
+                                ? 'center'
+                                : 'left'
+                        "
                         :style="{
                             paddingLeft: iconOpacity > 0.1 ? '1rem' : '1.5rem',
-                            paddingRight: state.expandButtonVisible ? '3rem' : iconOpacity > 0.1 ? '1rem' : '1.5rem',
+                            paddingRight: state.expandButtonVisible
+                                ? '3rem'
+                                : iconOpacity > 0.1
+                                  ? '1rem'
+                                  : '1.5rem',
                             paddingTop: '0.75rem',
                             paddingBottom: '0.75rem',
                         }"
@@ -78,18 +114,40 @@
                         @blur="handleBlur"
                         @input-click="handleInputClick"
                     />
-                    
+
                     <!-- Expand Button -->
-                    <button
-                        v-if="state.expandButtonVisible"
-                        class="absolute right-2 bottom-2 z-20 p-1 rounded-md bg-muted/50 
-                            hover:bg-muted/80 hover:scale-105 transition-all duration-200
-                            focus:outline-none focus:ring-2 focus:ring-primary/50"
-                        @click.stop="handleExpandClick"
-                        title="Expand for longer input"
+                    <Transition
+                        enter-active-class="transition-all duration-200 ease-out"
+                        leave-active-class="transition-all duration-200 ease-in"
+                        enter-from-class="opacity-0 scale-90"
+                        leave-to-class="opacity-0 scale-90"
                     >
-                        <Maximize2 class="h-4 w-4 text-foreground/70 hover:text-foreground" />
-                    </button>
+                        <button
+                            v-if="state.expandButtonVisible && state.scrollProgress < 0.3"
+                            :class="[
+                                'absolute right-2 bottom-2 z-20 rounded-md p-1 transition-all duration-200',
+                                'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
+                                state.isAIQuery
+                                    ? 'bg-amber-100/80 hover:bg-amber-200/80 dark:bg-amber-900/40 dark:hover:bg-amber-800/40'
+                                    : 'bg-muted/50 hover:bg-muted/80'
+                            ]"
+                            :style="{
+                                opacity: 1 - state.scrollProgress * 3,
+                                transform: `scale(${1 - state.scrollProgress * 0.5})`
+                            }"
+                            @click.stop="handleExpandClick"
+                            title="Expand for longer input"
+                        >
+                            <Maximize2
+                                :class="[
+                                    'h-4 w-4',
+                                    state.isAIQuery
+                                        ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
+                                        : 'text-foreground/70 hover:text-foreground'
+                                ]"
+                            />
+                        </button>
+                    </Transition>
                 </div>
 
                 <!-- Regenerate Button -->
@@ -97,6 +155,7 @@
                     v-if="store.currentEntry && state.searchMode === 'lookup'"
                     :show-button="true"
                     :opacity="iconOpacity"
+                    :ai-mode="state.isAIQuery"
                     v-model:force-refresh-mode="state.forceRefreshMode"
                     @regenerate="handleForceRegenerate"
                 />
@@ -105,22 +164,27 @@
                 <HamburgerButton
                     v-model="state.showControls"
                     :opacity="iconOpacity"
-                    :show-regenerate-button="!!store.currentEntry && state.searchMode === 'lookup'"
+                    :ai-mode="state.isAIQuery"
+                    :show-regenerate-button="
+                        !!store.currentEntry && state.searchMode === 'lookup'
+                    "
                 />
 
                 <!-- Progress Bar -->
-                <div
+                <!-- <div
                     v-if="store.loadingProgress > 0"
-                    class="absolute right-0 -bottom-2 left-0 h-2 overflow-hidden"
+                    class="absolute right-0 -bottom-2 left-0 h-2
+                        overflow-hidden"
                 >
                     <div
-                        class="h-full rounded-full transition-[width] duration-300"
+                        class="h-full rounded-full transition-[width]
+                            duration-300"
                         :style="{
                             width: `${store.loadingProgress}%`,
                             background: generateRainbowGradient(8),
                         }"
                     />
-                </div>
+                </div> -->
             </div>
 
             <!-- Dropdowns Container -->
@@ -165,14 +229,6 @@
         @close="closeExpandModal"
         @submit="submitExpandedQuery"
     />
-    
-    <!-- Debug Overlay (DEV only) -->
-    <div v-if="state.isDevelopment && false" class="fixed top-20 right-4 bg-black/80 text-white p-2 text-xs rounded z-50">
-        <div>Scroll: {{ (state.scrollProgress * 100).toFixed(0) }}%</div>
-        <div>Shrink: {{ (props.shrinkPercentage * 100).toFixed(0) }}%</div>
-        <div>Scale: {{ (1 - state.scrollProgress * 0.12).toFixed(2) }}</div>
-        <div>Opacity: {{ iconOpacity.toFixed(2) }}</div>
-    </div>
 </template>
 
 <script setup lang="ts">
@@ -216,11 +272,14 @@ const props = withDefaults(defineProps<SearchBarProps>(), {
 
 // Debug prop changes
 if (import.meta.env.DEV) {
-    watch(() => props.shrinkPercentage, (newVal, oldVal) => {
-        if (newVal !== oldVal) {
-            console.log('SearchBar prop changed:', { oldVal, newVal });
+    watch(
+        () => props.shrinkPercentage,
+        (newVal, oldVal) => {
+            if (newVal !== oldVal) {
+                console.log('SearchBar prop changed:', { oldVal, newVal });
+            }
         }
-    });
+    );
 }
 
 const emit = defineEmits<{
@@ -248,7 +307,7 @@ const placeholder = computed(() => {
     } else if (state.searchMode === 'stage') {
         return 'Enter text for staging...';
     }
-    
+
     // Default to mode-based placeholders for lookup mode
     return state.mode === 'dictionary'
         ? 'Enter a word to define...'
@@ -269,36 +328,40 @@ const { containerStyle, updateScrollState } = useScrollAnimationSimple(
 );
 
 // Update scroll progress from prop
-watch(() => props.shrinkPercentage, (newValue) => {
-    state.scrollProgress = newValue;
-    // Debug logging
-    if (import.meta.env.DEV) {
-        console.log('SearchBar scroll update:', {
-            shrinkPercentage: newValue,
-            scrollProgress: state.scrollProgress,
-            containerStyle: containerStyle.value
-        });
-    }
-}, { immediate: true });
+watch(
+    () => props.shrinkPercentage,
+    (newValue) => {
+        state.scrollProgress = newValue;
+        // Debug logging
+        if (import.meta.env.DEV) {
+            console.log('SearchBar scroll update:', {
+                shrinkPercentage: newValue,
+                scrollProgress: state.scrollProgress,
+                containerStyle: containerStyle.value,
+            });
+        }
+    },
+    { immediate: true }
+);
 
 // Create a computed ref for the search input element
 const searchInputRef = computed(() => searchInputComponent.value?.element);
 
 // Autocomplete setup
-const { 
+const {
     autocompleteText,
-    updateAutocomplete, 
+    updateAutocomplete,
     acceptAutocomplete,
     handleSpaceKey: handleAutocompleteSpaceKey,
     handleArrowKey: handleAutocompleteArrowKey,
-    handleInputClick: handleAutocompleteInputClick
+    handleInputClick: handleAutocompleteInputClick,
 } = useAutocomplete({
     query: computed(() => state.query),
     searchResults: computed(() => state.searchResults),
     searchInput: searchInputRef,
     onQueryUpdate: (newQuery: string) => {
         state.query = newQuery;
-    }
+    },
 });
 
 // Timers
@@ -306,18 +369,28 @@ let searchTimer: ReturnType<typeof setTimeout> | undefined;
 let isInteractingWithSearchArea = false;
 
 // Watch query for autocomplete
-watch(() => state.query, () => {
-    updateAutocomplete();
-    state.autocompleteText = autocompleteText.value;
-    state.expandButtonVisible = shouldShowExpandButton(state.isAIQuery, state.query.length, state.query.includes('\n'));
-});
+watch(
+    () => state.query,
+    () => {
+        updateAutocomplete();
+        state.autocompleteText = autocompleteText.value;
+        state.expandButtonVisible = shouldShowExpandButton(
+            state.isAIQuery,
+            state.query.length,
+            state.query.includes('\n')
+        );
+    }
+);
 
 // Watch search results for autocomplete
-watch(() => state.searchResults, () => {
-    state.selectedIndex = 0;
-    updateAutocomplete();
-    state.autocompleteText = autocompleteText.value;
-});
+watch(
+    () => state.searchResults,
+    () => {
+        state.selectedIndex = 0;
+        updateAutocomplete();
+        state.autocompleteText = autocompleteText.value;
+    }
+);
 
 // Event Handlers
 const handleMouseEnter = () => {
@@ -333,9 +406,12 @@ const handleMouseLeave = () => {
 const handleFocus = () => {
     state.isFocused = true;
     emit('focus');
-    
+
     // Restore search results if available
-    if (store.sessionState?.searchResults?.length > 0 && state.query.length >= 2) {
+    if (
+        store.sessionState?.searchResults?.length > 0 &&
+        state.query.length >= 2
+    ) {
         state.searchResults = store.sessionState.searchResults.slice(0, 8);
     }
 };
@@ -343,10 +419,10 @@ const handleFocus = () => {
 const handleBlur = () => {
     setTimeout(() => {
         if (isInteractingWithSearchArea) return;
-        
+
         state.isFocused = false;
         emit('blur');
-        
+
         // Hide results on blur
         state.showResults = false;
         state.searchResults = [];
@@ -435,16 +511,17 @@ const handleEnter = async () => {
         // Parse the query as a list of words (space, comma, or newline separated)
         const words = state.query
             .split(/[,\\s\\n]+/)
-            .map(word => word.trim())
-            .filter(word => word.length > 0);
-        
+            .map((word) => word.trim())
+            .filter((word) => word.length > 0);
+
         if (words.length > 0) {
             // Process wordlist - for now, just look up the first word
             // TODO: Implement full wordlist processing
             store.searchQuery = words[0];
             store.hasSearched = true;
+            state.showResults = false;
             await store.getDefinition(words[0]);
-            
+
             // You could emit a wordlist event here for future handling
             // emit('wordlist-enter', words);
         }
@@ -455,8 +532,11 @@ const handleEnter = async () => {
     if (state.isAIQuery && state.query) {
         try {
             const extractedCount = extractWordCount(state.query);
-            const wordSuggestions = await store.getAISuggestions(state.query, extractedCount);
-            
+            const wordSuggestions = await store.getAISuggestions(
+                state.query,
+                extractedCount
+            );
+
             if (wordSuggestions && wordSuggestions.suggestions.length > 0) {
                 store.wordSuggestions = wordSuggestions;
                 state.mode = 'suggestions';
@@ -485,6 +565,7 @@ const handleEnter = async () => {
         await selectResult(state.searchResults[state.selectedIndex]);
     } else if (state.query) {
         state.isFocused = false;
+        state.showResults = false;
         store.searchQuery = state.query;
         store.hasSearched = true;
         await store.getDefinition(state.query);
@@ -511,7 +592,7 @@ const handleArrowKey = (event: KeyboardEvent) => {
 
 const navigateResults = (direction: number) => {
     if (state.searchResults.length === 0) return;
-    
+
     state.selectedIndex = Math.max(
         0,
         Math.min(
@@ -519,7 +600,7 @@ const navigateResults = (direction: number) => {
             state.selectedIndex + direction
         )
     );
-    
+
     store.searchSelectedIndex = state.selectedIndex;
 };
 
@@ -528,6 +609,7 @@ const selectResult = async (result: SearchResult) => {
     state.query = result.word;
     store.searchQuery = result.word;
     state.searchResults = [];
+    state.showResults = false;
     store.hasSearched = true;
     await store.getDefinition(result.word);
 };
@@ -543,7 +625,11 @@ const handleForceRegenerate = () => {
 };
 
 const clearAllStorage = () => {
-    if (confirm('This will clear all local storage including history and settings. Are you sure?')) {
+    if (
+        confirm(
+            'This will clear all local storage including history and settings. Are you sure?'
+        )
+    ) {
         localStorage.clear();
         sessionStorage.clear();
         window.location.reload();
@@ -568,25 +654,71 @@ const submitExpandedQuery = (query: string) => {
 };
 
 // Update scroll state
-watch(() => props, () => {
-    updateScrollState();
-}, { deep: true });
+watch(
+    () => props,
+    () => {
+        updateScrollState();
+    },
+    { deep: true }
+);
+
+// Click outside handler
+const handleClickOutside = (event: MouseEvent) => {
+    if (!searchContainer.value || !state.showControls) return;
+    
+    const target = event.target as HTMLElement;
+    // Check if click is outside the search container
+    if (!searchContainer.value.contains(target)) {
+        state.showControls = false;
+    }
+};
 
 // Initialize
 onMounted(async () => {
+    // Add click outside listener
+    document.addEventListener('click', handleClickOutside);
     
     // Watch query changes
-    watch(() => state.query, () => {
-        performSearch();
-    });
-    
-    // Show results when focused with query
-    watch([() => state.isFocused, () => state.query], ([focused, query]) => {
-        if (focused && query && query.length > 0 && !state.isAIQuery) {
-            state.showResults = true;
+    watch(
+        () => state.query,
+        () => {
+            performSearch();
         }
-    });
+    );
     
+    // Watch store searchQuery changes to sync with local state
+    watch(
+        () => store.searchQuery,
+        (newQuery) => {
+            if (newQuery !== state.query) {
+                state.query = newQuery;
+            }
+        }
+    );
+
+    // Watch for AI mode changes from store
+    watch(
+        () => store.sessionState?.isAIQuery,
+        (isAI) => {
+            if (isAI !== state.isAIQuery) {
+                state.isAIQuery = isAI;
+                state.showSparkle = isAI;
+            }
+        }
+    );
+
+    // Show results when focused with query
+    watch(
+        [() => state.isFocused, () => state.query, () => state.isAIQuery],
+        ([focused, query, isAI]) => {
+            if (focused && query && query.length > 0 && !isAI) {
+                state.showResults = true;
+            } else if (isAI) {
+                state.showResults = false;
+            }
+        }
+    );
+
     // Restore AI state if persisted
     if (store.sessionState.isAIQuery) {
         state.isAIQuery = true;
@@ -595,7 +727,7 @@ onMounted(async () => {
             state.query = store.sessionState.aiQueryText;
         }
     }
-    
+
     // Get AI suggestions
     try {
         const history = await store.getHistoryBasedSuggestions();
@@ -608,6 +740,7 @@ onMounted(async () => {
 // Cleanup
 onUnmounted(() => {
     clearTimeout(searchTimer);
+    document.removeEventListener('click', handleClickOutside);
 });
 </script>
 
