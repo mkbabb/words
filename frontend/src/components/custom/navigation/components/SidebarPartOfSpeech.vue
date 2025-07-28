@@ -3,6 +3,7 @@
         <HoverCardTrigger>
             <button
                 @click="$emit('click')"
+                :data-sidebar-pos="`${clusterId}-${partOfSpeech.type}`"
                 :class="[
                     'group flex h-8 w-full cursor-pointer items-center justify-between rounded-md border px-2.5 py-1.5 transition-all duration-200',
                     isActive

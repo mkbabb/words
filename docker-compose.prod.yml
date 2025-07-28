@@ -32,6 +32,21 @@ services:
     # No command override - uses nginx from Dockerfile
     command: []
 
+  notification-server:
+    build:
+      target: production
+    image: floridify-notification-server:latest
+    volumes: []
+    command: ["node", "dist/server.js"]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
   # Nginx with SSL (optional - only if not using external load balancer)
   nginx:
     image: jonasal/nginx-certbot:5

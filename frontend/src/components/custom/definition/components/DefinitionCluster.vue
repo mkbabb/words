@@ -15,21 +15,30 @@
             />
             <HoverCard :open-delay="600" :close-delay="100">
                 <HoverCardTrigger as-child>
-                    <h4
-                        class="text-sm font-semibold tracking-wide uppercase inline-block px-3 py-1.5 rounded-md bg-muted/30 border border-border/50 hover:bg-muted/50 hover:border-border transition-all duration-200 cursor-help"
+                    <EditableField
+                        :model-value="formatClusterLabel(cluster.clusterId)"
+                        field-name="cluster name"
+                        :edit-mode="props.editModeEnabled"
+                        @update:model-value="(val) => emit('update:cluster-name', cluster.clusterId, String(val))"
                     >
-                        {{ formatClusterLabel(cluster.clusterId) }}
-                    </h4>
+                        <template #display>
+                            <h4
+                                class="text-sm font-semibold tracking-wide uppercase inline-block px-3 py-1.5 rounded-md bg-muted/30 border border-border/50 hover:bg-muted/50 hover:border-border transition-all duration-200 cursor-help"
+                            >
+                                {{ formatClusterLabel(cluster.clusterId) }}
+                            </h4>
+                        </template>
+                    </EditableField>
                 </HoverCardTrigger>
-                <HoverCardContent 
-                    :class="cn(
-                        'themed-hovercard w-96 z-[80]',
-                        cardVariant !== 'default' ? 'themed-shadow-sm' : ''
-                    )"
-                    :data-theme="cardVariant || 'default'"
-                    side="top"
-                    align="start"
-                >
+                        <HoverCardContent 
+                            :class="cn(
+                                'themed-hovercard w-96 z-[80]',
+                                cardVariant !== 'default' ? 'themed-shadow-sm' : ''
+                            )"
+                            :data-theme="cardVariant || 'default'"
+                            side="top"
+                            align="start"
+                        >
                     <div class="space-y-4">
                         <div>
                             <h4 class="text-base font-semibold mb-2">{{ formatClusterLabel(cluster.clusterId) }}</h4>
@@ -52,10 +61,10 @@
                                     <span class="text-sm text-muted-foreground">Confidence</span>
                                     <span class="text-sm font-medium">{{ Math.round(cluster.definitions[0].meaning_cluster.relevance * 100) }}%</span>
                                 </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </HoverCardContent>
+                        </HoverCardContent>
             </HoverCard>
         </div>
 
@@ -70,13 +79,19 @@ import { cn } from '@/utils';
 import { formatClusterLabel } from '../utils/clustering';
 import type { GroupedDefinition } from '../types';
 import type { CardVariant } from '@/types';
+import EditableField from './EditableField.vue';
 
 interface DefinitionClusterProps {
     cluster: GroupedDefinition;
     clusterIndex: number;
     totalClusters: number;
     cardVariant: CardVariant;
+    editModeEnabled?: boolean;
 }
 
-defineProps<DefinitionClusterProps>();
+const props = defineProps<DefinitionClusterProps>();
+
+const emit = defineEmits<{
+    'update:cluster-name': [clusterId: string, newName: string];
+}>();
 </script>

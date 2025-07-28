@@ -242,18 +242,6 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
         pass
 
 
-def handle_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
-    """Decorator for consistent error handling."""
-
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        try:
-            return await func(*args, **kwargs)
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(500, str(e))
-
-    return wrapper
 
 
 def get_etag(data: Any) -> str:

@@ -37,6 +37,7 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
         VITE_APP_TITLE: ${VITE_APP_TITLE:-Floridify}
+        VITE_VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
     container_name: floridify-frontend
     restart: unless-stopped
     ports:
@@ -44,6 +45,7 @@ services:
     environment:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
       VITE_APP_TITLE: ${VITE_APP_TITLE:-Floridify}
+      VITE_VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
       CHOKIDAR_USEPOLLING: "true"
     networks:
       - app-network
@@ -52,6 +54,44 @@ services:
       - ./frontend:/app
       - /app/node_modules
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+  # Notification server for PWA push notifications
+  notification-server:
+    build:
+      context: ./notification-server
+      target: ${BUILD_TARGET:-development}
+    container_name: floridify-notifications
+    restart: unless-stopped
+    ports:
+      - "${NOTIFICATION_PORT:-3001}:3001"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3001
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:notifications@floridify.com}
+      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017}
+      DB_NAME: ${MONGO_DATABASE:-floridify}
+      API_URL: ${API_URL:-http://backend:8000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://frontend:3000}
+    networks:
+      - app-network
+    depends_on:
+      - backend
+      - mongodb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Development volume mounts
+    volumes:
+      - ./notification-server:/app
+      - /app/node_modules
+    command: ["npm", "run", "dev"]
+    profiles:
+      - dev
 
   # MongoDB - only for local development
   # Comment out this service if using a remote MongoDB instance

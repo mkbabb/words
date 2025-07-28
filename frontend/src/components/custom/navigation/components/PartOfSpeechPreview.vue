@@ -16,10 +16,10 @@
                     {{ definition.definition || definition.text }}
                 </p>
                 <div
-                    v-if="definition.examples?.generated?.[0] || definition.examples?.literature?.[0]"
+                    v-if="definition.examples?.[0]"
                     class="themed-example-text text-xs italic opacity-75"
                 >
-                    "{{ (definition.examples.generated[0] || definition.examples.literature[0])?.sentence }}"
+                    "{{ definition.examples[0].text }}"
                 </div>
             </div>
             <div

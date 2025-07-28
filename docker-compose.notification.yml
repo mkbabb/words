@@ -1,0 +1,82 @@
+# Docker Compose configuration for notification server
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.notification.yml up
+version: '3.8'
+
+services:
+  notification-server:
+    build:
+      context: ./notification-server
+      target: production
+      args:
+        NODE_VERSION: 20-alpine
+    image: floridify-notification-server:latest
+    container_name: floridify-notifications
+    restart: unless-stopped
+    ports:
+      - "${NOTIFICATION_PORT:-3001}:3001"
+    environment:
+      # Node environment
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3001
+      
+      # VAPID configuration
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:notifications@floridify.com}
+      
+      # Database configuration
+      MONGO_URI: ${MONGO_URI:-mongodb://mongodb:27017}
+      DB_NAME: ${MONGO_DATABASE:-floridify}
+      
+      # API configuration
+      API_URL: ${API_URL:-http://backend:8000}
+      
+      # CORS configuration
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://frontend:3000}
+      
+    networks:
+      - app-network
+    depends_on:
+      - backend
+      - mongodb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - notification_logs:/app/logs
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Redis cache for notification server (optional but recommended)
+  redis:
+    image: redis:7-alpine
+    container_name: floridify-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - full
+
+volumes:
+  notification_logs:
+    driver: local
+  redis_data:
+    driver: local

@@ -1,5 +1,15 @@
 <template>
-    <div v-if="isMounted" class="absolute top-2 right-2 z-40">
+    <div v-if="isMounted" class="absolute top-2 right-2 z-50 flex items-center gap-2">
+        <!-- Edit Mode Toggle Button -->
+        <button
+            @click="$emit('toggle-edit-mode')"
+            class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-1.5 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
+            :title="editModeEnabled ? 'Exit edit mode' : 'Enter edit mode'"
+        >
+            <Edit2 v-if="!editModeEnabled" :size="14" class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground" />
+            <Check v-else :size="14" class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground" />
+        </button>
+        
         <!-- Custom dropdown with controlled animations -->
         <div class="relative">
             <button
@@ -25,7 +35,7 @@
             >
                 <div
                     v-if="showDropdown"
-                    class="absolute top-full right-0 z-50 mt-4 min-w-[140px] origin-top-right rounded-md border bg-popover text-popover-foreground shadow-md"
+                    class="absolute top-full right-0 z-60 mt-4 min-w-[140px] origin-top-right rounded-md border bg-popover text-popover-foreground shadow-md"
                     @click.stop
                 >
                     <div class="p-1">
@@ -65,13 +75,14 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronLeft } from 'lucide-vue-next';
+import { ChevronLeft, Edit2, Check } from 'lucide-vue-next';
 import { CARD_THEMES } from '../constants';
 import type { CardVariant } from '@/types';
 
 interface ThemeSelectorProps {
     isMounted: boolean;
     showDropdown: boolean;
+    editModeEnabled?: boolean;
 }
 
 defineProps<ThemeSelectorProps>();
@@ -81,6 +92,7 @@ const modelValue = defineModel<CardVariant>({ required: true });
 
 const emit = defineEmits<{
     'toggle-dropdown': [];
+    'toggle-edit-mode': [];
 }>();
 
 const themes = CARD_THEMES;

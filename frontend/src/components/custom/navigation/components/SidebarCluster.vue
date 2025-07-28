@@ -5,6 +5,7 @@
             <HoverCardTrigger as-child>
                 <button
                     @click="$emit('cluster-click')"
+                    :data-sidebar-cluster="cluster.clusterId"
                     :class="[
                         'group flex w-full items-center rounded-md px-2 py-1 text-left text-sm transition-all duration-200',
                         isActive

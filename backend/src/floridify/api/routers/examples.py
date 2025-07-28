@@ -17,7 +17,6 @@ from ..core import (
     SortParams,
     check_etag,
     get_etag,
-    handle_api_errors,
 )
 from ..repositories.example_repository import (
     ExampleCreate,
@@ -128,7 +127,6 @@ async def list_examples(
 
 
 @router.post("", response_model=ResourceResponse, status_code=201)
-@handle_api_errors
 async def create_example(
     data: ExampleCreate,
     repo: ExampleRepository = Depends(get_example_repo),
@@ -147,7 +145,6 @@ async def create_example(
 
 
 @router.get("/{example_id}", response_model=ResourceResponse)
-@handle_api_errors
 async def get_example(
     example_id: PydanticObjectId,
     request: Request,
@@ -190,7 +187,6 @@ async def get_example(
 
 
 @router.put("/{example_id}", response_model=ResourceResponse)
-@handle_api_errors
 async def update_example(
     example_id: PydanticObjectId,
     data: ExampleUpdate,
@@ -209,7 +205,6 @@ async def update_example(
 
 
 @router.delete("/{example_id}", status_code=204, response_model=None)
-@handle_api_errors
 async def delete_example(
     example_id: PydanticObjectId,
     repo: ExampleRepository = Depends(get_example_repo),
@@ -219,7 +214,6 @@ async def delete_example(
 
 
 @router.post("/definition/{definition_id}/generate", response_model=list[ResourceResponse])
-@handle_api_errors
 async def generate_examples_for_definition(
     definition_id: str,
     request: ExampleGenerationRequest,
@@ -279,7 +273,6 @@ async def generate_examples_for_definition(
 
 
 @router.post("/batch/update", response_model=dict[str, Any])
-@handle_api_errors
 async def batch_update_examples(
     request: BatchExampleUpdate,
     repo: ExampleRepository = Depends(get_example_repo),

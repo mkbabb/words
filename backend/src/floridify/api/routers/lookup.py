@@ -63,6 +63,7 @@ class DefinitionResponse(BaseModel):
     """Definition with resolved references for API response."""
 
     # Core fields
+    id: str  # Definition ID for frontend editing
     created_at: datetime
     updated_at: datetime
     version: int
@@ -242,6 +243,7 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
 
                 # Create DefinitionResponse
                 def_response = DefinitionResponse(
+                    id=str(definition.id),
                     created_at=definition.created_at,
                     updated_at=definition.updated_at,
                     version=definition.version,
@@ -483,6 +485,7 @@ async def _lookup_with_tracking(
 
                 # Create DefinitionResponse
                 def_response = DefinitionResponse(
+                    id=str(definition.id),
                     created_at=definition.created_at,
                     updated_at=definition.updated_at,
                     version=definition.version,

@@ -174,6 +174,16 @@ const config: Config = {
           '0%': { transform: 'rotate(0deg)' },
           '100%': { transform: 'rotate(360deg)' },
         },
+        wiggle: {
+          '0%, 100%': { transform: 'rotate(-3deg) scale(1)' },
+          '25%': { transform: 'rotate(3deg) scale(1.02)' },
+          '75%': { transform: 'rotate(-3deg) scale(0.98)' },
+        },
+        'wiggle-bounce': {
+          '0%, 100%': { transform: 'rotate(-2deg) translateY(0)' },
+          '25%': { transform: 'rotate(2deg) translateY(-2px)' },
+          '75%': { transform: 'rotate(-2deg) translateY(2px)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -195,6 +205,8 @@ const config: Config = {
         'icon-fade': 'icon-fade 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         'elastic-bounce': 'elastic-bounce 0.6s cubic-bezier(0.25, 0.1, 0.25, 1)',
         'spin-slow': 'spin-slow 3s linear infinite',
+        wiggle: 'wiggle 2.5s ease-in-out infinite',
+        'wiggle-bounce': 'wiggle-bounce 2.5s ease-in-out infinite',
       },
       transitionTimingFunction: {
         // Primary Apple-like easings

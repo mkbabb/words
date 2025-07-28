@@ -13,6 +13,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  publicDir: 'public',
   css: {
     postcss: {
       plugins: [autoprefixer()],
@@ -21,11 +22,23 @@ export default defineConfig({
   plugins: [vue(), tailwindcss()],
   server: {
     port: 3000,
-    host: true, // Listen on all local IPs
-    strictPort: true, // Exit if port is already in use
+    host: '0.0.0.0',
+    strictPort: true,
     hmr: {
-      // Ensure HMR works properly
-      overlay: true,
+      clientPort: 3000,
+      host: 'localhost',
+      protocol: 'ws',
+      timeout: 120000
+    },
+    watch: {
+      usePolling: true,
+      interval: 100
+    },
+    headers: {
+      // Disable caching in development
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
     },
     proxy: {
       '/api': {

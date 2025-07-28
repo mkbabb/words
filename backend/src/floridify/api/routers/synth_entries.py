@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from ...models import ImageMedia, SynthesizedDictionaryEntry
-from ..core import ErrorDetail, ErrorResponse, ResourceResponse, handle_api_errors
+from ..core import ErrorDetail, ErrorResponse, ResourceResponse
 
 router = APIRouter()
 
@@ -22,7 +22,7 @@ class ImageBindRequest(BaseModel):
 
 
 @router.post("/{entry_id}/images", response_model=ResourceResponse)
-@handle_api_errors
+
 async def bind_image_to_synth_entry(
     entry_id: PydanticObjectId,
     request: ImageBindRequest,

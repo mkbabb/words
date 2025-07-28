@@ -28,14 +28,10 @@ export {
   type LiteratureSource
 } from './api';
 
-// Frontend version of Definition with transformed examples
-export interface TransformedDefinition extends Omit<DefinitionResponse, 'examples'> {
+// Frontend version of Definition - no transformation needed
+export interface TransformedDefinition extends DefinitionResponse {
   definition?: string; // Alias for 'text' to maintain compatibility
   source?: string; // Added for provider tracking
-  examples: {
-    generated: SimpleExample[];
-    literature: SimpleExample[];
-  };
 }
 
 export interface SynthesizedDictionaryEntry extends Omit<LookupResponse, 'definitions'> {
@@ -48,12 +44,6 @@ export interface SynthesizedDictionaryEntry extends Omit<LookupResponse, 'defini
   status: string; // Entry status (active, archived, flagged, needs_review)
 }
 
-// Frontend display types
-export interface SimpleExample {
-  sentence: string;
-  regenerable?: boolean;
-  source?: string;
-}
 
 export interface SearchHistory {
   id: string;

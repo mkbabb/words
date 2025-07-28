@@ -33,7 +33,6 @@ from ..core import (
     SortParams,
     check_etag,
     get_etag,
-    handle_api_errors,
 )
 from ..repositories import (
     DefinitionCreate,
@@ -169,7 +168,6 @@ async def list_definitions(
 
 
 @router.post("", response_model=ResourceResponse, status_code=201)
-@handle_api_errors
 async def create_definition(
     data: DefinitionCreate,
     repo: DefinitionRepository = Depends(get_definition_repo),
@@ -185,7 +183,7 @@ async def create_definition(
     definition = await repo.create(data)
 
     return ResourceResponse(
-        data=definition.model_dump(),
+        data=definition.model_dump(mode='json'),
         links={
             "self": f"/definitions/{definition.id}",
             "word": f"/words/{definition.word_id}",
@@ -195,7 +193,6 @@ async def create_definition(
 
 
 @router.get("/{definition_id}", response_model=ResourceResponse)
-@handle_api_errors
 async def get_definition(
     definition_id: PydanticObjectId,
     request: Request,
@@ -251,7 +248,6 @@ async def get_definition(
 
 
 @router.put("/{definition_id}", response_model=ResourceResponse)
-@handle_api_errors
 async def update_definition(
     definition_id: PydanticObjectId,
     data: DefinitionUpdate,
@@ -272,16 +268,15 @@ async def update_definition(
     definition = await repo.update(definition_id, data, version)
 
     return ResourceResponse(
-        data=definition.model_dump(),
+        data=definition.model_dump(mode='json'),
         metadata={
             "version": definition.version,
-            "updated_at": definition.updated_at,
+            "updated_at": definition.updated_at.isoformat() if definition.updated_at else None,
         },
     )
 
 
 @router.delete("/{definition_id}", status_code=204, response_model=None)
-@handle_api_errors
 async def delete_definition(
     definition_id: PydanticObjectId,
     cascade: bool = Query(False, description="Delete related examples"),
@@ -296,7 +291,6 @@ async def delete_definition(
 
 
 @router.post("/{definition_id}/images", response_model=ResourceResponse)
-@handle_api_errors
 async def bind_image_to_definition(
     definition_id: PydanticObjectId,
     request: ImageBindRequest,
@@ -377,7 +371,7 @@ async def bind_image_to_definition(
         await definition.save()
     
     return ResourceResponse(
-        data=definition.model_dump(),
+        data=definition.model_dump(mode='json'),
         metadata={
             "image_id": str(image_media.id),
             "version": definition.version,
@@ -391,7 +385,6 @@ async def bind_image_to_definition(
 
 
 @router.post("/{definition_id}/regenerate", response_model=ResourceResponse)
-@handle_api_errors
 async def regenerate_components(
     definition_id: PydanticObjectId,
     request: ComponentRegenerationRequest,
@@ -534,7 +527,7 @@ async def regenerate_components(
     await definition.save()
 
     return ResourceResponse(
-        data=definition.model_dump(),
+        data=definition.model_dump(mode='json'),
         metadata={
             "regenerated_components": list(request.components),
             "version": definition.version,
@@ -544,7 +537,6 @@ async def regenerate_components(
 
 
 @router.post("/batch/regenerate", response_model=dict[str, Any])
-@handle_api_errors
 async def batch_regenerate_components(
     request: BatchComponentUpdate,
     repo: DefinitionRepository = Depends(get_definition_repo),

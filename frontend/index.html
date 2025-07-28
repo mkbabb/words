@@ -7,14 +7,49 @@
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png" />
     <link rel="icon" type="image/png" sizes="128x128" href="/favicon-128.png" />
     <link rel="apple-touch-icon" href="/favicon-256.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>floridify</title>
+    
+    <!-- iOS PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Floridify">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- iOS Splash Screens -->
+    <!-- iPhone 14 Pro Max -->
+    <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="/splash/iphone14promax.png">
+    <!-- iPhone 14 Pro -->
+    <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" href="/splash/iphone14pro.png">
+    <!-- iPhone 14/13/12 Pro -->
+    <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="/splash/iphone14.png">
+    <!-- iPhone 13/12 Mini -->
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" href="/splash/iphone13mini.png">
+    <!-- iPad Pro 12.9" -->
+    <link rel="apple-touch-startup-image" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" href="/splash/ipadpro129.png">
+    <!-- iPad Pro 11" -->
+    <link rel="apple-touch-startup-image" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)" href="/splash/ipadpro11.png">
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    
+    <title>Floridify - AI Dictionary</title>
     <script>
       // Prevent dark mode FOUC
       (function() {
         const savedTheme = localStorage.getItem('vueuse-color-scheme') || 'light';
         document.documentElement.classList.toggle('dark', savedTheme === 'dark');
       })();
+      
+      // Development mode: Clear service workers and caches
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        const script = document.createElement('script');
+        script.src = '/dev-sw-cleanup.js';
+        document.head.appendChild(script);
+      }
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -6,6 +6,7 @@ import Home from './views/Home.vue';
 
 // Import Tailwind CSS and custom styles
 import './assets/index.css';
+import './styles/ios-pwa.css';
 
 // Create router
 const router = createRouter({
@@ -43,6 +44,23 @@ const app = createApp(App);
 // Use plugins
 app.use(createPinia());
 app.use(router);
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  if (import.meta.env.PROD) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+        .then(registration => {
+          console.log('Service Worker registered:', registration);
+        })
+        .catch(error => {
+          console.error('Service Worker registration failed:', error);
+        });
+    });
+  } else {
+    console.log('⚠️ Service Worker registration skipped in development mode to prevent caching issues');
+  }
+}
 
 // Mount app
 app.mount('#app');

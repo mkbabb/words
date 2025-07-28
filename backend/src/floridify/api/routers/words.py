@@ -17,7 +17,6 @@ from ..core import (
     SortParams,
     check_etag,
     get_etag,
-    handle_api_errors,
 )
 from ..repositories import (
     WordCreate,
@@ -130,7 +129,7 @@ async def list_words(
 
 
 @router.post("", response_model=ResourceResponse, status_code=201)
-@handle_api_errors
+
 async def create_word(
     data: WordCreate,
     repo: WordRepository = Depends(get_word_repo),
@@ -181,7 +180,7 @@ async def create_word(
 
 
 @router.get("/{word_id}", response_model=ResourceResponse)
-@handle_api_errors
+
 async def get_word(
     word_id: PydanticObjectId,
     request: Request,
@@ -248,7 +247,7 @@ async def get_word(
 
 
 @router.put("/{word_id}", response_model=ResourceResponse)
-@handle_api_errors
+
 async def update_word(
     word_id: PydanticObjectId,
     data: WordUpdate,
@@ -285,7 +284,7 @@ async def update_word(
 
 
 @router.delete("/{word_id}", status_code=204, response_model=None)
-@handle_api_errors
+
 async def delete_word(
     word_id: PydanticObjectId,
     cascade: bool = Query(False, description="Delete related documents"),
@@ -309,7 +308,7 @@ async def delete_word(
 
 
 @router.get("/search/{query}", response_model=ListResponse[Word])
-@handle_api_errors
+
 async def search_words(
     query: str,
     language: Language | None = Query(None),

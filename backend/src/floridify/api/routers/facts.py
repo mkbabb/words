@@ -15,7 +15,6 @@ from ..core import (
     SortParams,
     check_etag,
     get_etag,
-    handle_api_errors,
 )
 from ..middleware.rate_limiting import ai_limiter, get_client_key
 from ..repositories.fact_repository import (
@@ -128,7 +127,7 @@ async def list_facts(
 
 
 @router.post("", response_model=ResourceResponse, status_code=201)
-@handle_api_errors
+
 async def create_fact(
     data: FactCreate,
     repo: FactRepository = Depends(get_fact_repo),
@@ -146,7 +145,7 @@ async def create_fact(
 
 
 @router.get("/{fact_id}", response_model=ResourceResponse)
-@handle_api_errors
+
 async def get_fact(
     fact_id: PydanticObjectId,
     request: Request,
@@ -188,7 +187,7 @@ async def get_fact(
 
 
 @router.put("/{fact_id}", response_model=ResourceResponse)
-@handle_api_errors
+
 async def update_fact(
     fact_id: PydanticObjectId,
     data: FactUpdate,
@@ -207,7 +206,7 @@ async def update_fact(
 
 
 @router.delete("/{fact_id}", status_code=204, response_model=None)
-@handle_api_errors
+
 async def delete_fact(
     fact_id: PydanticObjectId,
     repo: FactRepository = Depends(get_fact_repo),
@@ -217,7 +216,7 @@ async def delete_fact(
 
 
 @router.post("/word/{word_id}/generate", response_model=list[ResourceResponse])
-@handle_api_errors
+
 async def generate_facts_for_word(
     word_id: str,
     fact_request: FactGenerationRequest,
@@ -279,7 +278,7 @@ async def generate_facts_for_word(
 
 
 @router.get("/categories/{category}", response_model=ListResponse[Fact])
-@handle_api_errors
+
 async def get_facts_by_category(
     category: str,
     limit: int = Query(50, ge=1, le=200),

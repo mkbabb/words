@@ -13,7 +13,6 @@ from .base import (
     SortParams,
     check_etag,
     get_etag,
-    handle_api_errors,
 )
 from .cache import (
     APICacheConfig,
@@ -41,7 +40,6 @@ __all__ = [
     "BatchRequest",
     "BatchResponse",
     "BaseRepository",
-    "handle_api_errors",
     "get_etag",
     "check_etag",
     # Cache

@@ -475,6 +475,8 @@ export const useAppStore = defineStore('app', () => {
             console.log('Entry images:', entry.images);
             console.log('First definition:', entry.definitions?.[0]);
             console.log('First definition part_of_speech:', entry.definitions?.[0]?.part_of_speech);
+            console.log('First definition ID:', entry.definitions?.[0]?.id);
+            console.log('First definition examples:', entry.definitions?.[0]?.examples);
             
             // Log synth entry ID if available
             if (entry.synth_entry_id) {
@@ -488,6 +490,10 @@ export const useAppStore = defineStore('app', () => {
 
             // Add to lookup history
             addToLookupHistory(word, entry);
+            
+            // Emit events for engagement tracking
+            window.dispatchEvent(new CustomEvent('word-searched'));
+            window.dispatchEvent(new CustomEvent('definition-viewed'));
 
             // Refresh suggestions if this is a new word
             if (word !== suggestionsCache.value.lastWord) {
@@ -752,6 +758,34 @@ export const useAppStore = defineStore('app', () => {
         mode.value = 'dictionary';
     }
 
+    // Notification system
+    const notifications = ref<Array<{
+        id: string;
+        type: 'success' | 'error' | 'info' | 'warning';
+        message: string;
+        duration?: number;
+    }>>([]);
+
+    function showNotification(notification: {
+        type: 'success' | 'error' | 'info' | 'warning';
+        message: string;
+        duration?: number;
+    }) {
+        const id = generateId();
+        notifications.value.push({ id, ...notification });
+        
+        // Auto-remove after duration (default 5 seconds)
+        setTimeout(() => {
+            notifications.value = notifications.value.filter(n => n.id !== id);
+        }, notification.duration || 5000);
+    }
+
+    function removeNotification(id: string) {
+        notifications.value = notifications.value.filter(n => n.id !== id);
+    }
+
+    // Track session start time for engagement metrics
+    const sessionStartTime = ref(Date.now());
 
     // Enhanced SearchBar functions
     function toggleSearchMode() {
@@ -824,13 +858,9 @@ export const useAppStore = defineStore('app', () => {
             // Update the current entry with new examples
             if (currentEntry.value.definitions[definitionIndex]) {
                 const def = currentEntry.value.definitions[definitionIndex];
-                if (!def.examples) {
-                    def.examples = { generated: [], literature: [] };
-                }
-                def.examples.generated = response.examples.map((ex) => ({
-                    sentence: ex.sentence,
-                    regenerable: ex.regenerable,
-                }));
+                // Replace only generated examples, keep literature ones
+                const literatureExamples = def.examples?.filter(ex => ex.type === 'literature') || [];
+                def.examples = [...response.examples, ...literatureExamples];
             }
 
             // Also update in lookup history
@@ -1021,6 +1051,9 @@ export const useAppStore = defineStore('app', () => {
         sidebarActiveCluster,
         sidebarActivePartOfSpeech,
         sidebarAccordionState,
+        // Notifications
+        notifications,
+        sessionStartTime,
 
         // Computed
         searchState,
@@ -1046,6 +1079,8 @@ export const useAppStore = defineStore('app', () => {
         toggleSidebar,
         setSidebarCollapsed,
         reset,
+        showNotification,
+        removeNotification,
         // Enhanced SearchBar functions
         toggleSearchMode,
         toggleControls,
@@ -1057,5 +1092,118 @@ export const useAppStore = defineStore('app', () => {
         regenerateAllExamples,
         // AI functions
         getAISuggestions,
+        
+        // Definition update functions
+        async updateDefinition(definitionId: string, updates: any) {
+            console.log('[Store] Updating definition:', definitionId, 'with:', updates);
+            try {
+                const response = await dictionaryApi.updateDefinition(definitionId, updates);
+                console.log('[Store] Update response:', response);
+                
+                // Update current entry if this definition is part of it
+                if (currentEntry.value) {
+                    const defIndex = currentEntry.value.definitions.findIndex(
+                        d => d.id === definitionId
+                    );
+                    if (defIndex >= 0) {
+                        console.log('[Store] Updating local definition at index:', defIndex);
+                        Object.assign(currentEntry.value.definitions[defIndex], updates);
+                    } else {
+                        console.warn('[Store] Definition not found in current entry');
+                    }
+                }
+                
+                showNotification({
+                    type: 'success',
+                    message: 'Definition updated successfully',
+                    duration: 3000,
+                });
+                
+                return response;
+            } catch (error) {
+                console.error('Failed to update definition:', error);
+                showNotification({
+                    type: 'error',
+                    message: 'Failed to update definition',
+                    duration: 5000,
+                });
+                throw error;
+            }
+        },
+        
+        async updateExample(exampleId: string, updates: { text: string }) {
+            console.log('[Store] Updating example:', exampleId, 'with:', updates);
+            try {
+                const response = await dictionaryApi.updateExample(exampleId, updates);
+                console.log('[Store] Example update response:', response);
+                
+                showNotification({
+                    type: 'success',
+                    message: 'Example updated successfully',
+                    duration: 3000,
+                });
+                
+                return response;
+            } catch (error) {
+                console.error('[Store] Failed to update example:', error);
+                showNotification({
+                    type: 'error',
+                    message: 'Failed to update example',
+                    duration: 3000,
+                });
+                throw error;
+            }
+        },
+        
+        async regenerateDefinitionComponent(definitionId: string, component: string) {
+            try {
+                const response = await dictionaryApi.regenerateDefinitionComponent(
+                    definitionId,
+                    component
+                );
+                
+                // Update current entry with regenerated data
+                if (currentEntry.value) {
+                    const defIndex = currentEntry.value.definitions.findIndex(
+                        d => d.id === definitionId
+                    );
+                    if (defIndex >= 0) {
+                        const def = currentEntry.value.definitions[defIndex];
+                        // Update the specific component
+                        if (component === 'language_register') {
+                            def.language_register = response[component];
+                        } else if (component in def) {
+                            (def as any)[component] = response[component];
+                        }
+                    }
+                }
+                
+                showNotification({
+                    type: 'success',
+                    message: `${component} regenerated successfully`,
+                    duration: 3000,
+                });
+                
+                return response;
+            } catch (error) {
+                console.error(`Failed to regenerate ${component}:`, error);
+                showNotification({
+                    type: 'error',
+                    message: `Failed to regenerate ${component}`,
+                    duration: 5000,
+                });
+                throw error;
+            }
+        },
+        
+        async fetchDefinition(definitionId: string) {
+            try {
+                const response = await dictionaryApi.getDefinitionById(definitionId);
+                return response;
+            } catch (error) {
+                console.error('Failed to fetch definition:', error);
+                throw error;
+            }
+        },
     };
 });

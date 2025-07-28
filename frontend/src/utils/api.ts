@@ -14,7 +14,6 @@ import type {
   TransformedDefinition,
   ThesaurusEntry,
   VocabularySuggestionsResponse,
-  SimpleExample,
   WordSuggestionResponse,
 } from '@/types';
 
@@ -92,46 +91,6 @@ export const dictionaryApi = {
     }
   },
 
-  // Transform flat examples array to grouped structure
-  transformDefinitionExamples(definition: DefinitionResponse): TransformedDefinition {
-    if (!definition.examples || !Array.isArray(definition.examples)) {
-      return {
-        ...definition,
-        definition: definition.text, // Add alias for compatibility
-        examples: {
-          generated: [],
-          literature: []
-        }
-      } as TransformedDefinition;
-    }
-
-    // Group examples by type
-    const grouped = {
-      generated: [] as SimpleExample[],
-      literature: [] as SimpleExample[]
-    };
-
-    definition.examples.forEach((example: Example) => {
-      if (example.type === 'generated') {
-        grouped.generated.push({
-          sentence: example.text,
-          regenerable: true
-        });
-      } else if (example.type === 'literature') {
-        grouped.literature.push({
-          sentence: example.text,
-          regenerable: false,
-          source: example.source?.title || 'Unknown source'
-        });
-      }
-    });
-
-    return {
-      ...definition,
-      definition: definition.text, // Add alias for compatibility
-      examples: grouped
-    } as TransformedDefinition;
-  },
 
   // Get word definition
   async getDefinition(
@@ -163,15 +122,9 @@ export const dictionaryApi = {
       params: Object.fromEntries(params.entries())
     });
     
-    // Transform the response to match frontend expectations
-    const transformedDefinitions = response.data.definitions?.map((def: DefinitionResponse) => 
-      this.transformDefinitionExamples(def)
-    ) || [];
-    
-    // Add frontend-specific fields
+    // Add frontend-specific fields (no transformation needed)
     return {
       ...response.data,
-      definitions: transformedDefinitions,
       lookup_count: 0,
       regeneration_count: 0,
       status: 'active'
@@ -247,15 +200,9 @@ export const dictionaryApi = {
           // Extract the result from the details field, or fallback to direct data
           const result = data.details?.result || data;
           
-          // Transform definitions if present
-          const transformedDefinitions = result.definitions?.map((def: DefinitionResponse) => 
-            this.transformDefinitionExamples(def)
-          ) || [];
-          
-          // Add frontend-specific fields
+          // Add frontend-specific fields (no transformation needed)
           const synthesizedEntry: SynthesizedDictionaryEntry = {
             ...result,
-            definitions: transformedDefinitions,
             lookup_count: 0,
             regeneration_count: 0,
             status: 'active'
@@ -455,6 +402,47 @@ export const dictionaryApi = {
   async healthCheck(): Promise<{ status: string }> {
     const response = await api.get('/health');
     return response.data;
+  },
+
+  // Update definition
+  async updateDefinition(definitionId: string, updates: any): Promise<any> {
+    console.log('[API] Updating definition:', definitionId, 'with:', updates);
+    try {
+      const response = await api.put(`/definitions/${definitionId}`, updates);
+      console.log('[API] Update successful:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[API] Update failed:', error);
+      throw error;
+    }
+  },
+
+  // Update example
+  async updateExample(exampleId: string, updates: { text: string }): Promise<any> {
+    console.log('[API] Updating example:', exampleId, 'with:', updates);
+    try {
+      const response = await api.put(`/examples/${exampleId}`, updates);
+      console.log('[API] Example update successful:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[API] Example update failed:', error);
+      throw error;
+    }
+  },
+
+  // Regenerate definition component
+  async regenerateDefinitionComponent(definitionId: string, component: string): Promise<any> {
+    const response = await api.post(`/definitions/${definitionId}/regenerate`, {
+      components: [component],
+      force: true
+    });
+    return response.data.data;
+  },
+
+  // Get definition by ID
+  async getDefinitionById(definitionId: string): Promise<any> {
+    const response = await api.get(`/definitions/${definitionId}`);
+    return response.data.data;
   },
 };
 

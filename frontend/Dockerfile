@@ -28,9 +28,12 @@ RUN --mount=type=cache,target=/root/.npm \
 FROM base AS development
 WORKDIR /app
 
+# Copy package.json for npm scripts
+COPY package*.json ./
+
 # Copy dependencies
 COPY --from=dev-dependencies /app/node_modules ./node_modules
-COPY . .
+# Don't copy source files - they'll be mounted via volume
 
 # Environment for hot reloading
 ENV CHOKIDAR_USEPOLLING=true
@@ -50,8 +53,10 @@ COPY . .
 # Build arguments for environment variables
 ARG VITE_API_URL
 ARG VITE_APP_TITLE="Floridify"
+ARG VITE_VAPID_PUBLIC_KEY
 ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_APP_TITLE=${VITE_APP_TITLE}
+ENV VITE_VAPID_PUBLIC_KEY=${VITE_VAPID_PUBLIC_KEY}
 
 # Build the application
 RUN npm run build

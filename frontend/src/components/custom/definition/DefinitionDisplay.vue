@@ -2,12 +2,14 @@
     <div v-if="entry" class="relative">
         <!-- Main Card -->
         <ThemedCard :variant="store.selectedCardVariant" class="relative">
-            <!-- Theme Selector -->
+            <!-- Theme Selector (includes edit button) -->
             <ThemeSelector 
                 v-model="store.selectedCardVariant"
                 :isMounted="isMounted"
                 :showDropdown="showThemeDropdown"
+                :editModeEnabled="editModeEnabled"
                 @toggle-dropdown="showThemeDropdown = !showThemeDropdown"
+                @toggle-edit-mode="editModeEnabled = !editModeEnabled"
             />
             
             <!-- First Image Display -->
@@ -50,6 +52,8 @@
                                 :clusterIndex="clusterIndex"
                                 :totalClusters="groupedDefinitions.length"
                                 :cardVariant="store.selectedCardVariant"
+                                :editModeEnabled="editModeEnabled"
+                                @update:cluster-name="handleClusterNameUpdate"
                             >
                                 <DefinitionItem
                                     v-for="(definition, defIndex) in cluster.definitions"
@@ -59,6 +63,7 @@
                                     :isRegenerating="regeneratingIndex === getGlobalDefinitionIndex(clusterIndex, defIndex)"
                                     :isFirstInGroup="defIndex === 0"
                                     :isAISynthesized="!!entry.model_info"
+                                    :editModeEnabled="editModeEnabled"
                                     @regenerate="handleRegenerateExamples"
                                     @searchWord="store.searchWord"
                                 />
@@ -101,7 +106,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useMagicKeys, whenever } from '@vueuse/core';
 import { useAppStore } from '@/stores';
 import { CardContent } from '@/components/ui/card';
 import {
@@ -125,6 +131,7 @@ const regeneratingIndex = ref<number | null>(null);
 const animationKey = ref(0);
 const isMounted = ref(false);
 const showThemeDropdown = ref(false);
+const editModeEnabled = ref(false);
 
 // Computed properties
 const entry = computed(() => store.currentEntry);
@@ -215,17 +222,60 @@ const handleImageClick = () => {
     }
 };
 
-// Keyboard navigation
-const handleKeyDown = (event: KeyboardEvent) => {
-    if (!entry.value?.definitions) return;
+const handleClusterNameUpdate = async (clusterId: string, newName: string) => {
+    // Find the first definition in this cluster to update
+    const definition = entry.value?.definitions?.find(def => 
+        def.meaning_cluster?.id === clusterId || 
+        def.meaning_cluster?.name === clusterId
+    );
     
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        // Let ProgressiveSidebar handle the navigation
+    if (definition?.id) {
+        await store.updateDefinition(definition.id, {
+            meaning_cluster_name: newName
+        });
+    }
+};
+
+// Keyboard shortcuts using VueUse magic keys
+const keys = useMagicKeys();
+
+// Toggle edit mode with Cmd/Ctrl + E
+whenever(keys.cmd_e, () => {
+    editModeEnabled.value = !editModeEnabled.value;
+});
+whenever(keys.ctrl_e, () => {
+    editModeEnabled.value = !editModeEnabled.value;
+});
+
+// Exit edit mode with Escape
+whenever(keys.escape, () => {
+    if (editModeEnabled.value) {
+        editModeEnabled.value = false;
+        // Trigger save when exiting edit mode
+        saveAllChanges();
+    }
+});
+
+// Navigation with arrow keys
+whenever(keys.arrowdown, () => {
+    if (entry.value?.definitions) {
         document.dispatchEvent(new CustomEvent('navigate-definition', { 
-            detail: { direction: event.key === 'ArrowDown' ? 'next' : 'prev' } 
+            detail: { direction: 'next' } 
         }));
     }
+});
+whenever(keys.arrowup, () => {
+    if (entry.value?.definitions) {
+        document.dispatchEvent(new CustomEvent('navigate-definition', { 
+            detail: { direction: 'prev' } 
+        }));
+    }
+});
+
+// Save all changes function
+const saveAllChanges = () => {
+    // Emit a global save event that all EditableField components can listen to
+    document.dispatchEvent(new CustomEvent('save-all-edits'));
 };
 
 // Watch mode changes to ensure thesaurus data is loaded and trigger animations
@@ -242,15 +292,23 @@ watch(() => store.mode, async (newMode, oldMode) => {
 });
 
 // Lifecycle
-onMounted(() => {
-    isMounted.value = true;
-    startCycle();
-    document.addEventListener('keydown', handleKeyDown);
-});
+watch(() => isMounted.value, (mounted) => {
+    if (mounted) {
+        startCycle();
+    } else {
+        stopCycle();
+    }
+}, { immediate: true });
 
-onUnmounted(() => {
-    stopCycle();
-    document.removeEventListener('keydown', handleKeyDown);
+// Set mounted state
+isMounted.value = true;
+
+// Watch edit mode changes to save
+watch(editModeEnabled, (newVal, oldVal) => {
+    if (oldVal && !newVal) {
+        // Save when turning off edit mode
+        saveAllChanges();
+    }
 });
 </script>
 

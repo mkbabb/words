@@ -1,0 +1,51 @@
+# Production overrides for notification service
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.notification.yml -f docker-compose.prod.yml -f docker-compose.prod.notification.yml up
+version: '3.8'
+
+services:
+  notification-server:
+    image: ${DOCKER_REGISTRY}/floridify-notification-server:${VERSION:-latest}
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: warn
+    volumes:
+      # Production volumes with proper permissions
+      - type: volume
+        source: notification_logs
+        target: /app/logs
+        read_only: false
+    deploy:
+      mode: replicated
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 30s
+        max_failure_ratio: 0.3
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=notification"
+        
+  redis:
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+        labels: "service=redis"

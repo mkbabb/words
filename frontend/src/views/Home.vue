@@ -46,13 +46,8 @@
                     <div :class="['flex-1 max-w-5xl mx-auto', store.mode === 'suggestions' ? 'px-4 sm:px-2' : '']">
                         <!-- Animated Content Cards -->
                         <Transition
+                    name="content-switch"
                     mode="out-in"
-                    enter-active-class="transition-all duration-600 ease-out"
-                    leave-active-class="transition-all duration-400 ease-in"
-                    enter-from-class="opacity-0"
-                    enter-to-class="opacity-100"
-                    leave-from-class="opacity-100"
-                    leave-to-class="opacity-0"
                 >
                     <!-- Definition Content -->
                     <div v-if="store.searchMode === 'lookup' && store.mode !== 'suggestions'" key="lookup">
@@ -64,15 +59,10 @@
                         <!-- Definition Display with Fade Transition -->
                         <Transition
                             v-else-if="currentEntry || previousEntry"
+                            name="definition-switch"
                             mode="out-in"
-                            enter-active-class="transition-opacity duration-600 ease-out"
-                            leave-active-class="transition-opacity duration-400 ease-in"
-                            enter-from-class="opacity-0"
-                            enter-to-class="opacity-100"
-                            leave-from-class="opacity-100"
-                            leave-to-class="opacity-0"
                         >
-                            <div :key="currentEntry?.id || currentEntry?.word || 'empty'" class="space-y-8">
+                            <div :key="currentEntry?.word || 'empty'" class="space-y-8">
                                 <DefinitionDisplay v-if="currentEntry" />
                             </div>
                         </Transition>
@@ -245,8 +235,8 @@ const searchBarClasses = computed(() => {
 
 // Should show progressive sidebar
 const shouldShowProgressiveSidebar = computed(() => {
-    // Only show in dictionary mode with a current entry
-    if (store.mode !== 'dictionary' || !currentEntry.value) return false;
+    // Only show in lookup mode with dictionary content and a current entry
+    if (store.searchMode !== 'lookup' || store.mode !== 'dictionary' || !currentEntry.value) return false;
     
     // Check if we have multiple clusters
     const definitions = currentEntry.value.definitions;
@@ -259,6 +249,64 @@ const shouldShowProgressiveSidebar = computed(() => {
 </script>
 
 <style scoped>
+/* Content transitions - consistent with mode switching animation */
+.content-switch-enter-active {
+    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* apple-spring */
+}
+
+.content-switch-leave-active {
+    transition: all 0.25s cubic-bezier(0.6, -0.28, 0.735, 0.045); /* apple-bounce-in */
+}
+
+.content-switch-enter-from {
+    opacity: 0;
+    transform: scale(0.95) translateY(20px);
+}
+
+.content-switch-enter-to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.content-switch-leave-from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.content-switch-leave-to {
+    opacity: 0;
+    transform: scale(0.95) translateY(-20px);
+}
+
+/* Definition switching - smoother, opacity-focused */
+.definition-switch-enter-active {
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* apple-spring */
+}
+
+.definition-switch-leave-active {
+    transition: all 0.2s cubic-bezier(0.6, -0.28, 0.735, 0.045); /* apple-bounce-in */
+}
+
+.definition-switch-enter-from {
+    opacity: 0;
+    transform: scale(0.98) translateY(10px);
+}
+
+.definition-switch-enter-to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.definition-switch-leave-from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.definition-switch-leave-to {
+    opacity: 0;
+    transform: scale(0.98) translateY(-10px);
+}
+
 /* Progressive sidebar slide animation - Apple-style bounce */
 .sidebar-slide-enter-active {
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* apple-spring */

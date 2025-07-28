@@ -2,7 +2,7 @@
     <div
         ref="searchContainer"
         :class="[
-            'search-container relative z-50 mx-auto w-full origin-top px-1 sm:px-0',
+            'search-container relative z-30 mx-auto w-full origin-top px-1 sm:px-0',
             props.className,
         ]"
         :style="containerStyle"
@@ -211,7 +211,7 @@
             />
 
             <!-- Dropdowns Container -->
-            <div class="absolute top-full right-0 left-0 z-50 pt-2">
+            <div class="absolute top-full right-0 left-0 z-40 pt-2">
                 <!-- Controls Dropdown -->
                 <SearchControls
                     :show="state.showControls"

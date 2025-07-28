@@ -12,42 +12,83 @@
         />
 
         <div class="flex items-center gap-2">
-            <span class="text-2xl font-semibold text-primary">
-                {{ definition.part_of_speech }}
-            </span>
+            <EditableField
+                v-model="fields.part_of_speech.value"
+                field-name="part of speech"
+                :edit-mode="props.editModeEnabled"
+                :errors="fields.part_of_speech.errors"
+                @update:model-value="(value) => { 
+                    fields.part_of_speech.value = String(value);
+                    fields.part_of_speech.isDirty = true;
+                    save(); 
+                }"
+            >
+                <template #display>
+                    <span class="text-2xl font-semibold text-primary">
+                        {{ definition.part_of_speech }}
+                    </span>
+                </template>
+            </EditableField>
             <sup class="text-sm font-normal text-muted-foreground">{{ definitionIndex + 1 }}</sup>
         </div>
 
         <div class="border-l-2 border-accent pl-4">
-            <p class="text-base leading-relaxed" style="font-family: 'Fraunces', serif;">
-                {{ definition.definition || definition.text }}
-            </p>
+            <EditableField
+                v-model="fields.text.value"
+                field-name="definition"
+                :multiline="true"
+                :edit-mode="props.editModeEnabled"
+                :can-regenerate="canRegenerate('text')"
+                :is-regenerating="fields.text.isRegenerating"
+                :errors="fields.text.errors"
+                @regenerate="regenerateComponent('text')"
+                @update:model-value="(val) => { 
+                    fields.text.value = val;
+                    fields.text.isDirty = true;
+                    save(); 
+                }"
+            >
+                <template #display>
+                    <p class="text-base leading-relaxed" style="font-family: 'Fraunces', serif;">
+                        {{ definition.definition || definition.text }}
+                    </p>
+                </template>
+            </EditableField>
 
             <!-- Examples -->
-            <ExampleList
+            <ExampleListEditable
                 v-if="definition.examples"
                 :examples="definition.examples"
                 :word="store.currentEntry?.word || ''"
-                :regenerating="isRegenerating"
-                @regenerate="$emit('regenerate', definitionIndex)"
+                :edit-mode="props.editModeEnabled"
+                @update:example="handleExampleUpdate"
+                @regenerate:example="handleExampleRegenerate"
             />
 
             <!-- Synonyms -->
-            <SynonymList
+            <SynonymListEditable
                 v-if="shouldShowSynonyms"
-                :synonyms="definition.synonyms"
-                @synonym-click="$emit('searchWord', $event)"
+                :synonyms="fields.synonyms.value"
+                :edit-mode="props.editModeEnabled"
+                :can-regenerate="canRegenerate('synonyms')"
+                :is-regenerating="fields.synonyms.isRegenerating"
+                @update:synonyms="(val) => { fields.synonyms.value = val; save(); }"
+                @regenerate="regenerateComponent('synonyms')"
+                @synonym-click="emit('searchWord', $event)"
             />
         </div>
     </div>
 </template>
 
+
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useAppStore } from '@/stores';
+import { useDefinitionEditMode } from '@/composables';
 import type { TransformedDefinition } from '@/types';
-import ExampleList from './ExampleList.vue';
-import SynonymList from './SynonymList.vue';
+import ExampleListEditable from './ExampleListEditable.vue';
+import SynonymListEditable from './SynonymListEditable.vue';
+import EditableField from './EditableField.vue';
 
 interface DefinitionItemProps {
     definition: TransformedDefinition;
@@ -55,10 +96,42 @@ interface DefinitionItemProps {
     isRegenerating: boolean;
     isFirstInGroup?: boolean;
     isAISynthesized?: boolean;
+    editModeEnabled?: boolean;
 }
 
 const store = useAppStore();
 const props = defineProps<DefinitionItemProps>();
+
+// Debug logging
+console.log('[DefinitionItem] Definition:', props.definition);
+console.log('[DefinitionItem] Definition ID:', props.definition.id);
+console.log('[DefinitionItem] Definition examples:', props.definition.examples);
+
+// Create a ref for the definition to use with edit mode
+const definitionRef = computed(() => props.definition);
+
+// Use edit mode composable
+const {
+    fields,
+    save,
+    regenerateComponent,
+    canRegenerate,
+} = useDefinitionEditMode(definitionRef, {
+    onSave: async (updates) => {
+        console.log('[DefinitionItem] onSave called with updates:', updates);
+        if (props.definition.id) {
+            console.log('[DefinitionItem] Calling store.updateDefinition with id:', props.definition.id);
+            await store.updateDefinition(props.definition.id, updates);
+        } else {
+            console.error('[DefinitionItem] No definition ID available!');
+        }
+    },
+    onRegenerate: async (component) => {
+        if (props.definition.id) {
+            await store.regenerateDefinitionComponent(props.definition.id, component);
+        }
+    },
+});
 
 // Check if we need separator (not the first definition in the overall list)
 const isSeparatorNeeded = computed(() => props.definitionIndex > 0);
@@ -73,8 +146,42 @@ const shouldShowSynonyms = computed(() => {
     return props.isFirstInGroup && props.definition.synonyms && props.definition.synonyms.length > 0;
 });
 
-defineEmits<{
+const emit = defineEmits<{
     'regenerate': [index: number];
     'searchWord': [word: string];
 }>();
+
+// Handle example updates
+async function handleExampleUpdate(index: number, value: string) {
+    console.log('[DefinitionItem] handleExampleUpdate:', index, value);
+    if (props.definition.examples && props.definition.examples[index]) {
+        const example = props.definition.examples[index];
+        if (example.id) {
+            console.log('[DefinitionItem] Updating example with ID:', example.id);
+            try {
+                // Update via the examples API endpoint
+                await store.updateExample(example.id, { text: value });
+                // Update local state after successful save
+                example.text = value;
+            } catch (error) {
+                console.error('[DefinitionItem] Failed to update example:', error);
+                store.showNotification({
+                    type: 'error',
+                    message: 'Failed to update example',
+                    duration: 3000
+                });
+            }
+        } else {
+            console.warn('[DefinitionItem] Example has no ID, cannot update');
+        }
+    }
+}
+
+// Handle individual example regeneration
+async function handleExampleRegenerate(index: number) {
+    if (props.definition.examples && props.definition.examples[index]?.type === 'generated' && props.definition.id) {
+        // Call store method to regenerate single example
+        emit('regenerate', props.definitionIndex);
+    }
+}
 </script>
