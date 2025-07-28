@@ -38,11 +38,14 @@
                         v-for="source in DICTIONARY_SOURCES"
                         :key="source.id"
                         @click="toggleSource(source.id)"
+                        :disabled="noAI && selectedSources.length > 0 && !selectedSources.includes(source.id)"
                         :class="[
                             'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200',
                             selectedSources.includes(source.id)
                                 ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                                : noAI && selectedSources.length > 0
+                                    ? 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed'
+                                    : 'bg-muted text-muted-foreground hover:bg-muted/80',
                         ]"
                     >
                         <component :is="source.icon" :size="16" />
@@ -73,26 +76,6 @@
                         {{ language.label }}
                     </button>
                 </div>
-            </div>
-
-            <!-- AI Toggle (Lookup Mode) -->
-            <div
-                v-if="searchMode === 'lookup'"
-                class="border-t border-border/50 px-4 py-3"
-            >
-                <h3 class="mb-3 text-sm font-medium">AI Mode</h3>
-                <button
-                    @click="noAI = !noAI"
-                    :class="[
-                        'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200',
-                        !noAI
-                            ? 'bg-primary text-primary-foreground shadow-sm'
-                            : 'bg-muted text-muted-foreground hover:bg-muted/80',
-                    ]"
-                >
-                    <Sparkles :size="16" />
-                    {{ !noAI ? 'AI Synthesis' : 'No AI' }}
-                </button>
             </div>
 
             <!-- Actions Row -->
@@ -173,8 +156,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { Trash2, Menu, RefreshCw, Sparkles } from 'lucide-vue-next';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { Trash2, PanelLeft, RefreshCw, Wand2 } from 'lucide-vue-next';
 import { Button } from '@/components/ui';
 import { BouncyToggle } from '@/components/custom/animation';
 import { DICTIONARY_SOURCES, LANGUAGES } from '../constants/sources';

@@ -143,18 +143,37 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
               ${{ env.EC2_USER }}@${{ steps.runner-info.outputs.INSTANCE_IP }} << 'ENDSSH'
+            # Check if floridify directory exists, if not clone it
+            if [ ! -d ~/floridify ]; then
+              echo "Cloning repository..."
+              git clone https://github.com/mkbabb/words.git ~/floridify
+            fi
+            
             cd ~/floridify
             
             # Pull latest code
             git pull origin master
             
-            # Set environment variables needed by deploy script
-            export EC2_HOST=${{ steps.runner-info.outputs.INSTANCE_IP }}
-            export EC2_USER=${{ env.EC2_USER }}
-            export DOMAIN=${TARGET_DOMAIN}
+            # Make sure auth directory exists and has config
+            if [ ! -f ~/floridify/auth/config.toml ]; then
+              echo "Error: auth/config.toml not found on server"
+              echo "Please ensure auth/config.toml exists at ~/floridify/auth/config.toml"
+              exit 1
+            fi
             
-            # Run deploy script on server (without GITHUB_ACTIONS set)
-            ./scripts/deploy
+            # Run the setup script to ensure everything is configured
+            if [ -f ./scripts/setup ]; then
+              ./scripts/setup
+            fi
+            
+            # Build and deploy directly (skip SSH steps since we're on the server)
+            cd ~/floridify
+            
+            # Run docker compose build and up
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            
+            echo "Deployment completed!"
           ENDSSH
       
       - name: Remove runner IP from security group
