@@ -1,23 +1,5 @@
 <template>
   <div>
-    <!-- Mobile Toggle Button -->
-    <div
-      :class="cn(
-        'fixed top-[50%] z-70 transition-all duration-400 ease-apple-smooth lg:hidden',
-        { 'hidden': sidebarOpen }
-      )"
-    >
-      <button
-        @click="store.toggleSidebar()"
-        :class="cn(
-          'bg-background/80 border-border flex items-center justify-center border-2 shadow-lg backdrop-blur-sm transition-all duration-200',
-          'rounded-lg h-8 w-8 p-1.5 hover:scale-110'
-        )"
-      >
-        <ChevronLeft :size="12" class="text-muted-foreground rotate-180" />
-      </button>
-    </div>
-
     <!-- Desktop Sidebar -->
     <aside
       :class="cn(

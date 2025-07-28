@@ -84,48 +84,81 @@
                 class="border-t border-border/50 px-4 py-3"
             >
                 <h3 class="mb-3 text-sm font-medium">Actions</h3>
-                <div class="grid grid-cols-4 gap-2">
+                <div class="flex gap-2 justify-start">
                     <!-- Sidebar Toggle (Mobile Only) -->
                     <button
                         v-if="isMobile"
                         @click="$emit('toggle-sidebar')"
-                        class="hover-lift flex items-center justify-center rounded-lg bg-muted p-2 transition-all duration-200 hover:bg-muted/80"
+                        class="group hover-lift flex items-center justify-center rounded-lg bg-muted p-2 transition-all duration-200 hover:bg-muted/80"
                         title="Toggle Sidebar"
                     >
                         <PanelLeft 
                             :size="16" 
-                            class="text-foreground/70 transition-colors duration-200"
+                            class="text-foreground/70 transition-all duration-200 group-hover:scale-110"
+                        />
+                    </button>
+                    
+                    <!-- AI Mode Toggle -->
+                    <button
+                        @click="handleAIToggle"
+                        :class="[
+                            'group hover-lift flex items-center justify-center rounded-lg p-2 transition-all duration-200',
+                            !noAI
+                                ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                                : 'bg-muted text-foreground/70 hover:bg-muted/80 hover:text-foreground'
+                        ]"
+                        :title="!noAI ? 'AI synthesis enabled' : 'Raw provider data only'"
+                    >
+                        <Wand2 
+                            :size="16" 
+                            :class="[
+                                'transition-all duration-300',
+                                aiAnimating && 'animate-sparkle',
+                                'group-hover:scale-110'
+                            ]"
                         />
                     </button>
                     
                     <!-- Force Refresh Toggle -->
                     <button
                         v-if="showRefreshButton"
-                        @click="$emit('toggle-refresh')"
+                        @click="handleRefreshToggle"
                         :class="[
-                            'hover-lift flex items-center justify-center rounded-lg p-2 transition-all duration-200',
+                            'group hover-lift flex items-center justify-center rounded-lg p-2 transition-all duration-200',
                             forceRefreshMode
-                                ? 'bg-primary/20 text-primary'
-                                : 'bg-muted hover:bg-muted/80 text-foreground/70'
+                                ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                                : 'bg-muted text-foreground/70 hover:bg-muted/80 hover:text-foreground'
                         ]"
                         :title="forceRefreshMode ? 'Force refresh mode ON' : 'Toggle force refresh mode'"
                     >
                         <RefreshCw 
                             :size="16" 
-                            class="transition-colors duration-200"
+                            :class="[
+                                'transition-all duration-300',
+                                'group-hover:rotate-180 group-hover:scale-110',
+                                forceRefreshMode && 'animate-spin-slow'
+                            ]"
                         />
                     </button>
                     
                     <!-- Clear Storage (Debug) -->
                     <button
                         v-if="isDevelopment"
-                        @click="$emit('clear-storage')"
-                        class="hover-lift flex items-center justify-center rounded-lg bg-red-50 dark:bg-red-500/10 p-2 text-red-600 dark:text-red-500 transition-all duration-200 hover:bg-red-100 dark:hover:bg-red-500/20"
-                        title="Clear All Storage"
+                        @click="handleClearStorage"
+                        :class="[
+                            'group hover-lift flex items-center justify-center rounded-lg p-2 transition-all duration-200',
+                            'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-500',
+                            'hover:bg-red-100 dark:hover:bg-red-500/20 hover:text-red-700 dark:hover:text-red-400'
+                        ]"
+                        :title="'Clear All Storage'"
                     >
                         <Trash2 
                             :size="16" 
-                            class="text-muted-foreground/70 transition-colors duration-200 hover:text-destructive dark:text-muted-foreground"
+                            :class="[
+                                'transition-all duration-300',
+                                'group-hover:scale-110',
+                                trashAnimating && 'animate-wiggle'
+                            ]"
                         />
                     </button>
                 </div>
@@ -207,13 +240,29 @@ onUnmounted(() => {
     window.removeEventListener('resize', handleResize);
 });
 
+// Animation states
+const aiAnimating = ref(false);
+const trashAnimating = ref(false);
+
 // Helper functions for toggling
 const toggleSource = (sourceId: string) => {
-    const index = selectedSources.value.indexOf(sourceId);
-    if (index > -1) {
-        selectedSources.value.splice(index, 1);
+    // In no-AI mode, only allow one source at a time
+    if (noAI.value) {
+        if (selectedSources.value.includes(sourceId)) {
+            // Deselect if already selected
+            selectedSources.value = [];
+        } else {
+            // Select only this source
+            selectedSources.value = [sourceId];
+        }
     } else {
-        selectedSources.value.push(sourceId);
+        // Normal multi-select behavior
+        const index = selectedSources.value.indexOf(sourceId);
+        if (index > -1) {
+            selectedSources.value.splice(index, 1);
+        } else {
+            selectedSources.value.push(sourceId);
+        }
     }
 };
 
@@ -230,6 +279,35 @@ const controlsDropdown = ref<HTMLDivElement>();
 
 // Emit is used in template
 void emit;
+
+// Event handlers
+const handleAIToggle = () => {
+    noAI.value = !noAI.value;
+    aiAnimating.value = true;
+    setTimeout(() => {
+        aiAnimating.value = false;
+    }, 600);
+};
+
+const handleRefreshToggle = () => {
+    emit('toggle-refresh');
+};
+
+const handleClearStorage = () => {
+    trashAnimating.value = true;
+    setTimeout(() => {
+        trashAnimating.value = false;
+        emit('clear-storage');
+    }, 600);
+};
+
+// When noAI mode changes, ensure only one source is selected
+watch(noAI, (newValue) => {
+    if (newValue && selectedSources.value.length > 1) {
+        // Keep only the first source when entering no-AI mode
+        selectedSources.value = [selectedSources.value[0]];
+    }
+});
 
 defineExpose({
     element: controlsDropdown
