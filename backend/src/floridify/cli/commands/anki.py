@@ -150,8 +150,7 @@ async def _export_async(
         from ...utils.text_utils import normalize_word
 
         search_engine = await get_search_engine(
-            languages=[Language.ENGLISH],
-            enable_semantic=False,
+            languages=[Language.ENGLISH]
         )
 
         word_frequency_map: dict[str, int] = {}

@@ -21,6 +21,7 @@ from ...ai.synthesis_functions import (
     synthesize_synonyms,
     usage_note_generation,
 )
+from ...ai.constants import SynthesisComponent
 from ...models import Definition, ImageMedia, Word
 from ..core import (
     ErrorDetail,
@@ -422,7 +423,8 @@ async def regenerate_components(
     ai = get_openai_connector()
 
     # Map component names to functions
-    component_functions = {
+    from typing import Callable, Any
+    component_functions: dict[str, Callable[..., Any]] = {
         "synonyms": synthesize_synonyms,
         "antonyms": synthesize_antonyms,
         "examples": generate_examples,
@@ -559,8 +561,9 @@ async def batch_regenerate_components(
         Processing summary and results by word.
     """
     # Get definitions
-    definition_ids = [PydanticObjectId(id) for id in request.definition_ids]
-    definitions = await repo.get_many(definition_ids)
+    from beanie import PydanticObjectId
+    definition_oids = [PydanticObjectId(id_str) if isinstance(id_str, str) else id_str for id_str in request.definition_ids]
+    definitions = await repo.get_many(definition_oids)
 
     if len(definitions) != len(request.definition_ids):
         raise HTTPException(404, "Some definitions not found")
@@ -584,14 +587,18 @@ async def batch_regenerate_components(
             continue
 
         # Process definitions for this word
-        results = await enhance_definitions_parallel(
+        # Convert string components to SynthesisComponent enum
+        synthesis_components = {SynthesisComponent(comp) for comp in request.components} if request.components else None
+        
+        await enhance_definitions_parallel(
             word_definitions,
             word,
             ai,
-            components=request.components,
+            components=synthesis_components,
             force_refresh=request.force,
         )
-        all_results[word_id] = results
+        # enhance_definitions_parallel modifies definitions in place
+        all_results[word_id] = {"processed": len(word_definitions)}
 
     # Save all definitions
     for definition in definitions:

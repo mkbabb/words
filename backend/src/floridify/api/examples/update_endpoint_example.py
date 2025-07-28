@@ -78,7 +78,7 @@ async def get_synonyms(word: str) -> list[str]:
 class MigrationExample:
     """Example showing how to gradually migrate existing code."""
     
-    def __init__(self, use_deduplication: bool = False):
+    def __init__(self, use_deduplication: bool = False) -> None:
         self.use_deduplication = use_deduplication
     
     async def lookup_definition(self, word: str) -> dict[str, Any]:
@@ -104,7 +104,7 @@ class MigrationExample:
 
 
 # Real-world example: Updating the existing lookup endpoint
-def update_lookup_endpoint_example():
+def update_lookup_endpoint_example() -> None:
     """Shows the minimal changes needed to add deduplication."""
     
     # Original code:
@@ -141,7 +141,7 @@ def update_lookup_endpoint_example():
 class DeduplicationMetrics:
     """Track deduplication effectiveness."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self.total_requests = 0
         self.deduplicated_requests = 0
         self.cache_hits = 0
@@ -177,7 +177,7 @@ class DeduplicationMetrics:
 
 
 # Example of custom key generation for complex scenarios
-def custom_dedup_key_example():
+def custom_dedup_key_example() -> dict[str, Any]:
     """Shows different key generation strategies."""
     
     # 1. Simple key based on single parameter
@@ -187,21 +187,21 @@ def custom_dedup_key_example():
     composite_key = lambda user_id, resource_id: f"user:{user_id}:resource:{resource_id}"
     
     # 3. Key that ignores certain parameters
-    def selective_key(word: str, include_etymology: bool = False, debug: bool = False):
+    def selective_key(word: str, include_etymology: bool = False, debug: bool = False) -> tuple[str, str, bool]:
         # Ignore debug flag in deduplication key
-        return f"word:{word}:etymology:{include_etymology}"
+        return ("word", word, include_etymology)
     
     # 4. Key with normalized values
-    def normalized_key(query: str, limit: int = 10):
+    def normalized_key(query: str, limit: int = 10) -> tuple[str, str, int]:
         # Normalize query to lowercase and cap limit
-        return f"search:{query.lower()}:limit:{min(limit, 100)}"
+        return ("search", query.lower(), min(limit, 100))
     
     # 5. Key for time-bucketed deduplication
-    def time_bucketed_key(user_id: str, bucket_minutes: int = 5):
+    def time_bucketed_key(user_id: str, bucket_minutes: int = 5) -> tuple[str, str, int]:
         # Deduplicate within time buckets
         import time
         bucket = int(time.time() / (bucket_minutes * 60))
-        return f"user:{user_id}:bucket:{bucket}"
+        return ("user", user_id, bucket)
     
     return {
         "simple": simple_key,

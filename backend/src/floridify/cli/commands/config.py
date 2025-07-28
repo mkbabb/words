@@ -9,7 +9,7 @@ import toml
 from rich.console import Console
 from rich.table import Table
 
-from ...utils.paths import get_config_path
+from ...utils.paths import AUTH_DIR
 from ..utils.formatting import format_error, format_success, format_warning
 
 console = Console()
@@ -26,7 +26,7 @@ def config_group() -> None:
 def show_config(show_keys: bool) -> None:
     """Display current configuration."""
     try:
-        config_file = get_config_path()
+        config_file = AUTH_DIR / "config.toml"
         if not config_file.exists():
             console.print(
                 format_warning(
@@ -82,7 +82,7 @@ def set_config(key: str, value: str, section: str) -> None:
     VALUE: Value to set
     """
     try:
-        config_file = get_config_path()
+        config_file = AUTH_DIR / "config.toml"
         # Ensure config directory exists
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -119,7 +119,7 @@ def get_config(key: str, section: str) -> None:
     KEY: Configuration key to get
     """
     try:
-        config_file = get_config_path()
+        config_file = AUTH_DIR / "config.toml"
         if not config_file.exists():
             console.print(format_error("Configuration file not found"))
             return
@@ -151,7 +151,7 @@ def keys_group() -> None:
 def list_keys() -> None:
     """List all configured API keys."""
     try:
-        config_file = get_config_path()
+        config_file = AUTH_DIR / "config.toml"
         if not config_file.exists():
             console.print(format_warning("No configuration file found"))
             return
@@ -190,7 +190,7 @@ def set_key(service: str, api_key: str) -> None:
     API_KEY: The API key to set
     """
     try:
-        config_file = get_config_path()
+        config_file = AUTH_DIR / "config.toml"
         # Ensure config directory exists
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -245,7 +245,7 @@ def test_keys(service: str) -> None:
 def edit_config() -> None:
     """Open configuration file in default editor."""
     try:
-        config_file = get_config_path()
+        config_file = AUTH_DIR / "config.toml"
         if not config_file.exists():
             # Create default config file
             config_file.parent.mkdir(parents=True, exist_ok=True)
@@ -296,7 +296,7 @@ def reset_config(confirm: bool) -> None:
             return
 
     try:
-        config_file = get_config_path()
+        config_file = AUTH_DIR / "config.toml"
         if config_file.exists():
             config_file.unlink()
 

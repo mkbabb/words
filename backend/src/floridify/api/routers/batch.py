@@ -216,12 +216,13 @@ async def execute_batch(request: BatchRequest) -> BatchResponse:
         gather_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Convert exceptions to results
-        results: list[BatchResult] = []
+        batch_results: list[BatchResult] = []
         for i, result in enumerate(gather_results):
             if isinstance(result, Exception):
-                results.append(BatchResult(index=i, status=500, error=str(result)))
-            else:
-                results.append(result)
+                batch_results.append(BatchResult(index=i, status=500, error=str(result)))
+            elif isinstance(result, BatchResult):
+                batch_results.append(result)
+        results = batch_results
     else:
         # Execute sequentially
         results = []

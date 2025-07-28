@@ -25,7 +25,7 @@ class ModelTier(Enum):
     @property
     def supports_vision(self) -> bool:
         """Check if model supports vision/multimodal inputs."""
-        return self in {self.GPT_4O, self.GPT_4O_MINI}
+        return self in {ModelTier.GPT_4O, ModelTier.GPT_4O_MINI}
     
     @property
     def is_reasoning_model(self) -> bool:

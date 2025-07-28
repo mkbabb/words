@@ -68,9 +68,9 @@ class FactGenerationRequest(BaseModel):
 
     count: int = Field(5, ge=1, le=10, description="Number of facts to generate")
     categories: list[str] | None = Field(
-        None,
+        default=None,
         description="Specific categories to focus on",
-        example=["etymology", "cultural", "linguistic", "historical"],
+        examples=[["etymology", "cultural", "linguistic", "historical"]],
     )
     context_words: list[str] | None = Field(None, description="Related words for context")
 
@@ -245,44 +245,32 @@ async def generate_facts_for_word(
         raise HTTPException(404, "Word not found")
 
     # Get AI connector
-    ai = await get_openai_connector()
+    ai = get_openai_connector()
 
+    # Get definitions for the word
+    from ...models import Definition
+    definitions = await Definition.find(Definition.word_id == str(word.id)).to_list()
+    
     # Generate facts
-    fact_data_list = await generate_facts(
+    facts = await generate_facts(
         word,
+        definitions,
         ai,
         count=fact_request.count,
-        context_words=fact_request.context_words,
     )
 
     # Create fact documents
     responses = []
-    for fact_data in fact_data_list:
-        # Extract category if present in the fact text
-        category = None
-        if "etymology" in fact_data["text"].lower():
-            category = "etymology"
-        elif "cultur" in fact_data["text"].lower():
-            category = "cultural"
-        elif "histor" in fact_data["text"].lower():
-            category = "historical"
-        elif "linguistic" in fact_data["text"].lower():
-            category = "linguistic"
-
-        fact = Fact(
-            word_id=str(word.id),
-            text=fact_data["text"],
-            category=category,
-            confidence_score=fact_data.get("confidence_score", 0.8),
-        )
-        await fact.create()
+    for fact_obj in facts:
+        # Save the fact (it already has proper fields)
+        await fact_obj.create()
 
         responses.append(
             ResourceResponse(
-                data=fact.model_dump(),
+                data=fact_obj.model_dump(),
                 links={
-                    "self": f"/facts/{fact.id}",
-                    "word": f"/words/{fact.word_id}",
+                    "self": f"/facts/{fact_obj.id}",
+                    "word": f"/words/{fact_obj.word_id}",
                 },
             )
         )

@@ -12,7 +12,8 @@ from ..connectors.dictionary_com import DictionaryComConnector
 from ..connectors.oxford import OxfordConnector
 from ..connectors.wiktionary import WiktionaryConnector
 from ..constants import DictionaryProvider, Language
-from ..models.models import Definition, Etymology, ProviderData, SynthesizedDictionaryEntry, Word
+from ..models.base import Etymology
+from ..models.models import Definition, ProviderData, SynthesizedDictionaryEntry, Word
 from ..storage.mongodb import get_synthesized_entry
 from ..utils.config import Config
 from ..utils.logging import (

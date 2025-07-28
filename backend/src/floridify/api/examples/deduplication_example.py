@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from ...caching import cached_api_call
+from ...caching import cached_api_call, deduplicated
 from ...utils.logging import get_logger
 
 router = APIRouter()
@@ -99,7 +99,7 @@ async def search_items(q: str) -> dict[str, Any]:
 class BatchProcessor:
     """Example of manual deduplication for batch operations."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self._in_flight: dict[str, asyncio.Future[Any]] = {}
         self._lock = asyncio.Lock()
     
@@ -119,7 +119,8 @@ class BatchProcessor:
                 asyncio.create_task(self._do_process_batch(batch_id, items, future))
         
         # Wait for result
-        return await future
+        result: dict[str, Any] = await future
+        return result
     
     async def _do_process_batch(
         self,

@@ -22,12 +22,12 @@ def serialize_definition_for_ai(definition: Definition, include_examples: bool =
     
     # Only include synonyms if present and limit to first 5
     if definition.synonyms:
-        serialized["synonyms"] = definition.synonyms[:5]
+        serialized["synonyms"] = ", ".join(definition.synonyms[:5])
     
     # Only include examples if specifically requested
     if include_examples and definition.example_ids:
         # This would need to load examples - for now just indicate presence
-        serialized["has_examples"] = True
+        serialized["has_examples"] = "true"
         
     return serialized
 

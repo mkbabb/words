@@ -220,7 +220,7 @@ async def delete_example(
 
 @router.post("/definition/{definition_id}/generate", response_model=list[ResourceResponse])
 @handle_api_errors
-async def generate_examples(
+async def generate_examples_for_definition(
     definition_id: str,
     request: ExampleGenerationRequest,
     repo: ExampleRepository = Depends(get_example_repo),
@@ -236,24 +236,29 @@ async def generate_examples(
         raise HTTPException(404, "Word not found")
 
     # Get AI connector
-    ai = await get_openai_connector()
+    ai = get_openai_connector()
 
     # Generate examples
-    example_data_list = await generate_examples(
-        definition,
+    example_texts = await generate_examples(
         word.text,
+        definition,
         ai,
         count=request.count,
-        context=request.context,
     )
 
     # Create example documents
     responses = []
-    for example_data in example_data_list:
+    created_examples = []
+    for example_text in example_texts:
         example = Example(
-            word_id=definition.word_id, definition_id=str(definition.id), **example_data
+            word_id=definition.word_id,
+            definition_id=str(definition.id),
+            text=example_text,
+            type="generated",  # AI-generated example
+            quality_score=0.8,  # Default quality score for AI-generated examples
         )
         await example.create()
+        created_examples.append(example)
 
         responses.append(
             ResourceResponse(
@@ -267,7 +272,7 @@ async def generate_examples(
         )
 
     # Update definition with new example IDs
-    definition.example_ids.extend([str(ex.id) for ex in responses])
+    definition.example_ids.extend([str(ex.id) for ex in created_examples])
     await definition.save()
 
     return responses

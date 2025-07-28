@@ -88,20 +88,34 @@ async def _similar_async(
             part_of_speech = entry.definitions[0].part_of_speech
 
         # Generate synonyms using AI
-        ai_connector = get_openai_connector()
-        synonym_response = await ai_connector.generate_synonyms(
-            word=word,
-            definition=base_definition,
+        from ...ai.synthesis_functions import synthesize_synonyms
+        from ...models import Definition
+        
+        # Create a minimal Definition object for the synthesis function
+        definition_obj = Definition(
+            word_id="temp",  # Temporary ID
             part_of_speech=part_of_speech,
+            text=base_definition,
+            synonyms=[],
+            antonyms=[],
+            example_ids=[]
+        )
+        
+        ai_connector = get_openai_connector()
+        synonyms = await synthesize_synonyms(
+            word=word,
+            definition=definition_obj,
+            ai=ai_connector,
             count=count,
+            force_refresh=force
         )
 
-        if not synonym_response.synonyms:
+        if not synonyms:
             console.print(format_warning(f"No synonyms generated for '{word}'"))
             return
 
         # Display synonyms in a beautiful table
-        await _display_synonyms(word, synonym_response, show_definitions, force)
+        await _display_synonyms(word, synonyms, show_definitions, force)
 
     except Exception as e:
         logger.error(f"Similar command failed: {e}")
@@ -110,7 +124,7 @@ async def _similar_async(
 
 async def _display_synonyms(
     original_word: str,
-    synonym_response: SynonymGenerationResponse,
+    synonyms: list[str],
     show_definitions: bool,
     force: bool,
 ) -> None:
@@ -119,7 +133,6 @@ async def _display_synonyms(
     header = Text()
     header.append("Synonyms for ", style="dim")
     header.append(original_word, style="bold bright_blue")
-    header.append(f" (confidence: {synonym_response.confidence:.0%})", style="dim")
 
     # Create synonyms table
     table = Table(show_header=True, header_style="bold blue")
@@ -129,40 +142,28 @@ async def _display_synonyms(
     table.add_column("Beauty", style="magenta", width=10)
     table.add_column("Explanation", style="white", width=40)
 
-    for synonym in synonym_response.synonyms:
-        # Format scores as percentages
-        relevance_text = f"{synonym.relevance:.0%}"
-        efflorescence_text = f"{synonym.efflorescence:.0%}"
-
+    # Simplified display for list of synonyms
+    for i, synonym in enumerate(synonyms):
+        # Simple relevance based on position in list
+        relevance = 1.0 - (i * 0.1)  # Decrease by 10% for each position
+        relevance_text = f"{relevance:.0%}"
+        
         # Color-code relevance
-        if synonym.relevance >= 0.9:
+        if relevance >= 0.9:
             relevance_style = "bright_green"
-        elif synonym.relevance >= 0.7:
+        elif relevance >= 0.7:
             relevance_style = "green"
-        elif synonym.relevance >= 0.5:
+        elif relevance >= 0.5:
             relevance_style = "yellow"
         else:
             relevance_style = "red"
 
-        # Color-code efflorescence
-        if synonym.efflorescence >= 0.9:
-            efflorescence_style = "bright_magenta"
-        elif synonym.efflorescence >= 0.7:
-            efflorescence_style = "magenta"
-        elif synonym.efflorescence >= 0.5:
-            efflorescence_style = "blue"
-        else:
-            efflorescence_style = "dim"
-
-        # Display synonym word without clickable functionality
-        synonym_text = synonym.word
-
         table.add_row(
-            synonym_text,
-            synonym.language,
+            synonym,  # Just the synonym string
+            "English",  # Default language
             Text(relevance_text, style=relevance_style),
-            Text(efflorescence_text, style=efflorescence_style),
-            synonym.explanation,
+            "-",  # No beauty score available
+            "-",  # No explanation available
         )
 
     # Display the main table
@@ -177,11 +178,11 @@ async def _display_synonyms(
 
     # Show definitions if requested
     if show_definitions:
-        await _show_synonym_definitions(synonym_response.synonyms, force)
+        await _show_synonym_definitions(synonyms, force)
 
 
 async def _show_synonym_definitions(
-    synonyms: list[SynonymCandidate],
+    synonyms: list[str],
     force: bool,
 ) -> None:
     """Show synthesized definitions for each synonym."""
@@ -198,7 +199,7 @@ async def _show_synonym_definitions(
         try:
             # Get definition for this synonym
             entry = await lookup_word_pipeline(
-                word=synonym.word,
+                word=synonym,  # Just the string
                 providers=[DictionaryProvider.WIKTIONARY],
                 languages=[Language.ENGLISH, Language.FRENCH],
                 semantic=True,  # Use semantic search for better matches
@@ -210,8 +211,7 @@ async def _show_synonym_definitions(
                 # Create a simple definition display
                 definition_text = Text()
                 definition_text.append(f"{i}. ", style="dim")
-                definition_text.append(synonym.word, style="bold cyan")
-                definition_text.append(f" ({synonym.language})", style="yellow")
+                definition_text.append(synonym, style="bold cyan")
                 definition_text.append("\n")
                 definition_text.append(f"   {entry.definitions[0].definition}", style="white")
 
@@ -220,15 +220,14 @@ async def _show_synonym_definitions(
                 # Fallback if no definition found
                 fallback_text = Text()
                 fallback_text.append(f"{i}. ", style="dim")
-                fallback_text.append(synonym.word, style="bold cyan")
-                fallback_text.append(f" ({synonym.language})", style="yellow")
+                fallback_text.append(synonym, style="bold cyan")
                 fallback_text.append("\n")
                 fallback_text.append("   No definition available", style="dim italic")
 
                 console.print(fallback_text)
 
         except Exception as e:
-            logger.warning(f"Failed to get definition for '{synonym.word}': {e}")
+            logger.warning(f"Failed to get definition for '{synonym}': {e}")
             continue
 
         # Add spacing between definitions

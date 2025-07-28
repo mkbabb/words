@@ -106,7 +106,7 @@
                             paddingTop: '0.75rem',
                             paddingBottom: '0.75rem',
                         }"
-                        @enter="handleEnter"
+                        @enter="handleEnterWrapped"
                         @tab="acceptAutocomplete"
                         @space="handleSpaceKey"
                         @arrow-down="navigateResults(1)"
@@ -202,22 +202,6 @@
                         @mousedown.prevent
                     />
                 </div>
-
-                <!-- Progress Bar -->
-                <!-- <div
-                    v-if="store.loadingProgress > 0"
-                    class="absolute right-0 -bottom-2 left-0 h-2
-                        overflow-hidden"
-                >
-                    <div
-                        class="h-full rounded-full transition-[width]
-                            duration-300"
-                        :style="{
-                            width: `${store.loadingProgress}%`,
-                            background: generateRainbowGradient(8),
-                        }"
-                    />
-                </div> -->
             </div>
 
             <!-- Dropdowns Container -->
@@ -238,7 +222,7 @@
                     @interaction="handleSearchAreaInteraction"
                     @toggle-sidebar="store.toggleSidebar()"
                     @toggle-refresh="handleForceRegenerate"
-                    @execute-search="handleEnter"
+                    @execute-search="handleEnterWrapped"
                 />
 
                 <!-- Search Results Container -->
@@ -272,12 +256,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
-import { useMagicKeys, whenever } from '@vueuse/core';
-import { useRouter } from 'vue-router';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '@/stores';
-import type { SearchResult } from '@/types';
-import { showError } from '@/plugins/toast';
 import { Maximize2, X } from 'lucide-vue-next';
 import { HamburgerIcon } from '@/components/custom/icons';
 
@@ -290,11 +270,18 @@ import SearchControls from './components/SearchControls.vue';
 import SearchResults from './components/SearchResults.vue';
 import ExpandModal from './components/ExpandModal.vue';
 
-// Import composables and utilities
-import { useSearchBarUI } from './composables/useSearchBarUI';
-import { useScrollAnimationSimple } from './composables/useScrollAnimationSimple';
-import { useAutocomplete } from './composables/useAutocomplete';
-import { shouldTriggerAIMode, extractWordCount } from './utils/ai-query';
+// Import composables
+import {
+    useSearchBarUI,
+    useSearchState,
+    useSearchOperations,
+    useSearchNavigation,
+    useFocusManagement,
+    useModalManagement,
+    useSearchBarKeyboard,
+    useScrollAnimationSimple,
+    useAutocomplete
+} from './composables';
 import { shouldShowExpandButton } from './utils/keyboard';
 
 interface SearchBarProps {
@@ -310,18 +297,6 @@ const props = withDefaults(defineProps<SearchBarProps>(), {
     scrollThreshold: 100,
 });
 
-// Debug prop changes
-if (import.meta.env.DEV) {
-    watch(
-        () => props.shrinkPercentage,
-        (newVal, oldVal) => {
-            if (newVal !== oldVal) {
-                console.log('SearchBar prop changed:', { oldVal, newVal });
-            }
-        }
-    );
-}
-
 const emit = defineEmits<{
     focus: [];
     blur: [];
@@ -332,71 +307,10 @@ const emit = defineEmits<{
 
 // Store & State
 const store = useAppStore();
-const router = useRouter();
-const { uiState, iconOpacity } = useSearchBarUI();
+const { iconOpacity } = useSearchBarUI();
 
-// Reactive references for template use
-const state = reactive({
-    // Store state (computed)
-    get query() { return store.searchQuery; },
-    set query(value) { store.searchQuery = value; },
-    get searchResults() { return store.searchResults; },
-    set searchResults(value) { store.searchResults = value; },
-    get showResults() { return store.showSearchResults; },
-    set showResults(value) { store.showSearchResults = value; },
-    get isFocused() { return store.isSearchBarFocused; },
-    set isFocused(value) { store.isSearchBarFocused = value; },
-    get isSearching() { return store.isSearching; },
-    set isSearching(_) { /* readonly */ },
-    get isAIQuery() { return store.isAIQuery; },
-    set isAIQuery(value) { store.isAIQuery = value; },
-    get showSparkle() { return store.showSparkle; },
-    set showSparkle(value) { store.showSparkle = value; },
-    get showErrorAnimation() { return store.showErrorAnimation; },
-    set showErrorAnimation(value) { store.showErrorAnimation = value; },
-    get selectedIndex() { return store.searchSelectedIndex; },
-    set selectedIndex(value) { store.searchSelectedIndex = value; },
-    get showControls() { return store.showSearchControls; },
-    set showControls(value) { store.showSearchControls = value; },
-    get mode() { return store.mode; },
-    set mode(value) { store.mode = value; },
-    get searchMode() { return store.searchMode; },
-    set searchMode(value) { store.searchMode = value; },
-    get autocompleteText() { return store.autocompleteText; },
-    set autocompleteText(value) { store.autocompleteText = value; },
-    get selectedSources() { return store.selectedSources; },
-    set selectedSources(value) { store.selectedSources = value; },
-    get selectedLanguages() { return store.selectedLanguages; },
-    set selectedLanguages(value) { store.selectedLanguages = value; },
-    get noAI() { return store.noAI; },
-    set noAI(value) { store.noAI = value; },
-    get forceRefreshMode() { return store.forceRefreshMode; },
-    set forceRefreshMode(value) { store.forceRefreshMode = value; },
-    
-    // UI state (local)
-    get isContainerHovered() { return uiState.isContainerHovered; },
-    set isContainerHovered(value) { uiState.isContainerHovered = value; },
-    get showExpandModal() { return uiState.showExpandModal; },
-    set showExpandModal(value) { uiState.showExpandModal = value; },
-    get scrollProgress() { return uiState.scrollProgress; },
-    set scrollProgress(value) { uiState.scrollProgress = value; },
-    get searchBarHeight() { return uiState.searchBarHeight; },
-    set searchBarHeight(value) { uiState.searchBarHeight = value; },
-    get expandButtonVisible() { return uiState.expandButtonVisible; },
-    set expandButtonVisible(value) { uiState.expandButtonVisible = value; },
-    get isDevelopment() { return uiState.isDevelopment; },
-    get aiSuggestions() { return store.aiSuggestions; },
-    set aiSuggestions(value) { store.aiSuggestions = value; },
-});
-
-const canToggleMode = computed(() => {
-    const hasWordQuery = !!store.currentEntry;
-    const hasSuggestionQuery = !!store.wordSuggestions;
-    
-    if (!hasWordQuery && !hasSuggestionQuery) return false;
-    if (hasSuggestionQuery && !hasWordQuery) return false;
-    return true;
-});
+// Use centralized state management
+const { state, canToggleMode, placeholder, resultsContainerStyle } = useSearchState();
 
 // Refs
 const searchContainer = ref<HTMLDivElement>();
@@ -404,31 +318,8 @@ const searchBarElement = ref<HTMLDivElement>();
 const searchInputComponent = ref<any>();
 const searchResultsComponent = ref<any>();
 
-// Computed
-const placeholder = computed(() => {
-    // Hide placeholder when scrolled
-    if (state.scrollProgress > 0.3) {
-        return '';
-    }
-    
-    // First check searchMode for specific modes
-    if (state.searchMode === 'wordlist') {
-        return 'Enter words separated by spaces or commas...';
-    } else if (state.searchMode === 'stage') {
-        return 'Enter text for staging...';
-    }
-
-    // Default to mode-based placeholders for lookup mode
-    return state.mode === 'dictionary'
-        ? 'definitions'
-        : 'synonyms';
-});
-
-const resultsContainerStyle = computed(() => ({
-    paddingTop: '0px',
-    marginTop: state.showControls ? '0.5rem' : '0px',
-    transition: 'all 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-}));
+// Computed ref for search input element
+const searchInputRef = computed(() => searchInputComponent.value?.element);
 
 // Scroll animation setup
 const { containerStyle, updateScrollState } = useScrollAnimationSimple(
@@ -443,20 +334,9 @@ watch(
     () => props.shrinkPercentage,
     (newValue) => {
         state.scrollProgress = newValue;
-        // Debug logging
-        if (import.meta.env.DEV) {
-            console.log('SearchBar scroll update:', {
-                shrinkPercentage: newValue,
-                scrollProgress: state.scrollProgress,
-                containerStyle: containerStyle.value,
-            });
-        }
     },
     { immediate: true }
 );
-
-// Create a computed ref for the search input element
-const searchInputRef = computed(() => searchInputComponent.value?.element);
 
 // Autocomplete setup
 const {
@@ -475,9 +355,128 @@ const {
     },
 });
 
-// Timers
-let searchTimer: ReturnType<typeof setTimeout> | undefined;
-let isInteractingWithSearchArea = false;
+// Search operations
+const { performSearch, clearSearch, cleanup: cleanupSearch } = useSearchOperations({
+    query: computed(() => state.query),
+});
+
+// Navigation setup
+const { navigateResults, resetSelection } = useSearchNavigation({
+    searchResultsComponent,
+});
+
+// Focus management
+const {
+    handleFocus,
+    handleBlur,
+    handleSearchAreaInteraction,
+    focusInput,
+    cleanup: cleanupFocus,
+} = useFocusManagement({
+    searchInputComponent,
+    emit: emit as (event: string, ...args: any[]) => void,
+});
+
+// Modal management
+const {
+    showExpandModal,
+    handleExpandClick,
+    closeExpandModal,
+    submitExpandedQuery: submitExpandedQueryBase,
+} = useModalManagement();
+
+// Keyboard handling
+const {
+    handleEnter,
+    handleEscape,
+    selectResult,
+} = useSearchBarKeyboard({
+    searchInputRef,
+    onAutocompleteAccept: acceptAutocomplete,
+    onAutocompleteSpace: handleAutocompleteSpaceKey,
+    onAutocompleteArrow: handleAutocompleteArrowKey,
+});
+
+// Event Handlers
+const handleMouseEnter = () => {
+    state.isContainerHovered = true;
+    emit('mouseenter');
+};
+
+const handleMouseLeave = () => {
+    state.isContainerHovered = false;
+    emit('mouseleave');
+};
+
+const handleInputClick = (event: MouseEvent) => {
+    handleSearchAreaInteraction();
+    handleAutocompleteInputClick(event);
+};
+
+// Override handleEnter to handle stage mode
+const handleEnterWrapped = async () => {
+    if (state.searchMode === 'stage' && state.query) {
+        store.searchQuery = state.query;
+        emit('stage-enter', state.query);
+        return;
+    }
+    await handleEnter();
+};
+
+const toggleControls = () => {
+    state.showControls = !state.showControls;
+};
+
+const handleSpaceKey = (event: KeyboardEvent) => {
+    handleAutocompleteSpaceKey(event);
+};
+
+const handleArrowKey = (event: KeyboardEvent) => {
+    handleAutocompleteArrowKey(event);
+};
+
+const selectWord = async (word: string) => {
+    await store.searchWord(word);
+};
+
+const handleForceRegenerate = () => {
+    handleSearchAreaInteraction();
+    state.forceRefreshMode = !state.forceRefreshMode;
+};
+
+const clearQuery = () => {
+    clearSearch();
+    focusInput();
+};
+
+const clearAllStorage = () => {
+    if (
+        confirm(
+            'This will clear all local storage including history and settings. Are you sure?'
+        )
+    ) {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.reload();
+    }
+};
+
+// Expand modal wrapper
+const submitExpandedQuery = (query: string) => {
+    state.query = query;
+    submitExpandedQueryBase(query, handleEnterWrapped);
+};
+
+// Sync modal state
+watch(() => showExpandModal.value, (newVal) => {
+    state.showExpandModal = newVal;
+});
+
+watch(() => state.showExpandModal, (newVal) => {
+    if (newVal !== showExpandModal.value) {
+        showExpandModal.value = newVal;
+    }
+});
 
 // Watch query for autocomplete
 watch(
@@ -497,355 +496,11 @@ watch(
 watch(
     () => state.searchResults,
     () => {
-        state.selectedIndex = 0;
+        resetSelection();
         updateAutocomplete();
         state.autocompleteText = autocompleteText.value;
     }
 );
-
-// Event Handlers
-const handleMouseEnter = () => {
-    state.isContainerHovered = true;
-    emit('mouseenter');
-};
-
-const handleMouseLeave = () => {
-    state.isContainerHovered = false;
-    emit('mouseleave');
-};
-
-const handleFocus = () => {
-    state.isFocused = true;
-    emit('focus');
-
-    // Force textarea resize on focus
-    nextTick(() => {
-        if (searchInputComponent.value?.element?.value) {
-            const textarea = searchInputComponent.value.element.value;
-            if (textarea && textarea.style) {
-                textarea.style.height = 'auto';
-                const scrollHeight = textarea.scrollHeight;
-                textarea.style.height = `${scrollHeight}px`;
-            }
-        }
-    });
-
-    // Restore search results if available
-    if (
-        store.sessionState?.searchResults?.length > 0 &&
-        state.query.length >= 2
-    ) {
-        state.searchResults = store.sessionState.searchResults.slice(0, 8);
-        state.showResults = true;
-    }
-};
-
-const handleBlur = () => {
-    setTimeout(() => {
-        if (isInteractingWithSearchArea) return;
-
-        state.isFocused = false;
-        emit('blur');
-
-        // Hide results on blur
-        state.showResults = false;
-        state.searchResults = [];
-        state.isSearching = false;
-    }, 150);
-};
-
-const handleInputClick = (event: MouseEvent) => {
-    handleSearchAreaInteraction();
-    handleAutocompleteInputClick(event);
-};
-
-const handleSearchAreaInteraction = () => {
-    isInteractingWithSearchArea = true;
-    setTimeout(() => {
-        isInteractingWithSearchArea = false;
-    }, 100);
-};
-
-// Search functionality
-const performSearch = () => {
-    clearTimeout(searchTimer);
-    
-    // Skip search if this is a direct lookup from sidebar/controls
-    if (store.isDirectLookup) {
-        state.searchResults = [];
-        state.showResults = false;
-        return;
-    }
-    
-    store.searchQuery = state.query;
-
-    if (!state.query || state.query.length < 2) {
-        state.searchResults = [];
-        state.showResults = false;
-        state.isSearching = false;
-        state.isAIQuery = false;
-        state.showSparkle = false;
-        return;
-    }
-
-    state.isSearching = true;
-
-    searchTimer = setTimeout(async () => {
-        try {
-            const results = await store.search(state.query);
-            state.searchResults = results.slice(0, 8);
-            state.selectedIndex = 0;
-
-            if (store.sessionState) {
-                store.sessionState.searchResults = results;
-            }
-
-            // Show results if we have them
-            state.showResults = results.length > 0;
-
-            // Activate AI mode
-            if (results.length === 0 && shouldTriggerAIMode(state.query)) {
-                state.isAIQuery = true;
-                state.showSparkle = true;
-                store.sessionState.isAIQuery = true;
-                store.sessionState.aiQueryText = state.query;
-            } else {
-                state.isAIQuery = false;
-                state.showSparkle = false;
-                store.sessionState.isAIQuery = false;
-                store.sessionState.aiQueryText = '';
-            }
-        } catch (error) {
-            console.error('Search error:', error);
-            state.searchResults = [];
-        } finally {
-            state.isSearching = false;
-        }
-    }, 200);
-};
-
-// Keyboard handlers
-const handleEnter = async () => {
-    clearTimeout(searchTimer);
-
-    if (state.autocompleteText) {
-        const accepted = await acceptAutocomplete();
-        if (accepted) {
-            return;
-        }
-    }
-
-    // Handle stage mode
-    if (state.searchMode === 'stage' && state.query) {
-        store.searchQuery = state.query;
-        emit('stage-enter', state.query);
-        return;
-    }
-
-    // Handle wordlist mode
-    if (state.searchMode === 'wordlist' && state.query) {
-        // Parse the query as a list of words (space, comma, or newline separated)
-        const words = state.query
-            .split(/[,\\s\\n]+/)
-            .map((word) => word.trim())
-            .filter((word) => word.length > 0);
-
-        if (words.length > 0) {
-            // Process wordlist - for now, just look up the first word
-            // TODO: Implement full wordlist processing
-            
-            // Navigate to appropriate route based on mode
-            const routeName = state.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
-            router.push({ name: routeName, params: { word: words[0] } });
-            
-            // Use searchWord for direct lookup
-            await store.searchWord(words[0]);
-
-            // You could emit a wordlist event here for future handling
-            // emit('wordlist-enter', words);
-        }
-        return;
-    }
-
-    // Handle AI query mode
-    if (state.isAIQuery && state.query) {
-        try {
-            const extractedCount = extractWordCount(state.query);
-            const wordSuggestions = await store.getAISuggestions(
-                state.query,
-                extractedCount
-            );
-
-            if (wordSuggestions && wordSuggestions.suggestions.length > 0) {
-                store.wordSuggestions = wordSuggestions;
-                state.mode = 'suggestions';
-                store.hasSearched = true;
-                store.sessionState.aiQueryText = state.query;
-            } else {
-                state.showErrorAnimation = true;
-                showError('No word suggestions found for this query');
-                setTimeout(() => {
-                    state.showErrorAnimation = false;
-                }, 600);
-            }
-        } catch (error: any) {
-            console.error('AI suggestion error:', error);
-            state.showErrorAnimation = true;
-            showError(error.message || 'Failed to get word suggestions');
-            setTimeout(() => {
-                state.showErrorAnimation = false;
-            }, 600);
-        }
-        return;
-    }
-
-    // Regular search
-    if (state.searchResults.length > 0 && state.selectedIndex >= 0) {
-        await selectResult(state.searchResults[state.selectedIndex]);
-    } else if (state.query) {
-        // Navigate to appropriate route based on mode
-        const routeName = state.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
-        router.push({ name: routeName, params: { word: state.query } });
-        
-        // Use searchWord for direct lookup
-        await store.searchWord(state.query);
-    }
-};
-
-const handleShiftEnter = async () => {
-    // Force refresh mode for this query
-    const previousForceRefresh = state.forceRefreshMode;
-    state.forceRefreshMode = true;
-    
-    // Execute the query
-    await handleEnter();
-    
-    // Restore the previous force refresh state
-    state.forceRefreshMode = previousForceRefresh;
-};
-
-const handleEscape = () => {
-    if (state.showControls) {
-        // First priority: hide controls
-        state.showControls = false;
-    } else if (state.showResults) {
-        // Second priority: hide results
-        state.showResults = false;
-    } else {
-        // Finally: blur input
-        state.isFocused = false;
-    }
-};
-
-const toggleControls = () => {
-    state.showControls = !state.showControls;
-    // Don't hide results when toggling controls
-};
-
-const handleSpaceKey = (event: KeyboardEvent) => {
-    handleAutocompleteSpaceKey(event);
-};
-
-const handleArrowKey = (event: KeyboardEvent) => {
-    handleAutocompleteArrowKey(event);
-};
-
-const navigateResults = (direction: number) => {
-    if (state.searchResults.length === 0) return;
-
-    state.selectedIndex = Math.max(
-        0,
-        Math.min(
-            state.searchResults.length - 1,
-            state.selectedIndex + direction
-        )
-    );
-
-    store.searchSelectedIndex = state.selectedIndex;
-    
-    // Scroll the selected item into view with improved logic
-    nextTick(() => {
-        const container = searchResultsComponent.value?.container;
-        const selectedElement = searchResultsComponent.value?.resultRefs?.[state.selectedIndex];
-        
-        if (!container || !selectedElement) return;
-        
-        const containerRect = container.getBoundingClientRect();
-        const elementRect = selectedElement.getBoundingClientRect();
-        
-        // Calculate if element is outside visible area
-        const isAbove = elementRect.top < containerRect.top;
-        const isBelow = elementRect.bottom > containerRect.bottom;
-        
-        if (isAbove || isBelow) {
-            // Use different block positioning based on direction
-            const block = direction > 0 ? 'end' : 'start';
-            selectedElement.scrollIntoView({
-                behavior: 'smooth',
-                block: block
-            });
-        }
-    });
-};
-
-const selectResult = async (result: SearchResult) => {
-    clearTimeout(searchTimer);
-    
-    // Navigate to appropriate route based on mode
-    const routeName = state.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
-    router.push({ name: routeName, params: { word: result.word } });
-    
-    // Use searchWord for direct lookup (sets isDirectLookup flag)
-    await store.searchWord(result.word);
-};
-
-const selectWord = async (word: string) => {
-    // Use store's searchWord for direct lookup (sets isDirectLookup flag)
-    await store.searchWord(word);
-};
-
-const handleForceRegenerate = () => {
-    handleSearchAreaInteraction();
-    state.forceRefreshMode = !state.forceRefreshMode;
-};
-
-const clearQuery = () => {
-    state.query = '';
-    state.searchResults = [];
-    state.showResults = false;
-    state.isAIQuery = false;
-    state.showSparkle = false;
-    searchInputComponent.value?.focus();
-};
-
-const clearAllStorage = () => {
-    if (
-        confirm(
-            'This will clear all local storage including history and settings. Are you sure?'
-        )
-    ) {
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.reload();
-    }
-};
-
-// Expand modal
-const handleExpandClick = () => {
-    state.showExpandModal = true;
-};
-
-const closeExpandModal = () => {
-    state.showExpandModal = false;
-};
-
-const submitExpandedQuery = (query: string) => {
-    state.query = query;
-    state.showExpandModal = false;
-    nextTick(() => {
-        handleEnter();
-    });
-};
 
 // Update scroll state
 watch(
@@ -861,43 +516,16 @@ const handleClickOutside = (event: MouseEvent) => {
     if (!searchContainer.value || !state.showControls) return;
     
     const target = event.target as HTMLElement;
-    // Check if click is outside the search container
     if (!searchContainer.value.contains(target)) {
         state.showControls = false;
     }
 };
 
-// Setup keyboard shortcuts with MagicKeys
-const keys = useMagicKeys();
-const shiftEnter = keys['Shift+Enter'];
-const cmdEnter = keys['Cmd+Enter'];
-const ctrlEnter = keys['Ctrl+Enter']; // For Windows/Linux
-
-// Watch for force refresh shortcuts
-whenever(shiftEnter, () => {
-    if (state.isFocused && searchInputRef.value) {
-        handleShiftEnter();
-    }
-});
-
-whenever(cmdEnter, () => {
-    if (state.isFocused && searchInputRef.value) {
-        handleShiftEnter();
-    }
-});
-
-whenever(ctrlEnter, () => {
-    if (state.isFocused && searchInputRef.value) {
-        handleShiftEnter();
-    }
-});
-
 // Initialize
 onMounted(async () => {
-    // Add click outside listener
     document.addEventListener('click', handleClickOutside);
     
-    // Watch query changes
+    // Watch query changes to trigger search
     watch(
         () => state.query,
         () => {
@@ -926,7 +554,7 @@ onMounted(async () => {
         }
     );
     
-    // Also watch the store's isAIQuery ref directly for immediate updates
+    // Also watch the store's isAIQuery ref directly
     watch(
         () => store.isAIQuery,
         (isAI) => {
@@ -969,7 +597,8 @@ onMounted(async () => {
 
 // Cleanup
 onUnmounted(() => {
-    clearTimeout(searchTimer);
+    cleanupSearch();
+    cleanupFocus();
     document.removeEventListener('click', handleClickOutside);
 });
 </script>

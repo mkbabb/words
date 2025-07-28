@@ -875,14 +875,16 @@ class WiktionaryConnector(DictionaryConnector):
                             note_text = self.cleaner.clean_text(matches[0])
                             if note_text:
                                 # Map to valid UsageNote types
-                                if note_type in ["informal", "formal"]:
+                                # Valid types: "grammar", "confusion", "regional", "register", "error"
+                                from typing import Literal
+                                usage_type: Literal["grammar", "confusion", "regional", "register", "error"]
+                                
+                                if note_type in ["informal", "formal", "archaic", "technical"]:
                                     usage_type = "register"
                                 elif note_type == "regional":
                                     usage_type = "regional"
-                                elif note_type in ["archaic", "technical"]:
-                                    usage_type = "register"
                                 else:
-                                    usage_type = "register"  # Default
+                                    usage_type = "register"  # Safe default
                                     
                                 usage_note = UsageNote(
                                     type=usage_type,
@@ -1071,7 +1073,8 @@ class WiktionaryConnector(DictionaryConnector):
             List of Definition objects
         """
         # Return the definitions that were already extracted and passed in raw_data
-        return raw_data.get("definitions", [])
+        definitions = raw_data.get("definitions", [])
+        return definitions if isinstance(definitions, list) else []
 
     async def extract_etymology(self, raw_data: dict[str, Any]) -> Etymology | None:
         """Extract etymology from Wiktionary data.

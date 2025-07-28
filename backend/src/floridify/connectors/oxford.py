@@ -239,7 +239,8 @@ class OxfordConnector(DictionaryConnector):
                                 domain = domains[0].get("text") if domains else None
 
                                 registers = sense.get("registers", [])
-                                register = None
+                                from typing import Literal
+                                register: Literal["formal", "informal", "neutral", "slang", "technical"] | None = None
                                 if registers:
                                     reg_text = registers[0].get("text", "").lower()
                                     if "formal" in reg_text:
@@ -248,6 +249,10 @@ class OxfordConnector(DictionaryConnector):
                                         register = "informal"
                                     elif "slang" in reg_text:
                                         register = "slang"
+                                    elif "technical" in reg_text:
+                                        register = "technical"
+                                    else:
+                                        register = "neutral"  # Default to neutral for other cases
 
                                 # Create definition (meaning_cluster will be added by AI synthesis)
                                 definition = Definition(

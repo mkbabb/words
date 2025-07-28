@@ -1,6 +1,7 @@
 """Image serving API endpoints."""
 
 from pathlib import Path
+from typing import Any
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, HTTPException, Request
@@ -12,8 +13,8 @@ from ..core import ErrorDetail, ErrorResponse
 router = APIRouter()
 
 
-@router.get("/{image_id}")
-async def get_image(request: Request, image_id: str):
+@router.get("/{image_id}", response_model=None)
+async def get_image(request: Request, image_id: str) -> Response | dict[str, Any]:
     """Get image metadata or content based on Accept header.
 
     Args:
@@ -103,8 +104,8 @@ async def get_image(request: Request, image_id: str):
     }
 
 
-@router.get("/{image_id}/content")
-async def get_image_content(image_id: str):
+@router.get("/{image_id}/content", response_model=None)
+async def get_image_content(image_id: str) -> Response:
     """Serve image content.
 
     Args:

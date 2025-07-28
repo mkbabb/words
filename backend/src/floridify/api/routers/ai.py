@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -625,11 +625,11 @@ async def suggest_words(
     return result.model_dump()
 
 
-@router.get("/suggest-words/stream")
+@router.get("/suggest-words/stream", response_model=None)
 async def suggest_words_stream(
+    request: Request,
     query: str,
     count: int = 12,
-    api_request: Request = None,
 ) -> StreamingResponse:
     """Generate word suggestions with streaming progress updates."""
     import asyncio
@@ -641,7 +641,7 @@ async def suggest_words_stream(
     if count < 1 or count > 25:
         raise HTTPException(400, "Count must be between 1 and 25")
     
-    client_key = get_client_key(api_request)
+    client_key = get_client_key(request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=500)
     
     if not allowed:
@@ -650,11 +650,11 @@ async def suggest_words_stream(
     # Create state tracker for suggestions
     state_tracker = StateTracker()
     
-    async def generate_suggestion_events():
+    async def generate_suggestion_events() -> AsyncGenerator[str, None]:
         """Generate SSE events for suggestion pipeline."""
         async with state_tracker.subscribe() as subscriber_queue:
             
-            async def run_suggestion_pipeline():
+            async def run_suggestion_pipeline() -> None:
                 """Run the suggestion pipeline with state tracking."""
                 try:
                     await state_tracker.update_stage("START", progress=5)
@@ -740,7 +740,7 @@ async def synthesize_entry_components(
                 400,
                 f"Invalid components: {invalid_components}. Valid components: {sorted(valid_components)}"
             )
-        components = set(request.components)
+        components = {SynthesisComponent(comp) for comp in request.components}
     else:
         components = None
     

@@ -203,11 +203,11 @@ class BatchExecutor:
 class BatchContext:
     """Context manager for batch processing OpenAI requests."""
 
-    def __init__(self, connector: OpenAIConnector):
+    def __init__(self, connector: OpenAIConnector) -> None:
         self.connector = connector
         self.collector = BatchCollector()
         self.executor = BatchExecutor(connector.client)
-        self._original_method = None
+        self._original_method: Any = None
 
     async def __aenter__(self) -> "BatchContext":
         """Enter batch mode by patching the connector."""
@@ -232,11 +232,11 @@ class BatchContext:
             return asyncio.create_task(batch_context._await_future(future))
 
         # Patch the method
-        self.connector._make_structured_request = batch_wrapper  # type: ignore[assignment]
+        setattr(self.connector, '_make_structured_request', batch_wrapper)
         logger.info("✅ Batch mode activated - collecting API requests")
         return self
 
-    async def _await_future(self, future: asyncio.Future) -> Any:
+    async def _await_future(self, future: asyncio.Future[Any]) -> Any:
         """Helper to await a future."""
         return await future
 
@@ -248,7 +248,7 @@ class BatchContext:
 
         # Restore original method
         if self._original_method:
-            self.connector._make_structured_request = self._original_method
+            setattr(self.connector, '_make_structured_request', self._original_method)
             logger.debug("🔄 Restored original API method")
 
         # Execute batch if no exception
@@ -268,7 +268,7 @@ class BatchContext:
         logger.info(f"🎯 Executing batch with {len(self.collector.requests)} requests")
 
         # Log request types
-        request_types: dict = {}
+        request_types: dict[str, int] = {}
         for req in self.collector.requests:
             model_name = req.response_model.__name__
             request_types[model_name] = request_types.get(model_name, 0) + 1

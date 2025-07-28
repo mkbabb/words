@@ -7,6 +7,14 @@ from typing import Any
 from beanie import Document
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo import ASCENDING, DESCENDING
+from pymongo.operations import (
+    InsertOne,
+    UpdateOne,
+    UpdateMany,
+    ReplaceOne,
+    DeleteOne,
+    DeleteMany,
+)
 
 from ...storage.mongodb import get_database
 from ...utils.logging import get_logger
@@ -106,7 +114,14 @@ class QueryOptimizer:
         # Create indexes
         for keys, options in indexes:
             try:
-                index_name = await collection.create_index(keys, **options)
+                # Create index with proper parameters
+                index_kwargs = {}
+                if "unique" in options:
+                    index_kwargs["unique"] = options["unique"]
+                if "sparse" in options:
+                    index_kwargs["sparse"] = options["sparse"]
+                    
+                index_name = await collection.create_index(keys, session=None, **index_kwargs)
                 created.append(index_name)
                 logger.info(f"Created index {index_name} on {model.__name__}")
             except Exception as e:
@@ -218,48 +233,33 @@ class BulkOperationBuilder:
 
     def __init__(self, model: type[Document]):
         self.model = model
-        self.operations: list[dict[str, Any]] = []
+        self.operations: list[InsertOne[Any] | UpdateOne | UpdateMany | ReplaceOne[Any] | DeleteOne | DeleteMany] = []
 
     def insert_one(self, document: dict[str, Any]) -> "BulkOperationBuilder":
         """Add insert operation."""
-        self.operations.append({"insertOne": {"document": document}})
+        self.operations.append(InsertOne(document))
         return self
 
     def update_one(
         self, filter: dict[str, Any], update: dict[str, Any], upsert: bool = False
     ) -> "BulkOperationBuilder":
         """Add update one operation."""
-        self.operations.append(
-            {
-                "updateOne": {
-                    "filter": filter,
-                    "update": update,
-                    "upsert": upsert,
-                }
-            }
-        )
+        self.operations.append(UpdateOne(filter, update, upsert=upsert))
         return self
 
     def update_many(self, filter: dict[str, Any], update: dict[str, Any]) -> "BulkOperationBuilder":
         """Add update many operation."""
-        self.operations.append(
-            {
-                "updateMany": {
-                    "filter": filter,
-                    "update": update,
-                }
-            }
-        )
+        self.operations.append(UpdateMany(filter, update))
         return self
 
     def delete_one(self, filter: dict[str, Any]) -> "BulkOperationBuilder":
         """Add delete one operation."""
-        self.operations.append({"deleteOne": {"filter": filter}})
+        self.operations.append(DeleteOne(filter))
         return self
 
     def delete_many(self, filter: dict[str, Any]) -> "BulkOperationBuilder":
         """Add delete many operation."""
-        self.operations.append({"deleteMany": {"filter": filter}})
+        self.operations.append(DeleteMany(filter))
         return self
 
     async def execute(self) -> dict[str, Any]:
