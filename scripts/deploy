@@ -88,12 +88,29 @@ test_ssh() {
     local ssh_opts="-o StrictHostKeyChecking=no -o ConnectTimeout=10"
     if is_github_actions; then
         ssh_opts="$ssh_opts -i ~/.ssh/deploy_key"
+        # Debug: Check if key file exists and has correct permissions
+        if [ ! -f ~/.ssh/deploy_key ]; then
+            print_error "SSH key file not found at ~/.ssh/deploy_key"
+            exit 1
+        fi
+        print_info "SSH key file exists with permissions: $(ls -l ~/.ssh/deploy_key | awk '{print $1}')"
+    fi
+    
+    # Try SSH with verbose output for debugging
+    if is_github_actions; then
+        print_info "Attempting SSH connection with verbose output..."
+        ssh -v $ssh_opts $EC2_USER@$EC2_HOST 'echo "SSH connection successful"' 2>&1 | tail -20
     fi
     
     if ssh $ssh_opts $EC2_USER@$EC2_HOST 'echo "SSH connection successful"' &>/dev/null; then
         print_status "✓ SSH connection verified"
     else
         print_error "Cannot connect to EC2 instance via SSH"
+        print_info "Please check:"
+        print_info "  - EC2_HOST is correct: $EC2_HOST"
+        print_info "  - EC2_USER is correct: $EC2_USER"
+        print_info "  - SSH key is properly formatted in GitHub secrets"
+        print_info "  - EC2 security group allows SSH from GitHub Actions IPs"
         exit 1
     fi
 }
@@ -155,13 +172,6 @@ EOF
 copy_auth_config() {
     print_status "Copying auth configuration to server..."
     
-    # Check if local auth/config.toml exists
-    if [ ! -f "auth/config.toml" ]; then
-        print_error "auth/config.toml not found locally"
-        print_info "Run ./scripts/setup first to configure auth"
-        exit 1
-    fi
-    
     local ssh_cmd="ssh -o StrictHostKeyChecking=no"
     if is_github_actions; then
         ssh_cmd="$ssh_cmd -i ~/.ssh/deploy_key"
@@ -170,10 +180,39 @@ copy_auth_config() {
     # Create auth directory on server
     $ssh_cmd $EC2_USER@$EC2_HOST 'mkdir -p ~/floridify/auth'
     
-    # Copy config file
     if is_github_actions; then
+        # In GitHub Actions, create auth config from environment variables
+        print_status "Creating auth config from environment variables..."
+        
+        # Create temporary auth config file
+        mkdir -p auth
+        cat > auth/config.toml << EOF
+[api_keys]
+openai = "${OPENAI_API_KEY}"
+
+[mongodb]
+connection_string = "${MONGODB_CONNECTION_STRING}"
+
+[dictionary_providers]
+[dictionary_providers.oxford]
+app_id = "${OXFORD_APP_ID:-}"
+api_key = "${OXFORD_API_KEY:-}"
+
+[dictionary_providers.dictionary_com]
+auth = "${DICTIONARY_COM_AUTH:-}"
+EOF
+        
+        # Copy the generated config
         scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no auth/config.toml $EC2_USER@$EC2_HOST:~/floridify/auth/
     else
+        # Check if local auth/config.toml exists
+        if [ ! -f "auth/config.toml" ]; then
+            print_error "auth/config.toml not found locally"
+            print_info "Run ./scripts/setup first to configure auth"
+            exit 1
+        fi
+        
+        # Copy existing config file
         scp -o StrictHostKeyChecking=no auth/config.toml $EC2_USER@$EC2_HOST:~/floridify/auth/
     fi
     
