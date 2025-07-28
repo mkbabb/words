@@ -126,8 +126,7 @@ jobs:
             --group-id ${{ steps.runner-info.outputs.SECURITY_GROUP_ID }} \
             --protocol tcp \
             --port 22 \
-            --cidr ${{ steps.runner-info.outputs.RUNNER_IP }}/32 \
-            --group-rule-description "GitHub Actions deployment - temporary"
+            --cidr ${{ steps.runner-info.outputs.RUNNER_IP }}/32
       
       - name: Setup SSH
         run: |
