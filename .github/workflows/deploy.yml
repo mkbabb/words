@@ -16,6 +16,7 @@ env:
   EC2_HOST: ${{ secrets.EC2_HOST }}
   EC2_USER: ubuntu
   DOMAIN: ${{ secrets.DOMAIN }}
+  AWS_DEFAULT_REGION: us-east-1
 
 jobs:
   test:
@@ -65,8 +66,43 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+      
+      - name: Get runner IP and security group
+        id: runner-info
+        run: |
+          # Get runner's public IP
+          RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
+          echo "RUNNER_IP=${RUNNER_IP}" >> $GITHUB_OUTPUT
+          
+          # Get EC2 instance security group
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=ip-address,Values=${{ env.EC2_HOST }}" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+          
+          SECURITY_GROUP_ID=$(aws ec2 describe-instances \
+            --instance-ids ${INSTANCE_ID} \
+            --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' \
+            --output text)
+          
+          echo "SECURITY_GROUP_ID=${SECURITY_GROUP_ID}" >> $GITHUB_OUTPUT
+          echo "Runner IP: ${RUNNER_IP}"
+          echo "Security Group: ${SECURITY_GROUP_ID}"
+      
+      - name: Add runner IP to security group
+        run: |
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ steps.runner-info.outputs.SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.runner-info.outputs.RUNNER_IP }}/32 \
+            --group-rule-description "GitHub Actions deployment - temporary"
       
       - name: Setup SSH
         run: |
@@ -75,26 +111,34 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
       
-      - name: Deploy via local script
-        env:
-          EC2_HOST: ${{ env.EC2_HOST }}
-          EC2_USER: ${{ env.EC2_USER }}
-          DOMAIN: ${{ env.DOMAIN }}
-          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          MONGODB_CONNECTION_STRING: ${{ secrets.MONGODB_CONNECTION_STRING }}
-          CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL }}
-          OXFORD_APP_ID: ${{ secrets.OXFORD_APP_ID }}
-          OXFORD_API_KEY: ${{ secrets.OXFORD_API_KEY }}
-          DICTIONARY_COM_AUTH: ${{ secrets.DICTIONARY_COM_AUTH }}
-          GITHUB_ACTIONS: true
+      - name: Deploy on server
         run: |
-          # Note: If this fails with SSH connection timeout, the EC2 security group
-          # needs to be updated to allow SSH from GitHub Actions runners.
-          # GitHub Actions uses dynamic IP ranges that change frequently.
-          # See: https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#ip-addresses
-          chmod +x ./scripts/deploy
-          ./scripts/deploy
+          # SSH into server and run deploy script
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'ENDSSH'
+            cd ~/floridify
+            
+            # Pull latest code
+            git pull origin master
+            
+            # Set environment variables needed by deploy script
+            export EC2_HOST=${{ env.EC2_HOST }}
+            export EC2_USER=${{ env.EC2_USER }}
+            export DOMAIN=${{ env.DOMAIN }}
+            
+            # Run deploy script on server (without GITHUB_ACTIONS set)
+            ./scripts/deploy
+          ENDSSH
+      
+      - name: Remove runner IP from security group
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ steps.runner-info.outputs.SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr ${{ steps.runner-info.outputs.RUNNER_IP }}/32 || true
       
       - name: Cleanup
         if: always()

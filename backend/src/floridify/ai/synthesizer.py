@@ -334,14 +334,13 @@ class DefinitionSynthesizer:
                 state_tracker=state_tracker,
             )
 
-            # Create and save definition
+            # Create definition (don't save yet - wait for deduplication)
             definition = Definition(
                 word_id=str(word.id),
                 part_of_speech=synthesis_result["part_of_speech"],
                 text=synthesis_result["definition_text"],
                 meaning_cluster=cluster_defs[0].meaning_cluster,
             )
-            await definition.save()
             return definition
 
         # Create tasks for all clusters
@@ -354,6 +353,49 @@ class DefinitionSynthesizer:
 
         synthesized_definitions = await asyncio.gather(*synthesis_tasks)
 
+        # Deduplicate synthesized definitions to handle near-duplicates
+        if len(synthesized_definitions) > 1:
+            logger.info(f"Deduplicating {len(synthesized_definitions)} synthesized definitions")
+            
+            # Call deduplication
+            dedup_response = await self.ai.deduplicate_definitions(
+                word=word.text,
+                definitions=synthesized_definitions,
+            )
+            
+            # Map deduplicated results back to original definitions
+            deduplicated_definitions = []
+            for dedup_def in dedup_response.deduplicated_definitions:
+                # Use the first source index as the primary definition
+                primary_idx = dedup_def.source_indices[0]
+                definition = synthesized_definitions[primary_idx]
+                
+                # Update the definition text with the deduplicated version
+                definition.text = dedup_def.definition
+                deduplicated_definitions.append(definition)
+                
+                # Log which definitions were merged
+                if len(dedup_def.source_indices) > 1:
+                    merged_indices = dedup_def.source_indices[1:]
+                    logger.debug(
+                        f"Merged definitions at indices {merged_indices} into index {primary_idx}: "
+                        f"{dedup_def.reasoning}"
+                    )
+            
+            logger.success(
+                f"Deduplicated {len(synthesized_definitions)} → {len(deduplicated_definitions)} definitions"
+            )
+            
+            # Save deduplicated definitions
+            for definition in deduplicated_definitions:
+                await definition.save()
+            
+            return deduplicated_definitions
+        
+        # Save all definitions if no deduplication needed
+        for definition in synthesized_definitions:
+            await definition.save()
+            
         return synthesized_definitions
 
     async def generate_fallback_entry(

@@ -19,6 +19,7 @@ from .models import (
     CEFRLevelResponse,
     ClusterMappingResponse,
     CollocationResponse,
+    DeduplicationResponse,
     DictionaryEntryResponse,
     DomainIdentificationResponse,
     EtymologyResponse,
@@ -935,4 +936,47 @@ class OpenAIConnector:
             return result
         except Exception as e:
             logger.error(f"Word suggestion failed: {e}")
+            raise
+
+    async def deduplicate_definitions(
+        self,
+        word: str,
+        definitions: list[Definition],
+        part_of_speech: str | None = None,
+    ) -> DeduplicationResponse:
+        """Deduplicate near-duplicate definitions using semantic similarity.
+        
+        Args:
+            word: The word being defined
+            definitions: List of Definition objects to deduplicate
+            part_of_speech: Optional specific part of speech to focus on
+            
+        Returns:
+            DeduplicationResponse with deduplicated definitions
+        """
+        logger.info(
+            f"🔍 Deduplicating {len(definitions)} definitions for '{word}'"
+            f"{f' ({part_of_speech})' if part_of_speech else ''}"
+        )
+        
+        prompt = self.template_manager.get_deduplicate_prompt(
+            word=word,
+            definitions=definitions,
+            part_of_speech=part_of_speech,
+        )
+        
+        try:
+            result = await self._make_structured_request(
+                prompt, 
+                DeduplicationResponse, 
+                task_name="deduplicate_definitions"
+            )
+            
+            logger.success(
+                f"✨ Deduplicated {len(definitions)} → {len(result.deduplicated_definitions)} "
+                f"definitions (removed {result.removed_count}, confidence: {result.confidence:.1%})"
+            )
+            return result
+        except Exception as e:
+            logger.error(f"❌ Definition deduplication failed for '{word}': {e}")
             raise

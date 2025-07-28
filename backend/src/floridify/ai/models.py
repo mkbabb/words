@@ -439,6 +439,26 @@ class AnkiMultipleChoiceResponse(BaseModel):
     correct_choice: str = Field(description="Letter of correct answer (A, B, C, or D)")
 
 
+class DeduplicatedDefinition(BaseModel):
+    """A deduplicated definition with quality assessment."""
+    
+    part_of_speech: str = Field(description="Part of speech")
+    definition: str = Field(description="The highest quality definition text")
+    source_indices: list[int] = Field(description="Indices of merged definitions (0-based)")
+    quality_score: float = Field(description="Quality score (0.0-1.0)")
+    reasoning: str = Field(description="Brief explanation (max 10 words)")
+
+
+class DeduplicationResponse(BaseModel):
+    """Response from definition deduplication."""
+    
+    deduplicated_definitions: list[DeduplicatedDefinition] = Field(
+        description="Deduplicated definitions preserving highest quality"
+    )
+    removed_count: int = Field(description="Number of duplicate definitions removed")
+    confidence: float = Field(description="Confidence in deduplication (0.0-1.0)")
+
+
 # Rebuild models with forward references
 ProviderDataResponse.model_rebuild()
 SynthesisResponse.model_rebuild()

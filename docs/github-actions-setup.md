@@ -4,56 +4,64 @@
 
 The following secrets must be configured in your GitHub repository settings:
 
-1. **EC2_HOST**: The public IP address of your EC2 instance
-2. **EC2_SSH_KEY**: Your private SSH key for accessing the EC2 instance (full content, including header/footer)
-3. **DOMAIN**: Your domain name (e.g., words.babb.dev)
-4. **OPENAI_API_KEY**: Your OpenAI API key
-5. **MONGODB_CONNECTION_STRING**: Your MongoDB connection string
-6. **CERTBOT_EMAIL**: Email for SSL certificate generation
-7. **OXFORD_APP_ID**: (Optional) Oxford Dictionary API app ID
-8. **OXFORD_API_KEY**: (Optional) Oxford Dictionary API key
-9. **DICTIONARY_COM_AUTH**: (Optional) Dictionary.com auth token
+1. **AWS_ACCESS_KEY_ID**: AWS access key with EC2 permissions
+2. **AWS_SECRET_ACCESS_KEY**: AWS secret access key
+3. **EC2_HOST**: The public IP address of your EC2 instance
+4. **EC2_SSH_KEY**: Your private SSH key for accessing the EC2 instance (full content, including header/footer)
+5. **DOMAIN**: Your domain name (e.g., words.babb.dev)
 
-## EC2 Security Group Configuration
+## How It Works
 
-GitHub Actions uses dynamic IP ranges that change frequently. To allow deployments from GitHub Actions, you need to configure your EC2 security group:
+The GitHub Actions workflow automatically handles security group updates:
 
-### Option 1: Allow GitHub Actions IP Ranges (Recommended)
+1. Gets the runner's public IP address
+2. Temporarily adds this IP to the EC2 security group
+3. SSHs into the server and runs the deploy script
+4. Removes the IP from the security group when done
 
-1. Get the current GitHub Actions IP ranges:
-   ```bash
-   curl -s https://api.github.com/meta | jq -r '.actions[]' | sort -u
-   ```
+This approach ensures secure access without permanently opening your security group.
 
-2. Add these IP ranges to your EC2 security group for SSH (port 22)
+## AWS IAM Permissions
 
-3. Note: These IPs change periodically, so you may need to update them
+The AWS user associated with the access keys needs the following EC2 permissions:
 
-### Option 2: Use AWS Systems Manager Session Manager
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:RevokeSecurityGroupIngress"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
 
-Instead of direct SSH, use AWS Systems Manager for secure access without opening port 22.
+## Prerequisites
 
-### Option 3: Temporary Security Group Update
-
-Create a GitHub Action that:
-1. Temporarily adds the runner's IP to the security group
-2. Performs the deployment
-3. Removes the IP from the security group
-
-### Option 4: Self-Hosted Runner
-
-Deploy a self-hosted GitHub Actions runner within your AWS VPC for direct access.
+1. **Auth Config on Server**: The `auth/config.toml` file must already exist on the server at `~/floridify/auth/config.toml`
+2. **Git Repository**: The server must have the git repository cloned at `~/floridify/`
+3. **Deploy Script**: The deploy script must be executable on the server
 
 ## Troubleshooting
 
-### SSH Connection Timeout
+### Missing AWS Credentials
 
-If you see "Connection timed out" errors:
+If you see AWS credential errors, ensure you've added:
+- AWS_ACCESS_KEY_ID secret
+- AWS_SECRET_ACCESS_KEY secret
 
+### SSH Connection Failed
+
+If SSH fails after adding the IP to security group:
 1. Verify EC2_HOST secret contains the correct public IP
-2. Check EC2 instance is running and accessible
-3. Verify security group allows SSH from GitHub Actions IPs
-4. Ensure the SSH key is properly formatted in secrets
+2. Check EC2 instance is running
+3. Ensure the SSH key is properly formatted in secrets
 
 ### SSH Key Format
 
@@ -64,12 +72,10 @@ The EC2_SSH_KEY secret should contain the complete private key:
 -----END RSA PRIVATE KEY-----
 ```
 
-## Manual Deployment Alternative
+## Manual Deployment
 
-If GitHub Actions deployment fails, you can deploy manually from your local machine:
+If GitHub Actions deployment fails, deploy manually from your local machine:
 
 ```bash
 ./scripts/deploy
 ```
-
-This uses your local SSH configuration and doesn't require special security group rules.

@@ -254,3 +254,18 @@ class PromptTemplateManager:
             query=query,
             count=count,
         )
+
+    def get_deduplicate_prompt(
+        self,
+        word: str,
+        definitions: list[Definition],
+        part_of_speech: str | None = None,
+    ) -> str:
+        """Generate prompt for definition deduplication."""
+        return self.render_template(
+            "synthesize/deduplicate",
+            word=word,
+            definitions=definitions,
+            part_of_speech=part_of_speech,
+            enumerate=enumerate,
+        )
