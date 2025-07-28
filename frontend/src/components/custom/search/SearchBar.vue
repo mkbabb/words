@@ -204,6 +204,12 @@
                 </div>
             </div>
 
+            <!-- Rainbow Progress Bar -->
+            <RainbowProgressBar
+                :show="showProgressBar"
+                :progress="store.loadingProgress"
+            />
+
             <!-- Dropdowns Container -->
             <div class="absolute top-full right-0 left-0 z-50 pt-2">
                 <!-- Controls Dropdown -->
@@ -269,6 +275,7 @@ import AutocompleteOverlay from './components/AutocompleteOverlay.vue';
 import SearchControls from './components/SearchControls.vue';
 import SearchResults from './components/SearchResults.vue';
 import ExpandModal from './components/ExpandModal.vue';
+import RainbowProgressBar from './components/RainbowProgressBar.vue';
 
 // Import composables
 import {
@@ -311,6 +318,36 @@ const { iconOpacity } = useSearchBarUI();
 
 // Use centralized state management
 const { state, canToggleMode, placeholder, resultsContainerStyle } = useSearchState();
+
+// Progress bar state - track separately to persist after modal dismiss
+const isLoadingInProgress = ref(false);
+
+// Start showing progress when search starts
+watch(() => store.isSearching, (newVal) => {
+    if (newVal) {
+        isLoadingInProgress.value = true;
+    }
+});
+
+// Hide progress only when loading truly completes
+watch(() => [store.loadingProgress, store.isSearching], ([progress, searching]) => {
+    // Only hide if we're at 100% AND not searching anymore
+    if (progress >= 100 && !searching) {
+        // Delay hiding to show completion
+        setTimeout(() => {
+            isLoadingInProgress.value = false;
+        }, 1000);
+    }
+    // Reset immediately if progress goes to 0 and we're not searching
+    else if (progress === 0 && !searching) {
+        isLoadingInProgress.value = false;
+    }
+});
+
+const showProgressBar = computed(() => {
+    // Show progress bar if loading is in progress and modal is not visible
+    return isLoadingInProgress.value && !store.showLoadingModal;
+});
 
 // Refs
 const searchContainer = ref<HTMLDivElement>();

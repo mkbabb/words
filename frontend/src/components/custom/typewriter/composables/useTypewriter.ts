@@ -164,6 +164,10 @@ export const useTypewriter = (options: TypewriterOptions) => {
     const updateText = (newText: string) => {
         options.text = newText;
         currentText.value = newText;
+        // Force non-first animation so backspace will occur
+        if (displayText.value.length > 0) {
+            isFirstAnimation.value = false;
+        }
     };
 
     return {

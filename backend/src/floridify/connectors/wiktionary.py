@@ -363,6 +363,9 @@ class WiktionaryConnector(DictionaryConnector):
 
             # Use wtp.WikiList to extract numbered definitions
             definition_texts = self._extract_wikilist_items(str(subsection))
+            
+            # Store the full subsection text for example extraction
+            subsection_text = str(subsection)
 
             for idx, def_text in enumerate(definition_texts):
                 if not def_text or len(def_text.strip()) < 5:
@@ -399,8 +402,9 @@ class WiktionaryConnector(DictionaryConnector):
                 # Save definition to get ID
                 await definition.save()
 
-                # Extract and save examples
-                example_objs = await self._extract_examples(def_text, str(definition.id))
+                # Extract and save examples from both the definition and the full subsection
+                # This ensures we capture quotations that appear after the definition
+                example_objs = await self._extract_examples(subsection_text, str(definition.id))
                 definition.example_ids = [str(ex.id) for ex in example_objs]
                 await definition.save()  # Update with example IDs
 
@@ -447,6 +451,48 @@ class WiktionaryConnector(DictionaryConnector):
                                 definition_id=definition_id,
                                 text=clean_example,
                                 type="literature",  # Wiktionary examples are from real usage
+                            )
+                            await example.save()
+                            examples.append(example)
+                            
+                elif template_name.startswith("quote-") or template_name in ["quote", "quotation"]:
+                    # Quote templates (e.g., quote-book, quote-journal, etc.)
+                    # Extract the passage/text parameter
+                    passage = None
+                    year = None
+                    author = None
+                    
+                    for arg in template.arguments:
+                        arg_name = str(arg.name).strip().lower() if arg.name else ""
+                        arg_value = str(arg.value).strip()
+                        
+                        if arg_name in ["passage", "text", "quote"]:
+                            passage = arg_value
+                        elif arg_name == "year":
+                            year = arg_value
+                        elif arg_name in ["author", "last"]:
+                            author = arg_value
+                    
+                    if passage:
+                        clean_passage = self.cleaner.clean_text(
+                            passage, preserve_structure=True
+                        )
+                        if clean_passage and len(clean_passage) > 10:
+                            # Format with metadata if available
+                            if year or author:
+                                metadata_parts = []
+                                if year:
+                                    metadata_parts.append(year)
+                                if author:
+                                    metadata_parts.append(author)
+                                full_text = f"({', '.join(metadata_parts)}) {clean_passage}"
+                            else:
+                                full_text = clean_passage
+                                
+                            example = Example(
+                                definition_id=definition_id,
+                                text=full_text,
+                                type="quotation",
                             )
                             await example.save()
                             examples.append(example)

@@ -129,6 +129,13 @@ const showThemeDropdown = ref(false);
 // Computed properties
 const entry = computed(() => store.currentEntry);
 
+// Force animation key update when word changes
+watch(entry, (newEntry, oldEntry) => {
+    if (newEntry?.word !== oldEntry?.word) {
+        animationKey.value++;
+    }
+});
+
 const normalizedEtymology = computed(() => {
     return normalizeEtymology(entry.value?.etymology);
 });

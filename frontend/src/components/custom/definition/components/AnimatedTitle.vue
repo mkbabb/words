@@ -35,8 +35,8 @@ const animationProps = computed(() => {
         errorRate: 0.015, // Occasional typos (reduced)
         cursorBlink: true,
         startDelay: 50,
-        loop: true, // Enable looping to show backspace animations
-        animationDelay: 15000, // 15 seconds between animations
+        loop: false, // Disable looping - we want single animations per word
+        animationDelay: 0, // No delay needed when not looping
     };
 });
 </script>

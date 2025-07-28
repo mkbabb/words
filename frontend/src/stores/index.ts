@@ -22,6 +22,7 @@ export const useAppStore = defineStore('app', () => {
     const loadingProgress = ref(0);
     const loadingStage = ref('');
     const forceRefreshMode = ref(false);
+    const showLoadingModal = ref(false);
     
     // SearchBar UI state (not persisted)
     const showSearchResults = ref(false);
@@ -991,6 +992,7 @@ export const useAppStore = defineStore('app', () => {
         selectedCardVariant,
         loadingProgress,
         loadingStage,
+        showLoadingModal,
         searchCursorPosition,
         forceRefreshMode,
         sessionState,

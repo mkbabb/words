@@ -45,7 +45,8 @@ export function normalizeWord(word: string): string {
   return word
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '');
+    // Keep Unicode letters, numbers, spaces, hyphens, and common accented characters
+    .replace(/[^\p{L}\p{N}\s-]/gu, '');
 }
 
 export function getHeatmapClass(similarity: number): string {

@@ -47,24 +47,35 @@
                         <!-- Animated Content Cards -->
                         <Transition
                     mode="out-in"
-                    enter-active-class="transition-all duration-500 ease-apple-spring"
-                    leave-active-class="transition-all duration-250 ease-apple-bounce-in"
-                    enter-from-class="opacity-0 scale-90 translate-x-12 rotate-2"
-                    enter-to-class="opacity-100 scale-100 translate-x-0 rotate-0"
-                    leave-from-class="opacity-100 scale-100 translate-x-0 rotate-0"
-                    leave-to-class="opacity-0 scale-90 -translate-x-12 -rotate-2"
+                    enter-active-class="transition-all duration-600 ease-out"
+                    leave-active-class="transition-all duration-400 ease-in"
+                    enter-from-class="opacity-0"
+                    enter-to-class="opacity-100"
+                    leave-from-class="opacity-100"
+                    leave-to-class="opacity-0"
                 >
                     <!-- Definition Content -->
                     <div v-if="store.searchMode === 'lookup' && store.mode !== 'suggestions'" key="lookup">
-                        <!-- Loading State -->
-                        <div v-if="isSearching" class="space-y-8">
+                        <!-- Loading State - only show skeleton if modal is visible -->
+                        <div v-if="isSearching && showLoadingModal" class="space-y-8">
                             <DefinitionSkeleton />
                         </div>
 
-                        <!-- Definition Display -->
-                        <div v-else-if="currentEntry" class="space-y-8">
-                            <DefinitionDisplay />
-                        </div>
+                        <!-- Definition Display with Fade Transition -->
+                        <Transition
+                            v-else-if="currentEntry || previousEntry"
+                            mode="out-in"
+                            enter-active-class="transition-opacity duration-600 ease-out"
+                            leave-active-class="transition-opacity duration-400 ease-in"
+                            enter-from-class="opacity-0"
+                            enter-to-class="opacity-100"
+                            leave-from-class="opacity-100"
+                            leave-to-class="opacity-0"
+                        >
+                            <div :key="currentEntry?.id || currentEntry?.word || 'empty'" class="space-y-8">
+                                <DefinitionDisplay v-if="currentEntry" />
+                            </div>
+                        </Transition>
 
                         <!-- Empty State -->
                         <div v-else class="py-16 text-center">
@@ -109,10 +120,11 @@
 
     <!-- Loading Modal for Lookup -->
     <LoadingModal
-        v-model="isSearching"
+        v-model="showLoadingModal"
         :word="store.searchQuery || 'searching'"
         :progress="store.loadingProgress"
         :current-stage="store.loadingStage"
+        :allow-dismiss="true"
         mode="lookup"
     />
     
@@ -179,8 +191,40 @@ onMounted(async () => {
     }
 });
 
+// Track loading modal visibility separately from search state
+const showLoadingModal = ref(false);
 const isSearching = computed(() => store.isSearching);
 const currentEntry = computed(() => store.currentEntry);
+const previousEntry = ref<any>(null);
+
+// Track previous entry for smooth transitions
+watch(currentEntry, (newEntry, oldEntry) => {
+    if (oldEntry && newEntry?.word !== oldEntry?.word) {
+        previousEntry.value = oldEntry;
+    }
+    // Clear previous entry after transition
+    if (newEntry) {
+        setTimeout(() => {
+            previousEntry.value = null;
+        }, 1000);
+    }
+});
+
+// Sync loading modal visibility with search state
+watch(isSearching, (newVal) => {
+    if (newVal) {
+        showLoadingModal.value = true;
+    } else {
+        // Also hide modal when searching completes
+        showLoadingModal.value = false;
+    }
+});
+
+
+// Expose loading modal state to store
+watch(showLoadingModal, (newVal) => {
+    store.showLoadingModal = newVal;
+});
 
 // Scroll-based shrinking animation
 const { y } = useScroll(window);

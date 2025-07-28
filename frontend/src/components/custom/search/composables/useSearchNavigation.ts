@@ -46,12 +46,25 @@ export function useSearchNavigation(options: UseSearchNavigationOptions) {
       const isBelow = elementRect.bottom > containerRect.bottom;
       
       if (isAbove || isBelow) {
-        // Use different block positioning based on direction
-        const block = direction > 0 ? 'end' : 'start';
-        selectedElement.scrollIntoView({
-          behavior: 'smooth',
-          block: block
-        });
+        // Scroll within the container only, not the entire page
+        const scrollTop = container.scrollTop;
+        const containerHeight = container.offsetHeight;
+        const elementTop = selectedElement.offsetTop;
+        const elementHeight = selectedElement.offsetHeight;
+        
+        if (isAbove) {
+          // Scroll up to show the element at the top with smooth behavior
+          container.scrollTo({
+            top: elementTop,
+            behavior: 'smooth'
+          });
+        } else if (isBelow) {
+          // Scroll down to show the element at the bottom with smooth behavior
+          container.scrollTo({
+            top: elementTop + elementHeight - containerHeight,
+            behavior: 'smooth'
+          });
+        }
       }
     });
   };
