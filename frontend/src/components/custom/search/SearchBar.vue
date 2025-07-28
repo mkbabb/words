@@ -462,6 +462,7 @@ const handleFocus = () => {
         state.query.length >= 2
     ) {
         state.searchResults = store.sessionState.searchResults.slice(0, 8);
+        state.showResults = true;
     }
 };
 
@@ -498,6 +499,7 @@ const performSearch = () => {
 
     if (!state.query || state.query.length < 2) {
         state.searchResults = [];
+        state.showResults = false;
         state.isSearching = false;
         state.isAIQuery = false;
         state.showSparkle = false;
@@ -515,6 +517,9 @@ const performSearch = () => {
             if (store.sessionState) {
                 store.sessionState.searchResults = results;
             }
+
+            // Show results if we have them
+            state.showResults = results.length > 0;
 
             // Activate AI mode
             if (results.length === 0 && shouldTriggerAIMode(state.query)) {
@@ -804,9 +809,9 @@ onMounted(async () => {
 
     // Show results when focused with query
     watch(
-        [() => state.isFocused, () => state.query, () => state.isAIQuery],
-        ([focused, query, isAI]) => {
-            if (focused && query && query.length > 0 && !isAI) {
+        [() => state.isFocused, () => state.query, () => state.isAIQuery, () => state.searchResults],
+        ([focused, query, isAI, results]) => {
+            if (focused && query && query.length > 0 && !isAI && results && results.length > 0) {
                 state.showResults = true;
             } else if (isAI) {
                 state.showResults = false;
