@@ -11,7 +11,7 @@
         }"
         :class="[
             'relative z-10 w-full rounded-xl bg-transparent text-lg transition-all duration-300 ease-out outline-none',
-            'placeholder:text-muted-foreground resize-none',
+            'placeholder:text-muted-foreground placeholder:truncate resize-none',
             'focus:ring-1 focus:ring-gray-300 dark:focus:ring-gray-600',
             'flex items-center leading-relaxed',
             {
@@ -110,6 +110,9 @@ const handleInput = (event: Event) => {
 
 const handleFocus = () => {
     emit('focus');
+    nextTick(() => {
+        resizeTextarea();
+    });
 };
 
 const handleBlur = () => {

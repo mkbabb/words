@@ -2,7 +2,7 @@
     <div
         ref="searchContainer"
         :class="[
-            'search-container relative z-50 mx-auto w-full origin-top',
+            'search-container relative z-50 mx-auto w-full origin-top px-3 sm:px-0',
             props.className,
         ]"
         :style="containerStyle"
@@ -10,7 +10,7 @@
         @mouseleave="handleMouseLeave"
     >
         <!-- Main Layout -->
-        <div class="pointer-events-auto relative overflow-visible pt-2 px-2 pb-0">
+        <div class="pointer-events-auto relative overflow-visible pt-2 px-2 sm:px-2 pb-0">
             <!-- Search Bar -->
             <div
                 ref="searchBarElement"
@@ -150,25 +150,55 @@
                     </Transition>
                 </div>
 
-                <!-- Regenerate Button -->
-                <RegenerateButton
-                    v-if="store.currentEntry && state.searchMode === 'lookup'"
-                    :show-button="true"
-                    :opacity="iconOpacity"
-                    :ai-mode="state.isAIQuery"
-                    v-model:force-refresh-mode="state.forceRefreshMode"
-                    @regenerate="handleForceRegenerate"
-                />
+                <!-- Controls Button Group -->
+                <div 
+                    class="flex items-center gap-1 flex-shrink-0"
+                    :style="{
+                        opacity: iconOpacity,
+                        transform: `scale(${0.9 + iconOpacity * 0.1})`,
+                        transition: 'all 300ms ease-out'
+                    }"
+                >
+                    <!-- Regenerate Button -->
+                    <button
+                        v-if="store.currentEntry && state.searchMode === 'lookup'"
+                        @click="handleForceRegenerate"
+                        @mouseenter="regenerateRotation += 180"
+                        @mouseleave="regenerateRotation -= 180"
+                        :class="[
+                            'flex h-10 w-10 items-center justify-center rounded-lg',
+                            'transition-all duration-200 ease-out',
+                            state.isAIQuery
+                                ? 'hover:bg-amber-100/60 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                                : 'hover:bg-muted/50',
+                            state.forceRefreshMode && state.isAIQuery
+                                ? 'bg-amber-200/60 text-amber-800 dark:bg-amber-800/40 dark:text-amber-200'
+                                : state.forceRefreshMode
+                                ? 'bg-primary/20 text-primary'
+                                : ''
+                        ]"
+                        :title="
+                            state.forceRefreshMode
+                                ? 'Force refresh mode ON - Next lookup will regenerate'
+                                : 'Toggle force refresh mode'
+                        "
+                    >
+                        <RefreshCw
+                            :size="18"
+                            :style="{
+                                transform: `rotate(${regenerateRotation}deg)`,
+                                transition: 'transform 700ms cubic-bezier(0.175, 0.885, 0.32, 1.4)',
+                            }"
+                        />
+                    </button>
 
-                <!-- Hamburger Button -->
-                <HamburgerButton
-                    v-model="state.showControls"
-                    :opacity="iconOpacity"
-                    :ai-mode="state.isAIQuery"
-                    :show-regenerate-button="
-                        !!store.currentEntry && state.searchMode === 'lookup'
-                    "
-                />
+                    <!-- Hamburger Button -->
+                    <HamburgerIcon
+                        :is-open="state.showControls"
+                        :ai-mode="state.isAIQuery"
+                        @toggle="state.showControls = !state.showControls"
+                    />
+                </div>
 
                 <!-- Progress Bar -->
                 <!-- <div
@@ -236,7 +266,8 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '@/stores';
 import type { SearchResult } from '@/types';
 import { showError } from '@/plugins/toast';
-import { Maximize2 } from 'lucide-vue-next';
+import { Maximize2, RefreshCw } from 'lucide-vue-next';
+import { HamburgerIcon } from '@/components/custom/icons';
 
 // Import components
 import SearchInput from './components/SearchInput.vue';
@@ -245,8 +276,6 @@ import ModeToggle from './components/ModeToggle.vue';
 import AutocompleteOverlay from './components/AutocompleteOverlay.vue';
 import SearchControls from './components/SearchControls.vue';
 import SearchResults from './components/SearchResults.vue';
-import RegenerateButton from './components/RegenerateButton.vue';
-import HamburgerButton from './components/HamburgerButton.vue';
 import ExpandModal from './components/ExpandModal.vue';
 
 // Import composables and utilities
@@ -297,6 +326,7 @@ const { state, iconOpacity, canToggleMode } = useSearchBarSharedState();
 const searchContainer = ref<HTMLDivElement>();
 const searchBarElement = ref<HTMLDivElement>();
 const searchInputComponent = ref<any>();
+const regenerateRotation = ref(0);
 
 // Computed
 const placeholder = computed(() => {
@@ -309,8 +339,8 @@ const placeholder = computed(() => {
 
     // Default to mode-based placeholders for lookup mode
     return state.mode === 'dictionary'
-        ? 'Enter a word to define...'
-        : 'Enter a word to find synonyms...';
+        ? 'Definitions'
+        : 'Synonyms';
 });
 
 const resultsContainerStyle = computed(() => ({

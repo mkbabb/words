@@ -2,8 +2,8 @@
     <div
         v-if="suggestion && suggestion !== query"
         :class="[
-            'pointer-events-none absolute top-0 left-0 flex h-12 items-center text-lg transition-all duration-300 ease-out',
-            'text-muted-foreground/50'
+            'pointer-events-none absolute top-0 left-0 right-0 flex h-12 items-center text-lg transition-all duration-300 ease-out',
+            'text-muted-foreground/50 truncate'
         ]"
         :style="{
             paddingLeft: paddingLeft,
@@ -11,7 +11,7 @@
             textAlign: textAlign
         }"
     >
-        <span class="invisible">{{ query }}</span><span>{{ suggestion.slice(query.length) }}</span>
+        <span class="invisible whitespace-pre">{{ query }}</span><span class="truncate">{{ suggestion.slice(query.length) }}</span>
     </div>
 </template>
 

@@ -3,7 +3,7 @@
         <div class="flex flex-col items-center space-y-6 px-4">
             <AnimatedText
                 :text="displayText || word || ''"
-                text-class="text-6xl lg:text-8xl font-black pb-8"
+                text-class="text-4xl lg:text-6xl font-black pb-8"
                 :offset="0.15"
                 :show-dots="progress < 100"
                 :force-single-line="true"

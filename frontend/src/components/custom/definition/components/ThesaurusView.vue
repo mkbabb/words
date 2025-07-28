@@ -1,11 +1,11 @@
 <template>
     <CardContent
         v-if="thesaurusData"
-        class="space-y-6"
+        class="space-y-6 px-3 sm:px-6"
     >
         <div
             v-if="thesaurusData.synonyms.length > 0"
-            class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+            class="grid grid-cols-3 gap-1.5 sm:gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
         >
             <HoverCard 
                 v-for="synonym in thesaurusData.synonyms"
@@ -21,11 +21,11 @@
                         )"
                         @click="$emit('word-click', synonym.word)"
                     >
-                        <CardContent class="px-2 py-1">
-                            <div class="font-medium text-sm truncate">
+                        <CardContent class="px-2 py-0.5 sm:py-1">
+                            <div class="font-medium text-sm sm:text-sm truncate">
                                 {{ synonym.word }}
                             </div>
-                            <div class="text-xs opacity-75">
+                            <div class="text-xs sm:text-xs opacity-75">
                                 {{ Math.round(synonym.score * 100) }}%
                             </div>
                         </CardContent>
