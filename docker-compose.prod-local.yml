@@ -1,13 +1,13 @@
-# Production overrides for docker-compose.yml
-# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Production overrides for docker-compose.yml using local builds
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod-local.yml up -d
 version: '3.8'
 
 services:
   backend:
     build:
       target: production
-    # Build locally on server
-    image: floridify-backend:latest
+    # Use locally built image
+    image: floridify-backend:local
     # No volume mounts in production
     volumes: []
     # Production command without reload
@@ -23,8 +23,8 @@ services:
   frontend:
     build:
       target: production
-    # Build locally on server
-    image: floridify-frontend:latest
+    # Use locally built image
+    image: floridify-frontend:local
     # Remove port mappings when using nginx (ssl profile)
     ports: []
     # No volume mounts in production

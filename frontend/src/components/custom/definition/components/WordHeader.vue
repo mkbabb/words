@@ -37,7 +37,6 @@
 
 <script setup lang="ts">
 import { CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui';
 import AnimatedTitle from './AnimatedTitle.vue';
 import ProviderIcons from './ProviderIcons.vue';
 

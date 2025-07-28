@@ -171,7 +171,7 @@ const modalLeave = (el: Element, done: () => void) => {
     content.style.transform = currentContentTransform;
     
     // Force reflow
-    void el.offsetHeight;
+    void (el as HTMLElement).offsetHeight;
     
     // Animate out
     requestAnimationFrame(() => {

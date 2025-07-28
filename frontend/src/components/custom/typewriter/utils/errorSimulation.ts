@@ -15,8 +15,8 @@ const shouldMakeError = (config: ErrorConfig): boolean => {
 };
 
 export const simulateError = async (
-    text: string,
-    position: number,
+    _text: string,
+    _position: number,
     config: ErrorConfig
 ): Promise<ErrorResult> => {
     if (!shouldMakeError(config)) {

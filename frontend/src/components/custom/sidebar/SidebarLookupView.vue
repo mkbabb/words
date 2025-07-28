@@ -7,7 +7,7 @@
             </h3>
             <div class="space-y-2">
                 <VocabularySuggestionItem
-                    v-for="(suggestion, idx) in vocabularySuggestions.slice(0, 3)"
+                    v-for="suggestion in vocabularySuggestions.slice(0, 3)"
                     :key="suggestion.word"
                     :suggestion="suggestion"
                     @click="handleSuggestionClick"
@@ -36,8 +36,8 @@
             >
                 <template #default="{ items }">
                     <SidebarRecentItem
-                        v-for="(suggestion, idx) in items"
-                        :key="`${suggestion.query}-${idx}`"
+                        v-for="suggestion in items"
+                        :key="`${suggestion.query}-${suggestion.timestamp}`"
                         :item="suggestion"
                         :title="suggestion.query"
                         :timestamp="suggestion.timestamp"
@@ -100,11 +100,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from 'vue';
+import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAppStore } from '@/stores';
 import { Accordion } from '@/components/ui/accordion';
-import { Book, Search, Sparkles, Wand2 } from 'lucide-vue-next';
+import { Book, Search, Wand2 } from 'lucide-vue-next';
 import { capitalizeFirst } from '@/utils';
 import SidebarSection from './SidebarSection.vue';
 import GoldenSidebarSection from './GoldenSidebarSection.vue';
@@ -174,7 +174,7 @@ const handleSearchClick = (search: { query: string }) => {
             lookup => lookup.word.toLowerCase() === search.query.toLowerCase()
         );
         if (matchingLookup) {
-            store.currentEntry = matchingLookup;
+            store.currentEntry = matchingLookup.entry;
         }
     }
     

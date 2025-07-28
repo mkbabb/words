@@ -65,16 +65,34 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     
     steps:
-      - name: Deploy to EC2 via SSH
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup SSH
         run: |
-          # Create SSH key file
-          echo "${{ secrets.EC2_SSH_KEY }}" > /tmp/ssh_key
-          chmod 600 /tmp/ssh_key
-          
-          # SSH into dev server and run deploy script
-          ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no \
-            ${{ env.EC2_USER }}@${{ env.EC2_HOST }} \
-            'cd /opt/floridify && ./scripts/deploy'
-          
-          # Clean up SSH key
-          rm -f /tmp/ssh_key
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+      
+      - name: Deploy via local script
+        env:
+          EC2_HOST: ${{ env.EC2_HOST }}
+          EC2_USER: ${{ env.EC2_USER }}
+          DOMAIN: ${{ env.DOMAIN }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MONGODB_CONNECTION_STRING: ${{ secrets.MONGODB_CONNECTION_STRING }}
+          CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL }}
+          OXFORD_APP_ID: ${{ secrets.OXFORD_APP_ID }}
+          OXFORD_API_KEY: ${{ secrets.OXFORD_API_KEY }}
+          DICTIONARY_COM_AUTH: ${{ secrets.DICTIONARY_COM_AUTH }}
+          GITHUB_ACTIONS: true
+        run: |
+          chmod +x ./scripts/deploy
+          ./scripts/deploy
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key

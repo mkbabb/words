@@ -28,7 +28,7 @@
                 </div>
                 <div class="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{{ item.definitions?.length || 0 }} definitions</span>
-                    <span>{{ formatRelativeTime(item.timestamp) }}</span>
+                    <span>{{ formatRelativeTime(item.last_updated) }}</span>
                 </div>
             </div>
         </HoverCardContent>

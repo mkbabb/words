@@ -1,8 +1,8 @@
 // Frontend-specific types that extend or adapt backend types
 import type { 
-  LookupResponse, 
-  Definition as APIDefinition,
-  SearchResult as APISearchResult 
+  LookupResponse,
+  DefinitionResponse,
+  SearchResult
 } from './api';
 
 // Re-export backend-aligned types
@@ -28,7 +28,7 @@ export {
 } from './api';
 
 // Frontend version of Definition with transformed examples
-export interface TransformedDefinition extends Omit<APIDefinition, 'examples'> {
+export interface TransformedDefinition extends Omit<DefinitionResponse, 'examples'> {
   definition?: string; // Alias for 'text' to maintain compatibility
   source?: string; // Added for provider tracking
   examples: {
@@ -58,7 +58,7 @@ export interface SearchHistory {
   id: string;
   query: string;
   timestamp: Date;
-  results: APISearchResult[];
+  results: SearchResult[];
 }
 
 export interface LookupHistory {
@@ -126,7 +126,7 @@ export interface SearchState {
   query: string;
   isSearching: boolean;
   hasSearched: boolean;
-  results: APISearchResult[];
+  results: SearchResult[];
   currentEntry?: SynthesizedDictionaryEntry;
   mode: 'dictionary' | 'thesaurus';
 }

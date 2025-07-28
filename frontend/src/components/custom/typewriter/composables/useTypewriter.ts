@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { QWERTY_MAP, calculateKeyDelay } from '../utils/qwertyMap';
+import { calculateKeyDelay } from '../utils/qwertyMap';
 import { getPauseDelay, PAUSE_PATTERNS } from '../utils/pausePatterns';
 import { simulateError } from '../utils/errorSimulation';
 
@@ -16,10 +16,10 @@ interface TypewriterOptions {
 export const useTypewriter = (options: TypewriterOptions) => {
     const displayText = ref('');
     const isTyping = ref(false);
+    const isFirstAnimation = ref(true);
+    const hasCompletedAnimation = ref(false);
+    const currentText = ref(options.text);
     let animationId: number | null = null;
-    let hasTypedOnce = ref(false);
-    let isFirstAnimation = true;
-    let currentText = ref(options.text);
 
     const delay = (ms: number): Promise<void> => {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -31,87 +31,119 @@ export const useTypewriter = (options: TypewriterOptions) => {
         return Math.max(50, Math.min(500, calculatedDelay));
     };
 
-    const backspace = async (toPosition: number, totalDelay: number) => {
-        const backspacesNeeded = displayText.value.length - toPosition;
-        const delayPerBackspace = totalDelay / backspacesNeeded;
-        
-        for (let i = 0; i < backspacesNeeded; i++) {
+    const animateBackspace = async (fromLength: number, toLength: number) => {
+        while (displayText.value.length > toLength && isTyping.value) {
             displayText.value = displayText.value.slice(0, -1);
-            await delay(delayPerBackspace);
+            // Backspace speed: 30-70ms per character
+            await delay(30 + Math.random() * 40);
         }
     };
 
     const startTyping = async () => {
+        if (isTyping.value) return; // Prevent multiple animations
+        
         isTyping.value = true;
         
         // Update current text reference
         currentText.value = options.text;
         
-        // Determine if this is truly the first animation
-        const shouldBackspace = displayText.value.length > 0 && !isFirstAnimation;
-        
-        // Handle backspace animation when we have existing text
-        if (shouldBackspace) {
+        // Check if we need to backspace (not first animation and we have existing text)
+        if (!isFirstAnimation.value && displayText.value.length > 0) {
+            // Calculate how many characters to keep (20-80% will be deleted)
             const currentLength = displayText.value.length;
-            // Decide how many characters to backspace (20% to 80% of text)
-            const minBackspace = Math.max(1, Math.floor(currentLength * 0.2));
-            const maxBackspace = Math.floor(currentLength * 0.8);
-            const targetLength = currentLength - (minBackspace + Math.floor(Math.random() * (maxBackspace - minBackspace + 1)));
+            const deletePercentage = 0.2 + Math.random() * 0.6; // 20% to 80%
+            const charactersToDelete = Math.floor(currentLength * deletePercentage);
+            const targetLength = currentLength - charactersToDelete;
             
-            // Animate backspacing to target length
-            while (displayText.value.length > targetLength && isTyping.value) {
-                displayText.value = displayText.value.slice(0, -1);
-                // Visible backspace speed (50-90ms per character)
-                await delay(50 + Math.random() * 40);
-            }
+            // Animate backspacing
+            await animateBackspace(currentLength, targetLength);
             
             // Pause after partial backspace (200-400ms)
-            await delay(200 + Math.random() * 200);
-            
-            // Continue backspacing to empty
-            while (displayText.value.length > 0 && isTyping.value) {
-                displayText.value = displayText.value.slice(0, -1);
-                // Slightly faster for the final deletion
-                await delay(40 + Math.random() * 30);
+            if (isTyping.value) {
+                await delay(200 + Math.random() * 200);
             }
             
-            // Final pause before typing new text
-            await delay(200 + Math.random() * 200);
-        } else if (isFirstAnimation) {
-            // First animation - make sure we start clean
+            // Continue backspacing to empty if we haven't cleared everything
+            if (displayText.value.length > 0 && isTyping.value) {
+                await animateBackspace(displayText.value.length, 0);
+            }
+            
+            // Final pause before typing new text (200-400ms)
+            if (isTyping.value) {
+                await delay(200 + Math.random() * 200);
+            }
+        } else if (isFirstAnimation.value) {
+            // First animation - start clean
             displayText.value = '';
         }
         
-        // Now type the new text from the beginning
-        const chars = currentText.value.split('');
+        // Type the new text with occasional backspacing
+        await typeTextWithBackspacing();
         
-        for (let position = 0; position < chars.length && isTyping.value; position++) {
-            await typeCharacter(chars, position);
+        // Mark animation as completed
+        if (isTyping.value) {
+            if (isFirstAnimation.value) {
+                isFirstAnimation.value = false;
+            }
+            hasCompletedAnimation.value = true;
+            isTyping.value = false;
+            options.onComplete?.();
         }
         
-        // Mark that we've completed at least one animation
-        if (isFirstAnimation) {
-            isFirstAnimation = false;
-        }
-        hasTypedOnce.value = true;
-        isTyping.value = false;
-        options.onComplete?.();
-        
-        // Loop if enabled
+        // Handle looping if enabled
         if (options.loop && isTyping.value !== false) {
             await delay(1500); // Pause before looping
             startTyping();
         }
     };
     
-    const typeCharacter = async (chars: string[], position: number) => {
+    const typeTextWithBackspacing = async () => {
+        const chars = currentText.value.split('');
+        let position = 0;
+        
+        while (position < chars.length && isTyping.value) {
+            // Check if we should do random backspacing (not on first animation)
+            if (!isFirstAnimation.value && 
+                position > 5 && // Don't backspace too early
+                position < chars.length - 10 && // Don't backspace too close to the end
+                Math.random() < 0.15) { // 15% chance of backspacing
+                
+                // Decide how many characters to backspace (2-8 characters)
+                const backspaceCount = 2 + Math.floor(Math.random() * 7);
+                const actualBackspace = Math.min(backspaceCount, position - 2); // Keep at least 2 chars
+                
+                // Pause before realizing "mistake" (100-300ms)
+                await delay(100 + Math.random() * 200);
+                
+                // Animate backspacing
+                const targetLength = displayText.value.length - actualBackspace;
+                await animateBackspace(displayText.value.length, targetLength);
+                
+                // Pause after backspacing (200-400ms)
+                await delay(200 + Math.random() * 200);
+                
+                // Reset position to retype from where we backspaced to
+                position = targetLength;
+                continue;
+            }
+            
+            // Type the character (with possible typo)
+            const typed = await typeCharacter(chars, position);
+            if (typed) {
+                position++;
+            }
+            // If typeCharacter returns false (typo correction), position stays the same
+        }
+    };
+    
+    const typeCharacter = async (chars: string[], position: number): Promise<boolean> => {
         const currentChar = chars[position];
         const nextChar = chars[position + 1] || '';
         const prevChar = position > 0 ? chars[position - 1] : '';
         let keyDelay: number;
         
         // Use expert mode for first animation regardless of settings
-        const currentMode = (isFirstAnimation && !hasTypedOnce.value) ? 'expert' : options.mode;
+        const currentMode = isFirstAnimation.value ? 'expert' : (options.mode || 'human');
         
         if (currentMode === 'basic') {
             // Basic mode: constant speed with small variance
@@ -125,51 +157,54 @@ export const useTypewriter = (options: TypewriterOptions) => {
         
         // Add pause patterns for human and expert modes
         let pauseDelay = 0;
-        if (currentMode !== 'basic' && !isFirstAnimation) {
+        if (currentMode !== 'basic' && !isFirstAnimation.value) {
             pauseDelay = getPauseDelay(currentChar, nextChar, PAUSE_PATTERNS);
         }
         
-        // Determine if we should introduce errors (never on first animation)
-        const shouldIntroduceErrors = !isFirstAnimation && 
-            hasTypedOnce.value && 
-            options.mode !== 'basic' && 
-            Math.random() < 0.2; // 20% chance after first animation
-        
-        // Check for errors (human and expert modes, after initial animation)
-        if (shouldIntroduceErrors && position > 5 && position < chars.length - 5) {
-            const error = await simulateError(options.text, position, {
-                errorRate: options.errorRate || 0.03,
-                detectionDelay: 3,
-                correctionProbability: 0.9
-            });
+        // Simulate typos (only after first animation and not in basic mode)
+        if (!isFirstAnimation.value && hasCompletedAnimation.value && currentMode !== 'basic') {
+            const shouldSimulateError = Math.random() < 0.05 && // 5% chance
+                                       position > 3 && // Not at the beginning
+                                       position < chars.length - 3; // Not at the end
             
-            if (error.corrected) {
+            if (shouldSimulateError) {
                 // Type a wrong character
-                const wrongChars = 'asdfjkl;'.split('');
+                const wrongChars = 'asdfjkl;qwertyuiop'.split('');
                 const wrongChar = wrongChars[Math.floor(Math.random() * wrongChars.length)];
                 displayText.value += wrongChar;
                 
-                // Continue typing for detection delay
-                const detectionChars = Math.min(error.detectionDelay, chars.length - position - 1);
-                for (let i = 0; i < detectionChars; i++) {
+                // Continue typing for 1-3 more characters before noticing
+                const detectionDelay = 1 + Math.floor(Math.random() * 3);
+                const detectionChars = Math.min(detectionDelay, chars.length - position - 1);
+                
+                for (let i = 0; i < detectionChars && isTyping.value; i++) {
                     await delay(keyDelay);
                     displayText.value += chars[position + 1 + i];
                 }
                 
-                // Pause before correction
-                await delay(300 + Math.random() * 200);
+                // Pause before correction (human reaction time)
+                if (isTyping.value) {
+                    await delay(200 + Math.random() * 300);
+                }
                 
                 // Backspace to correct
-                await backspace(position, error.backspaceDelay * (detectionChars + 1));
-                return; // Exit to retry this character in the main loop
+                const backspaceTarget = displayText.value.length - (detectionChars + 1);
+                await animateBackspace(displayText.value.length, backspaceTarget);
+                
+                // Small pause after correction
+                await delay(100 + Math.random() * 100);
+                
+                return false; // Signal to retry this character
             }
         }
         
-        // Type the character
+        // Type the character normally
         displayText.value += currentChar;
         
         // Wait for next character
         await delay(keyDelay + pauseDelay);
+        
+        return true; // Successfully typed
     };
 
     const stopTyping = () => {
@@ -183,19 +218,22 @@ export const useTypewriter = (options: TypewriterOptions) => {
     const reset = () => {
         stopTyping();
         displayText.value = '';
-        hasTypedOnce.value = false;
-        isFirstAnimation = true;
+        isFirstAnimation.value = true;
+        hasCompletedAnimation.value = false;
     };
     
     const updateText = (newText: string) => {
         // Update the options text when it changes
         options.text = newText;
         currentText.value = newText;
+        // DO NOT reset or clear displayText here - let the animation handle it
     };
 
     return {
         displayText,
         isTyping,
+        isFirstAnimation,
+        hasCompletedAnimation,
         startTyping,
         stopTyping,
         reset,

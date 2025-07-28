@@ -237,7 +237,6 @@ import { useAppStore } from '@/stores';
 import type { SearchResult } from '@/types';
 import { showError } from '@/plugins/toast';
 import { Maximize2 } from 'lucide-vue-next';
-import { generateRainbowGradient } from '@/utils/animations';
 
 // Import components
 import SearchInput from './components/SearchInput.vue';

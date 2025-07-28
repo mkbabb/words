@@ -60,32 +60,22 @@ const typewriter = useTypewriter({
     }
 });
 
-const { displayText, isTyping, startTyping, stopTyping, reset, updateText } = typewriter;
+const { displayText, isTyping, isFirstAnimation, hasCompletedAnimation, startTyping, stopTyping, reset, updateText } = typewriter;
 
 // Watch for text changes
 watch(() => props.text, (newText, oldText) => {
-    stopTyping();
-    
-    if (newText) {
+    if (newText !== oldText && newText) {
+        stopTyping();
+        
         // Update the text in the typewriter
         updateText(newText);
         
-        // Don't reset if we have text displayed - allow backspace animation
-        if (oldText && displayText.value.length > 0) {
-            // Text changed but we have existing text - don't reset
-            // The startTyping function will handle the backspace animation
-            setTimeout(() => {
-                emit('start');
-                startTyping();
-            }, props.startDelay);
-        } else {
-            // First time or no text displayed - reset and start fresh
-            reset();
-            setTimeout(() => {
-                emit('start');
-                startTyping();
-            }, props.startDelay);
-        }
+        // Always let the animation handle the transition
+        // DO NOT reset unless we truly have no text
+        setTimeout(() => {
+            emit('start');
+            startTyping();
+        }, props.startDelay);
     }
 });
 

@@ -151,49 +151,33 @@ EOF
     print_status "✓ Environment file created"
 }
 
-# Create auth configuration on server from secrets
-create_auth_config() {
-    print_status "Creating auth configuration..."
+# Copy auth configuration from local to server
+copy_auth_config() {
+    print_status "Copying auth configuration to server..."
+    
+    # Check if local auth/config.toml exists
+    if [ ! -f "auth/config.toml" ]; then
+        print_error "auth/config.toml not found locally"
+        print_info "Run ./scripts/setup first to configure auth"
+        exit 1
+    fi
     
     local ssh_cmd="ssh -o StrictHostKeyChecking=no"
     if is_github_actions; then
         ssh_cmd="$ssh_cmd -i ~/.ssh/deploy_key"
     fi
     
-    # Create auth/config.toml on server from environment/secrets
-    $ssh_cmd $EC2_USER@$EC2_HOST << EOF
-        cd ~/floridify
-        mkdir -p auth
-        cat > auth/config.toml << 'CONFIG_EOF'
-[openai]
-api_key = "${OPENAI_API_KEY}"
-
-[models]
-openai_model = "gpt-4o"
-reasoning_effort = "high"
-embedding_model = "text-embedding-3-large"
-
-[oxford]
-app_id = "${OXFORD_APP_ID:-}"
-api_key = "${OXFORD_API_KEY:-}"
-
-[dictionary_com]
-authorization = "${DICTIONARY_COM_AUTH:-}"
-
-# Database configuration
-[database]
-url = "${MONGODB_CONNECTION_STRING}"
-name = "floridify"
-timeout = 30
-max_pool_size = 100
-
-[general]
-invalid-key-format = "value"
-CONFIG_EOF
-        echo "Auth configuration created successfully"
-EOF
-
-    print_status "✓ Auth configuration created"
+    # Create auth directory on server
+    $ssh_cmd $EC2_USER@$EC2_HOST 'mkdir -p ~/floridify/auth'
+    
+    # Copy config file
+    if is_github_actions; then
+        scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no auth/config.toml $EC2_USER@$EC2_HOST:~/floridify/auth/
+    else
+        scp -o StrictHostKeyChecking=no auth/config.toml $EC2_USER@$EC2_HOST:~/floridify/auth/
+    fi
+    
+    print_status "✓ Auth configuration copied"
 }
 
 # Build and deploy application on server
@@ -292,7 +276,7 @@ main() {
     test_ssh
     sync_codebase
     create_env_file
-    create_auth_config
+    copy_auth_config
     build_and_deploy
     verify_deployment
     
