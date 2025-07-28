@@ -31,6 +31,19 @@
                 :providers="providers"
                 :word="word"
             />
+            
+            <!-- AI Synthesis Indicator -->
+            <span
+                v-if="isAISynthesized !== undefined"
+                :class="[
+                    'text-xs px-2 py-1 rounded-md transition-all duration-200',
+                    isAISynthesized
+                        ? 'bg-primary/10 text-primary border border-primary/20'
+                        : 'bg-muted text-muted-foreground border border-border/50'
+                ]"
+            >
+                {{ isAISynthesized ? 'AI Enhanced' : 'Raw Data' }}
+            </span>
         </div>
     </CardHeader>
 </template>
@@ -51,6 +64,7 @@ interface WordHeaderProps {
     providers: string[];
     animationType: string;
     animationKey: number;
+    isAISynthesized?: boolean;
 }
 
 const props = defineProps<WordHeaderProps>();

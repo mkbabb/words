@@ -50,6 +50,7 @@ const state = reactive({
     // Selected options
     selectedSources: ['wiktionary'],
     selectedLanguages: ['en'],
+    noAI: false,
     
     // Dev mode
     isDevelopment: import.meta.env.DEV
@@ -98,6 +99,7 @@ export function useSearchBarSharedState() {
         state.forceRefreshMode = store.forceRefreshMode;
         state.selectedSources = store.selectedSources || ['wiktionary'];
         state.selectedLanguages = store.selectedLanguages || ['en'];
+        state.noAI = store.noAI || false;
         
         // Restore persisted search state
         if (store.searchQuery) {
@@ -213,6 +215,20 @@ export function useSearchBarSharedState() {
             state.selectedLanguages = newLanguages;
         }
     }, { deep: true });
+    
+    // Watch for changes in local noAI and sync to store
+    watch(() => state.noAI, (newNoAI) => {
+        if (store.noAI !== newNoAI) {
+            store.noAI = newNoAI;
+        }
+    });
+    
+    // Watch for changes in store noAI and sync to local state
+    watch(() => store.noAI, (newNoAI) => {
+        if (state.noAI !== newNoAI) {
+            state.noAI = newNoAI;
+        }
+    });
     
     return {
         state,

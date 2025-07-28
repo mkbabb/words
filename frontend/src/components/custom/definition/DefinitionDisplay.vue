@@ -18,6 +18,7 @@
                 :providers="usedProviders"
                 :animationType="'typewriter'"
                 :animationKey="animationKey"
+                :isAISynthesized="!!entry.model_info"
                 @toggle-pronunciation="store.togglePronunciation"
             />
 

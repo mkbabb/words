@@ -217,6 +217,7 @@
                     v-model:search-mode="state.searchMode"
                     v-model:selected-sources="state.selectedSources"
                     v-model:selected-languages="state.selectedLanguages"
+                    v-model:no-a-i="state.noAI"
                     :ai-suggestions="state.aiSuggestions"
                     :is-development="state.isDevelopment"
                     :show-refresh-button="!!store.currentEntry && state.searchMode === 'lookup'"

@@ -75,6 +75,26 @@
                 </div>
             </div>
 
+            <!-- AI Toggle (Lookup Mode) -->
+            <div
+                v-if="searchMode === 'lookup'"
+                class="border-t border-border/50 px-4 py-3"
+            >
+                <h3 class="mb-3 text-sm font-medium">AI Mode</h3>
+                <button
+                    @click="noAI = !noAI"
+                    :class="[
+                        'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200',
+                        !noAI
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                    ]"
+                >
+                    <Sparkles :size="16" />
+                    {{ !noAI ? 'AI Synthesis' : 'No AI' }}
+                </button>
+            </div>
+
             <!-- Actions Row -->
             <div
                 v-if="searchMode === 'lookup'"
@@ -154,7 +174,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Trash2, Menu, RefreshCw } from 'lucide-vue-next';
+import { Trash2, Menu, RefreshCw, Sparkles } from 'lucide-vue-next';
 import { Button } from '@/components/ui';
 import { BouncyToggle } from '@/components/custom/animation';
 import { DICTIONARY_SOURCES, LANGUAGES } from '../constants/sources';
@@ -174,6 +194,7 @@ defineProps<SearchControlsProps>();
 const searchMode = defineModel<SearchMode>('searchMode', { required: true });
 const selectedSources = defineModel<string[]>('selectedSources', { required: true });
 const selectedLanguages = defineModel<string[]>('selectedLanguages', { required: true });
+const noAI = defineModel<boolean>('noAI', { required: true });
 
 const emit = defineEmits<{
     'word-select': [word: string];

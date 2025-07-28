@@ -75,16 +75,27 @@ jobs:
       
       - name: Get runner IP and security group
         id: runner-info
+        env:
+          TARGET_HOST: ${{ secrets.EC2_HOST }}
         run: |
           # Get runner's public IP
           RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
           echo "RUNNER_IP=${RUNNER_IP}" >> $GITHUB_OUTPUT
           
           # Get EC2 instance security group
+          echo "Looking up EC2 instance by IP: ${TARGET_HOST}"
+          
           INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=ip-address,Values=${{ env.EC2_HOST }}" \
+            --filters "Name=ip-address,Values=${TARGET_HOST}" \
             --query 'Reservations[0].Instances[0].InstanceId' \
             --output text)
+          
+          if [ "${INSTANCE_ID}" = "None" ]; then
+            echo "Error: Could not find EC2 instance with IP ${TARGET_HOST}"
+            exit 1
+          fi
+          
+          echo "Found instance: ${INSTANCE_ID}"
           
           SECURITY_GROUP_ID=$(aws ec2 describe-instances \
             --instance-ids ${INSTANCE_ID} \
@@ -105,27 +116,32 @@ jobs:
             --group-rule-description "GitHub Actions deployment - temporary"
       
       - name: Setup SSH
+        env:
+          TARGET_HOST: ${{ secrets.EC2_HOST }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H ${TARGET_HOST} >> ~/.ssh/known_hosts 2>/dev/null || true
       
       - name: Deploy on server
+        env:
+          TARGET_HOST: ${{ secrets.EC2_HOST }}
+          TARGET_DOMAIN: ${{ secrets.DOMAIN }}
         run: |
           # SSH into server and run deploy script
           ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
-              ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'ENDSSH'
+              ${{ env.EC2_USER }}@${TARGET_HOST} << 'ENDSSH'
             cd ~/floridify
             
             # Pull latest code
             git pull origin master
             
             # Set environment variables needed by deploy script
-            export EC2_HOST=${{ env.EC2_HOST }}
+            export EC2_HOST=${TARGET_HOST}
             export EC2_USER=${{ env.EC2_USER }}
-            export DOMAIN=${{ env.DOMAIN }}
+            export DOMAIN=${TARGET_DOMAIN}
             
             # Run deploy script on server (without GITHUB_ACTIONS set)
             ./scripts/deploy
