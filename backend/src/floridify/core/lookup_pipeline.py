@@ -112,8 +112,8 @@ async def lookup_word_pipeline(
             if existing:
                 logger.info(f"🗑️  Deleting existing synthesized entry for '{best_match}' due to force_refresh")
                 await existing.delete()
-        elif not no_ai:
-            # Try to get a cached entry if not forcing refresh
+        else:
+            # Try to get a cached entry if not forcing refresh (regardless of AI setting)
             existing = await get_synthesized_entry(word)
             if existing:
                 logger.info(f"📋 Using cached synthesized entry for '{best_match}'")
