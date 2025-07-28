@@ -272,6 +272,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { useMagicKeys, whenever } from '@vueuse/core';
+import { useRouter } from 'vue-router';
 import { useAppStore } from '@/stores';
 import type { SearchResult } from '@/types';
 import { showError } from '@/plugins/toast';
@@ -329,6 +330,7 @@ const emit = defineEmits<{
 
 // Store & State
 const store = useAppStore();
+const router = useRouter();
 const { state, iconOpacity, canToggleMode } = useSearchBarSharedState();
 
 // Refs
@@ -574,6 +576,11 @@ const handleEnter = async () => {
             store.searchQuery = words[0];
             store.hasSearched = true;
             state.showResults = false;
+            
+            // Navigate to appropriate route based on mode
+            const routeName = state.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+            router.push({ name: routeName, params: { word: words[0] } });
+            
             await store.getDefinition(words[0]);
 
             // You could emit a wordlist event here for future handling
@@ -622,6 +629,11 @@ const handleEnter = async () => {
         state.showResults = false;
         store.searchQuery = state.query;
         store.hasSearched = true;
+        
+        // Navigate to appropriate route based on mode
+        const routeName = state.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+        router.push({ name: routeName, params: { word: state.query } });
+        
         await store.getDefinition(state.query);
     }
 };
@@ -677,6 +689,11 @@ const selectResult = async (result: SearchResult) => {
     state.searchResults = [];
     state.showResults = false;
     store.hasSearched = true;
+    
+    // Navigate to appropriate route based on mode
+    const routeName = state.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+    router.push({ name: routeName, params: { word: result.word } });
+    
     await store.getDefinition(result.word);
 };
 
