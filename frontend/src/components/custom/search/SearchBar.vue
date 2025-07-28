@@ -132,14 +132,18 @@
                             :class="[
                                 'absolute right-2 top-1/2 -translate-y-1/2 z-20 rounded-md p-1 transition-all duration-200',
                                 'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
-                                'bg-muted/50 hover:bg-muted/80'
+                                state.isAIQuery
+                                    ? 'bg-amber-100/80 hover:bg-amber-200/80 dark:bg-amber-900/40 dark:hover:bg-amber-800/40'
+                                    : 'bg-muted/50 hover:bg-muted/80'
                             ]"
                             title="Clear search"
                         >
                             <X
                                 :class="[
                                     'h-4 w-4',
-                                    'text-foreground/50 hover:text-foreground/70'
+                                    state.isAIQuery
+                                        ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
+                                        : 'text-foreground/50 hover:text-foreground/70'
                                 ]"
                             />
                         </button>

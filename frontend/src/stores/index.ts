@@ -236,6 +236,13 @@ export const useAppStore = defineStore('app', () => {
         },
     });
     
+    const noAI = computed({
+        get: () => uiState.value.noAI,
+        set: (value) => {
+            uiState.value.noAI = value;
+        },
+    });
+    
     const sidebarAccordionState = computed({
         get: () => uiState.value.sidebarAccordionState,
         set: (value) => {
@@ -434,7 +441,8 @@ export const useAppStore = defineStore('app', () => {
                     if (details) {
                         console.log(`Pipeline ${stage} details:`, details);
                     }
-                }
+                },
+                noAI.value // Pass noAI flag
             );
 
             console.log('Setting currentEntry:', entry);
@@ -950,6 +958,7 @@ export const useAppStore = defineStore('app', () => {
         selectedLanguages,
         showControls,
         selectedWordlist,
+        noAI,
         sidebarActiveCluster,
         sidebarActivePartOfSpeech,
         sidebarAccordionState,

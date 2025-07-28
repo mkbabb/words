@@ -138,7 +138,8 @@ export const dictionaryApi = {
     word: string, 
     forceRefresh: boolean = false,
     providers?: DictionaryProvider[],
-    languages?: Language[]
+    languages?: Language[],
+    noAI?: boolean
   ): Promise<SynthesizedDictionaryEntry> {
     const params = new URLSearchParams();
     if (forceRefresh) params.append('force_refresh', 'true');
@@ -151,6 +152,11 @@ export const dictionaryApi = {
     // Add languages to the query parameters
     if (languages && languages.length > 0) {
       languages.forEach(language => params.append('languages', language));
+    }
+    
+    // Add noAI parameter
+    if (noAI) {
+      params.append('no_ai', 'true');
     }
     
     const response = await api.get<LookupResponse>(`/lookup/${word}`, {
@@ -178,7 +184,8 @@ export const dictionaryApi = {
     forceRefresh: boolean = false,
     providers?: DictionaryProvider[],
     languages?: Language[],
-    onProgress?: (stage: string, progress: number, message: string, details?: any) => void
+    onProgress?: (stage: string, progress: number, message: string, details?: any) => void,
+    noAI?: boolean
   ): Promise<SynthesizedDictionaryEntry> {
     return new Promise((resolve, reject) => {
       const params = new URLSearchParams();
@@ -192,6 +199,11 @@ export const dictionaryApi = {
       // Add languages to the query parameters
       if (languages && languages.length > 0) {
         languages.forEach(language => params.append('languages', language));
+      }
+      
+      // Add noAI parameter
+      if (noAI) {
+        params.append('no_ai', 'true');
       }
       
       // Use relative URL to ensure it goes through the Vite proxy
