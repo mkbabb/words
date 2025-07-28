@@ -75,35 +75,49 @@ jobs:
       
       - name: Get runner IP and security group
         id: runner-info
-        env:
-          TARGET_HOST: ${{ secrets.EC2_HOST }}
         run: |
           # Get runner's public IP
           RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
           echo "RUNNER_IP=${RUNNER_IP}" >> $GITHUB_OUTPUT
           
-          # Get EC2 instance security group
-          echo "Looking up EC2 instance by IP: ${TARGET_HOST}"
+          # Get EC2 instance by tag Name=floridify (or find by domain)
+          echo "Looking up EC2 instance..."
           
+          # Try to find instance by tag first
           INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=ip-address,Values=${TARGET_HOST}" \
+            --filters "Name=tag:Name,Values=floridify" "Name=instance-state-name,Values=running" \
             --query 'Reservations[0].Instances[0].InstanceId' \
             --output text)
           
-          if [ "${INSTANCE_ID}" = "None" ]; then
-            echo "Error: Could not find EC2 instance with IP ${TARGET_HOST}"
+          # If not found by tag, try by domain
+          if [ "${INSTANCE_ID}" = "None" ] || [ -z "${INSTANCE_ID}" ]; then
+            echo "Instance not found by tag, trying alternative lookup..."
+            # Get all running instances and find the one we need
+            INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters "Name=instance-state-name,Values=running" \
+              --query 'Reservations[].Instances[?PublicIpAddress!=`null`].[InstanceId,PublicIpAddress]' \
+              --output text | grep -E '44\.216\.140\.209$' | awk '{print $1}' || echo "None")
+          fi
+          
+          if [ "${INSTANCE_ID}" = "None" ] || [ -z "${INSTANCE_ID}" ]; then
+            echo "Error: Could not find EC2 instance"
+            echo "Please ensure the instance is tagged with Name=floridify or update the workflow"
             exit 1
           fi
           
           echo "Found instance: ${INSTANCE_ID}"
           
-          SECURITY_GROUP_ID=$(aws ec2 describe-instances \
-            --instance-ids ${INSTANCE_ID} \
-            --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' \
-            --output text)
+          # Get instance details
+          INSTANCE_INFO=$(aws ec2 describe-instances --instance-ids ${INSTANCE_ID} --query 'Reservations[0].Instances[0]')
+          INSTANCE_IP=$(echo $INSTANCE_INFO | jq -r '.PublicIpAddress')
+          SECURITY_GROUP_ID=$(echo $INSTANCE_INFO | jq -r '.SecurityGroups[0].GroupId')
           
+          echo "INSTANCE_ID=${INSTANCE_ID}" >> $GITHUB_OUTPUT
+          echo "INSTANCE_IP=${INSTANCE_IP}" >> $GITHUB_OUTPUT
           echo "SECURITY_GROUP_ID=${SECURITY_GROUP_ID}" >> $GITHUB_OUTPUT
+          
           echo "Runner IP: ${RUNNER_IP}"
+          echo "Instance: ${INSTANCE_ID} (${INSTANCE_IP})"
           echo "Security Group: ${SECURITY_GROUP_ID}"
       
       - name: Add runner IP to security group
@@ -116,30 +130,27 @@ jobs:
             --group-rule-description "GitHub Actions deployment - temporary"
       
       - name: Setup SSH
-        env:
-          TARGET_HOST: ${{ secrets.EC2_HOST }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${TARGET_HOST} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H ${{ steps.runner-info.outputs.INSTANCE_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
       
       - name: Deploy on server
         env:
-          TARGET_HOST: ${{ secrets.EC2_HOST }}
           TARGET_DOMAIN: ${{ secrets.DOMAIN }}
         run: |
           # SSH into server and run deploy script
           ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
-              ${{ env.EC2_USER }}@${TARGET_HOST} << 'ENDSSH'
+              ${{ env.EC2_USER }}@${{ steps.runner-info.outputs.INSTANCE_IP }} << 'ENDSSH'
             cd ~/floridify
             
             # Pull latest code
             git pull origin master
             
             # Set environment variables needed by deploy script
-            export EC2_HOST=${TARGET_HOST}
+            export EC2_HOST=${{ steps.runner-info.outputs.INSTANCE_IP }}
             export EC2_USER=${{ env.EC2_USER }}
             export DOMAIN=${TARGET_DOMAIN}
             
