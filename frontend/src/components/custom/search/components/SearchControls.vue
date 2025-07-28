@@ -92,7 +92,7 @@
                         class="hover-lift flex items-center justify-center rounded-lg bg-muted p-2 transition-all duration-200 hover:bg-muted/80"
                         title="Toggle Sidebar"
                     >
-                        <Menu 
+                        <PanelLeft 
                             :size="16" 
                             class="text-foreground/70 transition-colors duration-200"
                         />
@@ -187,8 +187,25 @@ const emit = defineEmits<{
     'toggle-refresh': [];
 }>();
 
+// Reactive window width
+const windowWidth = ref(window.innerWidth);
+
 // Check if mobile
-const isMobile = computed(() => window.innerWidth < 768);
+const isMobile = computed(() => windowWidth.value < 768);
+
+// Handle window resize
+const handleResize = () => {
+    windowWidth.value = window.innerWidth;
+};
+
+// Set up resize listener
+onMounted(() => {
+    window.addEventListener('resize', handleResize);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('resize', handleResize);
+});
 
 // Helper functions for toggling
 const toggleSource = (sourceId: string) => {
