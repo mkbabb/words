@@ -133,8 +133,8 @@
                                 'absolute right-2 top-1/2 -translate-y-1/2 z-20 rounded-md p-1 transition-all duration-200',
                                 'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
                                 state.isAIQuery
-                                    ? 'bg-amber-100/80 hover:bg-amber-200/80 dark:bg-amber-900/40 dark:hover:bg-amber-800/40'
-                                    : 'bg-muted/50 hover:bg-muted/80'
+                                    ? 'bg-transparent hover:bg-amber-100/80 dark:hover:bg-amber-900/40'
+                                    : 'bg-transparent hover:bg-muted/80'
                             ]"
                             title="Clear search"
                         >
