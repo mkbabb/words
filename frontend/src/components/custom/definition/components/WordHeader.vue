@@ -12,11 +12,11 @@
 
         <!-- Pronunciation -->
         <div
-            v-if="pronunciation"
+            v-if="pronunciation && hasPronunciation"
             class="flex items-center gap-3 pt-2"
         >
             <span class="text-lg text-muted-foreground" style="font-family: 'Fira Code', monospace;">
-                {{ pronunciationMode === 'phonetic' ? pronunciation.phonetic : pronunciation.ipa }}
+                {{ currentPronunciation }}
             </span>
             
             <button
@@ -36,6 +36,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { CardHeader, CardTitle } from '@/components/ui/card';
 import AnimatedTitle from './AnimatedTitle.vue';
 import ProviderIcons from './ProviderIcons.vue';
@@ -52,9 +53,44 @@ interface WordHeaderProps {
     animationKey: number;
 }
 
-defineProps<WordHeaderProps>();
+const props = defineProps<WordHeaderProps>();
 
 defineEmits<{
     'toggle-pronunciation': [];
 }>();
+
+// Check if we have valid pronunciation data
+const hasPronunciation = computed(() => {
+    if (!props.pronunciation) return false;
+    const phoneticValid = props.pronunciation.phonetic && props.pronunciation.phonetic !== 'unknown';
+    const ipaValid = props.pronunciation.ipa && props.pronunciation.ipa !== 'unknown';
+    return phoneticValid || ipaValid;
+});
+
+// Get the current pronunciation to display
+const currentPronunciation = computed(() => {
+    if (!props.pronunciation) return '';
+    
+    const phonetic = props.pronunciation.phonetic;
+    const ipa = props.pronunciation.ipa;
+    
+    // Check what mode we're in
+    if (props.pronunciationMode === 'phonetic') {
+        // If phonetic is valid, use it; otherwise fall back to IPA
+        if (phonetic && phonetic !== 'unknown') {
+            return phonetic;
+        } else if (ipa && ipa !== 'unknown') {
+            return ipa;
+        }
+    } else {
+        // If IPA is valid, use it; otherwise fall back to phonetic
+        if (ipa && ipa !== 'unknown') {
+            return ipa;
+        } else if (phonetic && phonetic !== 'unknown') {
+            return phonetic;
+        }
+    }
+    
+    return '';
+});
 </script>

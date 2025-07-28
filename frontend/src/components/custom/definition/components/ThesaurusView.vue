@@ -22,10 +22,10 @@
                         @click="$emit('word-click', synonym.word)"
                     >
                         <CardContent class="px-2 py-0.5 sm:py-1">
-                            <div class="font-medium text-sm sm:text-sm truncate">
+                            <div class="font-medium text-base sm:text-sm truncate">
                                 {{ synonym.word }}
                             </div>
-                            <div class="text-xs sm:text-xs opacity-75">
+                            <div class="text-sm sm:text-xs opacity-75">
                                 {{ Math.round(synonym.score * 100) }}%
                             </div>
                         </CardContent>

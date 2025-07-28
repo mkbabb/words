@@ -35,7 +35,7 @@ const animationProps = computed(() => {
         errorRate: 0.015, // Occasional typos (reduced)
         cursorBlink: true,
         startDelay: 50,
-        loop: false // No looping for title animations
+        loop: true // Enable looping to show backspace animations
     };
 });
 </script>

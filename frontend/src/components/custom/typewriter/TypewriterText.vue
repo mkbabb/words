@@ -60,7 +60,7 @@ const typewriter = useTypewriter({
     }
 });
 
-const { displayText, isTyping, isFirstAnimation, hasCompletedAnimation, startTyping, stopTyping, reset, updateText } = typewriter;
+const { displayText, isTyping, startTyping, stopTyping, reset, updateText } = typewriter;
 
 // Watch for text changes
 watch(() => props.text, (newText, oldText) => {
