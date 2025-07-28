@@ -9,7 +9,7 @@ from beanie import Document
 from pydantic import BaseModel, Field
 
 from ..constants import DictionaryProvider, Language
-from .base import BaseMetadata, Etymology, ModelInfo
+from .base import BaseMetadata, Etymology, ImageMedia, ModelInfo
 from .relationships import (
     Collocation,
     GrammarPattern,
@@ -164,6 +164,7 @@ class SynthesizedDictionaryEntry(Document, BaseMetadata):
     definition_ids: list[str] = []  # FK to Definition documents
     etymology: Etymology | None = None  # Embedded as it's lightweight
     fact_ids: list[str] = []  # FK to Fact documents
+    image_ids: list[str] = []  # FK to ImageMedia documents
 
     # Synthesis metadata
     model_info: ModelInfo | None = None  # Optional for non-AI synthesized entries

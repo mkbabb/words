@@ -27,15 +27,20 @@ class ModelInfo(BaseModel):
     last_generated: datetime = Field(default_factory=datetime.utcnow)
 
 
-class ImageMedia(BaseMetadata):
+class ImageMedia(Document, BaseMetadata):
     """Image media storage."""
 
-    url: str
+    url: str | None = None  # Optional URL for external images
+    data: bytes | None = None  # Binary image data stored in MongoDB
     format: str  # png, jpg, webp
     size_bytes: int = Field(gt=0)
     width: int = Field(gt=0)
     height: int = Field(gt=0)
     alt_text: str | None = None
+    description: str | None = None  # Additional description for hover/tooltip
+
+    class Settings:
+        name = "image_media"
 
 
 class AudioMedia(Document, BaseMetadata):

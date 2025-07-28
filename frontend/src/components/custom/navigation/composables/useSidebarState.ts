@@ -13,7 +13,7 @@ export function useSidebarState() {
     
     // Transform grouped definitions to sidebar format
     const sidebarSections = computed((): SidebarCluster[] => {
-        return groupedDefinitions.value.map(group => {
+        const sections: SidebarCluster[] = groupedDefinitions.value.map(group => {
             // Count parts of speech
             const partsOfSpeech = new Map<string, number>();
             
@@ -38,6 +38,18 @@ export function useSidebarState() {
                 maxRelevancy: group.maxRelevancy
             };
         });
+        
+        // Add etymology section if available
+        if (entry.value?.etymology?.text) {
+            sections.push({
+                clusterId: 'etymology',
+                clusterDescription: 'Word origin and history',
+                partsOfSpeech: [{ type: 'etymology', count: 1 }],
+                maxRelevancy: 0.8
+            });
+        }
+        
+        return sections;
     });
     
     // Active states from store

@@ -1,68 +1,92 @@
 <template>
     <div class="flex gap-3 items-center">
         <!-- Sidebar Toggle (Mobile Only) -->
-        <ActionButton
-            v-if="isMobile"
-            @click="$emit('toggle-sidebar')"
-            title="Toggle Sidebar"
-            variant="default"
-        >
-            <PanelLeft :size="18" />
-        </ActionButton>
-        
+        <HoverCard v-if="isMobile" :open-delay="200" :close-delay="100">
+            <HoverCardTrigger as-child>
+                <ActionButton
+                    @click="$emit('toggle-sidebar')"
+                    variant="default"
+                >
+                    <PanelLeft :size="18" />
+                </ActionButton>
+            </HoverCardTrigger>
+            <HoverCardContent class="w-auto p-2" side="top">
+                <p class="text-sm">Toggle Sidebar</p>
+            </HoverCardContent>
+        </HoverCard>
+            
         <!-- AI Mode Toggle -->
-        <ActionButton
-            @click="handleAIToggle"
-            :title="!noAI ? 'AI synthesis enabled' : 'Raw provider data only'"
-            :variant="!noAI ? 'primary' : 'default'"
-        >
-            <Wand2 
-                :size="18" 
-                :class="[
-                    'transition-all duration-300',
-                    aiAnimating && 'animate-sparkle'
-                ]"
-            />
-        </ActionButton>
-        
+        <HoverCard :open-delay="200" :close-delay="100">
+            <HoverCardTrigger as-child>
+                <ActionButton
+                    @click="handleAIToggle"
+                    @keydown.enter.stop="handleAIToggle"
+                    :variant="!noAI ? 'primary' : 'default'"
+                >
+                    <Wand2 
+                        :size="18" 
+                        :class="[
+                            'transition-all duration-300',
+                            aiAnimating && 'animate-sparkle'
+                        ]"
+                    />
+                </ActionButton>
+            </HoverCardTrigger>
+            <HoverCardContent class="w-auto p-2" side="top">
+                <p class="text-sm">{{ !noAI ? 'AI synthesis enabled' : 'Raw provider data only' }}</p>
+            </HoverCardContent>
+        </HoverCard>
+            
         <!-- Force Refresh Toggle -->
-        <ActionButton
-            v-if="showRefreshButton"
-            @click="handleRefreshClick"
-            :title="forceRefreshMode ? 'Force refresh mode ON' : 'Toggle force refresh mode'"
-            :variant="forceRefreshMode ? 'primary' : 'default'"
-        >
-            <RefreshCw 
-                :size="18" 
-                :class="[
-                    'transition-all duration-300',
-                    'group-hover:rotate-180',
-                    refreshAnimating && 'animate-rotate-once'
-                ]"
-            />
-        </ActionButton>
-        
+        <HoverCard v-if="showRefreshButton" :open-delay="200" :close-delay="100">
+            <HoverCardTrigger as-child>
+                <ActionButton
+                    @click="handleRefreshClick"
+                    @keydown.enter.stop="handleRefreshClick"
+                    :variant="forceRefreshMode ? 'primary' : 'default'"
+                >
+                    <RefreshCw 
+                        :size="18" 
+                        :class="[
+                            'transition-all duration-300',
+                            'group-hover:rotate-180',
+                            refreshAnimating && 'animate-rotate-once'
+                        ]"
+                    />
+                </ActionButton>
+            </HoverCardTrigger>
+            <HoverCardContent class="w-auto p-2" side="top">
+                <p class="text-sm">{{ forceRefreshMode ? 'Force refresh mode ON' : 'Toggle force refresh mode' }}</p>
+            </HoverCardContent>
+        </HoverCard>
+            
         <!-- Clear Storage (Debug) -->
-        <ActionButton
-            v-if="isDevelopment"
-            @click="handleClearStorage"
-            title="Clear All Storage"
-            variant="danger"
-        >
-            <Trash2 
-                :size="18" 
-                :class="[
-                    'transition-all duration-300',
-                    trashAnimating && 'animate-wiggle'
-                ]"
-            />
-        </ActionButton>
+        <HoverCard v-if="isDevelopment" :open-delay="200" :close-delay="100">
+            <HoverCardTrigger as-child>
+                <ActionButton
+                    @click="handleClearStorage"
+                    variant="danger"
+                >
+                    <Trash2 
+                        :size="18" 
+                        :class="[
+                            'transition-all duration-300',
+                            trashAnimating && 'animate-wiggle'
+                        ]"
+                    />
+                </ActionButton>
+            </HoverCardTrigger>
+            <HoverCardContent class="w-auto p-2" side="top">
+                <p class="text-sm">Clear All Storage</p>
+            </HoverCardContent>
+        </HoverCard>
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Trash2, PanelLeft, RefreshCw, Wand2 } from 'lucide-vue-next';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import ActionButton from './ActionButton.vue';
 
 interface ActionsRowProps {

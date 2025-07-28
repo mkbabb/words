@@ -17,9 +17,13 @@
                                 <h4 class="text-sm font-semibold hover:underline">
                                     <a href="https://github.com/mkbabb" class="font-mono">@mbabb</a>
                                 </h4>
-                                <p class="text-muted-foreground text-sm">
-                                    AI-enhanced dictionary system
+                                <p class="text-muted-foreground text-sm italic">
+                                    Floridify your words, effloresce your communication and life thereof
                                 </p>
+                                <hr class="my-2 border-border/50" />
+                                <a href="https://github.com/mkbabb/words" class="text-sm text-primary hover:underline block mt-2">
+                                    View the project on GitHub
+                                </a>
                             </div>
                         </div>
                     </HoverCardContent>

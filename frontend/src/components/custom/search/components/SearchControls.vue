@@ -11,8 +11,10 @@
             v-if="show"
             ref="controlsDropdown"
             class="dropdown-element cartoon-shadow-sm mb-2 origin-top overflow-hidden rounded-2xl border-2 border-border bg-background/20 backdrop-blur-3xl"
+            tabindex="0"
             @mousedown.prevent
             @click="$emit('interaction')"
+            @keydown.enter="handleEnterKey"
         >
             <!-- Search Mode Toggle -->
             <div class="border-border/50 px-4 py-3">
@@ -38,14 +40,15 @@
                         v-for="source in DICTIONARY_SOURCES"
                         :key="source.id"
                         @click="toggleSource(source.id)"
+                        @keydown.enter.stop.prevent="toggleSource(source.id)"
                         :disabled="noAI && selectedSources.length > 0 && !selectedSources.includes(source.id)"
                         :class="[
                             'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200',
                             selectedSources.includes(source.id)
-                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
                                 : noAI && selectedSources.length > 0
                                     ? 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed'
-                                    : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                                    : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground',
                         ]"
                     >
                         <component :is="source.icon" :size="16" />
@@ -65,11 +68,12 @@
                         v-for="language in LANGUAGES"
                         :key="language.value"
                         @click="toggleLanguage(language.value)"
+                        @keydown.enter.stop.prevent="toggleLanguage(language.value)"
                         :class="[
                             'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200',
                             selectedLanguages.includes(language.value)
-                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                                ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground',
                         ]"
                     >
                         <component :is="language.icon" :size="16" />
@@ -109,6 +113,7 @@
                             size="default"
                             class="hover-text-grow flex-shrink-0 text-sm whitespace-nowrap font-medium"
                             @click="$emit('word-select', word)"
+                            @keydown.enter.stop="$emit('word-select', word)"
                         >
                             {{ word }}
                         </Button>
@@ -120,7 +125,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { Button } from '@/components/ui';
 import { BouncyToggle } from '@/components/custom/animation';
 import ActionsRow from './ActionsRow.vue';
@@ -135,7 +140,7 @@ interface SearchControlsProps {
     forceRefreshMode?: boolean;
 }
 
-defineProps<SearchControlsProps>();
+const props = defineProps<SearchControlsProps>();
 
 // Modern Vue 3.4+ patterns - using defineModel for two-way bindings
 const searchMode = defineModel<SearchMode>('searchMode', { required: true });
@@ -149,6 +154,7 @@ const emit = defineEmits<{
     'interaction': [];
     'toggle-sidebar': [];
     'toggle-refresh': [];
+    'execute-search': [];
 }>();
 
 
@@ -188,12 +194,64 @@ const controlsDropdown = ref<HTMLDivElement>();
 // Emit is used in template
 void emit;
 
+// Handle enter key press
+const handleEnterKey = (event: KeyboardEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    emit('execute-search');
+};
+
 // When noAI mode changes, ensure only one source is selected
 watch(noAI, (newValue) => {
     if (newValue && selectedSources.value.length > 1) {
         // Keep only the first source when entering no-AI mode
         selectedSources.value = [selectedSources.value[0]];
     }
+});
+
+// Global enter key handler when controls are visible
+const handleGlobalEnter = (event: KeyboardEvent) => {
+    if (!props.show) return;
+    
+    // When controls are visible, any enter key press should execute search
+    event.preventDefault();
+    event.stopPropagation();
+    emit('execute-search');
+};
+
+// Store the event handler reference for cleanup
+const keydownHandler = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') {
+        handleGlobalEnter(e);
+    }
+};
+
+// Setup enter key handling when component mounts or when show prop changes
+const setupEnterKeyHandling = async () => {
+    await nextTick();
+    
+    // No need to focus, as it might interfere with button clicks
+};
+
+// Watch for when controls are shown
+watch(() => props.show, async (newVal) => {
+    if (newVal) {
+        await setupEnterKeyHandling();
+    }
+});
+
+onMounted(() => {
+    // Use capture phase to catch events before they bubble
+    document.addEventListener('keydown', keydownHandler, true);
+    
+    // Setup initial handling if already shown
+    if (props.show) {
+        setupEnterKeyHandling();
+    }
+});
+
+onUnmounted(() => {
+    document.removeEventListener('keydown', keydownHandler, true);
 });
 
 defineExpose({

@@ -5,13 +5,13 @@ from enum import Enum
 
 class SynthesisComponent(Enum):
     """Components available for synthesis and enhancement."""
-    
+
     # Word-level components
     PRONUNCIATION = "pronunciation"
     ETYMOLOGY = "etymology"
     WORD_FORMS = "word_forms"
     FACTS = "facts"
-    
+
     # Definition-level components (default set)
     SYNONYMS = "synonyms"
     EXAMPLES = "examples"
@@ -24,22 +24,32 @@ class SynthesisComponent(Enum):
     COLLOCATIONS = "collocations"
     USAGE_NOTES = "usage_notes"
     REGIONAL_VARIANTS = "regional_variants"
-    
+
     # Synthesis utilities
     DEFINITION_TEXT = "definition_text"
     CLUSTER_DEFINITIONS = "cluster_definitions"
-    
+
     @classmethod
-    def default_components(cls) -> set["SynthesisComponent"]:
+    def default_definition_components(cls) -> set["SynthesisComponent"]:
         """Return default components for definition enhancement."""
         return {
             cls.SYNONYMS,
             cls.EXAMPLES,
             cls.ANTONYMS,
-            cls.USAGE_NOTES,
-            cls.REGIONAL_VARIANTS,
         }
-    
+
+    @classmethod
+    def default_word_components(cls) -> set["SynthesisComponent"]:
+        """Return default components for word-level synthesis."""
+        return {
+            cls.PRONUNCIATION,
+            cls.ETYMOLOGY,
+        }
+
+    @classmethod
+    def default_components(cls) -> set["SynthesisComponent"]:
+        return cls.default_word_components() | cls.default_definition_components()
+
     @classmethod
     def word_level_components(cls) -> set["SynthesisComponent"]:
         """Return components that apply to the entire word."""
@@ -49,7 +59,7 @@ class SynthesisComponent(Enum):
             cls.WORD_FORMS,
             cls.FACTS,
         }
-    
+
     @classmethod
     def definition_level_components(cls) -> set["SynthesisComponent"]:
         """Return components that apply to individual definitions."""
@@ -79,7 +89,7 @@ DEFAULT_USAGE_NOTE_COUNT = 3
 # Parameter ordering standard
 # Functions should follow this parameter order:
 # 1. word: str (the word being processed)
-# 2. definition: Definition (when working with a specific definition)  
+# 2. definition: Definition (when working with a specific definition)
 # 3. ai: OpenAIConnector (AI connector instance)
 # 4. count: int = DEFAULT_X_COUNT (for generation functions)
 # 5. state_tracker: StateTracker | None = None (optional state tracking)
@@ -87,7 +97,7 @@ DEFAULT_USAGE_NOTE_COUNT = 3
 # Function type categories
 SYNTHESIZE_FUNCTIONS = {
     "pronunciation",
-    "synonyms", 
+    "synonyms",
     "antonyms",
     "etymology",
     "definition_text",
@@ -96,7 +106,7 @@ SYNTHESIZE_FUNCTIONS = {
 
 GENERATE_FUNCTIONS = {
     "facts",
-    "examples", 
+    "examples",
     "word_forms",
     "usage_notes",
 }
@@ -105,7 +115,7 @@ ASSESS_FUNCTIONS = {
     "cefr_level",
     "frequency_band",
     "register",
-    "domain", 
+    "domain",
     "grammar_patterns",
     "collocations",
     "regional_variants",

@@ -2,7 +2,7 @@
     <div
         ref="searchContainer"
         :class="[
-            'search-container relative z-50 mx-auto w-full origin-top px-3 sm:px-0',
+            'search-container relative z-50 mx-auto w-full origin-top px-1 sm:px-0',
             props.className,
         ]"
         :style="containerStyle"
@@ -10,12 +10,12 @@
         @mouseleave="handleMouseLeave"
     >
         <!-- Main Layout -->
-        <div class="pointer-events-auto relative overflow-visible pt-2 px-2 sm:px-2 pb-0">
+        <div class="pointer-events-auto relative overflow-visible pt-2 px-0 sm:px-2 pb-0">
             <!-- Search Bar -->
             <div
                 ref="searchBarElement"
                 :class="[
-                    'search-bar relative flex items-center gap-2 overflow-visible px-1 py-0.5',
+                    'search-bar relative flex items-center gap-2 overflow-visible px-1 sm:px-1 py-0.5',
                     'cartoon-shadow-sm rounded-2xl transition-all duration-500 ease-out',
                     state.isAIQuery && !state.showErrorAnimation
                         ? 'border-2 border-amber-500 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-950/30 backdrop-blur-sm'
@@ -185,12 +185,22 @@
                 </div>
 
                 <!-- Hamburger Button -->
-                <HamburgerIcon
-                    :is-open="state.showControls"
-                    :ai-mode="state.isAIQuery"
-                    :opacity="iconOpacity"
-                    @toggle="state.showControls = !state.showControls"
-                />
+                <div
+                    class="flex flex-shrink-0 items-center justify-center overflow-hidden transition-all duration-300 ease-out"
+                    :style="{
+                        opacity: iconOpacity,
+                        transform: `scale(${0.9 + iconOpacity * 0.1})`,
+                        pointerEvents: iconOpacity > 0.1 ? 'auto' : 'none',
+                        width: iconOpacity > 0.1 ? '40px' : '0px',
+                        marginLeft: iconOpacity > 0.1 ? '8px' : '0px',
+                    }"
+                >
+                    <HamburgerIcon
+                        :is-open="state.showControls"
+                        :ai-mode="state.isAIQuery"
+                        @toggle="state.showControls = !state.showControls"
+                    />
+                </div>
 
                 <!-- Progress Bar -->
                 <!-- <div
@@ -227,6 +237,7 @@
                     @interaction="handleSearchAreaInteraction"
                     @toggle-sidebar="store.toggleSidebar()"
                     @toggle-refresh="handleForceRegenerate"
+                    @execute-search="handleEnter"
                 />
 
                 <!-- Search Results Container -->
@@ -260,10 +271,11 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
+import { useMagicKeys, whenever } from '@vueuse/core';
 import { useAppStore } from '@/stores';
 import type { SearchResult } from '@/types';
 import { showError } from '@/plugins/toast';
-import { Maximize2, RefreshCw, X } from 'lucide-vue-next';
+import { Maximize2, X } from 'lucide-vue-next';
 import { HamburgerIcon } from '@/components/custom/icons';
 
 // Import components
@@ -323,7 +335,6 @@ const { state, iconOpacity, canToggleMode } = useSearchBarSharedState();
 const searchContainer = ref<HTMLDivElement>();
 const searchBarElement = ref<HTMLDivElement>();
 const searchInputComponent = ref<any>();
-const regenerateRotation = ref(0);
 
 // Computed
 const placeholder = computed(() => {
@@ -437,9 +448,11 @@ const handleFocus = () => {
     nextTick(() => {
         if (searchInputComponent.value?.element?.value) {
             const textarea = searchInputComponent.value.element.value;
-            textarea.style.height = 'auto';
-            const scrollHeight = textarea.scrollHeight;
-            textarea.style.height = `${scrollHeight}px`;
+            if (textarea && textarea.style) {
+                textarea.style.height = 'auto';
+                const scrollHeight = textarea.scrollHeight;
+                textarea.style.height = `${scrollHeight}px`;
+            }
         }
     });
 
@@ -608,6 +621,18 @@ const handleEnter = async () => {
     }
 };
 
+const handleShiftEnter = async () => {
+    // Force refresh mode for this query
+    const previousForceRefresh = state.forceRefreshMode;
+    state.forceRefreshMode = true;
+    
+    // Execute the query
+    await handleEnter();
+    
+    // Restore the previous force refresh state
+    state.forceRefreshMode = previousForceRefresh;
+};
+
 const handleEscape = () => {
     if (state.showControls || state.showResults) {
         state.showControls = false;
@@ -717,6 +742,31 @@ const handleClickOutside = (event: MouseEvent) => {
         state.showControls = false;
     }
 };
+
+// Setup keyboard shortcuts with MagicKeys
+const keys = useMagicKeys();
+const shiftEnter = keys['Shift+Enter'];
+const cmdEnter = keys['Cmd+Enter'];
+const ctrlEnter = keys['Ctrl+Enter']; // For Windows/Linux
+
+// Watch for force refresh shortcuts
+whenever(shiftEnter, () => {
+    if (state.isFocused && searchInputRef.value) {
+        handleShiftEnter();
+    }
+});
+
+whenever(cmdEnter, () => {
+    if (state.isFocused && searchInputRef.value) {
+        handleShiftEnter();
+    }
+});
+
+whenever(ctrlEnter, () => {
+    if (state.isFocused && searchInputRef.value) {
+        handleShiftEnter();
+    }
+});
 
 // Initialize
 onMounted(async () => {

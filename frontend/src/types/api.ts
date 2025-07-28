@@ -93,13 +93,24 @@ export interface Example extends BaseMetadata {
   source?: LiteratureSource;
 }
 
-// Audio
+// Media
 export interface AudioFile {
   id: string;
   url: string;
   mime_type: string;
   accent?: string;
   gender?: string;
+}
+
+export interface ImageMedia extends BaseMetadata {
+  id: string;
+  url: string;
+  format: string;
+  size_bytes: number;
+  width: number;
+  height: number;
+  alt_text?: string;
+  description?: string;
 }
 
 // Pronunciation
@@ -125,6 +136,8 @@ export interface Definition extends BaseMetadata {
   word_forms: WordForm[];
   example_ids: string[];
   examples?: Example[]; // Populated in responses
+  image_ids: string[];
+  images?: ImageMedia[]; // Populated in responses
   synonyms: string[];
   antonyms: string[];
   language_register?: 'formal' | 'informal' | 'neutral' | 'slang' | 'technical';
@@ -156,6 +169,8 @@ export interface SynthesizedDictionaryEntry extends BaseMetadata {
   definitions?: Definition[]; // Populated in responses
   etymology?: Etymology;
   fact_ids: string[];
+  image_ids: string[];
+  images?: ImageMedia[]; // Populated in responses
   model_info?: ModelInfo | null;
   source_provider_data_ids: string[];
   accessed_at?: string;
@@ -210,10 +225,13 @@ export interface LookupResponse {
   last_updated: string;
   pipeline_metrics?: PipelineMetrics;
   model_info?: ModelInfo | null;
+  synth_entry_id?: string | null;
+  images?: ImageMedia[];
 }
 
 export interface DefinitionResponse extends Definition {
   examples: Example[]; // Always populated
+  images: ImageMedia[]; // Always populated
   providers_data: Array<Record<string, any>>;
 }
 

@@ -21,7 +21,7 @@ from ...ai.synthesis_functions import (
     synthesize_synonyms,
     usage_note_generation,
 )
-from ...models import Definition, Word
+from ...models import Definition, ImageMedia, Word
 from ..core import (
     ErrorDetail,
     ErrorResponse,
@@ -92,6 +92,13 @@ class BatchComponentUpdate(BaseModel):
     components: set[str] = Field(..., description="Components to update")
     force: bool = Field(False, description="Force regeneration")
     parallel: bool = Field(True, description="Process in parallel")
+
+
+class ImageBindRequest(BaseModel):
+    """Request to bind an image to a definition."""
+    
+    image_path: str = Field(..., description="Path to the image file")
+    alt_text: str | None = Field(None, description="Alternative text for accessibility")
 
 
 @router.get("", response_model=ListResponse[Definition])
@@ -285,6 +292,101 @@ async def delete_definition(
         - cascade: Delete related examples
     """
     await repo.delete(definition_id, cascade=cascade)
+
+
+@router.post("/{definition_id}/images", response_model=ResourceResponse)
+@handle_api_errors
+async def bind_image_to_definition(
+    definition_id: PydanticObjectId,
+    request: ImageBindRequest,
+    repo: DefinitionRepository = Depends(get_definition_repo),
+) -> ResourceResponse:
+    """Bind an image to a definition.
+    
+    Args:
+        definition_id: ID of the definition
+        request: Image binding request with path and optional alt text
+    
+    Returns:
+        Updated definition with image
+        
+    Raises:
+        404: Definition not found
+        400: Invalid image path
+    """
+    from pathlib import Path
+    
+    # Get the definition
+    definition = await repo.get(definition_id, raise_on_missing=True)
+    assert definition is not None  # Type assertion
+    
+    # Validate image path exists
+    image_path = Path(request.image_path)
+    if not image_path.exists():
+        raise HTTPException(
+            400,
+            detail=ErrorResponse(
+                error="Invalid image path",
+                details=[
+                    ErrorDetail(
+                        field="image_path",
+                        message=f"Image file not found: {request.image_path}",
+                        code="file_not_found",
+                    )
+                ],
+            ).model_dump(),
+        )
+    
+    # Get image metadata
+    try:
+        from PIL import Image
+        with Image.open(image_path) as img:
+            width, height = img.size
+            format = img.format.lower() if img.format else image_path.suffix[1:].lower()
+    except Exception as e:
+        raise HTTPException(
+            400,
+            detail=ErrorResponse(
+                error="Invalid image file",
+                details=[
+                    ErrorDetail(
+                        field="image_path",
+                        message=f"Could not open image file: {str(e)}",
+                        code="invalid_image",
+                    )
+                ],
+            ).model_dump(),
+        )
+    
+    # Create ImageMedia document
+    image_media = ImageMedia(
+        url=str(image_path),  # Store as file path for now
+        format=format,
+        size_bytes=image_path.stat().st_size,
+        width=width,
+        height=height,
+        alt_text=request.alt_text,
+    )
+    await image_media.save()
+    
+    # Add image ID to definition
+    if str(image_media.id) not in definition.image_ids:
+        definition.image_ids.append(str(image_media.id))
+        definition.version += 1
+        await definition.save()
+    
+    return ResourceResponse(
+        data=definition.model_dump(),
+        metadata={
+            "image_id": str(image_media.id),
+            "version": definition.version,
+        },
+        links={
+            "self": f"/definitions/{definition_id}",
+            "word": f"/words/{definition.word_id}",
+            "image": f"/images/{image_media.id}",
+        },
+    )
 
 
 @router.post("/{definition_id}/regenerate", response_model=ResourceResponse)

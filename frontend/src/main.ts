@@ -22,6 +22,18 @@ const router = createRouter({
       component: Home,
       props: true,
     },
+    {
+      path: '/definition/:word',
+      name: 'Definition',
+      component: Home,
+      props: true,
+    },
+    {
+      path: '/thesaurus/:word',
+      name: 'Thesaurus',
+      component: Home,
+      props: true,
+    },
   ],
 });
 

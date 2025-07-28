@@ -12,7 +12,7 @@ from ..connectors.dictionary_com import DictionaryComConnector
 from ..connectors.oxford import OxfordConnector
 from ..connectors.wiktionary import WiktionaryConnector
 from ..constants import DictionaryProvider, Language
-from ..models.models import ProviderData, SynthesizedDictionaryEntry, Etymology
+from ..models.models import Definition, Etymology, ProviderData, SynthesizedDictionaryEntry, Word
 from ..storage.mongodb import get_synthesized_entry
 from ..utils.config import Config
 from ..utils.logging import (
@@ -106,8 +106,14 @@ async def lookup_word_pipeline(
             f"search_time: {search_duration:.2f}s)"
         )
 
-        # Try to get a cached entry first
-        if not no_ai and not force_refresh:
+        # Handle force_refresh by deleting existing entry
+        if force_refresh:
+            existing = await get_synthesized_entry(word)
+            if existing:
+                logger.info(f"🗑️  Deleting existing synthesized entry for '{best_match}' due to force_refresh")
+                await existing.delete()
+        elif not no_ai:
+            # Try to get a cached entry if not forcing refresh
             existing = await get_synthesized_entry(word)
             if existing:
                 logger.info(f"📋 Using cached synthesized entry for '{best_match}'")
@@ -213,7 +219,7 @@ async def lookup_word_pipeline(
                     state_tracker=state_tracker,
                 )
             else:
-                logger.warning(f"No provider data available for non-AI synthesis")
+                logger.warning("No provider data available for non-AI synthesis")
                 return None
 
     except Exception as e:
@@ -358,13 +364,73 @@ async def _create_provider_mapped_entry(
     provider_data: ProviderData,
     state_tracker: StateTracker | None = None,
 ) -> SynthesizedDictionaryEntry | None:
-    """Create a synthesized entry from provider data without AI.
+    """Create a synthesized entry from provider data without full AI synthesis.
     
-    Maps raw provider data directly to a synthesized entry format.
+    Uses AI only for deduplication and clustering, but not for content generation.
     """
     logger.info(f"📦 Creating provider-mapped entry for '{word}' from {provider_data.provider}")
     
     try:
+        # Get Word object
+        word_obj = await Word.get(provider_data.word_id)
+        if not word_obj:
+            logger.error(f"Word object not found for ID: {provider_data.word_id}")
+            return None
+            
+        # Load all definitions from provider
+        all_definitions: list[Definition] = []
+        for def_id in provider_data.definition_ids:
+            definition = await Definition.get(def_id)
+            if definition:
+                all_definitions.append(definition)
+        
+        if not all_definitions:
+            logger.warning("No definitions found for provider data")
+            return None
+            
+        # Use AI for deduplication only
+        logger.info(f"🔍 Deduplicating {len(all_definitions)} definitions (AI-assisted)")
+        synthesizer = get_definition_synthesizer()
+        
+        dedup_response = await synthesizer.ai.deduplicate_definitions(
+            word=word,
+            definitions=all_definitions,
+        )
+        
+        # Create unique definitions list from deduplication results
+        unique_definitions: list[Definition] = []
+        processed_indices: set[int] = set()
+        
+        for dedup_def in dedup_response.deduplicated_definitions:
+            # Use the first source index as the primary definition
+            primary_idx = dedup_def.source_indices[0]
+            primary_def = all_definitions[primary_idx]
+            
+            # Keep original definition text (no AI rewriting)
+            unique_definitions.append(primary_def)
+            
+            # Track all processed indices
+            processed_indices.update(dedup_def.source_indices)
+        
+        logger.info(
+            f"✅ Deduplicated {len(all_definitions)} → {len(unique_definitions)} definitions"
+        )
+        
+        # Use AI for clustering only
+        logger.info(f"📊 Clustering definitions (AI-assisted)")
+        from ..ai.synthesis_functions import cluster_definitions
+        
+        clustered_definitions = await cluster_definitions(
+            word_obj, unique_definitions, synthesizer.ai, state_tracker
+        )
+        
+        # Save the clustered definitions to persist meaning_cluster assignments
+        for definition in clustered_definitions:
+            await definition.save()
+        
+        # Update definition IDs with clustered definitions
+        clustered_def_ids = [str(d.id) for d in clustered_definitions]
+        
         # Extract etymology if available
         etymology = None
         if hasattr(provider_data, 'raw_data') and provider_data.raw_data:
@@ -372,11 +438,11 @@ async def _create_provider_mapped_entry(
             if 'etymology' in raw_data and raw_data['etymology']:
                 etymology = Etymology(text=raw_data['etymology'])
         
-        # Create the synthesized entry without AI
+        # Create the synthesized entry without AI content generation
         synthesized_entry = SynthesizedDictionaryEntry(
             word_id=provider_data.word_id,
             pronunciation_id=provider_data.pronunciation_id,
-            definition_ids=provider_data.definition_ids,
+            definition_ids=clustered_def_ids,  # Use deduplicated and clustered definitions
             etymology=provider_data.etymology or etymology,
             fact_ids=[],  # No facts in non-AI mode
             model_info=None,  # No AI model info
@@ -388,11 +454,11 @@ async def _create_provider_mapped_entry(
         
         logger.info(
             f"✅ Created provider-mapped entry for '{word}' with "
-            f"{len(synthesized_entry.definition_ids)} definitions"
+            f"{len(synthesized_entry.definition_ids)} clustered definitions"
         )
         
         if state_tracker:
-            await state_tracker.update_stage(Stages.STORAGE_COMPLETE)
+            await state_tracker.update_stage(Stages.STORAGE_SAVE)
         
         return synthesized_entry
         

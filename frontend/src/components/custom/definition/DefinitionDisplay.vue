@@ -9,6 +9,14 @@
                 :showDropdown="showThemeDropdown"
                 @toggle-dropdown="showThemeDropdown = !showThemeDropdown"
             />
+            
+            <!-- First Image Display -->
+            <EntryImage 
+                :image="firstImage"
+                :fallbackText="entry.word"
+                @image-error="handleImageError"
+                @image-click="handleImageClick"
+            />
 
             <!-- Header -->
             <WordHeader 
@@ -49,6 +57,8 @@
                                     :definition="definition"
                                     :definitionIndex="getGlobalDefinitionIndex(clusterIndex, defIndex)"
                                     :isRegenerating="regeneratingIndex === getGlobalDefinitionIndex(clusterIndex, defIndex)"
+                                    :isFirstInGroup="defIndex === 0"
+                                    :isAISynthesized="!!entry.model_info"
                                     @regenerate="handleRegenerateExamples"
                                     @searchWord="store.searchWord"
                                 />
@@ -76,7 +86,16 @@
             </CardContent>
 
             <!-- Etymology -->
-            <Etymology v-if="entry.etymology" :etymology="entry.etymology" />
+            <div v-if="entry.etymology" data-cluster-id="etymology">
+                <Etymology :etymology="entry.etymology" />
+            </div>
+            
+            <!-- Synth Entry ID (for debugging) -->
+            <div v-if="entry.synth_entry_id" class="flex justify-center mt-4">
+                <div class="text-xs text-muted-foreground/50 px-3 py-1 border border-border/30 rounded-md bg-background/50">
+                    {{ entry.synth_entry_id }}
+                </div>
+            </div>
         </ThemedCard>
     </div>
 </template>
@@ -91,7 +110,8 @@ import {
     DefinitionCluster,
     DefinitionItem,
     ThesaurusView,
-    Etymology
+    Etymology,
+    EntryImage
 } from './components';
 import { ThemedCard } from '@/components/custom/card';
 import { useDefinitionGroups, useAnimationCycle, useProviders } from './composables';
@@ -107,6 +127,38 @@ const showThemeDropdown = ref(false);
 
 // Computed properties
 const entry = computed(() => store.currentEntry);
+
+const firstImage = computed(() => {
+    let image = null;
+    
+    // First check synth entry images - prefer ones with descriptions
+    if (entry.value?.images && entry.value.images.length > 0) {
+        // Try to find an image with a description first
+        image = entry.value.images.find(img => img.description) || entry.value.images[0];
+    }
+    
+    // Then check definition images
+    if (!image && entry.value?.definitions) {
+        for (const def of entry.value.definitions) {
+            if (def.images && def.images.length > 0) {
+                // Try to find an image with a description first
+                image = def.images.find(img => img.description) || def.images[0];
+                break;
+            }
+        }
+    }
+    
+    // If we have an image, construct the API URL
+    if (image && image.id) {
+        const imageWithUrl = {
+            ...image,
+            url: `/api/v1/images/${image.id}/content`
+        };
+        return imageWithUrl;
+    }
+    
+    return image;
+});
 
 // Composables
 const { groupedDefinitions } = useDefinitionGroups(entry);
@@ -135,6 +187,19 @@ const handleRegenerateExamples = async (definitionIndex: number) => {
         console.error('Failed to regenerate examples:', error);
     } finally {
         regeneratingIndex.value = null;
+    }
+};
+
+const handleImageError = (event: Event) => {
+    console.error('Failed to load image:', (event.target as HTMLImageElement).src);
+    // Could hide the image or show a placeholder
+    (event.target as HTMLImageElement).style.display = 'none';
+};
+
+const handleImageClick = () => {
+    if (firstImage.value?.url) {
+        // Open image in new tab
+        window.open(firstImage.value.url, '_blank');
     }
 };
 

@@ -486,7 +486,7 @@ class DefinitionSynthesizer:
             
         # Use default components if none specified
         if components is None:
-            components = SynthesisComponent.default_components()
+            components = SynthesisComponent.default_definition_components()
         
         logger.info(f"Regenerating components {components} for entry {entry_id}")
         

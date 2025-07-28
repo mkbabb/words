@@ -4,7 +4,7 @@
 **{{ provider.name }}**: {{ provider.etymology_text }}
 {% endfor %}
 
-Synthesize scholarly etymology with:
+Synthesize a pithy scholarly etymology with:
 - Origin language
 - Root words/morphemes
 - First known use

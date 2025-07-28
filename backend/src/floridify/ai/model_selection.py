@@ -65,6 +65,7 @@ TASK_COMPLEXITY_MAP: dict[str, ModelComplexity] = {
     "validate_query": ModelComplexity.LOW,
     "identify_grammar_patterns": ModelComplexity.LOW,
     "identify_regional_variants": ModelComplexity.LOW,
+
     "deduplicate_definitions": ModelComplexity.LOW,
 }
 

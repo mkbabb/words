@@ -9,9 +9,11 @@ from . import (
     examples,
     facts,
     health,
+    images,
     lookup,
     search,
     suggestions,
+    synth_entries,
     words,
 )
 
@@ -24,8 +26,10 @@ __all__ = [
     "examples",
     "facts",
     "health",
+    "images",
     "lookup",
     "search",
     "suggestions",
+    "synth_entries",
     "words",
 ]

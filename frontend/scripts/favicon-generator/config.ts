@@ -25,7 +25,7 @@ export const defaultConfig: FaviconConfig = {
   background: 'white',
   textColor: '#1f2937',
   sizes: [16, 32, 48, 64, 128, 256],
-  borderRadiusRatio: 0.125,
+  borderRadiusRatio: 0.225,
   fontSizeRatio: 0.75,
   verticalOffsetRatio: 0.0625,
   outputDir: '../../public',

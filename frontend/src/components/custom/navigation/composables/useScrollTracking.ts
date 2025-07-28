@@ -1,142 +1,116 @@
-import { ref, onMounted, onUnmounted, watch, type Ref } from 'vue';
-import { useScroll, useThrottleFn } from '@vueuse/core';
+import { ref, onMounted, onUnmounted, type Ref } from 'vue';
+import { useDebounceFn } from '@vueuse/core';
 
 interface TrackedElement {
     id: string;
-    level: number; // 0 = cluster, 1 = part of speech, etc.
+    level: number; // 0 = cluster, 1 = part of speech
     parentId?: string;
-    elements: Element[]; // Support multiple elements with same ID
-    visibility: number;
+    elements: Element[]; // DOM elements (can be multiple)
 }
 
 interface UseScrollTrackingOptions {
     activeStates: Map<number, Ref<string>>; // level -> active ID ref
     rootMargin?: string;
-    threshold?: number[];
-    scrollDirectionBuffer?: number; // pixels to prevent rapid switching
 }
 
 export function useScrollTracking({
     activeStates,
-    rootMargin = '-20% 0px -20% 0px', // Symmetric for consistency
-    threshold = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
-    scrollDirectionBuffer = 50
+    rootMargin = '-40% 0px -60% 0px' // Creates a reading line at 40% from top
 }: UseScrollTrackingOptions) {
     const trackedElements = new Map<string, TrackedElement>();
     const observer = ref<IntersectionObserver | null>(null);
+    const previousActives = new Map<number, string>();
     
-    // Scroll state
-    const { y } = useScroll(window);
-    const lastScrollY = ref(0);
-    const scrollDirection = ref<'up' | 'down' | 'idle'>('idle');
-    const lastActiveUpdate = ref(0);
+    // Elements currently in the reading zone
+    const elementsInReadingZone = new Set<string>();
     
-    // Track visibility scores for all elements
-    const visibilityScores = new Map<string, number>();
+    // Last known scroll position
+    let lastScrollY = 0;
     
-    // Update scroll direction with hysteresis
-    const updateScrollDirection = useThrottleFn(() => {
-        const delta = y.value - lastScrollY.value;
+    // Get all elements sorted by their position on the page
+    const getSortedElements = (level?: number): Array<{id: string; element: TrackedElement; top: number}> => {
+        const elements: Array<{id: string; element: TrackedElement; top: number}> = [];
         
-        if (Math.abs(delta) < scrollDirectionBuffer) {
-            scrollDirection.value = 'idle';
-        } else if (delta > 0) {
-            scrollDirection.value = 'down';
-        } else {
-            scrollDirection.value = 'up';
+        for (const [id, element] of trackedElements) {
+            if (level !== undefined && element.level !== level) continue;
+            
+            // Get the topmost position of all instances
+            const tops = element.elements.map(el => el.getBoundingClientRect().top);
+            if (tops.length === 0) continue;
+            
+            elements.push({
+                id,
+                element,
+                top: Math.min(...tops)
+            });
         }
         
-        lastScrollY.value = y.value;
-    }, 100);
-    
-    // Calculate element visibility score based on intersection ratio and position
-    const calculateVisibilityScore = (entry: IntersectionObserverEntry): number => {
-        const rect = entry.boundingClientRect;
-        const viewportHeight = window.innerHeight;
-        const centerY = rect.top + rect.height / 2;
-        const viewportCenterY = viewportHeight / 2;
-        
-        // Score based on how close element center is to viewport center
-        const centerDistance = Math.abs(centerY - viewportCenterY);
-        const centerScore = 1 - (centerDistance / viewportCenterY);
-        
-        // Combine intersection ratio with center proximity
-        return entry.intersectionRatio * 0.7 + Math.max(0, centerScore) * 0.3;
+        return elements.sort((a, b) => a.top - b.top);
     };
     
-    // Update active elements based on visibility
-    const updateActiveElements = () => {
-        const now = Date.now();
+    // Update active elements - the core logic
+    const updateActiveElementsRaw = () => {
+        const scrollTop = window.scrollY;
+        const scrollBottom = scrollTop + window.innerHeight;
+        const documentHeight = document.documentElement.scrollHeight;
         
-        // Prevent too frequent updates
-        if (now - lastActiveUpdate.value < 50) return;
-        lastActiveUpdate.value = now;
+        // Check if we're at the edges
+        const isAtTop = scrollTop < 50;
+        const isAtBottom = scrollBottom >= documentHeight - 50;
         
-        // Group elements by level
-        const elementsByLevel = new Map<number, TrackedElement[]>();
-        
-        for (const [id, score] of visibilityScores) {
-            const element = trackedElements.get(id);
-            if (!element || score <= 0) continue;
-            
-            element.visibility = score;
-            
-            if (!elementsByLevel.has(element.level)) {
-                elementsByLevel.set(element.level, []);
-            }
-            elementsByLevel.get(element.level)!.push(element);
-        }
-        
-        // Update active state for each level
+        // Update each level
         for (const [level, activeRef] of activeStates) {
-            const elements = elementsByLevel.get(level) || [];
+            const sortedElements = getSortedElements(level);
+            if (sortedElements.length === 0) continue;
             
-            if (elements.length === 0) continue;
+            let newActive: string | null = null;
             
-            // Sort by visibility score
-            elements.sort((a, b) => b.visibility - a.visibility);
-            
-            // Apply scroll direction bias
-            if (scrollDirection.value !== 'idle' && elements.length > 1) {
-                const currentActive = activeRef.value;
-                const currentIndex = elements.findIndex(el => el.id === currentActive);
+            // Edge case: at top of page
+            if (isAtTop) {
+                newActive = sortedElements[0].id;
+            }
+            // Edge case: at bottom of page
+            else if (isAtBottom) {
+                newActive = sortedElements[sortedElements.length - 1].id;
+            }
+            // Normal case: find the topmost element in reading zone
+            else {
+                // Get elements in reading zone, sorted by position
+                const inZone = sortedElements.filter(item => 
+                    elementsInReadingZone.has(item.id)
+                );
                 
-                // If scrolling down, prefer elements below current
-                // If scrolling up, prefer elements above current
-                if (currentIndex !== -1) {
-                    const bias = scrollDirection.value === 'down' ? 0.1 : -0.1;
-                    elements.forEach((el, idx) => {
-                        if (scrollDirection.value === 'down' && idx > currentIndex) {
-                            el.visibility += bias;
-                        } else if (scrollDirection.value === 'up' && idx < currentIndex) {
-                            el.visibility += bias;
-                        }
-                    });
-                    
-                    // Re-sort with bias applied
-                    elements.sort((a, b) => b.visibility - a.visibility);
+                if (inZone.length > 0) {
+                    // Always use the topmost element in the reading zone
+                    newActive = inZone[0].id;
+                } else {
+                    // Keep previous if nothing in zone
+                    newActive = previousActives.get(level) || null;
                 }
             }
             
-            // Only update if significantly more visible (hysteresis)
-            const bestElement = elements[0];
-            const currentActiveElement = elements.find(el => el.id === activeRef.value);
-            
-            if (!currentActiveElement || 
-                bestElement.visibility > currentActiveElement.visibility + 0.15) {
-                activeRef.value = bestElement.id;
+            // Only update if there's a valid new active and it's different
+            if (newActive && newActive !== activeRef.value) {
+                activeRef.value = newActive;
+                previousActives.set(level, newActive);
                 
-                // Update parent levels if needed
-                if (bestElement.parentId) {
-                    const parentLevel = level - 1;
-                    const parentRef = activeStates.get(parentLevel);
-                    if (parentRef) {
-                        parentRef.value = bestElement.parentId;
+                // Update parent cluster when part of speech changes
+                if (level === 1) {
+                    const element = trackedElements.get(newActive);
+                    if (element?.parentId) {
+                        const parentRef = activeStates.get(0);
+                        if (parentRef && parentRef.value !== element.parentId) {
+                            parentRef.value = element.parentId;
+                            previousActives.set(0, element.parentId);
+                        }
                     }
                 }
             }
         }
     };
+    
+    // Debounced version to prevent jitter
+    const updateActiveElements = useDebounceFn(updateActiveElementsRaw, 150);
     
     // Set up intersection observer
     const setupObserver = () => {
@@ -146,45 +120,52 @@ export function useScrollTracking({
         
         observer.value = new IntersectionObserver(
             (entries) => {
+                let hasChanges = false;
+                
                 entries.forEach(entry => {
                     const id = entry.target.getAttribute('data-track-id');
                     if (!id) return;
                     
                     if (entry.isIntersecting) {
-                        const score = calculateVisibilityScore(entry);
-                        visibilityScores.set(id, score);
+                        if (!elementsInReadingZone.has(id)) {
+                            elementsInReadingZone.add(id);
+                            hasChanges = true;
+                        }
                     } else {
-                        // Don't immediately remove, just set to 0
-                        visibilityScores.set(id, 0);
+                        if (elementsInReadingZone.delete(id)) {
+                            hasChanges = true;
+                        }
                     }
                 });
                 
-                updateActiveElements();
+                if (hasChanges) {
+                    updateActiveElements();
+                }
             },
-            { rootMargin, threshold }
+            { rootMargin, threshold: 0 }
         );
     };
     
-    // Register elements to track
+    // Register element for tracking
     const trackElement = (element: Element, id: string, level: number, parentId?: string) => {
         if (!element.hasAttribute('data-track-id')) {
             element.setAttribute('data-track-id', id);
         }
         
-        // If already tracking this ID, add to existing elements array
         const existing = trackedElements.get(id);
         if (existing) {
             if (!existing.elements.includes(element)) {
                 existing.elements.push(element);
-                if (observer.value) {
-                    observer.value.observe(element);
-                }
+                observer.value?.observe(element);
             }
         } else {
-            trackedElements.set(id, { id, level, parentId, elements: [element], visibility: 0 });
-            if (observer.value) {
-                observer.value.observe(element);
-            }
+            trackedElements.set(id, { 
+                id, 
+                level, 
+                parentId, 
+                elements: [element] 
+            });
+            observer.value?.observe(element);
         }
     };
     
@@ -195,71 +176,34 @@ export function useScrollTracking({
             tracked.elements.forEach(el => observer.value!.unobserve(el));
         }
         trackedElements.delete(id);
-        visibilityScores.delete(id);
+        elementsInReadingZone.delete(id);
     };
     
-    // Handle special cases
-    const handleEdgeCases = () => {
-        const scrollHeight = document.documentElement.scrollHeight;
-        const clientHeight = document.documentElement.clientHeight;
-        
-        // At top of page
-        if (y.value <= 50) {
-            // Find first element of each level
-            for (const [level, activeRef] of activeStates) {
-                const elements = Array.from(trackedElements.values())
-                    .filter(el => el.level === level)
-                    .sort((a, b) => {
-                        const aTop = Math.min(...a.elements.map(e => e.getBoundingClientRect().top));
-                        const bTop = Math.min(...b.elements.map(e => e.getBoundingClientRect().top));
-                        return aTop - bTop;
-                    });
-                
-                if (elements.length > 0) {
-                    activeRef.value = elements[0].id;
-                }
-            }
-        }
-        
-        // At bottom of page
-        else if (y.value + clientHeight >= scrollHeight - 50) {
-            // Find last element of each level
-            for (const [level, activeRef] of activeStates) {
-                const elements = Array.from(trackedElements.values())
-                    .filter(el => el.level === level)
-                    .sort((a, b) => {
-                        const aTop = Math.max(...a.elements.map(e => e.getBoundingClientRect().top));
-                        const bTop = Math.max(...b.elements.map(e => e.getBoundingClientRect().top));
-                        return bTop - aTop;
-                    });
-                
-                if (elements.length > 0) {
-                    activeRef.value = elements[0].id;
-                }
-            }
-        }
-    };
-    
-    // Watch scroll position
-    watch(y, () => {
-        updateScrollDirection();
-        handleEdgeCases();
-    });
+    // Check scroll position periodically for edge cases
+    let scrollCheckInterval: number | null = null;
     
     onMounted(() => {
+        // Check scroll position every 200ms
+        scrollCheckInterval = window.setInterval(() => {
+            const currentScrollY = window.scrollY;
+            if (Math.abs(currentScrollY - lastScrollY) > 50) {
+                lastScrollY = currentScrollY;
+                updateActiveElements();
+            }
+        }, 200);
         setupObserver();
     });
     
     onUnmounted(() => {
-        if (observer.value) {
-            observer.value.disconnect();
+        observer.value?.disconnect();
+        if (scrollCheckInterval) {
+            clearInterval(scrollCheckInterval);
         }
     });
     
     return {
         trackElement,
         untrackElement,
-        scrollDirection,
         setupObserver,
         updateActiveElements
     };

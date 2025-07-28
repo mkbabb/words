@@ -46,7 +46,7 @@ export const useAppStore = defineStore('app', () => {
             selectedSources: ['wiktionary'] as string[],
             selectedLanguages: ['en'] as string[],
             showControls: false,
-            noAI: false,
+            noAI: true,
             selectedWordlist: null as string | null,
             // Progressive sidebar state
             sidebarActiveCluster: '',
@@ -90,7 +90,7 @@ export const useAppStore = defineStore('app', () => {
                         }
                         // Validate noAI flag
                         if (typeof parsed.noAI !== 'boolean') {
-                            parsed.noAI = false;
+                            parsed.noAI = true;
                         }
                         // Validate accordion state
                         if (!parsed.sidebarAccordionState || typeof parsed.sidebarAccordionState !== 'object') {
@@ -112,7 +112,7 @@ export const useAppStore = defineStore('app', () => {
                             selectedSources: ['wiktionary'],
                             selectedLanguages: ['en'],
                             showControls: false,
-                            noAI: false,
+                            noAI: true,
                             selectedWordlist: null,
                             sidebarActiveCluster: '',
                             sidebarActivePartOfSpeech: '',
@@ -446,8 +446,15 @@ export const useAppStore = defineStore('app', () => {
             );
 
             console.log('Setting currentEntry:', entry);
+            console.log('Entry images:', entry.images);
             console.log('First definition:', entry.definitions?.[0]);
             console.log('First definition part_of_speech:', entry.definitions?.[0]?.part_of_speech);
+            
+            // Log synth entry ID if available
+            if (entry.synth_entry_id) {
+                console.log('Synthesized Entry ID:', entry.synth_entry_id);
+            }
+            
             currentEntry.value = entry;
 
             // Update current word in session

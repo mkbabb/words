@@ -50,7 +50,7 @@ const state = reactive({
     // Selected options
     selectedSources: ['wiktionary'],
     selectedLanguages: ['en'],
-    noAI: false,
+    noAI: true,
     
     // Dev mode
     isDevelopment: import.meta.env.DEV
@@ -99,7 +99,7 @@ export function useSearchBarSharedState() {
         state.forceRefreshMode = store.forceRefreshMode;
         state.selectedSources = store.selectedSources || ['wiktionary'];
         state.selectedLanguages = store.selectedLanguages || ['en'];
-        state.noAI = store.noAI || false;
+        state.noAI = store.noAI !== undefined ? store.noAI : true;
         
         // Restore persisted search state
         if (store.searchQuery) {

@@ -24,9 +24,11 @@ from .routers import (
     examples,
     facts,
     health,
+    images,
     lookup,
     search,
     suggestions,
+    synth_entries,
     words,
 )
 
@@ -109,6 +111,8 @@ app.include_router(examples.router, prefix=API_V1_PREFIX, tags=["examples"])
 app.include_router(batch.router, prefix=f"{API_V1_PREFIX}/batch", tags=["batch"])
 app.include_router(words.router, prefix=f"{API_V1_PREFIX}/words", tags=["words"])
 app.include_router(audio.router, prefix=API_V1_PREFIX, tags=["audio"])
+app.include_router(images.router, prefix=f"{API_V1_PREFIX}/images", tags=["images"])
+app.include_router(synth_entries.router, prefix=f"{API_V1_PREFIX}/synth-entries", tags=["synth-entries"])
 
 # Health check remains at root for monitoring
 app.include_router(health.router, prefix="", tags=["health"])

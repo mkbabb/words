@@ -89,9 +89,9 @@ async function generatePNG(
   await page.waitForSelector('.katex', { timeout: 5000 });
   await new Promise(resolve => setTimeout(resolve, 300));
 
-  // Take screenshot
+  // Take screenshot with transparent background
   const screenshot = await page.screenshot({
-    omitBackground: false,
+    omitBackground: true,
     type: 'png'
   });
 

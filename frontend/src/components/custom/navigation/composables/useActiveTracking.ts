@@ -1,4 +1,4 @@
-import { onMounted, watch, type Ref } from 'vue';
+import { onMounted, watch, nextTick, type Ref } from 'vue';
 import { useScrollTracking } from './useScrollTracking';
 import type { SidebarCluster } from '../types';
 
@@ -20,10 +20,7 @@ export function useActiveTracking({
     ]);
     
     const { trackElement, setupObserver } = useScrollTracking({
-        activeStates,
-        rootMargin: '-20% 0px -20% 0px',
-        threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
-        scrollDirectionBuffer: 30
+        activeStates
     });
     
     // Register all elements for tracking
@@ -67,11 +64,26 @@ export function useActiveTracking({
     });
     
     // Re-register when sections change
-    watch(() => sidebarSections.value, () => {
+    watch(() => sidebarSections.value, async () => {
         if (sidebarSections.value.length > 0) {
+            // Reset active states when sections change (new word)
+            activeCluster.value = '';
+            activePartOfSpeech.value = '';
+            
+            // Wait for DOM to update
+            await nextTick();
+            
             // Re-setup observer to track new elements
             setupObserver();
             registerElements();
+            
+            // Set initial active state to first cluster
+            const firstCluster = sidebarSections.value[0];
+            activeCluster.value = firstCluster.clusterId;
+            
+            if (firstCluster.partsOfSpeech.length > 0) {
+                activePartOfSpeech.value = `${firstCluster.clusterId}-${firstCluster.partsOfSpeech[0].type}`;
+            }
         }
     }, { deep: true });
     

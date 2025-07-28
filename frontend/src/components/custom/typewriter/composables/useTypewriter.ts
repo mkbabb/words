@@ -9,6 +9,7 @@ interface TypewriterOptions {
     variance?: number;
     errorRate?: number;
     loop?: boolean;
+    animationDelay?: number;
     onComplete?: () => void;
 }
 
@@ -63,7 +64,9 @@ export const useTypewriter = (options: TypewriterOptions) => {
             
             // Handle looping
             if (options.loop) {
-                await delay(2000); // Wait 2 seconds before looping
+                // Use animationDelay if provided, otherwise default to 2 seconds
+                const loopDelay = options.animationDelay || 2000;
+                await delay(loopDelay);
                 startTyping();
             }
         }

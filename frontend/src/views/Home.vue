@@ -14,7 +14,7 @@
         <div class="relative min-h-screen p-0 lg:p-4">
             <!-- Sticky Search Bar with scroll responsiveness -->
             <div :class="searchBarClasses">
-                <div class="mx-auto max-w-4xl">
+                <div class="mx-auto w-full sm:max-w-4xl">
                     <SearchBar
                         :shrink-percentage="shrinkPercentage"
                         @stage-enter="handleStageEnter"
@@ -36,7 +36,7 @@
                         <div 
                             v-if="shouldShowProgressiveSidebar"
                             class="sticky w-48"
-                            :style="{ top: isScrolled ? '5rem' : '6rem', zIndex: 30 }"
+                            :style="{ top: '5.5rem', zIndex: 30 }"
                         >
                             <ProgressiveSidebar />
                         </div>
@@ -127,7 +127,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useAppStore } from '@/stores';
 import { useScroll } from '@vueuse/core';
 import { cn } from '@/utils';
@@ -140,6 +141,7 @@ import { StageTest } from '@/components/custom/test';
 import { ProgressiveSidebar } from '@/components/custom/navigation';
 
 const store = useAppStore();
+const route = useRoute();
 
 // Component refs
 const stageTestRef = ref();
@@ -152,6 +154,23 @@ const handleStageEnter = (_query: string) => {
     }
 };
 
+
+// Watch for route changes
+watch(() => route.name, async (routeName) => {
+    if (routeName === 'Definition' && route.params.word) {
+        const word = route.params.word as string;
+        store.mode = 'dictionary';
+        store.searchQuery = word;
+        store.hasSearched = true;
+        await store.getDefinition(word);
+    } else if (routeName === 'Thesaurus' && route.params.word) {
+        const word = route.params.word as string;
+        store.mode = 'thesaurus';
+        store.searchQuery = word;
+        store.hasSearched = true;
+        await store.getDefinition(word);
+    }
+}, { immediate: true });
 
 onMounted(async () => {
     console.log('Home component mounted');

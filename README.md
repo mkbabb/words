@@ -1,214 +1,103 @@
-# 🌻 Floridify — An Efflorescent Dictionary for Word Lovers
+# `floridify`
 
-A full-stack dictionary system architected for the methodical acquisition and discovery of efflorescent words. Built with meaning-first philosophy, semantic intelligence, and the understanding that an expanded lexicon is akin to an extended color palette for precise articulation.
+A dictionary system that understands words the way we learn them -- by meaning, not memorization.
 
-## Overview
+## What It Is
 
-Floridify transcends traditional dictionary lookup through AI-synthesized meaning extraction, transforming the chaotic assemblage of definitions into hierarchical, learnable knowledge. This isn't merely another word application—it's a comprehensive vocabulary acquisition ecosystem designed for those who understand that words are the fundamental substrate of thought itself.
+`floridify` takes the usual dictionary muddle and organizes it sensibly. When you look up "bank," you don't get a wall of text; you get bank¹ (where money lives), bank² (river's edge), bank³ (to arrange). Each meaning stands alone, clear and learnable.
 
-The system employs a sophisticated multi-method search cascade (exact → fuzzy → semantic → AI) across 269k+ lexical entries, synthesizing definitions from disparate sources into coherent, meaning-clustered presentations. Each word becomes a structured learning artifact, complete with spaced repetition algorithms, contextual examples, and direct Anki integration for systematic vocabulary development.
+The backend runs on Python with FastAPI, the frontend on Vue 3. MongoDB stores everything, an LLM handles the synthesis, and Docker keeps it all running smoothly.
 
-## 🚀 Quick Start
+## Getting Started
 
-### Full-Stack Development
 ```bash
-# Concurrent frontend (Vue 3) and backend (FastAPI) development
-./dev.sh
+# Spin up everything at once
+./scripts/dev
 
-# Navigate to localhost:3000 for the web interface
-# API available at localhost:8000
+# Open localhost:3000 in your browser
 ```
 
-### CLI Installation
+For the command line folk:
+
 ```bash
-git clone <repository-url>
-cd floridify/backend
-uv venv && source .venv/bin/activate
-uv sync
-
-# Configure authentication
-cp auth/config.toml.example auth/config.toml
-# Add your OpenAI API key to auth/config.toml
-
-# Initialize search indices (one-time setup)
-floridify search init
-
-# Begin your lexical exploration
+cd backend && uv sync
+cp auth/config.toml.example auth/config.toml  # Add your OpenAI key
 floridify lookup perspicacious
 ```
 
-## 🎯 Core Features
+## How It Works
 
-### AI-Synthesized Meaning Extraction
-The system's architectural innovation lies in **meaning-based clustering before synthesis**. Rather than presenting a bewildering array of disparate definitions, Floridify employs an LLM (configurable provider hereof) to identify semantic clusters and synthesize coherent explanations per meaning group. The result: bank¹ (financial), bank² (geographic), bank³ (arrangement) — each with focused, learnable definitions.
+The search follows a simple cascade: first it tries an exact match, then fuzzy matching for typos, then semantic search for related concepts. If all else fails, an LLM generates something reasonable.
 
-### Multi-Method Search Intelligence
-Four-tier search architecture provides comprehensive lexical coverage:
-- **Trie-based exact matching** for instant results
-- **Fuzzy string algorithms** handling morphological variations  
-- **FAISS semantic search** with vector similarity
-- **AI fallback generation** for unknown, bespoke, or totally esoteric terms
+When you search a word, `floridify` fetches from multiple dictionaries simultaneously, uses an LLM to spot duplicates, groups similar meanings together, then enhances everything with examples and usage notes. The whole process takes 2-4 seconds.
 
-### Rich Terminal Interface
-A beautiful CLI experience leveraging the Rich library with Unicode superscripts, heat-mapped frequency visualization, progress tracking, and thoughtful typography. The terminal becomes a canvas for linguistic exploration.
+## The Good Parts
+
+### Smart Search
+
+The system uses sentence transformers for semantic search—proper 384-dimensional embeddings, not keyword matching. Falls back gracefully to character and word-level matching when needed. Everything's cached with FAISS indices for speed.
+
+### Learning Tools
+
+Built-in spaced repetition using the SM-2 algorithm (the one Anki uses). Words progress from Bronze to Silver to Gold as you master them. Direct export to Anki if that's your preference—no manual card creation needed.
+
+### Web Interface
+
+A clean Vue app with all the modern niceties: dark mode, search history, persistent preferences. The sidebar appears automatically when a word has multiple distinct meanings. Typography first, with a focus on readability and usability. Tailwind CSS used pervasively and idiomatically for styling.
+
+### Command Line
+
+There's a Rich-powered CLI with Unicode formatting and progress bars. Looks beautiful, works everywhere.
+
+## Development
+
+Backend: `cd backend && uv run uvicorn src.floridify.api.main:app --reload`
+
+Frontend: `cd frontend && npm run dev`
+
+Or just use Docker: `./scripts/dev`
+
+Tests: `pytest` for backend, `npm test` for frontend
+
+## Deployment
+
+Push to main and GitHub Actions handles everything. Or deploy manually:
 
 ```bash
-# Hierarchical meaning display
-floridify lookup sanguine
-
-╭─ sanguine /ˈsæŋɡwɪn/ ────────────────────────────╮
-│ ╭─ sanguine¹ (Optimistic Temperament) ──────╮   │
-│ │ adjective                                  │   │
-│ │   Confidently optimistic and cheerful.    │   │
-│ │   synonyms: hopeful, buoyant, ebullient   │   │
-│ ╰────────────────────────────────────────────╯   │
-│ ╭─ sanguine² (Blood-red Complexion) ────────╮   │
-│ │ adjective                                  │   │
-│ │   Having a ruddy, healthy complexion.     │   │
-│ ╰────────────────────────────────────────────╯   │
-╰───────────────────────────────────────────────────╯
+./scripts/deploy
 ```
 
-### Spaced Repetition Learning System
-Implements the proven SuperMemo SM-2 algorithm with personalized difficulty adjustment. Each word maintains review schedules, ease factors, and mastery progression (Bronze → Silver → Gold), optimizing long-term retention through scientifically-validated spacing intervals.
+Runs on EC2 with Nginx handling SSL, DocumentDB for production data storage. Zero-downtime deployments, health checks, the works.
 
-### Comprehensive Wordlist Processing
-Transform vocabulary corpora through intelligent batch processing:
-- **Multi-format parsing**: numbered lists, CSV, tab-separated, plain text
-- **Frequency tracking** with heat-map visualization  
-- **Cost-effective batch API processing** (50% OpenAI discount)
-- **Quality filtering** with configurable aggressiveness levels
-- **Auto-generated nomenclature** via animal phrase names ("ochre-guan", "ebony-tanuki")
+## Configuration
 
-### Direct Anki Integration
-Generate GRE-level flashcards that materialize instantly in your Anki application:
-- **Fill-in-blank cards** testing contextual comprehension
-- **Best-describes cards** with semantically relevant distractors
-- **Professional styling** with gradient backgrounds and typography
-- **AnkiConnect API** for seamless deck creation (no manual imports)
-
-### Web Interface Excellence
-Modern Vue 3 SPA with Tailwind CSS featuring:
-- **GPU-accelerated animations** with scroll-aware search bar behavior
-- **Typography-first excellence**: Fraunces serif elegance, Fira Code technical precision
-- **Intelligent state persistence** via Pinia with localStorage integration
-- **Metallic card variants** (gold, silver, bronze) with sparkle effects
-- **Real-time progress streaming** during AI synthesis operations
-
-## 🏗️ Architecture
-
-**Technology Stack**:
-- **Backend**: Python 3.12+ (FastAPI, MongoDB, OpenAI, FAISS)
-- **Frontend**: Vue 3 + TypeScript (Tailwind CSS, Pinia, Vite)
-- **Search**: Multi-method cascade with semantic vector similarity
-- **AI**: OpenAI GPT-4 with structured outputs and meaning extraction
-- **Storage**: MongoDB with Beanie ODM and multi-level caching
-
-**Data Flow**: User Input → Multi-Method Search → Provider Aggregation → AI Synthesis → Hierarchical Display → Persistent Storage
-
-**Performance Characteristics**:
-- Sub-second search across 269k+ entries
-- ~95% cache hit rate for repeated lookups  
-- 2-4 second AI synthesis with structured outputs
-- Concurrent batch processing (10 words parallel)
-- FAISS-accelerated semantic similarity matching
-
-## 📚 Advanced Functionality
-
-### Semantic Exploration
-```bash
-# Discover related concepts through vector similarity
-floridify search word --semantic efflorescence
-# Results: bloom, flourish, blossom, burgeon...
-
-# Synonym generation with "efflorescence" ranking
-floridify similar perspicacious
-# Balanced distribution: 40% common, 30% expressive, 20% foreign, 10% technical
-```
-
-### Batch Operations
-```bash
-# Process large vocabulary corpora
-floridify word-list create comprehensive-vocab.txt --name advanced-lexicon
-floridify word-list show advanced-lexicon  # Heat-mapped frequency display
-
-# Export flashcards with academic rigor
-floridify anki export advanced-lexicon --card-types fill_in_blank
-```
-
-### Database Management  
-```bash
-# Performance insights and optimization
-floridify database stats --detailed
-# Collection counts, cache metrics, synthesis quality scores
-
-# Configuration management with secure key handling
-floridify config keys set openai sk-your-api-key
-floridify config set max_results 50
-```
-
-## 🎓 Use Cases
-
-**Academic Excellence**: GRE/SAT preparation through systematic vocabulary acquisition with spaced repetition algorithms and scientifically-validated review scheduling.
-
-**Professional Development**: Industry-specific terminology expansion with contextual understanding and practical usage examples.
-
-**Linguistic Scholarship**: Comprehensive meaning analysis, etymology exploration, and semantic relationship discovery for serious language study.
-
-**Creative Writing**: Precision in lexical selection through extensive synonym networks and contextual usage guidance.
-
-## 🔧 Configuration
-
-Edit `auth/config.toml` for system customization:
+Drop your settings in `auth/config.toml`:
 
 ```toml
 [api]
-openai_api_key = "sk-your-key-here"
-openai_model = "gpt-4o"  # Supports reasoning models (o1, o3)
-rate_limit_enabled = true
+openai_api_key = "sk-..."
+openai_model = "gpt-4o"  # Also supports o1/o3 for complex reasoning
 
 [general]
 default_provider = "wiktionary"
-max_results = 20
 cache_duration_hours = 24
-
-[anki]
-default_card_types = ["best_describes", "fill_in_blank"]
-max_cards_per_word = 2
-direct_export = true  # Requires AnkiConnect add-on
 ```
 
-## 💻 Development & Deployment
+## API Endpoints
 
-### Local Development
-```bash
-# Docker mode (recommended)
-./dev.sh --build  # Force image rebuild
+The basics:
 
-# Native mode
-./dev.sh --native  # Local Python/Node execution
-```
+- `/api/v1/lookup/{word}` - Full AI-enhanced definitions
+- `/api/v1/search/{query}` - Multi-method search
+- `/api/v1/ai/synthesize/*` - Generate specific components
+- `/api/v1/batch/lookup` - Look up multiple words at once
 
-### Production Deployment
+Full docs at `localhost:8000/docs` when running.
 
-**One-time setup:**
-```bash
-# Configure GitHub secrets and EC2 access
-./scripts/setup
-```
+## Why This Exists
 
-**Deploy to production:**
-```bash
-# Manual deployment
-./scripts/deploy
+Words are tools for thinking. An expanded vocabulary isn't about sounding smart; it's about having the right word when you need it. The notion of one's mind being incandescent necessitates a large vocabulary to deploy at a moment's notice: `floridify` aids with exactly that by way of system that's fast, performant, and beautiful.
 
-# Or push to main branch for automated GitHub Actions deployment
-git push origin main
-```
+Built for those who collect words like others collect stamps, who understand that language is the substrate of thought itself; a proxy for human understanding.
 
-The system includes comprehensive deployment automation with:
-- Docker image building and publishing to GitHub Container Registry
-- AWS EC2 deployment with SSL certificate provisioning
-- DocumentDB integration with TLS security
-- Automated health checks and rollback capabilities
-
+_Look up → Understand → Remember → Use_

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -13,14 +14,14 @@ from ..caching import get_cached_http_client
 from ..constants import Language
 from ..core.state_tracker import Stages, StateTracker
 from ..models import (
+    Collocation,
     Definition,
     Etymology,
     Example,
     Pronunciation,
     ProviderData,
-    Word,
-    Collocation,
     UsageNote,
+    Word,
 )
 from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger
@@ -88,6 +89,15 @@ class WikitextCleaner:
         cleaned = re.sub(r"\{\{[^}]*\}\}", "", cleaned)  # Remove remaining templates
         cleaned = re.sub(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]", r"\1", cleaned)  # Clean links
         cleaned = re.sub(r"<ref[^>]*>.*?</ref>", "", cleaned, flags=re.DOTALL)  # Remove refs
+
+        # Decode HTML entities
+        cleaned = html.unescape(cleaned)
+        
+        # Remove any remaining wikitext artifacts
+        cleaned = re.sub(r"'''(.+?)'''", r"\1", cleaned)  # Bold text
+        cleaned = re.sub(r"''(.+?)''", r"\1", cleaned)  # Italic text
+        cleaned = re.sub(r"\[\.\.\.\.?\]", "...", cleaned)  # [...] to ...
+        cleaned = re.sub(r"&[a-zA-Z]+;", "", cleaned)  # Remove any remaining entities
 
         if not preserve_structure:
             cleaned = re.sub(r"\s+", " ", cleaned)  # Normalize whitespace
@@ -296,6 +306,15 @@ class WiktionaryConnector(DictionaryConnector):
             related_terms = self._extract_related_terms(english_section)
             usage_notes = self._extract_usage_notes(english_section)
             quotations = self._extract_quotations(english_section)
+            
+            # Extract synonyms from the dedicated section and add to definitions
+            section_synonyms = self._extract_section_synonyms(english_section)
+            
+            # Merge section synonyms with each definition
+            for definition in definitions:
+                if section_synonyms and not definition.synonyms:
+                    definition.synonyms = section_synonyms[:5]  # Add up to 5 section synonyms
+                    await definition.save()  # Update the definition
 
             return WiktionaryExtractedData(
                 definitions=definitions,
@@ -354,8 +373,8 @@ class WiktionaryConnector(DictionaryConnector):
                 if not clean_def:
                     continue
 
-                # Extract synonyms and antonyms
-                synonyms = self._extract_synonyms(def_text)
+                # Extract inline synonyms from definition
+                synonyms = self._extract_inline_synonyms(def_text)
                 
                 # Extract collocations from the definition context
                 collocations = self._extract_collocations_from_definition(def_text)
@@ -436,8 +455,8 @@ class WiktionaryConnector(DictionaryConnector):
 
         return examples
 
-    def _extract_synonyms(self, definition_text: str) -> list[str]:
-        """Extract synonyms systematically from templates."""
+    def _extract_inline_synonyms(self, definition_text: str) -> list[str]:
+        """Extract synonyms from inline templates in definitions."""
         synonyms = []
 
         try:
@@ -446,7 +465,7 @@ class WiktionaryConnector(DictionaryConnector):
             for template in parsed.templates:
                 template_name = template.name.strip().lower()
 
-                if template_name in ["syn", "synonym", "synonyms"]:
+                if template_name in ["syn", "synonym", "synonyms", "l", "link"]:
                     for arg in template.arguments:
                         if not arg.name:  # Positional arguments
                             arg_value = str(arg.value).strip()
@@ -456,17 +475,213 @@ class WiktionaryConnector(DictionaryConnector):
                                     synonyms.append(clean_syn)
 
         except Exception as e:
-            logger.debug(f"Error extracting synonyms: {e}")
+            logger.debug(f"Error extracting inline synonyms: {e}")
 
         return synonyms[:10]  # Limit to 10 synonyms
+    
+    def _extract_section_synonyms(self, section: wtp.Section) -> list[str]:
+        """Extract synonyms from dedicated Synonyms and See also sections."""
+        all_synonyms = []
+        
+        # Look for Synonyms and See also subsections
+        for subsection in section.sections:
+            if subsection.title and any(keyword in subsection.title.lower() for keyword in ["synonym", "see also"]):
+                # Extract all wikilist items and plain text
+                items = self._extract_wikilist_items(str(subsection))
+                
+                # Also parse templates in the section
+                parsed = wtp.parse(str(subsection))
+                
+                # Extract from templates
+                for template in parsed.templates:
+                    template_name = template.name.strip().lower()
+                    if template_name in ["l", "link", "syn", "synonym"]:
+                        for arg in template.arguments:
+                            if not arg.name or arg.name == "2":  # Second arg is usually the word
+                                value = str(arg.value).strip()
+                                if value and value not in ["en", "English"]:
+                                    clean_syn = self._clean_synonym(value)
+                                    if clean_syn and self._is_valid_synonym(clean_syn):
+                                        all_synonyms.append(clean_syn)
+                
+                # Extract from list items
+                for item in items:
+                    # Clean the item
+                    clean_item = self.cleaner.clean_text(item)
+                    if clean_item and len(clean_item) > 1:
+                        # Filter out Thesaurus references
+                        if "thesaurus:" in clean_item.lower():
+                            continue
+                            
+                        # Split by commas if multiple synonyms in one line
+                        parts = clean_item.split(",")
+                        for part in parts:
+                            syn = part.strip()
+                            if syn and len(syn) > 1 and self._is_valid_synonym(syn):
+                                all_synonyms.append(syn)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_synonyms = []
+        for syn in all_synonyms:
+            if syn.lower() not in seen:
+                seen.add(syn.lower())
+                unique_synonyms.append(syn)
+        
+        return unique_synonyms[:20]  # Limit to 20 synonyms
+    
+    def _is_valid_synonym(self, synonym: str) -> bool:
+        """Check if a synonym is valid (not a meta-reference)."""
+        lower_syn = synonym.lower()
+        # Filter out meta-references
+        invalid_patterns = [
+            "thesaurus:",
+            "see also",
+            "appendix:",
+            "category:",
+            "wikipedia:",
+            "wikisaurus:"
+        ]
+        return not any(pattern in lower_syn for pattern in invalid_patterns)
 
     def _extract_etymology(self, section: wtp.Section) -> str | None:
         """Extract etymology from dedicated section."""
         for subsection in section.sections:
             if subsection.title and "etymology" in subsection.title.lower():
-                etymology_text = str(subsection.contents)
-                return self.cleaner.clean_text(etymology_text, preserve_structure=True)
+                # Get only the direct text content, not subsections
+                # This avoids including pronunciation, noun definitions, etc.
+                text_parts = []
+                for content in subsection.contents.split('\n'):
+                    # Stop at the first subsection marker
+                    if content.strip().startswith('===') or content.strip().startswith('===='):
+                        break
+                    text_parts.append(content)
+                
+                etymology_text = '\n'.join(text_parts).strip()
+                if etymology_text:
+                    # Special cleaning for etymology to preserve language links
+                    return self._clean_etymology_text(etymology_text)
         return None
+    
+    def _clean_etymology_text(self, text: str) -> str:
+        """Clean etymology text with a simple, focused approach."""
+        if not text:
+            return ""
+        
+        # Language code mapping
+        lang_map = {
+            "enm": "Middle English",
+            "ang": "Old English", 
+            "fro": "Old French",
+            "fr": "French",
+            "la": "Latin",
+            "grc": "Ancient Greek",
+            "de": "German",
+            "es": "Spanish",
+            "it": "Italian",
+            "ar": "Arabic",
+            "sa": "Sanskrit",
+            "zh": "Chinese",
+            "ja": "Japanese",
+            "pt": "Portuguese",
+            "nl": "Dutch"
+        }
+        
+        try:
+            parsed = wtp.parse(text)
+            
+            # Process templates more carefully
+            for template in parsed.templates:
+                template_name = template.name.strip().lower()
+                
+                # Handle specific etymology templates
+                if template_name in ["der", "inh", "bor", "cog", "m", "mention", "l", "lang"]:
+                    args = [str(arg.value).strip() for arg in template.arguments]
+                    
+                    # Common pattern: {{template|en|lang_code|word|...}}
+                    if len(args) >= 3:
+                        # args[1] is usually the language code
+                        # args[2] is usually the word
+                        lang_code = args[1] if len(args[1]) <= 3 else None
+                        word = args[2] if len(args[2]) > 1 else None
+                        
+                        if word:
+                            if lang_code in lang_map:
+                                template.string = f"{lang_map[lang_code]} {word}"
+                            else:
+                                template.string = word
+                        else:
+                            template.string = ""
+                    else:
+                        template.string = ""
+                        
+                # Handle quotation templates (preserve the quoted text)
+                elif template_name in ["quote", "gloss"]:
+                    # Look for the gloss/translation argument
+                    gloss_text = ""
+                    for arg in template.arguments:
+                        if arg.name and str(arg.name).strip() in ["t", "gloss", "translation", "3"]:
+                            gloss_text = str(arg.value).strip()
+                            break
+                        elif not arg.name and len(str(arg.value).strip()) > 3:
+                            # Sometimes the gloss is a positional argument
+                            gloss_text = str(arg.value).strip()
+                    
+                    if gloss_text:
+                        template.string = f'("{gloss_text}")'
+                    else:
+                        template.string = ""
+                        
+                # Remove other templates but preserve doublet/see also references
+                elif template_name in ["doublet", "see"]:
+                    # Extract the word reference
+                    if template.arguments:
+                        word_ref = str(template.arguments[-1].value).strip()
+                        if word_ref and len(word_ref) > 1:
+                            template.string = word_ref
+                        else:
+                            template.string = ""
+                    else:
+                        template.string = ""
+                else:
+                    # Remove unhandled templates
+                    template.string = ""
+            
+            # Convert wikilinks to their display text
+            for wikilink in parsed.wikilinks:
+                display_text = wikilink.text or wikilink.target
+                wikilink.string = display_text or ""
+            
+            # Get the cleaned text
+            cleaned = str(parsed)
+            
+        except Exception as e:
+            logger.debug(f"Etymology parsing error: {e}")
+            # Fallback to regex cleaning
+            cleaned = text
+            
+            # Simple template removal
+            cleaned = re.sub(r"\{\{[^}]+\}\}", "", cleaned)
+            
+            # Convert wikilinks
+            cleaned = re.sub(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]", lambda m: m.group(2) or m.group(1), cleaned)
+        
+        # Final cleanup
+        cleaned = html.unescape(cleaned)
+        
+        # Clean up punctuation and whitespace
+        cleaned = re.sub(r"\s*([,;])\s*([,;])", r"\1", cleaned)  # Multiple punctuation
+        cleaned = re.sub(r"\s+([,;.!?])", r"\1", cleaned)  # Space before punctuation
+        cleaned = re.sub(r"([,;])\s*$", ".", cleaned)  # Change trailing comma/semicolon to period
+        cleaned = re.sub(r"^\s*[,;.]\s*", "", cleaned)  # Remove leading punctuation
+        cleaned = re.sub(r"\s+", " ", cleaned)  # Normalize whitespace
+        cleaned = re.sub(r"\.\s*\.", ".", cleaned)  # Multiple periods
+        
+        # Ensure it ends with a period if it doesn't have ending punctuation
+        if cleaned and cleaned[-1] not in ".!?":
+            cleaned += "."
+            
+        return cleaned.strip()
 
     def _extract_pronunciation(self, section: wtp.Section, word_id: str) -> Pronunciation | None:
         """Extract pronunciation comprehensively."""

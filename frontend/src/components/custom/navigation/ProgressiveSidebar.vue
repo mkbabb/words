@@ -4,22 +4,45 @@
         :data-theme="selectedCardVariant || 'default'"
     >
         <!-- Navigation Sections -->
-        <nav class="scrollbar-thin max-h-[calc(100vh-8rem)] space-y-0.5 overflow-y-auto overflow-x-hidden">
+        <nav class="scrollbar-thin max-h-[calc(100vh-8rem)] space-y-0 overflow-y-auto overflow-x-hidden">
             <template v-for="(cluster, index) in sidebarSections" :key="cluster.clusterId">
-                <SidebarCluster
-                    :cluster="cluster"
-                    :isActive="activeCluster === cluster.clusterId"
-                    :activePartOfSpeech="activePartOfSpeech"
-                    :cardVariant="selectedCardVariant"
-                    @cluster-click="handleClusterClick(cluster.clusterId)"
-                    @part-of-speech-click="(pos) => handlePartOfSpeechClick(cluster.clusterId, pos)"
-                />
+                <!-- Special handling for etymology -->
+                <template v-if="cluster.clusterId === 'etymology'">
+                    <!-- Different separator style before etymology -->
+                    <hr
+                        v-if="index > 0"
+                        class="my-1.5 border-0 h-0.5 bg-border/50"
+                    />
+                    <button
+                        @click="handleClusterClick('etymology')"
+                        :class="[
+                            'w-full text-left px-3 py-2 rounded-md transition-all duration-200',
+                            activeCluster === 'etymology'
+                                ? 'bg-primary/10 text-primary'
+                                : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'
+                        ]"
+                    >
+                        <h4 class="text-sm font-semibold">Etymology</h4>
+                    </button>
+                </template>
                 
-                <!-- Separator -->
-                <hr
-                    v-if="index < sidebarSections.length - 1"
-                    class="my-2 border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30"
-                />
+                <!-- Regular clusters -->
+                <template v-else>
+                    <SidebarCluster
+                        :cluster="cluster"
+                        :isActive="activeCluster === cluster.clusterId"
+                        :activePartOfSpeech="activePartOfSpeech"
+                        :cardVariant="selectedCardVariant"
+                        @cluster-click="handleClusterClick(cluster.clusterId)"
+                        @part-of-speech-click="(pos) => handlePartOfSpeechClick(cluster.clusterId, pos)"
+                    />
+                    
+                    <!-- Regular separator between non-etymology clusters -->
+                    <hr
+                        v-if="index < sidebarSections.length - 1 && sidebarSections[index + 1].clusterId !== 'etymology'"
+                        class="my-1 border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30"
+                    />
+                </template>
             </template>
         </nav>
     </div>

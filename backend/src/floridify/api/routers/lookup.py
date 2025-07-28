@@ -18,7 +18,7 @@ from ...caching import cached_api_call_with_dedup
 from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, lookup_state_tracker
-from ...models import AudioMedia, Definition, Example, Pronunciation, ProviderData, Word
+from ...models import AudioMedia, Definition, Example, ImageMedia, Pronunciation, ProviderData, Word
 from ...utils.logging import get_logger
 from ...utils.sanitization import validate_word_input
 from .common import PipelineMetrics
@@ -74,6 +74,7 @@ class DefinitionResponse(BaseModel):
     # Resolved references (not IDs)
     word_forms: list[dict[str, Any]] = []
     examples: list[dict[str, Any]] = []  # Resolved Example objects
+    images: list[dict[str, Any]] = []  # Resolved ImageMedia objects
 
     # Direct fields
     synonyms: list[str] = []
@@ -118,9 +119,21 @@ class LookupResponse(BaseModel):
     definitions: list[DefinitionResponse] = Field(
         default_factory=list, description="Word definitions with resolved examples"
     )
+    etymology: dict[str, Any] | None = Field(
+        None, description="Etymology information"
+    )
     last_updated: datetime = Field(..., description="When this entry was last updated")
     pipeline_metrics: PipelineMetrics | None = Field(
         None, description="Pipeline execution metrics (optional)"
+    )
+    model_info: dict[str, Any] | None = Field(
+        None, description="AI model information (null for non-AI entries)"
+    )
+    synth_entry_id: str | None = Field(
+        None, description="ID of the synthesized dictionary entry"
+    )
+    images: list[dict[str, Any]] = Field(
+        default_factory=list, description="Images attached to the synthesized entry"
     )
 
 
@@ -215,7 +228,17 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
                     for example_id in definition.example_ids:
                         example = await Example.get(example_id)
                         if example:
-                            examples.append(example.model_dump(exclude={"id"}))
+                            example_dict = example.model_dump(mode='json')
+                            examples.append(example_dict)
+                
+                # Load images
+                images = []
+                if definition.image_ids:
+                    for image_id in definition.image_ids:
+                        image = await ImageMedia.get(image_id)
+                        if image:
+                            image_dict = image.model_dump(mode='json', exclude={'data'})
+                            images.append(image_dict)
 
                 # Create DefinitionResponse
                 def_response = DefinitionResponse(
@@ -232,6 +255,7 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
                     sense_number=definition.sense_number,
                     word_forms=[wf.model_dump() for wf in definition.word_forms],
                     examples=examples,
+                    images=images,
                     synonyms=definition.synonyms,
                     antonyms=definition.antonyms,
                     language_register=definition.language_register,
@@ -260,13 +284,26 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
     # Load word
     word_obj = await Word.get(entry.word_id)
     word_text = word_obj.text if word_obj else "unknown"
+    
+    # Load images for the synth entry itself
+    synth_images = []
+    if entry.image_ids:
+        for image_id in entry.image_ids:
+            image = await ImageMedia.get(image_id)
+            if image:
+                image_dict = image.model_dump(mode='json', exclude={'data'})
+                synth_images.append(image_dict)
 
     return LookupResponse(
         word=word_text,
         pronunciation=pronunciation,
         definitions=definitions,
+        etymology=entry.etymology.model_dump() if entry.etymology else None,
         last_updated=entry.updated_at,  # Use updated_at from BaseMetadata
         pipeline_metrics=None,
+        model_info=entry.model_info.model_dump() if entry.model_info else None,
+        synth_entry_id=str(entry.id),
+        images=synth_images,  # Images attached to synth entry
     )
 
 
@@ -432,7 +469,17 @@ async def _lookup_with_tracking(
                     for example_id in definition.example_ids:
                         example = await Example.get(example_id)
                         if example:
-                            examples.append(example.model_dump(exclude={"id"}))
+                            example_dict = example.model_dump(mode='json')
+                            examples.append(example_dict)
+                
+                # Load images
+                images = []
+                if definition.image_ids:
+                    for image_id in definition.image_ids:
+                        image = await ImageMedia.get(image_id)
+                        if image:
+                            image_dict = image.model_dump(mode='json', exclude={'data'})
+                            images.append(image_dict)
 
                 # Create DefinitionResponse
                 def_response = DefinitionResponse(
@@ -449,6 +496,7 @@ async def _lookup_with_tracking(
                     sense_number=definition.sense_number,
                     word_forms=[wf.model_dump() for wf in definition.word_forms],
                     examples=examples,
+                    images=images,
                     synonyms=definition.synonyms,
                     antonyms=definition.antonyms,
                     language_register=definition.language_register,
@@ -478,13 +526,26 @@ async def _lookup_with_tracking(
     word_obj = await Word.get(entry.word_id)
     word_text = word_obj.text if word_obj else "unknown"
 
+    # Load images for the synth entry
+    synth_images = []
+    if entry.image_ids:
+        for image_id in entry.image_ids:
+            image = await ImageMedia.get(image_id)
+            if image:
+                image_dict = image.model_dump(mode='json', exclude={'data'})
+                synth_images.append(image_dict)
+
     # Convert to response model
     result = LookupResponse(
         word=word_text,
         pronunciation=pronunciation,
         definitions=definitions,
+        etymology=entry.etymology.model_dump() if entry.etymology else None,
         last_updated=entry.updated_at,  # Use updated_at from BaseMetadata
         pipeline_metrics=None,
+        model_info=entry.model_info.model_dump() if entry.model_info else None,
+        synth_entry_id=str(entry.id),
+        images=synth_images,  # Include images
     )
 
     # Mark as complete with result data

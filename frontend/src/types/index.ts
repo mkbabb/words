@@ -18,6 +18,7 @@ export {
   type SearchResponse,
   type Pronunciation,
   type AudioFile,
+  type ImageMedia,
   type WordForm,
   type UsageNote,
   type GrammarPattern,

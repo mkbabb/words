@@ -254,24 +254,24 @@ async def synthesize_antonyms(
 ) -> list[str]:
     """Synthesize antonyms: enhance existing or generate new to reach target count."""
     count = count or DEFAULT_ANTONYM_COUNT
-    
+
     # Get existing antonyms (empty if force_refresh)
     existing_antonyms = [] if force_refresh else (definition.antonyms or [])
-    
+
     # If we already have enough antonyms, return them
     if len(existing_antonyms) >= count:
         return existing_antonyms[:count]
-    
+
     # Calculate how many new antonyms we need
     needed_count = count - len(existing_antonyms)
-    
+
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, 
-                message=f"Synthesizing {needed_count} new antonyms for {word} (total: {count})"
+                stage=Stages.AI_SYNTHESIS,
+                message=f"Synthesizing {needed_count} new antonyms for {word} (total: {count})",
             )
-        
+
         response = await ai.synthesize_antonyms(
             word=word,
             definition=definition.text,
@@ -279,15 +279,15 @@ async def synthesize_antonyms(
             existing_antonyms=existing_antonyms,
             count=needed_count,
         )
-        
+
         # Union existing and new antonyms, removing duplicates
         all_antonyms = existing_antonyms.copy()
         for antonym in response.antonyms:
             if antonym not in all_antonyms:
                 all_antonyms.append(antonym)
-        
+
         return all_antonyms[:count]
-        
+
     except Exception as e:
         logger.error(f"Failed to synthesize antonyms: {e}")
         return existing_antonyms
@@ -551,22 +551,22 @@ async def synthesize_synonyms(
 ) -> list[str]:
     """Synthesize synonyms: enhance existing or generate new to reach target count."""
     count = count or DEFAULT_SYNONYM_COUNT
-    
+
     # Get existing synonyms (empty if force_refresh)
     existing_synonyms = [] if force_refresh else (definition.synonyms or [])
-    
+
     # If we already have enough synonyms, return them
     if len(existing_synonyms) >= count:
         return existing_synonyms[:count]
-    
+
     # Calculate how many new synonyms we need
     needed_count = count - len(existing_synonyms)
-    
+
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, 
-                message=f"Synthesizing {needed_count} new synonyms for {word} (total: {count})"
+                stage=Stages.AI_SYNTHESIS,
+                message=f"Synthesizing {needed_count} new synonyms for {word} (total: {count})",
             )
 
         response = await ai.synthesize_synonyms(
@@ -582,7 +582,7 @@ async def synthesize_synonyms(
         for candidate in response.synonyms:
             if candidate.word not in all_synonyms:
                 all_synonyms.append(candidate.word)
-        
+
         logger.info(f"Synthesized {len(all_synonyms)} total synonyms for '{word}'")
         return all_synonyms[:count]
 
@@ -741,8 +741,12 @@ async def cluster_definitions(
         # Apply cluster assignments
         for cluster_mapping in cluster_response.cluster_mappings:
             # Extract short name from cluster_id (e.g., "bank_finance" -> "finance")
-            cluster_name = cluster_mapping.cluster_id.split('_')[-1].title() if '_' in cluster_mapping.cluster_id else cluster_mapping.cluster_id
-            
+            cluster_name = (
+                cluster_mapping.cluster_id.split('_')[-1].title()
+                if '_' in cluster_mapping.cluster_id
+                else cluster_mapping.cluster_id
+            )
+
             cluster = MeaningCluster(
                 id=cluster_mapping.cluster_id,
                 name=cluster_name,  # Short name extracted from ID
@@ -833,16 +837,24 @@ async def enhance_definitions_parallel(
 
     for definition in definitions:
         # Synonyms
-        if SynthesisComponent.SYNONYMS in components and (not definition.synonyms or force_refresh):
+        if SynthesisComponent.SYNONYMS in components and (
+            not definition.synonyms or force_refresh
+        ):
             tasks.append(
                 synthesize_synonyms(
-                    word.text, definition, ai, force_refresh=force_refresh, state_tracker=state_tracker
+                    word.text,
+                    definition,
+                    ai,
+                    force_refresh=force_refresh,
+                    state_tracker=state_tracker,
                 )
             )
             task_info.append((definition, SynthesisComponent.SYNONYMS, len(tasks) - 1))
 
         # Examples
-        if SynthesisComponent.EXAMPLES in components and (not definition.example_ids or force_refresh):
+        if SynthesisComponent.EXAMPLES in components and (
+            not definition.example_ids or force_refresh
+        ):
             tasks.append(
                 generate_examples(
                     word.text, definition, ai, state_tracker=state_tracker
@@ -851,23 +863,33 @@ async def enhance_definitions_parallel(
             task_info.append((definition, SynthesisComponent.EXAMPLES, len(tasks) - 1))
 
         # Antonyms
-        if SynthesisComponent.ANTONYMS in components and (not definition.antonyms or force_refresh):
+        if SynthesisComponent.ANTONYMS in components and (
+            not definition.antonyms or force_refresh
+        ):
             tasks.append(
                 synthesize_antonyms(
-                    word.text, definition, ai, force_refresh=force_refresh, state_tracker=state_tracker
+                    word.text,
+                    definition,
+                    ai,
+                    force_refresh=force_refresh,
+                    state_tracker=state_tracker,
                 )
             )
             task_info.append((definition, SynthesisComponent.ANTONYMS, len(tasks) - 1))
 
         # Word forms
-        if SynthesisComponent.WORD_FORMS in components and (not definition.word_forms or force_refresh):
+        if SynthesisComponent.WORD_FORMS in components and (
+            not definition.word_forms or force_refresh
+        ):
             # Use the part of speech from the definition
             tasks.append(
                 synthesize_word_forms(
                     word, definition.part_of_speech, ai, state_tracker
                 )
             )
-            task_info.append((definition, SynthesisComponent.WORD_FORMS, len(tasks) - 1))
+            task_info.append(
+                (definition, SynthesisComponent.WORD_FORMS, len(tasks) - 1)
+            )
 
         # CEFR Level
         if SynthesisComponent.CEFR_LEVEL in components and (
@@ -876,7 +898,9 @@ async def enhance_definitions_parallel(
             tasks.append(
                 assess_definition_cefr(definition, word.text, ai, state_tracker)
             )
-            task_info.append((definition, SynthesisComponent.CEFR_LEVEL, len(tasks) - 1))
+            task_info.append(
+                (definition, SynthesisComponent.CEFR_LEVEL, len(tasks) - 1)
+            )
 
         # Frequency Band
         if SynthesisComponent.FREQUENCY_BAND in components and (
@@ -885,7 +909,9 @@ async def enhance_definitions_parallel(
             tasks.append(
                 assess_definition_frequency(definition, word.text, ai, state_tracker)
             )
-            task_info.append((definition, SynthesisComponent.FREQUENCY_BAND, len(tasks) - 1))
+            task_info.append(
+                (definition, SynthesisComponent.FREQUENCY_BAND, len(tasks) - 1)
+            )
 
         # Register
         if SynthesisComponent.REGISTER in components and (
@@ -895,7 +921,9 @@ async def enhance_definitions_parallel(
             task_info.append((definition, SynthesisComponent.REGISTER, len(tasks) - 1))
 
         # Domain
-        if SynthesisComponent.DOMAIN in components and (not definition.domain or force_refresh):
+        if SynthesisComponent.DOMAIN in components and (
+            not definition.domain or force_refresh
+        ):
             tasks.append(assess_definition_domain(definition, ai, state_tracker))
             task_info.append((definition, SynthesisComponent.DOMAIN, len(tasks) - 1))
 
@@ -904,30 +932,38 @@ async def enhance_definitions_parallel(
             not definition.grammar_patterns or force_refresh
         ):
             tasks.append(assess_grammar_patterns(definition, ai, state_tracker))
-            task_info.append((definition, SynthesisComponent.GRAMMAR_PATTERNS, len(tasks) - 1))
+            task_info.append(
+                (definition, SynthesisComponent.GRAMMAR_PATTERNS, len(tasks) - 1)
+            )
 
         # Collocations
         if SynthesisComponent.COLLOCATIONS in components and (
             not definition.collocations or force_refresh
         ):
-            tasks.append(
-                assess_collocations(definition, word.text, ai, state_tracker)
+            tasks.append(assess_collocations(definition, word.text, ai, state_tracker))
+            task_info.append(
+                (definition, SynthesisComponent.COLLOCATIONS, len(tasks) - 1)
             )
-            task_info.append((definition, SynthesisComponent.COLLOCATIONS, len(tasks) - 1))
 
         # Usage Notes
         if SynthesisComponent.USAGE_NOTES in components and (
             not definition.usage_notes or force_refresh
         ):
-            tasks.append(usage_note_generation(definition, word.text, ai, state_tracker))
-            task_info.append((definition, SynthesisComponent.USAGE_NOTES, len(tasks) - 1))
+            tasks.append(
+                usage_note_generation(definition, word.text, ai, state_tracker)
+            )
+            task_info.append(
+                (definition, SynthesisComponent.USAGE_NOTES, len(tasks) - 1)
+            )
 
         # Regional Variants
         if SynthesisComponent.REGIONAL_VARIANTS in components and (
             not definition.region or force_refresh
         ):
             tasks.append(assess_regional_variants(definition, ai, state_tracker))
-            task_info.append((definition, SynthesisComponent.REGIONAL_VARIANTS, len(tasks) - 1))
+            task_info.append(
+                (definition, SynthesisComponent.REGIONAL_VARIANTS, len(tasks) - 1)
+            )
 
     if not tasks:
         return
@@ -988,7 +1024,9 @@ async def enhance_definitions_parallel(
             definition.language_register = result  # type: ignore
         elif component == SynthesisComponent.DOMAIN and isinstance(result, str):
             definition.domain = result
-        elif component == SynthesisComponent.GRAMMAR_PATTERNS and isinstance(result, list):
+        elif component == SynthesisComponent.GRAMMAR_PATTERNS and isinstance(
+            result, list
+        ):
             definition.grammar_patterns = cast(list[GrammarPattern], result)
         elif component == SynthesisComponent.COLLOCATIONS and isinstance(result, list):
             definition.collocations = cast(list[Collocation], result)
@@ -1049,12 +1087,16 @@ async def enhance_synthesized_entry(
 
     # Default to all components
     if components is None:
-        components = (SynthesisComponent.word_level_components() | 
-                     SynthesisComponent.definition_level_components())
+        components = (
+            SynthesisComponent.word_level_components()
+            | SynthesisComponent.definition_level_components()
+        )
 
     # Separate word-level and definition-level components
     word_level_components = SynthesisComponent.word_level_components()
-    definition_level_components = components & SynthesisComponent.definition_level_components()
+    definition_level_components = (
+        components & SynthesisComponent.definition_level_components()
+    )
 
     # Load definitions if we need to enhance them
     definitions = []
@@ -1079,7 +1121,9 @@ async def enhance_synthesized_entry(
     word_tasks: list[Coroutine[Any, Any, Any]] = []
     task_types: list[SynthesisComponent] = []  # Track the type of each task
 
-    if SynthesisComponent.PRONUNCIATION in components and (not entry.pronunciation_id or force):
+    if SynthesisComponent.PRONUNCIATION in components and (
+        not entry.pronunciation_id or force
+    ):
         # TODO: Load provider data for pronunciation
         pron_provider_data: list[dict[str, Any]] = []
         word_tasks.append(
@@ -1113,11 +1157,17 @@ async def enhance_synthesized_entry(
                 logger.error(f"Failed to enhance {task_type}: {result}")
                 continue
 
-            if task_type == SynthesisComponent.PRONUNCIATION and isinstance(result, Pronunciation):
+            if task_type == SynthesisComponent.PRONUNCIATION and isinstance(
+                result, Pronunciation
+            ):
                 entry.pronunciation_id = str(result.id)
-            elif task_type == SynthesisComponent.ETYMOLOGY and isinstance(result, Etymology):
+            elif task_type == SynthesisComponent.ETYMOLOGY and isinstance(
+                result, Etymology
+            ):
                 entry.etymology = result
-            elif task_type == SynthesisComponent.WORD_FORMS and isinstance(result, list):
+            elif task_type == SynthesisComponent.WORD_FORMS and isinstance(
+                result, list
+            ):
                 entry.word_forms = cast(list[WordForm], result)
             elif task_type == SynthesisComponent.FACTS and isinstance(result, list):
                 entry.fact_ids = [str(fact.id) for fact in cast(list[Fact], result)]

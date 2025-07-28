@@ -34,7 +34,7 @@
 
             <!-- Synonyms -->
             <SynonymList
-                v-if="definition.synonyms"
+                v-if="shouldShowSynonyms"
                 :synonyms="definition.synonyms"
                 @synonym-click="$emit('searchWord', $event)"
             />
@@ -53,6 +53,8 @@ interface DefinitionItemProps {
     definition: TransformedDefinition;
     definitionIndex: number;
     isRegenerating: boolean;
+    isFirstInGroup?: boolean;
+    isAISynthesized?: boolean;
 }
 
 const store = useAppStore();
@@ -60,6 +62,16 @@ const props = defineProps<DefinitionItemProps>();
 
 // Check if we need separator (not the first definition in the overall list)
 const isSeparatorNeeded = computed(() => props.definitionIndex > 0);
+
+// For non-AI entries, only show synonyms on the first definition to avoid repetition
+const shouldShowSynonyms = computed(() => {
+    if (props.isAISynthesized !== false) {
+        // For AI entries or undefined, always show synonyms
+        return props.definition.synonyms && props.definition.synonyms.length > 0;
+    }
+    // For non-AI entries, only show on first definition
+    return props.isFirstInGroup && props.definition.synonyms && props.definition.synonyms.length > 0;
+});
 
 defineEmits<{
     'regenerate': [index: number];

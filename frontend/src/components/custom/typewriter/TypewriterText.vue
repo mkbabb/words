@@ -17,6 +17,7 @@ interface Props {
     loop?: boolean;
     cursorBlink?: boolean;
     startDelay?: number;
+    animationDelay?: number; // Delay between animation loops in milliseconds
     onComplete?: () => void;
 }
 
@@ -27,7 +28,8 @@ const props = withDefaults(defineProps<Props>(), {
     errorRate: 0.03,
     loop: false,
     cursorBlink: true,
-    startDelay: 0
+    startDelay: 0,
+    animationDelay: 0
 });
 
 const emit = defineEmits<{
@@ -54,6 +56,7 @@ const typewriter = useTypewriter({
     variance: props.variance,
     errorRate: props.errorRate,
     loop: props.loop,
+    animationDelay: props.animationDelay,
     onComplete: () => {
         props.onComplete?.();
         emit('complete');

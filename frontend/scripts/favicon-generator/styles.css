@@ -7,16 +7,33 @@
     --vertical-offset: -16px;
 }
 
+html {
+    background: transparent;
+}
+
 body {
     margin: 0;
     padding: 0;
     width: var(--size);
     height: var(--size);
-    background: var(--background);
-    border-radius: var(--border-radius);
+    background: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+}
+
+/* Create a rounded background layer */
+body::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--background);
+    border-radius: var(--border-radius);
+    z-index: -1;
 }
 
 .katex {
