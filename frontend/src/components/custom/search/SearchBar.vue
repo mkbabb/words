@@ -436,6 +436,16 @@ const handleFocus = () => {
     state.isFocused = true;
     emit('focus');
 
+    // Force textarea resize on focus
+    nextTick(() => {
+        if (searchInputComponent.value?.element?.value) {
+            const textarea = searchInputComponent.value.element.value;
+            textarea.style.height = 'auto';
+            const scrollHeight = textarea.scrollHeight;
+            textarea.style.height = `${scrollHeight}px`;
+        }
+    });
+
     // Restore search results if available
     if (
         store.sessionState?.searchResults?.length > 0 &&

@@ -85,9 +85,12 @@ const resizeTextarea = () => {
     // Get the scroll height (content height)
     const scrollHeight = textareaRef.value.scrollHeight;
     
+    // Ensure minimum height is respected
+    const minHeightValue = props.minHeight || 48;
+    
     // In AI mode, allow full expansion; otherwise limit to reasonable height
     const maxHeight = props.aiMode ? 400 : 200;
-    const finalHeight = Math.min(scrollHeight, maxHeight);
+    const finalHeight = Math.max(minHeightValue, Math.min(scrollHeight, maxHeight));
     
     // Set the textarea height directly
     textareaRef.value.style.height = `${finalHeight}px`;
@@ -132,6 +135,11 @@ watch(modelValue, () => {
 nextTick(() => {
     resizeTextarea();
 });
+
+// Also resize on mount to ensure proper initial state
+watch(() => props.minHeight, () => {
+    resizeTextarea();
+}, { immediate: true });
 
 // Props are used in template
 void props;

@@ -22,7 +22,7 @@
             />
 
             <!-- Gradient Separator -->
-            <hr class="my-2.5 border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30" />
+            <hr class="border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30" />
 
             <!-- Mode Content -->
             <CardContent class="space-y-4 px-4 sm:px-6">
