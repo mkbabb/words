@@ -171,7 +171,7 @@ jobs:
             
             # Run docker compose build and up
             docker compose -f docker-compose.yml -f docker-compose.prod.yml build
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile ssl up -d
             
             echo "Deployment completed!"
           ENDSSH

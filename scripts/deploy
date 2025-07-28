@@ -101,7 +101,7 @@ ENV_EOF
         # Build and deploy with Docker Compose
         echo "Building and deploying with Docker Compose..."
         docker compose -f docker-compose.yml -f docker-compose.prod.yml build
-        docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+        docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile ssl up -d
         
         # Show container status
         echo ""
