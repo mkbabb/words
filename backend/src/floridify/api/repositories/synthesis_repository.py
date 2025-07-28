@@ -18,7 +18,7 @@ class SynthesisCreate(BaseModel):
     definition_ids: list[str] = Field(default_factory=list)
     etymology: Etymology | None = None
     fact_ids: list[str] = Field(default_factory=list)
-    model_info: ModelInfo
+    model_info: ModelInfo | None = None
     source_provider_data_ids: list[str] = Field(default_factory=list)
 
 
@@ -126,7 +126,7 @@ class SynthesisRepository(
             fact_count=len(entry.fact_ids),
             completeness_score=completeness,
             last_updated=entry.updated_at,
-            model_version=getattr(entry.model_info, 'model', None) if entry.model_info else None,
+            model_version=entry.model_info.name if entry.model_info else None,
         )
 
     async def find_incomplete(self, limit: int = 100) -> list[SynthesizedDictionaryEntry]:

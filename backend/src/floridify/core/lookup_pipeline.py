@@ -12,7 +12,7 @@ from ..connectors.dictionary_com import DictionaryComConnector
 from ..connectors.oxford import OxfordConnector
 from ..connectors.wiktionary import WiktionaryConnector
 from ..constants import DictionaryProvider, Language
-from ..models.models import ProviderData, SynthesizedDictionaryEntry
+from ..models.models import ProviderData, SynthesizedDictionaryEntry, Etymology
 from ..storage.mongodb import get_synthesized_entry
 from ..utils.config import Config
 from ..utils.logging import (
@@ -202,11 +202,19 @@ async def lookup_word_pipeline(
                 # Try fallback if synthesis fails
                 return await _ai_fallback_lookup(best_match, force_refresh, state_tracker)
         else:
-            # When AI is disabled, we can't return a SynthesizedDictionaryEntry
-            logger.warning(
-                f"AI synthesis disabled, cannot return synthesized entry for '{best_match}'"
-            )
-            return None
+            # When AI is disabled, create a non-AI synthesized entry from provider data
+            logger.info(f"🔧 Creating non-AI synthesized entry for '{best_match}'")
+            
+            # In no-AI mode, only use the first provider's data
+            if providers_data:
+                return await _create_provider_mapped_entry(
+                    word=best_match,
+                    provider_data=providers_data[0],  # Use first provider only
+                    state_tracker=state_tracker,
+                )
+            else:
+                logger.warning(f"No provider data available for non-AI synthesis")
+                return None
 
     except Exception as e:
         logger.error(f"❌ Lookup pipeline failed for '{word}': {e}")
@@ -340,6 +348,56 @@ async def _synthesize_with_ai(
         return result
     except Exception as e:
         logger.error(f"❌ AI synthesis failed for '{word}': {e}")
+        return None
+
+
+@log_timing
+@log_stage("Provider Mapping", "🔄")
+async def _create_provider_mapped_entry(
+    word: str,
+    provider_data: ProviderData,
+    state_tracker: StateTracker | None = None,
+) -> SynthesizedDictionaryEntry | None:
+    """Create a synthesized entry from provider data without AI.
+    
+    Maps raw provider data directly to a synthesized entry format.
+    """
+    logger.info(f"📦 Creating provider-mapped entry for '{word}' from {provider_data.provider}")
+    
+    try:
+        # Extract etymology if available
+        etymology = None
+        if hasattr(provider_data, 'raw_data') and provider_data.raw_data:
+            raw_data = provider_data.raw_data
+            if 'etymology' in raw_data and raw_data['etymology']:
+                etymology = Etymology(text=raw_data['etymology'])
+        
+        # Create the synthesized entry without AI
+        synthesized_entry = SynthesizedDictionaryEntry(
+            word_id=provider_data.word_id,
+            pronunciation_id=provider_data.pronunciation_id,
+            definition_ids=provider_data.definition_ids,
+            etymology=provider_data.etymology or etymology,
+            fact_ids=[],  # No facts in non-AI mode
+            model_info=None,  # No AI model info
+            source_provider_data_ids=[str(provider_data.id)],
+        )
+        
+        # Save the entry
+        await synthesized_entry.save()
+        
+        logger.info(
+            f"✅ Created provider-mapped entry for '{word}' with "
+            f"{len(synthesized_entry.definition_ids)} definitions"
+        )
+        
+        if state_tracker:
+            await state_tracker.update_stage(Stages.STORAGE_COMPLETE)
+        
+        return synthesized_entry
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to create provider-mapped entry: {e}")
         return None
 
 

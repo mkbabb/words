@@ -46,6 +46,7 @@ export const useAppStore = defineStore('app', () => {
             selectedSources: ['wiktionary'] as string[],
             selectedLanguages: ['en'] as string[],
             showControls: false,
+            noAI: false,
             selectedWordlist: null as string | null,
             // Progressive sidebar state
             sidebarActiveCluster: '',
@@ -87,6 +88,10 @@ export const useAppStore = defineStore('app', () => {
                         if (!Array.isArray(parsed.selectedLanguages)) {
                             parsed.selectedLanguages = ['en'];
                         }
+                        // Validate noAI flag
+                        if (typeof parsed.noAI !== 'boolean') {
+                            parsed.noAI = false;
+                        }
                         // Validate accordion state
                         if (!parsed.sidebarAccordionState || typeof parsed.sidebarAccordionState !== 'object') {
                             parsed.sidebarAccordionState = {
@@ -107,6 +112,7 @@ export const useAppStore = defineStore('app', () => {
                             selectedSources: ['wiktionary'],
                             selectedLanguages: ['en'],
                             showControls: false,
+                            noAI: false,
                             selectedWordlist: null,
                             sidebarActiveCluster: '',
                             sidebarActivePartOfSpeech: '',

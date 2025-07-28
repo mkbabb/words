@@ -15,6 +15,7 @@ from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger
 from .batch_processor import batch_synthesis
 from .connector import OpenAIConnector
+from .constants import SynthesisComponent
 from .synthesis_functions import (
     cluster_definitions,
     enhance_definitions_parallel,
@@ -468,7 +469,7 @@ class DefinitionSynthesizer:
     async def regenerate_entry_components(
         self,
         entry_id: str,
-        components: set[str] | None = None,
+        components: set[SynthesisComponent] | None = None,
         state_tracker: StateTracker | None = None,
     ) -> SynthesizedDictionaryEntry | None:
         """Regenerate specific components of an existing synthesized dictionary entry.

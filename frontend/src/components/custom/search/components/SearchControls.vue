@@ -75,14 +75,47 @@
                 </div>
             </div>
 
-            <!-- Settings Row (DEBUG) -->
+            <!-- Actions Row -->
             <div
-                v-if="isDevelopment && searchMode === 'lookup'"
+                v-if="searchMode === 'lookup'"
                 class="border-t border-border/50 px-4 py-3"
             >
-                <h3 class="mb-3 text-sm font-medium">Settings</h3>
+                <h3 class="mb-3 text-sm font-medium">Actions</h3>
                 <div class="grid grid-cols-4 gap-2">
+                    <!-- Sidebar Toggle (Mobile Only) -->
                     <button
+                        v-if="isMobile"
+                        @click="$emit('toggle-sidebar')"
+                        class="hover-lift flex items-center justify-center rounded-lg bg-muted p-2 transition-all duration-200 hover:bg-muted/80"
+                        title="Toggle Sidebar"
+                    >
+                        <Menu 
+                            :size="16" 
+                            class="text-foreground/70 transition-colors duration-200"
+                        />
+                    </button>
+                    
+                    <!-- Force Refresh Toggle -->
+                    <button
+                        v-if="showRefreshButton"
+                        @click="$emit('toggle-refresh')"
+                        :class="[
+                            'hover-lift flex items-center justify-center rounded-lg p-2 transition-all duration-200',
+                            forceRefreshMode
+                                ? 'bg-primary/20 text-primary'
+                                : 'bg-muted hover:bg-muted/80 text-foreground/70'
+                        ]"
+                        :title="forceRefreshMode ? 'Force refresh mode ON' : 'Toggle force refresh mode'"
+                    >
+                        <RefreshCw 
+                            :size="16" 
+                            class="transition-colors duration-200"
+                        />
+                    </button>
+                    
+                    <!-- Clear Storage (Debug) -->
+                    <button
+                        v-if="isDevelopment"
                         @click="$emit('clear-storage')"
                         class="hover-lift flex items-center justify-center rounded-lg bg-red-50 dark:bg-red-500/10 p-2 text-red-600 dark:text-red-500 transition-all duration-200 hover:bg-red-100 dark:hover:bg-red-500/20"
                         title="Clear All Storage"
@@ -120,8 +153,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { Trash2 } from 'lucide-vue-next';
+import { ref, computed } from 'vue';
+import { Trash2, Menu, RefreshCw } from 'lucide-vue-next';
 import { Button } from '@/components/ui';
 import { BouncyToggle } from '@/components/custom/animation';
 import { DICTIONARY_SOURCES, LANGUAGES } from '../constants/sources';
@@ -131,6 +164,8 @@ interface SearchControlsProps {
     show: boolean;
     aiSuggestions: string[];
     isDevelopment: boolean;
+    showRefreshButton?: boolean;
+    forceRefreshMode?: boolean;
 }
 
 defineProps<SearchControlsProps>();
@@ -144,7 +179,12 @@ const emit = defineEmits<{
     'word-select': [word: string];
     'clear-storage': [];
     'interaction': [];
+    'toggle-sidebar': [];
+    'toggle-refresh': [];
 }>();
+
+// Check if mobile
+const isMobile = computed(() => window.innerWidth < 768);
 
 // Helper functions for toggling
 const toggleSource = (sourceId: string) => {

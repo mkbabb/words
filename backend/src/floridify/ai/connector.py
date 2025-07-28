@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 from openai import AsyncOpenAI
 from pydantic import BaseModel
@@ -203,7 +203,7 @@ class OpenAIConnector:
                     f"in {total_duration:.2f}s (tokens: {token_usage.get('total_tokens', 'N/A')})"
                 )
 
-                return cast(T, result)
+                return result
 
             except Exception as e:
                 retry_count += 1

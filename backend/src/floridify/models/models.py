@@ -166,7 +166,7 @@ class SynthesizedDictionaryEntry(Document, BaseMetadata):
     fact_ids: list[str] = []  # FK to Fact documents
 
     # Synthesis metadata
-    model_info: ModelInfo
+    model_info: ModelInfo | None = None  # Optional for non-AI synthesized entries
     source_provider_data_ids: list[str] = []  # FK to ProviderData documents
 
     # Access tracking

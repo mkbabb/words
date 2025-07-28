@@ -1,7 +1,7 @@
 <template>
   <div
     :class="[
-      'card flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground relative',
+      'card flex flex-col gap-6 rounded-xl border bg-card py-4 sm:py-6 text-card-foreground relative',
       textureClasses,
       className,
     ]"

@@ -68,7 +68,9 @@
                         :suggestion="state.autocompleteText"
                         :padding-left="iconOpacity > 0.1 ? '1rem' : '1.5rem'"
                         :padding-right="
-                            state.expandButtonVisible
+                            state.query.length > 0
+                                ? '5rem'
+                                : state.expandButtonVisible
                                 ? '3rem'
                                 : iconOpacity > 0.1
                                   ? '1rem'
@@ -94,7 +96,9 @@
                         "
                         :style="{
                             paddingLeft: iconOpacity > 0.1 ? '1rem' : '1.5rem',
-                            paddingRight: state.expandButtonVisible
+                            paddingRight: state.query.length > 0
+                                ? '5rem'
+                                : state.expandButtonVisible
                                 ? '3rem'
                                 : iconOpacity > 0.1
                                   ? '1rem'
@@ -115,6 +119,32 @@
                         @input-click="handleInputClick"
                     />
 
+                    <!-- Clear Button -->
+                    <Transition
+                        enter-active-class="transition-all duration-200 ease-out"
+                        leave-active-class="transition-all duration-200 ease-in"
+                        enter-from-class="opacity-0 scale-90"
+                        leave-to-class="opacity-0 scale-90"
+                    >
+                        <button
+                            v-if="state.query.length > 0"
+                            @click.stop="clearQuery"
+                            :class="[
+                                'absolute right-2 top-1/2 -translate-y-1/2 z-20 rounded-md p-1 transition-all duration-200',
+                                'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
+                                'bg-muted/50 hover:bg-muted/80'
+                            ]"
+                            title="Clear search"
+                        >
+                            <X
+                                :class="[
+                                    'h-4 w-4',
+                                    'text-foreground/50 hover:text-foreground/70'
+                                ]"
+                            />
+                        </button>
+                    </Transition>
+
                     <!-- Expand Button -->
                     <Transition
                         enter-active-class="transition-all duration-200 ease-out"
@@ -123,7 +153,7 @@
                         leave-to-class="opacity-0 scale-90"
                     >
                         <button
-                            v-if="state.expandButtonVisible && state.scrollProgress < 0.3"
+                            v-if="state.expandButtonVisible && state.scrollProgress < 0.3 && state.query.length === 0"
                             :class="[
                                 'absolute right-2 bottom-2 z-20 rounded-md p-1 transition-all duration-200',
                                 'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
@@ -150,55 +180,13 @@
                     </Transition>
                 </div>
 
-                <!-- Controls Button Group -->
-                <div 
-                    class="flex items-center gap-1 flex-shrink-0"
-                    :style="{
-                        opacity: iconOpacity,
-                        transform: `scale(${0.9 + iconOpacity * 0.1})`,
-                        transition: 'all 300ms ease-out'
-                    }"
-                >
-                    <!-- Regenerate Button -->
-                    <button
-                        v-if="store.currentEntry && state.searchMode === 'lookup'"
-                        @click="handleForceRegenerate"
-                        @mouseenter="regenerateRotation += 180"
-                        @mouseleave="regenerateRotation -= 180"
-                        :class="[
-                            'flex h-10 w-10 items-center justify-center rounded-lg',
-                            'transition-all duration-200 ease-out',
-                            state.isAIQuery
-                                ? 'hover:bg-amber-100/60 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                                : 'hover:bg-muted/50',
-                            state.forceRefreshMode && state.isAIQuery
-                                ? 'bg-amber-200/60 text-amber-800 dark:bg-amber-800/40 dark:text-amber-200'
-                                : state.forceRefreshMode
-                                ? 'bg-primary/20 text-primary'
-                                : ''
-                        ]"
-                        :title="
-                            state.forceRefreshMode
-                                ? 'Force refresh mode ON - Next lookup will regenerate'
-                                : 'Toggle force refresh mode'
-                        "
-                    >
-                        <RefreshCw
-                            :size="18"
-                            :style="{
-                                transform: `rotate(${regenerateRotation}deg)`,
-                                transition: 'transform 700ms cubic-bezier(0.175, 0.885, 0.32, 1.4)',
-                            }"
-                        />
-                    </button>
-
-                    <!-- Hamburger Button -->
-                    <HamburgerIcon
-                        :is-open="state.showControls"
-                        :ai-mode="state.isAIQuery"
-                        @toggle="state.showControls = !state.showControls"
-                    />
-                </div>
+                <!-- Hamburger Button -->
+                <HamburgerIcon
+                    :is-open="state.showControls"
+                    :ai-mode="state.isAIQuery"
+                    :opacity="iconOpacity"
+                    @toggle="state.showControls = !state.showControls"
+                />
 
                 <!-- Progress Bar -->
                 <!-- <div
@@ -227,9 +215,13 @@
                     v-model:selected-languages="state.selectedLanguages"
                     :ai-suggestions="state.aiSuggestions"
                     :is-development="state.isDevelopment"
+                    :show-refresh-button="!!store.currentEntry && state.searchMode === 'lookup'"
+                    :force-refresh-mode="state.forceRefreshMode"
                     @word-select="selectWord"
                     @clear-storage="clearAllStorage"
                     @interaction="handleSearchAreaInteraction"
+                    @toggle-sidebar="store.toggleSidebar()"
+                    @toggle-refresh="handleForceRegenerate"
                 />
 
                 <!-- Search Results Container -->
@@ -266,7 +258,7 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '@/stores';
 import type { SearchResult } from '@/types';
 import { showError } from '@/plugins/toast';
-import { Maximize2, RefreshCw } from 'lucide-vue-next';
+import { Maximize2, RefreshCw, X } from 'lucide-vue-next';
 import { HamburgerIcon } from '@/components/custom/icons';
 
 // Import components
@@ -661,6 +653,15 @@ const selectWord = (word: string) => {
 const handleForceRegenerate = () => {
     handleSearchAreaInteraction();
     state.forceRefreshMode = !state.forceRefreshMode;
+};
+
+const clearQuery = () => {
+    state.query = '';
+    state.searchResults = [];
+    state.showResults = false;
+    state.isAIQuery = false;
+    state.showSparkle = false;
+    searchInputComponent.value?.focus();
 };
 
 const clearAllStorage = () => {
