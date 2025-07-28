@@ -67,10 +67,11 @@ export interface Etymology {
 
 // Model Info (for AI-generated content)
 export interface ModelInfo {
-  provider: string;
-  model_name: string;
-  timestamp: string;
-  parameters?: Record<string, any>;
+  name: string;
+  confidence: number;
+  temperature: number;
+  generation_count: number;
+  last_generated: string;
 }
 
 // Literature Source
@@ -155,7 +156,7 @@ export interface SynthesizedDictionaryEntry extends BaseMetadata {
   definitions?: Definition[]; // Populated in responses
   etymology?: Etymology;
   fact_ids: string[];
-  model_info: ModelInfo;
+  model_info?: ModelInfo | null;
   source_provider_data_ids: string[];
   accessed_at?: string;
   access_count: number;
@@ -208,6 +209,7 @@ export interface LookupResponse {
   definitions: DefinitionResponse[];
   last_updated: string;
   pipeline_metrics?: PipelineMetrics;
+  model_info?: ModelInfo | null;
 }
 
 export interface DefinitionResponse extends Definition {

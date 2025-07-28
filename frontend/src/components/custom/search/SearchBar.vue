@@ -127,7 +127,7 @@
                         leave-to-class="opacity-0 scale-90"
                     >
                         <button
-                            v-if="state.query.length > 0"
+                            v-if="state.query.length > 0 && state.isFocused"
                             @click.stop="clearQuery"
                             :class="[
                                 'absolute right-2 top-1/2 -translate-y-1/2 z-20 rounded-md p-1 transition-all duration-200',
