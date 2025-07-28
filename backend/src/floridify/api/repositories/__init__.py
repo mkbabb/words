@@ -21,6 +21,15 @@ from .synthesis_repository import (
     SynthesisUpdate,
 )
 from .word_repository import WordCreate, WordFilter, WordRepository, WordUpdate
+from .wordlist_repository import (
+    WordListCreate,
+    WordListFilter,
+    WordListRepository,
+    WordListUpdate,
+    WordAddRequest,
+    WordReviewRequest,
+    StudySessionRequest,
+)
 
 __all__ = [
     "WordRepository",
@@ -44,4 +53,11 @@ __all__ = [
     "SynthesisUpdate",
     "SynthesisFilter",
     "ComponentStatus",
+    "WordListRepository",
+    "WordListCreate",
+    "WordListUpdate",
+    "WordListFilter",
+    "WordAddRequest",
+    "WordReviewRequest",
+    "StudySessionRequest",
 ]

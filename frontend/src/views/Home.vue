@@ -95,6 +95,21 @@
                         </div>
                     </div>
 
+                    <!-- Word of the Day Content -->
+                    <div
+                        v-else-if="store.searchMode === 'word-of-the-day'"
+                        key="word-of-the-day"
+                    >
+                        <div class="space-y-8">
+                            <!-- Word of the Day content will go here -->
+                            <div
+                                class="py-16 text-center text-muted-foreground"
+                            >
+                                Word of the Day mode coming soon...
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Stage Content -->
                     <div v-else-if="store.searchMode === 'stage'" key="stage">
                         <div class="space-y-8">

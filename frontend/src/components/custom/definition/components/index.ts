@@ -1,7 +1,7 @@
 export { default as AnimatedTitle } from './AnimatedTitle.vue';
 export { default as DefinitionCluster } from './DefinitionCluster.vue';
 export { default as DefinitionItem } from './DefinitionItem.vue';
-export { default as EntryImage } from './EntryImage.vue';
+export { default as ImageCarousel } from './ImageCarousel.vue';
 export { default as Etymology } from './Etymology.vue';
 export { default as ExampleList } from './ExampleList.vue';
 export { default as ProviderIcons } from './ProviderIcons.vue';

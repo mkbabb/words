@@ -1,7 +1,7 @@
 Query: {{ query }}
 
-Valid: word requests (meanings/descriptions/fill-in-blanks/characteristics)
-Invalid: unrelated/technical/inappropriate/non-vocabulary
+Valid: word requests (meanings/descriptions/fill-in-blanks/characteristics) **ONLY**: nothing else.
+
 
 Return:
 - **is_valid**: true/false

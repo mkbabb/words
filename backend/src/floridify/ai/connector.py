@@ -37,6 +37,7 @@ from .models import (
     UsageNoteResponse,
     WordFormResponse,
     WordSuggestionResponse,
+    WordOfTheDayResponse,
 )
 from .model_selection import ModelTier, get_model_for_task, get_temperature_for_model
 from .templates import PromptTemplateManager
@@ -979,4 +980,46 @@ class OpenAIConnector:
             return result
         except Exception as e:
             logger.error(f"❌ Definition deduplication failed for '{word}': {e}")
+            raise
+
+    async def generate_word_of_the_day(
+        self,
+        context: str | None = None,
+        previous_words: list[str] | None = None,
+    ) -> WordOfTheDayResponse:
+        """Generate a compelling Word of the Day.
+        
+        Args:
+            context: Optional context to steer word selection
+            previous_words: Previously used words to avoid
+            
+        Returns:
+            WordOfTheDayResponse with educational word content
+        """
+        logger.info(
+            f"📖 Generating Word of the Day"
+            f"{f' with context: {context}' if context else ''}"
+            f"{f' avoiding {len(previous_words)} previous words' if previous_words else ''}"
+        )
+        
+        prompt = self.template_manager.render_template(
+            "generate/word_of_the_day",
+            context=context,
+            previous_words=previous_words,
+        )
+        
+        try:
+            result = await self._make_structured_request(
+                prompt, 
+                WordOfTheDayResponse, 
+                task_name="generate_word_of_the_day"
+            )
+            
+            logger.success(
+                f"✨ Generated Word of the Day: '{result.word}' "
+                f"({result.difficulty_level}, confidence: {result.confidence:.1%})"
+            )
+            return result
+        except Exception as e:
+            logger.error(f"❌ Word of the Day generation failed: {e}")
             raise

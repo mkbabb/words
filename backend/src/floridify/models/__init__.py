@@ -31,6 +31,14 @@ from .relationships import (
     WordRelationship,
 )
 
+# Word of the Day models
+from .word_of_the_day import (
+    NotificationFrequency,
+    WordOfTheDayBatch,
+    WordOfTheDayConfig,
+    WordOfTheDayEntry,
+)
+
 __all__ = [
     # Base models
     "BaseMetadata",
@@ -55,6 +63,11 @@ __all__ = [
     "MeaningCluster",
     "WordRelationship",
     "PhrasalExpression",
+    # Word of the Day
+    "NotificationFrequency",
+    "WordOfTheDayBatch",
+    "WordOfTheDayConfig",
+    "WordOfTheDayEntry",
     # Constants
     "LiteratureSourceType",
 ]

@@ -68,6 +68,7 @@ export const useAppStore = defineStore('app', () => {
             sidebarAccordionState: {
                 lookup: [] as string[],
                 wordlist: [] as string[],
+                'word-of-the-day': [] as string[],
                 stage: [] as string[]
             },
         },
@@ -87,7 +88,7 @@ export const useAppStore = defineStore('app', () => {
                         }
                         // Validate search mode
                         if (
-                            !['lookup', 'wordlist', 'stage'].includes(
+                            !['lookup', 'wordlist', 'word-of-the-day', 'stage'].includes(
                                 parsed.searchMode
                             )
                         ) {
@@ -794,10 +795,12 @@ export const useAppStore = defineStore('app', () => {
             return;
         }
         
-        // Cycle through modes: lookup -> wordlist -> stage -> lookup
+        // Cycle through modes: lookup -> wordlist -> word-of-the-day -> stage -> lookup
         if (searchMode.value === 'lookup') {
             searchMode.value = 'wordlist';
         } else if (searchMode.value === 'wordlist') {
+            searchMode.value = 'word-of-the-day';
+        } else if (searchMode.value === 'word-of-the-day') {
             searchMode.value = 'stage';
         } else {
             searchMode.value = 'lookup';
@@ -1202,6 +1205,39 @@ export const useAppStore = defineStore('app', () => {
                 return response;
             } catch (error) {
                 console.error('Failed to fetch definition:', error);
+                throw error;
+            }
+        },
+        
+        async refreshSynthEntry(synthEntryId: string) {
+            try {
+                // Fetch the updated synth entry directly
+                const response = await fetch(`/api/v1/synth-entries/${synthEntryId}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch synth entry: ${response.status}`);
+                }
+                
+                const synthEntry = await response.json();
+                
+                // If this synth entry belongs to the current entry, refresh the whole word
+                if (currentEntry.value?.synth_entry_id === synthEntryId) {
+                    await getDefinition(currentEntry.value.word, false);
+                }
+                
+                showNotification({
+                    type: 'success',
+                    message: 'Images updated successfully',
+                    duration: 3000,
+                });
+                
+                return synthEntry;
+            } catch (error) {
+                console.error('Failed to refresh synth entry:', error);
+                showNotification({
+                    type: 'error',
+                    message: 'Failed to refresh images',
+                    duration: 5000,
+                });
                 throw error;
             }
         },

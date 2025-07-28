@@ -29,7 +29,9 @@ from .routers import (
     search,
     suggestions,
     synth_entries,
+    word_of_the_day,
     words,
+    wordlists,
 )
 
 # Configure logging for the application
@@ -110,6 +112,8 @@ app.include_router(definitions.router, prefix=f"{API_V1_PREFIX}/definitions", ta
 app.include_router(examples.router, prefix=API_V1_PREFIX, tags=["examples"])
 app.include_router(batch.router, prefix=f"{API_V1_PREFIX}/batch", tags=["batch"])
 app.include_router(words.router, prefix=f"{API_V1_PREFIX}/words", tags=["words"])
+app.include_router(wordlists.router, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
+app.include_router(word_of_the_day.router, prefix=f"{API_V1_PREFIX}/word-of-day", tags=["word-of-day"])
 app.include_router(audio.router, prefix=API_V1_PREFIX, tags=["audio"])
 app.include_router(images.router, prefix=f"{API_V1_PREFIX}/images", tags=["images"])
 app.include_router(synth_entries.router, prefix=f"{API_V1_PREFIX}/synth-entries", tags=["synth-entries"])

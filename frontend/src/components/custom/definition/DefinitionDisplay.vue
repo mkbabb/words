@@ -12,12 +12,15 @@
                 @toggle-edit-mode="editModeEnabled = !editModeEnabled"
             />
             
-            <!-- First Image Display -->
-            <EntryImage 
-                :image="firstImage"
+            <!-- Image Carousel Display -->
+            <ImageCarousel 
+                :images="allImages"
                 :fallbackText="entry.word"
+                :editMode="editModeEnabled"
+                :synthEntryId="entry.synth_entry_id"
                 @image-error="handleImageError"
                 @image-click="handleImageClick"
+                @images-updated="handleImagesUpdated"
             />
 
             <!-- Header -->
@@ -66,6 +69,7 @@
                                     :editModeEnabled="editModeEnabled"
                                     @regenerate="handleRegenerateExamples"
                                     @searchWord="store.searchWord"
+                                    @addToWordlist="handleAddToWordlist"
                                 />
                             </DefinitionCluster>
                         </template>
@@ -102,6 +106,13 @@
                 </div>
             </div>
         </ThemedCard>
+        
+        <!-- Wordlist Selection Modal -->
+        <WordlistSelectionModal
+            v-model="showWordlistModal"
+            :word="wordToAdd"
+            @word-added="handleWordAddedToList"
+        />
     </div>
 </template>
 
@@ -117,10 +128,11 @@ import {
     DefinitionItem,
     ThesaurusView,
     Etymology,
-    EntryImage
+    ImageCarousel
 } from './components';
 import { ThemedCard } from '@/components/custom/card';
-import { useDefinitionGroups, useAnimationCycle, useProviders } from './composables';
+import { WordlistSelectionModal } from '@/components/custom/wordlist';
+import { useDefinitionGroups, useAnimationCycle, useProviders, useImageManagement } from './composables';
 import { normalizeEtymology } from '@/utils/guards';
 
 // Store
@@ -132,6 +144,8 @@ const animationKey = ref(0);
 const isMounted = ref(false);
 const showThemeDropdown = ref(false);
 const editModeEnabled = ref(false);
+const showWordlistModal = ref(false);
+const wordToAdd = ref('');
 
 // Computed properties
 const entry = computed(() => store.currentEntry);
@@ -147,42 +161,11 @@ const normalizedEtymology = computed(() => {
     return normalizeEtymology(entry.value?.etymology);
 });
 
-const firstImage = computed(() => {
-    let image = null;
-    
-    // First check synth entry images - prefer ones with descriptions
-    if (entry.value?.images && entry.value.images.length > 0) {
-        // Try to find an image with a description first
-        image = entry.value.images.find(img => img.description) || entry.value.images[0];
-    }
-    
-    // Then check definition images
-    if (!image && entry.value?.definitions) {
-        for (const def of entry.value.definitions) {
-            if (def.images && def.images.length > 0) {
-                // Try to find an image with a description first
-                image = def.images.find(img => img.description) || def.images[0];
-                break;
-            }
-        }
-    }
-    
-    // If we have an image, construct the API URL
-    if (image && image.id) {
-        const imageWithUrl = {
-            ...image,
-            url: `/api/v1/images/${image.id}/content`
-        };
-        return imageWithUrl;
-    }
-    
-    return image;
-});
-
 // Composables
 const { groupedDefinitions } = useDefinitionGroups(entry);
 const { startCycle, stopCycle } = useAnimationCycle(() => animationKey.value++);
 const { usedProviders } = useProviders(entry);
+const { allImages, handleImageClick: baseHandleImageClick, handleImageError: baseHandleImageError } = useImageManagement(entry);
 
 
 
@@ -209,16 +192,14 @@ const handleRegenerateExamples = async (definitionIndex: number) => {
     }
 };
 
-const handleImageError = (event: Event) => {
-    console.error('Failed to load image:', (event.target as HTMLImageElement).src);
-    // Could hide the image or show a placeholder
-    (event.target as HTMLImageElement).style.display = 'none';
-};
+// Wrap the base handlers to add any additional logic if needed
+const handleImageError = baseHandleImageError;
+const handleImageClick = baseHandleImageClick;
 
-const handleImageClick = () => {
-    if (firstImage.value?.url) {
-        // Open image in new tab
-        window.open(firstImage.value.url, '_blank');
+const handleImagesUpdated = async (newImages: any[]) => {
+    // Refresh the current entry to get updated image data
+    if (entry.value?.synth_entry_id) {
+        await store.refreshSynthEntry(entry.value.synth_entry_id);
     }
 };
 
@@ -234,6 +215,17 @@ const handleClusterNameUpdate = async (clusterId: string, newName: string) => {
             meaning_cluster_name: newName
         });
     }
+};
+
+const handleAddToWordlist = (word: string) => {
+    wordToAdd.value = word;
+    showWordlistModal.value = true;
+};
+
+const handleWordAddedToList = (wordlist: any, word: string) => {
+    // Show success notification or handle the addition result
+    console.log(`Successfully added "${word}" to wordlist "${wordlist.name}"`);
+    // TODO: Show success toast notification
 };
 
 // Keyboard shortcuts using VueUse magic keys

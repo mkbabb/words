@@ -459,6 +459,19 @@ class DeduplicationResponse(BaseModel):
     confidence: float = Field(description="Confidence in deduplication (0.0-1.0)")
 
 
+class WordOfTheDayResponse(BaseModel):
+    """Response for Word of the Day generation."""
+
+    word: str = Field(description="The selected word")
+    definition: str = Field(description="Clear, concise definition")
+    etymology: str = Field(description="Brief origin and historical development")
+    example_usage: str = Field(description="Natural sentence demonstrating proper usage")
+    fascinating_fact: str = Field(description="Interesting linguistic, cultural, or historical insight")
+    difficulty_level: str = Field(description="Difficulty level: intermediate or advanced")
+    memorable_aspect: str = Field(description="What makes this word particularly worth learning")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in word selection")
+
+
 # Rebuild models with forward references
 ProviderDataResponse.model_rebuild()
 SynthesisResponse.model_rebuild()
