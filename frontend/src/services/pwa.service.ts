@@ -94,7 +94,7 @@ export class PWAService {
     try {
       await this.registration!.sync.register('sync-searches');
       console.log('Background sync registered');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Background sync registration failed:', error);
     }
   }

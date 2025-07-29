@@ -6,7 +6,8 @@ from typing import Any
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ...ai.connector import get_openai_connector, OpenAIConnector
+from ...ai.factory import get_openai_connector
+from ...ai.connector import OpenAIConnector
 from ...models import (
     NotificationFrequency,
     WordOfTheDayBatch,
@@ -148,7 +149,7 @@ async def send_current_word(
 async def list_word_batches(
     active_only: bool = Query(False, description="Show only active batches"),
     limit: int = Query(10, ge=1, le=50),
-) -> ListResponse:
+) -> ListResponse[dict[str, Any]]:
     """List Word of the Day batches.
     
     Query Parameters:
@@ -313,7 +314,7 @@ async def get_word_history(
     batch_id: PydanticObjectId = Query(None, description="Filter by batch ID"),
     days_back: int = Query(30, ge=1, le=365, description="Days of history to retrieve"),
     limit: int = Query(50, ge=1, le=200),
-) -> ListResponse:
+) -> ListResponse[dict[str, Any]]:
     """Get history of sent words.
     
     Query Parameters:
@@ -443,7 +444,7 @@ async def _generate_new_batch(
     context_params = batch.get_context_for_generation()
     
     # Generate words one by one to ensure variety
-    new_words = []
+    new_words: list[WordOfTheDayEntry] = []
     for _ in range(generation_count):
         try:
             # Update previous words to include newly generated ones

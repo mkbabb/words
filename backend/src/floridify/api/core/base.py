@@ -18,6 +18,7 @@ T = TypeVar("T", bound=Document)
 CreateSchema = TypeVar("CreateSchema", bound=BaseModel)
 UpdateSchema = TypeVar("UpdateSchema", bound=BaseModel)
 ResponseT = TypeVar("ResponseT")
+ListT = TypeVar("ListT")  # Generic type for list responses
 
 
 class ErrorDetail(BaseModel):
@@ -77,12 +78,12 @@ class FieldSelection(BaseModel):
         return data
 
 
-class ListResponse(BaseModel, Generic[T]):
+class ListResponse(BaseModel, Generic[ListT]):
     """Standard list response with pagination metadata."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    items: list[Any]
+    items: list[ListT]
     total: int
     offset: int
     limit: int

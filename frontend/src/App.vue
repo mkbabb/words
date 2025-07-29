@@ -19,10 +19,6 @@ import { Toaster } from '@/components/ui/toast';
 import { PWAInstallPrompt, PWANotificationPrompt } from '@/components/custom/pwa';
 import NotificationToast from '@/components/custom/NotificationToast.vue';
 import { useIOSPWA, usePWA } from '@/composables';
-import { useAppStore } from '@/stores';
-
-// Store
-const store = useAppStore();
 
 // Initialize PWA features
 const { isIOS, isStandalone, handleSwipeNavigation, handleViewportResize } = useIOSPWA();

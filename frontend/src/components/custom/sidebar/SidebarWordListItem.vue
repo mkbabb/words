@@ -57,7 +57,7 @@
     </div>
     
     <!-- Action menu -->
-    <div class="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+    <div class="ml-2 opacity-60 hover:opacity-100 transition-opacity duration-200">
       <DropdownMenu>
         <DropdownMenuTrigger as-child @click.stop>
           <Button variant="ghost" size="sm" class="h-6 w-6 p-0">
@@ -65,11 +65,6 @@
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem @click.stop="$emit('select', wordlist)">
-            <BookOpen class="h-3 w-3 mr-2" />
-            Open
-          </DropdownMenuItem>
-          
           <DropdownMenuItem v-if="!isPublic" @click.stop="$emit('edit', wordlist)">
             <Edit2 class="h-3 w-3 mr-2" />
             Edit
@@ -100,7 +95,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { 
-  BookOpen,
   Copy,
   Download,
   Edit2,

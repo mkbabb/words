@@ -11,7 +11,7 @@ import type {
     VocabularySuggestion,
     WordSuggestionResponse,
 } from '@/types';
-import { dictionaryApi } from '@/utils/api';
+import { dictionaryApi, wordlistApi } from '@/utils/api';
 import { generateId, normalizeWord } from '@/utils';
 
 export const useAppStore = defineStore('app', () => {
@@ -71,6 +71,23 @@ export const useAppStore = defineStore('app', () => {
                 'word-of-the-day': [] as string[],
                 stage: [] as string[]
             },
+            // Wordlist filters
+            wordlistFilters: {
+                showBronze: true,
+                showSilver: true, 
+                showGold: true,
+                showHotOnly: false,
+                showDueOnly: false,
+            },
+            // Wordlist chunking
+            wordlistChunking: {
+                byMastery: false,
+                byDate: false,
+                byLastVisited: false,
+                byFrequency: false,
+            },
+            // Wordlist sorting
+            wordlistSortCriteria: [] as any[],
         },
         undefined,
         {
@@ -114,6 +131,29 @@ export const useAppStore = defineStore('app', () => {
                                 stage: []
                             };
                         }
+                        // Validate wordlist filters
+                        if (!parsed.wordlistFilters || typeof parsed.wordlistFilters !== 'object') {
+                            parsed.wordlistFilters = {
+                                showBronze: true,
+                                showSilver: true,
+                                showGold: true,
+                                showHotOnly: false,
+                                showDueOnly: false,
+                            };
+                        }
+                        // Validate wordlist chunking
+                        if (!parsed.wordlistChunking || typeof parsed.wordlistChunking !== 'object') {
+                            parsed.wordlistChunking = {
+                                byMastery: false,
+                                byDate: false,
+                                byLastVisited: false,
+                                byFrequency: false,
+                            };
+                        }
+                        // Validate wordlist sort criteria
+                        if (!Array.isArray(parsed.wordlistSortCriteria)) {
+                            parsed.wordlistSortCriteria = [];
+                        }
                         return parsed;
                     } catch {
                         return {
@@ -135,6 +175,20 @@ export const useAppStore = defineStore('app', () => {
                                 wordlist: [],
                                 stage: []
                             },
+                            wordlistFilters: {
+                                showBronze: true,
+                                showSilver: true,
+                                showGold: true,
+                                showHotOnly: false,
+                                showDueOnly: false,
+                            },
+                            wordlistChunking: {
+                                byMastery: false,
+                                byDate: false,
+                                byLastVisited: false,
+                                byFrequency: false,
+                            },
+                            wordlistSortCriteria: [],
                         };
                     }
                 },
@@ -145,7 +199,13 @@ export const useAppStore = defineStore('app', () => {
 
     // Persisted Session State - Everything about search
     const sessionState = useStorage('session-state', {
-        searchQuery: '',
+        // Mode-specific search queries
+        searchQueries: {
+            lookup: '',
+            wordlist: '',
+            wordOfTheDay: '',
+            stage: ''
+        },
         searchCursorPosition: 0,
         searchSelectedIndex: 0,
         searchResults: [] as SearchResult[],
@@ -157,11 +217,17 @@ export const useAppStore = defineStore('app', () => {
         wordSuggestions: null as WordSuggestionResponse | null,
     });
 
-    // Create refs that sync with persisted state
+    // Create refs that sync with persisted state - mode-specific search queries
     const searchQuery = computed({
-        get: () => sessionState.value.searchQuery,
+        get: () => {
+            const mode = searchMode.value === 'word-of-the-day' ? 'wordOfTheDay' : searchMode.value;
+            return sessionState.value.searchQueries?.[mode] || '';
+        },
         set: (value) => {
-            sessionState.value.searchQuery = value;
+            const mode = searchMode.value === 'word-of-the-day' ? 'wordOfTheDay' : searchMode.value;
+            if (sessionState.value.searchQueries) {
+                sessionState.value.searchQueries[mode] = value;
+            }
         },
     });
 
@@ -275,6 +341,27 @@ export const useAppStore = defineStore('app', () => {
         get: () => uiState.value.sidebarActivePartOfSpeech,
         set: (value) => {
             uiState.value.sidebarActivePartOfSpeech = value;
+        },
+    });
+
+    const wordlistFilters = computed({
+        get: () => uiState.value.wordlistFilters,
+        set: (value) => {
+            uiState.value.wordlistFilters = value;
+        },
+    });
+
+    const wordlistChunking = computed({
+        get: () => uiState.value.wordlistChunking,
+        set: (value) => {
+            uiState.value.wordlistChunking = value;
+        },
+    });
+
+    const wordlistSortCriteria = computed({
+        get: () => uiState.value.wordlistSortCriteria,
+        set: (value) => {
+            uiState.value.wordlistSortCriteria = value;
         },
     });
 
@@ -415,7 +502,29 @@ export const useAppStore = defineStore('app', () => {
         if (!query.trim()) return [];
 
         try {
-            const results = await dictionaryApi.searchWord(query);
+            let results: SearchResult[] = [];
+            
+            // Handle different search modes
+            if (searchMode.value === 'wordlist' && selectedWordlist.value) {
+                // Search within the selected wordlist using corpus API
+                const corpusResults = await wordlistApi.searchWordlist(
+                    selectedWordlist.value,
+                    query,
+                    { max_results: 20, min_score: 0.6 }
+                );
+                
+                // Transform corpus results to SearchResult format
+                results = corpusResults.data.results?.map((result: any) => ({
+                    word: result.word,
+                    score: result.score,
+                    source_method: 'corpus' as const,
+                    highlight_snippet: result.context || '',
+                })) || [];
+            } else {
+                // Default dictionary search
+                results = await dictionaryApi.searchWord(query);
+            }
+            
             searchResults.value = results;
 
             // Update persisted search results
@@ -863,7 +972,7 @@ export const useAppStore = defineStore('app', () => {
                 const def = currentEntry.value.definitions[definitionIndex];
                 // Replace only generated examples, keep literature ones
                 const literatureExamples = def.examples?.filter(ex => ex.type === 'literature') || [];
-                def.examples = [...response.examples, ...literatureExamples];
+                def.examples = [...(response.examples as any[]), ...literatureExamples];
             }
 
             // Also update in lookup history
@@ -888,7 +997,7 @@ export const useAppStore = defineStore('app', () => {
         try {
             // Regenerate examples for each definition
             const promises = currentEntry.value.definitions.map((def, index) =>
-                regenerateExamples(index, def.definition)
+                regenerateExamples(index, def.text)
             );
 
             await Promise.all(promises);
@@ -1054,6 +1163,9 @@ export const useAppStore = defineStore('app', () => {
         sidebarActiveCluster,
         sidebarActivePartOfSpeech,
         sidebarAccordionState,
+        wordlistFilters,
+        wordlistChunking,
+        wordlistSortCriteria,
         // Notifications
         notifications,
         sessionStartTime,

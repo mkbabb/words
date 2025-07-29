@@ -41,112 +41,58 @@
     <!-- Gradient separator -->
     <hr class="border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent" />
 
-    <!-- Accordion for wordlist sections -->
-    <Accordion 
-      type="multiple" 
-      v-model="accordionValue"
-      class="w-full"
-    >
-      <!-- My Wordlists -->
-      <SidebarSection
-        title="My Wordlists"
-        value="my-wordlists"
-        :items="userWordlists"
-        :count="userWordlists.length"
-        :icon="FileText"
-        empty-message="No wordlists created yet"
-      >
-        <template #default="{ items }">
-          <SidebarWordListItem
-            v-for="wordlist in items"
-            :key="wordlist.id"
-            :wordlist="wordlist"
-            :is-selected="selectedWordlist === wordlist.id"
-            @select="handleWordlistSelect"
-            @edit="handleWordlistEdit"
-            @delete="handleWordlistDelete"
-            @duplicate="handleWordlistDuplicate"
-          />
-        </template>
-      </SidebarSection>
-
-      <!-- Recent Wordlists -->
-      <SidebarSection
-        v-if="recentWordlists.length > 0"
-        title="Recent"
-        value="recent-wordlists"
-        :items="recentWordlists"
-        :count="recentWordlists.length"
-        :icon="Clock"
-        empty-message="No recent wordlists"
-      >
-        <template #default="{ items }">
-          <SidebarWordListItem
-            v-for="wordlist in items"
-            :key="wordlist.id"
-            :wordlist="wordlist"
-            :is-selected="selectedWordlist === wordlist.id"
-            @select="handleWordlistSelect"
-            @edit="handleWordlistEdit"
-            @delete="handleWordlistDelete"
-          />
-        </template>
-      </SidebarSection>
-
-      <!-- Public Wordlists -->
-      <SidebarSection
-        title="Browse Public"
-        value="public-wordlists"
-        :items="publicWordlists"
-        :count="publicWordlists.length"
-        :icon="Globe"
-        empty-message="No public wordlists available"
-      >
-        <template #default="{ items }">
-          <SidebarWordListItem
-            v-for="wordlist in items"
-            :key="wordlist.id"
-            :wordlist="wordlist"
-            :is-selected="selectedWordlist === wordlist.id"
-            :is-public="true"
-            @select="handleWordlistSelect"
-            @duplicate="handleWordlistDuplicate"
-          />
-        </template>
-      </SidebarSection>
-
-      <!-- Processing Status (if there are any active uploads) -->
-      <SidebarSection
-        v-if="activeUploads.length > 0"
-        title="Processing"
-        value="processing"
-        :items="activeUploads"
-        :count="activeUploads.length"
-        :icon="Loader2"
-        empty-message="No active processing"
-      >
-        <template #default="{ items }">
-          <div
-            v-for="upload in items"
-            :key="upload.id"
-            class="flex items-center justify-between p-2 bg-muted/30 rounded-md"
-          >
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium truncate">{{ upload.filename }}</p>
-              <p class="text-xs text-muted-foreground">{{ upload.status }}</p>
-            </div>
-            <div class="ml-2">
-              <div class="w-12 h-1 bg-muted rounded-full overflow-hidden">
-                <div 
-                  class="h-full bg-primary transition-all duration-300"
-                  :style="{ width: `${upload.progress}%` }"
-                />
-              </div>
+    <!-- Processing Status (if there are any active uploads) -->
+    <div v-if="activeUploads.length > 0" class="mb-4">
+      <h3 class="text-sm font-medium text-muted-foreground mb-2">Processing</h3>
+      <div class="space-y-2">
+        <div
+          v-for="upload in activeUploads"
+          :key="upload.id"
+          class="flex items-center justify-between p-2 bg-muted/30 rounded-md"
+        >
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium truncate">{{ upload.filename }}</p>
+            <p class="text-xs text-muted-foreground">{{ upload.status }}</p>
+          </div>
+          <div class="ml-2">
+            <div class="w-12 h-1 bg-muted rounded-full overflow-hidden">
+              <div 
+                class="h-full bg-primary transition-all duration-300"
+                :style="{ width: `${upload.progress}%` }"
+              />
             </div>
           </div>
-        </template>
-      </SidebarSection>
-    </Accordion>
+        </div>
+      </div>
+    </div>
+
+    <!-- All Wordlists -->
+    <div v-if="isLoading" class="space-y-2">
+      <div v-for="i in 3" :key="i" class="animate-pulse">
+        <div class="h-16 bg-muted/30 rounded-md"></div>
+      </div>
+    </div>
+    
+    <div v-else-if="wordlists.length === 0" class="text-center py-8">
+      <FileText class="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+      <p class="text-muted-foreground">No wordlists found</p>
+      <p class="text-xs text-muted-foreground/70 mt-1">
+        Create your first wordlist to get started
+      </p>
+    </div>
+    
+    <div v-else class="space-y-2">
+      <SidebarWordListItem
+        v-for="wordlist in wordlists"
+        :key="wordlist.id"
+        :wordlist="wordlist"
+        :is-selected="selectedWordlist === wordlist.id"
+        @select="handleWordlistSelect"
+        @edit="handleWordlistEdit"
+        @delete="handleWordlistDelete"
+        @duplicate="handleWordlistDuplicate"
+      />
+    </div>
 
     <!-- File Upload Modal -->
     <WordListUploadModal 
@@ -171,17 +117,14 @@ import {
   FileText, 
   Plus, 
   Upload, 
-  Clock, 
-  Globe, 
-  Loader2 
+  Loader2
 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
-import { Accordion } from '@/components/ui/accordion';
-import SidebarSection from './SidebarSection.vue';
 import SidebarWordListItem from './SidebarWordListItem.vue';
 import WordListUploadModal from '../wordlist/WordListUploadModal.vue';
 import CreateWordListModal from '../wordlist/CreateWordListModal.vue';
 import type { WordList } from '@/types';
+import { wordlistApi } from '@/utils/api';
 
 const store = useAppStore();
 
@@ -192,25 +135,17 @@ const showUploadModal = ref(false);
 const showCreateModal = ref(false);
 const pendingFiles = ref<File[]>([]);
 
-// Mock data - replace with actual store data
-const userWordlists = ref<WordList[]>([]);
-const recentWordlists = ref<WordList[]>([]);
-const publicWordlists = ref<WordList[]>([]);
+// Real data from API
+const wordlists = ref<WordList[]>([]);
 const activeUploads = ref<Array<{
   id: string;
   filename: string;
   status: string;
   progress: number;
 }>>([]);
+const isLoading = ref(false);
 
 // Computed properties
-const accordionValue = computed({
-  get: () => store.sidebarAccordionState.wordlist,
-  set: (value: string[]) => {
-    store.sidebarAccordionState.wordlist = value;
-  },
-});
-
 const selectedWordlist = computed(() => store.selectedWordlist);
 
 // Methods
@@ -244,7 +179,7 @@ const handleFiles = async (files: File[]) => {
   }
   
   // If single file and we have existing wordlists, show upload modal
-  if (validFiles.length === 1 && userWordlists.value.length > 0) {
+  if (validFiles.length === 1 && wordlists.value.length > 0) {
     pendingFiles.value = validFiles;
     showUploadModal.value = true;
   } else {
@@ -266,21 +201,22 @@ const processFilesDirectly = async (files: File[]) => {
     });
     
     try {
-      // Simulate file processing
       const upload = activeUploads.value.find(u => u.id === uploadId);
       if (upload) {
-        for (let i = 0; i <= 100; i += 20) {
-          upload.progress = i;
-          upload.status = i < 100 ? 'Processing...' : 'Complete';
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
+        upload.progress = 25;
+        upload.status = 'Uploading...';
         
-        // Create wordlist from file
-        const words = await extractWordsFromFile(file);
-        const wordlistName = file.name.replace(/\.[^/.]+$/, ''); // Remove extension
+        // Upload to backend
+        const result = await wordlistApi.uploadWordlist(file, {
+          owner_id: 'current_user'
+        });
         
-        const newWordlist = await createWordlistFromWords(wordlistName, words);
-        userWordlists.value.unshift(newWordlist);
+        upload.progress = 100;
+        upload.status = 'Complete';
+        
+        // Transform backend response to frontend format
+        const newWordlist = transformWordlistFromAPI(result.data);
+        wordlists.value.unshift(newWordlist);
         
         // Remove from active uploads after a delay
         setTimeout(() => {
@@ -298,117 +234,117 @@ const processFilesDirectly = async (files: File[]) => {
   }
 };
 
-const extractWordsFromFile = async (file: File): Promise<string[]> => {
-  const text = await file.text();
-  const extension = file.name.toLowerCase().split('.').pop();
-  
-  switch (extension) {
-    case 'txt':
-      return text.split('\n').map(line => line.trim()).filter(line => line);
-    case 'csv':
-      const lines = text.split('\n').filter(line => line.trim());
-      const hasHeaders = lines[0]?.toLowerCase().includes('word');
-      const dataLines = hasHeaders ? lines.slice(1) : lines;
-      return dataLines.map(line => line.split(',')[0]?.trim()).filter(word => word);
-    case 'json':
-      const data = JSON.parse(text);
-      if (Array.isArray(data)) {
-        return data.map(item => typeof item === 'string' ? item : item.text || item.word).filter(Boolean);
-      }
-      return [];
-    default:
-      return [];
-  }
-};
-
-const createWordlistFromWords = async (name: string, words: string[]): Promise<WordList> => {
-  // Mock wordlist creation - replace with actual API call
+// Transform API response to frontend WordList format
+const transformWordlistFromAPI = (apiWordlist: any): WordList => {
   return {
-    id: `wl_${Date.now()}`,
-    name,
-    description: `Imported from file`,
-    hash_id: `hash_${Date.now()}`,
-    words: words.map(word => ({
-      text: word,
-      frequency: 1,
-      selected_definitions: [],
-      mastery_level: 'bronze' as const,
-      temperature: 'cold' as const,
-      review_data: {
-        repetitions: 0,
-        ease_factor: 2.5,
-        interval: 1,
-        next_review_date: new Date().toISOString(),
-        last_review_date: null,
-        lapse_count: 0,
-        review_history: [],
-      },
-      last_visited: null,
-      added_date: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      notes: '',
-      tags: [],
-    })),
-    total_words: words.length,
-    unique_words: words.length,
-    learning_stats: {
-      total_reviews: 0,
-      words_mastered: 0,
-      average_ease_factor: 2.5,
-      retention_rate: 0,
-      streak_days: 0,
-      last_study_date: null,
-      study_time_minutes: 0,
-    },
-    last_accessed: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    metadata: {},
-    tags: [],
-    is_public: false,
-    owner_id: 'current_user',
+    id: apiWordlist._id || apiWordlist.id,
+    name: apiWordlist.name,
+    description: apiWordlist.description,
+    hash_id: apiWordlist.hash_id,
+    words: apiWordlist.words || [],
+    total_words: apiWordlist.total_words,
+    unique_words: apiWordlist.unique_words,
+    learning_stats: apiWordlist.learning_stats,
+    last_accessed: apiWordlist.last_accessed,
+    created_at: apiWordlist.created_at,
+    updated_at: apiWordlist.updated_at,
+    metadata: apiWordlist.metadata || {},
+    tags: apiWordlist.tags || [],
+    is_public: apiWordlist.is_public || false,
+    owner_id: apiWordlist.owner_id,
   };
 };
 
-const handleWordlistSelect = (wordlist: WordList) => {
-  store.selectWordlist(wordlist.id);
+// Load wordlists from API
+const loadWordlists = async () => {
+  if (isLoading.value) return;
   
-  // Add to recent if not already there
-  const recentIndex = recentWordlists.value.findIndex(w => w.id === wordlist.id);
-  if (recentIndex >= 0) {
-    recentWordlists.value.splice(recentIndex, 1);
+  isLoading.value = true;
+  try {
+    // Remove owner_id filter to get all wordlists from DB as requested
+    const response = await wordlistApi.getWordlists({
+      limit: 50
+    });
+    
+    console.log('Loaded wordlists:', response);
+    wordlists.value = response.items.map(transformWordlistFromAPI);
+    
+    // Auto-select first wordlist if none selected and wordlists exist
+    if (!selectedWordlist.value && wordlists.value.length > 0) {
+      console.log('Auto-selecting first wordlist:', wordlists.value[0].name, 'ID:', wordlists.value[0].id);
+      store.setWordlist(wordlists.value[0].id);
+    } else {
+      console.log('Wordlist selection state:', {
+        selectedWordlist: selectedWordlist.value,
+        wordlistsCount: wordlists.value.length,
+        firstWordlistId: wordlists.value[0]?.id
+      });
+    }
+  } catch (error) {
+    console.error('Failed to load wordlists:', error);
+  } finally {
+    isLoading.value = false;
   }
-  recentWordlists.value.unshift(wordlist);
-  recentWordlists.value = recentWordlists.value.slice(0, 5);
+};
+
+const handleWordlistSelect = (wordlist: WordList) => {
+  store.setWordlist(wordlist.id);
 };
 
 const handleWordlistEdit = (wordlist: WordList) => {
-  console.log('Edit wordlist:', wordlist.name);
-  // Open edit modal
+  // For now, just open a prompt to rename
+  const newName = prompt('Enter new name for wordlist:', wordlist.name);
+  if (newName && newName !== wordlist.name) {
+    updateWordlistName(wordlist, newName);
+  }
+};
+
+const updateWordlistName = async (wordlist: WordList, newName: string) => {
+  try {
+    await wordlistApi.updateWordlist(wordlist.id, { name: newName });
+    
+    // Update local data
+    const index = wordlists.value.findIndex(w => w.id === wordlist.id);
+    if (index >= 0) {
+      wordlists.value[index].name = newName;
+    }
+  } catch (error) {
+    console.error('Failed to update wordlist name:', error);
+    alert('Failed to update wordlist name');
+  }
 };
 
 const handleWordlistDelete = async (wordlist: WordList) => {
   if (confirm(`Are you sure you want to delete "${wordlist.name}"?`)) {
-    userWordlists.value = userWordlists.value.filter(w => w.id !== wordlist.id);
-    recentWordlists.value = recentWordlists.value.filter(w => w.id !== wordlist.id);
-    
-    if (selectedWordlist.value === wordlist.id) {
-      store.selectWordlist(null);
+    try {
+      await wordlistApi.deleteWordlist(wordlist.id);
+      wordlists.value = wordlists.value.filter(w => w.id !== wordlist.id);
+      
+      if (selectedWordlist.value === wordlist.id) {
+        store.setWordlist(null);
+      }
+    } catch (error) {
+      console.error('Failed to delete wordlist:', error);
     }
   }
 };
 
 const handleWordlistDuplicate = async (wordlist: WordList) => {
-  const duplicated = {
-    ...wordlist,
-    id: `wl_${Date.now()}`,
-    name: `${wordlist.name} (Copy)`,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-  
-  userWordlists.value.unshift(duplicated);
+  try {
+    const words = wordlist.words.map(w => w.text);
+    const result = await wordlistApi.createWordlist({
+      name: `${wordlist.name} (Copy)`,
+      description: wordlist.description,
+      words,
+      tags: wordlist.tags,
+      owner_id: 'current_user'
+    });
+    
+    const newWordlist = transformWordlistFromAPI(result.data);
+    wordlists.value.unshift(newWordlist);
+  } catch (error) {
+    console.error('Failed to duplicate wordlist:', error);
+  }
 };
 
 const handleWordsUploaded = (words: string[]) => {
@@ -423,99 +359,15 @@ const handleUploadCancel = () => {
 };
 
 const handleWordlistCreated = (wordlist: WordList) => {
-  userWordlists.value.unshift(wordlist);
-  store.selectWordlist(wordlist.id);
+  wordlists.value.unshift(wordlist);
+  store.setWordlist(wordlist.id);
 };
 
 // Lifecycle
 onMounted(() => {
-  // Load initial wordlists - replace with actual API calls
-  loadMockData();
+  loadWordlists();
 });
 
-const loadMockData = () => {
-  // Mock data for development
-  userWordlists.value = [
-    {
-      id: 'wl_1',
-      name: 'SAT Vocabulary',
-      description: 'Essential SAT words',
-      hash_id: 'hash_1',
-      words: [],
-      total_words: 450,
-      unique_words: 450,
-      learning_stats: {
-        total_reviews: 23,
-        words_mastered: 12,
-        average_ease_factor: 2.3,
-        retention_rate: 0.85,
-        streak_days: 5,
-        last_study_date: new Date().toISOString(),
-        study_time_minutes: 145,
-      },
-      last_accessed: new Date().toISOString(),
-      created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date().toISOString(),
-      metadata: {},
-      tags: ['academic', 'test-prep'],
-      is_public: false,
-      owner_id: 'current_user',
-    },
-    {
-      id: 'wl_2',
-      name: 'Business English',
-      description: 'Professional vocabulary',
-      hash_id: 'hash_2',
-      words: [],
-      total_words: 120,
-      unique_words: 120,
-      learning_stats: {
-        total_reviews: 8,
-        words_mastered: 3,
-        average_ease_factor: 2.5,
-        retention_rate: 0.75,
-        streak_days: 2,
-        last_study_date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        study_time_minutes: 67,
-      },
-      last_accessed: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      created_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      metadata: {},
-      tags: ['business', 'professional'],
-      is_public: false,
-      owner_id: 'current_user',
-    },
-  ];
-  
-  publicWordlists.value = [
-    {
-      id: 'pub_1',
-      name: 'Common Academic Words',
-      description: 'Frequently used academic vocabulary',
-      hash_id: 'pub_hash_1',
-      words: [],
-      total_words: 570,
-      unique_words: 570,
-      learning_stats: {
-        total_reviews: 0,
-        words_mastered: 0,
-        average_ease_factor: 2.5,
-        retention_rate: 0,
-        streak_days: 0,
-        last_study_date: null,
-        study_time_minutes: 0,
-      },
-      last_accessed: null,
-      created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-      updated_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-      metadata: {},
-      tags: ['academic', 'common'],
-      is_public: true,
-      owner_id: 'admin_user',
-    },
-  ];
-};
 </script>
 
 <style scoped>

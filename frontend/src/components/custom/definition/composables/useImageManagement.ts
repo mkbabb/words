@@ -75,7 +75,7 @@ export function useImageManagement(entry: ComputedRef<SynthesizedDictionaryEntry
     /**
      * Helper to handle image click events
      */
-    const handleImageClick = (image: ImageMedia, index?: number) => {
+    const handleImageClick = (image: ImageMedia) => {
         if (image?.url) {
             window.open(image.url, '_blank');
         }
@@ -84,7 +84,7 @@ export function useImageManagement(entry: ComputedRef<SynthesizedDictionaryEntry
     /**
      * Helper to handle image error events
      */
-    const handleImageError = (event: Event, index?: number) => {
+    const handleImageError = (event: Event) => {
         console.error('Failed to load image:', (event.target as HTMLImageElement).src);
         // Hide the failed image
         (event.target as HTMLImageElement).style.display = 'none';

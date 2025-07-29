@@ -46,7 +46,7 @@
           <label class="text-sm font-medium">Initial Words (Optional)</label>
           <textarea
             v-model="initialWordsText"
-            placeholder="Enter words separated by commas or new lines..."
+            placeholder="words"
             class="w-full px-3 py-2 bg-background border border-border rounded-md focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
             rows="4"
           />
@@ -174,6 +174,7 @@ import { Modal } from '@/components/custom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { WordList, CreateWordListRequest } from '@/types';
+import { MasteryLevel, Temperature } from '@/types';
 
 interface Props {
   modelValue: boolean;
@@ -307,8 +308,8 @@ const handleCreate = async () => {
         text: word,
         frequency: 1,
         selected_definitions: [],
-        mastery_level: 'bronze' as const,
-        temperature: 'cold' as const,
+        mastery_level: MasteryLevel.BRONZE,
+        temperature: Temperature.COLD,
         review_data: {
           repetitions: 0,
           ease_factor: 2.5,

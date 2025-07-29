@@ -82,8 +82,7 @@
                       </div>
                       
                       <!-- Metadata -->
-                      <div v-if="entry.entry.frequency || entry.entry.lookup_count" class="flex justify-between text-xs text-muted-foreground border-t border-border/30 pt-2">
-                        <span v-if="entry.entry.frequency">Frequency: {{ entry.entry.frequency }}</span>
+                      <div v-if="entry.entry.lookup_count" class="flex justify-between text-xs text-muted-foreground border-t border-border/30 pt-2">
                         <span v-if="entry.entry.lookup_count">Lookups: {{ entry.entry.lookup_count }}</span>
                       </div>
                     </div>

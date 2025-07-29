@@ -1,6 +1,6 @@
 <template>
     <div v-if="images && images.length > 0" class="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
-        <div class="relative group">
+        <div class="relative group" @mouseenter="handleMouseEnter">
             <Carousel
                 v-slot="{ canScrollNext, canScrollPrev }"
                 class="w-32 sm:w-40 md:w-48 max-w-xs"
@@ -138,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import type { CarouselApi } from '@/components/ui/carousel';
@@ -239,7 +239,7 @@ const scheduleHideControls = () => {
     }, 500);
 };
 
-// Mouse hover handling
+// Mouse hover handling (used for keyboard navigation context)
 const handleMouseEnter = () => {
     if (props.images && props.images.length > 1) {
         showControls.value = true;
@@ -267,7 +267,7 @@ const handleKeydown = (event: KeyboardEvent) => {
 };
 
 // Reset loading state when images change
-watch(() => props.images, (newImages) => {
+watch(() => props.images, () => {
     loadedImages.value.clear();
     loadingImages.value.clear();
     currentIndex.value = 0;

@@ -30,6 +30,11 @@ from .wordlist_repository import (
     WordReviewRequest,
     StudySessionRequest,
 )
+from .corpus_repository import (
+    CorpusRepository,
+    CorpusCreate,
+    CorpusSearchParams,
+)
 
 __all__ = [
     "WordRepository",
@@ -60,4 +65,7 @@ __all__ = [
     "WordAddRequest",
     "WordReviewRequest",
     "StudySessionRequest",
+    "CorpusRepository",
+    "CorpusCreate", 
+    "CorpusSearchParams",
 ]

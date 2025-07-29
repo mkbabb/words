@@ -59,7 +59,8 @@ export interface WordList {
 }
 
 export enum MasteryLevel {
-  BRONZE = 'bronze',
+  DEFAULT = 'default',
+  BRONZE = 'bronze', 
   SILVER = 'silver',
   GOLD = 'gold'
 }
@@ -104,6 +105,7 @@ export interface WordListStats {
     due_for_review: number;
   };
   mastery_distribution: {
+    default: number;
     bronze: number;
     silver: number;
     gold: number;

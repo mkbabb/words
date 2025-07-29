@@ -13,7 +13,7 @@
                 class="space-y-1"
             >
                 <p class="themed-definition-text text-sm leading-relaxed">
-                    {{ definition.definition || definition.text }}
+                    {{ definition.text }}
                 </p>
                 <div
                     v-if="definition.examples?.[0]"

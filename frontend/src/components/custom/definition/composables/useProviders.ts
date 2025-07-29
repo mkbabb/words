@@ -16,10 +16,6 @@ export function useProviders(entry: ComputedRef<SynthesizedDictionaryEntry | nul
                     }
                 });
             }
-            // Fallback to source if providers_data is not available
-            else if (def.source) {
-                providers.add(def.source);
-            }
         });
         
         return Array.from(providers);

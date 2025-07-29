@@ -62,6 +62,12 @@ export function useSearchState() {
     get isDevelopment() { return uiState.isDevelopment; },
     get aiSuggestions() { return store.aiSuggestions; },
     set aiSuggestions(value) { store.aiSuggestions = value; },
+    get wordlistFilters() { return store.wordlistFilters; },
+    set wordlistFilters(value) { store.wordlistFilters = value; },
+    get wordlistChunking() { return store.wordlistChunking; },
+    set wordlistChunking(value) { store.wordlistChunking = value; },
+    get wordlistSortCriteria() { return store.wordlistSortCriteria; },
+    set wordlistSortCriteria(value) { store.wordlistSortCriteria = value; },
   });
 
   // Computed properties
@@ -82,9 +88,9 @@ export function useSearchState() {
     
     // First check searchMode for specific modes
     if (state.searchMode === 'wordlist') {
-      return 'Enter words separated by spaces or commas...';
+      return 'words';
     } else if (state.searchMode === 'stage') {
-      return 'Enter text for staging...';
+      return 'staging';
     }
 
     // Default to mode-based placeholders for lookup mode

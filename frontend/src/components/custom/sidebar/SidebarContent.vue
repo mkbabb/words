@@ -58,7 +58,34 @@
                     </HoverCard>
                 </template>
                 
-                <!-- Placeholder for wordlist/stage modes -->
+                <!-- Wordlist tiles for wordlist mode -->
+                <template v-else-if="store.searchMode === 'wordlist'">
+                    <HoverCard v-for="wordlist in recentWordlists" :key="wordlist.id">
+                        <HoverCardTrigger as-child>
+                            <button 
+                                @click="handleCollapsedWordlistClick(wordlist.id)"
+                                class="flex h-10 w-10 items-center justify-center rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-border transition-all duration-200 text-sm font-medium"
+                                :class="{ 'bg-primary/10 border-primary/20 hover:bg-primary/20': store.selectedWordlist === wordlist.id }"
+                            >
+                                {{ wordlist.name.substring(0, 2).toUpperCase() }}
+                            </button>
+                        </HoverCardTrigger>
+                        <HoverCardContent side="right" :sideOffset="5" class="w-64">
+                            <div class="space-y-2">
+                                <h4 class="font-semibold">{{ wordlist.name }}</h4>
+                                <p v-if="wordlist.description" class="text-sm text-muted-foreground">
+                                    {{ wordlist.description }}
+                                </p>
+                                <div class="flex items-center gap-4 text-xs text-muted-foreground">
+                                    <span>{{ wordlist.unique_words }} words</span>
+                                    <span>{{ formatWordlistDate(wordlist.last_accessed) }}</span>
+                                </div>
+                            </div>
+                        </HoverCardContent>
+                    </HoverCard>
+                </template>
+                
+                <!-- Placeholder for other modes -->
                 <template v-else>
                     <TooltipProvider>
                         <Tooltip>
@@ -82,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '@/stores';
@@ -91,7 +118,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import SidebarLookupView from './SidebarLookupView.vue';
 import SidebarWordListView from './SidebarWordListView.vue';
-import type { SynthesizedDictionaryEntry } from '@/types';
+import type { SynthesizedDictionaryEntry, WordList } from '@/types';
+import { wordlistApi } from '@/utils/api';
 
 interface Props {
     collapsed: boolean;
@@ -103,6 +131,9 @@ defineProps<Props>();
 const store = useAppStore();
 const router = useRouter();
 const { recentLookups, aiQueryHistory } = storeToRefs(store);
+
+// Wordlists state
+const recentWordlists = ref<WordList[]>([]);
 
 // Combine lookups and AI queries for collapsed view
 interface CombinedItem {
@@ -192,7 +223,7 @@ const getFirstDefinition = (entry: SynthesizedDictionaryEntry): string => {
     const firstDef = entry.definitions?.[0];
     if (!firstDef) return '';
     
-    const text = firstDef.definition || firstDef.text || '';
+    const text = firstDef.text || '';
     return text.length > 60 ? text.substring(0, 60) + '...' : text;
 };
 
@@ -211,4 +242,68 @@ const formatTimestamp = (timestamp: Date): string => {
     
     return date.toLocaleDateString();
 };
+
+const formatWordlistDate = (dateString: string | null): string => {
+    if (!dateString) return 'Never accessed';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+    
+    return date.toLocaleDateString();
+};
+
+const handleCollapsedWordlistClick = (wordlistId: string) => {
+    store.setWordlist(wordlistId);
+    store.searchMode = 'wordlist';
+};
+
+const loadRecentWordlists = async () => {
+    try {
+        const response = await wordlistApi.getWordlists({
+            limit: 8,
+            sort_by: 'last_accessed',
+            sort_order: 'desc'
+        });
+        
+        recentWordlists.value = response.items.map((item: any) => ({
+            id: item._id || item.id,
+            name: item.name,
+            description: item.description,
+            hash_id: item.hash_id,
+            words: item.words || [],
+            total_words: item.total_words,
+            unique_words: item.unique_words,
+            learning_stats: item.learning_stats,
+            last_accessed: item.last_accessed,
+            created_at: item.created_at,
+            updated_at: item.updated_at,
+            metadata: item.metadata || {},
+            tags: item.tags || [],
+            is_public: item.is_public || false,
+            owner_id: item.owner_id,
+        }));
+    } catch (error) {
+        console.error('Failed to load recent wordlists:', error);
+    }
+};
+
+// Load wordlists when component mounts
+onMounted(() => {
+    if (store.searchMode === 'wordlist') {
+        loadRecentWordlists();
+    }
+});
+
+// Watch for search mode changes
+watch(() => store.searchMode, (newMode) => {
+    if (newMode === 'wordlist') {
+        loadRecentWordlists();
+    }
+});
 </script>

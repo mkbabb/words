@@ -158,7 +158,7 @@ const handleFileSelect = async (event: Event) => {
             const file = validFiles[i];
             
             try {
-                const result = await uploadSingleFile(file, i, validFiles.length);
+                const result = await uploadSingleFile(file);
                 uploadedImages.push(result);
                 
                 // Update progress
@@ -203,7 +203,7 @@ const handleFileSelect = async (event: Event) => {
     }
 };
 
-const uploadSingleFile = async (file: File, index: number, total: number): Promise<ImageMedia> => {
+const uploadSingleFile = async (file: File): Promise<ImageMedia> => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('alt_text', file.name.replace(/\.[^/.]+$/, "")); // Remove extension for alt text
@@ -230,8 +230,8 @@ const uploadSingleFile = async (file: File, index: number, total: number): Promi
         size_bytes: file.size,
         width: 0, // Will need to be determined by backend
         height: 0, // Will need to be determined by backend
-        alt_text: formData.get('alt_text') as string,
-        description: null,
+        alt_text: formData.get('alt_text') as string || 'Uploaded image',
+        description: undefined,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         version: 1,
@@ -242,51 +242,59 @@ const uploadSingleFile = async (file: File, index: number, total: number): Promi
 <style scoped>
 /* Icon transition animations */
 .upload-icon-enter-active {
-    @apply transition-all duration-200 ease-out;
+    transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .upload-icon-leave-active {
-    @apply transition-all duration-150 ease-in;
+    transition: all 0.15s cubic-bezier(0.55, 0.055, 0.675, 0.19);
 }
 
 .upload-icon-enter-from {
-    @apply opacity-0 scale-90 rotate-90;
+    opacity: 0;
+    transform: scale(0.9) rotate(90deg);
 }
 
 .upload-icon-enter-to {
-    @apply opacity-100 scale-100 rotate-0;
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
 }
 
 .upload-icon-leave-from {
-    @apply opacity-100 scale-100 rotate-0;
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
 }
 
 .upload-icon-leave-to {
-    @apply opacity-0 scale-110 -rotate-90;
+    opacity: 0;
+    transform: scale(1.1) rotate(-90deg);
 }
 
 /* Progress fade animations */
 .progress-fade-enter-active {
-    @apply transition-all duration-300 ease-out;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .progress-fade-leave-active {
-    @apply transition-all duration-200 ease-in;
+    transition: all 0.2s cubic-bezier(0.55, 0.055, 0.675, 0.19);
 }
 
 .progress-fade-enter-from {
-    @apply opacity-0 translate-y-2;
+    opacity: 0;
+    transform: translateY(0.5rem);
 }
 
 .progress-fade-enter-to {
-    @apply opacity-100 translate-y-0;
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .progress-fade-leave-from {
-    @apply opacity-100 translate-y-0;
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .progress-fade-leave-to {
-    @apply opacity-0 -translate-y-1;
+    opacity: 0;
+    transform: translateY(-0.25rem);
 }
 </style>

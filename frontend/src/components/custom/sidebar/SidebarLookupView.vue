@@ -140,7 +140,7 @@ const getFirstDefinition = (entry: SynthesizedDictionaryEntry): string => {
     const firstDef = entry.definitions?.[0];
     if (!firstDef) return '';
     
-    const text = firstDef.definition || firstDef.text || '';
+    const text = firstDef.text || '';
     return text.length > 60 ? text.substring(0, 60) + '...' : text;
 };
 

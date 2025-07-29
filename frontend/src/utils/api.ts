@@ -3,15 +3,12 @@ import type {
   LookupResponse,
   SearchResponse,
   SearchResult,
-  DefinitionResponse,
-  Example,
   AIResponse,
   DictionaryProvider,
   Language,
 } from '@/types/api';
 import type {
   SynthesizedDictionaryEntry,
-  TransformedDefinition,
   ThesaurusEntry,
   VocabularySuggestionsResponse,
   WordSuggestionResponse,
@@ -443,6 +440,135 @@ export const dictionaryApi = {
   async getDefinitionById(definitionId: string): Promise<any> {
     const response = await api.get(`/definitions/${definitionId}`);
     return response.data.data;
+  },
+};
+
+export const wordlistApi = {
+  // Get all wordlists
+  async getWordlists(params?: {
+    offset?: number;
+    limit?: number;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+    owner_id?: string;
+  }) {
+    const response = await api.get('/wordlists', { params });
+    return response.data;
+  },
+
+  // Get single wordlist by ID
+  async getWordlist(id: string) {
+    const response = await api.get(`/wordlists/${id}`);
+    return response.data;
+  },
+
+  // Create new wordlist
+  async createWordlist(data: {
+    name: string;
+    description?: string;
+    words?: string[];
+    tags?: string[];
+    is_public?: boolean;
+    owner_id?: string;
+  }) {
+    const response = await api.post('/wordlists', data);
+    return response.data;
+  },
+
+  // Upload wordlist file
+  async uploadWordlist(file: File, options?: {
+    name?: string;
+    description?: string;
+    tags?: string;
+    is_public?: boolean;
+    owner_id?: string;
+  }) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    if (options?.name) formData.append('name', options.name);
+    if (options?.description) formData.append('description', options.description);
+    if (options?.tags) formData.append('tags', options.tags);
+    if (options?.is_public !== undefined) formData.append('is_public', options.is_public.toString());
+    if (options?.owner_id) formData.append('owner_id', options.owner_id);
+
+    const response = await api.post('/wordlists/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Update wordlist
+  async updateWordlist(id: string, data: {
+    name?: string;
+    description?: string;
+    tags?: string[];
+    is_public?: boolean;
+  }) {
+    const response = await api.put(`/wordlists/${id}`, data);
+    return response.data;
+  },
+
+  // Delete wordlist
+  async deleteWordlist(id: string) {
+    await api.delete(`/wordlists/${id}`);
+  },
+
+  // Add words to wordlist
+  async addWords(id: string, words: string[]) {
+    const response = await api.post(`/wordlists/${id}/words`, { words });
+    return response.data;
+  },
+
+  // Remove word from wordlist
+  async removeWord(id: string, word: string) {
+    await api.delete(`/wordlists/${id}/words/${encodeURIComponent(word)}`);
+  },
+
+  // Search within wordlist
+  async searchWordlist(id: string, query: string, options?: {
+    max_results?: number;
+    min_score?: number;
+  }) {
+    const params = {
+      query,
+      max_results: options?.max_results || 20,
+      min_score: options?.min_score || 0.6,
+    };
+    const response = await api.post(`/wordlists/${id}/search`, null, { params });
+    return response.data;
+  },
+
+  // Get wordlist words (paginated)
+  async getWordlistWords(id: string, options?: {
+    offset?: number;
+    limit?: number;
+    sort?: Array<{field: string, direction: 'asc' | 'desc'}>;
+    filters?: Record<string, any>;
+    search?: string;
+  }) {
+    const criteria = {
+      filters: options?.filters || {},
+      sort: options?.sort || [],
+      search: options?.search || ""
+    };
+    
+    const params = {
+      criteria: JSON.stringify(criteria),
+      offset: options?.offset || 0,
+      limit: options?.limit || 50,
+    };
+    
+    const response = await api.get(`/wordlists/${id}/words`, { params });
+    return response.data;
+  },
+
+  // Get wordlist statistics
+  async getStatistics(id: string) {
+    const response = await api.get(`/wordlists/${id}/statistics`);
+    return response.data;
   },
 };
 

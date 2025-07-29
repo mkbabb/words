@@ -150,7 +150,8 @@ import { X, Plus, Check } from 'lucide-vue-next';
 import { Modal } from '@/components/custom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { WordList, MasteryLevel } from '@/types';
+import type { WordList } from '@/types';
+import { MasteryLevel, Temperature } from '@/types';
 
 interface Props {
   modelValue: boolean;
@@ -244,8 +245,8 @@ const handleQuickCreate = async () => {
         text: props.word,
         frequency: 1,
         selected_definitions: [],
-        mastery_level: 'bronze' as const,
-        temperature: 'cold' as const,
+        mastery_level: MasteryLevel.BRONZE,
+        temperature: Temperature.COLD,
         review_data: {
           repetitions: 0,
           ease_factor: 2.5,

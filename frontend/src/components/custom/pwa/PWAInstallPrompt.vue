@@ -158,7 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { Share2, Download, Minus, CheckCircle2 } from 'lucide-vue-next';
 import { useIOSPWA, usePWA } from '@/composables';
 import { useAppStore } from '@/stores';

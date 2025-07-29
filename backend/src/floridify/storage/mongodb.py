@@ -9,7 +9,7 @@ from typing import Any
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
-from ..list.models import WordList
+from ..wordlist.models import WordList
 from ..models import (
     AudioMedia,
     Definition,

@@ -16,6 +16,10 @@
     "install:all": "npm install && cd frontend && npm install",
     "setup": "npm run install:all"
   },
+  "dependencies": {
+    "embla-carousel": "^8.6.0",
+    "embla-carousel-vue": "^8.6.0"
+  },
   "devDependencies": {
     "concurrently": "^8.2.2"
   }

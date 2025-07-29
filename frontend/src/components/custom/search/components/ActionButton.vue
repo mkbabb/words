@@ -19,7 +19,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-type Variant = 'default' | 'primary' | 'danger';
+type Variant = 'default' | 'primary' | 'danger' | 'secondary';
 
 interface ActionButtonProps {
     variant?: Variant;
@@ -33,7 +33,8 @@ const variantClasses = computed(() => {
     const variants: Record<Variant, string> = {
         default: 'bg-muted hover:bg-muted/80 text-foreground/70 hover:text-foreground',
         primary: 'bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90',
-        danger: 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-500/20 hover:text-red-700 dark:hover:text-red-400'
+        danger: 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-500/20 hover:text-red-700 dark:hover:text-red-400',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
     };
     
     return variants[props.variant];

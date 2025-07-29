@@ -85,14 +85,7 @@
                         v-else-if="store.searchMode === 'wordlist'"
                         key="wordlist"
                     >
-                        <div class="space-y-8">
-                            <!-- Wordlist content will go here -->
-                            <div
-                                class="py-16 text-center text-muted-foreground"
-                            >
-                                Wordlist mode coming soon...
-                            </div>
-                        </div>
+                        <WordListView />
                     </div>
 
                     <!-- Word of the Day Content -->
@@ -154,6 +147,7 @@ import { DefinitionDisplay, WordSuggestionDisplay } from '@/components/custom/de
 import { DefinitionSkeleton } from '@/components/custom/definition';
 import { Sidebar } from '@/components/custom';
 import { LoadingModal } from '@/components/custom/loading';
+import WordListView from '@/components/custom/wordlist/WordListView.vue';
 import { StageTest } from '@/components/custom/test';
 import { ProgressiveSidebar } from '@/components/custom/navigation';
 

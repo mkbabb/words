@@ -5,10 +5,31 @@
  * and represent the exact shape of data returned by the API.
  */
 
-// Enums and Constants
-export type Language = 'en' | 'es' | 'fr' | 'de' | 'it' | 'pt' | 'ru' | 'ja' | 'zh' | 'ar';
-export type DictionaryProvider = 'wiktionary' | 'oxford' | 'dictionary_com' | 'merriam_webster';
-export type SearchMethod = 'EXACT' | 'FUZZY' | 'SEMANTIC' | 'PHONETIC' | 'AI';
+// Enums and Constants - Isomorphic to backend
+export enum Language {
+  ENGLISH = 'en',
+  FRENCH = 'fr', 
+  SPANISH = 'es',
+  GERMAN = 'de',
+  ITALIAN = 'it'
+}
+
+export enum DictionaryProvider {
+  WIKTIONARY = 'wiktionary',
+  OXFORD = 'oxford',
+  DICTIONARY_COM = 'dictionary_com',
+  APPLE_DICTIONARY = 'apple_dictionary',
+  AI_FALLBACK = 'ai_fallback',
+  SYNTHESIS = 'synthesis'
+}
+
+export enum SearchMethod {
+  EXACT = 'EXACT',
+  FUZZY = 'FUZZY',
+  SEMANTIC = 'SEMANTIC',
+  PHONETIC = 'PHONETIC',
+  AI = 'AI'
+}
 
 // Base Metadata
 export interface BaseMetadata {
@@ -222,6 +243,7 @@ export interface LookupResponse {
     stress_pattern?: string;
   };
   definitions: DefinitionResponse[];
+  etymology?: Etymology;
   last_updated: string;
   pipeline_metrics?: PipelineMetrics;
   model_info?: ModelInfo | null;

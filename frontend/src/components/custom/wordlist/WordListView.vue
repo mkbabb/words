@@ -8,18 +8,6 @@
           {{ currentWordlist.description }}
         </p>
       </div>
-      
-      <!-- Actions -->
-      <div class="flex items-center gap-2">
-        <Button @click="showUploadModal = true" variant="outline" size="sm">
-          <Upload class="h-4 w-4 mr-2" />
-          Upload
-        </Button>
-        <Button @click="showCreateModal = true" variant="default" size="sm">
-          <Plus class="h-4 w-4 mr-2" />
-          Create
-        </Button>
-      </div>
     </div>
 
     <!-- Statistics -->
@@ -42,70 +30,6 @@
       </div>
     </div>
 
-    <!-- Search and Filters -->
-    <div class="flex items-center gap-4">
-      <div class="relative flex-1 max-w-sm">
-        <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          v-model="searchQuery"
-          placeholder="Search words..."
-          class="pl-10"
-          @input="handleSearch"
-        />
-      </div>
-      
-      <!-- Mastery filter -->
-      <DropdownMenu>
-        <DropdownMenuTrigger as-child>
-          <Button variant="outline" size="sm">
-            <Filter class="h-4 w-4 mr-2" />
-            Filter
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          <DropdownMenuCheckboxItem
-            v-model:checked="filters.showBronze"
-            @update:checked="updateFilters"
-          >
-            <div class="flex items-center">
-              <div class="w-3 h-3 rounded-full bg-gradient-to-r from-orange-400 to-orange-600 mr-2"></div>
-              Bronze
-            </div>
-          </DropdownMenuCheckboxItem>
-          <DropdownMenuCheckboxItem
-            v-model:checked="filters.showSilver"
-            @update:checked="updateFilters"
-          >
-            <div class="flex items-center">
-              <div class="w-3 h-3 rounded-full bg-gradient-to-r from-gray-400 to-gray-600 mr-2"></div>
-              Silver
-            </div>
-          </DropdownMenuCheckboxItem>
-          <DropdownMenuCheckboxItem
-            v-model:checked="filters.showGold"
-            @update:checked="updateFilters"
-          >
-            <div class="flex items-center">
-              <div class="w-3 h-3 rounded-full bg-gradient-to-r from-yellow-400 to-amber-600 mr-2"></div>
-              Gold
-            </div>
-          </DropdownMenuCheckboxItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuCheckboxItem
-            v-model:checked="filters.showHotOnly"
-            @update:checked="updateFilters"
-          >
-            🔥 Recently Studied
-          </DropdownMenuCheckboxItem>
-          <DropdownMenuCheckboxItem
-            v-model:checked="filters.showDueOnly"
-            @update:checked="updateFilters"
-          >
-            ⏰ Due for Review
-          </DropdownMenuCheckboxItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
 
     <!-- Loading State -->
     <div v-if="isLoading" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -115,7 +39,7 @@
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="!currentWordlist || filteredWords.length === 0" class="text-center py-16">
+    <div v-else-if="!currentWordlist || currentWords.length === 0" class="text-center py-16">
       <div class="max-w-sm mx-auto">
         <div v-if="!currentWordlist" class="space-y-4">
           <BookOpen class="h-16 w-16 mx-auto text-muted-foreground/50" />
@@ -128,22 +52,49 @@
           <FileText class="h-16 w-16 mx-auto text-muted-foreground/50" />
           <h3 class="text-lg font-semibold">No Words Found</h3>
           <p class="text-muted-foreground">
-            {{ searchQuery ? 'Try adjusting your search or filters.' : 'Add some words to get started.' }}
+            {{ store.searchQuery ? 'Try adjusting your search or filters.' : 'Add some words to get started.' }}
           </p>
         </div>
       </div>
     </div>
 
     <!-- Word Cards Grid -->
-    <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      <WordListCard
-        v-for="word in filteredWords"
-        :key="word.text"
-        :word="word"
-        @click="handleWordClick"
-        @review="handleReview"
-        @edit="handleEdit"
-      />
+    <div v-else class="space-y-4">
+      <div 
+        ref="scrollContainer"
+        class="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+      >
+        <WordListCard
+          v-for="word in currentWords"
+          :key="word._uniqueId"
+          :word="word"
+          @click="handleWordClick"
+          @review="handleReview"
+          @edit="handleEdit"
+        />
+      </div>
+      
+      <!-- Load More Button -->
+      <div v-if="!isLoadingWords && hasMoreWords" class="flex justify-center py-6">
+        <Button 
+          @click="loadMoreWords"
+          variant="outline"
+          size="lg"
+        >
+          Load More Words ({{ remainingWordsCount }} remaining)
+        </Button>
+      </div>
+      
+      <!-- Loading indicator -->
+      <div v-else-if="isLoadingWords" class="flex items-center justify-center py-4">
+        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+        <span class="text-sm text-muted-foreground ml-2">Loading more...</span>
+      </div>
+      
+      <!-- End of results -->
+      <div v-else-if="!hasMoreWords && currentWords.length > 0" class="text-center py-4">
+        <span class="text-xs text-muted-foreground">All words loaded</span>
+      </div>
     </div>
 
     <!-- File Upload Modal -->
@@ -158,187 +109,334 @@
       v-model="showCreateModal"
       @created="handleWordlistCreated"
     />
+
+    <!-- Edit Word Notes Modal -->
+    <EditWordNotesModal
+      v-model="showEditNotesModal"
+      :word="editingWord"
+      @save="updateWordNotes"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAppStore } from '@/stores';
+// Removed infinite scroll import
 import { 
   BookOpen, 
   FileText, 
   Plus, 
-  Upload, 
-  Search, 
-  Filter 
+  Upload 
 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  DropdownMenuCheckboxItem,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
-import type { WordListItem, MasteryLevel, Temperature } from '@/types';
+import type { WordListItem, WordList } from '@/types';
+import { MasteryLevel, Temperature } from '@/types/wordlist';
+import { wordlistApi } from '@/utils/api';
 import WordListCard from './WordListCard.vue';
 import WordListUploadModal from './WordListUploadModal.vue';
 import CreateWordListModal from './CreateWordListModal.vue';
+import EditWordNotesModal from './EditWordNotesModal.vue';
 
 const store = useAppStore();
+const router = useRouter();
 
 // Component state
-const searchQuery = ref('');
-const isLoading = ref(false);
+const isLoadingMeta = ref(false);
+const isLoadingWords = ref(false);
 const showUploadModal = ref(false);
 const showCreateModal = ref(false);
+const showEditNotesModal = ref(false);
+const editingWord = ref<WordListItem | null>(null);
+const currentWordlistData = ref<WordList | null>(null);
+const currentWords = ref<any[]>([]);
+const totalWords = ref(0);
+const currentPage = ref(0);
+const wordsPerPage = ref(25);
+const scrollContainer = ref<HTMLElement>();
 
-// Filters
-const filters = ref({
-  showBronze: true,
-  showSilver: true,
-  showGold: true,
-  showHotOnly: false,
-  showDueOnly: false,
+// Sort criteria from store (writeable)
+const sortCriteria = computed({
+  get: () => store.wordlistSortCriteria,
+  set: (value) => { store.wordlistSortCriteria = value; }
 });
 
+// Filters - use store filters
+const filters = computed(() => store.wordlistFilters);
+
 // Computed properties
-const currentWordlist = computed(() => store.currentWordlist);
+const currentWordlist = computed(() => currentWordlistData.value);
+const isLoading = computed(() => isLoadingMeta.value || isLoadingWords.value);
+
+const hasMoreWords = computed(() => {
+  return totalWords.value > currentWords.value.length;
+});
+
+const remainingWordsCount = computed(() => {
+  return Math.max(0, totalWords.value - currentWords.value.length);
+});
 
 const masteryStats = computed(() => {
-  if (!currentWordlist.value?.words) {
+  if (!currentWords.value || currentWords.value.length === 0) {
     return { bronze: 0, silver: 0, gold: 0 };
   }
   
-  return currentWordlist.value.words.reduce((acc, word) => {
-    acc[word.mastery_level]++;
+  return currentWords.value.reduce((acc: Record<string, number>, word: any) => {
+    acc[word.mastery_level] = (acc[word.mastery_level] || 0) + 1;
     return acc;
-  }, { bronze: 0, silver: 0, gold: 0 } as Record<MasteryLevel, number>);
+  }, { bronze: 0, silver: 0, gold: 0 });
 });
 
 const dueForReview = computed(() => {
-  if (!currentWordlist.value?.words) return 0;
+  if (!currentWords.value || currentWords.value.length === 0) return 0;
   
   const now = new Date();
-  return currentWordlist.value.words.filter(word => 
+  return currentWords.value.filter(word => 
     new Date(word.review_data.next_review_date) <= now
   ).length;
 });
 
-const filteredWords = computed(() => {
-  if (!currentWordlist.value?.words) return [];
-  
-  let words = currentWordlist.value.words;
-  
-  // Apply search filter
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase();
-    words = words.filter(word => 
-      word.text.toLowerCase().includes(query) ||
-      word.notes.toLowerCase().includes(query) ||
-      word.tags.some(tag => tag.toLowerCase().includes(query))
-    );
-  }
-  
-  // Apply mastery filters
-  words = words.filter(word => {
-    const showMastery = 
-      (filters.value.showBronze && word.mastery_level === 'bronze') ||
-      (filters.value.showSilver && word.mastery_level === 'silver') ||
-      (filters.value.showGold && word.mastery_level === 'gold');
-    
-    if (!showMastery) return false;
-    
-    // Apply additional filters
-    if (filters.value.showHotOnly && word.temperature !== 'hot') return false;
-    if (filters.value.showDueOnly) {
-      const now = new Date();
-      const dueDate = new Date(word.review_data.next_review_date);
-      if (dueDate > now) return false;
-    }
-    
-    return true;
-  });
-  
-  // Sort by mastery, then by frequency, then by last visited
-  return words.sort((a, b) => {
-    // First sort by mastery level (gold > silver > bronze)
-    const masteryOrder = { gold: 3, silver: 2, bronze: 1 };
-    const masteryDiff = masteryOrder[b.mastery_level] - masteryOrder[a.mastery_level];
-    if (masteryDiff !== 0) return masteryDiff;
-    
-    // Then by frequency (higher frequency first)
-    const freqDiff = b.frequency - a.frequency;
-    if (freqDiff !== 0) return freqDiff;
-    
-    // Finally by last visited (more recent first)
-    const aDate = a.last_visited ? new Date(a.last_visited) : new Date(0);
-    const bDate = b.last_visited ? new Date(b.last_visited) : new Date(0);
-    return bDate.getTime() - aDate.getTime();
-  });
-});
+// Filtering and sorting are done on backend, using currentWords directly
+
 
 // Methods
-const handleSearch = async () => {
-  // Debounce search to avoid excessive API calls
-  if (searchQuery.value.trim() && currentWordlist.value) {
-    // Could implement corpus search here for real-time filtering
-    console.log('Searching:', searchQuery.value);
+const formatLastAccessed = (lastAccessed: string | null): string => {
+  if (!lastAccessed) return 'Never';
+  
+  const date = new Date(lastAccessed);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+  if (diffMinutes < 1) return 'Just now';
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
+  
+  return `${Math.floor(diffDays / 365)}y ago`;
+};
+
+const handleWordClick = async (word: WordListItem) => {
+  // Switch to lookup mode for the animation
+  store.searchMode = 'lookup';
+  
+  // Navigate to definition route with smooth transition
+  await router.push(`/definition/${encodeURIComponent(word.text)}`);
+  
+  // Perform the word lookup after navigation
+  await store.searchWord(word.text);
+};
+
+const handleReview = async (word: WordListItem, quality: number) => {
+  try {
+    console.log('Processing review:', word.text, 'Quality:', quality);
+    
+    // Update review data using spaced repetition algorithm
+    const response = await wordlistApi.updateWordReview(word.id, {
+      quality,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Update the word in our local data
+    const wordIndex = currentWords.value.findIndex(w => w.id === word.id);
+    if (wordIndex >= 0) {
+      currentWords.value[wordIndex] = { ...currentWords.value[wordIndex], ...response.data };
+    }
+    
+    console.log('Review completed successfully');
+  } catch (error) {
+    console.error('Failed to process review:', error);
+    // Could show a toast notification here
   }
-};
-
-const updateFilters = () => {
-  // Filters are reactive, no additional action needed
-};
-
-const handleWordClick = (word: WordListItem) => {
-  // Navigate to word definition or open details modal
-  console.log('Word clicked:', word.text);
-  // store.searchWord(word.text);
-};
-
-const handleReview = (word: WordListItem, quality: number) => {
-  // Handle spaced repetition review
-  console.log('Review:', word.text, 'Quality:', quality);
-  // Call API to record review
 };
 
 const handleEdit = (word: WordListItem) => {
-  // Open edit modal for word
-  console.log('Edit word:', word.text);
+  console.log('Opening edit dialog for:', word.text);
+  editingWord.value = word;
+  showEditNotesModal.value = true;
+};
+
+const updateWordNotes = async (word: WordListItem, newNotes: string) => {
+  try {
+    console.log('Updating notes for:', word.text);
+    
+    const response = await wordlistApi.updateWord(word.id, {
+      notes: newNotes
+    });
+    
+    // Update the word in our local data
+    const wordIndex = currentWords.value.findIndex(w => w.id === word.id);
+    if (wordIndex >= 0) {
+      currentWords.value[wordIndex] = { ...currentWords.value[wordIndex], notes: newNotes };
+    }
+    
+    console.log('Notes updated successfully');
+  } catch (error) {
+    console.error('Failed to update notes:', error);
+    alert('Failed to update notes. Please try again.');
+  }
 };
 
 const handleWordsUploaded = (words: string[]) => {
   console.log('Words uploaded:', words.length);
   // Refresh current wordlist
-  if (currentWordlist.value) {
-    store.fetchWordlist(currentWordlist.value.id);
-  }
+  // Refresh current wordlist - stub for now
+  console.log('Refreshing wordlist data...');
 };
 
 const handleWordlistCreated = (wordlist: any) => {
   console.log('Wordlist created:', wordlist.name);
-  store.selectWordlist(wordlist);
+  store.setWordlist(wordlist.id);
 };
+
+// Clustering removed for simplicity
+
+const loadWordlistMeta = async (id: string) => {
+  if (!id) return;
+  
+  console.log('DEBUG: Loading wordlist metadata for ID:', id);
+  isLoadingMeta.value = true;
+  try {
+    const response = await wordlistApi.getWordlist(id);
+    console.log('DEBUG: Wordlist metadata response:', response);
+    
+    currentWordlistData.value = {
+      id: response.data._id || response.data.id,
+      name: response.data.name,
+      description: response.data.description,
+      hash_id: response.data.hash_id,
+      words: [], // Words loaded separately
+      total_words: response.data.total_words,
+      unique_words: response.data.unique_words,
+      learning_stats: response.data.learning_stats,
+      last_accessed: response.data.last_accessed,
+      created_at: response.data.created_at,
+      updated_at: response.data.updated_at,
+      metadata: response.data.metadata || {},
+      tags: response.data.tags || [],
+      is_public: response.data.is_public || false,
+      owner_id: response.data.owner_id,
+    };
+  } catch (error) {
+    console.error('Failed to load wordlist metadata:', error);
+  } finally {
+    isLoadingMeta.value = false;
+  }
+};
+
+const loadWordlistWords = async (id: string, page: number = 0, append: boolean = false) => {
+  if (!id) return;
+  
+  if (isLoadingWords.value) {
+    return;
+  }
+  
+  isLoadingWords.value = true;
+  
+  try {
+    const response = await wordlistApi.getWordlistWords(id, {
+      offset: page * wordsPerPage.value,
+      limit: wordsPerPage.value,
+      sort: sortCriteria.value || [],
+      filters: {},
+      search: store.searchQuery || ""
+    });
+    
+    if (append) {
+      // Add unique IDs and append
+      const newItems = (response.items || []).map((item, idx) => ({
+        ...item,
+        _uniqueId: `${item.text}-${item.added_date}-${Date.now()}-${idx}`
+      }));
+      console.log('Appending items:', newItems.length, 'to existing:', currentWords.value.length);
+      currentWords.value.splice(currentWords.value.length, 0, ...newItems);
+    } else {
+      // Add unique IDs for initial load
+      const initialItems = (response.items || []).map((item, idx) => ({
+        ...item,
+        _uniqueId: `${item.text}-${item.added_date}-${Date.now()}-${idx}`
+      }));
+      console.log('Initial load:', initialItems.length, 'items');
+      currentWords.value.splice(0, currentWords.value.length, ...initialItems);
+    }
+    totalWords.value = response.total || 0;
+    currentPage.value = page;
+  } catch (error) {
+    console.error('Failed to load wordlist words:', error);
+  } finally {
+    isLoadingWords.value = false;
+  }
+};
+
+// Clustering is now handled client-side only
+
+const loadMoreWords = async () => {
+  if (!store.selectedWordlist || isLoadingWords.value || !hasMoreWords.value) {
+    return;
+  }
+  
+  const nextPage = currentPage.value + 1;
+  await loadWordlistWords(store.selectedWordlist, nextPage, true);
+};
+
+// Infinite scroll removed - using manual Load More button instead
+
+const loadWordlist = async (id: string) => {
+  // Reset pagination state
+  currentPage.value = 0;
+  
+  await Promise.all([
+    loadWordlistMeta(id),
+    loadWordlistWords(id, 0, false)
+  ]);
+};
+
 
 // Lifecycle
 onMounted(() => {
-  // Load initial data if needed
-  if (!currentWordlist.value && store.selectedWordlist) {
-    store.fetchWordlist(store.selectedWordlist);
+  if (store.selectedWordlist) {
+    loadWordlist(store.selectedWordlist);
   }
 });
 
-// Watch for wordlist changes
+onUnmounted(() => {
+  // Cleanup handled automatically
+});
+
+// Watch for wordlist changes  
 watch(() => store.selectedWordlist, (newId) => {
   if (newId) {
-    isLoading.value = true;
-    store.fetchWordlist(newId).finally(() => {
-      isLoading.value = false;
-    });
+    loadWordlist(newId);
+  } else {
+    currentWordlistData.value = null;
+    currentWords.value = [];
   }
 });
+
+
+// TEMPORARILY DISABLED - these watchers were causing infinite loops
+// watch(() => filters.value, () => {
+//   if (store.selectedWordlist) {
+//     currentPage.value = 0;
+//     loadWordlistWords(store.selectedWordlist, 0, false);
+//   }
+// }, { deep: true });
+
+// watch(() => sortCriteria.value, () => {
+//   if (store.selectedWordlist) {
+//     currentPage.value = 0;
+//     loadWordlistWords(store.selectedWordlist, 0, false);
+//   }
+// }, { deep: true });
+
+// Only restart observer when wordlist changes, not on every data append
+// Removing this watcher as it causes scroll position issues
 </script>
 
 <style scoped>

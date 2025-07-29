@@ -492,7 +492,7 @@ class WiktionaryConnector(DictionaryConnector):
                             example = Example(
                                 definition_id=definition_id,
                                 text=full_text,
-                                type="quotation",
+                                type="literature",
                             )
                             await example.save()
                             examples.append(example)

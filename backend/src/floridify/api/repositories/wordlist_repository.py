@@ -4,11 +4,13 @@ from datetime import datetime
 from typing import Any
 
 from beanie import PydanticObjectId
+from beanie.odm.enums import SortDirection
 from beanie.operators import RegEx
 from pydantic import BaseModel, Field
 
-from ...list.models import WordList, WordListItem, MasteryLevel, Temperature
+from ...wordlist.models import WordList, WordListItem, MasteryLevel, Temperature
 from ..core.base import BaseRepository
+from .corpus_repository import CorpusRepository, CorpusSearchParams
 
 
 class WordListCreate(BaseModel):
@@ -89,7 +91,7 @@ class WordListFilter(BaseModel):
 class WordAddRequest(BaseModel):
     """Request to add words to a list."""
 
-    words: list[str] = Field(..., min_items=1, description="Words to add")
+    words: list[str] = Field(..., min_length=1, description="Words to add")
 
 
 class WordReviewRequest(BaseModel):
@@ -110,6 +112,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
     def __init__(self) -> None:
         super().__init__(WordList)
+        self.corpus_repo = CorpusRepository()
 
     async def find_by_name(self, name: str, owner_id: str | None = None) -> WordList | None:
         """Find word list by name and optional owner."""
@@ -136,7 +139,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
     async def get_popular(self, limit: int = 10) -> list[WordList]:
         """Get most accessed word lists."""
-        return await WordList.find({"is_public": True}).sort([("last_accessed", -1)]).limit(limit).to_list()
+        return await WordList.find({"is_public": True}).sort([("last_accessed", SortDirection.DESCENDING)]).limit(limit).to_list()
 
     async def create(self, data: WordListCreate) -> WordList:
         """Create a new word list."""
@@ -278,6 +281,37 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             "most_frequent": [w.model_dump() for w in wordlist.get_most_frequent(5)],
             "hot_words": [w.model_dump() for w in wordlist.get_hot_words(5)],
         }
+
+    async def create_corpus(self, wordlist_id: PydanticObjectId, ttl_hours: float = 2.0) -> str:
+        """Create a corpus from wordlist for search operations."""
+        wordlist = await self.get(wordlist_id, raise_on_missing=True)
+        if wordlist is None:
+            raise ValueError(f"WordList with id {wordlist_id} not found")
+        
+        words = [item.text for item in wordlist.words]
+        return await self.corpus_repo.create_from_wordlist(
+            words=words,
+            name=f"wordlist-{wordlist.name}",
+            ttl_hours=ttl_hours,
+        )
+
+    async def search_wordlist_corpus(
+        self, 
+        wordlist_id: PydanticObjectId, 
+        query: str, 
+        max_results: int = 20,
+        min_score: float = 0.6,
+    ) -> dict[str, Any]:
+        """Search within a wordlist using corpus functionality."""
+        corpus_id = await self.create_corpus(wordlist_id, ttl_hours=1.0)
+        
+        params = CorpusSearchParams(
+            query=query,
+            max_results=max_results,
+            min_score=min_score,
+        )
+        
+        return await self.corpus_repo.search(corpus_id, params)
 
     async def _cascade_delete(self, wordlist: WordList) -> None:
         """Handle cascade deletion - WordList is self-contained."""

@@ -554,7 +554,8 @@ async def batch_regenerate_components(
     """
     # Get definitions
     from beanie import PydanticObjectId
-    definition_oids = [PydanticObjectId(id_str) if isinstance(id_str, str) else id_str for id_str in request.definition_ids]
+    from typing import Union
+    definition_oids: list[Union[PydanticObjectId, str]] = [PydanticObjectId(id_str) if isinstance(id_str, str) else id_str for id_str in request.definition_ids]
     definitions = await repo.get_many(definition_oids)
 
     if len(definitions) != len(request.definition_ids):

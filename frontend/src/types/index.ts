@@ -12,8 +12,9 @@ export {
   type Definition,
   type SearchResult,
   type SearchMethod,
-  type Language,
-  type DictionaryProvider,
+  Language,
+  DictionaryProvider,
+  SearchMethod as SearchMethodEnum,
   type LookupResponse,
   type SearchResponse,
   type Pronunciation,
@@ -25,7 +26,8 @@ export {
   type Collocation,
   type Etymology,
   type ModelInfo,
-  type LiteratureSource
+  type LiteratureSource,
+  type DefinitionResponse
 } from './api';
 
 // Frontend version of Definition - no transformation needed
@@ -34,14 +36,13 @@ export interface TransformedDefinition extends DefinitionResponse {
   source?: string; // Added for provider tracking
 }
 
-export interface SynthesizedDictionaryEntry extends Omit<LookupResponse, 'definitions'> {
-  definitions: TransformedDefinition[];
-  etymology?: string;
-  frequency?: number;
-  // Frontend-specific fields for UI state
-  lookup_count: number; // Number of times accessed
-  regeneration_count: number; // Number of times content was regenerated
-  status: string; // Entry status (active, archived, flagged, needs_review)
+// Frontend SynthesizedDictionaryEntry is actually the LookupResponse from the API
+// with optional UI-specific fields
+export interface SynthesizedDictionaryEntry extends LookupResponse {
+  // UI-specific fields
+  lookup_count?: number; // Number of times accessed (optional for backward compatibility)
+  regeneration_count?: number; // Number of times content was regenerated (optional)
+  status?: string; // Entry status (active, archived, flagged, needs_review) (optional)
 }
 
 

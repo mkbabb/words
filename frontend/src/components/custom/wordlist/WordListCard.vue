@@ -3,55 +3,47 @@
     <HoverCardTrigger as-child>
       <ThemedCard
         :variant="word.mastery_level"
-        class="group relative cursor-pointer transition-all duration-500 ease-apple-spring hover:scale-[1.02] p-3"
+        class="group relative cursor-pointer transition-all duration-500 ease-apple-spring hover:scale-[1.02] p-3 sm:p-4"
         texture-enabled
         texture-type="clean"
         texture-intensity="subtle"
+        hide-star
         @click="$emit('click', word)"
       >
         <!-- Main content -->
         <div>
-          <!-- Header with word and status -->
-          <div class="mb-3 flex items-center justify-between">
-            <div class="min-w-0 flex-1">
-              <h3 class="text-lg font-semibold truncate themed-title transition-colors group-hover:text-primary">
+          <!-- Header with word and metadata -->
+          <div class="mb-3">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-base sm:text-xl font-semibold truncate themed-title transition-colors group-hover:text-primary">
                 {{ word.text }}
               </h3>
-              <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>{{ word.frequency }}x</span>
-                <span>•</span>
-                <span>{{ getMasteryLabel(word.mastery_level) }}</span>
-                <span v-if="isDueForReview" class="ml-1 px-1.5 py-0.5 bg-primary/10 text-primary rounded-full">
-                  Due
-                </span>
-              </div>
             </div>
-            
-            <!-- Temperature indicator -->
-            <div class="flex items-center gap-2">
-              <!-- Progress bar -->
-              <div class="relative h-2 w-12 overflow-hidden rounded-full bg-muted">
+
+            <!-- Progress bar below title -->
+            <div class="mb-2">
+              <div class="relative h-1.5 sm:h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div 
                   class="absolute inset-y-0 left-0 bg-gradient-to-r from-current to-current/70 transition-all duration-500"
                   :style="{ width: `${progressPercentage}%` }"
                 />
               </div>
-              <!-- Temperature -->
-              <div class="text-sm">
-                {{ word.temperature === 'hot' ? '🔥' : '❄️' }}
-              </div>
             </div>
-          </div>
 
-          <!-- Quick stats -->
-          <div class="flex justify-between text-xs text-muted-foreground">
-            <span>{{ word.review_data.repetitions }} reviews</span>
-            <span>Next: {{ formatNextReview(word.review_data.next_review_date) }}</span>
+            <!-- Word metadata -->
+            <div class="flex items-center gap-1 sm:gap-2 text-xs text-muted-foreground">
+              <span>{{ word.frequency }}x</span>
+              <span>•</span>
+              <span>{{ getMasteryLabel(word.mastery_level) }}</span>
+              <span v-if="isDueForReview" class="ml-1 px-1.5 py-0.5 bg-primary/10 text-primary rounded-full">
+                Due
+              </span>
+            </div>
           </div>
         </div>
 
         <!-- Action buttons (hidden by default, shown on hover) -->
-        <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
           <DropdownMenu>
             <DropdownMenuTrigger as-child @click.stop>
               <Button variant="ghost" size="sm" class="h-6 w-6 p-0 bg-background/80 backdrop-blur-sm">
@@ -223,6 +215,7 @@ const isDueForReview = computed(() => {
 const progressPercentage = computed(() => {
   // Calculate progress based on mastery level and review history
   const baseProgress = {
+    default: 0,
     bronze: 25,
     silver: 60,
     gold: 100
@@ -237,6 +230,7 @@ const progressPercentage = computed(() => {
 // Methods
 const getMasteryLabel = (level: MasteryLevel): string => {
   return {
+    default: 'New',
     bronze: 'Learning',
     silver: 'Familiar', 
     gold: 'Mastered'
@@ -245,6 +239,7 @@ const getMasteryLabel = (level: MasteryLevel): string => {
 
 const getMasteryEmoji = (level: MasteryLevel): string => {
   return {
+    default: '📝',
     bronze: '🥉',
     silver: '🥈',
     gold: '🥇'
@@ -252,16 +247,24 @@ const getMasteryEmoji = (level: MasteryLevel): string => {
 };
 
 const formatDate = (dateString: string): string => {
+  if (!dateString) return 'Never';
+  
   const date = new Date(dateString);
   const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   
-  if (diffDays === 0) return 'Today';
+  if (diffMinutes < 1) return 'Just now';
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
   
-  return date.toLocaleDateString();
+  return `${Math.floor(diffDays / 365)}y ago`;
 };
 
 const formatNextReview = (dateString: string): string => {

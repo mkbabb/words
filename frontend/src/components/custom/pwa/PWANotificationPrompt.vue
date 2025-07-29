@@ -89,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { Bell, X, Sparkles, BookOpen, Clock, Info } from 'lucide-vue-next';
 import { useIOSPWA, usePWA } from '@/composables';
 import { useAppStore } from '@/stores';

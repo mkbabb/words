@@ -17,7 +17,7 @@
                 :images="allImages"
                 :fallbackText="entry.word"
                 :editMode="editModeEnabled"
-                :synthEntryId="entry.synth_entry_id"
+                :synthEntryId="entry.synth_entry_id || undefined"
                 @image-error="handleImageError"
                 @image-click="handleImageClick"
                 @images-updated="handleImagesUpdated"
@@ -196,7 +196,7 @@ const handleRegenerateExamples = async (definitionIndex: number) => {
 const handleImageError = baseHandleImageError;
 const handleImageClick = baseHandleImageClick;
 
-const handleImagesUpdated = async (newImages: any[]) => {
+const handleImagesUpdated = async () => {
     // Refresh the current entry to get updated image data
     if (entry.value?.synth_entry_id) {
         await store.refreshSynthEntry(entry.value.synth_entry_id);

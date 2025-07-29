@@ -1,12 +1,33 @@
 <template>
     <CardHeader class="relative pr-36 sm:pr-44 md:pr-52">
         <div class="flex items-center justify-between">
-            <CardTitle>
-                <AnimatedTitle
-                    :text="word"
-                    :animation-type="animationType"
-                    :animation-key="animationKey"
-                />
+            <CardTitle class="relative flex items-center gap-3">
+                <div class="flex-1">
+                    <AnimatedTitle
+                        :text="word"
+                        :animation-type="animationType"
+                        :animation-key="animationKey"
+                    />
+                </div>
+                <!-- Add to Wordlist Button - Fixed position to prevent shifting -->
+                <HoverCard>
+                    <HoverCardTrigger as-child>
+                        <button 
+                            @click="showAddToWordlistModal = true"
+                            class="group flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-muted/30 hover:bg-muted hover:border-border transition-all duration-200 opacity-60 hover:opacity-100 shrink-0"
+                        >
+                            <Plus :size="14" class="text-muted-foreground group-hover:text-foreground" />
+                        </button>
+                    </HoverCardTrigger>
+                    <HoverCardContent side="top" :sideOffset="4" class="w-48">
+                        <div class="text-sm">
+                            <p class="font-medium">Add to Wordlist</p>
+                            <p class="text-muted-foreground text-xs mt-1">
+                                Save this word to your wordlists for study
+                            </p>
+                        </div>
+                    </HoverCardContent>
+                </HoverCard>
             </CardTitle>
         </div>
 
@@ -62,16 +83,24 @@
                 </HoverCardContent>
             </HoverCard>
         </div>
+        
+        <!-- Add to Wordlist Modal -->
+        <AddToWordlistModal
+            v-model="showAddToWordlistModal"
+            :word="word"
+            @added="handleWordAdded"
+        />
     </CardHeader>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { CardHeader, CardTitle } from '@/components/ui/card';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Sparkles } from 'lucide-vue-next';
+import { Sparkles, Plus } from 'lucide-vue-next';
 import AnimatedTitle from './AnimatedTitle.vue';
 import ProviderIcons from './ProviderIcons.vue';
+import AddToWordlistModal from './AddToWordlistModal.vue';
 
 interface WordHeaderProps {
     word: string;
@@ -91,6 +120,15 @@ const props = defineProps<WordHeaderProps>();
 defineEmits<{
     'toggle-pronunciation': [];
 }>();
+
+// Modal state
+const showAddToWordlistModal = ref(false);
+
+// Handle word added to wordlist
+const handleWordAdded = (wordlistName: string) => {
+    console.log(`Word "${props.word}" added to wordlist "${wordlistName}"`);
+    showAddToWordlistModal.value = false;
+};
 
 // Check if we have valid pronunciation data
 const hasPronunciation = computed(() => {

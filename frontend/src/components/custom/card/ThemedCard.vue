@@ -10,11 +10,11 @@
     :texture-intensity="textureIntensity"
     :custom-styles="sparkleStyle"
   >
-    <!-- Star Icon - absolute positioned but inside card -->
+    <!-- Star Icon - smaller size -->
     <StarIcon 
-      v-if="variant && variant !== 'default'"
+      v-if="variant && variant !== 'default' && !hideStar"
       :variant="variant" 
-      class="absolute top-2 right-2 z-30"
+      class="absolute top-1.5 right-1.5 z-30 h-6 w-6"
     />
 
     <!-- Sparkle Animation Overlay -->
@@ -41,6 +41,7 @@ interface Props {
   textureEnabled?: boolean
   textureType?: TextureType
   textureIntensity?: TextureIntensity
+  hideStar?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -49,10 +50,11 @@ const props = withDefaults(defineProps<Props>(), {
   textureEnabled: true,
   textureType: 'clean',
   textureIntensity: 'subtle',
+  hideStar: false,
 })
 
 // Clean prop handling
-const { variant, className, textureEnabled, textureType, textureIntensity } = toRefs(props)
+const { variant, className, textureEnabled, textureType, textureIntensity, hideStar } = toRefs(props)
 
 // Generate random variations for sparkle animation and gradient patterns
 const sparkleStyle = computed((): Record<string, string | number> => {

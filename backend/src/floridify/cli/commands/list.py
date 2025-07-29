@@ -10,8 +10,8 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from ...core.lookup_pipeline import lookup_word_pipeline
-from ...list import WordList
-from ...list.parser import generate_name, parse_file
+from ...wordlist import WordList
+from ...wordlist.parser import generate_name, parse_file
 from ...storage.mongodb import _ensure_initialized
 from ...utils.logging import get_logger
 from ..utils.formatting import console

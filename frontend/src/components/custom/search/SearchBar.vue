@@ -219,6 +219,9 @@
                     v-model:selected-sources="state.selectedSources"
                     v-model:selected-languages="state.selectedLanguages"
                     v-model:no-a-i="state.noAI"
+                    v-model:wordlist-filters="state.wordlistFilters"
+                    v-model:wordlist-chunking="state.wordlistChunking"
+                    v-model:wordlist-sort-criteria="state.wordlistSortCriteria"
                     :ai-suggestions="state.aiSuggestions"
                     :is-development="state.isDevelopment"
                     :show-refresh-button="!!store.currentEntry && state.searchMode === 'lookup'"
@@ -576,6 +579,16 @@ onMounted(async () => {
         (newQuery) => {
             if (newQuery !== state.query) {
                 state.query = newQuery;
+            }
+        }
+    );
+    
+    // Watch local query changes to save to store as user types
+    watch(
+        () => state.query,
+        (newQuery) => {
+            if (newQuery !== store.searchQuery) {
+                store.searchQuery = newQuery;
             }
         }
     );

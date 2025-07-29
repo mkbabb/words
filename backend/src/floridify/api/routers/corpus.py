@@ -8,14 +8,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from ...search.corpus import get_corpus_cache
 from ...utils.logging import get_logger
+from ..repositories.corpus_repository import CorpusRepository, CorpusCreate, CorpusSearchParams
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+def get_corpus_repo() -> CorpusRepository:
+    """Dependency to get corpus repository."""
+    return CorpusRepository()
 
 
 class CreateCorpusRequest(BaseModel):
@@ -72,7 +77,10 @@ class CacheStatsResponse(BaseModel):
 
 
 @router.post("/corpus", response_model=CreateCorpusResponse)
-async def create_corpus(request: CreateCorpusRequest) -> CreateCorpusResponse:
+async def create_corpus(
+    request: CreateCorpusRequest,
+    repo: CorpusRepository = Depends(get_corpus_repo),
+) -> CreateCorpusResponse:
     """
     Create a new searchable corpus.
 
@@ -80,24 +88,20 @@ async def create_corpus(request: CreateCorpusRequest) -> CreateCorpusResponse:
     Returns a unique ID for subsequent search operations.
     """
     try:
-        cache = await get_corpus_cache()
-        corpus_id = cache.create_corpus(
+        data = CorpusCreate(
             words=request.words,
             phrases=request.phrases,
             name=request.name,
             ttl_hours=request.ttl_hours,
         )
-
-        # Get metadata for response
-        metadata = cache.get_corpus_info(corpus_id)
-        if not metadata:
-            raise HTTPException(status_code=500, detail="Failed to create corpus")
+        
+        result = await repo.create(data)
 
         return CreateCorpusResponse(
-            corpus_id=corpus_id,
-            word_count=metadata.word_count,
-            phrase_count=metadata.phrase_count,
-            expires_at=metadata.expires_at.isoformat(),
+            corpus_id=result["corpus_id"],
+            word_count=result["word_count"],
+            phrase_count=result["phrase_count"],
+            expires_at=result["expires_at"],
         )
 
     except Exception as e:
@@ -111,6 +115,7 @@ async def search_corpus(
     query: str = Query(..., min_length=1, description="Search query"),
     max_results: int = Query(default=20, ge=1, le=100, description="Maximum results"),
     min_score: float = Query(default=0.6, ge=0.0, le=1.0, description="Minimum score"),
+    repo: CorpusRepository = Depends(get_corpus_repo),
 ) -> SearchCorpusResponse:
     """
     Search within a corpus.
@@ -119,14 +124,13 @@ async def search_corpus(
     Returns error if corpus doesn't exist or has expired.
     """
     try:
-        cache = await get_corpus_cache()
-        search_results = await cache.search_corpus(
-            corpus_id=corpus_id,
+        params = CorpusSearchParams(
             query=query,
             max_results=max_results,
             min_score=min_score,
         )
-
+        
+        search_results = await repo.search(corpus_id, params)
         return SearchCorpusResponse(**search_results)
 
     except ValueError as e:
@@ -138,29 +142,21 @@ async def search_corpus(
 
 
 @router.get("/corpus/{corpus_id}", response_model=CorpusInfoResponse)
-async def get_corpus_info(corpus_id: str) -> CorpusInfoResponse:
+async def get_corpus_info(
+    corpus_id: str,
+    repo: CorpusRepository = Depends(get_corpus_repo),
+) -> CorpusInfoResponse:
     """
     Get corpus metadata and statistics.
 
     Returns corpus information including creation time, expiration, and usage stats.
     """
     try:
-        cache = await get_corpus_cache()
-        metadata = cache.get_corpus_info(corpus_id)
-
+        metadata = await repo.get(corpus_id)
         if not metadata:
             raise HTTPException(status_code=404, detail=f"Corpus {corpus_id} not found or expired")
 
-        return CorpusInfoResponse(
-            corpus_id=metadata.corpus_id,
-            name=metadata.name,
-            created_at=metadata.created_at.isoformat(),
-            expires_at=metadata.expires_at.isoformat(),
-            word_count=metadata.word_count,
-            phrase_count=metadata.phrase_count,
-            search_count=metadata.search_count,
-            last_accessed=metadata.last_accessed.isoformat(),
-        )
+        return CorpusInfoResponse(**metadata)
 
     except HTTPException:
         raise
@@ -170,31 +166,20 @@ async def get_corpus_info(corpus_id: str) -> CorpusInfoResponse:
 
 
 @router.get("/corpus", response_model=ListCorporaResponse)
-async def list_corpora() -> ListCorporaResponse:
+async def list_corpora(
+    repo: CorpusRepository = Depends(get_corpus_repo),
+) -> ListCorporaResponse:
     """
     List all active corpora.
 
     Returns summary of all non-expired corpora with basic metadata.
     """
     try:
-        cache = await get_corpus_cache()
-        corpora = cache.list_corpora()
-
+        corpora_data = await repo.list_all()
+        
         return ListCorporaResponse(
-            corpora=[
-                CorpusInfoResponse(
-                    corpus_id=corpus.corpus_id,
-                    name=corpus.name,
-                    created_at=corpus.created_at.isoformat(),
-                    expires_at=corpus.expires_at.isoformat(),
-                    word_count=corpus.word_count,
-                    phrase_count=corpus.phrase_count,
-                    search_count=corpus.search_count,
-                    last_accessed=corpus.last_accessed.isoformat(),
-                )
-                for corpus in corpora
-            ],
-            total_count=len(corpora),
+            corpora=[CorpusInfoResponse(**corpus) for corpus in corpora_data],
+            total_count=len(corpora_data),
         )
 
     except Exception as e:
@@ -203,15 +188,16 @@ async def list_corpora() -> ListCorporaResponse:
 
 
 @router.get("/corpus-stats", response_model=CacheStatsResponse)
-async def get_cache_stats() -> CacheStatsResponse:
+async def get_cache_stats(
+    repo: CorpusRepository = Depends(get_corpus_repo),
+) -> CacheStatsResponse:
     """
     Get cache statistics.
 
     Returns overall cache usage and performance metrics.
     """
     try:
-        cache = await get_corpus_cache()
-        stats = cache.get_stats()
+        stats = await repo.get_stats()
 
         return CacheStatsResponse(
             status="active", cache=stats, message="Simplified corpus cache is active"
