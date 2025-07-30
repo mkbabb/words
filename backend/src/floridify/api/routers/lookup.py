@@ -70,16 +70,12 @@ class DefinitionResponse(BaseModel):
 class LookupParams(BaseModel):
     """Parameters for word lookup endpoint."""
 
-    force_refresh: bool = Field(
-        default=False, description="Force refresh of cached data"
-    )
+    force_refresh: bool = Field(default=False, description="Force refresh of cached data")
     providers: list[DictionaryProvider] = Field(
         default=[DictionaryProvider.WIKTIONARY],
         description="Dictionary providers to use",
     )
-    languages: list[Language] = Field(
-        default=[Language.ENGLISH], description="Languages to query"
-    )
+    languages: list[Language] = Field(default=[Language.ENGLISH], description="Languages to query")
     no_ai: bool = Field(default=False, description="Skip AI synthesis")
 
 
@@ -87,34 +83,24 @@ class LookupResponse(BaseModel):
     """Response for word lookup."""
 
     word: str = Field(..., description="The word that was looked up")
-    pronunciation: dict[str, Any] | None = Field(
-        None, description="Pronunciation information"
-    )
+    pronunciation: dict[str, Any] | None = Field(None, description="Pronunciation information")
     definitions: list[DefinitionResponse] = Field(
         default_factory=list, description="Word definitions with resolved examples"
     )
-    etymology: dict[str, Any] | None = Field(
-        None, description="Etymology information"
-    )
+    etymology: dict[str, Any] | None = Field(None, description="Etymology information")
     last_updated: datetime = Field(..., description="When this entry was last updated")
     model_info: dict[str, Any] | None = Field(
         None, description="AI model information (null for non-AI entries)"
     )
-    synth_entry_id: str | None = Field(
-        None, description="ID of the synthesized dictionary entry"
-    )
+    synth_entry_id: str | None = Field(None, description="ID of the synthesized dictionary entry")
     images: list[dict[str, Any]] = Field(
         default_factory=list, description="Images attached to the synthesized entry"
     )
 
 
 def parse_lookup_params(
-    force_refresh: bool = Query(
-        default=False, description="Force refresh of cached data"
-    ),
-    providers: list[str] = Query(
-        default=["wiktionary"], description="Dictionary providers"
-    ),
+    force_refresh: bool = Query(default=False, description="Force refresh of cached data"),
+    providers: list[str] = Query(default=["wiktionary"], description="Dictionary providers"),
     languages: list[str] = Query(default=["en"], description="Languages to query"),
     no_ai: bool = Query(default=False, description="Skip AI synthesis"),
 ) -> LookupParams:
@@ -194,7 +180,7 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
                     include_provider_data=True,
                     provider_data_ids=entry.source_provider_data_ids,
                 )
-                
+
                 # Create DefinitionResponse from the loaded data
                 def_response = DefinitionResponse(**def_dict)
                 definitions.append(def_response)
@@ -207,14 +193,14 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
     # Load word
     word_obj = await Word.get(entry.word_id)
     word_text = word_obj.text if word_obj else "unknown"
-    
+
     # Load images for the synth entry itself
     synth_images = []
     if entry.image_ids:
         for image_id in entry.image_ids:
             image = await ImageMedia.get(image_id)
             if image:
-                image_dict = image.model_dump(mode='json', exclude={'data'})
+                image_dict = image.model_dump(mode="json", exclude={"data"})
                 synth_images.append(image_dict)
 
     return LookupResponse(
@@ -270,9 +256,7 @@ async def lookup_word(
         result = await _cached_lookup(word, params)
 
         if not result:
-            raise HTTPException(
-                status_code=404, detail=f"No definition found for word: {word}"
-            )
+            raise HTTPException(status_code=404, detail=f"No definition found for word: {word}")
 
         # Log performance
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
@@ -285,9 +269,7 @@ async def lookup_word(
         raise
     except Exception as e:
         logger.error(f"Lookup failed for {word}: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Internal error during lookup: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Internal error during lookup: {str(e)}")
 
 
 async def generate_lookup_events(
@@ -318,10 +300,7 @@ async def generate_lookup_events(
                     while not queue.empty():
                         try:
                             pending_state = queue.get_nowait()
-                            if (
-                                not pending_state.is_complete
-                                and not pending_state.error
-                            ):
+                            if not pending_state.is_complete and not pending_state.error:
                                 yield f"event: progress\ndata: {json.dumps(pending_state.model_dump_optimized())}\n\n"
                         except asyncio.QueueEmpty:
                             break
@@ -348,9 +327,7 @@ async def generate_lookup_events(
                 pass
 
 
-async def _lookup_with_tracking(
-    word: str, params: LookupParams
-) -> LookupResponse | None:
+async def _lookup_with_tracking(word: str, params: LookupParams) -> LookupResponse | None:
     """Perform lookup with state tracking."""
 
     await lookup_state_tracker.update_stage(Stages.START)
@@ -386,7 +363,7 @@ async def _lookup_with_tracking(
                     include_provider_data=True,
                     provider_data_ids=entry.source_provider_data_ids,
                 )
-                
+
                 # Create DefinitionResponse from the loaded data
                 def_response = DefinitionResponse(**def_dict)
                 definitions.append(def_response)
@@ -406,7 +383,7 @@ async def _lookup_with_tracking(
         for image_id in entry.image_ids:
             image = await ImageMedia.get(image_id)
             if image:
-                image_dict = image.model_dump(mode='json', exclude={'data'})
+                image_dict = image.model_dump(mode="json", exclude={"data"})
                 synth_images.append(image_dict)
 
     # Convert to response model

@@ -186,8 +186,11 @@ export function useDefinitionEditMode(
       }
       if (fields.meaning_cluster_name.isDirty && fields.meaning_cluster_name.value !== null) {
         updateData.meaning_cluster = {
-          ...(definition.value.meaning_cluster || {}),
-          name: fields.meaning_cluster_name.value
+          id: definition.value.meaning_cluster?.id || '',  // Provide default id
+          name: fields.meaning_cluster_name.value,
+          description: definition.value.meaning_cluster?.description || '',
+          order: definition.value.meaning_cluster?.order || 0,
+          relevance: definition.value.meaning_cluster?.relevance || 0
         };
       }
 
@@ -208,7 +211,7 @@ export function useDefinitionEditMode(
         // Handle arrays and objects differently to avoid structuredClone issues
         if (Array.isArray(field.value)) {
           field.originalValue = [...field.value];
-        } else if (typeof field.value === 'object' && field.value !== null) {
+        } else if (field.value && typeof field.value === 'object' && field.value !== null) {
           field.originalValue = { ...field.value };
         } else {
           field.originalValue = field.value;

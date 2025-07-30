@@ -4,8 +4,6 @@ from .base import (
     BaseRepository,
     BatchRequest,
     BatchResponse,
-    ErrorDetail,
-    ErrorResponse,
     FieldSelection,
     ListResponse,
     PaginationParams,
@@ -23,20 +21,39 @@ from .cache import (
     generate_cache_key,
     get_cache_headers,
 )
-from .query import (
-    AggregationBuilder,
-    BulkOperationBuilder,
-    QueryOptimizer,
-)
 from .dependencies import (
     get_fields,
     get_pagination,
     get_sort,
 )
+from .exceptions import (
+    APIException,
+    ConflictException,
+    ErrorDetail,
+    ErrorResponse,
+    ForbiddenException,
+    InvalidContentTypeException,
+    NotFoundException,
+    PayloadTooLargeException,
+    RateLimitException,
+    ServiceUnavailableException,
+    UnauthorizedException,
+    ValidationException,
+    VersionConflictException,
+    raise_conflict,
+    raise_not_found,
+    raise_validation_error,
+    raise_version_conflict,
+)
+from .query import (
+    AggregationBuilder,
+    BulkOperationBuilder,
+    QueryOptimizer,
+)
 from .responses import (
-    StreamResponse,
-    ProgressResponse,
     CompleteResponse,
+    ProgressResponse,
+    StreamResponse,
     ValidationErrorResponse,
 )
 
@@ -68,11 +85,27 @@ __all__ = [
     "QueryOptimizer",
     # Dependencies
     "get_fields",
-    "get_pagination", 
+    "get_pagination",
     "get_sort",
     # Extended Responses
     "StreamResponse",
     "ProgressResponse",
     "CompleteResponse",
     "ValidationErrorResponse",
+    # Exceptions
+    "APIException",
+    "NotFoundException",
+    "ValidationException",
+    "ConflictException",
+    "VersionConflictException",
+    "UnauthorizedException",
+    "ForbiddenException",
+    "RateLimitException",
+    "ServiceUnavailableException",
+    "PayloadTooLargeException",
+    "InvalidContentTypeException",
+    "raise_not_found",
+    "raise_validation_error",
+    "raise_conflict",
+    "raise_version_conflict",
 ]

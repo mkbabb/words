@@ -3,7 +3,7 @@
 from typing import Any
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from ....ai import get_openai_connector
@@ -38,12 +38,14 @@ def get_example_repo() -> ExampleRepository:
 
 class ExampleQueryParams(BaseModel):
     """Query parameters for listing examples."""
-    
+
     word_id: str | None = Field(None, description="Filter by word ID")
     definition_id: str | None = Field(None, description="Filter by definition ID")
     is_ai_generated: bool | None = Field(None, description="Filter by AI generation status")
     can_regenerate: bool | None = Field(None, description="Filter by regeneration capability")
-    has_literature_source: bool | None = Field(None, description="Filter by literature source presence")
+    has_literature_source: bool | None = Field(
+        None, description="Filter by literature source presence"
+    )
     quality_score_min: float | None = Field(None, ge=0, le=1, description="Minimum quality score")
 
 

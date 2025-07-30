@@ -6,8 +6,8 @@ from typing import Any
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ....ai.factory import get_openai_connector
 from ....ai.connector import OpenAIConnector
+from ....ai.factory import get_openai_connector
 from ....models import (
     NotificationFrequency,
     WordOfTheDayBatch,
@@ -33,16 +33,16 @@ async def get_current_word_of_the_day(
     ai: OpenAIConnector = Depends(get_ai_connector),
 ) -> ResourceResponse:
     """Get the current Word of the Day.
-    
+
     This endpoint is used by the notification server and frontend.
     Returns the next scheduled word or generates a new batch if needed.
-    
+
     Query Parameters:
         - generate_if_empty: Automatically generate new batch if no words available
-    
+
     Returns:
         Current Word of the Day with all educational content.
-    
+
     Errors:
         404: No word available and generation disabled
         500: Word generation failed
@@ -93,12 +93,12 @@ async def send_current_word(
     ai: OpenAIConnector = Depends(get_ai_connector),
 ) -> ResourceResponse:
     """Mark the current word as sent and advance to next.
-    
+
     Used by the notification server to track sent words.
-    
+
     Returns:
         The word that was sent with updated statistics.
-    
+
     Errors:
         404: No word available to send
         409: Word not due for sending yet
@@ -124,8 +124,8 @@ async def send_current_word(
     if not batch.is_due_for_sending():
         time_until_due = batch.next_send_time - datetime.now()
         raise HTTPException(
-            409, 
-            f"Word not due for sending yet. Next word in {time_until_due.total_seconds():.0f} seconds"
+            409,
+            f"Word not due for sending yet. Next word in {time_until_due.total_seconds():.0f} seconds",
         )
 
     # Mark as sent
@@ -145,17 +145,17 @@ async def send_current_word(
     )
 
 
-@router.get("/batches", response_model=ListResponse)
+@router.get("/batches", response_model=ListResponse[dict[str, Any]])
 async def list_word_batches(
     active_only: bool = Query(False, description="Show only active batches"),
     limit: int = Query(10, ge=1, le=50),
 ) -> ListResponse[dict[str, Any]]:
     """List Word of the Day batches.
-    
+
     Query Parameters:
         - active_only: Show only active batches
         - limit: Maximum batches to return
-    
+
     Returns:
         List of batches with metadata and statistics.
     """
@@ -175,13 +175,13 @@ async def get_word_batch(
     batch_id: PydanticObjectId,
 ) -> ResourceResponse:
     """Get detailed information about a Word of the Day batch.
-    
+
     Path Parameters:
         - batch_id: MongoDB ObjectId of the batch
-    
+
     Returns:
         Batch details with current words and statistics.
-    
+
     Errors:
         404: Batch not found
     """
@@ -190,14 +190,16 @@ async def get_word_batch(
         raise HTTPException(404, "Batch not found")
 
     batch_data = batch.model_dump()
-    
+
     # Add computed statistics
     batch_data["statistics"] = {
         "words_remaining": len(batch.current_batch),
         "words_sent": len(batch.sent_words),
-        "batch_progress": len(batch.sent_words) / max(1, batch.total_words_sent + len(batch.current_batch)),
+        "batch_progress": len(batch.sent_words)
+        / max(1, batch.total_words_sent + len(batch.current_batch)),
         "days_active": (datetime.now() - batch.created_at).days,
-        "average_words_per_day": batch.total_words_sent / max(1, (datetime.now() - batch.created_at).days),
+        "average_words_per_day": batch.total_words_sent
+        / max(1, (datetime.now() - batch.created_at).days),
     }
 
     return ResourceResponse(
@@ -219,19 +221,19 @@ async def update_batch_config(
     active: bool = Query(None, description="Batch active status"),
 ) -> ResourceResponse:
     """Update Word of the Day batch configuration.
-    
+
     Path Parameters:
         - batch_id: MongoDB ObjectId of the batch
-    
+
     Query Parameters:
         - context: Context for AI word generation
         - frequency: Notification frequency
         - max_seen_words: Maximum seen words to track
         - active: Whether batch is active
-    
+
     Returns:
         Updated batch configuration.
-    
+
     Errors:
         404: Batch not found
     """
@@ -277,16 +279,16 @@ async def generate_new_batch_words(
     ai: OpenAIConnector = Depends(get_ai_connector),
 ) -> ResourceResponse:
     """Generate new words for a batch.
-    
+
     Path Parameters:
         - batch_id: MongoDB ObjectId of the batch
-    
+
     Query Parameters:
         - count: Number of words to generate
-    
+
     Returns:
         Updated batch with new words added.
-    
+
     Errors:
         404: Batch not found
         500: Word generation failed
@@ -309,19 +311,19 @@ async def generate_new_batch_words(
         raise HTTPException(500, f"Failed to generate words: {e}")
 
 
-@router.get("/history", response_model=ListResponse)
+@router.get("/history", response_model=ListResponse[dict[str, Any]])
 async def get_word_history(
     batch_id: PydanticObjectId = Query(None, description="Filter by batch ID"),
     days_back: int = Query(30, ge=1, le=365, description="Days of history to retrieve"),
     limit: int = Query(50, ge=1, le=200),
 ) -> ListResponse[dict[str, Any]]:
     """Get history of sent words.
-    
+
     Query Parameters:
         - batch_id: Optional batch ID filter
         - days_back: Number of days to look back
         - limit: Maximum words to return
-    
+
     Returns:
         List of recently sent words with metadata.
     """
@@ -331,27 +333,32 @@ async def get_word_history(
 
     # Get batches and extract sent word history
     batches = await WordOfTheDayBatch.find(query).to_list()
-    
+
     # Collect sent words from all batches
     sent_history = []
     cutoff_date = datetime.now() - timedelta(days=days_back)
-    
+
     for batch in batches:
         # Note: In a production system, you'd want to store full word history
         # For now, we just return the sent_words list with estimated dates
         for i, word in enumerate(batch.sent_words[-limit:]):
             # Estimate sent date based on frequency and position
-            estimated_date = batch.last_sent - timedelta(
-                minutes=batch.frequency.minutes * (len(batch.sent_words) - i - 1)
-            ) if batch.last_sent else batch.created_at
-            
+            estimated_date = (
+                batch.last_sent
+                - timedelta(minutes=batch.frequency.minutes * (len(batch.sent_words) - i - 1))
+                if batch.last_sent
+                else batch.created_at
+            )
+
             if estimated_date >= cutoff_date:
-                sent_history.append({
-                    "word": word,
-                    "estimated_sent_date": estimated_date,
-                    "batch_id": str(batch.id),
-                    "batch_context": batch.context,
-                })
+                sent_history.append(
+                    {
+                        "word": word,
+                        "estimated_sent_date": estimated_date,
+                        "batch_id": str(batch.id),
+                        "batch_context": batch.context,
+                    }
+                )
 
     # Sort by date and limit
     sent_history.sort(key=lambda x: x["estimated_sent_date"], reverse=True)
@@ -368,7 +375,7 @@ async def get_word_history(
 @router.get("/config", response_model=ResourceResponse)
 async def get_word_of_the_day_config() -> ResourceResponse:
     """Get global Word of the Day configuration.
-    
+
     Returns:
         Global configuration settings.
     """
@@ -389,18 +396,18 @@ async def update_word_of_the_day_config(
     generation_enabled: bool = Query(None),
 ) -> ResourceResponse:
     """Update global Word of the Day configuration.
-    
+
     Query Parameters:
         - default_batch_size: Default number of words to generate
         - min_batch_threshold: Generate new batch when below this threshold
         - max_previous_words: Maximum previous words to consider
         - generation_enabled: Whether automatic generation is enabled
-    
+
     Returns:
         Updated configuration.
     """
     config = await WordOfTheDayConfig.get_default()
-    
+
     updated = False
     if default_batch_size is not None:
         config.default_batch_size = default_batch_size
@@ -430,19 +437,17 @@ async def update_word_of_the_day_config(
 
 # Helper function for batch generation
 async def _generate_new_batch(
-    batch: WordOfTheDayBatch, 
-    ai: OpenAIConnector, 
-    count: int | None = None
+    batch: WordOfTheDayBatch, ai: OpenAIConnector, count: int | None = None
 ) -> None:
     """Generate new words for a batch."""
     config = await WordOfTheDayConfig.get_default()
-    
+
     if not config.generation_enabled:
         raise Exception("Word generation is disabled")
-    
+
     generation_count = count or config.default_batch_size
     context_params = batch.get_context_for_generation()
-    
+
     # Generate words one by one to ensure variety
     new_words: list[WordOfTheDayEntry] = []
     for _ in range(generation_count):
@@ -451,12 +456,12 @@ async def _generate_new_batch(
             if new_words:
                 existing_previous = context_params.get("previous_words", []) or []
                 context_params["previous_words"] = existing_previous + [w.word for w in new_words]
-            
+
             response = await ai.generate_word_of_the_day(
                 context=context_params.get("context"),
                 previous_words=context_params.get("previous_words"),
             )
-            
+
             new_entry = WordOfTheDayEntry(
                 word=response.word,
                 definition=response.definition,
@@ -468,14 +473,14 @@ async def _generate_new_batch(
                 confidence=response.confidence,
             )
             new_words.append(new_entry)
-            
+
         except Exception as e:
             # Log error but continue with other words
             print(f"Failed to generate word {len(new_words) + 1}: {e}")
             continue
-    
+
     if not new_words:
         raise Exception("Failed to generate any words")
-    
+
     batch.add_words_to_batch(new_words)
     await batch.save()

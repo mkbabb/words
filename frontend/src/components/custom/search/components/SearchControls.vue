@@ -17,8 +17,7 @@
             @keydown.enter="handleEnterKey"
         >
             <!-- Search Mode Toggle -->
-            <div class="border-border/50 px-4 py-3">
-                <h3 class="mb-3 text-sm font-medium">Mode</h3>
+            <div class="border-border/50 px-4 py-3 flex justify-center">
                 <BouncyToggle
                     v-model="searchMode"
                     :options="[
@@ -26,6 +25,7 @@
                         { label: 'Wordlist', value: 'wordlist' },
                         { label: 'Stage', value: 'stage' },
                     ]"
+                    class="text-base font-bold"
                 />
             </div>
 

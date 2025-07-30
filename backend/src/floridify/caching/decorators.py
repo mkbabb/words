@@ -58,7 +58,7 @@ class RequestDeduplicator:
         # Wait for result with timeout
         try:
             return await asyncio.wait_for(future, timeout=self._max_wait_time)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(f"⏱️ Timeout waiting for request: {key}")
             raise HTTPException(status_code=504, detail="Request timeout")
     

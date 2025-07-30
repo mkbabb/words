@@ -40,11 +40,13 @@ def get_fact_repo() -> FactRepository:
 
 class FactQueryParams(BaseModel):
     """Query parameters for listing facts."""
-    
+
     word_id: str | None = Field(None, description="Filter by word ID")
     category: str | None = Field(None, description="Filter by category")
     has_source: bool | None = Field(None, description="Filter by source presence")
-    confidence_score_min: float | None = Field(None, ge=0, le=1, description="Minimum confidence score")
+    confidence_score_min: float | None = Field(
+        None, ge=0, le=1, description="Minimum confidence score"
+    )
 
 
 class FactGenerationRequest(BaseModel):
@@ -108,7 +110,6 @@ async def list_facts(
 
 
 @router.post("", response_model=ResourceResponse, status_code=201)
-
 async def create_fact(
     data: FactCreate,
     repo: FactRepository = Depends(get_fact_repo),
@@ -126,7 +127,6 @@ async def create_fact(
 
 
 @router.get("/{fact_id}", response_model=ResourceResponse)
-
 async def get_fact(
     fact_id: PydanticObjectId,
     request: Request,
@@ -168,7 +168,6 @@ async def get_fact(
 
 
 @router.put("/{fact_id}", response_model=ResourceResponse)
-
 async def update_fact(
     fact_id: PydanticObjectId,
     data: FactUpdate,
@@ -187,7 +186,6 @@ async def update_fact(
 
 
 @router.delete("/{fact_id}", status_code=204, response_model=None)
-
 async def delete_fact(
     fact_id: PydanticObjectId,
     repo: FactRepository = Depends(get_fact_repo),
@@ -197,7 +195,6 @@ async def delete_fact(
 
 
 @router.post("/word/{word_id}/generate", response_model=list[ResourceResponse])
-
 async def generate_facts_for_word(
     word_id: str,
     fact_request: FactGenerationRequest,
@@ -229,7 +226,7 @@ async def generate_facts_for_word(
 
     # Get definitions for the word
     definitions = await Definition.find(Definition.word_id == str(word.id)).to_list()
-    
+
     # Generate facts
     facts = await generate_facts(
         word,
@@ -258,7 +255,6 @@ async def generate_facts_for_word(
 
 
 @router.get("/categories/{category}", response_model=ListResponse[Fact])
-
 async def get_facts_by_category(
     category: str,
     limit: int = Query(50, ge=1, le=200),

@@ -1,5 +1,6 @@
 import { computed, type ComputedRef } from 'vue';
-import type { SynthesizedDictionaryEntry, ImageMedia } from '@/types/api';
+import type { ImageMedia } from '@/types/api';
+import type { SynthesizedDictionaryEntry } from '@/types';
 
 /**
  * Composable for managing images from synthesized dictionary entries

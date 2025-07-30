@@ -112,7 +112,7 @@ def cached_endpoint(
             }
 
             cache_manager.set(
-                (cache_key,), orjson.dumps(cache_data).decode(), ttl_hours=config.ttl/3600
+                (cache_key,), orjson.dumps(cache_data).decode(), ttl_hours=config.ttl / 3600
             )
 
             # Set cache headers

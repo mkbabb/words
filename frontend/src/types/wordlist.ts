@@ -1,14 +1,12 @@
 export interface WordListItem {
-  text: string;
+  word: string; // Always word text from backend
   frequency: number;
-  selected_definitions: number[];
+  selected_definition_ids: string[];
   mastery_level: MasteryLevel;
   temperature: Temperature;
   review_data: ReviewData;
   last_visited: string | null;
   added_date: string;
-  created_at: string;
-  updated_at: string;
   notes: string;
   tags: string[];
 }

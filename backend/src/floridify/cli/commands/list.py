@@ -10,10 +10,12 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from ...core.lookup_pipeline import lookup_word_pipeline
-from ...wordlist import WordList
-from ...wordlist.parser import generate_name, parse_file
+from ...models import Word
 from ...storage.mongodb import _ensure_initialized
 from ...utils.logging import get_logger
+from ...wordlist import WordList
+from ...wordlist.parser import parse_file
+from ...wordlist.utils import generate_wordlist_hash, generate_wordlist_name
 from ..utils.formatting import console
 
 logger = get_logger(__name__)
@@ -60,7 +62,7 @@ async def _create_async(
 
     # Generate name if not provided
     if not name:
-        name = generate_name(parsed.words)
+        name = generate_wordlist_name(parsed.words)
         console.print(f"Generated name: [cyan]{name}[/cyan]")
 
     # Initialize database
@@ -76,7 +78,7 @@ async def _create_async(
     else:
         word_list = WordList(
             name=name,
-            hash_id=WordList.generate_hash(parsed.words),
+            hash_id=generate_wordlist_hash(parsed.words),
             metadata=parsed.metadata,
         )
 
@@ -93,7 +95,8 @@ async def _create_async(
     console.print("Starting batch dictionary lookup...")
 
     # Process words with dictionary lookup in batches
-    await _process_words_batch([wf.text for wf in word_list.words])
+    # Use the original parsed words since WordListItem doesn't have text field
+    await _process_words_batch(parsed.words)
 
     console.print("Dictionary lookup processing completed!")
 
@@ -136,6 +139,11 @@ async def _show_async(name: str, num: int | None) -> None:
 
     console.print(f"\nMost frequent words (showing {num}):")
 
+    # Fetch Word documents to get text
+    word_ids = [wf.word_id for wf in most_frequent]
+    words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+    word_text_map = {str(word.id): word.text for word in words}
+
     # Create frequency heat map
     max_freq = max(wf.frequency for wf in most_frequent)
 
@@ -166,9 +174,10 @@ async def _show_async(name: str, num: int | None) -> None:
             heat_color = "dim"
             heat_bar = "▓" * 8
 
+        word_text = word_text_map.get(wf.word_id, "")
         table.add_row(
             str(i),
-            wf.text,
+            word_text,
             f"{wf.frequency}x",
             f"[{heat_color}]{heat_bar}[/{heat_color}]",
         )
@@ -226,9 +235,8 @@ async def _update_async(name: str, input_file: Path) -> None:
     word_list.add_words(parsed.words)
 
     # Process new words with dictionary lookup
-    new_words_to_process = [
-        wf.text for wf in word_list.words if wf.text.lower() in [w.lower() for w in parsed.words]
-    ]
+    # Since we just added parsed.words, we can process those directly
+    new_words_to_process = parsed.words
     await _process_words_batch(new_words_to_process)
 
     await word_list.save()

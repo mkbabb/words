@@ -17,6 +17,10 @@ export function useIOSPWA() {
   const supportsPWA = ref(false);
   const supportsNotifications = ref(false);
   
+  // Install prompt state
+  const canInstall = ref(false);
+  const deferredPrompt = ref<any>(null);
+  
   // Safe area handling
   const safeAreaInsets = ref<SafeAreaInsets>({ 
     top: 0, 
@@ -80,6 +84,13 @@ export function useIOSPWA() {
     // Update on orientation change
     useEventListener('orientationchange', updateSafeAreaInsets);
     useEventListener('resize', handleViewportResize);
+    
+    // Listen for install prompt
+    window.addEventListener('beforeinstallprompt', (e: any) => {
+      e.preventDefault();
+      deferredPrompt.value = e;
+      canInstall.value = true;
+    });
   });
   
   // Update safe area insets
@@ -247,6 +258,30 @@ export function useIOSPWA() {
     }
   }
   
+  // Install prompt
+  async function promptInstall() {
+    if (!canInstall.value || !deferredPrompt.value) {
+      return false;
+    }
+    
+    try {
+      // Show the install prompt
+      deferredPrompt.value.prompt();
+      
+      // Wait for the user to respond to the prompt
+      const { outcome } = await deferredPrompt.value.userChoice;
+      
+      // Clear the deferred prompt
+      deferredPrompt.value = null;
+      canInstall.value = false;
+      
+      return outcome === 'accepted';
+    } catch (error) {
+      console.error('Install prompt error:', error);
+      return false;
+    }
+  }
+  
   return {
     // Device detection
     isIOS,
@@ -266,6 +301,10 @@ export function useIOSPWA() {
     supportsBadging,
     supportsShare,
     supportsVibrate,
+    
+    // Installation
+    canInstall,
+    promptInstall,
     
     // Safe areas
     safeAreaInsets,

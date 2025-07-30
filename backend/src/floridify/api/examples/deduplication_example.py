@@ -49,7 +49,7 @@ async def call_external_api(query: str) -> dict[str, Any]:
 # @deduplicated(key_func=lambda item_id: f"get_item:{item_id}")
 async def get_item(item_id: str) -> dict[str, Any]:
     """Get item details with request deduplication.
-    
+
     Multiple concurrent requests for the same item will only result
     in one database query.
     """
@@ -75,7 +75,7 @@ async def get_item(item_id: str) -> dict[str, Any]:
 )
 async def search_items(q: str) -> dict[str, Any]:
     """Search items with caching and deduplication.
-    
+
     Benefits:
     1. Concurrent identical searches share the same result (deduplication)
     2. Subsequent searches within 30 minutes return cached results
@@ -83,10 +83,10 @@ async def search_items(q: str) -> dict[str, Any]:
     """
     if not q or len(q) < 3:
         raise HTTPException(status_code=400, detail="Query must be at least 3 characters")
-    
+
     # This expensive operation will be both cached and deduplicated
     api_result = await call_external_api(q)
-    
+
     return {
         "status": "success",
         "query": q,
@@ -98,11 +98,11 @@ async def search_items(q: str) -> dict[str, Any]:
 # Example 3: Manual deduplication for complex operations
 class BatchProcessor:
     """Example of manual deduplication for batch operations."""
-    
+
     def __init__(self) -> None:
         self._in_flight: dict[str, asyncio.Future[Any]] = {}
         self._lock = asyncio.Lock()
-    
+
     async def process_batch(self, batch_id: str, items: list[str]) -> dict[str, Any]:
         """Process a batch with deduplication."""
         # Check if this batch is already being processed
@@ -114,14 +114,14 @@ class BatchProcessor:
                 # Create new future for this batch
                 future = asyncio.Future()
                 self._in_flight[batch_id] = future
-                
+
                 # Schedule the actual processing
                 asyncio.create_task(self._do_process_batch(batch_id, items, future))
-        
+
         # Wait for result
         result: dict[str, Any] = await future
         return result
-    
+
     async def _do_process_batch(
         self,
         batch_id: str,
@@ -132,21 +132,21 @@ class BatchProcessor:
         try:
             logger.info(f"🏭 Processing batch {batch_id} with {len(items)} items")
             await asyncio.sleep(3)  # Simulate processing
-            
+
             result = {
                 "batch_id": batch_id,
                 "processed_count": len(items),
                 "items": items,
                 "processed_at": time.time(),
             }
-            
+
             future.set_result(result)
             logger.info(f"✅ Batch {batch_id} processing complete")
-            
+
         except Exception as e:
             future.set_exception(e)
             logger.error(f"❌ Batch {batch_id} processing failed: {e}")
-        
+
         finally:
             # Clean up
             async with self._lock:
@@ -160,15 +160,15 @@ batch_processor = BatchProcessor()
 @router.post("/process-batch/{batch_id}")
 async def process_batch(batch_id: str, items: list[str]) -> dict[str, Any]:
     """Process a batch of items with deduplication.
-    
+
     If multiple requests come in for the same batch_id while processing
     is in progress, they will all wait for and receive the same result.
     """
     if not items:
         raise HTTPException(status_code=400, detail="Items list cannot be empty")
-    
+
     result = await batch_processor.process_batch(batch_id, items)
-    
+
     return {
         "status": "success",
         "data": result,
@@ -184,19 +184,20 @@ async def process_batch(batch_id: str, items: list[str]) -> dict[str, Any]:
 )
 async def get_external_data(resource_id: str) -> dict[str, Any]:
     """Fetch external data with deduplication and timeout.
-    
+
     If a request is already in flight, new requests will wait up to
     5 seconds for it to complete. After that, they'll make their own request.
     """
     try:
         # Simulate unreliable external service
         logger.info(f"🌍 Fetching external resource: {resource_id}")
-        
+
         # Random delay to simulate network issues
         import random
+
         delay = random.uniform(1, 7)  # Sometimes exceeds timeout
         await asyncio.sleep(delay)
-        
+
         return {
             "status": "success",
             "resource_id": resource_id,
@@ -204,7 +205,7 @@ async def get_external_data(resource_id: str) -> dict[str, Any]:
             "fetch_time": delay,
             "timestamp": time.time(),
         }
-        
+
     except asyncio.CancelledError:
         logger.warning(f"Request cancelled for resource: {resource_id}")
         raise HTTPException(status_code=503, detail="Request cancelled")
@@ -217,32 +218,28 @@ async def get_external_data(resource_id: str) -> dict[str, Any]:
 @router.get("/test-deduplication")
 async def test_deduplication() -> dict[str, Any]:
     """Test endpoint that triggers multiple concurrent requests.
-    
+
     This demonstrates how deduplication works by making several
     concurrent requests to the same endpoints.
     """
     # Test 1: Multiple requests for the same item
-    item_tasks = [
-        get_item("test-item-123") for _ in range(5)
-    ]
-    
+    item_tasks = [get_item("test-item-123") for _ in range(5)]
+
     # Test 2: Multiple searches
-    search_tasks = [
-        search_items("python") for _ in range(3)
-    ]
-    
+    search_tasks = [search_items("python") for _ in range(3)]
+
     start_time = time.time()
-    
+
     # Execute all tasks concurrently
     item_results = await asyncio.gather(*item_tasks)
     search_results = await asyncio.gather(*search_tasks)
-    
+
     elapsed = time.time() - start_time
-    
+
     # Check if deduplication worked
     item_timestamps = [r["data"]["fetched_at"] for r in item_results]
     search_timestamps = [r["data"]["api_timestamp"] for r in search_results]
-    
+
     return {
         "status": "success",
         "elapsed_time": elapsed,

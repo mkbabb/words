@@ -7,7 +7,7 @@
         <Button
           variant="ghost"
           size="sm"
-          @click="clearAllCriteria"
+          @click.stop="clearAllCriteria"
           class="h-7 px-2 text-xs hover:text-destructive"
         >
           <X :size="12" class="mr-1" />
@@ -48,7 +48,7 @@
             
             <!-- Direction toggle -->
             <button
-              @click="toggleDirection(criterion.id)"
+              @click.stop="toggleDirection(criterion.id)"
               :class="[
                 'flex items-center justify-center w-6 h-6 rounded transition-colors',
                 'hover:bg-primary/20 text-primary hover:text-primary-foreground'
@@ -61,7 +61,7 @@
             
             <!-- Remove button -->
             <button
-              @click="removeCriterion(criterion.id)"
+              @click.stop="removeCriterion(criterion.id)"
               class="flex items-center justify-center w-6 h-6 rounded transition-colors hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
               title="Remove criterion"
             >
@@ -79,7 +79,7 @@
         <button
           v-for="option in availableOptions"
           :key="option.field"
-          @click="addCriterion(option.field)"
+          @click.stop="addCriterion(option.field)"
           :disabled="isCriterionActive(option.field)"
           :class="[
             'flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200',

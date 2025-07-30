@@ -331,7 +331,7 @@ const handleWordlistDelete = async (wordlist: WordList) => {
 
 const handleWordlistDuplicate = async (wordlist: WordList) => {
   try {
-    const words = wordlist.words.map(w => w.text);
+    const words = wordlist.words.map(w => w.word);
     const result = await wordlistApi.createWordlist({
       name: `${wordlist.name} (Copy)`,
       description: wordlist.description,

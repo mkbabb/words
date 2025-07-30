@@ -19,7 +19,7 @@ class PerformanceMetrics:
 
     _instance = None
 
-    def __new__(cls) -> 'PerformanceMetrics':
+    def __new__(cls) -> "PerformanceMetrics":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialize()
@@ -156,7 +156,9 @@ async def track_request_performance(request: Request, response: Response) -> Any
             logger.warning(f"Slow request: {endpoint} took {duration:.2f}s")
 
 
-def track_db_operation(collection: str, operation: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+def track_db_operation(
+    collection: str, operation: str
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator for tracking database operation performance."""
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:

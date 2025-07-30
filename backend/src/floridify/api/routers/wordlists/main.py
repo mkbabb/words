@@ -1,13 +1,12 @@
 """WordLists API - Simplified CRUD operations for word lists."""
 
-import json
 import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from ....wordlist.models import WordList
@@ -38,7 +37,7 @@ def get_wordlist_repo() -> WordListRepository:
 
 class WordListQueryParams(BaseModel):
     """Query parameters for listing wordlists."""
-    
+
     name: str | None = Field(None, description="Exact name match")
     name_pattern: str | None = Field(None, description="Partial name match")
     owner_id: str | None = Field(None, description="Filter by owner")
@@ -50,7 +49,7 @@ class WordListQueryParams(BaseModel):
     created_before: datetime | None = Field(None, description="Created before date")
 
 
-@router.get("", response_model=ListResponse[WordList])
+@router.get("", response_model=ListResponse[dict[str, Any]])
 async def list_wordlists(
     repo: WordListRepository = Depends(get_wordlist_repo),
     pagination: PaginationParams = Depends(get_pagination),
@@ -58,7 +57,7 @@ async def list_wordlists(
     params: WordListQueryParams = Depends(),
 ) -> ListResponse[WordList]:
     """List wordlists with filtering and pagination.
-    
+
     Query Parameters:
         - name/name_pattern: Name filters
         - owner_id: Filter by owner
@@ -67,7 +66,7 @@ async def list_wordlists(
         - min/max_words: Word count range
         - created_after/before: Date range
         - Standard pagination params
-    
+
     Returns:
         Paginated list of wordlists.
     """
@@ -83,7 +82,7 @@ async def list_wordlists(
         created_after=params.created_after,
         created_before=params.created_before,
     )
-    
+
     # Get data
     wordlists, total = await repo.list(
         filter_dict=filter_params.to_query(),
@@ -91,8 +90,14 @@ async def list_wordlists(
         sort=sort,
     )
     
+    # Populate word text for each wordlist
+    populated_wordlists = []
+    for wordlist in wordlists:
+        populated_data = await repo.populate_words(wordlist)
+        populated_wordlists.append(populated_data)
+
     return ListResponse(
-        items=wordlists,
+        items=populated_wordlists,
         total=total,
         offset=pagination.offset,
         limit=pagination.limit,
@@ -105,21 +110,21 @@ async def create_wordlist(
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Create a new wordlist.
-    
+
     Body:
         - name: List name (required)
         - description: List description
         - is_public: Visibility (default: false)
         - tags: List of tags
         - words: Initial words (optional)
-    
+
     Returns:
         Created wordlist with resource links.
     """
     wordlist = await repo.create(data)
-    
+
     return ResourceResponse(
-        data=wordlist.model_dump(mode='json'),
+        data=wordlist.model_dump(mode="json"),
         links={
             "self": f"/wordlists/{wordlist.id}",
             "words": f"/wordlists/{wordlist.id}/words",
@@ -134,22 +139,25 @@ async def get_wordlist(
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Get wordlist details.
-    
+
     Returns:
         Wordlist with metadata and statistics.
     """
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
-    
+
     # Calculate statistics
     total_words = len(wordlist.words)
     mastery_distribution: dict[str, int] = {}
     for word in wordlist.words:
         level = word.mastery_level.value
         mastery_distribution[level] = mastery_distribution.get(level, 0) + 1
-    
+
+    # Populate with word text
+    wordlist_data = await repo.populate_words(wordlist)
+
     return ResourceResponse(
-        data=wordlist.model_dump(mode='json'),
+        data=wordlist_data,
         metadata={
             "statistics": {
                 "total_words": total_words,
@@ -173,12 +181,12 @@ async def get_wordlist_statistics(
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Get detailed wordlist statistics.
-    
+
     Returns:
         Comprehensive statistics about the wordlist.
     """
     stats = await repo.get_statistics(wordlist_id)
-    
+
     return ResourceResponse(
         data=stats,
         links={
@@ -194,20 +202,20 @@ async def update_wordlist(
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Update wordlist metadata.
-    
+
     Body:
         - name: New name
         - description: New description
         - is_public: New visibility
         - tags: New tags
-    
+
     Returns:
         Updated wordlist.
     """
     wordlist = await repo.update(wordlist_id, data)
-    
+
     return ResourceResponse(
-        data=wordlist.model_dump(mode='json'),
+        data=wordlist.model_dump(mode="json"),
         metadata={
             "version": wordlist.version,
         },
@@ -236,35 +244,35 @@ async def upload_wordlist(
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Upload a wordlist from a file.
-    
+
     Accepts text files with one word per line.
-    
+
     Form Data:
         - file: Text file with words
         - name: List name (auto-generated if not provided)
         - description: List description
         - is_public: Visibility
-    
+
     Returns:
         Created wordlist.
     """
     try:
         # Read file content
         content = await file.read()
-        
+
         # Create temporary file for parser
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.txt') as tmp_file:
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as tmp_file:
             tmp_file.write(content)
             tmp_path = Path(tmp_file.name)
-        
+
         try:
             # Parse file
             parsed = parse_file(tmp_path)
-            
+
             # Generate name if not provided
             if not name:
                 name = generate_wordlist_name(parsed.words)
-            
+
             # Create wordlist
             data = WordListCreate(
                 name=name,
@@ -273,9 +281,9 @@ async def upload_wordlist(
                 tags=parsed.metadata.get("tags", []),
                 words=parsed.words,
             )
-            
+
             wordlist = await repo.create(data)
-            
+
             return ResourceResponse(
                 data={
                     "id": str(wordlist.id),
@@ -292,41 +300,47 @@ async def upload_wordlist(
                     "words": f"/wordlists/{wordlist.id}/words",
                 },
             )
-            
+
         finally:
             # Clean up temp file
             tmp_path.unlink(missing_ok=True)
-            
+
     except Exception as e:
         raise HTTPException(400, detail=f"Failed to parse file: {str(e)}")
 
 
-@router.get("/search/{query}", response_model=ListResponse[WordList])
+@router.get("/search/{query}", response_model=ListResponse[dict[str, Any]])
 async def search_wordlists(
     query: str,
     limit: int = 10,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ListResponse[WordList]:
     """Search wordlists by name.
-    
+
     Path Parameters:
         - query: Search query
-    
+
     Query Parameters:
         - limit: Maximum results
-    
+
     Returns:
         Matching wordlists.
     """
     filter_params = WordListFilter(name_pattern=query, min_words=None, max_words=None)
-    
+
     wordlists, total = await repo.list(
         filter_dict=filter_params.to_query(),
         pagination=PaginationParams(offset=0, limit=limit),
     )
     
+    # Populate word text for each wordlist
+    populated_wordlists = []
+    for wordlist in wordlists:
+        populated_data = await repo.populate_words(wordlist)
+        populated_wordlists.append(populated_data)
+
     return ListResponse(
-        items=wordlists,
+        items=populated_wordlists,
         total=total,
         offset=0,
         limit=limit,

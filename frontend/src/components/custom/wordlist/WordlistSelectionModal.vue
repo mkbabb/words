@@ -312,11 +312,11 @@ const handleAddToWordlist = async (wordlist: WordList) => {
 
     // Add word to local wordlist
     const newWord = {
-      text: props.word,
+      word: props.word,
       frequency: 1,
-      selected_definitions: [],
-      mastery_level: 'bronze' as const,
-      temperature: 'cold' as const,
+      selected_definition_ids: [],
+      mastery_level: MasteryLevel.BRONZE,
+      temperature: Temperature.COLD,
       review_data: {
         repetitions: 0,
         ease_factor: 2.5,
@@ -328,8 +328,6 @@ const handleAddToWordlist = async (wordlist: WordList) => {
       },
       last_visited: null,
       added_date: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
       notes: '',
       tags: [],
     };

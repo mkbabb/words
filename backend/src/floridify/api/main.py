@@ -29,10 +29,10 @@ from .routers import (
     search,
     suggestions,
     word_of_the_day,
-    words,
-    wordlists,
-    wordlist_words,
     wordlist_reviews,
+    wordlist_words,
+    wordlists,
+    words,
 )
 
 # Configure logging for the application
@@ -45,30 +45,30 @@ async def lifespan(app: FastAPI) -> Any:
     # Startup
     try:
         # Initialize MongoDB storage
-        storage = await get_storage()
+        await get_storage()
         print("✅ MongoDB storage initialized successfully")
-        
+
         # Initialize language search engine (singleton)
-        language_search = await get_language_search([Language.ENGLISH])
+        await get_language_search([Language.ENGLISH])
         print("✅ Language search engine initialized successfully")
-        
+
         # Initialize text processor (singleton)
-        text_processor = get_text_processor()
+        get_text_processor()
         print("✅ Text processor initialized successfully")
-        
+
         # Initialize AI components (singletons)
-        ai_connector = get_openai_connector()
+        get_openai_connector()
         print("✅ OpenAI connector initialized successfully")
-        
-        definition_synthesizer = get_definition_synthesizer()
+
+        get_definition_synthesizer()
         print("✅ Definition synthesizer initialized successfully")
-        
+
     except Exception as e:
         print(f"❌ Application initialization failed: {e}")
         raise
-    
+
     yield
-    
+
     # Shutdown
     print("🔄 Shutting down...")
 

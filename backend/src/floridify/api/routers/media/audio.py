@@ -3,23 +3,28 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from ....models import AudioMedia
 from ....utils.paths import get_project_root
 from ...core import (
-    ErrorDetail,
-    ErrorResponse,
+    ForbiddenException,
+    InvalidContentTypeException,
     ListResponse,
+    # Centralized exception handling
+    NotFoundException,
     PaginationParams,
+    PayloadTooLargeException,
     ResourceResponse,
     SortParams,
+    VersionConflictException,
     get_pagination,
     get_sort,
 )
@@ -40,12 +45,16 @@ def get_audio_repo() -> AudioRepository:
 
 class AudioQueryParams(BaseModel):
     """Query parameters for listing audio files."""
-    
+
     format: str | None = Field(None, description="Filter by format (mp3, wav, ogg)")
     accent: str | None = Field(None, description="Filter by accent (us, uk, au)")
-    quality: Literal["low", "standard", "high"] | None = Field(None, description="Filter by quality")
+    quality: Literal["low", "standard", "high"] | None = Field(
+        None, description="Filter by quality"
+    )
     min_duration_ms: int | None = Field(None, description="Minimum duration in milliseconds")
     max_duration_ms: int | None = Field(None, description="Maximum duration in milliseconds")
+    created_after: datetime | None = Field(None, description="Created after date")
+    created_before: datetime | None = Field(None, description="Created before date")
 
 
 @router.get("", response_model=ListResponse[dict[str, Any]])
@@ -56,14 +65,14 @@ async def list_audio_files(
     params: AudioQueryParams = Depends(),
 ) -> ListResponse[dict[str, Any]]:
     """List audio files with filtering and pagination.
-    
+
     Query Parameters:
         - format: Filter by audio format
         - accent: Filter by accent
         - quality: Filter by quality level
         - min/max_duration_ms: Duration range filter
         - Standard pagination params
-    
+
     Returns:
         Paginated list of audio metadata.
     """
@@ -74,30 +83,34 @@ async def list_audio_files(
         quality=params.quality,
         min_duration_ms=params.min_duration_ms,
         max_duration_ms=params.max_duration_ms,
+        created_after=params.created_after,
+        created_before=params.created_before,
     )
-    
+
     # Get data
     audio_files, total = await repo.list(
         filter_dict=filter_params.to_query(),
         pagination=pagination,
         sort=sort,
     )
-    
+
     # Convert to response format
     items = []
     for audio in audio_files:
-        items.append({
-            "id": str(audio.id),
-            "url": audio.url,
-            "format": audio.format,
-            "size_bytes": audio.size_bytes,
-            "duration_ms": audio.duration_ms,
-            "accent": audio.accent,
-            "quality": audio.quality,
-            "content_url": f"/api/v1/audio/{audio.id}/content",
-            "created_at": audio.created_at.isoformat() if audio.created_at else None,
-        })
-    
+        items.append(
+            {
+                "id": str(audio.id),
+                "url": audio.url,
+                "format": audio.format,
+                "size_bytes": audio.size_bytes,
+                "duration_ms": audio.duration_ms,
+                "accent": audio.accent,
+                "quality": audio.quality,
+                "content_url": f"/api/v1/audio/{audio.id}/content",
+                "created_at": audio.created_at.isoformat() if audio.created_at else None,
+            }
+        )
+
     return ListResponse(
         items=items,
         total=total,
@@ -114,75 +127,59 @@ async def upload_audio(
     repo: AudioRepository = Depends(get_audio_repo),
 ) -> ResourceResponse:
     """Upload a new audio file.
-    
+
     Body:
         - file: Audio file (multipart/form-data)
-    
+
     Query Parameters:
         - accent: Audio accent
         - quality: Audio quality level
-    
+
     Returns:
         Created audio metadata with resource links.
-    
+
     Errors:
         400: Invalid audio file
         413: File too large (max 50MB)
     """
     # Validate file type
     if not file.content_type or not file.content_type.startswith("audio/"):
-        raise HTTPException(
-            400,
-            detail=ErrorResponse(
-                error="Invalid file type",
-                details=[
-                    ErrorDetail(
-                        field="file",
-                        message=f"File must be audio, got {file.content_type}",
-                        code="invalid_type",
-                    )
-                ],
-            ).model_dump(),
+        raise InvalidContentTypeException(
+            expected_type="audio",
+            actual_type=file.content_type,
+            field="file",
         )
-    
+
     # Read file data
     data = await file.read()
-    
+
     # Check file size (max 50MB for audio)
     if len(data) > 50 * 1024 * 1024:
-        raise HTTPException(
-            413,
-            detail=ErrorResponse(
-                error="File too large",
-                details=[
-                    ErrorDetail(
-                        field="file",
-                        message="File size must be less than 50MB",
-                        code="file_too_large",
-                    )
-                ],
-            ).model_dump(),
+        raise PayloadTooLargeException(
+            max_size="50MB",
+            field="file",
         )
-    
+
     # Save file to disk
     # Create audio cache directory if not exists
     cache_dir = get_project_root() / "data" / "audio_cache" / "uploads"
     cache_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Generate filename
     import uuid
-    file_ext = file.filename.split('.')[-1] if file.filename else 'mp3'
+
+    file_ext = file.filename.split(".")[-1] if file.filename else "mp3"
     filename = f"{uuid.uuid4()}.{file_ext}"
     file_path = cache_dir / filename
-    
+
     # Write file
-    with open(file_path, 'wb') as f:
+    with open(file_path, "wb") as f:
         f.write(data)
-    
+
     # Get audio duration (simplified - in real app use audio library)
     # For now, estimate based on file size and format
     duration_ms = len(data) // 100  # Very rough estimate
-    
+
     # Create audio entry
     audio_data = AudioCreate(
         url=str(file_path),
@@ -192,9 +189,9 @@ async def upload_audio(
         accent=accent,
         quality=quality,
     )
-    
+
     audio = await repo.create(audio_data)
-    
+
     return ResourceResponse(
         data={
             "id": str(audio.id),
@@ -219,19 +216,19 @@ async def get_audio_metadata(
     repo: AudioRepository = Depends(get_audio_repo),
 ) -> ResourceResponse:
     """Get audio metadata.
-    
+
     Path Parameters:
         - audio_id: ID of the audio file
-    
+
     Returns:
         Audio metadata with resource links.
-    
+
     Errors:
         404: Audio not found
     """
     audio = await repo.get(audio_id, raise_on_missing=True)
     assert audio is not None
-    
+
     return ResourceResponse(
         data={
             "id": str(audio.id),
@@ -271,7 +268,7 @@ async def get_audio_content(audio_id: str) -> FileResponse:
     # Get the audio media document
     audio = await AudioMedia.get(audio_id)
     if not audio:
-        raise HTTPException(status_code=404, detail="Audio file not found")
+        raise NotFoundException(resource="Audio file", identifier=audio_id)
 
     # Get the file path
     file_path = Path(audio.url)
@@ -282,7 +279,7 @@ async def get_audio_content(audio_id: str) -> FileResponse:
 
     # Verify the file exists
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Audio file not found on disk")
+        raise NotFoundException(resource="Audio file", identifier="file on disk")
 
     # Return the file
     return FileResponse(
@@ -300,27 +297,27 @@ async def update_audio(
     repo: AudioRepository = Depends(get_audio_repo),
 ) -> ResourceResponse:
     """Update audio metadata.
-    
+
     Path Parameters:
         - audio_id: ID of the audio to update
-    
+
     Query Parameters:
         - version: Version for optimistic locking
-    
+
     Body:
         - accent: Audio accent
         - quality: Audio quality level
-    
+
     Returns:
         Updated audio metadata.
-    
+
     Errors:
         404: Audio not found
         409: Version conflict
     """
     try:
         audio = await repo.update(audio_id, update, version)
-        
+
         return ResourceResponse(
             data={
                 "id": str(audio.id),
@@ -343,18 +340,11 @@ async def update_audio(
         )
     except ValueError as e:
         if "Version mismatch" in str(e):
-            raise HTTPException(
-                409,
-                detail=ErrorResponse(
-                    error="Version conflict",
-                    details=[
-                        ErrorDetail(
-                            field="version",
-                            message=str(e),
-                            code="version_conflict",
-                        )
-                    ],
-                ).model_dump(),
+            # Extract version numbers from error message if possible
+            raise VersionConflictException(
+                expected=version or 0,
+                actual=audio.version,
+                resource="Audio",
             )
         raise
 
@@ -365,20 +355,20 @@ async def delete_audio(
     repo: AudioRepository = Depends(get_audio_repo),
 ) -> None:
     """Delete an audio file.
-    
+
     Path Parameters:
         - audio_id: ID of the audio to delete
-    
+
     Errors:
         404: Audio not found
     """
     # Get audio to check file path
     audio = await repo.get(audio_id, raise_on_missing=True)
     assert audio is not None
-    
+
     # Delete from database
     await repo.delete(audio_id)
-    
+
     # Try to delete file from disk if it's in uploads
     if "/uploads/" in audio.url:
         try:
@@ -422,18 +412,25 @@ async def get_cached_audio(subdir: str, filename: str) -> FileResponse:
         file_path = file_path.resolve()
         cache_dir = cache_dir.resolve()
         if not str(file_path).startswith(str(cache_dir)):
-            raise HTTPException(status_code=403, detail="Access denied")
+            raise ForbiddenException(
+                message="Cannot access files outside audio cache",
+                resource="audio cache",
+            )
     except Exception:
-        raise HTTPException(status_code=404, detail="Invalid file path")
+        raise NotFoundException(resource="File path", identifier=str(file_path))
 
     # Verify the file exists
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Audio file not found")
+        raise NotFoundException(resource="Audio file", identifier=filename)
 
     # Determine format from extension
     format = file_path.suffix.lstrip(".")
     if format not in ["mp3", "wav", "ogg"]:
-        raise HTTPException(status_code=400, detail="Invalid audio format")
+        raise InvalidContentTypeException(
+            expected_type="mp3, wav, or ogg",
+            actual_type=format,
+            field="format",
+        )
 
     # Return the file
     return FileResponse(

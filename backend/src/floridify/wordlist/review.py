@@ -1,7 +1,6 @@
 """Spaced repetition review logic using SM-2 algorithm."""
 
 from datetime import datetime, timedelta
-from typing import Any
 
 from pydantic import BaseModel, Field
 

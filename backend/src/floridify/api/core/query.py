@@ -8,12 +8,12 @@ from beanie import Document
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo import ASCENDING, DESCENDING
 from pymongo.operations import (
-    InsertOne,
-    UpdateOne,
-    UpdateMany,
-    ReplaceOne,
-    DeleteOne,
     DeleteMany,
+    DeleteOne,
+    InsertOne,
+    ReplaceOne,
+    UpdateMany,
+    UpdateOne,
 )
 
 from ...storage.mongodb import get_database
@@ -120,7 +120,7 @@ class QueryOptimizer:
                     index_kwargs["unique"] = options["unique"]
                 if "sparse" in options:
                     index_kwargs["sparse"] = options["sparse"]
-                    
+
                 index_name = await collection.create_index(keys, session=None, **index_kwargs)
                 created.append(index_name)
                 logger.info(f"Created index {index_name} on {model.__name__}")
@@ -233,7 +233,9 @@ class BulkOperationBuilder:
 
     def __init__(self, model: type[Document]):
         self.model = model
-        self.operations: list[InsertOne[Any] | UpdateOne | UpdateMany | ReplaceOne[Any] | DeleteOne | DeleteMany] = []
+        self.operations: list[
+            InsertOne[Any] | UpdateOne | UpdateMany | ReplaceOne[Any] | DeleteOne | DeleteMany
+        ] = []
 
     def insert_one(self, document: dict[str, Any]) -> "BulkOperationBuilder":
         """Add insert operation."""

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import builtins
 from datetime import datetime
 from typing import Any
 
 from beanie import PydanticObjectId
 from beanie.odm.enums import SortDirection
-from beanie.operators import In, RegEx
 from pydantic import BaseModel, Field
 
 from ...models import ImageMedia
@@ -16,7 +16,7 @@ from ..core import BaseRepository, PaginationParams, SortParams
 
 class ImageFilter(BaseModel):
     """Filter parameters for image queries."""
-    
+
     format: str | None = Field(None, description="Image format (png, jpg, webp)")
     min_width: int | None = Field(None, description="Minimum width in pixels")
     max_width: int | None = Field(None, description="Maximum width in pixels")
@@ -25,11 +25,11 @@ class ImageFilter(BaseModel):
     has_alt_text: bool | None = Field(None, description="Has alt text")
     created_after: datetime | None = Field(None, description="Created after date")
     created_before: datetime | None = Field(None, description="Created before date")
-    
+
     def to_query(self) -> dict[str, Any]:
         """Convert to MongoDB query."""
         query: dict[str, Any] = {}
-        
+
         if self.format:
             query["format"] = self.format
         if self.min_width:
@@ -49,13 +49,13 @@ class ImageFilter(BaseModel):
             query["created_at"] = {"$gte": self.created_after}
         if self.created_before:
             query.setdefault("created_at", {})["$lte"] = self.created_before
-            
+
         return query
 
 
 class ImageCreate(BaseModel):
     """Schema for creating an image."""
-    
+
     data: bytes = Field(..., description="Binary image data")
     format: str = Field(..., description="Image format")
     size_bytes: int = Field(..., gt=0, description="File size in bytes")
@@ -68,7 +68,7 @@ class ImageCreate(BaseModel):
 
 class ImageUpdate(BaseModel):
     """Schema for updating image metadata."""
-    
+
     alt_text: str | None = Field(None, description="Alternative text")
     description: str | None = Field(None, description="Image description")
     url: str | None = Field(None, description="External URL")
@@ -76,21 +76,23 @@ class ImageUpdate(BaseModel):
 
 class ImageRepository(BaseRepository[ImageMedia, ImageCreate, ImageUpdate]):
     """Repository for image operations."""
-    
-    model = ImageMedia
-    
+
+    def __init__(self) -> None:
+        """Initialize image repository."""
+        super().__init__(ImageMedia)
+
     async def list(
         self,
         filter_dict: dict[str, Any] | None = None,
         pagination: PaginationParams | None = None,
         sort: SortParams | None = None,
-    ) -> tuple[list[ImageMedia], int]:
+    ) -> tuple[builtins.list[ImageMedia], int]:
         """List images with filtering and pagination."""
         query = self.model.find(filter_dict or {})
-        
+
         # Get total count
         total = await query.count()
-        
+
         # Apply sorting
         if sort and sort.sort_by:
             sort_criteria = sort.get_sort_criteria()
@@ -100,14 +102,14 @@ class ImageRepository(BaseRepository[ImageMedia, ImageCreate, ImageUpdate]):
         else:
             # Default sort by created_at desc
             query = query.sort(("created_at", SortDirection.DESCENDING))
-        
+
         # Apply pagination
         if pagination:
             query = query.skip(pagination.skip).limit(pagination.limit)
-        
+
         items = await query.to_list()
         return items, total
-    
+
     async def create(self, data: ImageCreate) -> ImageMedia:
         """Create new image."""
         image = ImageMedia(
@@ -122,7 +124,7 @@ class ImageRepository(BaseRepository[ImageMedia, ImageCreate, ImageUpdate]):
         )
         await image.save()
         return image
-    
+
     async def update(
         self,
         item_id: PydanticObjectId,
@@ -132,35 +134,42 @@ class ImageRepository(BaseRepository[ImageMedia, ImageCreate, ImageUpdate]):
         """Update image metadata."""
         image = await self.get(item_id, raise_on_missing=True)
         assert image is not None
-        
+
         # Version check
         if version is not None and image.version != version:
             raise ValueError(f"Version mismatch: expected {version}, got {image.version}")
-        
+
         # Update fields
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(image, field, value)
-        
+
         image.version += 1
         await image.save()
-        
+
         return image
-    
-    async def delete(self, item_id: PydanticObjectId, cascade: bool = False) -> None:
+
+    async def delete(self, item_id: PydanticObjectId, cascade: bool = False) -> bool:
         """Delete image."""
         image = await self.get(item_id, raise_on_missing=True)
         assert image is not None
-        
+
         # Note: cascade not applicable for images, but keeping for consistency
         await image.delete()
-    
-    async def get_by_format(self, format: str) -> list[ImageMedia]:
+        return True
+
+    async def get_by_format(self, format: str) -> builtins.list[ImageMedia]:
         """Get all images by format."""
         return await self.model.find(ImageMedia.format == format).to_list()
-    
-    async def get_orphaned_images(self) -> list[ImageMedia]:
+
+    async def get_orphaned_images(self) -> builtins.list[ImageMedia]:
         """Get images not referenced by any definitions."""
         # This would require checking against Definition.image_ids
         # For now, return empty list - can be implemented later
         return []
+
+    async def _cascade_delete(self, doc: ImageMedia) -> None:
+        """Handle cascade deletion of related documents."""
+        # For images, no cascade deletion is needed
+        # But we could clean up references in other documents if needed
+        pass

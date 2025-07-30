@@ -7,10 +7,10 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
+from ....models import Word
 from ....wordlist.constants import MasteryLevel
 from ...core import ListResponse, ResourceResponse
-from ...repositories import WordListRepository, WordReviewRequest, StudySessionRequest
-
+from ...repositories import StudySessionRequest, WordListRepository, WordReviewRequest
 
 router = APIRouter()
 
@@ -22,17 +22,16 @@ def get_wordlist_repo() -> WordListRepository:
 
 class ReviewSessionParams(BaseModel):
     """Parameters for getting a review session."""
-    
+
     limit: int = Field(20, ge=1, le=50, description="Maximum words to review")
     mastery_threshold: MasteryLevel = Field(
-        MasteryLevel.SILVER,
-        description="Maximum mastery level to include"
+        MasteryLevel.SILVER, description="Maximum mastery level to include"
     )
 
 
 class BulkReviewRequest(BaseModel):
     """Request for bulk review submission."""
-    
+
     reviews: list[WordReviewRequest] = Field(..., description="List of word reviews")
 
 
@@ -43,26 +42,34 @@ async def get_due_words(
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ListResponse[dict[str, Any]]:
     """Get words due for review based on spaced repetition.
-    
+
     Query Parameters:
         - limit: Maximum number of due words
-    
+
     Returns:
         List of words that need review.
     """
     due_words = await repo.get_due_words(wordlist_id, limit)
-    
+
+    # Fetch Word documents to get text
+    word_ids = [w.word_id for w in due_words]
+    words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+    word_text_map = {str(word.id): word.text for word in words}
+
     items = []
-    for word in due_words:
-        items.append({
-            "word_id": word.word_id,
-            "text": word.text,
-            "mastery_level": word.mastery_level,
-            "last_reviewed": word.review_data.last_review_date.isoformat() if word.review_data.last_review_date else None,
-            "review_count": word.review_data.repetitions,
-            "due_priority": word.get_overdue_days(),
-        })
-    
+    for word_item in due_words:
+        items.append(
+            {
+                "word": word_text_map.get(word_item.word_id, ""),
+                "mastery_level": word_item.mastery_level,
+                "last_reviewed": word_item.review_data.last_review_date.isoformat()
+                if word_item.review_data.last_review_date
+                else None,
+                "review_count": word_item.review_data.repetitions,
+                "due_priority": word_item.get_overdue_days(),
+            }
+        )
+
     return ListResponse(
         items=items,
         total=len(items),
@@ -78,45 +85,53 @@ async def get_review_session(
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Get a new review session with words to study.
-    
+
     Query Parameters:
         - limit: Maximum words in session
         - mastery_threshold: Include words up to this mastery level
-    
+
     Returns:
         Review session with selected words.
     """
     # Get wordlist
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
-    
+
     # Select words for review
     review_words = []
     now = datetime.utcnow()
-    
+
     for word in wordlist.words:
         # Skip if above mastery threshold
         if word.mastery_level.value > params.mastery_threshold.value:
             continue
-        
+
         # Include if due for review
         if word.is_due_for_review():
             review_words.append(word)
-        
+
         if len(review_words) >= params.limit:
             break
-    
+
+    # Fetch Word documents to get text for review words
+    word_ids = [w.word_id for w in review_words]
+    words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+    word_text_map = {str(word.id): word.text for word in words}
+
     # Convert to response
     session_words = []
-    for word in review_words:
-        session_words.append({
-            "word_id": word.word_id,
-            "text": word.text,
-            "mastery_level": word.mastery_level,
-            "last_reviewed": word.review_data.last_review_date.isoformat() if word.review_data.last_review_date else None,
-            "notes": word.notes,
-        })
-    
+    for word_item in review_words:
+        session_words.append(
+            {
+                "word": word_text_map.get(word_item.word_id, ""),
+                "mastery_level": word_item.mastery_level,
+                "last_reviewed": word_item.review_data.last_review_date.isoformat()
+                if word_item.review_data.last_review_date
+                else None,
+                "notes": word_item.notes,
+            }
+        )
+
     return ResourceResponse(
         data={
             "session_id": str(wordlist.id) + "_" + str(int(now.timestamp())),
@@ -143,29 +158,35 @@ async def submit_review(
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Submit a single word review result.
-    
+
     Body:
         - word: Word that was reviewed
         - mastery_level: New mastery level
         - quality_score: Review quality (0-1)
-    
+
     Returns:
         Updated word metadata.
     """
     updated_list = await repo.review_word(wordlist_id, request)
-    
-    # Find the updated word
+
+    # Find the updated word by fetching Word documents
+    word_ids = [w.word_id for w in updated_list.words]
+    words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+    word_text_map = {str(word.id): word.text for word in words}
+
     updated_word = None
-    for word in updated_list.words:
-        if word.text == request.word:
-            updated_word = word
+    for word_item in updated_list.words:
+        if word_text_map.get(word_item.word_id, "") == request.word:
+            updated_word = word_item
             break
-    
+
     return ResourceResponse(
         data={
             "word": request.word,
             "mastery_level": updated_word.mastery_level if updated_word else None,
-            "last_reviewed": updated_word.review_data.last_review_date.isoformat() if updated_word and updated_word.review_data.last_review_date else None,
+            "last_reviewed": updated_word.review_data.last_review_date.isoformat()
+            if updated_word and updated_word.review_data.last_review_date
+            else None,
         },
         metadata={
             "wordlist_version": updated_list.version,
@@ -184,24 +205,24 @@ async def submit_bulk_reviews(
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Submit multiple word reviews at once.
-    
+
     Body:
         - reviews: List of review results
-    
+
     Returns:
         Summary of review results.
     """
     # Process each review
     success_count = 0
     failed_words = []
-    
+
     for review in request.reviews:
         try:
             await repo.review_word(wordlist_id, review)
             success_count += 1
         except Exception:
             failed_words.append(review.word)
-    
+
     return ResourceResponse(
         data={
             "total_reviewed": len(request.reviews),
@@ -223,22 +244,24 @@ async def record_study_session(
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ResourceResponse:
     """Record a study session.
-    
+
     Body:
         - duration_minutes: Session duration
         - words_studied: Number of words studied
         - words_mastered: Number of words mastered
-    
+
     Returns:
         Updated statistics.
     """
     updated_list = await repo.record_study_session(wordlist_id, request)
-    
+
     return ResourceResponse(
         data={
             "total_study_time": updated_list.learning_stats.study_time_minutes,
             "study_session_count": updated_list.learning_stats.total_reviews,
-            "last_studied": updated_list.learning_stats.last_study_date.isoformat() if updated_list.learning_stats.last_study_date else None,
+            "last_studied": updated_list.learning_stats.last_study_date.isoformat()
+            if updated_list.learning_stats.last_study_date
+            else None,
         },
         metadata={
             "session": {

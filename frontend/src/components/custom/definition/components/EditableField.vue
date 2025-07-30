@@ -196,7 +196,8 @@ function cancel() {
 }
 
 // Keyboard handling
-const keys = useMagicKeys({ target: contentRef });
+const target = computed(() => contentRef.value || document.body);
+const keys = useMagicKeys({ target });
 
 // Save with Shift+Enter (for multiline) or Enter (for single line)
 function handleKeydown(event: KeyboardEvent) {

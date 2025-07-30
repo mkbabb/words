@@ -490,12 +490,7 @@ export const imageApi = {
     
     const response = await api.post<ResourceResponse>(
       `/images${params.toString() ? '?' + params.toString() : ''}`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
+      formData
     );
     
     // Extract image data from ResourceResponse

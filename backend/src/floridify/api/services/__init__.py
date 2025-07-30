@@ -4,6 +4,6 @@ from .loaders import DataLoader, DefinitionLoader, PronunciationLoader
 
 __all__ = [
     "DataLoader",
-    "DefinitionLoader", 
+    "DefinitionLoader",
     "PronunciationLoader",
 ]

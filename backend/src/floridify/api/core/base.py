@@ -4,38 +4,22 @@ from __future__ import annotations
 
 import builtins
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from beanie import Document, PydanticObjectId
 from beanie.odm.enums import SortDirection
 from beanie.operators import In
-from fastapi import HTTPException, Request
+from fastapi import Request, Response
 from pydantic import BaseModel, ConfigDict, Field
+
+from .exceptions import ErrorResponse, NotFoundException, VersionConflictException
 
 T = TypeVar("T", bound=Document)
 CreateSchema = TypeVar("CreateSchema", bound=BaseModel)
 UpdateSchema = TypeVar("UpdateSchema", bound=BaseModel)
 ResponseT = TypeVar("ResponseT")
 ListT = TypeVar("ListT")  # Generic type for list responses
-
-
-class ErrorDetail(BaseModel):
-    """Standard error detail."""
-
-    field: str | None = None
-    message: str
-    code: str | None = None
-
-
-class ErrorResponse(BaseModel):
-    """Standard error response."""
-
-    error: str
-    details: list[ErrorDetail] | None = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    request_id: str | None = None
 
 
 class PaginationParams(BaseModel):
@@ -58,7 +42,9 @@ class SortParams(BaseModel):
     def get_sort_criteria(self) -> list[tuple[str, SortDirection]] | None:
         if not self.sort_by:
             return None
-        direction = SortDirection.ASCENDING if self.sort_order == "asc" else SortDirection.DESCENDING
+        direction = (
+            SortDirection.ASCENDING if self.sort_order == "asc" else SortDirection.DESCENDING
+        )
         return [(self.sort_by, direction)]
 
 
@@ -78,7 +64,7 @@ class FieldSelection(BaseModel):
         return data
 
 
-class ListResponse(BaseModel, Generic[ListT]):
+class ListResponse[ListT](BaseModel):
     """Standard list response with pagination metadata."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -119,7 +105,7 @@ class BatchResponse(BaseModel):
     failed: int
 
 
-class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
+class BaseRepository[T: Document, CreateSchema: BaseModel, UpdateSchema: BaseModel](ABC):
     """Base repository for CRUD operations."""
 
     def __init__(self, model: type[T]):
@@ -129,7 +115,10 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
         """Get a single document by ID."""
         doc = await self.model.get(id)
         if not doc and raise_on_missing:
-            raise HTTPException(404, f"{self.model.__name__} not found")
+            raise NotFoundException(
+                resource=self.model.__name__,
+                identifier=str(id),
+            )
         return doc
 
     # Placeholder for duplicate methods - real implementations below
@@ -146,12 +135,19 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
         """Update a document with optional optimistic locking."""
         doc = await self.get(id, raise_on_missing=True)
         if doc is None:
-            raise HTTPException(404, "Document not found")
+            raise NotFoundException(
+                resource=self.model.__name__,
+                identifier=str(id),
+            )
 
         # Check version for optimistic locking
         if version is not None and hasattr(doc, "version"):
             if doc.version != version:
-                raise HTTPException(409, "Version conflict")
+                raise VersionConflictException(
+                    expected=version,
+                    actual=doc.version,
+                    resource=self.model.__name__,
+                )
 
         # Update fields
         update_data = data.model_dump(exclude_unset=True)
@@ -169,7 +165,10 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
         """Delete a document, optionally with cascade."""
         doc = await self.get(id, raise_on_missing=True)
         if doc is None:
-            raise HTTPException(404, "Document not found")
+            raise NotFoundException(
+                resource=self.model.__name__,
+                identifier=str(id),
+            )
 
         if cascade:
             await self._cascade_delete(doc)
@@ -213,36 +212,37 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):
         return result.deleted_count if result else 0
 
     async def list(
-        self, filter_dict: dict[str, Any] | None = None, 
+        self,
+        filter_dict: dict[str, Any] | None = None,
         pagination: PaginationParams | None = None,
-        sort: SortParams | None = None
+        sort: SortParams | None = None,
     ) -> tuple[list[T], int]:
         """List documents with filtering, pagination, and sorting."""
         filter_dict = filter_dict or {}
         pagination = pagination or PaginationParams(offset=0, limit=20)
-        
+
         # Build query
         query = self.model.find(filter_dict)
-        
+
         # Apply sorting
         if sort and sort.sort_by:
-            sort_direction = SortDirection.ASCENDING if sort.sort_order == "asc" else SortDirection.DESCENDING
+            sort_direction = (
+                SortDirection.ASCENDING if sort.sort_order == "asc" else SortDirection.DESCENDING
+            )
             query = query.sort([(sort.sort_by, sort_direction)])
-        
+
         # Get total count
         total = await query.count()
-        
+
         # Apply pagination
         documents = await query.skip(pagination.offset).limit(pagination.limit).to_list()
-        
+
         return documents, total
 
     @abstractmethod
     async def _cascade_delete(self, doc: T) -> None:
         """Handle cascade deletion of related documents."""
         pass
-
-
 
 
 def get_etag(data: Any) -> str:
@@ -263,7 +263,7 @@ def check_etag(request: Request, etag: str) -> bool:
 # Response building utilities
 class ResponseBuilder:
     """Utility class for building consistent API responses."""
-    
+
     @staticmethod
     def build_resource_response(
         data: Any,
@@ -276,36 +276,38 @@ class ResponseBuilder:
     ) -> ResourceResponse:
         """Build a standardized resource response."""
         # Extract ID if not provided
-        if resource_id is None and hasattr(data, 'id'):
+        if resource_id is None and hasattr(data, "id"):
             resource_id = str(data.id)
-        elif resource_id is None and isinstance(data, dict) and 'id' in data:
-            resource_id = str(data['id'])
-            
+        elif resource_id is None and isinstance(data, dict) and "id" in data:
+            resource_id = str(data["id"])
+
         # Build links
         links = {
             "self": f"/{resource_type}s/{resource_id}" if resource_id else f"/{resource_type}s",
         }
         if additional_links:
             links.update(additional_links)
-            
+
         # Build metadata
-        metadata = {}
+        metadata: dict[str, Any] = {}
         if version is not None:
             metadata["version"] = version
         if updated_at is not None:
-            metadata["last_modified"] = updated_at.isoformat() if hasattr(updated_at, 'isoformat') else str(updated_at)
+            metadata["last_modified"] = (
+                updated_at.isoformat() if hasattr(updated_at, "isoformat") else str(updated_at)
+            )
         if additional_metadata:
             metadata.update(additional_metadata)
-            
+
         # Convert data to dict if it's a Pydantic model
-        response_data = data.model_dump(mode='json') if hasattr(data, 'model_dump') else data
-            
+        response_data = data.model_dump(mode="json") if hasattr(data, "model_dump") else data
+
         return ResourceResponse(
             data=response_data,
             metadata=metadata if metadata else None,
             links=links,
         )
-    
+
     @staticmethod
     def build_list_response(
         items: list[Any],
@@ -313,29 +315,28 @@ class ResponseBuilder:
         pagination: PaginationParams,
         resource_type: str | None = None,
         additional_metadata: dict[str, Any] | None = None,
-    ) -> ListResponse:
+    ) -> ListResponse[Any]:
         """Build a standardized list response."""
         # Convert items to dicts if they're Pydantic models
         serialized_items = [
-            item.model_dump(mode='json') if hasattr(item, 'model_dump') else item
-            for item in items
+            item.model_dump(mode="json") if hasattr(item, "model_dump") else item for item in items
         ]
-        
-        response = ListResponse(
+
+        response: ListResponse[Any] = ListResponse(
             items=serialized_items,
             total=total,
             offset=pagination.offset,
             limit=pagination.limit,
         )
-        
+
         # Add resource type to metadata if provided
         if resource_type and additional_metadata:
             additional_metadata["resource_type"] = resource_type
         elif resource_type:
             additional_metadata = {"resource_type": resource_type}
-            
+
         return response
-    
+
     @staticmethod
     def apply_etag(
         response: Response,
@@ -343,14 +344,14 @@ class ResponseBuilder:
         request: Request,
     ) -> bool:
         """Apply ETag to response and check for Not Modified.
-        
+
         Returns:
             True if the client has the latest version (304 Not Modified should be sent)
             False if the response should be sent normally
         """
         etag = get_etag(data)
         response.headers["ETag"] = etag
-        
+
         return check_etag(request, etag)
 
 
@@ -359,9 +360,11 @@ def get_pagination() -> PaginationParams:
     """Get pagination parameters from query params."""
     return PaginationParams(offset=0, limit=20)
 
+
 def get_sort() -> SortParams:
     """Get sort parameters from query params."""
     return SortParams(sort_by=None, sort_order="asc")
+
 
 def get_fields() -> FieldSelection:
     """Get field selection from query params."""

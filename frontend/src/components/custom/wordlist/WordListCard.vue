@@ -79,9 +79,9 @@
         <!-- Header -->
         <div class="flex items-center justify-between">
           <div>
-            <h4 class="font-semibold text-lg">{{ word.text }}</h4>
+            <h4 class="font-semibold text-lg">{{ word.word }}</h4>
             <p class="text-sm text-muted-foreground">
-              {{ getMasteryLabel(word.mastery_level) }} • {{ word.temperature === 'hot' ? 'Recently studied' : 'Not recently studied' }}
+              {{ getMasteryLabel(word.mastery_level) }} • {{ word.temperature === Temperature.HOT ? 'Recently studied' : 'Not recently studied' }}
             </p>
           </div>
           <div class="text-2xl">
@@ -192,6 +192,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import type { WordListItem, MasteryLevel } from '@/types';
+import { Temperature } from '@/types';
 
 interface Props {
   word: WordListItem;

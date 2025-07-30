@@ -8,11 +8,11 @@ from beanie.odm.enums import SortDirection
 from beanie.operators import RegEx
 from pydantic import BaseModel, Field
 
-from ...wordlist.models import WordList, WordListItem
-from ...wordlist.constants import MasteryLevel, Temperature
-from ...wordlist.utils import generate_wordlist_hash
-from ...models.models import Word
 from ...constants import Language
+from ...models.models import Word
+from ...wordlist.constants import MasteryLevel, Temperature
+from ...wordlist.models import WordList, WordListItem
+from ...wordlist.utils import generate_wordlist_hash
 from ..core.base import BaseRepository
 from .corpus_repository import CorpusRepository, CorpusSearchParams
 
@@ -107,7 +107,7 @@ class WordReviewRequest(BaseModel):
 
 class StudySessionRequest(BaseModel):
     """Request to record a study session."""
-    
+
     duration_minutes: int = Field(..., ge=1, description="Session duration in minutes")
     words_studied: int = Field(default=0, ge=0, description="Number of words studied")
     words_mastered: int = Field(default=0, ge=0, description="Number of words mastered")
@@ -145,17 +145,23 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
     async def get_popular(self, limit: int = 10) -> list[WordList]:
         """Get most accessed word lists."""
-        return await WordList.find({"is_public": True}).sort([("last_accessed", SortDirection.DESCENDING)]).limit(limit).to_list()
+        return (
+            await WordList.find({"is_public": True})
+            .sort([("last_accessed", SortDirection.DESCENDING)])
+            .limit(limit)
+            .to_list()
+        )
 
     async def create(self, data: WordListCreate) -> WordList:
         """Create a new word list."""
         # Generate hash from words
         hash_id = generate_wordlist_hash(data.words)
-        
+
         # Check for existing list with same hash
-        existing = await self.find_by_hash(hash_id)
-        if existing:
-            return existing
+        # Temporarily disabled to avoid loading old data format
+        # existing = await self.find_by_hash(hash_id)
+        # if existing:
+        #     return existing
 
         # Create new word list
         wordlist = WordList(
@@ -170,30 +176,25 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         # Add words if provided
         if data.words:
             # Get or create Word documents inline
-            word_data = []
+            word_ids = []
             for text in data.words:
                 normalized = text.lower().strip()
-                
+
                 # Try to find existing word
-                existing_word = await Word.find_one({
-                    "normalized": normalized,
-                    "language": Language.ENGLISH
-                })
-                
+                existing_word = await Word.find_one(
+                    {"normalized": normalized, "language": Language.ENGLISH}
+                )
+
                 if existing_word:
-                    word_data.append((str(existing_word.id), existing_word.text))
+                    word_ids.append(str(existing_word.id))
                 else:
                     # Create new word
-                    word = Word(
-                        text=text.strip(),
-                        normalized=normalized,
-                        language=Language.ENGLISH
-                    )
+                    word = Word(text=text.strip(), normalized=normalized, language=Language.ENGLISH)
                     await word.create()
-                    word_data.append((str(word.id), word.text))
-            
-            wordlist.add_words(word_data)
-        
+                    word_ids.append(str(word.id))
+
+            wordlist.add_words(word_ids)
+
         await wordlist.create()
         return wordlist
 
@@ -202,55 +203,51 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
             raise ValueError(f"WordList with id {wordlist_id} not found")
-        
+
         # Get or create Word documents inline
-        word_data = []
+        word_ids = []
         for text in request.words:
             normalized = text.lower().strip()
-            
+
             # Try to find existing word
-            existing_word = await Word.find_one({
-                "normalized": normalized,
-                "language": Language.ENGLISH
-            })
-            
+            existing_word = await Word.find_one(
+                {"normalized": normalized, "language": Language.ENGLISH}
+            )
+
             if existing_word:
-                word_data.append((str(existing_word.id), existing_word.text))
+                word_ids.append(str(existing_word.id))
             else:
                 # Create new word
-                word = Word(
-                    text=text.strip(),
-                    normalized=normalized,
-                    language=Language.ENGLISH
-                )
+                word = Word(text=text.strip(), normalized=normalized, language=Language.ENGLISH)
                 await word.create()
-                word_data.append((str(word.id), word.text))
-        
-        wordlist.add_words(word_data)
+                word_ids.append(str(word.id))
+
+        wordlist.add_words(word_ids)
         wordlist.mark_accessed()
         await wordlist.save()
         return wordlist
 
-    async def remove_word(self, wordlist_id: PydanticObjectId, word: str) -> WordList:
-        """Remove a word from a word list."""
+    async def remove_word(self, wordlist_id: PydanticObjectId, word_id: str) -> WordList:
+        """Remove a word from a word list by word ID."""
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
             raise ValueError(f"WordList with id {wordlist_id} not found")
-        
-        # Find and remove the word
-        word_lower = word.lower()
-        wordlist.words = [w for w in wordlist.words if w.text.lower() != word_lower]
+
+        # Find and remove the word by ID
+        wordlist.words = [w for w in wordlist.words if w.word_id != word_id]
         wordlist.update_stats()
         wordlist.mark_accessed()
         await wordlist.save()
         return wordlist
 
-    async def review_word(self, wordlist_id: PydanticObjectId, request: WordReviewRequest) -> WordList:
+    async def review_word(
+        self, wordlist_id: PydanticObjectId, request: WordReviewRequest
+    ) -> WordList:
         """Process a word review session."""
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
             raise ValueError(f"WordList with id {wordlist_id} not found")
-        
+
         # Find the word and process review
         word_item = wordlist.get_word_item(request.word)
         if word_item:
@@ -258,7 +255,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             wordlist.update_stats()
             wordlist.mark_accessed()
             await wordlist.save()
-        
+
         return wordlist
 
     async def mark_word_visited(self, wordlist_id: PydanticObjectId, word: str) -> WordList:
@@ -266,39 +263,45 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
             raise ValueError(f"WordList with id {wordlist_id} not found")
-        
+
         word_item = wordlist.get_word_item(word)
         if word_item:
             word_item.mark_visited()
             wordlist.mark_accessed()
             await wordlist.save()
-        
+
         return wordlist
 
-    async def record_study_session(self, wordlist_id: PydanticObjectId, request: StudySessionRequest) -> WordList:
+    async def record_study_session(
+        self, wordlist_id: PydanticObjectId, request: StudySessionRequest
+    ) -> WordList:
         """Record a study session."""
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
             raise ValueError(f"WordList with id {wordlist_id} not found")
-        
+
         wordlist.record_study_session(request.duration_minutes)
         await wordlist.save()
         return wordlist
 
-    async def get_due_words(self, wordlist_id: PydanticObjectId, limit: int | None = None) -> list[WordListItem]:
+    async def get_due_words(
+        self, wordlist_id: PydanticObjectId, limit: int | None = None
+    ) -> list[WordListItem]:
         """Get words due for review from a word list."""
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
             return []
-        
+
         return wordlist.get_due_for_review(limit)
 
-    async def get_by_mastery(self, wordlist_id: PydanticObjectId, level: MasteryLevel) -> list[WordListItem]:
+    async def get_by_mastery(
+        self, wordlist_id: PydanticObjectId, level: MasteryLevel
+    ) -> list[WordListItem]:
         """Get words at a specific mastery level."""
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
             return []
-        
+
         return wordlist.get_by_mastery(level)
 
     async def get_statistics(self, wordlist_id: PydanticObjectId) -> dict[str, Any]:
@@ -306,20 +309,18 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
             return {}
-        
+
         # Calculate additional statistics
         mastery_distribution = wordlist.get_mastery_distribution()
-        mastery_counts = {
-            level.value: count for level, count in mastery_distribution.items()
-        }
-        
+        mastery_counts = {level.value: count for level, count in mastery_distribution.items()}
+
         temperature_counts = {
             "hot": len([w for w in wordlist.words if w.temperature == Temperature.HOT]),
             "cold": len([w for w in wordlist.words if w.temperature == Temperature.COLD]),
         }
-        
+
         due_count = len(wordlist.get_due_for_review())
-        
+
         return {
             "basic_stats": wordlist.learning_stats.model_dump(),
             "word_counts": {
@@ -338,33 +339,72 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
             raise ValueError(f"WordList with id {wordlist_id} not found")
-        
-        words = [item.text for item in wordlist.words]
+
+        # Check if corpus already exists for this wordlist
+        corpus_name = f"wordlist-{str(wordlist_id)}"
+        existing_corpus = await self.corpus_repo.get_by_name(corpus_name)
+        if existing_corpus:
+            return existing_corpus
+
+        # Fetch Word documents to get text
+        from ...models import Word
+
+        word_ids = [item.word_id for item in wordlist.words]
+        words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+
+        # Extract word text
+        word_texts = [word.text for word in words]
+
         return await self.corpus_repo.create_from_wordlist(
-            words=words,
-            name=f"wordlist-{wordlist.name}",
+            words=word_texts,
+            name=corpus_name,
             ttl_hours=ttl_hours,
         )
 
     async def search_wordlist_corpus(
-        self, 
-        wordlist_id: PydanticObjectId, 
-        query: str, 
+        self,
+        wordlist_id: PydanticObjectId,
+        query: str,
         max_results: int = 20,
         min_score: float = 0.6,
     ) -> dict[str, Any]:
         """Search within a wordlist using corpus functionality."""
         corpus_id = await self.create_corpus(wordlist_id, ttl_hours=1.0)
-        
+
         params = CorpusSearchParams(
             query=query,
             max_results=max_results,
             min_score=min_score,
         )
-        
+
         return await self.corpus_repo.search(corpus_id, params)
 
     async def _cascade_delete(self, wordlist: WordList) -> None:
         """Handle cascade deletion - WordList is self-contained."""
         # WordList contains all data internally, no cascade needed
         pass
+    
+    async def populate_words(self, wordlist: WordList) -> dict[str, Any]:
+        """Populate wordlist with actual word text instead of just IDs.
+        
+        Returns a dictionary representation with word text included.
+        """
+        # Get word IDs
+        word_ids = [item.word_id for item in wordlist.words]
+        
+        # Fetch Word documents
+        from ...models import Word
+        words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+        
+        # Create word text map
+        word_text_map = {str(word.id): word.text for word in words}
+        
+        # Convert wordlist to dict and update word items
+        wordlist_dict = wordlist.model_dump(mode="json")
+        
+        # Update each word item with actual word text and remove word_id
+        for word_item in wordlist_dict["words"]:
+            word_id = word_item.pop("word_id", "")
+            word_item["word"] = word_text_map.get(word_id, "")
+        
+        return wordlist_dict

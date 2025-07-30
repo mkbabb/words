@@ -11,7 +11,6 @@ from rich.table import Table
 from rich.text import Text
 
 from ...ai import get_openai_connector
-from ...ai.models import SynonymCandidate, SynonymGenerationResponse
 from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...utils.logging import get_logger

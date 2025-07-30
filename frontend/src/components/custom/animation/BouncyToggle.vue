@@ -14,10 +14,11 @@
       ref="buttonRefs"
       @click="handleSelect(option.value, index)"
       :class="[
-        'relative z-10 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200',
+        'relative z-10 px-3 py-1.5 rounded-lg font-medium transition-all duration-200',
         activeValue === option.value
           ? 'text-primary-foreground'
-          : 'text-muted-foreground hover:text-foreground'
+          : 'text-muted-foreground hover:text-foreground',
+        inheritedClass
       ]"
     >
       {{ option.label }}
@@ -26,8 +27,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted } from 'vue';
+import { ref, computed, nextTick, onMounted, useAttrs } from 'vue';
 import { gsap } from 'gsap';
+
+// Disable automatic attribute inheritance
+defineOptions({
+  inheritAttrs: false
+});
 
 interface ToggleOption {
   label: string;
@@ -40,6 +46,8 @@ interface BouncyToggleProps {
 }
 
 const props = defineProps<BouncyToggleProps>();
+const attrs = useAttrs();
+const inheritedClass = computed(() => attrs.class || 'text-sm');
 const emit = defineEmits<{
   'update:modelValue': [value: string];
 }>();

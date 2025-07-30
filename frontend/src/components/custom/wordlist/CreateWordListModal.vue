@@ -305,9 +305,9 @@ const handleCreate = async () => {
       description: request.description || '',
       hash_id: `hash_${Date.now()}`,
       words: request.words.map(word => ({
-        text: word,
+        word: word,
         frequency: 1,
-        selected_definitions: [],
+        selected_definition_ids: [],
         mastery_level: MasteryLevel.BRONZE,
         temperature: Temperature.COLD,
         review_data: {

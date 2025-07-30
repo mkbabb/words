@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ...utils.logging import get_logger
-from ..repositories.corpus_repository import CorpusRepository, CorpusCreate, CorpusSearchParams
 from ..core import ListResponse, PaginationParams, get_pagination
+from ..repositories.corpus_repository import CorpusCreate, CorpusRepository, CorpusSearchParams
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -26,7 +26,7 @@ def get_corpus_repo() -> CorpusRepository:
 
 class CorpusSearchQueryParams(BaseModel):
     """Query parameters for corpus search."""
-    
+
     query: str = Field(..., min_length=1, description="Search query")
     max_results: int = Field(default=20, ge=1, le=100, description="Maximum results to return")
     min_score: float = Field(default=0.6, ge=0.0, le=1.0, description="Minimum relevance score")
@@ -99,7 +99,7 @@ async def create_corpus(
             name=request.name,
             ttl_hours=request.ttl_hours,
         )
-        
+
         result = await repo.create(data)
 
         return CreateCorpusResponse(
@@ -132,7 +132,7 @@ async def search_corpus(
             max_results=params.max_results,
             min_score=params.min_score,
         )
-        
+
         search_results = await repo.search(corpus_id, search_params)
         return SearchCorpusResponse(**search_results)
 
@@ -180,13 +180,13 @@ async def list_corpora(
     """
     try:
         corpora_data = await repo.list_all()
-        
+
         # Apply pagination
         total = len(corpora_data)
         start = pagination.offset
         end = start + pagination.limit
         paginated_data = corpora_data[start:end]
-        
+
         return ListResponse(
             items=[CorpusInfoResponse(**corpus) for corpus in paginated_data],
             total=total,

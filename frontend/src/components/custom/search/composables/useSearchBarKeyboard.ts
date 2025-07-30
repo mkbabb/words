@@ -66,8 +66,8 @@ export function useSearchBarKeyboard(options: UseSearchBarKeyboardOptions) {
     if (store.searchMode === 'wordlist' && query) {
       const words = query
         .split(/[,\s\n]+/)
-        .map((word) => word.trim())
-        .filter((word) => word.length > 0);
+        .map((word: string) => word.trim())
+        .filter((word: string) => word.length > 0);
 
       if (words.length > 0) {
         const routeName = store.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';

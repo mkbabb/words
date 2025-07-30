@@ -17,8 +17,6 @@ from ...core import (
     ResourceResponse,
     ResponseBuilder,
     SortParams,
-    check_etag,
-    get_etag,
     get_fields,
     get_pagination,
     get_sort,
@@ -41,7 +39,7 @@ def get_word_repo() -> WordRepository:
 
 class WordQueryParams(BaseModel):
     """Query parameters for listing words."""
-    
+
     text: str | None = Field(None, description="Exact text match")
     text_pattern: str | None = Field(None, description="Partial text match")
     language: Language | None = Field(None, description="Language filter")
@@ -59,7 +57,7 @@ async def list_words(
     params: WordQueryParams = Depends(),
 ) -> ListResponse[Word]:
     """Retrieve paginated word list with filtering and sorting.
-    
+
     Query Parameters:
         - offset: Skip first N results (default: 0)
         - limit: Maximum results to return (default: 20, max: 100)
@@ -70,10 +68,10 @@ async def list_words(
         - language: Language code filter (e.g., 'en', 'es')
         - offensive_flag: Filter by offensive content flag
         - created_after/before: Date range filters
-    
+
     Returns:
         Paginated list with items, total count, offset, and limit.
-    
+
     Example:
         GET /api/v1/words?language=en&limit=10&sort_by=text
     """
@@ -113,23 +111,22 @@ async def list_words(
 
 
 @router.post("", response_model=ResourceResponse, status_code=201)
-
 async def create_word(
     data: WordCreate,
     repo: WordRepository = Depends(get_word_repo),
 ) -> ResourceResponse:
     """Create new word entry.
-    
+
     Body:
         - text: Word text (required)
         - normalized: Normalized form (required)
         - language: Language code (required)
         - offensive_flag: Mark as offensive (optional)
         - first_known_use: Historical first use (optional)
-    
+
     Returns:
         Created word with links to related resources.
-    
+
     Errors:
         409: Word already exists in specified language
         422: Invalid input data
@@ -166,7 +163,6 @@ async def create_word(
 
 
 @router.get("/{word_id}", response_model=ResourceResponse)
-
 async def get_word(
     word_id: PydanticObjectId,
     request: Request,
@@ -175,18 +171,18 @@ async def get_word(
     fields: FieldSelection = Depends(get_fields),
 ) -> Response | ResourceResponse:
     """Retrieve word details by ID.
-    
+
     Path Parameters:
         - word_id: MongoDB ObjectId of word
-    
+
     Query Parameters:
         - include: Comma-separated fields to include
         - exclude: Comma-separated fields to exclude
         - expand: Comma-separated relations to expand (e.g., 'definitions')
-    
+
     Returns:
         Word data with metadata and resource links.
-        
+
     Headers:
         - ETag: Entity tag for caching
         - Returns 304 if If-None-Match matches current ETag
@@ -226,7 +222,6 @@ async def get_word(
 
 
 @router.put("/{word_id}", response_model=ResourceResponse)
-
 async def update_word(
     word_id: PydanticObjectId,
     data: WordUpdate,
@@ -234,19 +229,19 @@ async def update_word(
     repo: WordRepository = Depends(get_word_repo),
 ) -> ResourceResponse:
     """Update word with optimistic concurrency control.
-    
+
     Path Parameters:
         - word_id: MongoDB ObjectId of word
-    
+
     Query Parameters:
         - version: Current version for optimistic locking (optional)
-    
+
     Body:
         Partial update fields (only provided fields are updated)
-    
+
     Returns:
         Updated word with new version number.
-    
+
     Errors:
         409: Version conflict (concurrent modification)
         404: Word not found
@@ -262,26 +257,23 @@ async def update_word(
 
 
 @router.delete("/{word_id}", status_code=204, response_model=None)
-
 async def delete_word(
     word_id: PydanticObjectId,
     cascade: bool = Query(False, description="Delete related documents"),
     repo: WordRepository = Depends(get_word_repo),
 ) -> None:
     """Delete word and optionally cascade to related documents.
-    
+
     Path Parameters:
         - word_id: MongoDB ObjectId of word
-    
+
     Query Parameters:
         - cascade: Delete related definitions, examples, facts (default: false)
-    
+
     Returns:
         204 No Content on success
-    
+
     Errors:
         404: Word not found
     """
     await repo.delete(word_id, cascade=cascade)
-
-

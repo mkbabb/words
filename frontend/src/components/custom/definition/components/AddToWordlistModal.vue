@@ -104,6 +104,7 @@ import { Button } from '@/components/ui/button';
 import Modal from '@/components/custom/Modal.vue';
 import CreateWordListModal from '../../wordlist/CreateWordListModal.vue';
 import type { WordList } from '@/types';
+import { MasteryLevel, Temperature } from '@/types';
 import { wordlistApi } from '@/utils/api';
 
 interface Props {
@@ -183,7 +184,7 @@ const addToWordlist = async (wordlist: WordList) => {
     const wordlistIndex = wordlists.value.findIndex(w => w.id === wordlist.id);
     if (wordlistIndex >= 0) {
       const existingWordIndex = wordlists.value[wordlistIndex].words.findIndex(
-        w => w.text.toLowerCase() === props.word.toLowerCase()
+        w => w.word.toLowerCase() === props.word.toLowerCase()
       );
       
       if (existingWordIndex >= 0) {
@@ -192,11 +193,11 @@ const addToWordlist = async (wordlist: WordList) => {
       } else {
         // Add new word
         wordlists.value[wordlistIndex].words.push({
-          text: props.word,
+          word: props.word,
           frequency: 1,
-          selected_definitions: [],
-          mastery_level: 'bronze' as const,
-          temperature: 'cold' as const,
+          selected_definition_ids: [],
+          mastery_level: MasteryLevel.BRONZE,
+          temperature: Temperature.COLD,
           review_data: {
             repetitions: 0,
             ease_factor: 2.5,
@@ -208,8 +209,6 @@ const addToWordlist = async (wordlist: WordList) => {
           },
           last_visited: null,
           added_date: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
           notes: '',
           tags: [],
         });

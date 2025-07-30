@@ -14,6 +14,12 @@ import type {
 import { dictionaryApi, wordlistApi } from '@/utils/api';
 import { generateId, normalizeWord } from '@/utils';
 
+// Define sort criteria type
+interface SortCriterion {
+    field: string;
+    direction: 'asc' | 'desc';
+}
+
 export const useAppStore = defineStore('app', () => {
     // Runtime state (not persisted)
     const isSearching = ref(false);
@@ -23,7 +29,7 @@ export const useAppStore = defineStore('app', () => {
     const loadingStage = ref('');
     const forceRefreshMode = ref(false);
     const showLoadingModal = ref(false);
-    
+
     // SearchBar UI state (not persisted)
     const showSearchResults = ref(false);
     const searchSelectedIndex = ref(0);
@@ -69,12 +75,12 @@ export const useAppStore = defineStore('app', () => {
                 lookup: [] as string[],
                 wordlist: [] as string[],
                 'word-of-the-day': [] as string[],
-                stage: [] as string[]
+                stage: [] as string[],
             },
             // Wordlist filters
             wordlistFilters: {
                 showBronze: true,
-                showSilver: true, 
+                showSilver: true,
                 showGold: true,
                 showHotOnly: false,
                 showDueOnly: false,
@@ -87,7 +93,7 @@ export const useAppStore = defineStore('app', () => {
                 byFrequency: false,
             },
             // Wordlist sorting
-            wordlistSortCriteria: [] as any[],
+            wordlistSortCriteria: [] as SortCriterion[],
         },
         undefined,
         {
@@ -105,9 +111,12 @@ export const useAppStore = defineStore('app', () => {
                         }
                         // Validate search mode
                         if (
-                            !['lookup', 'wordlist', 'word-of-the-day', 'stage'].includes(
-                                parsed.searchMode
-                            )
+                            ![
+                                'lookup',
+                                'wordlist',
+                                'word-of-the-day',
+                                'stage',
+                            ].includes(parsed.searchMode)
                         ) {
                             parsed.searchMode = 'lookup';
                         }
@@ -124,15 +133,21 @@ export const useAppStore = defineStore('app', () => {
                             parsed.noAI = true;
                         }
                         // Validate accordion state
-                        if (!parsed.sidebarAccordionState || typeof parsed.sidebarAccordionState !== 'object') {
+                        if (
+                            !parsed.sidebarAccordionState ||
+                            typeof parsed.sidebarAccordionState !== 'object'
+                        ) {
                             parsed.sidebarAccordionState = {
                                 lookup: [],
                                 wordlist: [],
-                                stage: []
+                                stage: [],
                             };
                         }
                         // Validate wordlist filters
-                        if (!parsed.wordlistFilters || typeof parsed.wordlistFilters !== 'object') {
+                        if (
+                            !parsed.wordlistFilters ||
+                            typeof parsed.wordlistFilters !== 'object'
+                        ) {
                             parsed.wordlistFilters = {
                                 showBronze: true,
                                 showSilver: true,
@@ -142,7 +157,10 @@ export const useAppStore = defineStore('app', () => {
                             };
                         }
                         // Validate wordlist chunking
-                        if (!parsed.wordlistChunking || typeof parsed.wordlistChunking !== 'object') {
+                        if (
+                            !parsed.wordlistChunking ||
+                            typeof parsed.wordlistChunking !== 'object'
+                        ) {
                             parsed.wordlistChunking = {
                                 byMastery: false,
                                 byDate: false,
@@ -173,7 +191,7 @@ export const useAppStore = defineStore('app', () => {
                             sidebarAccordionState: {
                                 lookup: [],
                                 wordlist: [],
-                                stage: []
+                                stage: [],
                             },
                             wordlistFilters: {
                                 showBronze: true,
@@ -188,7 +206,7 @@ export const useAppStore = defineStore('app', () => {
                                 byLastVisited: false,
                                 byFrequency: false,
                             },
-                            wordlistSortCriteria: [],
+                            wordlistSortCriteria: [] as SortCriterion[],
                         };
                     }
                 },
@@ -204,7 +222,7 @@ export const useAppStore = defineStore('app', () => {
             lookup: '',
             wordlist: '',
             wordOfTheDay: '',
-            stage: ''
+            stage: '',
         },
         searchCursorPosition: 0,
         searchSelectedIndex: 0,
@@ -220,11 +238,17 @@ export const useAppStore = defineStore('app', () => {
     // Create refs that sync with persisted state - mode-specific search queries
     const searchQuery = computed({
         get: () => {
-            const mode = searchMode.value === 'word-of-the-day' ? 'wordOfTheDay' : searchMode.value;
+            const mode =
+                searchMode.value === 'word-of-the-day'
+                    ? 'wordOfTheDay'
+                    : searchMode.value;
             return sessionState.value.searchQueries?.[mode] || '';
         },
         set: (value) => {
-            const mode = searchMode.value === 'word-of-the-day' ? 'wordOfTheDay' : searchMode.value;
+            const mode =
+                searchMode.value === 'word-of-the-day'
+                    ? 'wordOfTheDay'
+                    : searchMode.value;
             if (sessionState.value.searchQueries) {
                 sessionState.value.searchQueries[mode] = value;
             }
@@ -315,14 +339,14 @@ export const useAppStore = defineStore('app', () => {
             uiState.value.selectedWordlist = value;
         },
     });
-    
+
     const noAI = computed({
         get: () => uiState.value.noAI,
         set: (value) => {
             uiState.value.noAI = value;
         },
     });
-    
+
     const sidebarAccordionState = computed({
         get: () => uiState.value.sidebarAccordionState,
         set: (value) => {
@@ -374,7 +398,6 @@ export const useAppStore = defineStore('app', () => {
         },
     });
 
-
     const theme = useStorage('theme', 'light');
 
     // Search history (persisted) - keeping for search bar functionality
@@ -382,9 +405,11 @@ export const useAppStore = defineStore('app', () => {
 
     // Lookup history (persisted) - main source for suggestions and tiles
     const lookupHistory = useStorage<LookupHistory[]>('lookup-history', []);
-    
+
     // AI Query history (persisted) - for Recent AI Suggestions
-    const aiQueryHistory = useStorage<Array<{ query: string; timestamp: string }>>('ai-query-history', []);
+    const aiQueryHistory = useStorage<
+        Array<{ query: string; timestamp: string }>
+    >('ai-query-history', []);
 
     // Persisted suggestions cache
     const suggestionsCache = useStorage('suggestions-cache', {
@@ -471,18 +496,18 @@ export const useAppStore = defineStore('app', () => {
         if (!query.trim()) return;
 
         const normalizedQuery = normalizeWord(query);
-        
+
         // Set direct lookup flag to prevent search triggering
         isDirectLookup.value = true;
         searchQuery.value = normalizedQuery;
         hasSearched.value = true;
-        
+
         // Reset AI mode when doing a direct word lookup
         isAIQuery.value = false;
         showSparkle.value = false;
         sessionState.value.isAIQuery = false;
         sessionState.value.aiQueryText = '';
-        
+
         // Hide search dropdown when performing word lookup
         searchResults.value = [];
         sessionState.value.searchResults = [];
@@ -490,7 +515,7 @@ export const useAppStore = defineStore('app', () => {
 
         // Direct lookup - no need for intermediate search
         await getDefinition(normalizedQuery);
-        
+
         // Reset direct lookup flag after a short delay
         setTimeout(() => {
             isDirectLookup.value = false;
@@ -503,7 +528,7 @@ export const useAppStore = defineStore('app', () => {
 
         try {
             let results: SearchResult[] = [];
-            
+
             // Handle different search modes
             if (searchMode.value === 'wordlist' && selectedWordlist.value) {
                 // Search within the selected wordlist using corpus API
@@ -512,19 +537,20 @@ export const useAppStore = defineStore('app', () => {
                     query,
                     { max_results: 20, min_score: 0.6 }
                 );
-                
+
                 // Transform corpus results to SearchResult format
-                results = corpusResults.data.results?.map((result: any) => ({
-                    word: result.word,
-                    score: result.score,
-                    source_method: 'corpus' as const,
-                    highlight_snippet: result.context || '',
-                })) || [];
+                results =
+                    corpusResults.data.results?.map((result: any) => ({
+                        word: result.word,
+                        score: result.score,
+                        source_method: 'corpus' as const,
+                        highlight_snippet: result.context || '',
+                    })) || [];
             } else {
                 // Default dictionary search
                 results = await dictionaryApi.searchWord(query);
             }
-            
+
             searchResults.value = results;
 
             // Update persisted search results
@@ -544,8 +570,7 @@ export const useAppStore = defineStore('app', () => {
 
     async function getDefinition(word: string, forceRefresh?: boolean) {
         // Use forceRefreshMode state or explicit override
-        const shouldForceRefresh =
-            forceRefresh ?? forceRefreshMode.value;
+        const shouldForceRefresh = forceRefresh ?? forceRefreshMode.value;
 
         isSearching.value = true;
         loadingProgress.value = 0;
@@ -584,15 +609,21 @@ export const useAppStore = defineStore('app', () => {
             console.log('Setting currentEntry:', entry);
             console.log('Entry images:', entry.images);
             console.log('First definition:', entry.definitions?.[0]);
-            console.log('First definition part_of_speech:', entry.definitions?.[0]?.part_of_speech);
+            console.log(
+                'First definition part_of_speech:',
+                entry.definitions?.[0]?.part_of_speech
+            );
             console.log('First definition ID:', entry.definitions?.[0]?.id);
-            console.log('First definition examples:', entry.definitions?.[0]?.examples);
-            
+            console.log(
+                'First definition examples:',
+                entry.definitions?.[0]?.examples
+            );
+
             // Log synth entry ID if available
             if (entry.synth_entry_id) {
                 console.log('Synthesized Entry ID:', entry.synth_entry_id);
             }
-            
+
             currentEntry.value = entry;
 
             // Update current word in session
@@ -600,7 +631,7 @@ export const useAppStore = defineStore('app', () => {
 
             // Add to lookup history
             addToLookupHistory(word, entry);
-            
+
             // Emit events for engagement tracking
             window.dispatchEvent(new CustomEvent('word-searched'));
             window.dispatchEvent(new CustomEvent('definition-viewed'));
@@ -609,7 +640,7 @@ export const useAppStore = defineStore('app', () => {
             if (word !== suggestionsCache.value.lastWord) {
                 refreshVocabularySuggestions();
             }
-            
+
             // Auto-switch from suggestions mode to dictionary mode after successful lookup
             if (mode.value === 'suggestions') {
                 mode.value = 'dictionary';
@@ -643,29 +674,32 @@ export const useAppStore = defineStore('app', () => {
             // If we already have the current entry, use its synonyms directly
             if (currentEntry.value && currentEntry.value.word === word) {
                 const synonymsList: Array<{ word: string; score: number }> = [];
-                
+
                 // Collect synonyms from all definitions
                 currentEntry.value.definitions?.forEach((def, index) => {
                     if (def.synonyms && Array.isArray(def.synonyms)) {
                         def.synonyms.forEach((syn: string, synIndex) => {
                             // Avoid duplicates
-                            if (!synonymsList.some(s => s.word === syn)) {
+                            if (!synonymsList.some((s) => s.word === syn)) {
                                 // Generate varying scores based on definition order and synonym position
                                 // Primary definitions get higher base scores
-                                const baseScore = 0.9 - (index * 0.1);
+                                const baseScore = 0.9 - index * 0.1;
                                 // Earlier synonyms in the list are typically more relevant
                                 const positionPenalty = synIndex * 0.02;
-                                const score = Math.max(0.5, Math.min(0.95, baseScore - positionPenalty));
+                                const score = Math.max(
+                                    0.5,
+                                    Math.min(0.95, baseScore - positionPenalty)
+                                );
                                 synonymsList.push({ word: syn, score });
                             }
                         });
                     }
                 });
-                
+
                 currentThesaurus.value = {
                     word: word,
                     synonyms: synonymsList,
-                    confidence: 0.9
+                    confidence: 0.9,
                 };
             } else {
                 // Fallback to API call if we don't have the entry
@@ -677,7 +711,7 @@ export const useAppStore = defineStore('app', () => {
             currentThesaurus.value = {
                 word: word,
                 synonyms: [],
-                confidence: 0
+                confidence: 0,
             };
         }
     }
@@ -815,7 +849,7 @@ export const useAppStore = defineStore('app', () => {
     function toggleMode() {
         // Store the current suggestions state if we're leaving suggestions mode
         const hasSuggestionsData = !!wordSuggestions.value;
-        
+
         // If in suggestions mode
         if (mode.value === 'suggestions') {
             // Only allow switching if we have a current entry (last looked up word)
@@ -826,7 +860,7 @@ export const useAppStore = defineStore('app', () => {
             // If no current entry, do nothing - can't switch modes
             return;
         }
-        
+
         // If in dictionary/thesaurus and we have suggestions data, allow cycling through all modes
         if (mode.value === 'dictionary') {
             mode.value = 'thesaurus';
@@ -869,12 +903,14 @@ export const useAppStore = defineStore('app', () => {
     }
 
     // Notification system
-    const notifications = ref<Array<{
-        id: string;
-        type: 'success' | 'error' | 'info' | 'warning';
-        message: string;
-        duration?: number;
-    }>>([]);
+    const notifications = ref<
+        Array<{
+            id: string;
+            type: 'success' | 'error' | 'info' | 'warning';
+            message: string;
+            duration?: number;
+        }>
+    >([]);
 
     function showNotification(notification: {
         type: 'success' | 'error' | 'info' | 'warning';
@@ -883,15 +919,17 @@ export const useAppStore = defineStore('app', () => {
     }) {
         const id = generateId();
         notifications.value.push({ id, ...notification });
-        
+
         // Auto-remove after duration (default 5 seconds)
         setTimeout(() => {
-            notifications.value = notifications.value.filter(n => n.id !== id);
+            notifications.value = notifications.value.filter(
+                (n) => n.id !== id
+            );
         }, notification.duration || 5000);
     }
 
     function removeNotification(id: string) {
-        notifications.value = notifications.value.filter(n => n.id !== id);
+        notifications.value = notifications.value.filter((n) => n.id !== id);
     }
 
     // Track session start time for engagement metrics
@@ -903,7 +941,7 @@ export const useAppStore = defineStore('app', () => {
         if (isSearching.value || isSuggestingWords.value) {
             return;
         }
-        
+
         // Cycle through modes: lookup -> wordlist -> word-of-the-day -> stage -> lookup
         if (searchMode.value === 'lookup') {
             searchMode.value = 'wordlist';
@@ -914,7 +952,7 @@ export const useAppStore = defineStore('app', () => {
         } else {
             searchMode.value = 'lookup';
         }
-        
+
         // Reset suggestion mode when changing search modes
         if (mode.value === 'suggestions' && searchMode.value !== 'lookup') {
             // Only reset if we don't have a current entry to fall back to
@@ -942,7 +980,9 @@ export const useAppStore = defineStore('app', () => {
     function toggleLanguage(language: string) {
         const languages = selectedLanguages.value;
         if (languages.includes(language)) {
-            selectedLanguages.value = languages.filter((l: string) => l !== language);
+            selectedLanguages.value = languages.filter(
+                (l: string) => l !== language
+            );
         } else {
             selectedLanguages.value = [...languages, language];
         }
@@ -971,8 +1011,13 @@ export const useAppStore = defineStore('app', () => {
             if (currentEntry.value.definitions[definitionIndex]) {
                 const def = currentEntry.value.definitions[definitionIndex];
                 // Replace only generated examples, keep literature ones
-                const literatureExamples = def.examples?.filter(ex => ex.type === 'literature') || [];
-                def.examples = [...(response.examples as any[]), ...literatureExamples];
+                const literatureExamples =
+                    def.examples?.filter((ex) => ex.type === 'literature') ||
+                    [];
+                def.examples = [
+                    ...(response.examples as any[]),
+                    ...literatureExamples,
+                ];
             }
 
             // Also update in lookup history
@@ -1017,16 +1062,19 @@ export const useAppStore = defineStore('app', () => {
     initializeVocabularySuggestions();
 
     // Get AI word suggestions for descriptive queries
-    async function getAISuggestions(query: string, count: number = 12): Promise<WordSuggestionResponse | null> {
+    async function getAISuggestions(
+        query: string,
+        count: number = 12
+    ): Promise<WordSuggestionResponse | null> {
         try {
             // Set direct lookup flag for AI suggestions
             isDirectLookup.value = true;
-            
+
             // Hide search dropdown when getting AI suggestions
             searchResults.value = [];
             sessionState.value.searchResults = [];
             showSearchResults.value = false;
-            
+
             isSuggestingWords.value = true;
             suggestionsProgress.value = 0;
             suggestionsStage.value = 'START';
@@ -1039,36 +1087,40 @@ export const useAppStore = defineStore('app', () => {
                     // Update progress and stage in real-time
                     suggestionsStage.value = stage;
                     suggestionsProgress.value = progress;
-                    
+
                     // Log progress for debugging
-                    console.log(`AI Suggestions - Stage: ${stage}, Progress: ${progress}%, Message: ${message || ''}`);
+                    console.log(
+                        `AI Suggestions - Stage: ${stage}, Progress: ${progress}%, Message: ${message || ''}`
+                    );
                 }
             );
-            
+
             wordSuggestions.value = response;
-            
+
             // Add to AI query history
-            const existingIndex = aiQueryHistory.value.findIndex(item => item.query === query);
+            const existingIndex = aiQueryHistory.value.findIndex(
+                (item) => item.query === query
+            );
             if (existingIndex >= 0) {
                 // Move existing query to front
                 aiQueryHistory.value.splice(existingIndex, 1);
             }
             aiQueryHistory.value.unshift({
                 query,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
             });
             // Keep only last 10 AI queries
             if (aiQueryHistory.value.length > 10) {
                 aiQueryHistory.value = aiQueryHistory.value.slice(0, 10);
             }
-            
+
             // Don't manually set progress - let the streaming handle it
-            
+
             // Reset direct lookup flag
             setTimeout(() => {
                 isDirectLookup.value = false;
             }, 100);
-            
+
             return response;
         } catch (error) {
             console.error('AI suggestions error:', error);
@@ -1207,33 +1259,49 @@ export const useAppStore = defineStore('app', () => {
         regenerateAllExamples,
         // AI functions
         getAISuggestions,
-        
+
         // Definition update functions
         async updateDefinition(definitionId: string, updates: any) {
-            console.log('[Store] Updating definition:', definitionId, 'with:', updates);
+            console.log(
+                '[Store] Updating definition:',
+                definitionId,
+                'with:',
+                updates
+            );
             try {
-                const response = await dictionaryApi.updateDefinition(definitionId, updates);
+                const response = await dictionaryApi.updateDefinition(
+                    definitionId,
+                    updates
+                );
                 console.log('[Store] Update response:', response);
-                
+
                 // Update current entry if this definition is part of it
                 if (currentEntry.value) {
                     const defIndex = currentEntry.value.definitions.findIndex(
-                        d => d.id === definitionId
+                        (d) => d.id === definitionId
                     );
                     if (defIndex >= 0) {
-                        console.log('[Store] Updating local definition at index:', defIndex);
-                        Object.assign(currentEntry.value.definitions[defIndex], updates);
+                        console.log(
+                            '[Store] Updating local definition at index:',
+                            defIndex
+                        );
+                        Object.assign(
+                            currentEntry.value.definitions[defIndex],
+                            updates
+                        );
                     } else {
-                        console.warn('[Store] Definition not found in current entry');
+                        console.warn(
+                            '[Store] Definition not found in current entry'
+                        );
                     }
                 }
-                
+
                 showNotification({
                     type: 'success',
                     message: 'Definition updated successfully',
                     duration: 3000,
                 });
-                
+
                 return response;
             } catch (error) {
                 console.error('Failed to update definition:', error);
@@ -1245,19 +1313,27 @@ export const useAppStore = defineStore('app', () => {
                 throw error;
             }
         },
-        
+
         async updateExample(exampleId: string, updates: { text: string }) {
-            console.log('[Store] Updating example:', exampleId, 'with:', updates);
+            console.log(
+                '[Store] Updating example:',
+                exampleId,
+                'with:',
+                updates
+            );
             try {
-                const response = await dictionaryApi.updateExample(exampleId, updates);
+                const response = await dictionaryApi.updateExample(
+                    exampleId,
+                    updates
+                );
                 console.log('[Store] Example update response:', response);
-                
+
                 showNotification({
                     type: 'success',
                     message: 'Example updated successfully',
                     duration: 3000,
                 });
-                
+
                 return response;
             } catch (error) {
                 console.error('[Store] Failed to update example:', error);
@@ -1269,18 +1345,22 @@ export const useAppStore = defineStore('app', () => {
                 throw error;
             }
         },
-        
-        async regenerateDefinitionComponent(definitionId: string, component: string) {
+
+        async regenerateDefinitionComponent(
+            definitionId: string,
+            component: string
+        ) {
             try {
-                const response = await dictionaryApi.regenerateDefinitionComponent(
-                    definitionId,
-                    component
-                );
-                
+                const response =
+                    await dictionaryApi.regenerateDefinitionComponent(
+                        definitionId,
+                        component
+                    );
+
                 // Update current entry with regenerated data
                 if (currentEntry.value) {
                     const defIndex = currentEntry.value.definitions.findIndex(
-                        d => d.id === definitionId
+                        (d) => d.id === definitionId
                     );
                     if (defIndex >= 0) {
                         const def = currentEntry.value.definitions[defIndex];
@@ -1292,13 +1372,13 @@ export const useAppStore = defineStore('app', () => {
                         }
                     }
                 }
-                
+
                 showNotification({
                     type: 'success',
                     message: `${component} regenerated successfully`,
                     duration: 3000,
                 });
-                
+
                 return response;
             } catch (error) {
                 console.error(`Failed to regenerate ${component}:`, error);
@@ -1310,46 +1390,14 @@ export const useAppStore = defineStore('app', () => {
                 throw error;
             }
         },
-        
+
         async fetchDefinition(definitionId: string) {
             try {
-                const response = await dictionaryApi.getDefinitionById(definitionId);
+                const response =
+                    await dictionaryApi.getDefinitionById(definitionId);
                 return response;
             } catch (error) {
                 console.error('Failed to fetch definition:', error);
-                throw error;
-            }
-        },
-        
-        async refreshSynthEntry(synthEntryId: string) {
-            try {
-                // Fetch the updated synth entry directly
-                const response = await fetch(`/api/v1/synth-entries/${synthEntryId}`);
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch synth entry: ${response.status}`);
-                }
-                
-                const synthEntry = await response.json();
-                
-                // If this synth entry belongs to the current entry, refresh the whole word
-                if (currentEntry.value?.synth_entry_id === synthEntryId) {
-                    await getDefinition(currentEntry.value.word, false);
-                }
-                
-                showNotification({
-                    type: 'success',
-                    message: 'Images updated successfully',
-                    duration: 3000,
-                });
-                
-                return synthEntry;
-            } catch (error) {
-                console.error('Failed to refresh synth entry:', error);
-                showNotification({
-                    type: 'error',
-                    message: 'Failed to refresh images',
-                    duration: 5000,
-                });
                 throw error;
             }
         },

@@ -17,21 +17,21 @@ router = APIRouter()
 
 class BatchOperationResponse(BaseModel):
     """Response for batch operations with per-item results."""
-    
+
     results: list[dict[str, Any]] = Field(..., description="Individual operation results")
     summary: dict[str, int] = Field(..., description="Operation summary statistics")
     errors: list[dict[str, Any]] = Field(default_factory=list, description="List of errors")
-    
+
     @property
     def successful_count(self) -> int:
         """Count of successful operations."""
         return self.summary.get("successful", 0)
-    
+
     @property
     def failed_count(self) -> int:
         """Count of failed operations."""
         return self.summary.get("failed", 0)
-    
+
     @property
     def total_count(self) -> int:
         """Total number of operations."""
@@ -68,6 +68,7 @@ class BatchResult(BaseModel):
 
 class BatchResponse(BatchOperationResponse):
     """Response from batch operations with detailed results."""
+
     pass  # Use all fields from BatchOperationResponse
 
 
@@ -78,8 +79,6 @@ class BatchLookupRequest(BaseModel):
     providers: list[str] | None = None
     languages: list[str] | None = None
     force_refresh: bool = False
-
-
 
 
 @router.post("/lookup")
@@ -124,8 +123,6 @@ async def batch_lookup(request: BatchLookupRequest) -> dict[str, Any]:
     except Exception as e:
         logger.error(f"Batch lookup error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
 
 
 @router.post("/execute")
@@ -185,14 +182,10 @@ async def execute_batch(request: BatchRequest) -> BatchResponse:
         }
         for r in results
     ]
-    
+
     # Include errors in the response
-    errors = [
-        {"index": r.index, "error": r.error}
-        for r in results
-        if r.error
-    ]
-    
+    errors = [{"index": r.index, "error": r.error} for r in results if r.error]
+
     return BatchResponse(
         results=result_dicts,
         summary=summary,

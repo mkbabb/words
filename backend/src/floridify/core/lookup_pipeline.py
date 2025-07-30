@@ -418,7 +418,7 @@ async def _create_provider_mapped_entry(
         )
         
         # Use AI for clustering only
-        logger.info(f"📊 Clustering definitions (AI-assisted)")
+        logger.info("📊 Clustering definitions (AI-assisted)")
         from ..ai.synthesis_functions import cluster_definitions
         
         clustered_definitions = await cluster_definitions(

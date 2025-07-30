@@ -9,7 +9,6 @@ from typing import Any
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
-from ..wordlist.models import WordList
 from ..models import (
     AudioMedia,
     Definition,
@@ -25,6 +24,7 @@ from ..models import (
 )
 from ..utils.config import Config
 from ..utils.logging import get_logger
+from ..wordlist.models import WordList
 
 logger = get_logger(__name__)
 

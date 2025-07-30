@@ -182,7 +182,7 @@ const handleExport = () => {
   const csvContent = [
     'word,mastery_level,frequency,last_visited,notes',
     ...words.map(word => [
-      word.text,
+      word.word,
       word.mastery_level,
       word.frequency,
       word.last_visited || '',

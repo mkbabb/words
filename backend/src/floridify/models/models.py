@@ -9,7 +9,7 @@ from beanie import Document
 from pydantic import BaseModel, Field
 
 from ..constants import DictionaryProvider, Language
-from .base import BaseMetadata, Etymology, ImageMedia, ModelInfo
+from .base import BaseMetadata, Etymology, ModelInfo
 from .relationships import (
     Collocation,
     GrammarPattern,

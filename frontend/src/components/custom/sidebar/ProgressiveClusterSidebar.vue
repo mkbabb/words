@@ -159,14 +159,15 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import ProgressiveSidebarBase from '@/components/custom/navigation/ProgressiveSidebarBase.vue';
+import { MasteryLevel, Temperature } from '@/types';
 
 interface WordItem {
   id: string;
   text: string;
-  mastery_level: 'default' | 'bronze' | 'silver' | 'gold';
+  mastery_level: MasteryLevel;
   frequency: number;
   last_visited?: string;
-  temperature?: 'hot' | 'cold';
+  temperature?: Temperature;
 }
 
 interface Props {

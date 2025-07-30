@@ -4,7 +4,7 @@
       <DialogHeader>
         <DialogTitle>Edit Notes</DialogTitle>
         <DialogDescription>
-          Update notes for "{{ word?.text }}"
+          Update notes for "{{ word?.word }}"
         </DialogDescription>
       </DialogHeader>
       

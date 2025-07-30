@@ -1,6 +1,6 @@
 """Learning statistics and analytics for wordlists."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field

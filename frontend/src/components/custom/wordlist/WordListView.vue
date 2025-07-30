@@ -364,17 +364,17 @@ const loadWordlistWords = async (id: string, page: number = 0, append: boolean =
     
     if (append) {
       // Add unique IDs and append
-      const newItems = (response.items || []).map((item, idx) => ({
+      const newItems = (response.items || []).map((item: WordListItem, idx: number) => ({
         ...item,
-        _uniqueId: `${item.text}-${item.added_date}-${Date.now()}-${idx}`
+        _uniqueId: `${item.word}-${item.added_date}-${Date.now()}-${idx}`
       }));
       console.log('Appending items:', newItems.length, 'to existing:', currentWords.value.length);
       currentWords.value.splice(currentWords.value.length, 0, ...newItems);
     } else {
       // Add unique IDs for initial load
-      const initialItems = (response.items || []).map((item, idx) => ({
+      const initialItems = (response.items || []).map((item: WordListItem, idx: number) => ({
         ...item,
-        _uniqueId: `${item.text}-${item.added_date}-${Date.now()}-${idx}`
+        _uniqueId: `${item.word}-${item.added_date}-${Date.now()}-${idx}`
       }));
       console.log('Initial load:', initialItems.length, 'items');
       currentWords.value.splice(0, currentWords.value.length, ...initialItems);

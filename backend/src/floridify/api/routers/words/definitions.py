@@ -1,8 +1,9 @@
 """Definitions API - Comprehensive CRUD and component operations."""
 
 from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Union
+from typing import Any
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -10,6 +11,7 @@ from PIL import Image
 from pydantic import BaseModel, Field
 
 from ....ai import get_openai_connector
+from ....ai.constants import SynthesisComponent
 from ....ai.synthesis_functions import (
     assess_collocations,
     assess_definition_cefr,
@@ -24,7 +26,6 @@ from ....ai.synthesis_functions import (
     synthesize_synonyms,
     usage_note_generation,
 )
-from ....ai.constants import SynthesisComponent
 from ....models import Definition, Example, ImageMedia, Word
 from ...core import (
     ErrorDetail,
@@ -57,10 +58,12 @@ def get_definition_repo() -> DefinitionRepository:
 
 class DefinitionQueryParams(BaseModel):
     """Query parameters for listing definitions."""
-    
+
     word_id: str | None = Field(None, description="Filter by word ID")
     part_of_speech: str | None = Field(None, description="Filter by part of speech")
-    language_register: str | None = Field(None, description="Filter by register (formal/informal/neutral/slang/technical)")
+    language_register: str | None = Field(
+        None, description="Filter by register (formal/informal/neutral/slang/technical)"
+    )
     domain: str | None = Field(None, description="Filter by domain")
     cefr_level: str | None = Field(None, description="Filter by CEFR level")
     frequency_band: int | None = Field(None, ge=1, le=5, description="Filter by frequency band")
@@ -70,9 +73,7 @@ class DefinitionQueryParams(BaseModel):
 class ComponentRegenerationRequest(BaseModel):
     """Request for regenerating definition components."""
 
-    components: set[str] = Field(
-        description="Components to regenerate"
-    )
+    components: set[str] = Field(description="Components to regenerate")
     force: bool = Field(False, description="Force regeneration even if data exists")
 
 
@@ -87,7 +88,7 @@ class BatchComponentUpdate(BaseModel):
 
 class DefinitionImageUpdate(BaseModel):
     """Request to update definition images."""
-    
+
     image_path: str = Field(..., description="Path to the image file")
     alt_text: str | None = Field(None, description="Alternative text for accessibility")
     action: str = Field(default="add", description="Action: add or remove")
@@ -102,7 +103,7 @@ async def list_definitions(
     params: DefinitionQueryParams = Depends(),
 ) -> ListResponse[Definition]:
     """List definitions with advanced filtering.
-    
+
     Query Parameters:
         - word_id: Filter by word
         - part_of_speech: Filter by POS
@@ -112,7 +113,7 @@ async def list_definitions(
         - frequency_band: 1-5
         - has_examples: Boolean filter
         - Pagination: offset, limit, sort_by, sort_order
-    
+
     Returns:
         Paginated definition list.
     """
@@ -158,17 +159,17 @@ async def create_definition(
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
     """Create definition entry.
-    
+
     Body:
         Complete definition data including text, POS, metadata.
-    
+
     Returns:
         Created definition with resource links.
     """
     definition = await repo.create(data)
 
     return ResourceResponse(
-        data=definition.model_dump(mode='json'),
+        data=definition.model_dump(mode="json"),
         links={
             "self": f"/definitions/{definition.id}",
             "word": f"/words/{definition.word_id}",
@@ -186,11 +187,11 @@ async def get_definition(
     fields: FieldSelection = Depends(get_fields),
 ) -> Response | ResourceResponse:
     """Retrieve definition with optional expansions.
-    
+
     Query Parameters:
         - expand: 'examples' to include example data
         - Field selection: include, exclude parameters
-    
+
     Returns:
         Definition with completeness score and ETag.
     """
@@ -240,20 +241,20 @@ async def update_definition(
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
     """Update definition with version control.
-    
+
     Query Parameters:
         - version: For optimistic locking
-    
+
     Body:
         Partial update fields.
-    
+
     Errors:
         409: Version conflict
     """
     definition = await repo.update(definition_id, data, version)
 
     return ResourceResponse(
-        data=definition.model_dump(mode='json'),
+        data=definition.model_dump(mode="json"),
         metadata={
             "version": definition.version,
             "updated_at": definition.updated_at.isoformat() if definition.updated_at else None,
@@ -268,7 +269,7 @@ async def delete_definition(
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> None:
     """Delete definition.
-    
+
     Query Parameters:
         - cascade: Delete related examples
     """
@@ -283,16 +284,20 @@ async def update_definition_partial(
     if_match: str | None = Depends(check_etag),
 ) -> ResourceResponse:
     """Partially update definition fields.
-    
+
     This endpoint replaces the specific bind_image_to_definition endpoint
     with a more generic update that can handle any field updates including images.
     """
-    definition = await repo.update(definition_id, update, if_match=if_match)
-    
+    # Convert if_match header to version for optimistic locking
+    version = int(if_match) if if_match else None
+    definition = await repo.update(definition_id, update, version=version)
+
     return ResourceResponse(
-        data=definition.model_dump(mode='json'),
-        etag=get_etag(definition),
-        metadata={"version": definition.version},
+        data=definition.model_dump(mode="json"),
+        metadata={
+            "version": definition.version,
+            "etag": get_etag(definition),
+        },
         links={
             "self": f"/definitions/{definition_id}",
             "word": f"/words/{definition.word_id}",
@@ -308,25 +313,25 @@ async def bind_image_to_definition(
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
     """[DEPRECATED] Use PATCH /definitions/{definition_id} instead.
-    
+
     Bind an image to a definition.
-    
+
     Args:
         definition_id: ID of the definition
         request: Image binding request with path and optional alt text
-    
+
     Returns:
         Updated definition with image
-        
+
     Raises:
         404: Definition not found
         400: Invalid image path
     """
-    
+
     # Get the definition
     definition = await repo.get(definition_id, raise_on_missing=True)
     assert definition is not None  # Type assertion
-    
+
     # Validate image path exists
     image_path = Path(request.image_path)
     if not image_path.exists():
@@ -343,7 +348,7 @@ async def bind_image_to_definition(
                 ],
             ).model_dump(),
         )
-    
+
     # Get image metadata
     try:
         with Image.open(image_path) as img:
@@ -363,7 +368,7 @@ async def bind_image_to_definition(
                 ],
             ).model_dump(),
         )
-    
+
     # Create ImageMedia document
     image_media = ImageMedia(
         url=str(image_path),  # Store as file path for now
@@ -374,15 +379,15 @@ async def bind_image_to_definition(
         alt_text=request.alt_text,
     )
     await image_media.save()
-    
+
     # Add image ID to definition
     if str(image_media.id) not in definition.image_ids:
         definition.image_ids.append(str(image_media.id))
         definition.version += 1
         await definition.save()
-    
+
     return ResourceResponse(
-        data=definition.model_dump(mode='json'),
+        data=definition.model_dump(mode="json"),
         metadata={
             "image_id": str(image_media.id),
             "version": definition.version,
@@ -402,17 +407,17 @@ async def regenerate_components(
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
     """AI-regenerate definition components.
-    
+
     Body:
         - components: Set of components to regenerate
           Options: synonyms, antonyms, examples, cefr_level,
           frequency_band, register, domain, grammar_patterns,
           collocations, usage_notes, regional_variants
         - force: Regenerate even if data exists
-    
+
     Returns:
         Updated definition with regenerated components.
-    
+
     Errors:
         400: Invalid component names
         404: Definition or word not found
@@ -490,15 +495,13 @@ async def regenerate_components(
                 word=word.text,
                 part_of_speech=definition.part_of_speech,
                 definition=definition.text,
-                count=3
+                count=3,
             )
             # Save examples
             example_docs = []
             for example_text in examples_response.example_sentences:
                 example = Example(
-                    definition_id=str(definition.id),
-                    text=example_text,
-                    type="generated"
+                    definition_id=str(definition.id), text=example_text, type="generated"
                 )
                 await example.save()
                 example_docs.append(example)
@@ -507,7 +510,7 @@ async def regenerate_components(
         else:
             # Generate component
             func = component_functions[component]
-            
+
             # Call with appropriate parameters based on function type
             if component in ["synonyms", "antonyms"]:
                 result = await func(word.text, definition, ai, force_refresh=request.force)
@@ -535,7 +538,7 @@ async def regenerate_components(
     await definition.save()
 
     return ResourceResponse(
-        data=definition.model_dump(mode='json'),
+        data=definition.model_dump(mode="json"),
         metadata={
             "regenerated_components": list(request.components),
             "version": definition.version,
@@ -550,18 +553,21 @@ async def batch_regenerate_components(
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> dict[str, Any]:
     """Batch AI-regenerate components.
-    
+
     Body:
         - definition_ids: List of definition IDs (max 100)
         - components: Components to regenerate
         - force: Force regeneration
         - parallel: Process in parallel
-    
+
     Returns:
         Processing summary and results by word.
     """
     # Get definitions
-    definition_oids: list[Union[PydanticObjectId, str]] = [PydanticObjectId(id_str) if isinstance(id_str, str) else id_str for id_str in request.definition_ids]
+    definition_oids: list[PydanticObjectId | str] = [
+        PydanticObjectId(id_str) if isinstance(id_str, str) else id_str
+        for id_str in request.definition_ids
+    ]
     definitions = await repo.get_many(definition_oids)
 
     if len(definitions) != len(request.definition_ids):
@@ -586,8 +592,12 @@ async def batch_regenerate_components(
 
         # Process definitions for this word
         # Convert string components to SynthesisComponent enum
-        synthesis_components = {SynthesisComponent(comp) for comp in request.components} if request.components else None
-        
+        synthesis_components = (
+            {SynthesisComponent(comp) for comp in request.components}
+            if request.components
+            else None
+        )
+
         await enhance_definitions_parallel(
             word_definitions,
             word,

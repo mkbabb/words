@@ -55,6 +55,8 @@ class DefinitionUpdate(BaseModel):
     usage_notes: list[UsageNote] | None = None
     grammar_patterns: list[GrammarPattern] | None = None
     collocations: list[Collocation] | None = None
+    add_image_id: str | None = Field(None, description="Image ID to add to the definition")
+    remove_image_id: str | None = Field(None, description="Image ID to remove from the definition")
 
 
 class DefinitionFilter(BaseModel):
@@ -155,6 +157,50 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
                 setattr(definition, field, components[field])
 
         definition.version += 1
+        await definition.save()
+        return definition
+
+    async def update(
+        self, id: PydanticObjectId, data: DefinitionUpdate, version: int | None = None
+    ) -> Definition:
+        """Update a definition with support for image operations."""
+        # Get the definition
+        definition = await self.get(id, raise_on_missing=True)
+        assert definition is not None
+        
+        # Check version for optimistic locking
+        if version is not None and hasattr(definition, "version"):
+            if definition.version != version:
+                from ...core.exceptions import VersionConflictException
+                raise VersionConflictException(
+                    expected=version,
+                    actual=definition.version,
+                    resource="Definition",
+                )
+        
+        # Handle special image operations
+        update_data = data.model_dump(exclude_unset=True)
+        
+        # Add image
+        if "add_image_id" in update_data:
+            image_id = update_data.pop("add_image_id")
+            if image_id and image_id not in definition.image_ids:
+                definition.image_ids.append(image_id)
+        
+        # Remove image
+        if "remove_image_id" in update_data:
+            image_id = update_data.pop("remove_image_id")
+            if image_id and image_id in definition.image_ids:
+                definition.image_ids.remove(image_id)
+        
+        # Update other fields
+        for field, value in update_data.items():
+            setattr(definition, field, value)
+        
+        # Increment version
+        if hasattr(definition, "version"):
+            definition.version += 1
+        
         await definition.save()
         return definition
 

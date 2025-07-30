@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from ..caching.decorators import cached_api_call
 from ..models import Definition
 from ..utils.logging import get_logger, log_metrics
+from .model_selection import ModelTier, get_model_for_task, get_temperature_for_model
 from .models import (
     AnkiFillBlankResponse,
     AnkiMultipleChoiceResponse,
@@ -36,10 +37,9 @@ from .models import (
     SynthesisResponse,
     UsageNoteResponse,
     WordFormResponse,
-    WordSuggestionResponse,
     WordOfTheDayResponse,
+    WordSuggestionResponse,
 )
-from .model_selection import ModelTier, get_model_for_task, get_temperature_for_model
 from .templates import PromptTemplateManager
 
 T = TypeVar("T", bound=BaseModel)
