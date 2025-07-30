@@ -42,18 +42,18 @@ class PronunciationLoader(DataLoader):
             return None
 
         # Convert to dict
-        pron_dict = pronunciation.model_dump(exclude={"id"})
+        pron_dict = pronunciation.model_dump(mode="json", exclude={"id", "word_id"})
 
         # Load and transform audio files
         audio_files = []
-        if pronunciation.audio_file_ids:
-            for audio_id in pronunciation.audio_file_ids:
+        if pron_dict.get("audio_file_ids"):
+            for audio_id in pron_dict["audio_file_ids"]:
                 audio = await AudioMedia.get(audio_id)
                 if audio:
-                    audio_dict = audio.model_dump(exclude={"id"})
+                    audio_dict = audio.model_dump(mode="json", exclude={"id"})
                     # Convert file path to API URL
                     if audio_dict.get("url", "").startswith("/"):
-                        audio_dict["url"] = f"/api/v1/audio/files/{audio_id}"
+                        audio_dict["url"] = f"/api/v1/audio/files/{str(audio_id)}"
                     audio_files.append(audio_dict)
 
         pron_dict["audio_files"] = audio_files
@@ -92,18 +92,18 @@ class DefinitionLoader(DataLoader):
             "part_of_speech": definition.part_of_speech,
             "text": definition.text,
             "meaning_cluster": (
-                definition.meaning_cluster.model_dump() if definition.meaning_cluster else None
+                definition.meaning_cluster.model_dump(mode="json") if definition.meaning_cluster else None
             ),
             "sense_number": definition.sense_number,
-            "word_forms": [wf.model_dump() for wf in definition.word_forms],
+            "word_forms": [wf.model_dump(mode="json") for wf in definition.word_forms],
             "synonyms": definition.synonyms,
             "antonyms": definition.antonyms,
             "language_register": definition.language_register,
             "domain": definition.domain,
             "region": definition.region,
-            "usage_notes": [un.model_dump() for un in definition.usage_notes],
-            "grammar_patterns": [gp.model_dump() for gp in definition.grammar_patterns],
-            "collocations": [c.model_dump() for c in definition.collocations],
+            "usage_notes": [un.model_dump(mode="json") for un in definition.usage_notes],
+            "grammar_patterns": [gp.model_dump(mode="json") for gp in definition.grammar_patterns],
+            "collocations": [c.model_dump(mode="json") for c in definition.collocations],
             "transitivity": definition.transitivity,
             "cefr_level": definition.cefr_level,
             "frequency_band": definition.frequency_band,
@@ -137,7 +137,8 @@ class DefinitionLoader(DataLoader):
             for provider_id in provider_data_ids:
                 provider_data = await ProviderData.get(provider_id)
                 if provider_data:
-                    providers_data.append(provider_data.model_dump(exclude={"id"}))
+                    # Exclude raw_data to avoid potential ObjectId serialization issues
+                    providers_data.append(provider_data.model_dump(mode="json", exclude={"id", "raw_data"}))
             def_dict["providers_data"] = providers_data
         else:
             def_dict["providers_data"] = []

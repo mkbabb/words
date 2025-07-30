@@ -5,16 +5,49 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from beanie import Document
-from pydantic import BaseModel, Field
+from beanie import Document, PydanticObjectId
+from bson import ObjectId
+from pydantic import BaseModel, ConfigDict, Field
+
+
+def objectid_json_serializer(obj: ObjectId | PydanticObjectId) -> str:
+    """High-performance ObjectId serializer for Pydantic v2."""
+    return str(obj)
 
 
 class BaseMetadata(BaseModel):
     """Standard metadata for entities requiring CRUD tracking."""
+    
+    model_config = ConfigDict(
+        # Configure custom JSON serializers for ObjectIds
+        json_serializers={
+            ObjectId: objectid_json_serializer,
+            PydanticObjectId: objectid_json_serializer,
+        },
+        # Performance optimizations
+        arbitrary_types_allowed=True,
+        str_strip_whitespace=True,
+        use_enum_values=True
+    )
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     version: int = Field(default=1, ge=1)
+
+
+class DocumentWithObjectIdSupport(Document, BaseMetadata):
+    """Base class for all Beanie Document models with proper ObjectId serialization."""
+    
+    model_config = ConfigDict(
+        # Ensure ObjectId serializers are properly inherited for Beanie Documents
+        json_serializers={
+            ObjectId: objectid_json_serializer,
+            PydanticObjectId: objectid_json_serializer,
+        },
+        arbitrary_types_allowed=True,
+        str_strip_whitespace=True,
+        use_enum_values=True
+    )
 
 
 class ModelInfo(BaseModel):
@@ -27,7 +60,7 @@ class ModelInfo(BaseModel):
     last_generated: datetime = Field(default_factory=datetime.utcnow)
 
 
-class ImageMedia(Document, BaseMetadata):
+class ImageMedia(DocumentWithObjectIdSupport):
     """Image media storage."""
 
     url: str | None = None  # Optional URL for external images
@@ -43,7 +76,7 @@ class ImageMedia(Document, BaseMetadata):
         name = "image_media"
 
 
-class AudioMedia(Document, BaseMetadata):
+class AudioMedia(DocumentWithObjectIdSupport):
     """Audio media storage."""
 
     url: str

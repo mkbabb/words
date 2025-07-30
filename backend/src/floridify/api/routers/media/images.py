@@ -7,10 +7,12 @@ from typing import Any
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from PIL import Image as PILImage
 from pydantic import BaseModel, Field
 
+from ....core.state_tracker import Stages, StateTracker
+from ....core.streaming import create_streaming_response
 from ....models import ImageMedia
 from ...core import (
     ErrorDetail,
@@ -233,6 +235,132 @@ async def upload_image(
             "self": f"/images/{image.id}",
             "content": f"/images/{image.id}/content",
         },
+    )
+
+
+@router.post("/upload/stream", response_model=ResourceResponse, status_code=201)
+async def upload_image_stream(
+    file: UploadFile = File(...),
+    alt_text: str | None = Query(None, description="Alternative text"),
+    description: str | None = Query(None, description="Image description"),
+    repo: ImageRepository = Depends(get_image_repo),
+) -> StreamingResponse:
+    """Upload an image with streaming progress updates.
+
+    Returns Server-Sent Events (SSE) with progress updates.
+
+    Form Data:
+        - file: Image file (multipart/form-data)
+
+    Query Parameters:
+        - alt_text: Alternative text for accessibility
+        - description: Image description
+
+    Event Types:
+        - config: Stage definitions for progress visualization
+        - progress: Update on current operation with stage and progress
+        - complete: Final result with image info
+        - error: Error details if something goes wrong
+    """
+    # Read file content
+    data = await file.read()
+
+    # Create state tracker for image upload process
+    state_tracker = StateTracker(category="image")
+
+    async def upload_process() -> dict[str, Any]:
+        """Perform the image upload process while updating state tracker."""
+        try:
+            # Start upload
+            await state_tracker.update_stage(Stages.IMAGE_UPLOAD_START)
+            await state_tracker.update(
+                stage=Stages.IMAGE_UPLOAD_START, message="Starting image upload..."
+            )
+
+            # Validate file type
+            await state_tracker.update_stage(Stages.IMAGE_UPLOAD_VALIDATING)
+            await state_tracker.update(
+                stage=Stages.IMAGE_UPLOAD_VALIDATING, message="Validating file type..."
+            )
+
+            if not file.content_type or not file.content_type.startswith("image/"):
+                raise ValueError(f"File must be an image, got {file.content_type}")
+
+            # Check file size (max 10MB)
+            if len(data) > 10 * 1024 * 1024:
+                raise ValueError("File size must be less than 10MB")
+
+            await state_tracker.update(
+                stage=Stages.IMAGE_UPLOAD_VALIDATING,
+                progress=40,
+                message=f"Validated {file.content_type} file ({len(data)} bytes)",
+            )
+
+            # Process image metadata
+            await state_tracker.update_stage(Stages.IMAGE_UPLOAD_PROCESSING)
+            await state_tracker.update(
+                stage=Stages.IMAGE_UPLOAD_PROCESSING, message="Processing image metadata..."
+            )
+
+            try:
+                img = PILImage.open(io.BytesIO(data))
+                width, height = img.size
+                format = img.format.lower() if img.format else "unknown"
+            except Exception as e:
+                raise ValueError(f"Could not parse image: {str(e)}")
+
+            await state_tracker.update(
+                stage=Stages.IMAGE_UPLOAD_PROCESSING,
+                progress=70,
+                message=f"Processed {width}x{height} {format} image",
+            )
+
+            # Store image
+            await state_tracker.update_stage(Stages.IMAGE_UPLOAD_STORING)
+            await state_tracker.update(
+                stage=Stages.IMAGE_UPLOAD_STORING, message="Storing image data..."
+            )
+
+            # Create image
+            image_data = ImageCreate(
+                data=data,
+                format=format,
+                size_bytes=len(data),
+                width=width,
+                height=height,
+                alt_text=alt_text,
+                description=description,
+                url=None,
+            )
+
+            image = await repo.create(image_data)
+
+            # Complete successfully
+            await state_tracker.update_complete(message="Image uploaded successfully!")
+
+            # Return result data
+            return {
+                "id": str(image.id),
+                "format": image.format,
+                "size_bytes": image.size_bytes,
+                "width": image.width,
+                "height": image.height,
+                "alt_text": image.alt_text,
+                "description": image.description,
+                "url": f"/api/v1/images/{image.id}",
+                "content_url": f"/api/v1/images/{image.id}/content",
+            }
+
+        except Exception as e:
+            await state_tracker.update_error(f"Failed to upload image: {str(e)}")
+            raise
+
+    # Use the generalized streaming system
+    return await create_streaming_response(
+        state_tracker=state_tracker,
+        process_func=upload_process,
+        include_stage_definitions=True,
+        include_completion_data=True,
     )
 
 

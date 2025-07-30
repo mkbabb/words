@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import hashlib
 import inspect
 import time
 from collections.abc import Awaitable, Callable
@@ -22,14 +23,14 @@ logger = get_logger(__name__)
 
 class RequestDeduplicator:
     """Manages in-flight requests to prevent duplicate executions."""
-    
-    def __init__(self, max_wait_time: float = 30.0, cleanup_interval: float = 60.0):
+
+    def __init__(self, max_wait_time: float = 120.0, cleanup_interval: float = 60.0):  # Default 2 minutes
         self._in_flight: dict[str, asyncio.Future[Any]] = {}
         self._lock = asyncio.Lock()
         self._max_wait_time = max_wait_time
         self._cleanup_interval = cleanup_interval
         self._last_cleanup = time.time()
-    
+
     async def deduplicate(
         self,
         key: str,
@@ -48,20 +49,20 @@ class RequestDeduplicator:
                 future = asyncio.Future()
                 self._in_flight[key] = future
                 logger.info(f"🚀 Starting new request: {key}")
-                
+
                 # Schedule the actual execution
                 asyncio.create_task(self._execute(key, future, func, *args, **kwargs))
-            
+
             # Cleanup old entries periodically
             await self._cleanup_stale_entries()
-        
+
         # Wait for result with timeout
         try:
             return await asyncio.wait_for(future, timeout=self._max_wait_time)
         except TimeoutError:
             logger.warning(f"⏱️ Timeout waiting for request: {key}")
             raise HTTPException(status_code=504, detail="Request timeout")
-    
+
     async def _execute(
         self,
         key: str,
@@ -83,26 +84,23 @@ class RequestDeduplicator:
             await asyncio.sleep(0.1)
             async with self._lock:
                 self._in_flight.pop(key, None)
-    
+
     async def _cleanup_stale_entries(self) -> None:
         """Remove completed futures that weren't cleaned up."""
         current_time = time.time()
         if current_time - self._last_cleanup < self._cleanup_interval:
             return
-        
+
         self._last_cleanup = current_time
-        stale_keys = [
-            key for key, future in self._in_flight.items()
-            if future.done()
-        ]
-        
+        stale_keys = [key for key, future in self._in_flight.items() if future.done()]
+
         for key in stale_keys:
             self._in_flight.pop(key, None)
             logger.debug(f"🧹 Cleaned up stale request: {key}")
 
 
-# Global deduplicator instance
-_deduplicator = RequestDeduplicator()
+# Global deduplicator instance with increased timeout
+_deduplicator = RequestDeduplicator(max_wait_time=120.0)  # 2 minutes default
 
 
 def cached_api_call(
@@ -327,31 +325,32 @@ def deduplicated(
     max_wait_time: float | None = None,
 ) -> Callable[[AF], AF]:
     """Decorator for request deduplication.
-    
+
     Args:
         key_func: Function to generate deduplication key from arguments
         max_wait_time: Maximum time to wait for in-flight request
-    
+
     Returns:
         Decorated async function
     """
+
     def decorator(func: AF) -> AF:
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             # Generate deduplication key
             key = key_func(*args, **kwargs)
-            
+
             # Use custom wait time if provided
             deduplicator = _deduplicator
             if max_wait_time is not None:
                 # Create temporary deduplicator with custom timeout
                 deduplicator = RequestDeduplicator(max_wait_time=max_wait_time)
-            
+
             # Execute with deduplication
             return await deduplicator.deduplicate(key, func, *args, **kwargs)
-        
+
         return wrapper  # type: ignore[return-value]
-    
+
     return decorator
 
 
@@ -360,28 +359,29 @@ def cached_api_call_with_dedup(
     use_file_cache: bool = False,
     key_func: Callable[..., tuple[Any, ...]] | None = None,
     force_refresh_param: str = "force_refresh",
-    max_wait_time: float = 30.0,
+    max_wait_time: float = 120.0,  # Default 2 minutes
 ) -> Callable[[AF], AF]:
     """Decorator combining caching and request deduplication.
-    
+
     Args:
         ttl_hours: Cache TTL in hours
         use_file_cache: Whether to persist cache to disk
         key_func: Function to generate cache key from args/kwargs
         force_refresh_param: Parameter name for cache invalidation
         max_wait_time: Maximum time to wait for in-flight request
-    
+
     Returns:
         Decorated async function with both caching and deduplication
     """
+
     def decorator(func: AF) -> AF:
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             cache_manager = get_cache_manager()
-            
+
             # Check for force refresh
             force_refresh = kwargs.get(force_refresh_param, False)
-            
+
             # Generate cache key
             if key_func:
                 key_parts = key_func(*args, **kwargs)
@@ -392,7 +392,7 @@ def cached_api_call_with_dedup(
                     args,
                     tuple(sorted(kwargs.items())),
                 )
-            
+
             # Check cache first (unless forcing refresh)
             if not force_refresh:
                 cached_result = cache_manager.get(
@@ -402,10 +402,13 @@ def cached_api_call_with_dedup(
                 if cached_result is not None:
                     logger.debug(f"🎯 Cache hit: {func.__name__}")
                     return cached_result
-            
+
             # Create deduplication key
-            dedup_key = f"{func.__module__}:{func.__name__}:{hash(key_parts)}"
-            
+            # Convert key_parts to string for hashing (handles unhashable types)
+            key_str = "|".join(str(part) for part in key_parts)
+            key_hash = hashlib.sha256(key_str.encode()).hexdigest()[:16]
+            dedup_key = f"{func.__module__}:{func.__name__}:{key_hash}"
+
             # Execute with deduplication
             result = await _deduplicator.deduplicate(
                 dedup_key,
@@ -413,7 +416,7 @@ def cached_api_call_with_dedup(
                 *args,
                 **kwargs,
             )
-            
+
             # Cache the result
             cache_manager.set(
                 key_parts,
@@ -421,9 +424,9 @@ def cached_api_call_with_dedup(
                 ttl_hours=ttl_hours,
                 use_file_cache=use_file_cache,
             )
-            
+
             return result
-        
+
         return wrapper  # type: ignore[return-value]
-    
+
     return decorator

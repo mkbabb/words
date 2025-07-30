@@ -7,6 +7,7 @@ from collections.abc import Callable
 from typing import Any
 
 import httpx
+from beanie import PydanticObjectId
 
 from ..constants import Language
 from ..core.state_tracker import StateTracker
@@ -46,7 +47,7 @@ class OxfordConnector(DictionaryConnector):
                 "app_key": self.api_key,
                 "Accept": "application/json",
             },
-            timeout=30.0,
+            timeout=120.0,
         )
 
     @property
@@ -148,7 +149,9 @@ class OxfordConnector(DictionaryConnector):
         """Close the HTTP session."""
         await self.session.aclose()
 
-    async def extract_pronunciation(self, raw_data: dict[str, Any]) -> Pronunciation | None:
+    async def extract_pronunciation(
+        self, raw_data: dict[str, Any], word_id: PydanticObjectId
+    ) -> Pronunciation | None:
         """Extract pronunciation from Oxford data.
 
         Args:
@@ -186,7 +189,7 @@ class OxfordConnector(DictionaryConnector):
                         # Use American IPA as primary, fallback to British
                         primary_ipa = ipa_american or ipa_british or phonetic or "unknown"
                         return Pronunciation(
-                            word_id="",  # Will be set by base connector
+                            word_id=word_id,  # This should be passed as parameter
                             phonetic=phonetic if phonetic else "unknown",
                             ipa=primary_ipa,
                             syllables=[],
@@ -197,7 +200,9 @@ class OxfordConnector(DictionaryConnector):
 
         return None
 
-    async def extract_definitions(self, raw_data: dict[str, Any], word_id: str) -> list[Definition]:
+    async def extract_definitions(
+        self, raw_data: dict[str, Any], word_id: PydanticObjectId
+    ) -> list[Definition]:
         """Extract definitions from Oxford data.
 
         Args:
@@ -240,7 +245,11 @@ class OxfordConnector(DictionaryConnector):
 
                                 registers = sense.get("registers", [])
                                 from typing import Literal
-                                register: Literal["formal", "informal", "neutral", "slang", "technical"] | None = None
+
+                                register: (
+                                    Literal["formal", "informal", "neutral", "slang", "technical"]
+                                    | None
+                                ) = None
                                 if registers:
                                     reg_text = registers[0].get("text", "").lower()
                                     if "formal" in reg_text:
@@ -276,13 +285,19 @@ class OxfordConnector(DictionaryConnector):
                                 for example in oxford_examples:
                                     example_text = example.get("text", "")
                                     if example_text:
+                                        assert (
+                                            definition.id is not None
+                                        )  # After save(), id is guaranteed to be not None
                                         example_obj = Example(
-                                            definition_id=str(definition.id),
+                                            definition_id=definition.id,
                                             text=example_text,
                                             type="literature",  # Oxford examples are from real usage
                                         )
                                         await example_obj.save()
-                                        definition.example_ids.append(str(example_obj.id))
+                                        assert (
+                                            example_obj.id is not None
+                                        )  # After save(), id is guaranteed to be not None
+                                        definition.example_ids.append(example_obj.id)
 
                                 # Update definition with example IDs
                                 await definition.save()

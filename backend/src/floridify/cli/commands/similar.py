@@ -87,26 +87,23 @@ async def _similar_async(
             part_of_speech = entry.definitions[0].part_of_speech
 
         # Generate synonyms using AI
+        # Create a minimal Definition object for the synthesis function
+        from beanie import PydanticObjectId
+
         from ...ai.synthesis_functions import synthesize_synonyms
         from ...models import Definition
-        
-        # Create a minimal Definition object for the synthesis function
         definition_obj = Definition(
-            word_id="temp",  # Temporary ID
+            word_id=PydanticObjectId(),  # Temporary ID
             part_of_speech=part_of_speech,
             text=base_definition,
             synonyms=[],
             antonyms=[],
-            example_ids=[]
+            example_ids=[],
         )
-        
+
         ai_connector = get_openai_connector()
         synonyms = await synthesize_synonyms(
-            word=word,
-            definition=definition_obj,
-            ai=ai_connector,
-            count=count,
-            force_refresh=force
+            word=word, definition=definition_obj, ai=ai_connector, count=count, force_refresh=force
         )
 
         if not synonyms:
@@ -146,7 +143,7 @@ async def _display_synonyms(
         # Simple relevance based on position in list
         relevance = 1.0 - (i * 0.1)  # Decrease by 10% for each position
         relevance_text = f"{relevance:.0%}"
-        
+
         # Color-code relevance
         if relevance >= 0.9:
             relevance_style = "bright_green"

@@ -167,7 +167,7 @@ const loadWordlists = async () => {
 };
 
 const isWordInWordlist = (wordlist: WordList): boolean => {
-  return wordlist.words.some(w => w.text.toLowerCase() === props.word.toLowerCase());
+  return wordlist.words.some(w => w.word.toLowerCase() === props.word.toLowerCase());
 };
 
 const getWordFrequency = (wordlist: WordList): number => {

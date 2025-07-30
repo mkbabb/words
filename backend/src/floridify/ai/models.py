@@ -68,9 +68,7 @@ class ClusterMapping(BaseModel):
     cluster_id: str = Field(
         description="Pithy unique cluster identifier (e.g., 'bank_financial') - always in the form {word}_{meaning_cluster}."
     )
-    cluster_description: str = Field(
-        description="Human-readable description of this cluster"
-    )
+    cluster_description: str = Field(description="Human-readable description of this cluster")
     definition_indices: list[int] = Field(
         description="List of definition indices (0-based) in this cluster"
     )
@@ -97,9 +95,7 @@ class ClusterMappingResponse(BaseModel):
         description="List of cluster mappings with their descriptions and indices",
     )
 
-    confidence: float = Field(
-        description="Overall confidence in the clustering (0.0-1.0)"
-    )
+    confidence: float = Field(description="Overall confidence in the clustering (0.0-1.0)")
 
 
 class SynthesisResponse(BaseModel):
@@ -116,13 +112,9 @@ class SynonymCandidate(BaseModel):
     """A single synonym candidate with relevance and efflorescence rating."""
 
     word: str = Field(description="The synonym word or phrase")
-    language: str = Field(
-        description="Language of origin (e.g., English, Latin, French)"
-    )
+    language: str = Field(description="Language of origin (e.g., English, Latin, French)")
     relevance: float = Field(description="Relevance score (0.0 to 1.0)")
-    efflorescence: float = Field(
-        description="Beauty and expressive power score (0.0 to 1.0)"
-    )
+    efflorescence: float = Field(description="Beauty and expressive power score (0.0 to 1.0)")
     explanation: str = Field(
         description="Brief explanation of the relationship and why it's beautiful"
     )
@@ -134,18 +126,14 @@ class SynonymGenerationResponse(BaseModel):
     synonyms: list[SynonymCandidate] = Field(
         description="List of synonyms ordered by relevance and efflorescence"
     )
-    confidence: float = Field(
-        description="Overall confidence in the synonym generation"
-    )
+    confidence: float = Field(description="Overall confidence in the synonym generation")
 
 
 class Suggestion(BaseModel):
     """A single word suggestion."""
 
     word: str = Field(description="The suggested word")
-    reasoning: str = Field(
-        description="Brief explanation of why this word is a good suggestion"
-    )
+    reasoning: str = Field(description="Brief explanation of why this word is a good suggestion")
     difficulty_level: int = Field(
         ge=1, le=5, description="Difficulty level from 1 (basic) to 5 (advanced)"
     )
@@ -155,23 +143,17 @@ class Suggestion(BaseModel):
 class SuggestionsResponse(BaseModel):
     """Response for word suggestions based on input words."""
 
-    suggestions: list[Suggestion] = Field(
-        description="List of word suggestions with explanations"
-    )
+    suggestions: list[Suggestion] = Field(description="List of word suggestions with explanations")
     input_analysis: str = Field(
         description="Brief analysis of the input words and suggestion rationale"
     )
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Overall confidence in suggestions"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Overall confidence in suggestions")
 
 
 class FactGenerationResponse(BaseModel):
     """Response from AI fact generation about a word."""
 
-    facts: list[str] = Field(
-        description="List of interesting, educational facts about the word"
-    )
+    facts: list[str] = Field(description="List of interesting, educational facts about the word")
     confidence: float = Field(
         ge=0.0, le=1.0, description="Overall confidence in fact accuracy and quality"
     )
@@ -183,9 +165,7 @@ class FactGenerationResponse(BaseModel):
 class Collocation(BaseModel):
     """A single collocation entry."""
 
-    type: str = Field(
-        description="Type of collocation (e.g., verb+noun, adjective+noun)"
-    )
+    type: str = Field(description="Type of collocation (e.g., verb+noun, adjective+noun)")
     phrase: str = Field(description="The collocation phrase")
     frequency: float = Field(ge=0.0, le=1.0, description="Frequency score")
 
@@ -203,18 +183,10 @@ class WordSuggestion(BaseModel):
     """A word suggestion based on descriptive query."""
 
     word: str = Field(description="The suggested word")
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Semantic match confidence"
-    )
-    efflorescence: float = Field(
-        ge=0.0, le=1.0, description="Beauty and memorability score"
-    )
-    reasoning: str = Field(
-        description="Why this word fits the query"
-    )
-    example_usage: str | None = Field(
-        None, description="Example sentence with word in context"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Semantic match confidence")
+    efflorescence: float = Field(ge=0.0, le=1.0, description="Beauty and memorability score")
+    reasoning: str = Field(description="Why this word fits the query")
+    example_usage: str | None = Field(None, description="Example sentence with word in context")
 
 
 class WordSuggestionResponse(BaseModel):
@@ -239,12 +211,8 @@ class QueryValidationResponse(BaseModel):
 class GrammarPatternResponse(BaseModel):
     """Response for grammar pattern extraction."""
 
-    patterns: list[str] = Field(
-        description="Common grammatical constructions (e.g., [Tn], sb/sth)"
-    )
-    descriptions: list[str] = Field(
-        description="Human-readable descriptions of patterns"
-    )
+    patterns: list[str] = Field(description="Common grammatical constructions (e.g., [Tn], sb/sth)")
+    descriptions: list[str] = Field(description="Human-readable descriptions of patterns")
     confidence: float = Field(ge=0.0, le=1.0)
 
 
@@ -259,9 +227,7 @@ class CEFRLevelResponse(BaseModel):
 class UsageNote(BaseModel):
     """A single usage note."""
 
-    type: str = Field(
-        description="Type of usage note (e.g., register, formality, context)"
-    )
+    type: str = Field(description="Type of usage note (e.g., register, formality, context)")
     text: str = Field(description="The usage guidance text")
 
 
@@ -327,9 +293,7 @@ class RegisterClassificationResponse(BaseModel):
 class DomainIdentificationResponse(BaseModel):
     """Response for domain identification."""
 
-    domain: str | None = Field(
-        None, description="Domain/field: medical, legal, computing, etc."
-    )
+    domain: str | None = Field(None, description="Domain/field: medical, legal, computing, etc.")
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str = Field(description="Explanation for identification")
 
@@ -337,9 +301,7 @@ class DomainIdentificationResponse(BaseModel):
 class FrequencyBandResponse(BaseModel):
     """Response for frequency band assessment."""
 
-    band: int = Field(
-        ge=1, le=5, description="Frequency band: 1 (most common) to 5 (least common)"
-    )
+    band: int = Field(ge=1, le=5, description="Frequency band: 1 (most common) to 5 (least common)")
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str = Field(description="Explanation for assessment")
 
@@ -347,9 +309,7 @@ class FrequencyBandResponse(BaseModel):
 class RegionalVariantResponse(BaseModel):
     """Response for regional variant detection."""
 
-    regions: list[str] = Field(
-        description="Regions where this usage is common (US, UK, AU, etc.)"
-    )
+    regions: list[str] = Field(description="Regions where this usage is common (US, UK, AU, etc.)")
     confidence: float = Field(ge=0.0, le=1.0)
 
 
@@ -386,9 +346,7 @@ class ComprehensiveSynthesisResponse(BaseModel):
 class ExampleSynthesisResponse(BaseModel):
     """Response for example sentence synthesis."""
 
-    examples: list[str] = Field(
-        description="List of natural, contextual example sentences"
-    )
+    examples: list[str] = Field(description="List of natural, contextual example sentences")
     confidence: float = Field(ge=0.0, le=1.0)
 
 
@@ -398,9 +356,7 @@ class DefinitionSynthesisResponse(BaseModel):
     definition_text: str = Field(
         description="Synthesized definition text combining clustered meanings"
     )
-    part_of_speech: str = Field(
-        description="Part of speech for this definition cluster"
-    )
+    part_of_speech: str = Field(description="Part of speech for this definition cluster")
     confidence: float = Field(ge=0.0, le=1.0)
     sources_used: list[str] = Field(description="Provider sources used in synthesis")
 
@@ -408,9 +364,7 @@ class DefinitionSynthesisResponse(BaseModel):
 class MeaningClusterResponse(BaseModel):
     """Response for single definition meaning cluster generation."""
 
-    cluster_id: str = Field(
-        description="Semantic cluster identifier for this definition"
-    )
+    cluster_id: str = Field(description="Semantic cluster identifier for this definition")
     cluster_description: str = Field(description="Human-readable cluster description")
     confidence: float = Field(ge=0.0, le=1.0)
 
@@ -441,7 +395,7 @@ class AnkiMultipleChoiceResponse(BaseModel):
 
 class DeduplicatedDefinition(BaseModel):
     """A deduplicated definition with quality assessment."""
-    
+
     part_of_speech: str = Field(description="Part of speech")
     definition: str = Field(description="The highest quality definition text")
     source_indices: list[int] = Field(description="Indices of merged definitions (0-based)")
@@ -451,7 +405,7 @@ class DeduplicatedDefinition(BaseModel):
 
 class DeduplicationResponse(BaseModel):
     """Response from definition deduplication."""
-    
+
     deduplicated_definitions: list[DeduplicatedDefinition] = Field(
         description="Deduplicated definitions preserving highest quality"
     )
@@ -466,7 +420,9 @@ class WordOfTheDayResponse(BaseModel):
     definition: str = Field(description="Clear, concise definition")
     etymology: str = Field(description="Brief origin and historical development")
     example_usage: str = Field(description="Natural sentence demonstrating proper usage")
-    fascinating_fact: str = Field(description="Interesting linguistic, cultural, or historical insight")
+    fascinating_fact: str = Field(
+        description="Interesting linguistic, cultural, or historical insight"
+    )
     difficulty_level: str = Field(description="Difficulty level: intermediate or advanced")
     memorable_aspect: str = Field(description="What makes this word particularly worth learning")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in word selection")

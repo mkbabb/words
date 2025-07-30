@@ -52,8 +52,9 @@ class DatabaseConfig:
 
     production_url: str = ""
     development_url: str = ""
+    local_mongodb_url: str = ""
     name: str = "floridify"
-    timeout: int = 30
+    timeout: int = 120
     max_pool_size: int = 100
 
     def get_url(self) -> str:
@@ -67,8 +68,11 @@ class DatabaseConfig:
         if is_production:
             url = self.production_url
         else:
-            # Development always uses SSH tunnel on host
-            url = self.development_url
+            # For development, prefer local MongoDB if available, fall back to SSH tunnel
+            if self.local_mongodb_url:
+                url = self.local_mongodb_url
+            else:
+                url = self.development_url
 
         if not url:
             raise ValueError(
@@ -76,10 +80,6 @@ class DatabaseConfig:
                 f"(production={is_production}, docker={is_docker}). "
                 f"Please check auth/config.toml"
             )
-
-        # For Docker, replace localhost with host.docker.internal
-        if is_docker and not is_production:
-            url = url.replace("localhost:", "host.docker.internal:")
 
         return url
 
@@ -181,8 +181,9 @@ class Config:
         database_config = DatabaseConfig(
             production_url=db_data.get("production_url", ""),
             development_url=db_data.get("development_url", ""),
+            local_mongodb_url=db_data.get("local_mongodb_url", ""),
             name=db_data.get("name", "floridify"),
-            timeout=db_data.get("timeout", 30),
+            timeout=db_data.get("timeout", 120),
             max_pool_size=db_data.get("max_pool_size", 100),
         )
 

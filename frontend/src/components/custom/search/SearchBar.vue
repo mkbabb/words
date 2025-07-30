@@ -262,6 +262,17 @@
         @close="closeExpandModal"
         @submit="submitExpandedQuery"
     />
+
+    <ConfirmDialog
+        v-model:open="showClearStorageDialog"
+        title="Clear All Storage"
+        description="This will clear all local storage including history and settings."
+        message="This action cannot be undone. You will lose all your saved settings and search history."
+        confirm-text="Clear All"
+        cancel-text="Cancel"
+        :destructive="true"
+        @confirm="confirmClearStorage"
+    />
 </template>
 
 <script setup lang="ts">
@@ -279,6 +290,7 @@ import SearchControls from './components/SearchControls.vue';
 import SearchResults from './components/SearchResults.vue';
 import ExpandModal from './components/ExpandModal.vue';
 import RainbowProgressBar from './components/RainbowProgressBar.vue';
+import ConfirmDialog from '../ConfirmDialog.vue';
 
 // Import composables
 import {
@@ -324,6 +336,9 @@ const { state, canToggleMode, placeholder, resultsContainerStyle } = useSearchSt
 
 // Progress bar state - track separately to persist after modal dismiss
 const isLoadingInProgress = ref(false);
+
+// Dialog state
+const showClearStorageDialog = ref(false);
 
 // Start showing progress when search starts
 watch(() => store.isSearching, (newVal) => {
@@ -490,15 +505,14 @@ const clearQuery = () => {
 };
 
 const clearAllStorage = () => {
-    if (
-        confirm(
-            'This will clear all local storage including history and settings. Are you sure?'
-        )
-    ) {
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.reload();
-    }
+    showClearStorageDialog.value = true;
+};
+
+const confirmClearStorage = () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    showClearStorageDialog.value = false;
+    window.location.reload();
 };
 
 // Expand modal wrapper

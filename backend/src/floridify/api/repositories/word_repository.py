@@ -10,13 +10,13 @@ from pydantic import BaseModel, Field
 
 from ...constants import Language
 from ...models import (
-    Word,
     Definition,
     Example,
     Fact,
     Pronunciation,
     ProviderData,
     SynthesizedDictionaryEntry,
+    Word,
 )
 from ..core.base import BaseRepository
 
@@ -130,13 +130,11 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
         definitions_count_task = Definition.find({"word_id": word_id_str}).count()
         examples_count_task = Example.find({"word_id": word_id_str}).count()
         facts_count_task = Fact.find({"word_id": word_id_str}).count()
-        
+
         definitions_count, examples_count, facts_count = await asyncio.gather(
-            definitions_count_task,
-            examples_count_task,
-            facts_count_task
+            definitions_count_task, examples_count_task, facts_count_task
         )
-        
+
         word_dict["counts"] = {
             "definitions": definitions_count,
             "examples": examples_count,

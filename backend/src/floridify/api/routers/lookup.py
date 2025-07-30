@@ -2,22 +2,19 @@
 
 from __future__ import annotations
 
-import asyncio
-import json
 import time
-from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from ...caching import cached_api_call_with_dedup
 from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
-from ...core.state_tracker import Stages, lookup_state_tracker
+from ...core.state_tracker import Stages, StateTracker
+from ...core.streaming import create_streaming_response
 from ...models import Definition, ImageMedia, Word
 from ...utils.logging import get_logger
 from ...utils.sanitization import validate_word_input
@@ -178,7 +175,7 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
                     include_examples=True,
                     include_images=True,
                     include_provider_data=True,
-                    provider_data_ids=entry.source_provider_data_ids,
+                    provider_data_ids=[str(pid) for pid in entry.source_provider_data_ids] if entry.source_provider_data_ids else None,
                 )
 
                 # Create DefinitionResponse from the loaded data
@@ -188,7 +185,7 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
     # Load pronunciation with audio files using the service
     pronunciation = None
     if entry.pronunciation_id is not None:
-        pronunciation = await PronunciationLoader.load_with_audio(entry.pronunciation_id)
+        pronunciation = await PronunciationLoader.load_with_audio(str(entry.pronunciation_id) if entry.pronunciation_id else None)
 
     # Load word
     word_obj = await Word.get(entry.word_id)
@@ -203,16 +200,28 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
                 image_dict = image.model_dump(mode="json", exclude={"data"})
                 synth_images.append(image_dict)
 
-    return LookupResponse(
-        word=word_text,
-        pronunciation=pronunciation,
-        definitions=definitions,
-        etymology=entry.etymology.model_dump() if entry.etymology else None,
-        last_updated=entry.updated_at,  # Use updated_at from BaseMetadata
-        model_info=entry.model_info.model_dump() if entry.model_info else None,
-        synth_entry_id=str(entry.id),
-        images=synth_images,  # Images attached to synth entry
-    )
+    try:
+        response = LookupResponse(
+            word=word_text,
+            pronunciation=pronunciation,
+            definitions=definitions,
+            etymology=entry.etymology.model_dump(mode="json") if entry.etymology else None,
+            last_updated=entry.updated_at,  # Use updated_at from BaseMetadata
+            model_info=entry.model_info.model_dump(mode="json") if entry.model_info else None,
+            synth_entry_id=str(entry.id),
+            images=synth_images,  # Images attached to synth entry
+        )
+        return response
+    except Exception as e:
+        logger.error(f"Error creating LookupResponse: {e}")
+        logger.error(f"word_text type: {type(word_text)}")
+        logger.error(f"pronunciation type: {type(pronunciation)}")
+        logger.error(f"pronunciation content: {pronunciation}")
+        logger.error(f"definitions type: {type(definitions)}")
+        logger.error(f"definitions count: {len(definitions) if definitions else 0}")
+        if definitions and len(definitions) > 0:
+            logger.error(f"First definition type: {type(definitions[0])}")
+        raise
 
 
 @router.get("/lookup/{word}", response_model=LookupResponse)
@@ -272,142 +281,98 @@ async def lookup_word(
         raise HTTPException(status_code=500, detail=f"Internal error during lookup: {str(e)}")
 
 
-async def generate_lookup_events(
-    word: str,
-    params: LookupParams,
-) -> AsyncGenerator[str, None]:
-    """Generate SSE events for lookup pipeline progress."""
-    # Sanitize and validate word input
+async def _lookup_with_tracking(
+    word: str, params: LookupParams, state_tracker: StateTracker
+) -> LookupResponse | None:
+    """Perform lookup with state tracking using the generalized system."""
     try:
-        word = validate_word_input(word)
-    except ValueError as e:
-        yield f"data: {json.dumps({'error': str(e)})}\n\n"
-        return
+        # Sanitize and validate word input
+        try:
+            word = validate_word_input(word)
+        except ValueError as e:
+            raise ValueError(f"Invalid word input: {str(e)}")
 
-    # Reset the state tracker
-    lookup_state_tracker.reset()
+        await state_tracker.update_stage(Stages.START)
+        await state_tracker.update(stage=Stages.START, message=f"Starting lookup for '{word}'...")
 
-    # Start the lookup in a background task
-    lookup_task = asyncio.create_task(_lookup_with_tracking(word, params))
+        # Execute the actual lookup pipeline with state tracking
+        logger.info(f"Looking up word: {word} with state tracking")
 
-    try:
-        # Subscribe to state updates
-        async with lookup_state_tracker.subscribe() as queue:
-            while True:
-                state = await asyncio.wait_for(queue.get(), timeout=30.0)
+        entry = await lookup_word_pipeline(
+            word=word,
+            providers=params.providers,
+            languages=params.languages,
+            force_refresh=params.force_refresh,
+            no_ai=params.no_ai,
+            state_tracker=state_tracker,
+        )
 
-                if state.is_complete:
-                    while not queue.empty():
-                        try:
-                            pending_state = queue.get_nowait()
-                            if not pending_state.is_complete and not pending_state.error:
-                                yield f"event: progress\ndata: {json.dumps(pending_state.model_dump_optimized())}\n\n"
-                        except asyncio.QueueEmpty:
-                            break
-                    # Emit the final complete event
-                    yield f"event: complete\ndata: {json.dumps(jsonable_encoder(state))}\n\n"
-                    break
-                elif state.error:
-                    yield f'event: error\ndata: {{"error": "{state.error}"}}\n\n'
-                    break
-                else:
-                    # Always emit the progress event with optimized payload
-                    yield f"event: progress\ndata: {json.dumps(state.model_dump_optimized())}\n\n"
+        if not entry:
+            await state_tracker.update_complete(message="Word not found")
+            return None
+
+        # Load definitions using the centralized loader
+        await state_tracker.update(
+            stage=Stages.COMPLETE, progress=90, message="Loading definition details..."
+        )
+
+        definitions = []
+        if entry.definition_ids:
+            # Load definitions with all relations
+            for def_id in entry.definition_ids:
+                definition = await Definition.get(def_id)
+                if definition:
+                    # Use the loader to get fully resolved definition
+                    def_dict = await DefinitionLoader.load_with_relations(
+                        definition=definition,
+                        include_examples=True,
+                        include_images=True,
+                        include_provider_data=True,
+                        provider_data_ids=[str(pid) for pid in entry.source_provider_data_ids] if entry.source_provider_data_ids else None,
+                    )
+
+                    # Create DefinitionResponse from the loaded data
+                    def_response = DefinitionResponse(**def_dict)
+                    definitions.append(def_response)
+
+        # Load pronunciation with audio files
+        pronunciation = None
+        if entry.pronunciation_id:
+            pronunciation = await PronunciationLoader.load_with_audio(str(entry.pronunciation_id) if entry.pronunciation_id else None)
+
+        # Load word
+        word_obj = await Word.get(entry.word_id)
+        word_text = word_obj.text if word_obj else "unknown"
+
+        # Load images for the synth entry
+        synth_images = []
+        if entry.image_ids:
+            for image_id in entry.image_ids:
+                image = await ImageMedia.get(image_id)
+                if image:
+                    image_dict = image.model_dump(mode="json", exclude={"data"})
+                    synth_images.append(image_dict)
+
+        # Convert to response model
+        result = LookupResponse(
+            word=word_text,
+            pronunciation=pronunciation,
+            definitions=definitions,
+            etymology=entry.etymology.model_dump(mode="json") if entry.etymology else None,
+            last_updated=entry.updated_at,  # Use updated_at from BaseMetadata
+            model_info=entry.model_info.model_dump(mode="json") if entry.model_info else None,
+            synth_entry_id=str(entry.id),
+            images=synth_images,  # Include images
+        )
+
+        # Mark as complete with result data
+        await state_tracker.update_complete(message=f"Found {len(result.definitions)} definitions")
+
+        return result
 
     except Exception as e:
-        logger.error(f"SSE generation failed: {e}")
-        yield f'event: error\ndata: {{"error": "{str(e)}"}}\n\n'
-    finally:
-        # Ensure the lookup task is completed or cancelled
-        if not lookup_task.done():
-            lookup_task.cancel()
-            try:
-                await lookup_task
-            except asyncio.CancelledError:
-                pass
-
-
-async def _lookup_with_tracking(word: str, params: LookupParams) -> LookupResponse | None:
-    """Perform lookup with state tracking."""
-
-    await lookup_state_tracker.update_stage(Stages.START)
-
-    # Execute the actual lookup pipeline with state tracking
-    logger.info(f"Looking up word: {word} with state tracking")
-
-    entry = await lookup_word_pipeline(
-        word=word,
-        providers=params.providers,
-        languages=params.languages,
-        force_refresh=params.force_refresh,
-        no_ai=params.no_ai,
-        state_tracker=lookup_state_tracker,
-    )
-
-    if not entry:
-        await lookup_state_tracker.update_complete(message="Word not found")
-        return None
-
-    # Load definitions using the centralized loader
-    definitions = []
-    if entry.definition_ids:
-        # Load definitions with all relations
-        for def_id in entry.definition_ids:
-            definition = await Definition.get(def_id)
-            if definition:
-                # Use the loader to get fully resolved definition
-                def_dict = await DefinitionLoader.load_with_relations(
-                    definition=definition,
-                    include_examples=True,
-                    include_images=True,
-                    include_provider_data=True,
-                    provider_data_ids=entry.source_provider_data_ids,
-                )
-
-                # Create DefinitionResponse from the loaded data
-                def_response = DefinitionResponse(**def_dict)
-                definitions.append(def_response)
-
-    # Load pronunciation with audio files
-    pronunciation = None
-    if entry.pronunciation_id:
-        pronunciation = await PronunciationLoader.load_with_audio(entry.pronunciation_id)
-
-    # Load word
-    word_obj = await Word.get(entry.word_id)
-    word_text = word_obj.text if word_obj else "unknown"
-
-    # Load images for the synth entry
-    synth_images = []
-    if entry.image_ids:
-        for image_id in entry.image_ids:
-            image = await ImageMedia.get(image_id)
-            if image:
-                image_dict = image.model_dump(mode="json", exclude={"data"})
-                synth_images.append(image_dict)
-
-    # Convert to response model
-    result = LookupResponse(
-        word=word_text,
-        pronunciation=pronunciation,
-        definitions=definitions,
-        etymology=entry.etymology.model_dump() if entry.etymology else None,
-        last_updated=entry.updated_at,  # Use updated_at from BaseMetadata
-        model_info=entry.model_info.model_dump() if entry.model_info else None,
-        synth_entry_id=str(entry.id),
-        images=synth_images,  # Include images
-    )
-
-    # Mark as complete with result data
-    await lookup_state_tracker.update(
-        stage=Stages.COMPLETE,
-        progress=100,
-        message=f"Found {len(result.definitions)} definitions",
-        is_complete=True,
-        details={"result": jsonable_encoder(result)},
-    )
-
-    return result
+        await state_tracker.update_error(f"Lookup failed: {str(e)}")
+        raise
 
 
 @router.get("/lookup/{word}/stream")
@@ -421,6 +386,7 @@ async def lookup_word_stream(
     including search, provider fetching, and AI synthesis stages.
 
     SSE Event Types:
+    - **config**: Stage definitions for progress visualization
     - **progress**: Pipeline stage updates with progress percentage and timing metrics
     - **complete**: Final result with full word entry data
     - **error**: Error message if lookup fails
@@ -436,15 +402,19 @@ async def lookup_word_stream(
         and final synthesized result. Includes timing metrics for performance monitoring.
         Content-Type: text/event-stream
     """
-
     logger.info(f"Starting streaming lookup for word: {word}")
 
-    return StreamingResponse(
-        generate_lookup_events(word, params),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
-        },
+    # Create state tracker for lookup process
+    state_tracker = StateTracker(category="lookup")
+
+    async def lookup_process() -> LookupResponse | None:
+        """Perform the lookup process while updating state tracker."""
+        return await _lookup_with_tracking(word, params, state_tracker)
+
+    # Use the generalized streaming system
+    return await create_streaming_response(
+        state_tracker=state_tracker,
+        process_func=lookup_process,
+        include_stage_definitions=True,
+        include_completion_data=True,
     )

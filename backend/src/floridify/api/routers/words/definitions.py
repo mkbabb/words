@@ -381,8 +381,9 @@ async def bind_image_to_definition(
     await image_media.save()
 
     # Add image ID to definition
-    if str(image_media.id) not in definition.image_ids:
-        definition.image_ids.append(str(image_media.id))
+    assert image_media.id is not None  # Saved media should have ID
+    if image_media.id not in definition.image_ids:
+        definition.image_ids.append(image_media.id)
         definition.version += 1
         await definition.save()
 
@@ -500,12 +501,13 @@ async def regenerate_components(
             # Save examples
             example_docs = []
             for example_text in examples_response.example_sentences:
+                assert definition.id is not None  # Definition from database should have ID
                 example = Example(
-                    definition_id=str(definition.id), text=example_text, type="generated"
+                    definition_id=definition.id, text=example_text, type="generated"
                 )
                 await example.save()
                 example_docs.append(example)
-            definition.example_ids = [str(ex.id) for ex in example_docs]
+            definition.example_ids = [ex.id for ex in example_docs if ex.id is not None]
             updates["examples"] = [ex.model_dump() for ex in example_docs]
         else:
             # Generate component
@@ -606,7 +608,7 @@ async def batch_regenerate_components(
             force_refresh=request.force,
         )
         # enhance_definitions_parallel modifies definitions in place
-        all_results[word_id] = {"processed": len(word_definitions)}
+        all_results[str(word_id)] = {"processed": len(word_definitions)}
 
     # Save all definitions
     for definition in definitions:

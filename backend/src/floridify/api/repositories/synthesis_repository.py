@@ -118,7 +118,7 @@ class SynthesisRepository(
         completeness = sum(components) / len(components)
 
         return ComponentStatus(
-            word_id=entry.word_id,
+            word_id=str(entry.word_id),
             has_pronunciation=entry.pronunciation_id is not None,
             has_etymology=entry.etymology is not None,
             has_facts=bool(entry.fact_ids),

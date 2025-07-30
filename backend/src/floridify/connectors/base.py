@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any
 
+from beanie import PydanticObjectId
+
 from ..constants import DictionaryProvider
 from ..core.state_tracker import StateTracker
 from ..models import Definition, Etymology, Pronunciation, ProviderData, Word
@@ -54,7 +56,9 @@ class DictionaryConnector(ABC):
         pass
 
     @abstractmethod
-    async def extract_pronunciation(self, raw_data: dict[str, Any]) -> Pronunciation | None:
+    async def extract_pronunciation(
+        self, raw_data: dict[str, Any], word_id: PydanticObjectId
+    ) -> Pronunciation | None:
         """Extract pronunciation from raw provider data.
 
         Args:
@@ -66,7 +70,9 @@ class DictionaryConnector(ABC):
         pass
 
     @abstractmethod
-    async def extract_definitions(self, raw_data: dict[str, Any], word_id: str) -> list[Definition]:
+    async def extract_definitions(
+        self, raw_data: dict[str, Any], word_id: PydanticObjectId
+    ) -> list[Definition]:
         """Extract definitions from raw provider data.
 
         Args:
@@ -125,40 +131,53 @@ class DictionaryConnector(ABC):
             # Extract components using abstract methods with error handling
             pronunciation = None
             try:
-                pronunciation = await self.extract_pronunciation(response_data)
+                pronunciation = await self.extract_pronunciation(response_data, word.id)
             except Exception as e:
-                logger.warning(f"Failed to extract pronunciation from {self.provider_name} for '{word.text}': {e}")
+                logger.warning(
+                    f"Failed to extract pronunciation from {self.provider_name} for '{word.text}': {e}"
+                )
 
             definitions = []
             try:
-                definitions = await self.extract_definitions(response_data, str(word.id))
+                definitions = await self.extract_definitions(response_data, word.id)
             except Exception as e:
-                logger.warning(f"Failed to extract definitions from {self.provider_name} for '{word.text}': {e}")
+                logger.warning(
+                    f"Failed to extract definitions from {self.provider_name} for '{word.text}': {e}"
+                )
 
             etymology = None
             try:
                 etymology = await self.extract_etymology(response_data)
             except Exception as e:
-                logger.warning(f"Failed to extract etymology from {self.provider_name} for '{word.text}': {e}")
+                logger.warning(
+                    f"Failed to extract etymology from {self.provider_name} for '{word.text}': {e}"
+                )
 
             # Save pronunciation if found
-            pronunciation_id = None
+            pronunciation_id: PydanticObjectId | None = None
             if pronunciation:
                 try:
-                    pronunciation.word_id = str(word.id)
+                    pronunciation.word_id = word.id
                     await pronunciation.save()
-                    pronunciation_id = str(pronunciation.id)
+                    pronunciation_id = pronunciation.id
                 except Exception as e:
-                    logger.error(f"Failed to save pronunciation from {self.provider_name} for '{word.text}': {e}")
+                    logger.error(
+                        f"Failed to save pronunciation from {self.provider_name} for '{word.text}': {e}"
+                    )
 
             # Save definitions and collect IDs
-            definition_ids = []
+            definition_ids: list[PydanticObjectId] = []
             for definition in definitions or []:
                 try:
                     await definition.save()
-                    definition_ids.append(str(definition.id))
+                    assert (
+                        definition.id is not None
+                    )  # After save(), id is guaranteed to be not None
+                    definition_ids.append(definition.id)
                 except Exception as e:
-                    logger.error(f"Failed to save definition from {self.provider_name} for '{word.text}': {e}")
+                    logger.error(
+                        f"Failed to save definition from {self.provider_name} for '{word.text}': {e}"
+                    )
 
             # Create and save provider data
             # Filter out any non-serializable data from raw_data
@@ -169,7 +188,7 @@ class DictionaryConnector(ABC):
             }
 
             provider_data = ProviderData(
-                word_id=str(word.id),
+                word_id=word.id,
                 provider=DictionaryProvider(self.provider_name),
                 definition_ids=definition_ids,
                 pronunciation_id=pronunciation_id,
@@ -178,11 +197,15 @@ class DictionaryConnector(ABC):
             )
             await provider_data.save()
 
-            logger.debug(f"Successfully normalized response from {self.provider_name} for '{word.text}': "
-                        f"{len(definition_ids)} definitions, pronunciation: {pronunciation_id is not None}")
+            logger.debug(
+                f"Successfully normalized response from {self.provider_name} for '{word.text}': "
+                f"{len(definition_ids)} definitions, pronunciation: {pronunciation_id is not None}"
+            )
 
             return provider_data
 
         except Exception as e:
-            logger.error(f"Failed to normalize response from {self.provider_name} for '{word.text}': {e}")
+            logger.error(
+                f"Failed to normalize response from {self.provider_name} for '{word.text}': {e}"
+            )
             raise

@@ -8,7 +8,7 @@ from typing import Any
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
-from .base import BaseMetadata
+from ..models.base import DocumentWithObjectIdSupport
 from .constants import MasteryLevel, Temperature
 from .review import ReviewData
 from .stats import LearningStats
@@ -19,7 +19,7 @@ class WordListItem(BaseModel):
 
     # Foreign key to Word model - optimized with ObjectId
     word_id: PydanticObjectId = Field(..., description="FK to Word document")
-    
+
     # Learning metadata
     frequency: int = Field(default=1, ge=1, description="Number of occurrences in list")
     selected_definition_ids: list[PydanticObjectId] = Field(
@@ -34,13 +34,15 @@ class WordListItem(BaseModel):
     review_data: ReviewData = Field(
         default_factory=ReviewData, description="Spaced repetition data"
     )
-    
+
     # Timestamps
     last_visited: datetime | None = Field(
         default=None, description="Last time word was viewed/studied"
     )
-    added_date: datetime = Field(default_factory=lambda: datetime.now(), description="When added to list")
-    
+    added_date: datetime = Field(
+        default_factory=lambda: datetime.now(), description="When added to list"
+    )
+
     # User metadata
     notes: str = Field(default="", description="User notes about the word")
     tags: list[str] = Field(default_factory=list, description="User-defined tags")
@@ -59,7 +61,7 @@ class WordListItem(BaseModel):
         self.review_data.update_sm2(quality)
         self.last_visited = datetime.now()
         self.temperature = Temperature.HOT
-        
+
         # Update mastery based on performance
         self._update_mastery_level()
 
@@ -81,21 +83,21 @@ class WordListItem(BaseModel):
         return self.review_data.get_overdue_days()
 
 
-class WordList(Document, BaseMetadata):
+class WordList(DocumentWithObjectIdSupport):
     """Word list with learning metadata and statistics."""
 
     name: str = Field(..., description="Human-readable list name")
     description: str = Field(default="", description="List description/purpose")
     hash_id: str = Field(..., description="Content-based hash identifier")
     words: list[WordListItem] = Field(default_factory=list, description="Words with learning data")
-    
+
     # Statistics
     total_words: int = Field(default=0, ge=0, description="Total word count")
     unique_words: int = Field(default=0, ge=0, description="Unique word count")
     learning_stats: LearningStats = Field(
         default_factory=LearningStats, description="Aggregated learning statistics"
     )
-    
+
     # Metadata
     tags: list[str] = Field(default_factory=list, description="List categorization tags")
     is_public: bool = Field(default=False, description="Public visibility flag")
@@ -116,7 +118,7 @@ class WordList(Document, BaseMetadata):
 
     def add_words(self, word_ids: list[PydanticObjectId]) -> None:
         """Add words to the list, updating frequencies for duplicates.
-        
+
         Args:
             word_ids: List of word ObjectIds to add
         """
@@ -172,6 +174,20 @@ class WordList(Document, BaseMetadata):
                 return w
         return None
 
+    async def get_word_item(self, word_text: str) -> WordListItem | None:
+        """Get WordListItem by word text."""
+        from ..models.models import Word
+
+        # Find the word document by text
+        word_doc = await Word.find_one({"text": word_text})
+        if not word_doc:
+            return None
+
+        # Find the matching word item in this wordlist
+        if word_doc.id is None:
+            return None
+        return self.get_word_item_by_id(word_doc.id)
+
     def record_study_session(self, duration_minutes: int) -> None:
         """Record a study session."""
         self.learning_stats.record_study_session(duration_minutes)
@@ -180,3 +196,13 @@ class WordList(Document, BaseMetadata):
     def get_mastery_distribution(self) -> dict[MasteryLevel, int]:
         """Get distribution of words by mastery level."""
         return self.learning_stats.get_mastery_distribution(self.words)
+
+    # Corpus naming helpers for consistent search integration
+    def get_words_corpus_name(self) -> str:
+        """Get consistent corpus name for this wordlist's words."""
+        return f"Words in wordlist {self.id}"
+
+    @staticmethod
+    def get_names_corpus_name() -> str:
+        """Get consistent corpus name for wordlist names."""
+        return "Wordlist Names"

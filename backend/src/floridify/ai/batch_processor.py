@@ -68,7 +68,7 @@ class BatchCollector:
             return None
 
         # Create temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
             for req in self.requests:
                 # Build messages
                 messages = [
@@ -115,14 +115,12 @@ class BatchExecutor:
     def __init__(self, client: AsyncOpenAI) -> None:
         self.client = client
 
-    async def execute_batch(
-        self, batch_file: Path, check_interval: int = 1
-    ) -> dict[str, Any]:
+    async def execute_batch(self, batch_file: Path, check_interval: int = 1) -> dict[str, Any]:
         """Upload and execute a batch file, returning results mapped by custom_id."""
         try:
             # Upload file
             logger.info(f"📎 Uploading batch file: {batch_file}")
-            with open(batch_file, 'rb') as f:
+            with open(batch_file, "rb") as f:
                 uploaded_file = await self.client.files.create(file=f, purpose="batch")
             logger.info(f"✅ File uploaded: {uploaded_file.id}")
 
@@ -136,12 +134,8 @@ class BatchExecutor:
 
             # Wait for completion
             logger.info(f"🎫 Batch job created: {batch_job.id}")
-            logger.info(
-                f"⏳ Waiting for batch completion (checking every {check_interval}s)"
-            )
-            completed_job = await self._wait_for_completion(
-                batch_job.id, check_interval
-            )
+            logger.info(f"⏳ Waiting for batch completion (checking every {check_interval}s)")
+            completed_job = await self._wait_for_completion(batch_job.id, check_interval)
             logger.info("✅ Batch completed successfully")
 
             # Download and parse results
@@ -182,7 +176,7 @@ class BatchExecutor:
         content = await self.client.files.content(file_id)
 
         results = []
-        for line in content.content.decode('utf-8').strip().split('\n'):
+        for line in content.content.decode("utf-8").strip().split("\n"):
             if line:
                 results.append(json.loads(line))
 
@@ -218,13 +212,9 @@ class BatchContext:
         batch_context = self
 
         # Create wrapper that collects requests
-        def batch_wrapper(
-            prompt: str, response_model: type[BaseModel], **kwargs: Any
-        ) -> Any:
+        def batch_wrapper(prompt: str, response_model: type[BaseModel], **kwargs: Any) -> Any:
             # Add to batch and return future
-            future = batch_context.collector.add_request(
-                prompt, response_model, **kwargs
-            )
+            future = batch_context.collector.add_request(prompt, response_model, **kwargs)
             logger.debug(
                 f"📥 Collected request #{len(batch_context.collector.requests)}: {response_model.__name__}"
             )
@@ -232,7 +222,7 @@ class BatchContext:
             return asyncio.create_task(batch_context._await_future(future))
 
         # Patch the method
-        setattr(self.connector, '_make_structured_request', batch_wrapper)
+        setattr(self.connector, "_make_structured_request", batch_wrapper)
         logger.info("✅ Batch mode activated - collecting API requests")
         return self
 
@@ -242,22 +232,18 @@ class BatchContext:
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit batch mode and execute collected requests."""
-        logger.info(
-            f"🏁 Exiting batch context with {len(self.collector.requests)} requests"
-        )
+        logger.info(f"🏁 Exiting batch context with {len(self.collector.requests)} requests")
 
         # Restore original method
         if self._original_method:
-            setattr(self.connector, '_make_structured_request', self._original_method)
+            setattr(self.connector, "_make_structured_request", self._original_method)
             logger.debug("🔄 Restored original API method")
 
         # Execute batch if no exception
         if exc_type is None:
             await self.execute()
         else:
-            logger.error(
-                f"❌ Batch context exited with error: {exc_type.__name__}: {exc_val}"
-            )
+            logger.error(f"❌ Batch context exited with error: {exc_type.__name__}: {exc_val}")
 
     async def execute(self) -> None:
         """Execute all collected requests as a batch."""
@@ -293,9 +279,7 @@ class BatchContext:
                 if result and result.get("response", {}).get("status_code") == 200:
                     try:
                         # Extract content from response
-                        content = result["response"]["body"]["choices"][0]["message"][
-                            "content"
-                        ]
+                        content = result["response"]["body"]["choices"][0]["message"]["content"]
 
                         # Parse JSON if using structured output
                         if hasattr(request.response_model, "model_validate_json"):
@@ -304,9 +288,7 @@ class BatchContext:
                         else:
                             request.future.set_result(content)
                     except Exception as e:
-                        logger.error(
-                            f"Failed to parse result for {request.custom_id}: {e}"
-                        )
+                        logger.error(f"Failed to parse result for {request.custom_id}: {e}")
                         request.future.set_exception(e)
                 else:
                     error = (
@@ -315,9 +297,7 @@ class BatchContext:
                         else "No result found"
                     )
                     logger.error(f"Request {request.custom_id} failed: {error}")
-                    request.future.set_exception(
-                        Exception(f"Batch request failed: {error}")
-                    )
+                    request.future.set_exception(Exception(f"Batch request failed: {error}"))
 
         except Exception as e:
             # Set exception on all futures

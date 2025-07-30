@@ -41,7 +41,7 @@
         </p>
         <span class="text-xs text-muted-foreground">•</span>
         <p class="text-xs text-muted-foreground">
-          {{ formatLastAccessed(wordlist.last_accessed) }}
+          {{ formatRelativeTime(wordlist.last_accessed) }}
         </p>
       </div>
       
@@ -90,10 +90,21 @@
       </DropdownMenu>
     </div>
   </button>
+
+  <ConfirmDialog
+    v-model:open="showDeleteDialog"
+    title="Delete Wordlist"
+    :description="`Are you sure you want to delete &quot;${wordlist.name}&quot;?`"
+    message="This action cannot be undone. All words and progress will be permanently deleted."
+    confirm-text="Delete"
+    cancel-text="Cancel"
+    :destructive="true"
+    @confirm="handleConfirmDelete"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { 
   Copy,
   Download,
@@ -109,7 +120,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import ConfirmDialog from '../ConfirmDialog.vue';
 import type { WordList, MasteryLevel } from '@/types';
+import { formatRelativeTime } from '@/utils';
 
 interface Props {
   wordlist: WordList;
@@ -128,6 +141,9 @@ const emit = defineEmits<{
   delete: [wordlist: WordList];
   duplicate: [wordlist: WordList];
 }>();
+
+// Dialog state
+const showDeleteDialog = ref(false);
 
 // Computed properties
 const masteryStats = computed(() => {
@@ -154,26 +170,14 @@ const masteryProgress = computed(() => {
 });
 
 // Methods
-const formatLastAccessed = (lastAccessed: string | null): string => {
-  if (!lastAccessed) return 'Never';
-  
-  const date = new Date(lastAccessed);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
-  
-  return `${Math.floor(diffDays / 365)}y ago`;
-};
 
 const confirmDelete = () => {
-  if (confirm(`Are you sure you want to delete "${props.wordlist.name}"?`)) {
-    emit('delete', props.wordlist);
-  }
+  showDeleteDialog.value = true;
+};
+
+const handleConfirmDelete = () => {
+  emit('delete', props.wordlist);
+  showDeleteDialog.value = false;
 };
 
 const handleExport = () => {

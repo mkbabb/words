@@ -17,6 +17,7 @@
                 :stage-message="currentStageText"
                 :checkpoints="progressCheckpoints"
                 :mode="mode"
+                :category="category"
                 @progress-change="$emit('progress-change', $event)"
             />
 
@@ -43,6 +44,7 @@ import { computed, watch } from 'vue';
 import { Modal } from '@/components/custom';
 import { AnimatedText, ShimmerText } from '@/components/custom/animation';
 import { LoadingProgress } from '@/components/custom/loading';
+import { getDefaultStages, getStageMessage, getStageDescription } from './pipeline-stages';
 
 
 interface Props {
@@ -53,6 +55,8 @@ interface Props {
     currentStage: string;
     allowDismiss?: boolean;
     mode?: 'lookup' | 'suggestions';
+    dynamicCheckpoints?: Array<{progress: number, label: string, description: string}>;
+    category?: string;
 }
 
 interface Emits {
@@ -63,6 +67,8 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
     allowDismiss: false,
     mode: 'lookup',
+    dynamicCheckpoints: undefined,
+    category: undefined,
 });
 
 const emit = defineEmits<Emits>();
@@ -90,62 +96,9 @@ const currentStageText = computed(() => {
         return 'Initializing...';
     }
 
-    const lookupStageMessages: Record<string, string> = {
-        // Main pipeline stages (uppercase from backend)
-        START: 'Initializing lookup pipeline...',
-        SEARCH_START: 'Beginning word search...',
-        SEARCH_COMPLETE: 'Search results found...',
-        PROVIDER_FETCH_START: 'Fetching from dictionary providers...',
-        PROVIDER_FETCH_COMPLETE: 'Provider data collected...',
-        AI_CLUSTERING: 'Clustering definitions by meaning...',
-        AI_SYNTHESIS: 'AI synthesizing comprehensive definitions...',
-        AI_FALLBACK: 'Using AI fallback for definitions...',
-        STORAGE_SAVE: 'Saving to knowledge base...',
-        COMPLETE: 'Lookup complete!',
-        complete: 'Lookup complete!', // Handle both cases
-    };
-
-    const suggestionStageMessages: Record<string, string> = {
-        // AI suggestion stages
-        START: 'Understanding your query...',
-        QUERY_VALIDATION: 'Validating query intent...',
-        WORD_GENERATION: 'Generating word suggestions...',
-        SCORING: 'Evaluating word relevance...',
-        COMPLETE: 'Suggestions ready!',
-    };
-
-    // Add provider-specific stages to lookup messages
-    if (props.mode === 'lookup') {
-        Object.assign(lookupStageMessages, {
-            // Provider-specific HTTP stages
-            PROVIDER_FETCH_HTTP_CONNECTING: 'Connecting to dictionary APIs...',
-            PROVIDER_FETCH_HTTP_DOWNLOADING: 'Downloading dictionary data...',
-            PROVIDER_FETCH_HTTP_RATE_LIMITED: 'Rate limited - waiting...',
-            PROVIDER_FETCH_HTTP_PARSING: 'Parsing provider responses...',
-            PROVIDER_FETCH_HTTP_COMPLETE: 'Provider fetch complete...',
-            PROVIDER_FETCH_ERROR: 'Provider error - retrying...',
-            
-            // Error state
-            error: 'An error occurred',
-        });
-    }
-
-    const stageMessages = props.mode === 'suggestions' ? suggestionStageMessages : lookupStageMessages;
-
-    // Return the mapped message if available, otherwise use the stage itself as a readable message
-    const mappedMessage = stageMessages[props.currentStage];
-    if (mappedMessage) {
-        return mappedMessage;
-    }
-    
-    // If no mapping exists, convert the stage to a readable format
-    // Convert UPPERCASE_STAGE to "Uppercase stage..."
-    const readableStage = props.currentStage
-        .toLowerCase()
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (char) => char.toUpperCase());
-    
-    return `${readableStage}...`;
+    // Use category first, then mode as fallback
+    const category = props.category || props.mode || 'lookup';
+    return getStageMessage(category, props.currentStage);
 });
 
 const progressTextClass = computed(() => ({
@@ -153,46 +106,11 @@ const progressTextClass = computed(() => ({
     'text-green-600 dark:text-green-400': props.progress >= 100,
 }));
 
-// Computed property for stage description
+// Computed property for stage description using centralized config
 const stageDescription = computed(() => {
-    const lookupDescriptions: Record<string, string> = {
-        // Main pipeline stages
-        START: 'Setting up search engines, AI models, and database connections.',
-        SEARCH_START: 'Searching exact matches, fuzzy matches, and semantic similarities.',
-        SEARCH_COMPLETE: 'Best match identified with confidence scoring.',
-        PROVIDER_FETCH_START: 'Connecting to multiple dictionary APIs simultaneously.',
-        PROVIDER_FETCH_COMPLETE: 'All available definitions have been retrieved.',
-        AI_CLUSTERING: 'Grouping similar meanings to eliminate redundancy.',
-        AI_SYNTHESIS: 'Creating comprehensive definitions with examples and usage notes.',
-        AI_FALLBACK: 'Generating definitions from AI knowledge when sources are unavailable.',
-        STORAGE_SAVE: 'Persisting results for faster future lookups.',
-        COMPLETE: 'Your word is ready to explore!',
-        complete: 'Your word is ready to explore!',
-        
-        // Provider-specific stages
-        PROVIDER_FETCH_HTTP_CONNECTING: 'Establishing secure connections to dictionary services.',
-        PROVIDER_FETCH_HTTP_DOWNLOADING: 'Retrieving raw definition data from providers.',
-        PROVIDER_FETCH_HTTP_RATE_LIMITED: 'Respecting API limits - brief pause required.',
-        PROVIDER_FETCH_HTTP_PARSING: 'Extracting structured data from provider responses.',
-        PROVIDER_FETCH_HTTP_COMPLETE: 'Provider data successfully processed.',
-        PROVIDER_FETCH_ERROR: 'Encountering issues - trying alternative sources.',
-        
-        // Error state
-        error: 'Something went wrong. Please try again.',
-    };
-
-    const suggestionDescriptions: Record<string, string> = {
-        // AI suggestion stages
-        START: 'Analyzing your descriptive query for semantic meaning.',
-        QUERY_VALIDATION: 'Ensuring your query seeks word suggestions.',
-        WORD_GENERATION: 'AI is finding the perfect words to match your description.',
-        SCORING: 'Ranking words by relevance and aesthetic quality.',
-        COMPLETE: 'Your curated word suggestions are ready!',
-    };
-    
-    const stageDescriptions = props.mode === 'suggestions' ? suggestionDescriptions : lookupDescriptions;
-    
-    return stageDescriptions[props.currentStage] || 'Processing your request...';
+    // Use category first, then mode as fallback
+    const category = props.category || props.mode || 'lookup';
+    return getStageDescription(category, props.currentStage);
 });
 
 // Pass through the model value
@@ -201,30 +119,20 @@ const modelValue = computed({
     set: (value) => emit('update:modelValue', value),
 });
 
-// Define different checkpoints for lookup vs suggestions
+// Use dynamic checkpoints if provided, otherwise fall back to centralized defaults
 const progressCheckpoints = computed(() => {
-    if (props.mode === 'suggestions') {
-        return [
-            { progress: 5, label: 'Start' },
-            { progress: 20, label: 'Query Validation' },
-            { progress: 40, label: 'Word Generation' },
-            { progress: 80, label: 'Scoring' },
-            { progress: 100, label: 'Complete' },
-        ];
-    } else {
-        // Default lookup checkpoints
-        return [
-            { progress: 5, label: 'Start' },
-            { progress: 10, label: 'Search Start' },
-            { progress: 20, label: 'Search Complete' },
-            { progress: 25, label: 'Provider Fetch' },
-            { progress: 60, label: 'Providers Complete' },
-            { progress: 70, label: 'AI Clustering' },
-            { progress: 85, label: 'AI Synthesis' },
-            { progress: 95, label: 'Storage' },
-            { progress: 100, label: 'Complete' },
-        ];
+    // If dynamic checkpoints are provided, use them
+    if (props.dynamicCheckpoints && props.dynamicCheckpoints.length > 0) {
+        return props.dynamicCheckpoints;
     }
+    
+    // Otherwise use centralized defaults
+    const category = props.category || props.mode || 'lookup';
+    const stages = getDefaultStages(category);
+    return stages.map(stage => ({
+        progress: stage.progress,
+        label: stage.label
+    }));
 });
 </script>
 

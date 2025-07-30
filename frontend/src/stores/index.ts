@@ -29,6 +29,8 @@ export const useAppStore = defineStore('app', () => {
     const loadingStage = ref('');
     const forceRefreshMode = ref(false);
     const showLoadingModal = ref(false);
+    const loadingStageDefinitions = ref<Array<{progress: number, label: string, description: string}>>([]);
+    const loadingCategory = ref('');
 
     // SearchBar UI state (not persisted)
     const showSearchResults = ref(false);
@@ -50,6 +52,8 @@ export const useAppStore = defineStore('app', () => {
     const isSuggestingWords = ref(false);
     const suggestionsProgress = ref(0);
     const suggestionsStage = ref('');
+    const suggestionsStageDefinitions = ref<Array<{progress: number, label: string, description: string}>>([]);
+    const suggestionsCategory = ref('');
 
     // Persisted UI State with validation
     const uiState = useStorage(
@@ -603,6 +607,12 @@ export const useAppStore = defineStore('app', () => {
                         console.log(`Pipeline ${stage} details:`, details);
                     }
                 },
+                (category, stages) => {
+                    // Handle dynamic stage configuration
+                    console.log(`Received stage config for category: ${category}`, stages);
+                    loadingCategory.value = category;
+                    loadingStageDefinitions.value = stages;
+                },
                 noAI.value // Pass noAI flag
             );
 
@@ -1083,7 +1093,7 @@ export const useAppStore = defineStore('app', () => {
             const response = await dictionaryApi.getAISuggestionsStream(
                 query,
                 count,
-                (stage, progress, message) => {
+                (stage, progress, message, details) => {
                     // Update progress and stage in real-time
                     suggestionsStage.value = stage;
                     suggestionsProgress.value = progress;
@@ -1092,6 +1102,12 @@ export const useAppStore = defineStore('app', () => {
                     console.log(
                         `AI Suggestions - Stage: ${stage}, Progress: ${progress}%, Message: ${message || ''}`
                     );
+                },
+                (category, stages) => {
+                    // Handle dynamic stage configuration
+                    console.log(`Received suggestions stage config for category: ${category}`, stages);
+                    suggestionsCategory.value = category;
+                    suggestionsStageDefinitions.value = stages;
                 }
             );
 
@@ -1186,6 +1202,8 @@ export const useAppStore = defineStore('app', () => {
         selectedCardVariant,
         loadingProgress,
         loadingStage,
+        loadingStageDefinitions,
+        loadingCategory,
         showLoadingModal,
         searchCursorPosition,
         forceRefreshMode,
@@ -1194,6 +1212,8 @@ export const useAppStore = defineStore('app', () => {
         isSuggestingWords,
         suggestionsProgress,
         suggestionsStage,
+        suggestionsStageDefinitions,
+        suggestionsCategory,
         // SearchBar UI state
         showSearchResults,
         isSearchBarFocused,

@@ -11,10 +11,10 @@ logger = get_logger(__name__)
 
 def generate_wordlist_hash(words: list[str]) -> str:
     """Generate content-based hash from word list.
-    
+
     Args:
         words: List of word strings
-        
+
     Returns:
         16-character hash string
     """
@@ -26,10 +26,10 @@ def generate_wordlist_hash(words: list[str]) -> str:
 
 def generate_wordlist_name(words: list[str]) -> str:
     """Generate a human-readable animal phrase name.
-    
+
     Args:
         words: List of words (used for fallback hash)
-        
+
     Returns:
         Generated name like 'myrtle-goldfish-swim' or fallback 'wordlist-{hash}'
     """

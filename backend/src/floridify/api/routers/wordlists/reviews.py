@@ -53,7 +53,7 @@ async def get_due_words(
 
     # Fetch Word documents to get text (word_ids are now ObjectIds)
     word_ids = [w.word_id for w in due_words if w.word_id]
-    
+
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_text_map = {str(word.id): word.text for word in words}
 
@@ -61,7 +61,7 @@ async def get_due_words(
     for word_item in due_words:
         items.append(
             {
-                "word": word_text_map.get(word_item.word_id, ""),
+                "word": word_text_map.get(str(word_item.word_id), ""),
                 "mastery_level": word_item.mastery_level,
                 "last_reviewed": word_item.review_data.last_review_date.isoformat()
                 if word_item.review_data.last_review_date
@@ -116,7 +116,7 @@ async def get_review_session(
 
     # Fetch Word documents to get text for review words (word_ids are now ObjectIds)
     word_ids = [w.word_id for w in review_words if w.word_id]
-    
+
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_text_map = {str(word.id): word.text for word in words}
 
@@ -125,7 +125,7 @@ async def get_review_session(
     for word_item in review_words:
         session_words.append(
             {
-                "word": word_text_map.get(word_item.word_id, ""),
+                "word": word_text_map.get(str(word_item.word_id), ""),
                 "mastery_level": word_item.mastery_level,
                 "last_reviewed": word_item.review_data.last_review_date.isoformat()
                 if word_item.review_data.last_review_date
@@ -173,13 +173,13 @@ async def submit_review(
 
     # Find the updated word by fetching Word documents (word_ids are now ObjectIds)
     word_ids = [w.word_id for w in updated_list.words if w.word_id]
-    
+
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_text_map = {str(word.id): word.text for word in words}
 
     updated_word = None
     for word_item in updated_list.words:
-        if word_text_map.get(word_item.word_id, "") == request.word:
+        if word_text_map.get(str(word_item.word_id), "") == request.word:
             updated_word = word_item
             break
 

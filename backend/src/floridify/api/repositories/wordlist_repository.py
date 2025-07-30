@@ -13,8 +13,12 @@ from ...models.models import Word
 from ...wordlist.constants import MasteryLevel, Temperature
 from ...wordlist.models import WordList, WordListItem
 from ...wordlist.utils import generate_wordlist_hash
+from ...search.corpus import invalidate_wordlist_names_corpus, invalidate_wordlist_corpus
+from ...utils.logging import get_logger
 from ..core.base import BaseRepository
 from .corpus_repository import CorpusRepository, CorpusSearchParams
+
+logger = get_logger(__name__)
 
 
 class WordListCreate(BaseModel):
@@ -180,11 +184,25 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             wordlist.add_words(word_ids)
 
         await wordlist.create()
+        
+        # Only invalidate corpus cache if there were existing wordlists
+        # If this is the first wordlist, there's no corpus to invalidate
+        existing_count = await WordList.count()
+        if existing_count > 1:  # More than just the one we just created
+            logger.debug(f"Invalidating wordlist names corpus (total wordlists: {existing_count})")
+            await invalidate_wordlist_names_corpus()
+        else:
+            logger.debug("Skipping corpus invalidation - this is the first wordlist")
+        
+        # Create corpus for this wordlist's words immediately
+        if data.words:
+            await self._create_wordlist_corpus(wordlist)
+        
         return wordlist
 
     async def _batch_get_or_create_words(self, word_texts: list[str]) -> list[PydanticObjectId]:
         """Batch get or create Word documents, returning their IDs.
-        
+
         This method optimizes performance by:
         1. Normalizing all words at once
         2. Performing a single bulk lookup
@@ -198,7 +216,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             normalized = text.lower().strip()
             normalized_map[normalized] = text.strip()
             normalized_list.append(normalized)
-        
+
         # Remove duplicates while preserving order
         seen = set()
         unique_normalized = []
@@ -206,44 +224,67 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             if norm not in seen:
                 seen.add(norm)
                 unique_normalized.append(norm)
-        
+
         # Bulk lookup existing words
-        existing_words = await Word.find({
-            "normalized": {"$in": unique_normalized},
-            "language": Language.ENGLISH
-        }).to_list()
-        
+        existing_words = await Word.find(
+            {"normalized": {"$in": unique_normalized}, "language": Language.ENGLISH}
+        ).to_list()
+
         # Create a map of normalized text to word ObjectId
         existing_map = {word.normalized: word.id for word in existing_words}
-        
+
         # Identify missing words
         missing_normalized = [norm for norm in unique_normalized if norm not in existing_map]
-        
+
         # Bulk create missing words if any
         if missing_normalized:
             new_words = [
-                Word(
-                    text=normalized_map[norm],
-                    normalized=norm,
-                    language=Language.ENGLISH
-                )
+                Word(text=normalized_map[norm], normalized=norm, language=Language.ENGLISH)
                 for norm in missing_normalized
             ]
-            
+
             # Bulk insert
             await Word.insert_many(new_words)
-            
-            # Add new words to existing map
+
+            # Add new words to existing map - use new_words which now have IDs populated after insert
             for word in new_words:
+                assert word.id is not None  # After insert_many, id should be populated
                 existing_map[word.normalized] = word.id
-        
+
         # Return word IDs in the same order as input
-        word_ids = []
+        word_ids: list[PydanticObjectId] = []
         for text in word_texts:
             normalized = text.lower().strip()
-            word_ids.append(existing_map[normalized])
-        
+            word_id = existing_map.get(normalized)
+            if word_id is None:
+                raise ValueError(f"Word ID not found for '{text}' after processing")
+            word_ids.append(word_id)
+
         return word_ids
+
+    async def _create_wordlist_corpus(self, wordlist: WordList) -> None:
+        """Create corpus for wordlist words immediately upon creation."""
+        from ...search.corpus import get_corpus_cache
+        
+        # Get Word documents for this wordlist
+        word_ids = [w.word_id for w in wordlist.words if w.word_id]
+        if not word_ids:
+            return
+            
+        words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+        word_texts = [word.text for word in words if word.text]
+        
+        if not word_texts:
+            return
+            
+        # Create corpus with no TTL (ttl_hours=None means no expiration)
+        cache = await get_corpus_cache()
+        corpus_id = cache.create_corpus(
+            words=word_texts,
+            name=wordlist.get_words_corpus_name(),
+            ttl_hours=None,  # No expiration
+        )
+        logger.debug(f"Created corpus {corpus_id[:8]} for wordlist {wordlist.id} with {len(word_texts)} words")
 
     async def add_word(self, wordlist_id: PydanticObjectId, request: WordAddRequest) -> WordList:
         """Add words to an existing word list."""
@@ -253,13 +294,19 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         # Use batch processing for better performance
         word_ids = await self._batch_get_or_create_words(request.words)
-        
+
         wordlist.add_words(word_ids)
         wordlist.mark_accessed()
         await wordlist.save()
+        
+        # Invalidate corpus cache for this wordlist since words changed
+        await invalidate_wordlist_corpus(str(wordlist_id))
+        
         return wordlist
 
-    async def remove_word(self, wordlist_id: PydanticObjectId, word_id: PydanticObjectId) -> WordList:
+    async def remove_word(
+        self, wordlist_id: PydanticObjectId, word_id: PydanticObjectId
+    ) -> WordList:
         """Remove a word from a word list by word ID."""
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
@@ -270,7 +317,39 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         wordlist.update_stats()
         wordlist.mark_accessed()
         await wordlist.save()
+        
+        # Invalidate corpus cache for this wordlist since words changed
+        await invalidate_wordlist_corpus(str(wordlist_id))
+        
         return wordlist
+
+    async def update(self, id: PydanticObjectId, data: WordListUpdate) -> WordList:
+        """Update a wordlist and invalidate name corpus cache if name changed."""
+        # Get the original wordlist to check if name changed
+        original_wordlist = await self.get(id, raise_on_missing=True)
+        assert original_wordlist is not None
+        original_name = original_wordlist.name
+        
+        # Use parent's update method
+        updated_wordlist = await super().update(id, data)
+        
+        # Invalidate name corpus cache if name changed
+        if data.name and data.name != original_name:
+            from ..routers.wordlists.utils import invalidate_wordlist_names_corpus
+            await invalidate_wordlist_names_corpus()
+        
+        return updated_wordlist
+
+    async def delete(self, id: PydanticObjectId, cascade: bool = False) -> bool:
+        """Delete a wordlist and invalidate corpus caches."""
+        # Call parent's delete method
+        result = await super().delete(id, cascade)
+        
+        # Invalidate both corpus caches
+        await invalidate_wordlist_corpus(str(id))
+        await invalidate_wordlist_names_corpus()
+        
+        return result
 
     async def review_word(
         self, wordlist_id: PydanticObjectId, request: WordReviewRequest
@@ -281,7 +360,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             raise ValueError(f"WordList with id {wordlist_id} not found")
 
         # Find the word and process review
-        word_item = wordlist.get_word_item(request.word)
+        word_item = await wordlist.get_word_item(request.word)
         if word_item:
             word_item.review(request.quality)
             wordlist.update_stats()
@@ -296,7 +375,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         if wordlist is None:
             raise ValueError(f"WordList with id {wordlist_id} not found")
 
-        word_item = wordlist.get_word_item(word)
+        word_item = await wordlist.get_word_item(word)
         if word_item:
             word_item.mark_visited()
             wordlist.mark_accessed()
@@ -380,7 +459,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         # Fetch Word documents to get text (word_ids are now ObjectIds)
         word_ids = [item.word_id for item in wordlist.words if item.word_id]
-        
+
         words = await Word.find({"_id": {"$in": word_ids}}).to_list()
 
         # Extract word text
@@ -414,15 +493,15 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         """Handle cascade deletion - WordList is self-contained."""
         # WordList contains all data internally, no cascade needed
         pass
-    
+
     async def populate_words(self, wordlist: WordList) -> dict[str, Any]:
         """Populate wordlist with actual word text instead of just IDs.
-        
+
         Returns a dictionary representation with word text included.
         """
         # Get word IDs from wordlist items (they are now ObjectIds)
         word_ids = [item.word_id for item in wordlist.words if item.word_id]
-        
+
         if not word_ids:
             # No words to fetch, return empty wordlist
             wordlist_dict = wordlist.model_dump(mode="json")
@@ -430,19 +509,19 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
                 word_item.pop("word_id", None)
                 word_item["word"] = ""
             return wordlist_dict
-        
+
         # Fetch Word documents directly with ObjectIds (no conversion needed!)
         words = await Word.find({"_id": {"$in": word_ids}}).to_list()
-        
+
         # Create word text map using string IDs
         word_text_map = {str(word.id): word.text for word in words}
-        
+
         # Convert wordlist to dict and update word items
         wordlist_dict = wordlist.model_dump(mode="json")
-        
+
         # Update each word item with actual word text
         for word_item in wordlist_dict["words"]:
             word_id = word_item.pop("word_id", "")
             word_item["word"] = word_text_map.get(word_id, "")
-        
+
         return wordlist_dict

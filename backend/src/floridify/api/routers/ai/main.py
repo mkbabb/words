@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-import json
-from collections.abc import AsyncGenerator
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
@@ -14,6 +11,7 @@ from pydantic import BaseModel, Field
 from ....ai.constants import SynthesisComponent
 from ....ai.factory import get_definition_synthesizer, get_openai_connector
 from ....core.state_tracker import StateTracker
+from ....core.streaming import create_streaming_response
 from ....utils.logging import get_logger
 from ...core import ResourceResponse
 from ...middleware.rate_limiting import ai_limiter, get_client_key
@@ -656,7 +654,20 @@ async def suggest_words_stream(
     query: str,
     count: int = 12,
 ) -> StreamingResponse:
-    """Generate word suggestions with streaming progress updates."""
+    """Generate word suggestions with streaming progress updates.
+
+    Returns Server-Sent Events (SSE) with progress updates.
+
+    Query Parameters:
+        - query: Descriptive query for word suggestions
+        - count: Number of suggestions (1-25, default: 12)
+
+    Event Types:
+        - config: Stage definitions for progress visualization
+        - progress: Update on current operation with stage and progress
+        - complete: Final result with word suggestions
+        - error: Error details if something goes wrong
+    """
     # Validate count parameter
     if count < 1 or count > 25:
         raise HTTPException(400, "Count must be between 1 and 25")
@@ -668,71 +679,66 @@ async def suggest_words_stream(
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
     # Create state tracker for suggestions
-    state_tracker = StateTracker()
+    state_tracker = StateTracker(category="suggestions")
 
-    async def generate_suggestion_events() -> AsyncGenerator[str, None]:
-        """Generate SSE events for suggestion pipeline."""
-        async with state_tracker.subscribe() as subscriber_queue:
+    async def suggestions_process() -> dict[str, Any]:
+        """Run the suggestion pipeline with state tracking."""
+        try:
+            await state_tracker.update_stage("START")
+            await state_tracker.update(
+                stage="START", message=f"Starting word suggestions for '{query}'..."
+            )
 
-            async def run_suggestion_pipeline() -> None:
-                """Run the suggestion pipeline with state tracking."""
-                try:
-                    await state_tracker.update_stage("START", progress=5)
+            # Validate query
+            await state_tracker.update_stage("QUERY_VALIDATION")
+            await state_tracker.update(stage="QUERY_VALIDATION", message="Validating query...")
 
-                    # Validate query
-                    await state_tracker.update_stage("QUERY_VALIDATION", progress=20)
-                    connector = get_openai_connector()
-                    validation = await connector.validate_query(query)
+            connector = get_openai_connector()
+            validation = await connector.validate_query(query)
 
-                    if not validation.is_valid:
-                        await state_tracker.update_error(f"Invalid query: {validation.reason}")
-                        return
+            if not validation.is_valid:
+                raise ValueError(f"Invalid query: {validation.reason}")
 
-                    # Generate words
-                    await state_tracker.update_stage("WORD_GENERATION", progress=40)
-                    # The connector will extract count from query if present
-                    result = await connector.suggest_words(query, count)
+            await state_tracker.update(
+                stage="QUERY_VALIDATION", progress=30, message="Query validated successfully"
+            )
 
-                    # Score and rank
-                    await state_tracker.update_stage("SCORING", progress=80)
+            # Generate words
+            await state_tracker.update_stage("WORD_GENERATION")
+            await state_tracker.update(
+                stage="WORD_GENERATION", message="Generating word suggestions..."
+            )
 
-                    # Complete - Only send one update with the result
-                    await state_tracker.update(
-                        stage="COMPLETE",
-                        progress=100,
-                        message="Suggestions generated",
-                        details=result.model_dump(),
-                        is_complete=True,
-                    )
+            result = await connector.suggest_words(query, count)
 
-                except Exception as e:
-                    await state_tracker.update_error(str(e))
+            await state_tracker.update(
+                stage="WORD_GENERATION",
+                progress=70,
+                message=f"Generated {len(result.suggestions)} suggestions",
+            )
 
-            # Start pipeline in background
-            asyncio.create_task(run_suggestion_pipeline())
+            # Score and rank
+            await state_tracker.update_stage("SCORING")
+            await state_tracker.update(
+                stage="SCORING", message="Scoring and ranking suggestions..."
+            )
 
-            # Stream state updates from the queue
-            try:
-                while True:
-                    state = await subscriber_queue.get()
-                    if state.is_complete:
-                        if state.error:
-                            yield f"event: error\ndata: {json.dumps({'error': state.error})}\n\n"
-                        else:
-                            yield f"event: complete\ndata: {json.dumps(state.details)}\n\n"
-                        break
-                    else:
-                        yield f"event: progress\ndata: {json.dumps(state.model_dump_optimized())}\n\n"
-            except asyncio.CancelledError:
-                pass
+            # Complete successfully
+            await state_tracker.update_complete(message="Suggestions generated successfully!")
 
-    return StreamingResponse(
-        generate_suggestion_events(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-        },
+            # Return result data
+            return result.model_dump()
+
+        except Exception as e:
+            await state_tracker.update_error(f"Failed to generate suggestions: {str(e)}")
+            raise
+
+    # Use the generalized streaming system
+    return await create_streaming_response(
+        state_tracker=state_tracker,
+        process_func=suggestions_process,
+        include_stage_definitions=True,
+        include_completion_data=True,
     )
 
 

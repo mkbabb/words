@@ -111,11 +111,11 @@ async def get_language_search(
     force_rebuild: bool = False,
 ) -> LanguageSearch:
     """Get or create global language search instance.
-    
+
     Args:
         languages: Languages to support (defaults to English)
         force_rebuild: Force rebuild of search indices and re-download lexicons
-    
+
     Returns:
         Initialized LanguageSearch instance
     """

@@ -227,9 +227,10 @@ async def generate_examples_for_definition(
     responses = []
     created_examples = []
     for example_text in example_texts:
+        assert definition.id is not None  # Definition from database should have ID
         example = Example(
             word_id=definition.word_id,
-            definition_id=str(definition.id),
+            definition_id=definition.id,
             text=example_text,
             type="generated",  # AI-generated example
             quality_score=0.8,  # Default quality score for AI-generated examples
@@ -249,7 +250,7 @@ async def generate_examples_for_definition(
         )
 
     # Update definition with new example IDs
-    definition.example_ids.extend([str(ex.id) for ex in created_examples])
+    definition.example_ids.extend([ex.id for ex in created_examples if ex.id is not None])
     await definition.save()
 
     return responses

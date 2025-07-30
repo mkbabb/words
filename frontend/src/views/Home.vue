@@ -124,6 +124,8 @@
         :current-stage="store.loadingStage"
         :allow-dismiss="true"
         mode="lookup"
+        :dynamic-checkpoints="store.loadingStageDefinitions"
+        :category="store.loadingCategory"
     />
     
     <!-- Loading Modal for AI Suggestions -->
@@ -133,6 +135,8 @@
         :progress="store.suggestionsProgress"
         :current-stage="store.suggestionsStage"
         mode="suggestions"
+        :dynamic-checkpoints="store.suggestionsStageDefinitions"
+        :category="store.suggestionsCategory"
     />
 </template>
 

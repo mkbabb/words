@@ -6,10 +6,11 @@ from datetime import datetime
 from typing import Any, Literal
 
 from beanie import Document, PydanticObjectId
-from pydantic import BaseModel, Field
+from bson import ObjectId
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..constants import DictionaryProvider, Language
-from .base import BaseMetadata, Etymology, ModelInfo
+from .base import BaseMetadata, DocumentWithObjectIdSupport, Etymology, ModelInfo
 from .relationships import (
     Collocation,
     GrammarPattern,
@@ -19,13 +20,15 @@ from .relationships import (
 )
 
 
-class Pronunciation(Document, BaseMetadata):
+class Pronunciation(DocumentWithObjectIdSupport):
     """Pronunciation with multi-format support."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     phonetic: str  # e.g., "on koo-LEES"
     ipa: str = ""  # American IPA - default to empty string for backwards compatibility
-    audio_file_ids: list[PydanticObjectId] = []  # FK to AudioMedia documents - optimized with ObjectIds
+    audio_file_ids: list[
+        PydanticObjectId
+    ] = []  # FK to AudioMedia documents - optimized with ObjectIds
     syllables: list[str] = []
     stress_pattern: str | None = None  # Primary/secondary stress
 
@@ -42,7 +45,7 @@ class LiteratureSource(BaseModel):
     context: str | None = None  # Surrounding text for context
 
 
-class Example(Document, BaseMetadata):
+class Example(DocumentWithObjectIdSupport):
     """Example storage with type discrimination."""
 
     definition_id: PydanticObjectId  # FK to Definition - optimized with ObjectId
@@ -60,7 +63,7 @@ class Example(Document, BaseMetadata):
         name = "examples"
 
 
-class Fact(Document, BaseMetadata):
+class Fact(DocumentWithObjectIdSupport):
     """Interesting fact about a word."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
@@ -73,7 +76,7 @@ class Fact(Document, BaseMetadata):
         name = "facts"
 
 
-class Definition(Document, BaseMetadata):
+class Definition(DocumentWithObjectIdSupport):
     """Single definition with examples and comprehensive linguistic data."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
@@ -89,9 +92,7 @@ class Definition(Document, BaseMetadata):
     antonyms: list[str] = []
 
     # Usage and context
-    language_register: (
-        Literal["formal", "informal", "neutral", "slang", "technical"] | None
-    ) = None
+    language_register: Literal["formal", "informal", "neutral", "slang", "technical"] | None = None
     domain: str | None = None  # medical, legal, computing
     region: str | None = None  # US, UK, AU
     usage_notes: list[UsageNote] = []
@@ -103,26 +104,30 @@ class Definition(Document, BaseMetadata):
 
     # Educational metadata
     cefr_level: Literal["A1", "A2", "B1", "B2", "C1", "C2"] | None = None
-    frequency_band: int | None = Field(
-        default=None, ge=1, le=5
-    )  # 1-5, Oxford 3000/5000 style
+    frequency_band: int | None = Field(default=None, ge=1, le=5)  # 1-5, Oxford 3000/5000 style
 
     # Media and provenance
     image_ids: list[PydanticObjectId] = []  # FK to ImageMedia documents - optimized with ObjectIds
-    provider_data_id: PydanticObjectId | None = None  # FK to ProviderData if from provider - optimized with ObjectId
+    provider_data_id: PydanticObjectId | None = (
+        None  # FK to ProviderData if from provider - optimized with ObjectId
+    )
 
     class Settings:
         name = "definitions"
         indexes = ["word_id", "part_of_speech", [("word_id", 1), ("part_of_speech", 1)]]
 
 
-class ProviderData(Document, BaseMetadata):
+class ProviderData(DocumentWithObjectIdSupport):
     """Raw data from a dictionary provider."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     provider: DictionaryProvider
-    definition_ids: list[PydanticObjectId] = []  # FK to Definition documents - optimized with ObjectIds
-    pronunciation_id: PydanticObjectId | None = None  # FK to Pronunciation - optimized with ObjectId
+    definition_ids: list[
+        PydanticObjectId
+    ] = []  # FK to Definition documents - optimized with ObjectIds
+    pronunciation_id: PydanticObjectId | None = (
+        None  # FK to Pronunciation - optimized with ObjectId
+    )
     etymology: Etymology | None = None
     raw_data: dict[str, Any] | None = None  # Original API response
 
@@ -131,7 +136,7 @@ class ProviderData(Document, BaseMetadata):
         indexes = ["word_id", "provider", [("word_id", 1), ("provider", 1)]]
 
 
-class Word(Document, BaseMetadata):
+class Word(DocumentWithObjectIdSupport):
     """Core word entity."""
 
     text: str
@@ -154,21 +159,27 @@ class Word(Document, BaseMetadata):
         ]
 
 
-class SynthesizedDictionaryEntry(Document, BaseMetadata):
+class SynthesizedDictionaryEntry(DocumentWithObjectIdSupport):
     """AI-synthesized entry with full provenance."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
 
     # Synthesized content references
-    pronunciation_id: PydanticObjectId | None = None  # FK to Pronunciation - optimized with ObjectId
-    definition_ids: list[PydanticObjectId] = []  # FK to Definition documents - optimized with ObjectIds
+    pronunciation_id: PydanticObjectId | None = (
+        None  # FK to Pronunciation - optimized with ObjectId
+    )
+    definition_ids: list[
+        PydanticObjectId
+    ] = []  # FK to Definition documents - optimized with ObjectIds
     etymology: Etymology | None = None  # Embedded as it's lightweight
     fact_ids: list[PydanticObjectId] = []  # FK to Fact documents - optimized with ObjectIds
     image_ids: list[PydanticObjectId] = []  # FK to ImageMedia documents - optimized with ObjectIds
 
     # Synthesis metadata
     model_info: ModelInfo | None = None  # Optional for non-AI synthesized entries
-    source_provider_data_ids: list[PydanticObjectId] = []  # FK to ProviderData documents - optimized with ObjectIds
+    source_provider_data_ids: list[
+        PydanticObjectId
+    ] = []  # FK to ProviderData documents - optimized with ObjectIds
 
     # Access tracking
     accessed_at: datetime | None = None

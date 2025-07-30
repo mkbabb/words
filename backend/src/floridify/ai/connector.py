@@ -119,9 +119,7 @@ class OpenAIConnector:
 
         # Get appropriate temperature
         temperature = (
-            get_temperature_for_model(model_tier, task_name)
-            if model_tier
-            else self.temperature
+            get_temperature_for_model(model_tier, task_name) if model_tier else self.temperature
         )
 
         # Prepare request parameters
@@ -263,9 +261,7 @@ class OpenAIConnector:
             # Success logging handled by synthesizer context
             return result
         except Exception as e:
-            logger.error(
-                f"❌ Definition synthesis failed for '{word}' ({meaning_cluster}): {e}"
-            )
+            logger.error(f"❌ Definition synthesis failed for '{word}' ({meaning_cluster}): {e}")
             raise
 
     async def generate_examples(
@@ -276,9 +272,7 @@ class OpenAIConnector:
         count: int = 1,
     ) -> ExampleGenerationResponse:
         """Generate modern usage examples."""
-        logger.debug(
-            f"📝 Generating {count} example sentence(s) for '{word}' ({part_of_speech})"
-        )
+        logger.debug(f"📝 Generating {count} example sentence(s) for '{word}' ({part_of_speech})")
 
         prompt = self.template_manager.get_generate_examples_prompt(
             word, definition, part_of_speech, count
@@ -290,11 +284,7 @@ class OpenAIConnector:
             )
             if result.example_sentences:
                 first_example = result.example_sentences[0]
-                truncated = (
-                    first_example[:50] + "..."
-                    if len(first_example) > 50
-                    else first_example
-                )
+                truncated = first_example[:50] + "..." if len(first_example) > 50 else first_example
                 logger.debug(f"✏️  Generated example for '{word}': \"{truncated}\"")
             return result
         except Exception as e:
@@ -349,9 +339,7 @@ class OpenAIConnector:
         start_time = time.perf_counter()
         def_count = len(definitions)
 
-        logger.info(
-            f"🔢 Extracting cluster mappings for '{word}' from {def_count} definitions"
-        )
+        logger.info(f"🔢 Extracting cluster mappings for '{word}' from {def_count} definitions")
 
         prompt = self.template_manager.get_meaning_extraction_prompt(word, definitions)
 
@@ -362,9 +350,7 @@ class OpenAIConnector:
             duration = time.perf_counter() - start_time
 
             # Log detailed cluster information
-            total_defs_mapped = sum(
-                len(cm.definition_indices) for cm in result.cluster_mappings
-            )
+            total_defs_mapped = sum(len(cm.definition_indices) for cm in result.cluster_mappings)
             logger.success(
                 f"🧮 Extracted {len(result.cluster_mappings)} meaning clusters for '{word}' "
                 f"in {duration:.2f}s (mapped {total_defs_mapped}/{def_count} definitions)"
@@ -552,9 +538,7 @@ class OpenAIConnector:
             )
 
             facts_count = len(result.facts)
-            categories_str = (
-                ", ".join(result.categories) if result.categories else "general"
-            )
+            categories_str = ", ".join(result.categories) if result.categories else "general"
             logger.success(
                 f"✨ Generated {facts_count} facts for '{word}' "
                 f"({categories_str}, confidence: {result.confidence:.1%})"
@@ -623,9 +607,7 @@ class OpenAIConnector:
             result = await self._make_structured_request(
                 prompt, EtymologyResponse, task_name="synthesize_etymology"
             )
-            logger.info(
-                f"Extracted etymology for '{word}' (origin: {result.origin_language})"
-            )
+            logger.info(f"Extracted etymology for '{word}' (origin: {result.origin_language})")
             return result
         except Exception as e:
             logger.error(f"Etymology extraction failed for '{word}': {e}")
@@ -821,9 +803,7 @@ class OpenAIConnector:
             result = await self._make_structured_request(
                 prompt, CollocationResponse, task_name="generate_collocations"
             )
-            logger.info(
-                f"Identified {len(result.collocations)} collocations for '{word}'"
-            )
+            logger.info(f"Identified {len(result.collocations)} collocations for '{word}'")
             return result
         except Exception as e:
             logger.error(f"Collocation identification failed for '{word}': {e}")
@@ -870,9 +850,7 @@ class OpenAIConnector:
         Returns:
             RegionalVariantResponse with regions
         """
-        prompt = self.template_manager.get_regional_variants_prompt(
-            definition=definition
-        )
+        prompt = self.template_manager.get_regional_variants_prompt(definition=definition)
 
         try:
             result = await self._make_structured_request(
@@ -946,12 +924,12 @@ class OpenAIConnector:
         part_of_speech: str | None = None,
     ) -> DeduplicationResponse:
         """Deduplicate near-duplicate definitions using semantic similarity.
-        
+
         Args:
             word: The word being defined
             definitions: List of Definition objects to deduplicate
             part_of_speech: Optional specific part of speech to focus on
-            
+
         Returns:
             DeduplicationResponse with deduplicated definitions
         """
@@ -959,20 +937,18 @@ class OpenAIConnector:
             f"🔍 Deduplicating {len(definitions)} definitions for '{word}'"
             f"{f' ({part_of_speech})' if part_of_speech else ''}"
         )
-        
+
         prompt = self.template_manager.get_deduplicate_prompt(
             word=word,
             definitions=definitions,
             part_of_speech=part_of_speech,
         )
-        
+
         try:
             result = await self._make_structured_request(
-                prompt, 
-                DeduplicationResponse, 
-                task_name="deduplicate_definitions"
+                prompt, DeduplicationResponse, task_name="deduplicate_definitions"
             )
-            
+
             logger.success(
                 f"✨ Deduplicated {len(definitions)} → {len(result.deduplicated_definitions)} "
                 f"definitions (removed {result.removed_count}, confidence: {result.confidence:.1%})"
@@ -988,11 +964,11 @@ class OpenAIConnector:
         previous_words: list[str] | None = None,
     ) -> WordOfTheDayResponse:
         """Generate a compelling Word of the Day.
-        
+
         Args:
             context: Optional context to steer word selection
             previous_words: Previously used words to avoid
-            
+
         Returns:
             WordOfTheDayResponse with educational word content
         """
@@ -1001,20 +977,18 @@ class OpenAIConnector:
             f"{f' with context: {context}' if context else ''}"
             f"{f' avoiding {len(previous_words)} previous words' if previous_words else ''}"
         )
-        
+
         prompt = self.template_manager.render_template(
             "generate/word_of_the_day",
             context=context,
             previous_words=previous_words,
         )
-        
+
         try:
             result = await self._make_structured_request(
-                prompt, 
-                WordOfTheDayResponse, 
-                task_name="generate_word_of_the_day"
+                prompt, WordOfTheDayResponse, task_name="generate_word_of_the_day"
             )
-            
+
             logger.success(
                 f"✨ Generated Word of the Day: '{result.word}' "
                 f"({result.difficulty_level}, confidence: {result.confidence:.1%})"

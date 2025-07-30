@@ -113,7 +113,7 @@ def sanitize_query_params(params: dict[str, Any]) -> dict[str, Any]:
         # Sanitize value based on type
         if isinstance(value, str):
             sanitized[clean_key] = sanitize_mongodb_input(value)
-        elif isinstance(value, (list, tuple)):
+        elif isinstance(value, list | tuple):
             sanitized[clean_key] = [
                 sanitize_mongodb_input(v) if isinstance(v, str) else v for v in value
             ]

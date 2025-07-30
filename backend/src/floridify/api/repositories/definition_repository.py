@@ -15,6 +15,7 @@ from ...models import (
     WordForm,
 )
 from ..core.base import BaseRepository
+from ..core.exceptions import VersionConflictException
 
 
 class DefinitionCreate(BaseModel):
@@ -167,40 +168,39 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         # Get the definition
         definition = await self.get(id, raise_on_missing=True)
         assert definition is not None
-        
+
         # Check version for optimistic locking
         if version is not None and hasattr(definition, "version"):
             if definition.version != version:
-                from ...core.exceptions import VersionConflictException
                 raise VersionConflictException(
                     expected=version,
                     actual=definition.version,
                     resource="Definition",
                 )
-        
+
         # Handle special image operations
         update_data = data.model_dump(exclude_unset=True)
-        
+
         # Add image
         if "add_image_id" in update_data:
             image_id = update_data.pop("add_image_id")
             if image_id and image_id not in definition.image_ids:
                 definition.image_ids.append(image_id)
-        
+
         # Remove image
         if "remove_image_id" in update_data:
             image_id = update_data.pop("remove_image_id")
             if image_id and image_id in definition.image_ids:
                 definition.image_ids.remove(image_id)
-        
+
         # Update other fields
         for field, value in update_data.items():
             setattr(definition, field, value)
-        
+
         # Increment version
         if hasattr(definition, "version"):
             definition.version += 1
-        
+
         await definition.save()
         return definition
 

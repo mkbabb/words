@@ -107,6 +107,17 @@
       v-model="showCreateModal"
       @created="handleWordlistCreated"
     />
+
+    <ConfirmDialog
+      v-model:open="showDeleteDialog"
+      title="Delete Wordlist"
+      :description="`Are you sure you want to delete &quot;${wordlistToDelete?.name}&quot;?`"
+      message="This action cannot be undone. All words and progress will be permanently deleted."
+      confirm-text="Delete"
+      cancel-text="Cancel"
+      :destructive="true"
+      @confirm="confirmDelete"
+    />
   </div>
 </template>
 
@@ -123,10 +134,13 @@ import { Button } from '@/components/ui/button';
 import SidebarWordListItem from './SidebarWordListItem.vue';
 import WordListUploadModal from '../wordlist/WordListUploadModal.vue';
 import CreateWordListModal from '../wordlist/CreateWordListModal.vue';
+import ConfirmDialog from '../ConfirmDialog.vue';
 import type { WordList } from '@/types';
 import { wordlistApi } from '@/utils/api';
+import { useToast } from '@/components/ui/toast/use-toast';
 
 const store = useAppStore();
+const { toast } = useToast();
 
 // Component state
 const fileInput = ref<HTMLInputElement>();
@@ -134,6 +148,10 @@ const isDragging = ref(false);
 const showUploadModal = ref(false);
 const showCreateModal = ref(false);
 const pendingFiles = ref<File[]>([]);
+
+// Dialog state
+const showDeleteDialog = ref(false);
+const wordlistToDelete = ref<WordList | null>(null);
 
 // Real data from API
 const wordlists = ref<WordList[]>([]);
@@ -310,22 +328,46 @@ const updateWordlistName = async (wordlist: WordList, newName: string) => {
     }
   } catch (error) {
     console.error('Failed to update wordlist name:', error);
-    alert('Failed to update wordlist name');
+    toast({
+      title: "Error",
+      description: "Failed to update wordlist name",
+      variant: "destructive",
+    });
   }
 };
 
-const handleWordlistDelete = async (wordlist: WordList) => {
-  if (confirm(`Are you sure you want to delete "${wordlist.name}"?`)) {
-    try {
-      await wordlistApi.deleteWordlist(wordlist.id);
-      wordlists.value = wordlists.value.filter(w => w.id !== wordlist.id);
-      
-      if (selectedWordlist.value === wordlist.id) {
-        store.setWordlist(null);
-      }
-    } catch (error) {
-      console.error('Failed to delete wordlist:', error);
+const handleWordlistDelete = (wordlist: WordList) => {
+  wordlistToDelete.value = wordlist;
+  showDeleteDialog.value = true;
+};
+
+const confirmDelete = async () => {
+  if (!wordlistToDelete.value) return;
+  
+  try {
+    await wordlistApi.deleteWordlist(wordlistToDelete.value.id);
+    wordlists.value = wordlists.value.filter(w => w.id !== wordlistToDelete.value!.id);
+    
+    // Handle graceful fallback if deleted wordlist was selected
+    if (selectedWordlist.value === wordlistToDelete.value.id) {
+      const firstWordlist = wordlists.value[0];
+      store.setWordlist(firstWordlist?.id || null);
     }
+    
+    toast({
+      title: "Success",
+      description: `Wordlist "${wordlistToDelete.value.name}" has been deleted`,
+    });
+  } catch (error) {
+    console.error('Failed to delete wordlist:', error);
+    toast({
+      title: "Error",
+      description: "Failed to delete wordlist",
+      variant: "destructive",
+    });
+  } finally {
+    showDeleteDialog.value = false;
+    wordlistToDelete.value = null;
   }
 };
 

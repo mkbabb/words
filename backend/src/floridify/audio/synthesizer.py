@@ -23,9 +23,7 @@ class AudioSynthesisConfig(BaseModel):
 
     credentials_path: Path | None = None
     project_id: str | None = None
-    cache_dir: Path = Field(
-        default_factory=lambda: get_project_root() / "data" / "audio_cache"
-    )
+    cache_dir: Path = Field(default_factory=lambda: get_project_root() / "data" / "audio_cache")
 
     # Voice configuration
     american_voice: str = "en-US-Wavenet-D"  # Male voice
@@ -119,7 +117,7 @@ class AudioSynthesizer:
         """Get or create the TTS client."""
         if self._client is None:
             if self.config.credentials_path and self.config.credentials_path.exists():
-                credentials = service_account.Credentials.from_service_account_file(
+                credentials = service_account.Credentials.from_service_account_file(  # type: ignore[no-untyped-call]
                     str(self.config.credentials_path)
                 )
                 self._client = texttospeech.TextToSpeechClient(credentials=credentials)
@@ -128,9 +126,7 @@ class AudioSynthesizer:
                 self._client = texttospeech.TextToSpeechClient()
         return self._client
 
-    def _generate_cache_key(
-        self, text: str, voice_name: str, is_ssml: bool = False
-    ) -> str:
+    def _generate_cache_key(self, text: str, voice_name: str, is_ssml: bool = False) -> str:
         """Generate a cache key for the audio file."""
         content = f"{text}:{voice_name}:{is_ssml}:{self.config.audio_encoding}:{self.config.speaking_rate}"
         return hashlib.md5(content.encode()).hexdigest()
@@ -285,9 +281,7 @@ class AudioSynthesizer:
             synthesis_text = word
 
             # Check cache
-            cache_key = self._generate_cache_key(
-                synthesis_text, voice_name, is_ssml=False
-            )
+            cache_key = self._generate_cache_key(synthesis_text, voice_name, is_ssml=False)
             cache_path = self._get_cache_path(cache_key)
 
             if cache_path.exists():

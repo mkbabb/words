@@ -134,6 +134,8 @@ import { Button } from '@/components/ui/button';
 import type { WordListItem, WordList } from '@/types';
 import { MasteryLevel, Temperature } from '@/types/wordlist';
 import { wordlistApi } from '@/utils/api';
+import { useToast } from '@/components/ui/toast/use-toast';
+import { formatRelativeTime } from '@/utils';
 import WordListCard from './WordListCard.vue';
 import WordListUploadModal from './WordListUploadModal.vue';
 import CreateWordListModal from './CreateWordListModal.vue';
@@ -141,6 +143,7 @@ import EditWordNotesModal from './EditWordNotesModal.vue';
 
 const store = useAppStore();
 const router = useRouter();
+const { toast } = useToast();
 
 // Component state
 const isLoadingMeta = ref(false);
@@ -201,41 +204,21 @@ const dueForReview = computed(() => {
 
 
 // Methods
-const formatLastAccessed = (lastAccessed: string | null): string => {
-  if (!lastAccessed) return 'Never';
-  
-  const date = new Date(lastAccessed);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
-  if (diffMinutes < 1) return 'Just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
-  
-  return `${Math.floor(diffDays / 365)}y ago`;
-};
 
 const handleWordClick = async (word: WordListItem) => {
   // Switch to lookup mode for the animation
   store.searchMode = 'lookup';
   
   // Navigate to definition route with smooth transition
-  await router.push(`/definition/${encodeURIComponent(word.text)}`);
+  await router.push(`/definition/${encodeURIComponent(word.word)}`);
   
   // Perform the word lookup after navigation
-  await store.searchWord(word.text);
+  await store.searchWord(word.word);
 };
 
 const handleReview = async (word: WordListItem, quality: number) => {
   try {
-    console.log('Processing review:', word.text, 'Quality:', quality);
+    console.log('Processing review:', word.word, 'Quality:', quality);
     
     if (!currentWordlist.value?.id) {
       console.error('No wordlist selected');
@@ -244,12 +227,12 @@ const handleReview = async (word: WordListItem, quality: number) => {
     
     // Submit review to backend
     const response = await wordlistApi.submitWordReview(currentWordlist.value.id, {
-      word: word.text,
+      word: word.word,
       quality
     });
     
     // Update the word in our local data with the new review data
-    const wordIndex = currentWords.value.findIndex(w => w.text === word.text);
+    const wordIndex = currentWords.value.findIndex(w => w.word === word.word);
     if (wordIndex >= 0 && response.data) {
       // Update mastery level and last reviewed date based on response
       currentWords.value[wordIndex] = {
@@ -270,14 +253,14 @@ const handleReview = async (word: WordListItem, quality: number) => {
 };
 
 const handleEdit = (word: WordListItem) => {
-  console.log('Opening edit dialog for:', word.text);
+  console.log('Opening edit dialog for:', word.word);
   editingWord.value = word;
   showEditNotesModal.value = true;
 };
 
 const updateWordNotes = async (word: WordListItem, newNotes: string) => {
   try {
-    console.log('Updating notes for:', word.text);
+    console.log('Updating notes for:', word.word);
     
     if (!currentWordlist.value?.id) {
       console.error('No wordlist selected');
@@ -286,7 +269,7 @@ const updateWordNotes = async (word: WordListItem, newNotes: string) => {
     
     // Note: Backend doesn't have a direct update endpoint yet
     // For now, we'll update locally only
-    const wordIndex = currentWords.value.findIndex(w => w.text === word.text);
+    const wordIndex = currentWords.value.findIndex(w => w.word === word.word);
     if (wordIndex >= 0) {
       currentWords.value[wordIndex] = { ...currentWords.value[wordIndex], notes: newNotes };
     }
@@ -294,7 +277,11 @@ const updateWordNotes = async (word: WordListItem, newNotes: string) => {
     console.log('Notes updated locally (backend endpoint pending)');
   } catch (error) {
     console.error('Failed to update notes:', error);
-    alert('Failed to update notes. Please try again.');
+    toast({
+      title: "Error",
+      description: "Failed to update notes. Please try again.",
+      variant: "destructive",
+    });
   }
 };
 

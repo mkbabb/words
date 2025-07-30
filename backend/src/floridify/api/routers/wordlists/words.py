@@ -3,13 +3,14 @@
 from typing import Any
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ....models import Word
 from ....wordlist.constants import MasteryLevel
 from ...core import ListResponse, ResourceResponse
 from ...repositories import WordAddRequest, WordListRepository
+from .utils import search_words_in_wordlist
 
 router = APIRouter()
 
@@ -97,7 +98,7 @@ async def list_words(
 
     # Fetch Word documents for the paginated items (word_ids are now ObjectIds)
     word_ids = [w.word_id for w in paginated_words if w.word_id]
-    
+
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
 
     # Create a map of word_id to word text
@@ -108,9 +109,9 @@ async def list_words(
     for word_item in paginated_words:
         items.append(
             {
-                "word": word_text_map.get(word_item.word_id, ""),  # Only include word text
+                "word": word_text_map.get(str(word_item.word_id), ""),  # Only include word text
                 "frequency": word_item.frequency,
-                "selected_definition_ids": word_item.selected_definition_ids,
+                "selected_definition_ids": [str(id) for id in word_item.selected_definition_ids],
                 "mastery_level": word_item.mastery_level,
                 "temperature": word_item.temperature,
                 "review_data": word_item.review_data.model_dump()
@@ -180,52 +181,44 @@ async def remove_word(
     Errors:
         404: Word not in list
     """
-    await repo.remove_word(wordlist_id, word)
+    # Find the word document by text
+    word_doc = await Word.find_one({"text": word})
+    if not word_doc:
+        raise HTTPException(status_code=404, detail="Word not found")
+
+    assert word_doc.id is not None  # Word from database should have ID
+    await repo.remove_word(wordlist_id, word_doc.id)
 
 
 @router.get("/{wordlist_id}/words/search", response_model=ListResponse[dict[str, Any]])
 async def search_words_in_list(
     wordlist_id: PydanticObjectId,
     query: str = Query(..., description="Search query"),
+    limit: int = Query(50, ge=1, le=100, description="Maximum results"),
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> ListResponse[dict[str, Any]]:
-    """Search for words within the wordlist.
+    """Search for words within the wordlist using fuzzy search with TTL corpus caching.
 
     Query Parameters:
         - query: Search query
+        - limit: Maximum results
 
     Returns:
-        Matching words from the list.
+        Matching words from the list with search scores.
     """
-    # Get wordlist
-    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
-    assert wordlist is not None
-
-    # Fetch Word documents to perform text search (word_ids are now ObjectIds)
-    word_ids = [w.word_id for w in wordlist.words if w.word_id]
-    
-    words = await Word.find({"_id": {"$in": word_ids}}).to_list()
-    word_map = {str(word.id): word for word in words}
-
-    # Simple substring search
-    query_lower = query.lower()
-    matching_words = []
-
-    for word_item in wordlist.words:
-        word = word_map.get(word_item.word_id)
-        if word and query_lower in word.text.lower():
-            matching_words.append(
-                {
-                    "word": word.text,
-                    "mastery_level": word_item.mastery_level,
-                    "review_count": word_item.review_data.repetitions,
-                    "notes": word_item.notes,
-                }
-            )
+    # Use TTL corpus-based fuzzy search
+    search_results = await search_words_in_wordlist(
+        wordlist_id=wordlist_id,
+        query=query,
+        repo=repo,
+        # No TTL expiration - corpus persists until invalidated
+        max_results=limit,
+        min_score=0.4,  # Slightly stricter for word matching
+    )
 
     return ListResponse(
-        items=matching_words,
-        total=len(matching_words),
+        items=search_results,
+        total=len(search_results),
         offset=0,
-        limit=len(matching_words),
+        limit=len(search_results),
     )

@@ -156,6 +156,7 @@ export const dictionaryApi = {
     providers?: DictionaryProvider[],
     languages?: Language[],
     onProgress?: (stage: string, progress: number, message: string, details?: any) => void,
+    onConfig?: (category: string, stages: Array<{progress: number, label: string, description: string}>) => void,
     noAI?: boolean
   ): Promise<SynthesizedDictionaryEntry> {
     return new Promise((resolve, reject) => {
@@ -195,6 +196,20 @@ export const dictionaryApi = {
         }
       }, 5000);
       
+      // Handle config events for dynamic stage setup
+      eventSource.addEventListener('config', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          hasReceivedData = true;
+          clearTimeout(connectionTimeout);
+          if (onConfig) {
+            onConfig(data.category, data.stages);
+          }
+        } catch (e) {
+          console.error('Error parsing config event:', e);
+        }
+      });
+      
       eventSource.addEventListener('progress', (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -215,8 +230,8 @@ export const dictionaryApi = {
           eventSource.close();
           console.log('SSE connection completed successfully');
           
-          // Extract the result from the details field, or fallback to direct data
-          const result = data.details?.result || data;
+          // Extract the result from the new structured format
+          const result = data.result || data.details?.result || data;
           
           // Add frontend-specific fields (no transformation needed)
           const synthesizedEntry: SynthesizedDictionaryEntry = {
@@ -241,7 +256,7 @@ export const dictionaryApi = {
           try {
             const data = JSON.parse((event as any).data);
             eventSource.close();
-            reject(new Error(data.error || 'Stream error'));
+            reject(new Error(data.error || data.message || 'Stream error'));
           } catch {
             // Not a JSON error message
           }
@@ -362,7 +377,8 @@ export const dictionaryApi = {
   async getAISuggestionsStream(
     query: string,
     count: number = 12,
-    onProgress?: (stage: string, progress: number, message?: string) => void
+    onProgress?: (stage: string, progress: number, message?: string, details?: any) => void,
+    onConfig?: (category: string, stages: Array<{progress: number, label: string, description: string}>) => void
   ): Promise<WordSuggestionResponse> {
     return new Promise((resolve, reject) => {
       // Cap count at 25 (backend limit)
@@ -376,11 +392,19 @@ export const dictionaryApi = {
         `${API_BASE_URL}/ai/suggest-words/stream?${params.toString()}`
       );
 
+      // Handle config events for dynamic stage setup
+      eventSource.addEventListener('config', (event) => {
+        const data = JSON.parse(event.data);
+        if (onConfig) {
+          onConfig(data.category, data.stages);
+        }
+      });
+      
       // Handle progress events
       eventSource.addEventListener('progress', (event) => {
         const data = JSON.parse(event.data);
         if (onProgress) {
-          onProgress(data.stage, data.progress, data.message);
+          onProgress(data.stage, data.progress, data.message, data.details);
         }
       });
 
@@ -388,7 +412,9 @@ export const dictionaryApi = {
       eventSource.addEventListener('complete', (event) => {
         const data = JSON.parse(event.data);
         eventSource.close();
-        resolve(data as WordSuggestionResponse);
+        // Extract result from new structured format
+        const result = data.result || data;
+        resolve(result as WordSuggestionResponse);
       });
 
       // Handle errors
@@ -396,7 +422,7 @@ export const dictionaryApi = {
         if (event.data) {
           const data = JSON.parse(event.data);
           eventSource.close();
-          reject(new Error(data.error || 'Unknown error'));
+          reject(new Error(data.error || data.message || 'Unknown error'));
         } else {
           eventSource.close();
           reject(new Error('Connection error'));
@@ -601,6 +627,104 @@ export const wordlistApi = {
       },
     });
     return response.data;
+  },
+
+  // Upload wordlist file with streaming progress
+  async uploadWordlistStream(
+    file: File,
+    options?: {
+      name?: string;
+      description?: string;
+      is_public?: boolean;
+    },
+    onProgress?: (stage: string, progress: number, message?: string, details?: any) => void,
+    onConfig?: (category: string, stages: Array<{progress: number, label: string, description: string}>) => void
+  ): Promise<{
+    id: string;
+    name: string;
+    word_count: number;
+    created_at: string;
+    metadata: any;
+    links: any;
+  }> {
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      if (options?.name) formData.append('name', options.name);
+      if (options?.description) formData.append('description', options.description);
+      if (options?.is_public !== undefined) formData.append('is_public', options.is_public.toString());
+
+      // Create FormData URL params for the streaming endpoint
+      const params = new URLSearchParams();
+      if (options?.name) params.append('name', options.name);
+      if (options?.description) params.append('description', options.description);
+      if (options?.is_public !== undefined) params.append('is_public', options.is_public.toString());
+
+      // Use XMLHttpRequest for file upload with SSE-like response handling
+      const xhr = new XMLHttpRequest();
+      
+      xhr.open('POST', `${API_BASE_URL}/wordlists/upload/stream${params.toString() ? '?' + params.toString() : ''}`, true);
+      
+      let buffer = '';
+      let hasReceivedData = false;
+      
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState === 3 || xhr.readyState === 4) { // LOADING or DONE
+          hasReceivedData = true;
+          
+          // Get new data
+          const newData = xhr.responseText.substr(buffer.length);
+          buffer = xhr.responseText;
+          
+          // Parse SSE events from new data
+          const lines = newData.split('\n');
+          let eventData = '';
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              eventData = line.substr(6);
+              try {
+                const data = JSON.parse(eventData);
+                
+                if (data.type === 'config' && onConfig) {
+                  onConfig(data.category, data.stages);
+                } else if (data.type === 'progress' && onProgress) {
+                  onProgress(data.stage, data.progress, data.message, data.details);
+                } else if (data.type === 'complete') {
+                  resolve(data.result);
+                  return;
+                } else if (data.type === 'error') {
+                  reject(new Error(data.message));
+                  return;
+                }
+              } catch (e) {
+                console.error('Error parsing SSE data:', e);
+              }
+            }
+          }
+        }
+      };
+      
+      xhr.onerror = () => {
+        reject(new Error('Upload failed'));
+      };
+      
+      xhr.ontimeout = () => {
+        reject(new Error('Upload timeout'));
+      };
+      
+      xhr.timeout = 60000; // 60 second timeout
+      xhr.send(formData);
+      
+      // Fallback timeout for no initial response
+      setTimeout(() => {
+        if (!hasReceivedData) {
+          xhr.abort();
+          reject(new Error('No response from server'));
+        }
+      }, 5000);
+    });
   },
 
   // Update wordlist

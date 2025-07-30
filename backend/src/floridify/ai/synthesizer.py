@@ -84,28 +84,28 @@ class DefinitionSynthesizer:
 
         # DEDUPLICATION: Use AI to identify and merge near-duplicates before clustering
         logger.info(f"Deduplicating {len(all_definitions)} definitions before clustering")
-        
+
         dedup_response = await self.ai.deduplicate_definitions(
             word=word,
             definitions=all_definitions,
         )
-        
+
         # Create unique definitions list from deduplication results
         unique_definitions: list[Definition] = []
         processed_indices: set[int] = set()
-        
+
         for dedup_def in dedup_response.deduplicated_definitions:
             # Use the first source index as the primary definition
             primary_idx = dedup_def.source_indices[0]
             primary_def = all_definitions[primary_idx]
-            
+
             # Update the definition text with the deduplicated version
             primary_def.text = dedup_def.definition
             unique_definitions.append(primary_def)
-            
+
             # Track all processed indices
             processed_indices.update(dedup_def.source_indices)
-            
+
             # Log which definitions were merged
             if len(dedup_def.source_indices) > 1:
                 merged_indices = dedup_def.source_indices[1:]
@@ -113,7 +113,7 @@ class DefinitionSynthesizer:
                     f"Merged definitions at indices {merged_indices} into index {primary_idx}: "
                     f"{dedup_def.reasoning}"
                 )
-        
+
         logger.success(
             f"Deduplicated {len(all_definitions)} → {len(unique_definitions)} definitions "
             f"(removed {dedup_response.removed_count} duplicates)"
@@ -148,18 +148,19 @@ class DefinitionSynthesizer:
         facts = await generate_facts(word_obj, synthesized_definitions, self.ai, self.facts_count)
 
         # Create synthesized entry
+        assert word_obj.id is not None  # Word should have been saved before this point
         entry = SynthesizedDictionaryEntry(
-            word_id=str(word_obj.id),
-            pronunciation_id=str(pronunciation.id) if pronunciation else None,
-            definition_ids=[str(d.id) for d in synthesized_definitions],
+            word_id=word_obj.id,
+            pronunciation_id=pronunciation.id if pronunciation else None,
+            definition_ids=[d.id for d in synthesized_definitions if d.id is not None],
             etymology=etymology,
-            fact_ids=[str(f.id) for f in facts],
+            fact_ids=[f.id for f in facts if f.id is not None],
             model_info=ModelInfo(
                 name=self.ai.last_model_used,  # Use the actual model that was used
                 generation_count=1,
                 confidence=0,  # Will be set later
             ),
-            source_provider_data_ids=[str(pd.id) for pd in providers_data],
+            source_provider_data_ids=[pd.id for pd in providers_data if pd.id is not None],
         )
 
         # Save entry
@@ -179,11 +180,11 @@ class DefinitionSynthesizer:
             force_refresh=force_refresh,
             state_tracker=state_tracker,
         )
-        
+
         # Report batch analysis removed - simple_batch_logger not available
 
         return entry
-    
+
     async def synthesize_entry_batch(
         self,
         word: str,
@@ -193,11 +194,11 @@ class DefinitionSynthesizer:
         state_tracker: StateTracker | None = None,
     ) -> SynthesizedDictionaryEntry | None:
         """Synthesize a complete dictionary entry using batch processing.
-        
+
         This method is optimized for bulk processing with 50% cost reduction
         through OpenAI's Batch API. Use this when processing multiple words.
         """
-        
+
         # Get or create Word document
         storage = await get_storage()
         word_obj = await storage.get_word(word)
@@ -252,7 +253,7 @@ class DefinitionSynthesizer:
             # Cluster unique definitions
             if state_tracker:
                 await state_tracker.update_stage(Stages.AI_CLUSTERING)
-            
+
             clustered_definitions = await cluster_definitions(
                 word_obj, unique_definitions, self.ai, state_tracker
             )
@@ -275,21 +276,24 @@ class DefinitionSynthesizer:
             etymology = await synthesize_etymology(word_obj, providers_data, self.ai, state_tracker)
 
             # Generate facts
-            facts = await generate_facts(word_obj, synthesized_definitions, self.ai, self.facts_count)
+            facts = await generate_facts(
+                word_obj, synthesized_definitions, self.ai, self.facts_count
+            )
 
         # Create synthesized entry
+        assert word_obj.id is not None  # Word should have been saved before this point
         entry = SynthesizedDictionaryEntry(
-            word_id=str(word_obj.id),
-            pronunciation_id=str(pronunciation.id) if pronunciation else None,
-            definition_ids=[str(d.id) for d in synthesized_definitions],
+            word_id=word_obj.id,
+            pronunciation_id=pronunciation.id if pronunciation else None,
+            definition_ids=[d.id for d in synthesized_definitions if d.id is not None],
             etymology=etymology,
-            fact_ids=[str(f.id) for f in facts],
+            fact_ids=[f.id for f in facts if f.id is not None],
             model_info=ModelInfo(
                 name=self.ai.last_model_used,  # Use the actual model that was used
                 generation_count=1,
                 confidence=0,  # Will be set later
             ),
-            source_provider_data_ids=[str(pd.id) for pd in providers_data],
+            source_provider_data_ids=[pd.id for pd in providers_data if pd.id is not None],
         )
 
         # Save entry
@@ -355,8 +359,9 @@ class DefinitionSynthesizer:
             )
 
             # Create and save definition
+            assert word.id is not None  # Word should have been saved before this point
             definition = Definition(
-                word_id=str(word.id),
+                word_id=word.id,
                 part_of_speech=synthesis_result["part_of_speech"],
                 text=synthesis_result["definition_text"],
                 meaning_cluster=cluster_defs[0].meaning_cluster,
@@ -412,18 +417,21 @@ class DefinitionSynthesizer:
         definitions: list[Definition] = []
         for idx, ai_def in enumerate(dictionary_entry.provider_data.definitions):
             # Create definition
+            assert word_obj.id is not None  # Word should have been saved before this point
             definition = Definition(
-                word_id=str(word_obj.id),
+                word_id=word_obj.id,
                 part_of_speech=ai_def.part_of_speech,
                 text=ai_def.definition,
             )
             await definition.save()
+            definitions.append(definition)  # Add to the list!
 
         # Create tmp provider data
+        assert word_obj.id is not None  # Word should have been saved before this point
         provider_data = ProviderData(
-            word_id=str(word_obj.id),
+            word_id=word_obj.id,
             provider=DictionaryProvider.AI_FALLBACK,
-            definition_ids=[str(d.id) for d in definitions],
+            definition_ids=[d.id for d in definitions if d.id is not None],
         )
         await provider_data.save()
 
@@ -450,51 +458,51 @@ class DefinitionSynthesizer:
         state_tracker: StateTracker | None = None,
     ) -> SynthesizedDictionaryEntry | None:
         """Regenerate specific components of an existing synthesized dictionary entry.
-        
+
         Args:
             entry_id: ID of the existing synthesized dictionary entry
             components: Set of component names to regenerate (uses default if None)
             state_tracker: Optional progress tracking
-            
+
         Returns:
             Updated synthesized dictionary entry or None if not found
         """
         from .constants import SynthesisComponent
-        
+
         # Fetch existing entry
         entry = await SynthesizedDictionaryEntry.get(entry_id)
         if not entry:
             logger.error(f"Synthesized entry not found: {entry_id}")
             return None
-            
+
         # Get associated word
         word = await Word.get(entry.word_id)
         if not word:
             logger.error(f"Word not found for entry: {entry.word_id}")
             return None
-        
+
         # Load existing definitions
         definitions = []
         for def_id in entry.definition_ids:
             definition = await Definition.get(def_id)
             if definition:
                 definitions.append(definition)
-        
+
         if not definitions:
             logger.error(f"No definitions found for entry: {entry_id}")
             return None
-            
+
         # Use default components if none specified
         if components is None:
             components = SynthesisComponent.default_definition_components()
-        
+
         logger.info(f"Regenerating components {components} for entry {entry_id}")
-        
+
         if state_tracker:
             await state_tracker.update_stage(
                 Stages.AI_SYNTHESIS,
             )
-        
+
         # Enhance definitions with force_refresh=True
         await enhance_definitions_parallel(
             definitions=definitions,
@@ -504,14 +512,14 @@ class DefinitionSynthesizer:
             force_refresh=True,  # Force regeneration of all specified components
             state_tracker=state_tracker,
         )
-        
+
         # Refresh entry from database to get updated data
         entry = await SynthesizedDictionaryEntry.get(entry_id)
-        
+
         if state_tracker:
             await state_tracker.update_stage(
                 Stages.COMPLETE,
             )
-        
+
         logger.info(f"Successfully regenerated components for entry {entry_id}")
         return entry

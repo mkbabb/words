@@ -15,6 +15,16 @@ from ..utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+class ProcessStage(BaseModel):
+    """Dynamic stage definition with flexible progress mapping."""
+
+    name: str = Field(..., description="Stage identifier")
+    progress: int = Field(..., ge=0, le=100, description="Progress percentage")
+    label: str = Field(..., description="Human-readable stage name")
+    description: str = Field("", description="Stage description for UI")
+    category: str = Field("general", description="Stage category (lookup, upload, etc.)")
+
+
 class Stages:
     """Optimized stage constants with progress mapping."""
 
@@ -31,6 +41,20 @@ class Stages:
     COMPLETE = "COMPLETE"
     ERROR = "ERROR"
 
+    # Upload stages
+    UPLOAD_START = "UPLOAD_START"
+    UPLOAD_READING = "UPLOAD_READING"
+    UPLOAD_PARSING = "UPLOAD_PARSING"
+    UPLOAD_PROCESSING = "UPLOAD_PROCESSING"
+    UPLOAD_CREATING = "UPLOAD_CREATING"
+    UPLOAD_FINALIZING = "UPLOAD_FINALIZING"
+
+    # Image upload stages
+    IMAGE_UPLOAD_START = "IMAGE_UPLOAD_START"
+    IMAGE_UPLOAD_VALIDATING = "IMAGE_UPLOAD_VALIDATING"
+    IMAGE_UPLOAD_PROCESSING = "IMAGE_UPLOAD_PROCESSING"
+    IMAGE_UPLOAD_STORING = "IMAGE_UPLOAD_STORING"
+
     # Provider sub-stages (rarely used by frontend)
     PROVIDER_FETCH_HTTP_CONNECTING = "PROVIDER_FETCH_HTTP_CONNECTING"
     PROVIDER_FETCH_HTTP_DOWNLOADING = "PROVIDER_FETCH_HTTP_DOWNLOADING"
@@ -41,6 +65,7 @@ class Stages:
 
     # Progress mapping for automatic progress calculation
     PROGRESS_MAP = {
+        # Lookup pipeline stages
         START: 5,
         SEARCH_START: 10,
         SEARCH_COMPLETE: 20,
@@ -52,7 +77,208 @@ class Stages:
         STORAGE_SAVE: 95,
         COMPLETE: 100,
         ERROR: 0,
+        # Upload pipeline stages
+        UPLOAD_START: 5,
+        UPLOAD_READING: 15,
+        UPLOAD_PARSING: 30,
+        UPLOAD_PROCESSING: 60,
+        UPLOAD_CREATING: 80,
+        UPLOAD_FINALIZING: 95,
+        # Image upload stages
+        IMAGE_UPLOAD_START: 10,
+        IMAGE_UPLOAD_VALIDATING: 30,
+        IMAGE_UPLOAD_PROCESSING: 60,
+        IMAGE_UPLOAD_STORING: 90,
     }
+
+    @classmethod
+    def get_stage_definitions(cls, category: str = "lookup") -> list[ProcessStage]:
+        """Get predefined stage definitions for a process category."""
+
+        if category == "lookup":
+            return [
+                ProcessStage(
+                    name=cls.START,
+                    progress=5,
+                    label="Start",
+                    description="Pipeline initialization and setup",
+                    category="lookup",
+                ),
+                ProcessStage(
+                    name=cls.SEARCH_START,
+                    progress=10,
+                    label="Search Start",
+                    description="Beginning multi-method word search",
+                    category="lookup",
+                ),
+                ProcessStage(
+                    name=cls.SEARCH_COMPLETE,
+                    progress=20,
+                    label="Search Complete",
+                    description="Found best matching word",
+                    category="lookup",
+                ),
+                ProcessStage(
+                    name=cls.PROVIDER_FETCH_START,
+                    progress=25,
+                    label="Provider Fetch",
+                    description="Fetching from dictionary providers",
+                    category="lookup",
+                ),
+                ProcessStage(
+                    name=cls.PROVIDER_FETCH_COMPLETE,
+                    progress=60,
+                    label="Providers Complete",
+                    description="All provider data collected",
+                    category="lookup",
+                ),
+                ProcessStage(
+                    name=cls.AI_CLUSTERING,
+                    progress=70,
+                    label="AI Clustering",
+                    description="AI analyzing and clustering definitions",
+                    category="lookup",
+                ),
+                ProcessStage(
+                    name=cls.AI_SYNTHESIS,
+                    progress=85,
+                    label="AI Synthesis",
+                    description="AI synthesizing comprehensive definitions",
+                    category="lookup",
+                ),
+                ProcessStage(
+                    name=cls.STORAGE_SAVE,
+                    progress=95,
+                    label="Storage",
+                    description="Saving to knowledge base",
+                    category="lookup",
+                ),
+                ProcessStage(
+                    name=cls.COMPLETE,
+                    progress=100,
+                    label="Complete",
+                    description="Pipeline complete!",
+                    category="lookup",
+                ),
+            ]
+
+        elif category == "upload":
+            return [
+                ProcessStage(
+                    name=cls.UPLOAD_START,
+                    progress=5,
+                    label="Start",
+                    description="Initializing upload process",
+                    category="upload",
+                ),
+                ProcessStage(
+                    name=cls.UPLOAD_READING,
+                    progress=15,
+                    label="Reading File",
+                    description="Reading uploaded file content",
+                    category="upload",
+                ),
+                ProcessStage(
+                    name=cls.UPLOAD_PARSING,
+                    progress=30,
+                    label="Parsing",
+                    description="Parsing words from file",
+                    category="upload",
+                ),
+                ProcessStage(
+                    name=cls.UPLOAD_PROCESSING,
+                    progress=60,
+                    label="Processing",
+                    description="Creating word entries",
+                    category="upload",
+                ),
+                ProcessStage(
+                    name=cls.UPLOAD_CREATING,
+                    progress=80,
+                    label="Creating List",
+                    description="Finalizing wordlist creation",
+                    category="upload",
+                ),
+                ProcessStage(
+                    name=cls.UPLOAD_FINALIZING,
+                    progress=95,
+                    label="Finalizing",
+                    description="Completing upload process",
+                    category="upload",
+                ),
+                ProcessStage(
+                    name=cls.COMPLETE,
+                    progress=100,
+                    label="Complete",
+                    description="Upload complete!",
+                    category="upload",
+                ),
+            ]
+
+        elif category == "image":
+            return [
+                ProcessStage(
+                    name=cls.IMAGE_UPLOAD_START,
+                    progress=10,
+                    label="Start",
+                    description="Starting image upload",
+                    category="image",
+                ),
+                ProcessStage(
+                    name=cls.IMAGE_UPLOAD_VALIDATING,
+                    progress=30,
+                    label="Validation",
+                    description="Validating image format and size",
+                    category="image",
+                ),
+                ProcessStage(
+                    name=cls.IMAGE_UPLOAD_PROCESSING,
+                    progress=60,
+                    label="Processing",
+                    description="Processing image metadata",
+                    category="image",
+                ),
+                ProcessStage(
+                    name=cls.IMAGE_UPLOAD_STORING,
+                    progress=90,
+                    label="Storing",
+                    description="Storing image data",
+                    category="image",
+                ),
+                ProcessStage(
+                    name=cls.COMPLETE,
+                    progress=100,
+                    label="Complete",
+                    description="Image uploaded!",
+                    category="image",
+                ),
+            ]
+
+        else:
+            # Generic stages for unknown categories
+            return [
+                ProcessStage(
+                    name=cls.START,
+                    progress=10,
+                    label="Start",
+                    description="Starting process",
+                    category=category,
+                ),
+                ProcessStage(
+                    name="PROCESSING",
+                    progress=50,
+                    label="Processing",
+                    description="Processing data",
+                    category=category,
+                ),
+                ProcessStage(
+                    name=cls.COMPLETE,
+                    progress=100,
+                    label="Complete",
+                    description="Process complete!",
+                    category=category,
+                ),
+            ]
 
 
 class PipelineState(BaseModel):
@@ -97,11 +323,25 @@ class PipelineState(BaseModel):
 class StateTracker:
     """Tracks pipeline state and provides async event streaming."""
 
-    def __init__(self) -> None:
-        """Initialize the state tracker."""
+    def __init__(
+        self, category: str = "general", custom_stages: list[ProcessStage] | None = None
+    ) -> None:
+        """Initialize the state tracker.
+
+        Args:
+            category: Process category (lookup, upload, image, etc.)
+            custom_stages: Optional custom stage definitions
+        """
         self._queue: asyncio.Queue[PipelineState] = asyncio.Queue()
         self._current_state: PipelineState | None = None
         self._subscribers: set[asyncio.Queue[PipelineState]] = set()
+        self._category = category
+        self._stages = custom_stages or Stages.get_stage_definitions(category)
+
+        # Build progress map from stages
+        self._progress_map = {stage.name: stage.progress for stage in self._stages}
+        # Include default progress map as fallback
+        self._progress_map.update(Stages.PROGRESS_MAP)
 
     async def update(
         self,
@@ -118,13 +358,13 @@ class StateTracker:
         # 2. If stage has a mapped progress, use that
         # 3. Otherwise maintain current progress
         if progress is None:
-            if stage in Stages.PROGRESS_MAP:
-                progress = Stages.PROGRESS_MAP[stage]
+            if stage in self._progress_map:
+                progress = self._progress_map[stage]
             elif self._current_state:
                 progress = self._current_state.progress
             else:
                 progress = 0
-                
+
         state = PipelineState(
             stage=stage,
             progress=progress,
@@ -152,7 +392,7 @@ class StateTracker:
         """Optimized update for stage-only changes (most common case)."""
         # Auto-calculate progress from stage if not provided
         if progress is None:
-            progress = Stages.PROGRESS_MAP.get(stage, 0)
+            progress = self._progress_map.get(stage, 0)
         await self.update(stage=stage, progress=progress)
 
     async def update_progress(self, progress: int) -> None:
@@ -174,8 +414,8 @@ class StateTracker:
         """Optimized update for errors."""
         # Maintain current progress or use stage progress if available
         progress = self._current_state.progress if self._current_state else 0
-        if stage != "ERROR" and stage in Stages.PROGRESS_MAP:
-            progress = Stages.PROGRESS_MAP[stage]
+        if stage != "ERROR" and stage in self._progress_map:
+            progress = self._progress_map[stage]
         await self.update(stage=stage, progress=progress, error=error, is_complete=True)
 
     async def get_states(self) -> AsyncGenerator[PipelineState, None]:
@@ -205,6 +445,19 @@ class StateTracker:
                 self._queue.get_nowait()
             except asyncio.QueueEmpty:
                 break
+
+    def get_stage_definitions(self) -> list[ProcessStage]:
+        """Get the stage definitions for this tracker."""
+        return self._stages.copy()
+
+    def get_current_state(self) -> PipelineState | None:
+        """Get the current state."""
+        return self._current_state
+
+    @property
+    def category(self) -> str:
+        """Get the process category."""
+        return self._category
 
 
 # Global state tracker instance for lookup operations

@@ -1,9 +1,14 @@
-export function formatRelativeTime(date: Date | string): string {
+export function formatRelativeTime(date: Date | string | null): string {
+    if (!date) return 'Never';
+    
     const now = new Date();
     const then = typeof date === 'string' ? new Date(date) : date;
+    
+    if (!then || isNaN(then.getTime())) return 'Invalid date';
+    
     const seconds = Math.floor((now.getTime() - then.getTime()) / 1000);
     
-    if (seconds < 60) return 'just now';
+    if (seconds < 60) return 'Just now';
     
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `${minutes}m ago`;
@@ -12,12 +17,17 @@ export function formatRelativeTime(date: Date | string): string {
     if (hours < 24) return `${hours}h ago`;
     
     const days = Math.floor(hours / 24);
+    if (days === 1) return 'Yesterday';
     if (days < 7) return `${days}d ago`;
     
     const weeks = Math.floor(days / 7);
     if (weeks < 4) return `${weeks}w ago`;
     
-    return then.toLocaleDateString();
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months}mo ago`;
+    
+    const years = Math.floor(days / 365);
+    return `${years}y ago`;
 }
 
 export function formatTimeDisplay(date: Date | string): string {

@@ -119,7 +119,12 @@ class PromptTemplateManager:
         )
 
     def get_synthesize_synonyms_prompt(
-        self, word: str, definition: str, part_of_speech: str, existing_synonyms: list[str], count: int = 10
+        self,
+        word: str,
+        definition: str,
+        part_of_speech: str,
+        existing_synonyms: list[str],
+        count: int = 10,
     ) -> str:
         """Generate prompt for synonym synthesis with existing items."""
         return self.render_template(
@@ -151,7 +156,14 @@ class PromptTemplateManager:
             previous_words=previous_words or [],
         )
 
-    def get_synthesize_antonyms_prompt(self, word: str, definition: str, part_of_speech: str, existing_antonyms: list[str], count: int = 5) -> str:
+    def get_synthesize_antonyms_prompt(
+        self,
+        word: str,
+        definition: str,
+        part_of_speech: str,
+        existing_antonyms: list[str],
+        count: int = 5,
+    ) -> str:
         """Generate prompt for antonym synthesis."""
         return self.render_template(
             "synthesize/antonyms",

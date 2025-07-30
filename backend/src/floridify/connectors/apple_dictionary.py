@@ -6,6 +6,8 @@ import platform
 import re
 from typing import Any
 
+from beanie import PydanticObjectId
+
 from ..constants import Language
 from ..core.state_tracker import Stages, StateTracker
 from ..models import Definition, Etymology, Example, Pronunciation, ProviderData, Word
@@ -330,7 +332,9 @@ class AppleDictionaryConnector(DictionaryConnector):
             "rate_limit": self.rate_limit,
         }
 
-    async def extract_pronunciation(self, raw_data: dict[str, Any]) -> Pronunciation | None:
+    async def extract_pronunciation(
+        self, raw_data: dict[str, Any], word_id: PydanticObjectId
+    ) -> Pronunciation | None:
         """Extract pronunciation from Apple Dictionary data.
 
         Args:
@@ -350,7 +354,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             phonetic = self._ipa_to_phonetic(ipa)
 
             return Pronunciation(
-                word_id="",  # Will be set by base connector
+                word_id=word_id,
                 phonetic=phonetic,
                 ipa=ipa,  # Apple typically provides American pronunciation
                 syllables=[],
@@ -359,7 +363,9 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         return None
 
-    async def extract_definitions(self, raw_data: dict[str, Any], word_id: str) -> list[Definition]:
+    async def extract_definitions(
+        self, raw_data: dict[str, Any], word_id: PydanticObjectId
+    ) -> list[Definition]:
         """Extract definitions from Apple Dictionary data.
 
         Args:
@@ -384,7 +390,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             part_of_speech = self._normalize_part_of_speech(raw_definition)
         except Exception:
             part_of_speech = "noun"  # Default fallback
-        
+
         definition_text = self._clean_definition_text(raw_definition)
         # If definition is empty, try extracting main definition
         if not definition_text:
@@ -406,16 +412,18 @@ class AppleDictionaryConnector(DictionaryConnector):
 
             # Save definition to get ID
             await definition.save()
+            assert definition.id is not None  # After save(), id is guaranteed to be not None
 
             # Create and save examples
             for example_text in examples:
                 example = Example(
-                    definition_id=str(definition.id),
+                    definition_id=definition.id,
                     text=example_text,
                     type="generated",  # Apple examples are typically generated
                 )
                 await example.save()
-                definition.example_ids.append(str(example.id))
+                assert example.id is not None  # After save(), id is guaranteed to be not None
+                definition.example_ids.append(example.id)
 
             # Update definition with example IDs if any were added
             if definition.example_ids:

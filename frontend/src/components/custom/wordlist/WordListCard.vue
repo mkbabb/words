@@ -16,7 +16,7 @@
           <div class="mb-3">
             <div class="flex items-center justify-between mb-2">
               <h3 class="text-base sm:text-xl font-semibold truncate themed-title transition-colors group-hover:text-primary">
-                {{ word.text }}
+                {{ word.word }}
               </h3>
             </div>
 
@@ -115,16 +115,16 @@
           <div class="space-y-1 text-xs">
             <div class="flex justify-between">
               <span>Added:</span>
-              <span>{{ formatDate(word.added_date) }}</span>
+              <span>{{ formatRelativeTime(word.added_date) }}</span>
             </div>
             <div v-if="word.last_visited" class="flex justify-between">
               <span>Last visited:</span>
-              <span>{{ formatDate(word.last_visited) }}</span>
+              <span>{{ formatRelativeTime(word.last_visited) }}</span>
             </div>
             <div class="flex justify-between">
               <span>Next review:</span>
               <span :class="isDueForReview ? 'text-primary font-medium' : ''">
-                {{ formatDate(word.review_data.next_review_date) }}
+                {{ formatRelativeTime(word.review_data.next_review_date) }}
               </span>
             </div>
           </div>
@@ -193,6 +193,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { WordListItem, MasteryLevel } from '@/types';
 import { Temperature } from '@/types';
+import { formatRelativeTime } from '@/utils';
 
 interface Props {
   word: WordListItem;
@@ -247,39 +248,7 @@ const getMasteryEmoji = (level: MasteryLevel): string => {
   }[level];
 };
 
-const formatDate = (dateString: string): string => {
-  if (!dateString) return 'Never';
-  
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
-  if (diffMinutes < 1) return 'Just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
-  
-  return `${Math.floor(diffDays / 365)}y ago`;
-};
 
-const formatNextReview = (dateString: string): string => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (diffDays <= 0) return 'Now';
-  if (diffDays === 1) return 'Tomorrow';
-  if (diffDays < 7) return `${diffDays}d`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w`;
-  
-  return `${Math.floor(diffDays / 30)}m`;
-};
 
 const startReview = () => {
   // For now, simulate a good review (quality 4)
@@ -289,12 +258,12 @@ const startReview = () => {
 
 const markAsVisited = () => {
   // Mark word as visited without formal review
-  console.log('Marking as visited:', props.word.text);
+  console.log('Marking as visited:', props.word.word);
 };
 
 const removeFromList = () => {
   // Remove word from wordlist
-  console.log('Removing from list:', props.word.text);
+  console.log('Removing from list:', props.word.word);
 };
 </script>
 

@@ -44,12 +44,18 @@ class CorpusEntry:
         words: list[str],
         phrases: list[str] | None = None,
         name: str = "",
-        ttl_hours: float = 1.0,
+        ttl_hours: float | None = 1.0,
     ) -> None:
+        # If ttl_hours is None, set expires_at to a far future date (effectively no expiration)
+        if ttl_hours is None:
+            expires_at = datetime.max
+        else:
+            expires_at = datetime.now() + timedelta(hours=ttl_hours)
+            
         self.metadata = CorpusMetadata(
             corpus_id=corpus_id,
             name=name,
-            expires_at=datetime.now() + timedelta(hours=ttl_hours),
+            expires_at=expires_at,
             word_count=len(words),
             phrase_count=len(phrases or []),
         )
@@ -117,7 +123,7 @@ class CorpusCache:
         words: list[str],
         phrases: list[str] | None = None,
         name: str = "",
-        ttl_hours: float = 1.0,
+        ttl_hours: float | None = 1.0,
     ) -> str:
         """
         Create a new corpus and return its ID.
@@ -126,7 +132,7 @@ class CorpusCache:
             words: List of words to include
             phrases: Optional list of phrases
             name: Optional corpus name
-            ttl_hours: Time to live in hours
+            ttl_hours: Time to live in hours, or None for no expiration
 
         Returns:
             Unique corpus ID
@@ -144,9 +150,10 @@ class CorpusCache:
         )
 
         self._cache[corpus_id] = entry
+        ttl_str = "no expiration" if ttl_hours is None else f"{ttl_hours}h"
         logger.info(
             f"Created corpus {corpus_id[:8]} with {len(words)} words, "
-            f"{len(phrases or [])} phrases, TTL={ttl_hours}h"
+            f"{len(phrases or [])} phrases, TTL={ttl_str}"
         )
 
         return corpus_id
@@ -223,6 +230,29 @@ class CorpusCache:
         self._cleanup_expired()
         return [entry.metadata for entry in self._cache.values()]
 
+    def remove_corpus(self, corpus_id: str) -> bool:
+        """Remove a specific corpus from cache."""
+        if corpus_id in self._cache:
+            del self._cache[corpus_id]
+            logger.debug(f"Manually removed corpus {corpus_id[:8]}")
+            return True
+        return False
+
+    def remove_corpus_by_name(self, name: str) -> int:
+        """Remove all corpora with a specific name."""
+        removed_count = 0
+        corpus_ids_to_remove = [
+            corpus_id for corpus_id, entry in self._cache.items() 
+            if entry.metadata.name == name
+        ]
+        
+        for corpus_id in corpus_ids_to_remove:
+            del self._cache[corpus_id]
+            logger.debug(f"Removed corpus {corpus_id[:8]} with name '{name}'")
+            removed_count += 1
+        
+        return removed_count
+
     def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         self._cleanup_expired()
@@ -282,3 +312,40 @@ async def shutdown_corpus_cache() -> None:
     if _corpus_cache:
         await _corpus_cache.stop()
         _corpus_cache = None
+
+
+async def invalidate_wordlist_names_corpus() -> None:
+    """
+    Invalidate corpus cache for wordlist names.
+    
+    Call this when wordlist names have been modified (create/update/delete)
+    to ensure fresh corpus creation on next search.
+    """
+    cache = await get_corpus_cache()
+    
+    # Remove wordlist names corpus using consistent naming
+    corpus_name = "Wordlist Names"
+    removed_count = cache.remove_corpus_by_name(corpus_name)
+    if removed_count > 0:
+        logger.debug(f"Invalidated {removed_count} wordlist names corpus(es)")
+
+
+async def invalidate_wordlist_corpus(wordlist_id: str) -> None:
+    """
+    Invalidate corpus cache for a specific wordlist.
+    
+    Call this when a wordlist's words have been modified to ensure
+    fresh corpus creation on next search.
+    
+    Args:
+        wordlist_id: ID of the wordlist whose corpus should be invalidated
+    """
+    cache = await get_corpus_cache()
+    
+    # Use consistent naming pattern
+    corpus_name = f"Words in wordlist {wordlist_id}"
+    
+    # Remove any corpora for this specific wordlist
+    removed_count = cache.remove_corpus_by_name(corpus_name)
+    if removed_count > 0:
+        logger.debug(f"Invalidated {removed_count} corpus(es) for wordlist {wordlist_id}")

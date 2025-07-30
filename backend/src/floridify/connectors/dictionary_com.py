@@ -9,6 +9,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from beanie import PydanticObjectId
+
 from ..core.state_tracker import Stages, StateTracker
 from ..models import (
     Definition,
@@ -90,7 +92,9 @@ class DictionaryComConnector(DictionaryConnector):
 
             return None
 
-    async def extract_pronunciation(self, raw_data: dict[str, Any]) -> Pronunciation | None:
+    async def extract_pronunciation(
+        self, raw_data: dict[str, Any], word_id: PydanticObjectId
+    ) -> Pronunciation | None:
         """Extract pronunciation from Dictionary.com data.
 
         Args:
@@ -106,7 +110,9 @@ class DictionaryComConnector(DictionaryConnector):
         # - audio URLs
         return None
 
-    async def extract_definitions(self, raw_data: dict[str, Any], word_id: str) -> list[Definition]:
+    async def extract_definitions(
+        self, raw_data: dict[str, Any], word_id: PydanticObjectId
+    ) -> list[Definition]:
         """Extract definitions from Dictionary.com data.
 
         Args:

@@ -32,7 +32,7 @@
             <!-- Checkpoint Markers -->
             <div class="absolute top-0 bottom-0 w-full">
                 <div
-                    v-for="(checkpoint, index) in checkpoints"
+                    v-for="(checkpoint, index) in effectiveCheckpoints"
                     :key="index"
                     class="absolute flex items-center justify-center"
                     :style="{
@@ -93,7 +93,7 @@
                                         text-muted-foreground"
                                 >
                                     {{
-                                        getCheckpointDescription(
+                                        getCheckpointDescriptionText(
                                             checkpoint.progress
                                         )
                                     }}
@@ -136,6 +136,7 @@ import {
     HoverCardContent,
     HoverCardTrigger,
 } from '@/components/ui/hover-card';
+import { getDefaultStages, getCheckpointDescription } from './pipeline-stages';
 
 interface Checkpoint {
     progress: number;
@@ -148,7 +149,8 @@ interface Props {
     interactive?: boolean;
     currentStage?: string;
     stageMessage?: string;
-    mode?: 'lookup' | 'suggestions';
+    mode?: 'lookup' | 'suggestions' | 'upload' | 'image' | string;
+    category?: string; // Process category for dynamic descriptions
 }
 
 // Ensure progress is a number
@@ -161,19 +163,30 @@ interface Emits {
     (e: 'progress-change', progress: number): void;
 }
 
+// Convert pipeline stages to checkpoint format
+const convertToCheckpoints = (stages: Array<{progress: number, label: string, description: string}>): Checkpoint[] => {
+    return stages.map(stage => ({
+        progress: stage.progress,
+        label: stage.label
+    }));
+};
+
 const props = withDefaults(defineProps<Props>(), {
-    checkpoints: () => [
-        { progress: 5, label: 'Start' },
-        { progress: 10, label: 'Search Start' },
-        { progress: 20, label: 'Search Complete' },
-        { progress: 25, label: 'Provider Fetch' },
-        { progress: 60, label: 'Providers Complete' },
-        { progress: 70, label: 'AI Clustering' },
-        { progress: 85, label: 'AI Synthesis' },
-        { progress: 95, label: 'Storage' },
-        { progress: 100, label: 'Complete' },
-    ],
+    checkpoints: undefined, // Will be computed dynamically
     interactive: false,
+    mode: 'lookup',
+});
+
+// Compute checkpoints dynamically if not provided
+const effectiveCheckpoints = computed(() => {
+    if (props.checkpoints) {
+        return props.checkpoints;
+    }
+    
+    // Use category first, then mode as fallback
+    const category = props.category || props.mode || 'lookup';
+    const stages = getDefaultStages(category);
+    return convertToCheckpoints(stages);
 });
 
 const emit = defineEmits<Emits>();
@@ -202,38 +215,16 @@ const isDragging = ref(false);
 
 const rainbowGradient = computed(() => generateRainbowGradient(8));
 
-// Get descriptive text for checkpoint stages
-const getCheckpointDescription = (progress: number): string => {
-    if (props.mode === 'suggestions') {
-        const suggestionDescriptions: Record<number, string> = {
-            5: 'Initializing AI language models and preparing to analyze your descriptive query.',
-            20: 'Validating that your query is seeking word suggestions based on meaning or description.',
-            40: 'AI is creatively generating words that match your description, considering nuance and context.',
-            80: 'Evaluating and ranking suggestions by relevance, aesthetic quality, and semantic accuracy.',
-            100: 'Your curated word suggestions are ready! Each word includes confidence and efflorescence scores.',
-        };
-        return suggestionDescriptions[progress] || 'Processing your word suggestion request...';
-    } else {
-        // Default lookup descriptions
-        const lookupDescriptions: Record<number, string> = {
-            5: 'Pipeline initialization and setup. Preparing search engines and AI processing systems.',
-            10: 'Beginning multi-method word search through dictionary indices and semantic databases.',
-            20: 'Search complete. Found best matching word across all available sources.',
-            25: 'Starting parallel fetches from dictionary providers (Wiktionary, Oxford, Dictionary.com).',
-            60: 'All provider data collected. Ready for AI processing and synthesis.',
-            70: 'AI analyzing and clustering definitions by semantic meaning to reduce redundancy.',
-            85: 'AI synthesizing comprehensive definitions from clustered meanings and generating examples.',
-            95: 'Saving processed entry to knowledge base and updating search indices for future lookups.',
-            100: 'Pipeline complete! Ready to display comprehensive word information with examples, synonyms, and pronunciation.',
-        };
-        return lookupDescriptions[progress] || 'Processing pipeline stage...';
-    }
+// Get descriptive text for checkpoint stages using centralized config
+const getCheckpointDescriptionText = (progress: number): string => {
+    const category = props.category || props.mode || 'lookup';
+    return getCheckpointDescription(category, progress);
 };
 
 // Check if a checkpoint is currently active
 const isActiveCheckpoint = (checkpointProgress: number): boolean => {
     // Find the current checkpoint range
-    const sortedCheckpoints = props.checkpoints.sort(
+    const sortedCheckpoints = effectiveCheckpoints.value.sort(
         (a, b) => a.progress - b.progress
     );
     const currentIndex = sortedCheckpoints.findIndex(
