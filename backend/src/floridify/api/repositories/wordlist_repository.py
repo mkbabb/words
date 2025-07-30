@@ -175,28 +175,75 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         # Add words if provided
         if data.words:
-            # Get or create Word documents inline
-            word_ids = []
-            for text in data.words:
-                normalized = text.lower().strip()
-
-                # Try to find existing word
-                existing_word = await Word.find_one(
-                    {"normalized": normalized, "language": Language.ENGLISH}
-                )
-
-                if existing_word:
-                    word_ids.append(str(existing_word.id))
-                else:
-                    # Create new word
-                    word = Word(text=text.strip(), normalized=normalized, language=Language.ENGLISH)
-                    await word.create()
-                    word_ids.append(str(word.id))
-
+            # Batch process words for better performance
+            word_ids = await self._batch_get_or_create_words(data.words)
             wordlist.add_words(word_ids)
 
         await wordlist.create()
         return wordlist
+
+    async def _batch_get_or_create_words(self, word_texts: list[str]) -> list[PydanticObjectId]:
+        """Batch get or create Word documents, returning their IDs.
+        
+        This method optimizes performance by:
+        1. Normalizing all words at once
+        2. Performing a single bulk lookup
+        3. Bulk creating missing words
+        4. Returning word IDs in the same order as input
+        """
+        # Normalize all words
+        normalized_map = {}
+        normalized_list = []
+        for text in word_texts:
+            normalized = text.lower().strip()
+            normalized_map[normalized] = text.strip()
+            normalized_list.append(normalized)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_normalized = []
+        for norm in normalized_list:
+            if norm not in seen:
+                seen.add(norm)
+                unique_normalized.append(norm)
+        
+        # Bulk lookup existing words
+        existing_words = await Word.find({
+            "normalized": {"$in": unique_normalized},
+            "language": Language.ENGLISH
+        }).to_list()
+        
+        # Create a map of normalized text to word ObjectId
+        existing_map = {word.normalized: word.id for word in existing_words}
+        
+        # Identify missing words
+        missing_normalized = [norm for norm in unique_normalized if norm not in existing_map]
+        
+        # Bulk create missing words if any
+        if missing_normalized:
+            new_words = [
+                Word(
+                    text=normalized_map[norm],
+                    normalized=norm,
+                    language=Language.ENGLISH
+                )
+                for norm in missing_normalized
+            ]
+            
+            # Bulk insert
+            await Word.insert_many(new_words)
+            
+            # Add new words to existing map
+            for word in new_words:
+                existing_map[word.normalized] = word.id
+        
+        # Return word IDs in the same order as input
+        word_ids = []
+        for text in word_texts:
+            normalized = text.lower().strip()
+            word_ids.append(existing_map[normalized])
+        
+        return word_ids
 
     async def add_word(self, wordlist_id: PydanticObjectId, request: WordAddRequest) -> WordList:
         """Add words to an existing word list."""
@@ -204,30 +251,15 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         if wordlist is None:
             raise ValueError(f"WordList with id {wordlist_id} not found")
 
-        # Get or create Word documents inline
-        word_ids = []
-        for text in request.words:
-            normalized = text.lower().strip()
-
-            # Try to find existing word
-            existing_word = await Word.find_one(
-                {"normalized": normalized, "language": Language.ENGLISH}
-            )
-
-            if existing_word:
-                word_ids.append(str(existing_word.id))
-            else:
-                # Create new word
-                word = Word(text=text.strip(), normalized=normalized, language=Language.ENGLISH)
-                await word.create()
-                word_ids.append(str(word.id))
-
+        # Use batch processing for better performance
+        word_ids = await self._batch_get_or_create_words(request.words)
+        
         wordlist.add_words(word_ids)
         wordlist.mark_accessed()
         await wordlist.save()
         return wordlist
 
-    async def remove_word(self, wordlist_id: PydanticObjectId, word_id: str) -> WordList:
+    async def remove_word(self, wordlist_id: PydanticObjectId, word_id: PydanticObjectId) -> WordList:
         """Remove a word from a word list by word ID."""
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
@@ -346,10 +378,9 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         if existing_corpus:
             return existing_corpus
 
-        # Fetch Word documents to get text
-        from ...models import Word
-
-        word_ids = [item.word_id for item in wordlist.words]
+        # Fetch Word documents to get text (word_ids are now ObjectIds)
+        word_ids = [item.word_id for item in wordlist.words if item.word_id]
+        
         words = await Word.find({"_id": {"$in": word_ids}}).to_list()
 
         # Extract word text
@@ -389,20 +420,27 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         
         Returns a dictionary representation with word text included.
         """
-        # Get word IDs
-        word_ids = [item.word_id for item in wordlist.words]
+        # Get word IDs from wordlist items (they are now ObjectIds)
+        word_ids = [item.word_id for item in wordlist.words if item.word_id]
         
-        # Fetch Word documents
-        from ...models import Word
+        if not word_ids:
+            # No words to fetch, return empty wordlist
+            wordlist_dict = wordlist.model_dump(mode="json")
+            for word_item in wordlist_dict["words"]:
+                word_item.pop("word_id", None)
+                word_item["word"] = ""
+            return wordlist_dict
+        
+        # Fetch Word documents directly with ObjectIds (no conversion needed!)
         words = await Word.find({"_id": {"$in": word_ids}}).to_list()
         
-        # Create word text map
+        # Create word text map using string IDs
         word_text_map = {str(word.id): word.text for word in words}
         
         # Convert wordlist to dict and update word items
         wordlist_dict = wordlist.model_dump(mode="json")
         
-        # Update each word item with actual word text and remove word_id
+        # Update each word item with actual word text
         for word_item in wordlist_dict["words"]:
             word_id = word_item.pop("word_id", "")
             word_item["word"] = word_text_map.get(word_id, "")

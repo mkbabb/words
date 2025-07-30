@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from beanie import Document
+from beanie import Document, PydanticObjectId
 
 from .base import BaseMetadata
 
@@ -12,10 +12,10 @@ from .base import BaseMetadata
 class PhrasalExpression(Document, BaseMetadata):
     """Phrasal verbs, idioms, and multi-word expressions."""
 
-    base_word_id: str  # FK to main Word
+    base_word_id: PydanticObjectId  # FK to main Word - optimized with ObjectId
     expression: str  # Full expression text
     type: Literal["phrasal_verb", "idiom", "colloquialism", "proverb"]
-    definition_ids: list[str] = []  # FK to Definition documents
+    definition_ids: list[PydanticObjectId] = []  # FK to Definition documents - optimized with ObjectIds
     separable: bool | None = None  # For phrasal verbs
 
     class Settings:

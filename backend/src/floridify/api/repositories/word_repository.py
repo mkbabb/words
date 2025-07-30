@@ -1,5 +1,6 @@
 """Repository for Word model operations."""
 
+import asyncio
 from datetime import datetime
 from typing import Any
 
@@ -8,7 +9,15 @@ from beanie.operators import RegEx
 from pydantic import BaseModel, Field
 
 from ...constants import Language
-from ...models import Word
+from ...models import (
+    Word,
+    Definition,
+    Example,
+    Fact,
+    Pronunciation,
+    ProviderData,
+    SynthesizedDictionaryEntry,
+)
 from ..core.base import BaseRepository
 
 
@@ -96,37 +105,42 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
 
     async def _cascade_delete(self, word: Word) -> None:
         """Delete related documents when deleting a word."""
-        from ...models import (
-            Definition,
-            Example,
-            Fact,
-            Pronunciation,
-            ProviderData,
-            SynthesizedDictionaryEntry,
-        )
 
-        # Delete all related documents
-        await Definition.find({"word_id": str(word.id)}).delete()
-        await Example.find({"word_id": str(word.id)}).delete()
-        await Fact.find({"word_id": str(word.id)}).delete()
-        await Pronunciation.find({"word_id": str(word.id)}).delete()
-        await ProviderData.find({"word_id": str(word.id)}).delete()
-        await SynthesizedDictionaryEntry.find({"word_id": str(word.id)}).delete()
+        # Delete all related documents in parallel for better performance
+        word_id_str = str(word.id)
+        await asyncio.gather(
+            Definition.find({"word_id": word_id_str}).delete(),
+            Example.find({"word_id": word_id_str}).delete(),
+            Fact.find({"word_id": word_id_str}).delete(),
+            Pronunciation.find({"word_id": word_id_str}).delete(),
+            ProviderData.find({"word_id": word_id_str}).delete(),
+            SynthesizedDictionaryEntry.find({"word_id": word_id_str}).delete(),
+        )
 
     async def get_with_counts(self, id: PydanticObjectId) -> dict[str, Any]:
         """Get word with related document counts."""
-        from ...models import Definition, Example, Fact
 
         word = await self.get(id, raise_on_missing=True)
         if word is None:
             raise ValueError(f"Word with id {id} not found")
         word_dict = word.model_dump()
 
-        # Add counts
+        # Run counts in parallel for better performance
+        word_id_str = str(id)
+        definitions_count_task = Definition.find({"word_id": word_id_str}).count()
+        examples_count_task = Example.find({"word_id": word_id_str}).count()
+        facts_count_task = Fact.find({"word_id": word_id_str}).count()
+        
+        definitions_count, examples_count, facts_count = await asyncio.gather(
+            definitions_count_task,
+            examples_count_task,
+            facts_count_task
+        )
+        
         word_dict["counts"] = {
-            "definitions": await Definition.find({"word_id": str(id)}).count(),
-            "examples": await Example.find({"word_id": str(id)}).count(),
-            "facts": await Fact.find({"word_id": str(id)}).count(),
+            "definitions": definitions_count,
+            "examples": examples_count,
+            "facts": facts_count,
         }
 
         return word_dict

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from beanie import Document
+from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
 from ..constants import DictionaryProvider, Language
@@ -22,10 +22,10 @@ from .relationships import (
 class Pronunciation(Document, BaseMetadata):
     """Pronunciation with multi-format support."""
 
-    word_id: str  # FK to Word
+    word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     phonetic: str  # e.g., "on koo-LEES"
     ipa: str = ""  # American IPA - default to empty string for backwards compatibility
-    audio_file_ids: list[str] = []  # FK to AudioMedia documents
+    audio_file_ids: list[PydanticObjectId] = []  # FK to AudioMedia documents - optimized with ObjectIds
     syllables: list[str] = []
     stress_pattern: str | None = None  # Primary/secondary stress
 
@@ -45,7 +45,7 @@ class LiteratureSource(BaseModel):
 class Example(Document, BaseMetadata):
     """Example storage with type discrimination."""
 
-    definition_id: str  # FK to Definition
+    definition_id: PydanticObjectId  # FK to Definition - optimized with ObjectId
     text: str
     type: Literal["generated", "literature"]
 
@@ -63,7 +63,7 @@ class Example(Document, BaseMetadata):
 class Fact(Document, BaseMetadata):
     """Interesting fact about a word."""
 
-    word_id: str  # FK to Word
+    word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     content: str
     category: Literal["etymology", "usage", "cultural", "linguistic", "historical"]
     model_info: ModelInfo | None = None  # If AI-generated
@@ -76,7 +76,7 @@ class Fact(Document, BaseMetadata):
 class Definition(Document, BaseMetadata):
     """Single definition with examples and comprehensive linguistic data."""
 
-    word_id: str  # FK to Word
+    word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     part_of_speech: str  # noun, verb, adjective, etc.
     text: str  # The definition text
     meaning_cluster: MeaningCluster | None = None
@@ -84,7 +84,7 @@ class Definition(Document, BaseMetadata):
     word_forms: list[WordForm] = []  # List of WordForm objects
 
     # Examples and relationships
-    example_ids: list[str] = []  # FK to Example documents
+    example_ids: list[PydanticObjectId] = []  # FK to Example documents - optimized with ObjectIds
     synonyms: list[str] = []
     antonyms: list[str] = []
 
@@ -108,8 +108,8 @@ class Definition(Document, BaseMetadata):
     )  # 1-5, Oxford 3000/5000 style
 
     # Media and provenance
-    image_ids: list[str] = []  # FK to ImageMedia documents
-    provider_data_id: str | None = None  # FK to ProviderData if from provider
+    image_ids: list[PydanticObjectId] = []  # FK to ImageMedia documents - optimized with ObjectIds
+    provider_data_id: PydanticObjectId | None = None  # FK to ProviderData if from provider - optimized with ObjectId
 
     class Settings:
         name = "definitions"
@@ -119,10 +119,10 @@ class Definition(Document, BaseMetadata):
 class ProviderData(Document, BaseMetadata):
     """Raw data from a dictionary provider."""
 
-    word_id: str  # FK to Word
+    word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     provider: DictionaryProvider
-    definition_ids: list[str] = []  # FK to Definition documents
-    pronunciation_id: str | None = None  # FK to Pronunciation
+    definition_ids: list[PydanticObjectId] = []  # FK to Definition documents - optimized with ObjectIds
+    pronunciation_id: PydanticObjectId | None = None  # FK to Pronunciation - optimized with ObjectId
     etymology: Etymology | None = None
     raw_data: dict[str, Any] | None = None  # Original API response
 
@@ -157,18 +157,18 @@ class Word(Document, BaseMetadata):
 class SynthesizedDictionaryEntry(Document, BaseMetadata):
     """AI-synthesized entry with full provenance."""
 
-    word_id: str  # FK to Word
+    word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
 
     # Synthesized content references
-    pronunciation_id: str | None = None  # FK to Pronunciation
-    definition_ids: list[str] = []  # FK to Definition documents
+    pronunciation_id: PydanticObjectId | None = None  # FK to Pronunciation - optimized with ObjectId
+    definition_ids: list[PydanticObjectId] = []  # FK to Definition documents - optimized with ObjectIds
     etymology: Etymology | None = None  # Embedded as it's lightweight
-    fact_ids: list[str] = []  # FK to Fact documents
-    image_ids: list[str] = []  # FK to ImageMedia documents
+    fact_ids: list[PydanticObjectId] = []  # FK to Fact documents - optimized with ObjectIds
+    image_ids: list[PydanticObjectId] = []  # FK to ImageMedia documents - optimized with ObjectIds
 
     # Synthesis metadata
     model_info: ModelInfo | None = None  # Optional for non-AI synthesized entries
-    source_provider_data_ids: list[str] = []  # FK to ProviderData documents
+    source_provider_data_ids: list[PydanticObjectId] = []  # FK to ProviderData documents - optimized with ObjectIds
 
     # Access tracking
     accessed_at: datetime | None = None

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from beanie import Document
+from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
 from .base import BaseMetadata
@@ -17,12 +17,12 @@ from .stats import LearningStats
 class WordListItem(BaseModel):
     """Word reference with learning metadata and spaced repetition data."""
 
-    # Foreign key to Word model - this is all we need
-    word_id: str = Field(..., description="FK to Word document")
+    # Foreign key to Word model - optimized with ObjectId
+    word_id: PydanticObjectId = Field(..., description="FK to Word document")
     
     # Learning metadata
     frequency: int = Field(default=1, ge=1, description="Number of occurrences in list")
-    selected_definition_ids: list[str] = Field(
+    selected_definition_ids: list[PydanticObjectId] = Field(
         default_factory=list, description="FK to selected Definition documents"
     )
     mastery_level: MasteryLevel = Field(
@@ -114,11 +114,11 @@ class WordList(Document, BaseMetadata):
             "owner_id",
         ]
 
-    def add_words(self, word_ids: list[str]) -> None:
+    def add_words(self, word_ids: list[PydanticObjectId]) -> None:
         """Add words to the list, updating frequencies for duplicates.
         
         Args:
-            word_ids: List of word IDs to add
+            word_ids: List of word ObjectIds to add
         """
         # Create a map of existing word_ids for quick lookup
         word_map = {w.word_id: w for w in self.words}
@@ -165,8 +165,8 @@ class WordList(Document, BaseMetadata):
         hot.sort(key=lambda w: w.last_visited or w.added_date, reverse=True)
         return hot[:limit]
 
-    def get_word_item_by_id(self, word_id: str) -> WordListItem | None:
-        """Get WordListItem by word ID."""
+    def get_word_item_by_id(self, word_id: PydanticObjectId) -> WordListItem | None:
+        """Get WordListItem by word ObjectId."""
         for w in self.words:
             if w.word_id == word_id:
                 return w

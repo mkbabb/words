@@ -95,8 +95,9 @@ async def list_words(
     end = start + params.limit
     paginated_words = filtered_words[start:end]
 
-    # Fetch Word documents for the paginated items
-    word_ids = [w.word_id for w in paginated_words]
+    # Fetch Word documents for the paginated items (word_ids are now ObjectIds)
+    word_ids = [w.word_id for w in paginated_words if w.word_id]
+    
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
 
     # Create a map of word_id to word text
@@ -200,8 +201,9 @@ async def search_words_in_list(
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
 
-    # Fetch Word documents to perform text search
-    word_ids = [w.word_id for w in wordlist.words]
+    # Fetch Word documents to perform text search (word_ids are now ObjectIds)
+    word_ids = [w.word_id for w in wordlist.words if w.word_id]
+    
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_map = {str(word.id): word for word in words}
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from beanie import Document
+from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
 
@@ -58,8 +58,8 @@ class MeaningCluster(BaseModel):
 class WordRelationship(Document):
     """Relationships between words."""
 
-    from_word_id: str
-    to_word_id: str
+    from_word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
+    to_word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     relationship_type: Literal[
         "synonym", "antonym", "related", "compare", "see_also", "derived_from"
     ]

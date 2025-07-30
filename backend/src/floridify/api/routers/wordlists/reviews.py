@@ -51,8 +51,9 @@ async def get_due_words(
     """
     due_words = await repo.get_due_words(wordlist_id, limit)
 
-    # Fetch Word documents to get text
-    word_ids = [w.word_id for w in due_words]
+    # Fetch Word documents to get text (word_ids are now ObjectIds)
+    word_ids = [w.word_id for w in due_words if w.word_id]
+    
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_text_map = {str(word.id): word.text for word in words}
 
@@ -113,8 +114,9 @@ async def get_review_session(
         if len(review_words) >= params.limit:
             break
 
-    # Fetch Word documents to get text for review words
-    word_ids = [w.word_id for w in review_words]
+    # Fetch Word documents to get text for review words (word_ids are now ObjectIds)
+    word_ids = [w.word_id for w in review_words if w.word_id]
+    
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_text_map = {str(word.id): word.text for word in words}
 
@@ -169,8 +171,9 @@ async def submit_review(
     """
     updated_list = await repo.review_word(wordlist_id, request)
 
-    # Find the updated word by fetching Word documents
-    word_ids = [w.word_id for w in updated_list.words]
+    # Find the updated word by fetching Word documents (word_ids are now ObjectIds)
+    word_ids = [w.word_id for w in updated_list.words if w.word_id]
+    
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_text_map = {str(word.id): word.text for word in words}
 

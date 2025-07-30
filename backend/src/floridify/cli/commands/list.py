@@ -139,8 +139,8 @@ async def _show_async(name: str, num: int | None) -> None:
 
     console.print(f"\nMost frequent words (showing {num}):")
 
-    # Fetch Word documents to get text
-    word_ids = [wf.word_id for wf in most_frequent]
+    # Fetch Word documents to get text (word_ids are now ObjectIds)
+    word_ids = [wf.word_id for wf in most_frequent if wf.word_id]
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
     word_text_map = {str(word.id): word.text for word in words}
 
