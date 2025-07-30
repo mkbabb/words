@@ -6,6 +6,9 @@ import type {
   AIResponse,
   DictionaryProvider,
   Language,
+  ImageMedia,
+  ResourceResponse,
+  HealthResponse,
 } from '@/types/api';
 import type {
   SynthesizedDictionaryEntry,
@@ -18,6 +21,7 @@ import type {
 const API_VERSION = 'v1';
 const API_BASE_URL = `/api/${API_VERSION}`;
 
+// Create axios instance with standardized configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 60000, // 60 seconds (1 minute)
@@ -25,6 +29,28 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Error type for consistent error handling
+export interface APIError {
+  message: string;
+  code?: string;
+  field?: string;
+  details?: any;
+}
+
+// Transform error responses to consistent format
+function transformError(error: any): APIError {
+  if (error.response?.data?.error) {
+    return {
+      message: error.response.data.error,
+      details: error.response.data.details,
+    };
+  }
+  return {
+    message: error.message || 'An unknown error occurred',
+    code: error.code,
+  };
+}
 
 // Request interceptor
 api.interceptors.request.use(
@@ -89,43 +115,38 @@ export const dictionaryApi = {
   },
 
 
-  // Get word definition
+  // Get word definition with standardized parameters
   async getDefinition(
     word: string, 
-    forceRefresh: boolean = false,
-    providers?: DictionaryProvider[],
-    languages?: Language[],
-    noAI?: boolean
+    options?: {
+      forceRefresh?: boolean;
+      providers?: DictionaryProvider[];
+      languages?: Language[];
+      noAI?: boolean;
+    }
   ): Promise<SynthesizedDictionaryEntry> {
-    const params = new URLSearchParams();
-    if (forceRefresh) params.append('force_refresh', 'true');
-    
-    // Add providers to the query parameters
-    if (providers && providers.length > 0) {
-      providers.forEach(provider => params.append('providers', provider));
+    try {
+      const params: Record<string, any> = {};
+      
+      if (options?.forceRefresh) params.force_refresh = true;
+      if (options?.providers?.length) params.providers = options.providers;
+      if (options?.languages?.length) params.languages = options.languages;
+      if (options?.noAI) params.no_ai = true;
+      
+      const response = await api.get<LookupResponse>(`/lookup/${encodeURIComponent(word)}`, {
+        params
+      });
+      
+      // Transform backend response to frontend model
+      return {
+        ...response.data,
+        lookup_count: 0,
+        regeneration_count: 0,
+        status: 'active'
+      } as SynthesizedDictionaryEntry;
+    } catch (error) {
+      throw transformError(error);
     }
-    
-    // Add languages to the query parameters
-    if (languages && languages.length > 0) {
-      languages.forEach(language => params.append('languages', language));
-    }
-    
-    // Add noAI parameter
-    if (noAI) {
-      params.append('no_ai', 'true');
-    }
-    
-    const response = await api.get<LookupResponse>(`/lookup/${word}`, {
-      params: Object.fromEntries(params.entries())
-    });
-    
-    // Add frontend-specific fields (no transformation needed)
-    return {
-      ...response.data,
-      lookup_count: 0,
-      regeneration_count: 0,
-      status: 'active'
-    } as SynthesizedDictionaryEntry;
   },
 
   // Get word definition with streaming progress
@@ -242,42 +263,39 @@ export const dictionaryApi = {
     });
   },
 
-  // Get synonyms/thesaurus data
+  // Get synonyms using AI synthesis endpoint
   async getSynonyms(word: string): Promise<ThesaurusEntry> {
-    // Use the new AI synthesis endpoint instead of deprecated synonyms endpoint
     try {
-      // First, get the word definition to provide context
-      const lookupResponse = await api.get(`/lookup/${word}`);
-      if (!lookupResponse.data || !lookupResponse.data.definitions || lookupResponse.data.definitions.length === 0) {
+      // Get word context from lookup
+      const lookupResponse = await api.get<LookupResponse>(`/lookup/${encodeURIComponent(word)}`);
+      
+      if (!lookupResponse.data?.definitions?.length) {
         throw new Error('No definitions found for word');
       }
 
-      // Use the first definition for context
       const firstDefinition = lookupResponse.data.definitions[0];
       
-      // Call the new AI synthesis endpoint
-      const response = await api.post<AIResponse<{ synonyms: Array<{ word: string; score: number }>, confidence: number }>>('/ai/synthesize/synonyms', {
-        word: word,
-        definition: firstDefinition.text || firstDefinition.definition,
+      // Call AI synthesis endpoint with consistent parameter structure
+      const response = await api.post<AIResponse<{ 
+        synonyms: Array<{ word: string; score: number }>;
+        confidence: number;
+      }>>('/ai/synthesize/synonyms', {
+        word,
+        definition: firstDefinition.text,
         part_of_speech: firstDefinition.part_of_speech,
         existing_synonyms: firstDefinition.synonyms || [],
         count: 10
       });
 
-      // Transform the response to match ThesaurusEntry format
+      // Transform response to frontend format
       return {
-        word: word,
+        word,
         synonyms: response.data.result.synonyms || [],
         confidence: response.data.result.confidence || 0
       };
     } catch (error) {
       console.error('Error fetching synonyms:', error);
-      // Fallback to empty thesaurus entry
-      return {
-        word: word,
-        synonyms: [],
-        confidence: 0
-      };
+      throw transformError(error);
     }
   },
 
@@ -395,22 +413,36 @@ export const dictionaryApi = {
     });
   },
 
-  // Health check
-  async healthCheck(): Promise<{ status: string }> {
-    const response = await api.get('/health');
-    return response.data;
+  // Health check with proper response type
+  async healthCheck(): Promise<HealthResponse> {
+    try {
+      const response = await api.get<HealthResponse>('/health');
+      return response.data;
+    } catch (error) {
+      throw transformError(error);
+    }
   },
 
-  // Update definition
-  async updateDefinition(definitionId: string, updates: any): Promise<any> {
+  // Update definition with ResourceResponse wrapper
+  async updateDefinition(definitionId: string, updates: Partial<{
+    text: string;
+    part_of_speech: string;
+    synonyms: string[];
+    antonyms: string[];
+    language_register: string;
+    domain: string;
+    region: string;
+    cefr_level: string;
+    frequency_band: number;
+  }>): Promise<ResourceResponse> {
     console.log('[API] Updating definition:', definitionId, 'with:', updates);
     try {
-      const response = await api.put(`/definitions/${definitionId}`, updates);
+      const response = await api.put<ResourceResponse>(`/definitions/${definitionId}`, updates);
       console.log('[API] Update successful:', response.data);
       return response.data;
     } catch (error) {
       console.error('[API] Update failed:', error);
-      throw error;
+      throw transformError(error);
     }
   },
 
@@ -441,6 +473,82 @@ export const dictionaryApi = {
     const response = await api.get(`/definitions/${definitionId}`);
     return response.data.data;
   },
+};
+
+export const imageApi = {
+  // Upload image
+  async uploadImage(file: File, options?: {
+    alt_text?: string;
+    description?: string;
+  }): Promise<ImageMedia> {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const params = new URLSearchParams();
+    if (options?.alt_text) params.append('alt_text', options.alt_text);
+    if (options?.description) params.append('description', options.description);
+    
+    const response = await api.post<ResourceResponse>(
+      `/images${params.toString() ? '?' + params.toString() : ''}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    
+    // Extract image data from ResourceResponse
+    return {
+      id: response.data.data.id,
+      url: response.data.data.url,
+      format: response.data.data.format,
+      size_bytes: response.data.data.size_bytes,
+      width: response.data.data.width,
+      height: response.data.data.height,
+      alt_text: response.data.data.alt_text,
+      description: response.data.data.description,
+      created_at: response.data.data.created_at,
+      updated_at: response.data.data.updated_at,
+      version: response.data.data.version || 1,
+    };
+  },
+
+  // Get image metadata
+  async getImage(imageId: string): Promise<ImageMedia> {
+    const response = await api.get(`/images/${imageId}`);
+    return response.data;
+  },
+
+  // Update image metadata
+  async updateImage(imageId: string, updates: {
+    alt_text?: string;
+    description?: string;
+  }): Promise<ImageMedia> {
+    const response = await api.put<ResourceResponse>(`/images/${imageId}`, updates);
+    return response.data.data;
+  },
+
+  // Delete image
+  async deleteImage(imageId: string): Promise<void> {
+    await api.delete(`/images/${imageId}`);
+  },
+
+  // Bind image to definition
+  async bindImageToDefinition(definitionId: string, imageId: string): Promise<any> {
+    const response = await api.patch(`/definitions/${definitionId}`, {
+      add_image_id: imageId
+    });
+    return response.data;
+  },
+
+  // Remove image from definition
+  async removeImageFromDefinition(definitionId: string, imageId: string): Promise<any> {
+    const response = await api.patch(`/definitions/${definitionId}`, {
+      remove_image_id: imageId
+    });
+    return response.data;
+  }
 };
 
 export const wordlistApi = {
@@ -545,21 +653,25 @@ export const wordlistApi = {
   async getWordlistWords(id: string, options?: {
     offset?: number;
     limit?: number;
-    sort?: Array<{field: string, direction: 'asc' | 'desc'}>;
-    filters?: Record<string, any>;
-    search?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+    mastery_level?: string;
+    min_views?: number;
+    max_views?: number;
+    reviewed?: boolean;
   }) {
-    const criteria = {
-      filters: options?.filters || {},
-      sort: options?.sort || [],
-      search: options?.search || ""
-    };
-    
-    const params = {
-      criteria: JSON.stringify(criteria),
+    const params: Record<string, any> = {
       offset: options?.offset || 0,
       limit: options?.limit || 50,
     };
+    
+    // Add optional parameters
+    if (options?.sort_by) params.sort_by = options.sort_by;
+    if (options?.sort_order) params.sort_order = options.sort_order;
+    if (options?.mastery_level) params.mastery_level = options.mastery_level;
+    if (options?.min_views !== undefined) params.min_views = options.min_views;
+    if (options?.max_views !== undefined) params.max_views = options.max_views;
+    if (options?.reviewed !== undefined) params.reviewed = options.reviewed;
     
     const response = await api.get(`/wordlists/${id}/words`, { params });
     return response.data;
@@ -569,6 +681,34 @@ export const wordlistApi = {
   async getStatistics(id: string) {
     const response = await api.get(`/wordlists/${id}/statistics`);
     return response.data;
+  },
+
+  // Submit word review
+  async submitWordReview(wordlistId: string, review: {
+    word: string;
+    quality: number; // 0-5 for SM-2 algorithm
+  }) {
+    const response = await api.post(`/wordlists/${wordlistId}/review`, review);
+    return response.data;
+  },
+
+  // Get due words for review
+  async getDueWords(wordlistId: string, limit: number = 20) {
+    const response = await api.get(`/wordlists/${wordlistId}/review/due`, {
+      params: { limit }
+    });
+    return response.data;
+  },
+
+  // Update word in wordlist (notes, tags, etc)
+  async updateWord(wordlistId: string, wordText: string, updates: {
+    notes?: string;
+    tags?: string[];
+  }) {
+    // Since backend doesn't have a direct update endpoint, we'll need to handle this differently
+    // For now, return a mock response
+    console.warn('updateWord API not implemented on backend');
+    return { data: { ...updates, word: wordText } };
   },
 };
 

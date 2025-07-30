@@ -245,7 +245,6 @@ export interface LookupResponse {
   definitions: DefinitionResponse[];
   etymology?: Etymology;
   last_updated: string;
-  pipeline_metrics?: PipelineMetrics;
   model_info?: ModelInfo | null;
   synth_entry_id?: string | null;
   images?: ImageMedia[];
@@ -257,14 +256,6 @@ export interface DefinitionResponse extends Definition {
   providers_data: Array<Record<string, any>>;
 }
 
-export interface PipelineMetrics {
-  total_duration_ms: number;
-  stages: Record<string, {
-    duration_ms: number;
-    success: boolean;
-    details?: any;
-  }>;
-}
 
 // Search Response Types
 export interface SearchResult {
@@ -292,6 +283,10 @@ export interface ProgressEvent {
 // Health Check Types
 export interface HealthResponse {
   status: 'healthy' | 'degraded';
+  version?: string | null;
+  services: Record<string, string>;
+  metrics: Record<string, any>;
+  timestamp: string;
   database: 'connected' | 'disconnected' | 'unhealthy';
   search_engine: 'initialized' | 'uninitialized';
   cache_hit_rate: number;

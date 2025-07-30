@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter
@@ -13,7 +14,6 @@ from ...constants import Language
 from ...core.search_pipeline import get_search_engine
 from ...storage.mongodb import _ensure_initialized, get_storage
 from ...utils.logging import get_logger
-
 logger = get_logger(__name__)
 router = APIRouter()
 
@@ -21,10 +21,27 @@ router = APIRouter()
 _start_time = time.perf_counter()
 
 
-class HealthResponse(BaseModel):
-    """Response for health check."""
+class HealthCheckResponse(BaseModel):
+    """Response for health check endpoints."""
+    
+    status: str = Field(..., description="Service status")
+    version: str | None = Field(None, description="API version")
+    services: dict[str, str] = Field(default_factory=dict, description="Sub-service statuses")
+    metrics: dict[str, Any] = Field(default_factory=dict, description="Performance metrics")
+    timestamp: str = Field(..., description="Check timestamp")
+    
+    @property
+    def is_healthy(self) -> bool:
+        """Check if all services are healthy."""
+        return self.status == "healthy" and all(
+            status == "healthy" for status in self.services.values()
+        )
 
-    status: str = Field(..., description="Overall service status")
+
+# Use the standardized HealthCheckResponse from core but extend if needed
+class HealthResponse(HealthCheckResponse):
+    """Extended health check response with specific service details."""
+    
     database: str = Field(..., description="Database connection status")
     search_engine: str = Field(..., description="Search engine status")
     cache_hit_rate: float = Field(..., ge=0.0, le=1.0, description="Cache hit rate")
@@ -98,6 +115,17 @@ async def health_check() -> HealthResponse:
 
     return HealthResponse(
         status=overall_status,
+        version="0.1.0",  # Version from pyproject.toml
+        timestamp=datetime.utcnow().isoformat(),
+        services={
+            "database": database_status,
+            "search_engine": search_status,
+            "cache": "healthy" if cache_hit_rate > 0 else "degraded",
+        },
+        metrics={
+            "cache_hit_rate": cache_hit_rate,
+            "uptime_seconds": uptime_seconds,
+        },
         database=database_status,
         search_engine=search_status,
         cache_hit_rate=cache_hit_rate,

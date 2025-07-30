@@ -10,6 +10,7 @@ from .base import (
     ListResponse,
     PaginationParams,
     ResourceResponse,
+    ResponseBuilder,
     SortParams,
     check_etag,
     get_etag,
@@ -27,6 +28,17 @@ from .query import (
     BulkOperationBuilder,
     QueryOptimizer,
 )
+from .dependencies import (
+    get_fields,
+    get_pagination,
+    get_sort,
+)
+from .responses import (
+    StreamResponse,
+    ProgressResponse,
+    CompleteResponse,
+    ValidationErrorResponse,
+)
 
 __all__ = [
     # Base
@@ -37,6 +49,7 @@ __all__ = [
     "FieldSelection",
     "ListResponse",
     "ResourceResponse",
+    "ResponseBuilder",
     "BatchRequest",
     "BatchResponse",
     "BaseRepository",
@@ -53,4 +66,13 @@ __all__ = [
     "AggregationBuilder",
     "BulkOperationBuilder",
     "QueryOptimizer",
+    # Dependencies
+    "get_fields",
+    "get_pagination", 
+    "get_sort",
+    # Extended Responses
+    "StreamResponse",
+    "ProgressResponse",
+    "CompleteResponse",
+    "ValidationErrorResponse",
 ]

@@ -4,10 +4,10 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from ...ai import get_openai_connector
-from ...ai.synthesis_functions import generate_facts
-from ...models import Fact, Word
-from ..core import (
+from ....ai import get_openai_connector
+from ....ai.synthesis_functions import generate_facts
+from ....models import Definition, Fact, Word
+from ...core import (
     FieldSelection,
     ListResponse,
     PaginationParams,
@@ -15,9 +15,12 @@ from ..core import (
     SortParams,
     check_etag,
     get_etag,
+    get_fields,
+    get_pagination,
+    get_sort,
 )
-from ..middleware.rate_limiting import ai_limiter, get_client_key
-from ..repositories.fact_repository import (
+from ...middleware.rate_limiting import ai_limiter, get_client_key
+from ...repositories.fact_repository import (
     FactCreate,
     FactFilter,
     FactRepository,
@@ -35,31 +38,13 @@ def get_fact_repo() -> FactRepository:
     return FactRepository()
 
 
-def get_pagination(
-    offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=100)
-) -> PaginationParams:
-    """Get pagination parameters from query."""
-    return PaginationParams(offset=offset, limit=limit)
-
-
-def get_sort(
-    sort_by: str | None = Query(None), sort_order: str = Query("asc", pattern="^(asc|desc)$")
-) -> SortParams:
-    """Get sort parameters from query."""
-    return SortParams(sort_by=sort_by, sort_order=sort_order)
-
-
-def get_fields(
-    include: str | None = Query(None),
-    exclude: str | None = Query(None),
-    expand: str | None = Query(None),
-) -> FieldSelection:
-    """Get field selection from query."""
-    return FieldSelection(
-        include=set(include.split(",")) if include else None,
-        exclude=set(exclude.split(",")) if exclude else None,
-        expand=set(expand.split(",")) if expand else None,
-    )
+class FactQueryParams(BaseModel):
+    """Query parameters for listing facts."""
+    
+    word_id: str | None = Field(None, description="Filter by word ID")
+    category: str | None = Field(None, description="Filter by category")
+    has_source: bool | None = Field(None, description="Filter by source presence")
+    confidence_score_min: float | None = Field(None, ge=0, le=1, description="Minimum confidence score")
 
 
 class FactGenerationRequest(BaseModel):
@@ -80,25 +65,21 @@ async def list_facts(
     pagination: PaginationParams = Depends(get_pagination),
     sort: SortParams = Depends(get_sort),
     fields: FieldSelection = Depends(get_fields),
-    # Filter parameters
-    word_id: str | None = Query(None),
-    category: str | None = Query(None),
-    has_source: bool | None = Query(None),
-    confidence_score_min: float | None = Query(None, ge=0, le=1),
+    params: FactQueryParams = Depends(),
 ) -> ListResponse[Fact]:
     """List facts with filtering and pagination."""
     # Validate category if provided
-    if category and category not in ALLOWED_CATEGORIES:
+    if params.category and params.category not in ALLOWED_CATEGORIES:
         raise HTTPException(
             400, f"Invalid category. Allowed categories: {', '.join(sorted(ALLOWED_CATEGORIES))}"
         )
 
     # Build filter
     filter_params = FactFilter(
-        word_id=word_id,
-        category=category,
-        has_source=has_source,
-        confidence_score_min=confidence_score_min,
+        word_id=params.word_id,
+        category=params.category,
+        has_source=params.has_source,
+        confidence_score_min=params.confidence_score_min,
     )
 
     # Get data
@@ -247,7 +228,6 @@ async def generate_facts_for_word(
     ai = get_openai_connector()
 
     # Get definitions for the word
-    from ...models import Definition
     definitions = await Definition.find(Definition.word_id == str(word.id)).to_list()
     
     # Generate facts

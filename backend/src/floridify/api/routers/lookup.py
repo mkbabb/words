@@ -18,44 +18,17 @@ from ...caching import cached_api_call_with_dedup
 from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, lookup_state_tracker
-from ...models import AudioMedia, Definition, Example, ImageMedia, Pronunciation, ProviderData, Word
+from ...models import Definition, ImageMedia, Word
 from ...utils.logging import get_logger
 from ...utils.sanitization import validate_word_input
-from .common import PipelineMetrics
+from ..services.loaders import DefinitionLoader, PronunciationLoader
 
 logger = get_logger(__name__)
 router = APIRouter()
 
 
-async def load_pronunciation_with_audio(pronunciation_id: str) -> dict[str, Any] | None:
-    """Load pronunciation with audio file information."""
-    if not pronunciation_id:
-        return None
-
-    pronunciation = await Pronunciation.get(pronunciation_id)
-    if not pronunciation:
-        return None
-
-    # Convert to dict and add audio files
-    pron_dict = pronunciation.model_dump(exclude={"id"})
-
-    # Load audio files if any
-    if pronunciation.audio_file_ids:
-        audio_files = []
-        for audio_id in pronunciation.audio_file_ids:
-            audio = await AudioMedia.get(audio_id)
-            if audio:
-                audio_dict = audio.model_dump(exclude={"id"})
-                # Convert file path to API URL
-                if audio_dict.get("url", "").startswith("/"):
-                    # Local file path - convert to API URL
-                    audio_dict["url"] = f"/api/v1/audio/files/{audio_id}"
-                audio_files.append(audio_dict)
-        pron_dict["audio_files"] = audio_files
-    else:
-        pron_dict["audio_files"] = []
-
-    return pron_dict
+# Use the centralized loader service instead of duplicating logic
+# The PronunciationLoader is imported from services.loaders above
 
 
 # Models specific to lookup endpoints
@@ -124,9 +97,6 @@ class LookupResponse(BaseModel):
         None, description="Etymology information"
     )
     last_updated: datetime = Field(..., description="When this entry was last updated")
-    pipeline_metrics: PipelineMetrics | None = Field(
-        None, description="Pipeline execution metrics (optional)"
-    )
     model_info: dict[str, Any] | None = Field(
         None, description="AI model information (null for non-AI entries)"
     )
@@ -209,79 +179,30 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
     if not entry:
         return None
 
-    # Load definitions from IDs and create DefinitionResponse objects
+    # Load definitions using the centralized loader
     definitions = []
     if entry.definition_ids:
-        # Load all provider data for this entry
-        all_providers_data = []
-        if entry.source_provider_data_ids:
-            for provider_id in entry.source_provider_data_ids:
-                provider_data = await ProviderData.get(provider_id)
-                if provider_data:
-                    all_providers_data.append(provider_data)
-
+        # Load definitions with all relations
         for def_id in entry.definition_ids:
             definition = await Definition.get(def_id)
             if definition:
-                # Load examples
-                examples = []
-                if definition.example_ids:
-                    for example_id in definition.example_ids:
-                        example = await Example.get(example_id)
-                        if example:
-                            example_dict = example.model_dump(mode='json')
-                            examples.append(example_dict)
-                
-                # Load images
-                images = []
-                if definition.image_ids:
-                    for image_id in definition.image_ids:
-                        image = await ImageMedia.get(image_id)
-                        if image:
-                            image_dict = image.model_dump(mode='json', exclude={'data'})
-                            images.append(image_dict)
-
-                # Create DefinitionResponse
-                def_response = DefinitionResponse(
-                    id=str(definition.id),
-                    created_at=definition.created_at,
-                    updated_at=definition.updated_at,
-                    version=definition.version,
-                    part_of_speech=definition.part_of_speech,
-                    text=definition.text,
-                    meaning_cluster=(
-                        definition.meaning_cluster.model_dump()
-                        if definition.meaning_cluster
-                        else None
-                    ),
-                    sense_number=definition.sense_number,
-                    word_forms=[wf.model_dump() for wf in definition.word_forms],
-                    examples=examples,
-                    images=images,
-                    synonyms=definition.synonyms,
-                    antonyms=definition.antonyms,
-                    language_register=definition.language_register,
-                    domain=definition.domain,
-                    region=definition.region,
-                    usage_notes=[un.model_dump() for un in definition.usage_notes],
-                    grammar_patterns=[
-                        gp.model_dump() for gp in definition.grammar_patterns
-                    ],
-                    collocations=[c.model_dump() for c in definition.collocations],
-                    transitivity=definition.transitivity,
-                    cefr_level=definition.cefr_level,
-                    frequency_band=definition.frequency_band,
-                    providers_data=[
-                        pd.model_dump(exclude={"id"}) for pd in all_providers_data
-                    ],  # Convert to dict
+                # Use the loader to get fully resolved definition
+                def_dict = await DefinitionLoader.load_with_relations(
+                    definition=definition,
+                    include_examples=True,
+                    include_images=True,
+                    include_provider_data=True,
+                    provider_data_ids=entry.source_provider_data_ids,
                 )
-
+                
+                # Create DefinitionResponse from the loaded data
+                def_response = DefinitionResponse(**def_dict)
                 definitions.append(def_response)
 
-    # Load pronunciation with audio files
+    # Load pronunciation with audio files using the service
     pronunciation = None
     if entry.pronunciation_id is not None:
-        pronunciation = await load_pronunciation_with_audio(entry.pronunciation_id)
+        pronunciation = await PronunciationLoader.load_with_audio(entry.pronunciation_id)
 
     # Load word
     word_obj = await Word.get(entry.word_id)
@@ -302,7 +223,6 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
         definitions=definitions,
         etymology=entry.etymology.model_dump() if entry.etymology else None,
         last_updated=entry.updated_at,  # Use updated_at from BaseMetadata
-        pipeline_metrics=None,
         model_info=entry.model_info.model_dump() if entry.model_info else None,
         synth_entry_id=str(entry.id),
         images=synth_images,  # Images attached to synth entry
@@ -451,79 +371,30 @@ async def _lookup_with_tracking(
         await lookup_state_tracker.update_complete(message="Word not found")
         return None
 
-    # Load definitions from IDs and create DefinitionResponse objects
+    # Load definitions using the centralized loader
     definitions = []
     if entry.definition_ids:
-        # Load all provider data for this entry
-        all_providers_data = []
-        if entry.source_provider_data_ids:
-            for provider_id in entry.source_provider_data_ids:
-                provider_data = await ProviderData.get(provider_id)
-                if provider_data:
-                    all_providers_data.append(provider_data)
-
+        # Load definitions with all relations
         for def_id in entry.definition_ids:
             definition = await Definition.get(def_id)
             if definition:
-                # Load examples
-                examples = []
-                if definition.example_ids:
-                    for example_id in definition.example_ids:
-                        example = await Example.get(example_id)
-                        if example:
-                            example_dict = example.model_dump(mode='json')
-                            examples.append(example_dict)
-                
-                # Load images
-                images = []
-                if definition.image_ids:
-                    for image_id in definition.image_ids:
-                        image = await ImageMedia.get(image_id)
-                        if image:
-                            image_dict = image.model_dump(mode='json', exclude={'data'})
-                            images.append(image_dict)
-
-                # Create DefinitionResponse
-                def_response = DefinitionResponse(
-                    id=str(definition.id),
-                    created_at=definition.created_at,
-                    updated_at=definition.updated_at,
-                    version=definition.version,
-                    part_of_speech=definition.part_of_speech,
-                    text=definition.text,
-                    meaning_cluster=(
-                        definition.meaning_cluster.model_dump()
-                        if definition.meaning_cluster
-                        else None
-                    ),
-                    sense_number=definition.sense_number,
-                    word_forms=[wf.model_dump() for wf in definition.word_forms],
-                    examples=examples,
-                    images=images,
-                    synonyms=definition.synonyms,
-                    antonyms=definition.antonyms,
-                    language_register=definition.language_register,
-                    domain=definition.domain,
-                    region=definition.region,
-                    usage_notes=[un.model_dump() for un in definition.usage_notes],
-                    grammar_patterns=[
-                        gp.model_dump() for gp in definition.grammar_patterns
-                    ],
-                    collocations=[c.model_dump() for c in definition.collocations],
-                    transitivity=definition.transitivity,
-                    cefr_level=definition.cefr_level,
-                    frequency_band=definition.frequency_band,
-                    providers_data=[
-                        pd.model_dump(exclude={"id"}) for pd in all_providers_data
-                    ],  # Convert to dict
+                # Use the loader to get fully resolved definition
+                def_dict = await DefinitionLoader.load_with_relations(
+                    definition=definition,
+                    include_examples=True,
+                    include_images=True,
+                    include_provider_data=True,
+                    provider_data_ids=entry.source_provider_data_ids,
                 )
-
+                
+                # Create DefinitionResponse from the loaded data
+                def_response = DefinitionResponse(**def_dict)
                 definitions.append(def_response)
 
     # Load pronunciation with audio files
     pronunciation = None
     if entry.pronunciation_id:
-        pronunciation = await load_pronunciation_with_audio(entry.pronunciation_id)
+        pronunciation = await PronunciationLoader.load_with_audio(entry.pronunciation_id)
 
     # Load word
     word_obj = await Word.get(entry.word_id)
@@ -545,7 +416,6 @@ async def _lookup_with_tracking(
         definitions=definitions,
         etymology=entry.etymology.model_dump() if entry.etymology else None,
         last_updated=entry.updated_at,  # Use updated_at from BaseMetadata
-        pipeline_metrics=None,
         model_info=entry.model_info.model_dump() if entry.model_info else None,
         synth_entry_id=str(entry.id),
         images=synth_images,  # Include images

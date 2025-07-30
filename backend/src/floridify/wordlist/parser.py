@@ -6,7 +6,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-import coolname  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 
 from ..utils.logging import get_logger
@@ -49,20 +48,6 @@ def parse_file(file_path: Path) -> ParsedWordList:
     return ParsedWordList(words=words, metadata=metadata, source_file=str(file_path))
 
 
-def generate_name(words: list[str]) -> str:
-    """Generate a human-readable animal phrase name."""
-    try:
-        # Generate a cool name with adjective + animal format
-        name: str = coolname.generate_slug(2)  # 2 words: adjective-animal
-        logger.debug(f"Generated name: {name}")
-        return name
-    except Exception as e:
-        logger.warning(f"Failed to generate cool name: {e}")
-        # Fallback to hash-based name
-        from .models import WordList
-
-        hash_id = WordList.generate_hash(words)
-        return f"wordlist-{hash_id}"
 
 
 def _extract_words(content: str) -> list[str]:

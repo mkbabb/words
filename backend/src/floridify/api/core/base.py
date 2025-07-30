@@ -260,6 +260,100 @@ def check_etag(request: Request, etag: str) -> bool:
     return client_etag == etag
 
 
+# Response building utilities
+class ResponseBuilder:
+    """Utility class for building consistent API responses."""
+    
+    @staticmethod
+    def build_resource_response(
+        data: Any,
+        resource_type: str,
+        resource_id: str | None = None,
+        version: int | None = None,
+        updated_at: datetime | None = None,
+        additional_links: dict[str, str] | None = None,
+        additional_metadata: dict[str, Any] | None = None,
+    ) -> ResourceResponse:
+        """Build a standardized resource response."""
+        # Extract ID if not provided
+        if resource_id is None and hasattr(data, 'id'):
+            resource_id = str(data.id)
+        elif resource_id is None and isinstance(data, dict) and 'id' in data:
+            resource_id = str(data['id'])
+            
+        # Build links
+        links = {
+            "self": f"/{resource_type}s/{resource_id}" if resource_id else f"/{resource_type}s",
+        }
+        if additional_links:
+            links.update(additional_links)
+            
+        # Build metadata
+        metadata = {}
+        if version is not None:
+            metadata["version"] = version
+        if updated_at is not None:
+            metadata["last_modified"] = updated_at.isoformat() if hasattr(updated_at, 'isoformat') else str(updated_at)
+        if additional_metadata:
+            metadata.update(additional_metadata)
+            
+        # Convert data to dict if it's a Pydantic model
+        response_data = data.model_dump(mode='json') if hasattr(data, 'model_dump') else data
+            
+        return ResourceResponse(
+            data=response_data,
+            metadata=metadata if metadata else None,
+            links=links,
+        )
+    
+    @staticmethod
+    def build_list_response(
+        items: list[Any],
+        total: int,
+        pagination: PaginationParams,
+        resource_type: str | None = None,
+        additional_metadata: dict[str, Any] | None = None,
+    ) -> ListResponse:
+        """Build a standardized list response."""
+        # Convert items to dicts if they're Pydantic models
+        serialized_items = [
+            item.model_dump(mode='json') if hasattr(item, 'model_dump') else item
+            for item in items
+        ]
+        
+        response = ListResponse(
+            items=serialized_items,
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
+        )
+        
+        # Add resource type to metadata if provided
+        if resource_type and additional_metadata:
+            additional_metadata["resource_type"] = resource_type
+        elif resource_type:
+            additional_metadata = {"resource_type": resource_type}
+            
+        return response
+    
+    @staticmethod
+    def apply_etag(
+        response: Response,
+        data: Any,
+        request: Request,
+    ) -> bool:
+        """Apply ETag to response and check for Not Modified.
+        
+        Returns:
+            True if the client has the latest version (304 Not Modified should be sent)
+            False if the response should be sent normally
+        """
+        etag = get_etag(data)
+        response.headers["ETag"] = etag
+        
+        return check_etag(request, etag)
+
+
 # Dependency injection helpers for FastAPI
 def get_pagination() -> PaginationParams:
     """Get pagination parameters from query params."""

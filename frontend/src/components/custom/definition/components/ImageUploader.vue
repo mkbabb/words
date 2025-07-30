@@ -55,9 +55,11 @@ import { ref, computed } from 'vue';
 import { CameraIcon, LoaderIcon } from 'lucide-vue-next';
 import { useToast } from '@/components/ui/toast/use-toast';
 import type { ImageMedia } from '@/types/api';
+import { imageApi } from '@/utils/api';
 
 interface ImageUploaderProps {
     synthEntryId?: string;
+    definitionId?: string;
     size?: 'sm' | 'lg';
     variant?: 'icon' | 'empty';
     showProgress?: boolean;
@@ -112,10 +114,12 @@ const handleFileSelect = async (event: Event) => {
     const files = input.files;
     
     if (!files || files.length === 0) return;
-    if (!props.synthEntryId) {
+    
+    // We need either synthEntryId or definitionId
+    if (!props.synthEntryId && !props.definitionId) {
         toast({
             title: "Error",
-            description: "No entry ID provided for image upload",
+            description: "No ID provided for image upload",
             variant: "destructive",
         });
         return;
@@ -204,38 +208,25 @@ const handleFileSelect = async (event: Event) => {
 };
 
 const uploadSingleFile = async (file: File): Promise<ImageMedia> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('alt_text', file.name.replace(/\.[^/.]+$/, "")); // Remove extension for alt text
+    try {
+        // First upload the image
+        const uploadedImage = await imageApi.uploadImage(file, {
+            alt_text: file.name.replace(/\.[^/.]+$/, ""), // Remove extension for alt text
+        });
 
-    // Use fetch with progress tracking if possible
-    const response = await fetch(`/api/v1/synth-entries/${props.synthEntryId}/images/upload`, {
-        method: 'POST',
-        body: formData,
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Upload failed: ${response.status} ${errorText}`);
+        // Then bind it to the definition if we have a definitionId
+        if (props.definitionId) {
+            await imageApi.bindImageToDefinition(props.definitionId, uploadedImage.id);
+        }
+        
+        // For synth entries, we'll need to handle this differently
+        // For now, just return the uploaded image
+        return uploadedImage;
+        
+    } catch (error) {
+        console.error('Upload error:', error);
+        throw error;
     }
-
-    const result = await response.json();
-    
-    // The backend should return the updated entry with new images
-    // For now, we'll construct the ImageMedia object from the response
-    return {
-        id: result.data.image_id || result.image_id,
-        url: `/api/v1/images/${result.data.image_id || result.image_id}/content`,
-        format: file.type.split('/')[1] || 'unknown',
-        size_bytes: file.size,
-        width: 0, // Will need to be determined by backend
-        height: 0, // Will need to be determined by backend
-        alt_text: formData.get('alt_text') as string || 'Uploaded image',
-        description: undefined,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        version: 1,
-    };
 };
 </script>
 

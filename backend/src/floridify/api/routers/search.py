@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -15,8 +15,24 @@ from ...search.constants import SearchMethod
 from ...search.language import get_language_search
 from ...utils.logging import get_logger
 
+T = TypeVar("T")
+
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+class SearchResultResponse(BaseModel, Generic[T]):
+    """Response for search operations with scoring and metadata."""
+    
+    query: str = Field(..., description="Original search query")
+    results: list[T] = Field(..., description="Search results")
+    total_found: int = Field(..., description="Total number of matches")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Search metadata")
+    
+    @property
+    def has_results(self) -> bool:
+        """Check if search returned any results."""
+        return len(self.results) > 0
 
 
 class SearchParams(BaseModel):
@@ -36,12 +52,9 @@ class SearchResponseItem(BaseModel):
     is_phrase: bool = Field(default=False, description="Is multi-word phrase")
 
 
-class SearchResponse(BaseModel):
-    """Response for search query."""
-
-    query: str = Field(..., description="Original search query")
-    results: list[SearchResponseItem] = Field(default_factory=list, description="Search results")
-    total_found: int = Field(..., description="Total number of matches found")
+class SearchResponse(SearchResultResponse[SearchResponseItem]):
+    """Response for search query with language metadata."""
+    
     language: Language = Field(..., description="Language searched")
 
 

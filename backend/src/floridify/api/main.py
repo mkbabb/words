@@ -28,10 +28,11 @@ from .routers import (
     lookup,
     search,
     suggestions,
-    synth_entries,
     word_of_the_day,
     words,
     wordlists,
+    wordlist_words,
+    wordlist_reviews,
 )
 
 # Configure logging for the application
@@ -101,25 +102,26 @@ app.add_middleware(LoggingMiddleware)
 API_V1_PREFIX = "/api/v1"
 
 # Include routers with versioned API prefix
-app.include_router(lookup.router, prefix=API_V1_PREFIX, tags=["lookup"])
-app.include_router(search.router, prefix=API_V1_PREFIX, tags=["search"])
-app.include_router(corpus.router, prefix=API_V1_PREFIX, tags=["corpus"])
+app.include_router(lookup, prefix=API_V1_PREFIX, tags=["lookup"])
+app.include_router(search, prefix=API_V1_PREFIX, tags=["search"])
+app.include_router(corpus, prefix=API_V1_PREFIX, tags=["corpus"])
 # Old synonyms endpoint removed - now handled by /ai/synthesize/synonyms
-app.include_router(suggestions.router, prefix=API_V1_PREFIX, tags=["suggestions"])
-app.include_router(ai.router, prefix=API_V1_PREFIX, tags=["ai"])
-app.include_router(facts.router, prefix=API_V1_PREFIX, tags=["facts"])
-app.include_router(definitions.router, prefix=f"{API_V1_PREFIX}/definitions", tags=["definitions"])
-app.include_router(examples.router, prefix=API_V1_PREFIX, tags=["examples"])
-app.include_router(batch.router, prefix=f"{API_V1_PREFIX}/batch", tags=["batch"])
-app.include_router(words.router, prefix=f"{API_V1_PREFIX}/words", tags=["words"])
-app.include_router(wordlists.router, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
-app.include_router(word_of_the_day.router, prefix=f"{API_V1_PREFIX}/word-of-day", tags=["word-of-day"])
-app.include_router(audio.router, prefix=API_V1_PREFIX, tags=["audio"])
-app.include_router(images.router, prefix=f"{API_V1_PREFIX}/images", tags=["images"])
-app.include_router(synth_entries.router, prefix=f"{API_V1_PREFIX}/synth-entries", tags=["synth-entries"])
+app.include_router(suggestions, prefix=API_V1_PREFIX, tags=["suggestions"])
+app.include_router(ai, prefix=API_V1_PREFIX, tags=["ai"])
+app.include_router(facts, prefix=API_V1_PREFIX, tags=["facts"])
+app.include_router(definitions, prefix=f"{API_V1_PREFIX}/definitions", tags=["definitions"])
+app.include_router(examples, prefix=API_V1_PREFIX, tags=["examples"])
+app.include_router(batch, prefix=f"{API_V1_PREFIX}/batch", tags=["batch"])
+app.include_router(words, prefix=f"{API_V1_PREFIX}/words", tags=["words"])
+app.include_router(wordlists, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
+app.include_router(wordlist_words, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-words"])
+app.include_router(wordlist_reviews, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-reviews"])
+app.include_router(word_of_the_day, prefix=f"{API_V1_PREFIX}/word-of-day", tags=["word-of-day"])
+app.include_router(audio, prefix=API_V1_PREFIX, tags=["audio"])
+app.include_router(images, prefix=f"{API_V1_PREFIX}/images", tags=["images"])
 
 # Health check remains at root for monitoring
-app.include_router(health.router, prefix="", tags=["health"])
+app.include_router(health, prefix="", tags=["health"])
 
 
 @app.get("/api")

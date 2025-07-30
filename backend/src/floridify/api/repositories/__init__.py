@@ -1,5 +1,6 @@
 """Repository implementations for data models."""
 
+from .audio_repository import AudioCreate, AudioFilter, AudioRepository, AudioUpdate
 from .definition_repository import (
     DefinitionCreate,
     DefinitionFilter,
@@ -13,6 +14,7 @@ from .example_repository import (
     ExampleUpdate,
 )
 from .fact_repository import FactCreate, FactFilter, FactRepository, FactUpdate
+from .image_repository import ImageCreate, ImageFilter, ImageRepository, ImageUpdate
 from .synthesis_repository import (
     ComponentStatus,
     SynthesisCreate,
@@ -68,4 +70,12 @@ __all__ = [
     "CorpusRepository",
     "CorpusCreate", 
     "CorpusSearchParams",
+    "ImageRepository",
+    "ImageCreate",
+    "ImageUpdate",
+    "ImageFilter",
+    "AudioRepository",
+    "AudioCreate",
+    "AudioUpdate",
+    "AudioFilter",
 ]

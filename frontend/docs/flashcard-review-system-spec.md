@@ -67,16 +67,21 @@ enum CardState {
   RELEARNING = 'relearning' // Failed review, back to learning
 }
 
+// ReviewData is stored within WordListItem in the backend
 interface ReviewData {
   state: CardState;
   due: Date;
-  interval: number;
-  easeFactor: number;
-  repetitions: number;
-  lapses: number;
+  interval: number;      // Days until next review
+  easeFactor: number;    // Difficulty multiplier (1.3-2.5)
+  repetitions: number;   // Successful review count
+  lapses: number;       // Failed review count
   lastReview?: Date;
-  learningStep: number;
+  learningStep: number; // Current position in learning steps
 }
+
+// Note: Review data is persisted as part of WordListItem model,
+// not as separate card entities. Each word in a wordlist maintains
+// its own review state specific to that list.
 ```
 
 ### 4. UI Components
@@ -157,20 +162,30 @@ Session progress tracking:
 ### 8. Data Flow
 
 ```typescript
-// Review session flow
-const startReviewSession = (wordlistId: string, options: ReviewOptions) => {
-  const dueCards = getDueCards(wordlistId);
-  return new ReviewSession(dueCards, options);
+// Review session flow using API endpoints
+const startReviewSession = async (wordlistId: string, options: ReviewOptions) => {
+  const response = await api.post(`/wordlists/${wordlistId}/review-sessions`, options);
+  return response.data;
 };
 
-const handleResponse = (quality: Quality, card: Card) => {
-  const newReviewData = calculateNextReview(card.reviewData, quality);
-  updateCard(card.id, { reviewData: newReviewData });
-  advanceToNextCard();
+const getNextCard = async (wordlistId: string, sessionId: string) => {
+  const response = await api.get(`/wordlists/${wordlistId}/review-sessions/${sessionId}/next-card`);
+  return response.data;
 };
 
+const submitResponse = async (wordlistId: string, sessionId: string, quality: Quality, word: string) => {
+  const response = await api.post(`/wordlists/${wordlistId}/review-sessions/${sessionId}/response`, {
+    word,
+    quality,
+    responseTime: calculateResponseTime()
+  });
+  return response.data; // Returns updated review data
+};
+
+// Client-side algorithm reference (server handles actual calculation)
 const calculateNextReview = (current: ReviewData, quality: Quality): ReviewData => {
-  // Implement Anki algorithm
+  // Algorithm is implemented server-side for consistency
+  // This is just for reference/documentation
   switch (current.state) {
     case CardState.NEW:
     case CardState.LEARNING:
@@ -287,19 +302,70 @@ interface AlgorithmSettings {
 - Theme consistency
 
 #### API Endpoints
+
+Following the existing API patterns in the codebase, all endpoints are centered around wordlists:
+
 ```typescript
-// Review session management
-POST /api/v1/review-sessions
-GET /api/v1/review-sessions/{id}
-PUT /api/v1/review-sessions/{id}/response
+// Review Session Management
+POST   /api/v1/wordlists/{wordlist_id}/review-sessions
+GET    /api/v1/wordlists/{wordlist_id}/review-sessions/current
+GET    /api/v1/wordlists/{wordlist_id}/review-sessions/{session_id}
+PUT    /api/v1/wordlists/{wordlist_id}/review-sessions/{session_id}/complete
 
-// Card data updates
-PUT /api/v1/words/{id}/review-data
-GET /api/v1/wordlists/{id}/due-cards
+// Card Reviews (within sessions)
+GET    /api/v1/wordlists/{wordlist_id}/review-sessions/{session_id}/next-card
+POST   /api/v1/wordlists/{wordlist_id}/review-sessions/{session_id}/response
+POST   /api/v1/wordlists/{wordlist_id}/review-sessions/{session_id}/undo
 
-// Statistics
-GET /api/v1/wordlists/{id}/stats
-GET /api/v1/users/review-stats
+// Due Cards & Statistics
+GET    /api/v1/wordlists/{wordlist_id}/due-cards
+GET    /api/v1/wordlists/{wordlist_id}/review-stats
+GET    /api/v1/wordlists/{wordlist_id}/words/{word}/review-data
+
+// Review Settings
+GET    /api/v1/wordlists/{wordlist_id}/review-settings
+PUT    /api/v1/wordlists/{wordlist_id}/review-settings
+```
+
+##### Request/Response Examples
+
+**Start Review Session**
+```typescript
+POST /api/v1/wordlists/{wordlist_id}/review-sessions
+{
+  "mode": "mixed",
+  "maxCards": 50,
+  "newCardLimit": 10,
+  "includeOverdue": true
+}
+
+Response:
+{
+  "id": "session-123",
+  "wordlistId": "wordlist-456",
+  "totalCards": 25,
+  "completedCards": 0,
+  "startedAt": "2025-01-29T10:00:00Z",
+  "settings": { ... }
+}
+```
+
+**Submit Review Response**
+```typescript
+POST /api/v1/wordlists/{wordlist_id}/review-sessions/{session_id}/response
+{
+  "word": "effulgent",
+  "quality": 2,  // 0=Again, 1=Hard, 2=Good, 3=Easy
+  "responseTime": 3.5
+}
+
+Response:
+{
+  "nextReview": "2025-01-30T10:00:00Z",
+  "interval": 1,
+  "easeFactor": 2.4,
+  "repetitions": 1
+}
 ```
 
 This specification provides a comprehensive foundation for implementing a world-class flashcard review system that enhances vocabulary learning through proven spaced repetition techniques while maintaining our commitment to beautiful, intuitive design.

@@ -15,6 +15,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+class BatchOperationResponse(BaseModel):
+    """Response for batch operations with per-item results."""
+    
+    results: list[dict[str, Any]] = Field(..., description="Individual operation results")
+    summary: dict[str, int] = Field(..., description="Operation summary statistics")
+    errors: list[dict[str, Any]] = Field(default_factory=list, description="List of errors")
+    
+    @property
+    def successful_count(self) -> int:
+        """Count of successful operations."""
+        return self.summary.get("successful", 0)
+    
+    @property
+    def failed_count(self) -> int:
+        """Count of failed operations."""
+        return self.summary.get("failed", 0)
+    
+    @property
+    def total_count(self) -> int:
+        """Total number of operations."""
+        return self.summary.get("total", len(self.results))
+
+
 class BatchOperation(BaseModel):
     """Single operation in a batch request."""
 
@@ -43,11 +66,9 @@ class BatchResult(BaseModel):
     error: str | None = None
 
 
-class BatchResponse(BaseModel):
-    """Response from batch operations."""
-
-    results: list[BatchResult]
-    summary: dict[str, int]
+class BatchResponse(BatchOperationResponse):
+    """Response from batch operations with detailed results."""
+    pass  # Use all fields from BatchOperationResponse
 
 
 class BatchLookupRequest(BaseModel):
@@ -59,18 +80,6 @@ class BatchLookupRequest(BaseModel):
     force_refresh: bool = False
 
 
-class BatchDefinitionUpdate(BaseModel):
-    """Batch definition update."""
-
-    word: str
-    index: int
-    updates: dict[str, Any]
-
-
-class BatchDefinitionUpdateRequest(BaseModel):
-    """Request for batch definition updates."""
-
-    updates: list[BatchDefinitionUpdate] = Field(min_length=1, max_length=100)
 
 
 @router.post("/lookup")
@@ -117,80 +126,6 @@ async def batch_lookup(request: BatchLookupRequest) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/definitions/update")
-async def batch_update_definitions(request: BatchDefinitionUpdateRequest) -> dict[str, Any]:
-    """Batch update multiple definitions."""
-    try:
-        results = []
-
-        for update in request.updates:
-            try:
-                # Get entry
-                from ...storage.mongodb import get_synthesized_entry
-
-                entry = await get_synthesized_entry(update.word)
-                if not entry:
-                    results.append(
-                        {
-                            "word": update.word,
-                            "index": update.index,
-                            "status": "error",
-                            "error": "Word not found",
-                        }
-                    )
-                    continue
-
-                # Validate index
-                if update.index >= len(entry.definitions):
-                    results.append(
-                        {
-                            "word": update.word,
-                            "index": update.index,
-                            "status": "error",
-                            "error": "Index out of range",
-                        }
-                    )
-                    continue
-
-                # Apply updates
-                definition = entry.definitions[update.index]
-                for field, value in update.updates.items():
-                    if hasattr(definition, field):
-                        setattr(definition, field, value)
-
-                # Save
-                from ...storage.mongodb import save_synthesized_entry
-
-                await save_synthesized_entry(entry)
-
-                results.append(
-                    {
-                        "word": update.word,
-                        "index": update.index,
-                        "status": "success",
-                        "updated_fields": list(update.updates.keys()),
-                    }
-                )
-
-            except Exception as e:
-                results.append(
-                    {"word": update.word, "index": update.index, "status": "error", "error": str(e)}
-                )
-
-        successful = sum(1 for r in results if r["status"] == "success")
-
-        return {
-            "results": results,
-            "summary": {
-                "total": len(request.updates),
-                "successful": successful,
-                "failed": len(request.updates) - successful,
-            },
-        }
-
-    except Exception as e:
-        logger.error(f"Batch update error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/execute")
@@ -240,4 +175,26 @@ async def execute_batch(request: BatchRequest) -> BatchResponse:
         "failed": sum(1 for r in results if r.status >= 400),
     }
 
-    return BatchResponse(results=results, summary=summary)
+    # Convert BatchResult to dict format for BatchOperationResponse
+    result_dicts = [
+        {
+            "index": r.index,
+            "status": r.status,
+            "data": r.data,
+            "error": r.error,
+        }
+        for r in results
+    ]
+    
+    # Include errors in the response
+    errors = [
+        {"index": r.index, "error": r.error}
+        for r in results
+        if r.error
+    ]
+    
+    return BatchResponse(
+        results=result_dicts,
+        summary=summary,
+        errors=errors,
+    )

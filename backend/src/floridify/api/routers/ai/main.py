@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 from typing import Any, AsyncGenerator
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from ...ai.constants import SynthesisComponent
-from ...ai.factory import get_definition_synthesizer, get_openai_connector
-from ...utils.logging import get_logger
-from ..core import ResourceResponse
-from ..middleware.rate_limiting import ai_limiter, get_client_key
+from ....ai.constants import SynthesisComponent
+from ....ai.factory import get_definition_synthesizer, get_openai_connector
+from ....core.state_tracker import StateTracker
+from ....utils.logging import get_logger
+from ...core import ResourceResponse
+from ...middleware.rate_limiting import ai_limiter, get_client_key
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -632,11 +635,6 @@ async def suggest_words_stream(
     count: int = 12,
 ) -> StreamingResponse:
     """Generate word suggestions with streaming progress updates."""
-    import asyncio
-    import json
-
-    from ...core.state_tracker import StateTracker
-    
     # Validate count parameter
     if count < 1 or count > 25:
         raise HTTPException(400, "Count must be between 1 and 25")

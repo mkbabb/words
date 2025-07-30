@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from ...utils.logging import get_logger
 from ..repositories.corpus_repository import CorpusRepository, CorpusCreate, CorpusSearchParams
+from ..core import ListResponse, PaginationParams, get_pagination
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -21,6 +22,14 @@ router = APIRouter()
 def get_corpus_repo() -> CorpusRepository:
     """Dependency to get corpus repository."""
     return CorpusRepository()
+
+
+class CorpusSearchQueryParams(BaseModel):
+    """Query parameters for corpus search."""
+    
+    query: str = Field(..., min_length=1, description="Search query")
+    max_results: int = Field(default=20, ge=1, le=100, description="Maximum results to return")
+    min_score: float = Field(default=0.6, ge=0.0, le=1.0, description="Minimum relevance score")
 
 
 class CreateCorpusRequest(BaseModel):
@@ -61,11 +70,7 @@ class CorpusInfoResponse(BaseModel):
     last_accessed: str = Field(..., description="Last access timestamp")
 
 
-class ListCorporaResponse(BaseModel):
-    """Response model for listing corpora."""
-
-    corpora: list[CorpusInfoResponse] = Field(..., description="List of active corpora")
-    total_count: int = Field(..., description="Total number of corpora")
+# ListCorporaResponse removed - using ListResponse[CorpusInfoResponse] instead
 
 
 class CacheStatsResponse(BaseModel):
@@ -112,9 +117,7 @@ async def create_corpus(
 @router.post("/corpus/{corpus_id}/search", response_model=SearchCorpusResponse)
 async def search_corpus(
     corpus_id: str,
-    query: str = Query(..., min_length=1, description="Search query"),
-    max_results: int = Query(default=20, ge=1, le=100, description="Maximum results"),
-    min_score: float = Query(default=0.6, ge=0.0, le=1.0, description="Minimum score"),
+    params: CorpusSearchQueryParams = Depends(),
     repo: CorpusRepository = Depends(get_corpus_repo),
 ) -> SearchCorpusResponse:
     """
@@ -124,13 +127,13 @@ async def search_corpus(
     Returns error if corpus doesn't exist or has expired.
     """
     try:
-        params = CorpusSearchParams(
-            query=query,
-            max_results=max_results,
-            min_score=min_score,
+        search_params = CorpusSearchParams(
+            query=params.query,
+            max_results=params.max_results,
+            min_score=params.min_score,
         )
         
-        search_results = await repo.search(corpus_id, params)
+        search_results = await repo.search(corpus_id, search_params)
         return SearchCorpusResponse(**search_results)
 
     except ValueError as e:
@@ -165,21 +168,30 @@ async def get_corpus_info(
         raise HTTPException(status_code=500, detail="Failed to get corpus info")
 
 
-@router.get("/corpus", response_model=ListCorporaResponse)
+@router.get("/corpus", response_model=ListResponse[CorpusInfoResponse])
 async def list_corpora(
     repo: CorpusRepository = Depends(get_corpus_repo),
-) -> ListCorporaResponse:
+    pagination: PaginationParams = Depends(get_pagination),
+) -> ListResponse[CorpusInfoResponse]:
     """
-    List all active corpora.
+    List all active corpora with pagination.
 
     Returns summary of all non-expired corpora with basic metadata.
     """
     try:
         corpora_data = await repo.list_all()
         
-        return ListCorporaResponse(
-            corpora=[CorpusInfoResponse(**corpus) for corpus in corpora_data],
-            total_count=len(corpora_data),
+        # Apply pagination
+        total = len(corpora_data)
+        start = pagination.offset
+        end = start + pagination.limit
+        paginated_data = corpora_data[start:end]
+        
+        return ListResponse(
+            items=[CorpusInfoResponse(**corpus) for corpus in paginated_data],
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
         )
 
     except Exception as e:
@@ -187,7 +199,7 @@ async def list_corpora(
         raise HTTPException(status_code=500, detail="Failed to list corpora")
 
 
-@router.get("/corpus-stats", response_model=CacheStatsResponse)
+@router.get("/corpus/stats", response_model=CacheStatsResponse)
 async def get_cache_stats(
     repo: CorpusRepository = Depends(get_corpus_repo),
 ) -> CacheStatsResponse:

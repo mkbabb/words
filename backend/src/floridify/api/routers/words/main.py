@@ -4,21 +4,27 @@ from datetime import datetime
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import BaseModel, Field
 
-from ...constants import Language
-from ...models import Word
-from ..core import (
+from ....constants import Language
+from ....models import Word
+from ...core import (
     ErrorDetail,
     ErrorResponse,
     FieldSelection,
     ListResponse,
     PaginationParams,
     ResourceResponse,
+    ResponseBuilder,
     SortParams,
     check_etag,
     get_etag,
+    get_fields,
+    get_pagination,
+    get_sort,
 )
-from ..repositories import (
+from ...repositories import (
+    DefinitionRepository,
     WordCreate,
     WordFilter,
     WordRepository,
@@ -33,31 +39,15 @@ def get_word_repo() -> WordRepository:
     return WordRepository()
 
 
-def get_pagination(
-    offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=100)
-) -> PaginationParams:
-    """Get pagination parameters from query."""
-    return PaginationParams(offset=offset, limit=limit)
-
-
-def get_sort(
-    sort_by: str | None = Query(None), sort_order: str = Query("asc", pattern="^(asc|desc)$")
-) -> SortParams:
-    """Get sort parameters from query."""
-    return SortParams(sort_by=sort_by, sort_order=sort_order)
-
-
-def get_fields(
-    include: str | None = Query(None),
-    exclude: str | None = Query(None),
-    expand: str | None = Query(None),
-) -> FieldSelection:
-    """Get field selection from query."""
-    return FieldSelection(
-        include=set(include.split(",")) if include else None,
-        exclude=set(exclude.split(",")) if exclude else None,
-        expand=set(expand.split(",")) if expand else None,
-    )
+class WordQueryParams(BaseModel):
+    """Query parameters for listing words."""
+    
+    text: str | None = Field(None, description="Exact text match")
+    text_pattern: str | None = Field(None, description="Partial text match")
+    language: Language | None = Field(None, description="Language filter")
+    offensive_flag: bool | None = Field(None, description="Offensive content filter")
+    created_after: datetime | None = Field(None, description="Created after date")
+    created_before: datetime | None = Field(None, description="Created before date")
 
 
 @router.get("", response_model=ListResponse[Word])
@@ -66,13 +56,7 @@ async def list_words(
     pagination: PaginationParams = Depends(get_pagination),
     sort: SortParams = Depends(get_sort),
     fields: FieldSelection = Depends(get_fields),
-    # Filter parameters
-    text: str | None = Query(None),
-    text_pattern: str | None = Query(None),
-    language: Language | None = Query(None),
-    offensive_flag: bool | None = Query(None),
-    created_after: datetime | None = Query(None),
-    created_before: datetime | None = Query(None),
+    params: WordQueryParams = Depends(),
 ) -> ListResponse[Word]:
     """Retrieve paginated word list with filtering and sorting.
     
@@ -95,12 +79,12 @@ async def list_words(
     """
     # Build filter
     filter_params = WordFilter(
-        text=text,
-        text_pattern=text_pattern,
-        language=language,
-        offensive_flag=offensive_flag,
-        created_after=created_after,
-        created_before=created_before,
+        text=params.text,
+        text_pattern=params.text_pattern,
+        language=params.language,
+        offensive_flag=params.offensive_flag,
+        created_after=params.created_after,
+        created_before=params.created_before,
     )
 
     # Get data
@@ -119,12 +103,12 @@ async def list_words(
             pass
         items.append(item)
 
-    # Build response
-    return ListResponse(
-        items=items,
+    # Build response using ResponseBuilder
+    return ResponseBuilder.build_list_response(
+        items=words,  # Pass the original documents, not the dicts
         total=total,
-        offset=pagination.offset,
-        limit=pagination.limit,
+        pagination=pagination,
+        resource_type="word",
     )
 
 
@@ -170,10 +154,12 @@ async def create_word(
     # Create word
     word = await repo.create(data)
 
-    return ResourceResponse(
-        data=word.model_dump(),
-        links={
-            "self": f"/words/{word.id}",
+    return ResponseBuilder.build_resource_response(
+        data=word,
+        resource_type="word",
+        version=word.version,
+        updated_at=word.updated_at,
+        additional_links={
             "definitions": f"/words/{word.id}/definitions",
         },
     )
@@ -214,33 +200,26 @@ async def get_word(
     # Handle expansions
     if fields.expand:
         if "definitions" in fields.expand:
-            from ..repositories import DefinitionRepository
-
             def_repo = DefinitionRepository()
             definitions = await def_repo.find_by_word(str(word_id))
             word_data["definitions"] = [d.model_dump() for d in definitions]
 
     # Build response
-    response_data = ResourceResponse(
+    response_data = ResponseBuilder.build_resource_response(
         data=word_data,
-        metadata={
-            "version": word_data.get("version", 1),
-            "last_modified": word_data.get("updated_at"),
-        },
-        links={
-            "self": f"/words/{word_id}",
+        resource_type="word",
+        resource_id=str(word_id),
+        version=word_data.get("version", 1),
+        updated_at=word_data.get("updated_at"),
+        additional_links={
             "definitions": f"/words/{word_id}/definitions",
             "facts": f"/words/{word_id}/facts",
             "pronunciation": f"/words/{word_id}/pronunciation",
         },
     )
 
-    # Set ETag
-    etag = get_etag(response_data.model_dump())
-    response.headers["ETag"] = etag
-
-    # Check if Not Modified
-    if check_etag(request, etag):
+    # Apply ETag and check for Not Modified
+    if ResponseBuilder.apply_etag(response, response_data.model_dump(), request):
         return Response(status_code=304)
 
     return response_data
@@ -274,12 +253,11 @@ async def update_word(
     """
     word = await repo.update(word_id, data, version)
 
-    return ResourceResponse(
-        data=word.model_dump(),
-        metadata={
-            "version": word.version,
-            "updated_at": word.updated_at,
-        },
+    return ResponseBuilder.build_resource_response(
+        data=word,
+        resource_type="word",
+        version=word.version,
+        updated_at=word.updated_at,
     )
 
 
@@ -307,34 +285,3 @@ async def delete_word(
     await repo.delete(word_id, cascade=cascade)
 
 
-@router.get("/search/{query}", response_model=ListResponse[Word])
-
-async def search_words(
-    query: str,
-    language: Language | None = Query(None),
-    limit: int = Query(10, ge=1, le=50),
-    repo: WordRepository = Depends(get_word_repo),
-) -> ListResponse[Word]:
-    """Search words by text pattern.
-    
-    Path Parameters:
-        - query: Search query text
-    
-    Query Parameters:
-        - language: Filter by language code
-        - limit: Maximum results (default: 10, max: 50)
-    
-    Returns:
-        List of matching words with relevance ordering.
-    
-    Example:
-        GET /api/v1/words/search/test?language=en&limit=5
-    """
-    words = await repo.search(query, language, limit)
-
-    return ListResponse(
-        items=[w.model_dump() for w in words],
-        total=len(words),
-        offset=0,
-        limit=limit,
-    )

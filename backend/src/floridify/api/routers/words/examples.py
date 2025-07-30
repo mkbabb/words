@@ -6,10 +6,10 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from ...ai import get_openai_connector
-from ...ai.synthesis_functions import generate_examples
-from ...models import Definition, Example, Word
-from ..core import (
+from ....ai import get_openai_connector
+from ....ai.synthesis_functions import generate_examples
+from ....models import Definition, Example, Word
+from ...core import (
     FieldSelection,
     ListResponse,
     PaginationParams,
@@ -17,8 +17,11 @@ from ..core import (
     SortParams,
     check_etag,
     get_etag,
+    get_fields,
+    get_pagination,
+    get_sort,
 )
-from ..repositories.example_repository import (
+from ...repositories.example_repository import (
     ExampleCreate,
     ExampleFilter,
     ExampleRepository,
@@ -33,31 +36,15 @@ def get_example_repo() -> ExampleRepository:
     return ExampleRepository()
 
 
-def get_pagination(
-    offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=100)
-) -> PaginationParams:
-    """Get pagination parameters from query."""
-    return PaginationParams(offset=offset, limit=limit)
-
-
-def get_sort(
-    sort_by: str | None = Query(None), sort_order: str = Query("asc", pattern="^(asc|desc)$")
-) -> SortParams:
-    """Get sort parameters from query."""
-    return SortParams(sort_by=sort_by, sort_order=sort_order)
-
-
-def get_fields(
-    include: str | None = Query(None),
-    exclude: str | None = Query(None),
-    expand: str | None = Query(None),
-) -> FieldSelection:
-    """Get field selection from query."""
-    return FieldSelection(
-        include=set(include.split(",")) if include else None,
-        exclude=set(exclude.split(",")) if exclude else None,
-        expand=set(expand.split(",")) if expand else None,
-    )
+class ExampleQueryParams(BaseModel):
+    """Query parameters for listing examples."""
+    
+    word_id: str | None = Field(None, description="Filter by word ID")
+    definition_id: str | None = Field(None, description="Filter by definition ID")
+    is_ai_generated: bool | None = Field(None, description="Filter by AI generation status")
+    can_regenerate: bool | None = Field(None, description="Filter by regeneration capability")
+    has_literature_source: bool | None = Field(None, description="Filter by literature source presence")
+    quality_score_min: float | None = Field(None, ge=0, le=1, description="Minimum quality score")
 
 
 class ExampleGenerationRequest(BaseModel):
@@ -82,23 +69,17 @@ async def list_examples(
     pagination: PaginationParams = Depends(get_pagination),
     sort: SortParams = Depends(get_sort),
     fields: FieldSelection = Depends(get_fields),
-    # Filter parameters
-    word_id: str | None = Query(None),
-    definition_id: str | None = Query(None),
-    is_ai_generated: bool | None = Query(None),
-    can_regenerate: bool | None = Query(None),
-    has_literature_source: bool | None = Query(None),
-    quality_score_min: float | None = Query(None, ge=0, le=1),
+    params: ExampleQueryParams = Depends(),
 ) -> ListResponse[Example]:
     """List examples with filtering and pagination."""
     # Build filter
     filter_params = ExampleFilter(
-        word_id=word_id,
-        definition_id=definition_id,
-        is_ai_generated=is_ai_generated,
-        can_regenerate=can_regenerate,
-        has_literature_source=has_literature_source,
-        quality_score_min=quality_score_min,
+        word_id=params.word_id,
+        definition_id=params.definition_id,
+        is_ai_generated=params.is_ai_generated,
+        can_regenerate=params.can_regenerate,
+        has_literature_source=params.has_literature_source,
+        quality_score_min=params.quality_score_min,
     )
 
     # Get data

@@ -1,13 +1,16 @@
 """Definitions API - Comprehensive CRUD and component operations."""
 
-from typing import Any
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Callable, Union
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from PIL import Image
 from pydantic import BaseModel, Field
 
-from ...ai import get_openai_connector
-from ...ai.synthesis_functions import (
+from ....ai import get_openai_connector
+from ....ai.synthesis_functions import (
     assess_collocations,
     assess_definition_cefr,
     assess_definition_domain,
@@ -21,9 +24,9 @@ from ...ai.synthesis_functions import (
     synthesize_synonyms,
     usage_note_generation,
 )
-from ...ai.constants import SynthesisComponent
-from ...models import Definition, ImageMedia, Word
-from ..core import (
+from ....ai.constants import SynthesisComponent
+from ....models import Definition, Example, ImageMedia, Word
+from ...core import (
     ErrorDetail,
     ErrorResponse,
     FieldSelection,
@@ -33,8 +36,11 @@ from ..core import (
     SortParams,
     check_etag,
     get_etag,
+    get_fields,
+    get_pagination,
+    get_sort,
 )
-from ..repositories import (
+from ...repositories import (
     DefinitionCreate,
     DefinitionFilter,
     DefinitionRepository,
@@ -49,31 +55,16 @@ def get_definition_repo() -> DefinitionRepository:
     return DefinitionRepository()
 
 
-def get_pagination(
-    offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=100)
-) -> PaginationParams:
-    """Get pagination parameters from query."""
-    return PaginationParams(offset=offset, limit=limit)
-
-
-def get_sort(
-    sort_by: str | None = Query(None), sort_order: str = Query("asc", pattern="^(asc|desc)$")
-) -> SortParams:
-    """Get sort parameters from query."""
-    return SortParams(sort_by=sort_by, sort_order=sort_order)
-
-
-def get_fields(
-    include: str | None = Query(None),
-    exclude: str | None = Query(None),
-    expand: str | None = Query(None),
-) -> FieldSelection:
-    """Get field selection from query."""
-    return FieldSelection(
-        include=set(include.split(",")) if include else None,
-        exclude=set(exclude.split(",")) if exclude else None,
-        expand=set(expand.split(",")) if expand else None,
-    )
+class DefinitionQueryParams(BaseModel):
+    """Query parameters for listing definitions."""
+    
+    word_id: str | None = Field(None, description="Filter by word ID")
+    part_of_speech: str | None = Field(None, description="Filter by part of speech")
+    language_register: str | None = Field(None, description="Filter by register (formal/informal/neutral/slang/technical)")
+    domain: str | None = Field(None, description="Filter by domain")
+    cefr_level: str | None = Field(None, description="Filter by CEFR level")
+    frequency_band: int | None = Field(None, ge=1, le=5, description="Filter by frequency band")
+    has_examples: bool | None = Field(None, description="Filter by example presence")
 
 
 class ComponentRegenerationRequest(BaseModel):
@@ -94,11 +85,12 @@ class BatchComponentUpdate(BaseModel):
     parallel: bool = Field(True, description="Process in parallel")
 
 
-class ImageBindRequest(BaseModel):
-    """Request to bind an image to a definition."""
+class DefinitionImageUpdate(BaseModel):
+    """Request to update definition images."""
     
     image_path: str = Field(..., description="Path to the image file")
     alt_text: str | None = Field(None, description="Alternative text for accessibility")
+    action: str = Field(default="add", description="Action: add or remove")
 
 
 @router.get("", response_model=ListResponse[Definition])
@@ -107,14 +99,7 @@ async def list_definitions(
     pagination: PaginationParams = Depends(get_pagination),
     sort: SortParams = Depends(get_sort),
     fields: FieldSelection = Depends(get_fields),
-    # Filter parameters
-    word_id: str | None = Query(None),
-    part_of_speech: str | None = Query(None),
-    language_register: str | None = Query(None),
-    domain: str | None = Query(None),
-    cefr_level: str | None = Query(None),
-    frequency_band: int | None = Query(None, ge=1, le=5),
-    has_examples: bool | None = Query(None),
+    params: DefinitionQueryParams = Depends(),
 ) -> ListResponse[Definition]:
     """List definitions with advanced filtering.
     
@@ -133,13 +118,13 @@ async def list_definitions(
     """
     # Build filter
     filter_params = DefinitionFilter(
-        word_id=word_id,
-        part_of_speech=part_of_speech,
-        language_register=language_register,
-        domain=domain,
-        cefr_level=cefr_level,
-        frequency_band=frequency_band,
-        has_examples=has_examples,
+        word_id=params.word_id,
+        part_of_speech=params.part_of_speech,
+        language_register=params.language_register,
+        domain=params.domain,
+        cefr_level=params.cefr_level,
+        frequency_band=params.frequency_band,
+        has_examples=params.has_examples,
     )
 
     # Get data
@@ -290,13 +275,41 @@ async def delete_definition(
     await repo.delete(definition_id, cascade=cascade)
 
 
-@router.post("/{definition_id}/images", response_model=ResourceResponse)
+@router.patch("/{definition_id}", response_model=ResourceResponse)
+async def update_definition_partial(
+    definition_id: PydanticObjectId,
+    update: DefinitionUpdate,
+    repo: DefinitionRepository = Depends(get_definition_repo),
+    if_match: str | None = Depends(check_etag),
+) -> ResourceResponse:
+    """Partially update definition fields.
+    
+    This endpoint replaces the specific bind_image_to_definition endpoint
+    with a more generic update that can handle any field updates including images.
+    """
+    definition = await repo.update(definition_id, update, if_match=if_match)
+    
+    return ResourceResponse(
+        data=definition.model_dump(mode='json'),
+        etag=get_etag(definition),
+        metadata={"version": definition.version},
+        links={
+            "self": f"/definitions/{definition_id}",
+            "word": f"/words/{definition.word_id}",
+        },
+    )
+
+
+# Keep old endpoint for backward compatibility but mark as deprecated
+@router.post("/{definition_id}/images", response_model=ResourceResponse, deprecated=True)
 async def bind_image_to_definition(
     definition_id: PydanticObjectId,
-    request: ImageBindRequest,
+    request: DefinitionImageUpdate,
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
-    """Bind an image to a definition.
+    """[DEPRECATED] Use PATCH /definitions/{definition_id} instead.
+    
+    Bind an image to a definition.
     
     Args:
         definition_id: ID of the definition
@@ -309,7 +322,6 @@ async def bind_image_to_definition(
         404: Definition not found
         400: Invalid image path
     """
-    from pathlib import Path
     
     # Get the definition
     definition = await repo.get(definition_id, raise_on_missing=True)
@@ -334,7 +346,6 @@ async def bind_image_to_definition(
     
     # Get image metadata
     try:
-        from PIL import Image
         with Image.open(image_path) as img:
             width, height = img.size
             format = img.format.lower() if img.format else image_path.suffix[1:].lower()
@@ -416,7 +427,6 @@ async def regenerate_components(
     ai = get_openai_connector()
 
     # Map component names to functions
-    from typing import Callable, Any
     component_functions: dict[str, Callable[..., Any]] = {
         "synonyms": synthesize_synonyms,
         "antonyms": synthesize_antonyms,
@@ -449,7 +459,6 @@ async def regenerate_components(
         )
 
     # Get word for context
-    from ...models import Word
 
     word = await Word.get(definition.word_id)
     if not word:
@@ -475,7 +484,6 @@ async def regenerate_components(
     for component in request.components:
         if component == "examples":
             # Special handling for examples
-            from ...models import Example
 
             # Generate examples using AI connector
             examples_response = await ai.generate_examples(
@@ -553,8 +561,6 @@ async def batch_regenerate_components(
         Processing summary and results by word.
     """
     # Get definitions
-    from beanie import PydanticObjectId
-    from typing import Union
     definition_oids: list[Union[PydanticObjectId, str]] = [PydanticObjectId(id_str) if isinstance(id_str, str) else id_str for id_str in request.definition_ids]
     definitions = await repo.get_many(definition_oids)
 
@@ -565,7 +571,6 @@ async def batch_regenerate_components(
     ai = get_openai_connector()
 
     # Group definitions by word
-    from collections import defaultdict
 
     definitions_by_word = defaultdict(list)
     for definition in definitions:

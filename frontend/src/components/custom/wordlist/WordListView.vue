@@ -237,16 +237,29 @@ const handleReview = async (word: WordListItem, quality: number) => {
   try {
     console.log('Processing review:', word.text, 'Quality:', quality);
     
-    // Update review data using spaced repetition algorithm
-    const response = await wordlistApi.updateWordReview(word.id, {
-      quality,
-      timestamp: new Date().toISOString()
+    if (!currentWordlist.value?.id) {
+      console.error('No wordlist selected');
+      return;
+    }
+    
+    // Submit review to backend
+    const response = await wordlistApi.submitWordReview(currentWordlist.value.id, {
+      word: word.text,
+      quality
     });
     
-    // Update the word in our local data
-    const wordIndex = currentWords.value.findIndex(w => w.id === word.id);
-    if (wordIndex >= 0) {
-      currentWords.value[wordIndex] = { ...currentWords.value[wordIndex], ...response.data };
+    // Update the word in our local data with the new review data
+    const wordIndex = currentWords.value.findIndex(w => w.text === word.text);
+    if (wordIndex >= 0 && response.data) {
+      // Update mastery level and last reviewed date based on response
+      currentWords.value[wordIndex] = {
+        ...currentWords.value[wordIndex],
+        mastery_level: response.data.mastery_level || currentWords.value[wordIndex].mastery_level,
+        review_data: {
+          ...currentWords.value[wordIndex].review_data,
+          last_review_date: response.data.last_reviewed || new Date().toISOString()
+        }
+      };
     }
     
     console.log('Review completed successfully');
@@ -266,17 +279,19 @@ const updateWordNotes = async (word: WordListItem, newNotes: string) => {
   try {
     console.log('Updating notes for:', word.text);
     
-    const response = await wordlistApi.updateWord(word.id, {
-      notes: newNotes
-    });
+    if (!currentWordlist.value?.id) {
+      console.error('No wordlist selected');
+      return;
+    }
     
-    // Update the word in our local data
-    const wordIndex = currentWords.value.findIndex(w => w.id === word.id);
+    // Note: Backend doesn't have a direct update endpoint yet
+    // For now, we'll update locally only
+    const wordIndex = currentWords.value.findIndex(w => w.text === word.text);
     if (wordIndex >= 0) {
       currentWords.value[wordIndex] = { ...currentWords.value[wordIndex], notes: newNotes };
     }
     
-    console.log('Notes updated successfully');
+    console.log('Notes updated locally (backend endpoint pending)');
   } catch (error) {
     console.error('Failed to update notes:', error);
     alert('Failed to update notes. Please try again.');
@@ -343,9 +358,8 @@ const loadWordlistWords = async (id: string, page: number = 0, append: boolean =
     const response = await wordlistApi.getWordlistWords(id, {
       offset: page * wordsPerPage.value,
       limit: wordsPerPage.value,
-      sort: sortCriteria.value || [],
-      filters: {},
-      search: store.searchQuery || ""
+      sort_by: sortCriteria.value?.[0]?.field || 'added_at',
+      sort_order: sortCriteria.value?.[0]?.direction || 'desc'
     });
     
     if (append) {

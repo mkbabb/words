@@ -6,15 +6,15 @@ from typing import Any
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ...ai.factory import get_openai_connector
-from ...ai.connector import OpenAIConnector
-from ...models import (
+from ....ai.factory import get_openai_connector
+from ....ai.connector import OpenAIConnector
+from ....models import (
     NotificationFrequency,
     WordOfTheDayBatch,
     WordOfTheDayConfig,
     WordOfTheDayEntry,
 )
-from ..core import (
+from ...core import (
     ListResponse,
     ResourceResponse,
 )
