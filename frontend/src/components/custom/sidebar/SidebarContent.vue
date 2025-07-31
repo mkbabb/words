@@ -189,8 +189,8 @@ const handleCollapsedWordClick = async (word: string) => {
 
 const handleCollapsedAIClick = async (query: string) => {
     // Set AI mode first
-    store.sessionState.isAIQuery = true;
-    store.sessionState.aiQueryText = query;
+    store.isAIQuery = true;
+    // aiQueryText removed - router handles query persistence
     store.mode = 'suggestions';
     
     // Navigate to home to display suggestions

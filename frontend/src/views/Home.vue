@@ -127,7 +127,7 @@
     <!-- Loading Modal for AI Suggestions -->
     <LoadingModal
         v-model="store.isSuggestingWords"
-        :display-text="'Efflorescing'"
+        :display-text="'efflorescing'"
         :progress="store.suggestionsProgress"
         :current-stage="store.suggestionsStage"
         mode="suggestions"
@@ -158,6 +158,8 @@ const router = useRouter();
 // Component refs
 const stageTestRef = ref();
 
+// Track loading modal visibility separately from search state
+const showLoadingModal = ref(false);
 
 // Handle stage mode enter key
 const handleStageEnter = (_query: string) => {
@@ -175,34 +177,59 @@ watch(() => route.name, async (routeName) => {
         const word = route.params.word as string;
         console.log('🔍 ROUTE WATCHER - Loading Definition for:', word);
         
-        store.setSearchMode('lookup', router);  // Pass router to indicate mode switching
+        // Only call setSearchMode if we're not already in lookup mode
+        if (store.searchMode !== 'lookup') {
+            console.log('🔍 ROUTE WATCHER - Switching to lookup mode');
+            store.setSearchMode('lookup', router);
+        } else {
+            console.log('🔍 ROUTE WATCHER - Already in lookup mode');
+        }
         store.mode = 'dictionary';
+        
+        // Ensure the search query matches the word from the route
+        console.log('🔍 ROUTE WATCHER - Setting search query to:', word);
+        store.searchQuery = word;
+        // Also update the lookup mode query in modeQueries
+        store.modeQueries.lookup = word;
         
         // Hide search results immediately when loading definition via route
         console.log('🔍 ROUTE WATCHER - Hiding search results before searchWord');
         store.showSearchResults = false;
         store.searchResults = [];
         
+        // Just do a normal lookup like any other search
         await store.searchWord(word);
-        console.log('🔍 ROUTE WATCHER - searchWord completed');
     } else if (routeName === 'Thesaurus' && route.params.word) {
         const word = route.params.word as string;
         console.log('🔍 ROUTE WATCHER - Loading Thesaurus for:', word);
         
-        store.setSearchMode('lookup', router);  // Pass router to indicate mode switching
+        // Only call setSearchMode if we're not already in lookup mode
+        if (store.searchMode !== 'lookup') {
+            console.log('🔍 ROUTE WATCHER - Switching to lookup mode');
+            store.setSearchMode('lookup', router);
+        } else {
+            console.log('🔍 ROUTE WATCHER - Already in lookup mode');
+        }
         store.mode = 'thesaurus';
+        
+        // Ensure the search query matches the word from the route
+        console.log('🔍 ROUTE WATCHER - Setting search query to:', word);
+        store.searchQuery = word;
+        // Also update the lookup mode query in modeQueries
+        store.modeQueries.lookup = word;
         
         // Hide search results immediately when loading thesaurus via route
         console.log('🔍 ROUTE WATCHER - Hiding search results before searchWord');
         store.showSearchResults = false;
         store.searchResults = [];
         
+        // Just do a normal lookup like any other search
         await store.searchWord(word);
-        console.log('🔍 ROUTE WATCHER - searchWord completed');
     } else if ((routeName === 'Wordlist' || routeName === 'WordlistSearch') && route.params.wordlistId) {
         const wordlistId = route.params.wordlistId as string;
         console.log('🔍 ROUTE WATCHER - Loading Wordlist:', wordlistId);
         
+        console.log('🏠 Home.vue route watcher switching to wordlist mode');
         store.setSearchMode('wordlist', router);  // Pass router to indicate mode switching
         store.setWordlist(wordlistId);
         
@@ -236,7 +263,7 @@ onMounted(async () => {
 });
 
 // Track loading modal visibility separately from search state
-const showLoadingModal = ref(false);
+// (moved above route watcher to avoid reference error)
 const isSearching = computed(() => store.isSearching);
 const currentEntry = computed(() => store.currentEntry);
 const previousEntry = ref<any>(null);
@@ -268,6 +295,11 @@ watch(isSearching, (newVal) => {
 // Expose loading modal state to store
 watch(showLoadingModal, (newVal) => {
     store.showLoadingModal = newVal;
+});
+
+// Sync store loading modal state back to local state
+watch(() => store.showLoadingModal, (newVal) => {
+    showLoadingModal.value = newVal;
 });
 
 // Scroll-based shrinking animation

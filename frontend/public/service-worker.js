@@ -1,7 +1,7 @@
 // Floridify Service Worker
-const CACHE_NAME = 'floridify-v2'; // Increment to force update
-const STATIC_CACHE = 'floridify-static-v2';
-const API_CACHE = 'floridify-api-v2';
+const CACHE_NAME = 'floridify-v3'; // Increment to force update
+const STATIC_CACHE = 'floridify-static-v3';
+const API_CACHE = 'floridify-api-v3';
 
 // Critical resources to cache immediately
 const STATIC_ASSETS = [
@@ -76,6 +76,10 @@ self.addEventListener('fetch', (event) => {
 
   // API calls - Stale While Revalidate
   if (url.pathname.startsWith('/api/')) {
+    // Skip caching for slug generation endpoint to ensure fresh names
+    if (url.pathname.includes('/generate-name')) {
+      return; // Let the request pass through without caching
+    }
     event.respondWith(staleWhileRevalidate(request, API_CACHE));
     return;
   }

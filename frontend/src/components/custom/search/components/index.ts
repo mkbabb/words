@@ -7,3 +7,4 @@ export { default as SearchResults } from './SearchResults.vue';
 export { default as ExpandModal } from './ExpandModal.vue';
 export { default as HamburgerButton } from './HamburgerButton.vue';
 export { default as RegenerateButton } from './RegenerateButton.vue';
+export { default as ThinLoadingProgress } from './ThinLoadingProgress.vue';

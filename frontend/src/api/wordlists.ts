@@ -256,6 +256,21 @@ export const wordlistsApi = {
     return response.data;
   },
 
+  // Generate a random slug name for wordlists
+  async generateSlugName(): Promise<{ name: string }> {
+    // Add cache-busting parameter to ensure fresh requests
+    const response = await api.get('/wordlists/generate-name', {
+      params: {
+        t: Date.now()
+      },
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+    return response.data;
+  },
+
   // Update word in wordlist (notes, tags, etc)
   async updateWord(_wordlistId: string, wordText: string, updates: {
     notes?: string;

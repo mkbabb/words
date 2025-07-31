@@ -95,7 +95,7 @@ export function useSearchBarKeyboard(options: UseSearchBarKeyboardOptions) {
           store.wordSuggestions = wordSuggestions;
           store.mode = 'suggestions';
           store.hasSearched = true;
-          store.sessionState.aiQueryText = query;
+          // aiQueryText removed - router handles query persistence
         } else {
           store.showErrorAnimation = true;
           showError('No word suggestions found for this query');

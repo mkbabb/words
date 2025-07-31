@@ -85,6 +85,7 @@ class ImageMedia(Document, BaseMetadata):
     alt_text: str | None = None
     description: str | None = None  # Additional description for hover/tooltip
 
+
     class Settings:
         name = "image_media"
 

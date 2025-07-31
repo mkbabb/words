@@ -1,20 +1,5 @@
 <template>
     <div class="flex items-center justify-evenly w-full">
-        <!-- Sidebar Toggle (Mobile Only) -->
-        <HoverCard v-if="isMobile" :open-delay="200" :close-delay="100">
-            <HoverCardTrigger as-child>
-                <ActionButton
-                    @click="$emit('toggle-sidebar')"
-                    variant="default"
-                >
-                    <PanelLeft :size="20" />
-                </ActionButton>
-            </HoverCardTrigger>
-            <HoverCardContent class="w-auto p-2" side="top">
-                <p class="text-sm">Toggle Sidebar</p>
-            </HoverCardContent>
-        </HoverCard>
-            
         <!-- AI Mode Toggle -->
         <HoverCard :open-delay="200" :close-delay="100">
             <HoverCardTrigger as-child>
@@ -148,7 +133,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Trash2, PanelLeft, RefreshCw, Wand2, Download, Bell, BellDot } from 'lucide-vue-next';
+import { Trash2, RefreshCw, Wand2, Download, Bell, BellDot } from 'lucide-vue-next';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import ActionButton from './ActionButton.vue';
 // import { usePWA } from '@/composables';
@@ -174,11 +159,8 @@ const emit = defineEmits<{
 // const { subscribeToPush } = usePWA();
 const store = useAppStore();
 
-// Reactive window width
+// Reactive window width for potential future use
 const windowWidth = ref(window.innerWidth);
-
-// Check if mobile
-const isMobile = computed(() => windowWidth.value < 768);
 
 // Animation states
 const aiAnimating = ref(false);

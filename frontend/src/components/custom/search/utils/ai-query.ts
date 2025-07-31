@@ -14,6 +14,15 @@ export function shouldTriggerAIMode(queryText: string): boolean {
 }
 
 /**
+ * Checks if a query contains the "_w" AI mode pattern
+ * @param queryText The search query text
+ * @returns True if query contains "_w" pattern
+ */
+export function hasAIModePattern(queryText: string): boolean {
+    return queryText.includes('_w');
+}
+
+/**
  * Extracts word count from a natural language query
  * Supports numeric digits, written numbers, and common phrases
  * @param queryText The query text to extract count from

@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import { useStorage } from '@vueuse/core';
+import { getCurrentInstance } from 'vue';
+import { shouldTriggerAIMode } from '@/components/custom/search/utils/ai-query';
 import type {
     SearchState,
     SearchHistory,
@@ -233,44 +235,26 @@ export const useAppStore = defineStore('app', () => {
         }
     );
 
-    // Persisted Session State - Everything about search
+    // Persisted Session State - Everything about search (except queries and AI mode - router/dynamic detection handles those)
     const sessionState = useStorage('session-state', {
-        // Mode-specific search queries
-        searchQueries: {
-            lookup: '',
-            wordlist: '',
-            wordOfTheDay: '',
-            stage: '',
-        },
         searchCursorPosition: 0,
         searchSelectedIndex: 0,
         searchResults: [] as SearchResult[],
         currentWord: null as string | null,
         currentEntry: null as SynthesizedDictionaryEntry | null,
         currentThesaurus: null as ThesaurusEntry | null,
-        isAIQuery: false,
-        aiQueryText: '',
         wordSuggestions: null as WordSuggestionResponse | null,
     });
 
-    // Create refs that sync with persisted state - mode-specific search queries
-    const searchQuery = computed({
-        get: () => {
-            const mode =
-                searchMode.value === 'word-of-the-day'
-                    ? 'wordOfTheDay'
-                    : searchMode.value;
-            return sessionState.value.searchQueries[mode];
-        },
-        set: (value) => {
-            const mode =
-                searchMode.value === 'word-of-the-day'
-                    ? 'wordOfTheDay'
-                    : searchMode.value;
-            if (sessionState.value.searchQueries) {
-                sessionState.value.searchQueries[mode] = value;
-            }
-        },
+    // Non-persisted search query - router handles query persistence now  
+    const searchQuery = ref('');
+    
+    // Non-persisted mode-specific queries for mode switching
+    const modeQueries = ref({
+        lookup: '',
+        wordlist: '',
+        wordOfTheDay: '',
+        stage: '',
     });
 
     const currentEntry = computed({
@@ -509,6 +493,53 @@ export const useAppStore = defineStore('app', () => {
         recentLookups.value.map((lookup) => lookup.word)
     );
 
+    // Helper function to update router for current lookup state
+    function updateRouterForCurrentEntry() {
+        // Only update router if we're in lookup mode and have an entry
+        if (searchMode.value !== 'lookup' || !currentEntry.value?.word) {
+            return;
+        }
+
+        try {
+            // Try to get router from current Vue instance
+            const instance = getCurrentInstance();
+            const router = instance?.appContext.app.config.globalProperties.$router;
+            
+            if (!router) {
+                console.log('🧭 Router not available for URL update');
+                return;
+            }
+
+            const word = currentEntry.value.word;
+            const currentRoute = router.currentRoute?.value;
+            
+            // Determine target route based on mode
+            const targetRoute = mode.value === 'thesaurus' ? 'Thesaurus' : 'Definition';
+            const targetPath = mode.value === 'thesaurus' ? `/thesaurus/${word}` : `/definition/${word}`;
+            
+            // Only update if we're not already on the correct route
+            if (currentRoute?.name !== targetRoute || currentRoute.params.word !== word) {
+                console.log('🧭 Updating router for lookup:', { 
+                    word, 
+                    mode: mode.value, 
+                    targetRoute, 
+                    targetPath,
+                    currentRouteName: currentRoute?.name,
+                    currentRouteParams: currentRoute?.params
+                });
+                router.push(targetPath);
+            } else {
+                console.log('🧭 Already on correct route, no update needed:', { 
+                    currentRoute: currentRoute?.name, 
+                    targetRoute,
+                    word: currentRoute?.params.word
+                });
+            }
+        } catch (error) {
+            console.log('🧭 Could not update router:', error);
+        }
+    }
+
     // Actions
     async function searchWord(query: string) {
         console.log('🔍 SEARCHWORD - Called with query:', query, {
@@ -540,8 +571,8 @@ export const useAppStore = defineStore('app', () => {
         // Reset AI mode when doing a direct word lookup
         isAIQuery.value = false;
         showSparkle.value = false;
-        sessionState.value.isAIQuery = false;
-        sessionState.value.aiQueryText = '';
+        // isAIQuery is now non-persisted - already cleared above
+        // aiQueryText removed - router handles query persistence
 
         // Hide search dropdown when performing word lookup
         searchResults.value = [];
@@ -670,6 +701,20 @@ export const useAppStore = defineStore('app', () => {
             }
 
             currentEntry.value = entry;
+            
+            // Auto-adjust AI mode based on model_info presence
+            if (entry && entry.model_info) {
+                // Entry has AI model info, set AI mode to enabled (noAI = false)
+                noAI.value = false;
+                console.log('Auto-enabled AI mode: definition has model_info');
+            } else if (entry && !entry.model_info) {
+                // Entry has no AI model info, set AI mode to disabled (noAI = true)
+                noAI.value = true;
+                console.log('Auto-disabled AI mode: definition has no model_info');
+            }
+            
+            // Update router to reflect successful lookup
+            updateRouterForCurrentEntry();
             
             // Check for empty results and set error state if needed
             if (!entry || !entry.definitions || entry.definitions.length === 0) {
@@ -998,6 +1043,11 @@ export const useAppStore = defineStore('app', () => {
         if (currentEntry.value && mode.value === 'thesaurus') {
             getThesaurusData(currentEntry.value.word);
         }
+        
+        // Update router when switching dictionary modes with existing lookup
+        if (currentEntry.value?.word && searchMode.value === 'lookup') {
+            updateRouterForCurrentEntry();
+        }
     }
 
     function toggleTheme() {
@@ -1056,15 +1106,23 @@ export const useAppStore = defineStore('app', () => {
     const sessionStartTime = ref(Date.now());
 
     // Enhanced SearchBar functions
-    function toggleSearchMode(router?: any) {
+    async function toggleSearchMode(router?: any) {
         // Don't allow mode switching during active search
         if (isSearching.value || isSuggestingWords.value) {
             return;
         }
 
+        console.log('🔄 toggleSearchMode called:', searchMode.value);
+        
         // Store current state before switching
         const currentQuery = searchQuery.value;
         const currentWordlist = selectedWordlist.value;
+        
+        console.log('💾 Saving query for mode:', searchMode.value, 'query:', currentQuery);
+        
+        // Save current query to mode-specific storage BEFORE changing mode
+        const currentModeKey = searchMode.value === 'word-of-the-day' ? 'wordOfTheDay' : searchMode.value;
+        modeQueries.value[currentModeKey] = currentQuery;
         
         // Cycle through modes: lookup -> wordlist -> word-of-the-day -> stage -> lookup
         const oldMode = searchMode.value;
@@ -1082,18 +1140,79 @@ export const useAppStore = defineStore('app', () => {
         showSearchResults.value = false;
         searchResults.value = [];
         
+        // Restore query for the NEW mode
+        const newModeKey = searchMode.value === 'word-of-the-day' ? 'wordOfTheDay' : searchMode.value;
+        const restoredQuery = modeQueries.value[newModeKey] || '';
+        searchQuery.value = restoredQuery;
+        
+        console.log('🔄 Restored query for mode:', searchMode.value, 'query:', restoredQuery);
+        console.log('📋 All mode queries:', modeQueries.value);
+        console.log('🎯 searchQuery.value after assignment:', searchQuery.value);
+        
+        // Force reactivity trigger
+        await nextTick();
+        
+        // Handle AI mode based on the new mode and restored query
+        if (searchMode.value === 'lookup') {
+            // Check if restored query should trigger AI mode
+            if (shouldTriggerAIMode(restoredQuery)) {
+                isAIQuery.value = true;
+                showSparkle.value = true;
+                console.log('✨ AI mode enabled for restored query');
+            } else {
+                isAIQuery.value = false;
+                showSparkle.value = false;
+                console.log('❌ AI mode disabled - query does not meet criteria');
+            }
+        } else {
+            // Disable AI mode when switching away from lookup mode
+            isAIQuery.value = false;
+            showSparkle.value = false;
+            console.log('❌ AI mode disabled - not in lookup mode');
+        }
+        
         // Handle router navigation when switching modes
         if (router) {
-            // When switching TO lookup mode, preserve the query from the previous mode
-            if (searchMode.value === 'lookup' && currentQuery && currentQuery.trim()) {
-                router.push(`/definition/${encodeURIComponent(currentQuery)}`);
-            }
-            // When switching TO wordlist mode, preserve the selected wordlist
-            else if (searchMode.value === 'wordlist' && currentWordlist) {
-                if (currentQuery && currentQuery.trim()) {
-                    router.push(`/wordlist/${currentWordlist}/search/${encodeURIComponent(currentQuery)}`);
+            // When switching TO lookup mode, update router to reflect current state
+            if (searchMode.value === 'lookup') {
+                // Check if we're already on a definition/thesaurus route - don't clear it
+                const currentRoute = router.currentRoute?.value;
+                const isOnDefinitionRoute = currentRoute?.name === 'Definition' || currentRoute?.name === 'Thesaurus';
+                
+                if (currentEntry.value?.word) {
+                    updateRouterForCurrentEntry();
+                } else if (isOnDefinitionRoute) {
+                    // We're on a definition route but don't have currentEntry yet (loading in progress)
+                    // Don't navigate away - let the route load
+                    console.log('🧭 toggleSearchMode: on definition route, letting it load');
                 } else {
+                    // No current entry and not on a definition route, go to home
+                    router.push('/');
+                }
+            }
+            // When switching TO wordlist mode, ensure we have a wordlist selected
+            else if (searchMode.value === 'wordlist') {
+                if (currentWordlist) {
+                    console.log('🧭 toggleSearchMode: navigating to existing wordlist:', currentWordlist);
                     router.push(`/wordlist/${currentWordlist}`);
+                } else {
+                    // No wordlist selected, fetch available wordlists and select first one
+                    console.log('🧭 toggleSearchMode: no wordlist selected, fetching first available');
+                    try {
+                        const response = await wordlistApi.getWordlists({ limit: 1 });
+                        if (response.items && response.items.length > 0) {
+                            const firstWordlist = response.items[0];
+                            selectedWordlist.value = firstWordlist.id;
+                            console.log('🧭 toggleSearchMode: selected first wordlist:', firstWordlist.name, firstWordlist.id);
+                            router.push(`/wordlist/${firstWordlist.id}`);
+                        } else {
+                            console.log('🧭 toggleSearchMode: no wordlists available, staying on home');
+                            router.push('/');
+                        }
+                    } catch (error) {
+                        console.error('🧭 toggleSearchMode: failed to fetch wordlists:', error);
+                        router.push('/');
+                    }
                 }
             }
             // For other modes, go to home for now
@@ -1111,6 +1230,8 @@ export const useAppStore = defineStore('app', () => {
                 mode.value = 'dictionary';
             }
         }
+
+        // AI mode handling is now done above when mode is set
     }
 
     function toggleControls() {
@@ -1141,31 +1262,156 @@ export const useAppStore = defineStore('app', () => {
         selectedWordlist.value = wordlist;
     }
 
-    function setSearchMode(newMode: 'lookup' | 'wordlist' | 'word-of-the-day' | 'stage', router?: any) {
+    async function setSearchMode(newMode: 'lookup' | 'wordlist' | 'word-of-the-day' | 'stage', router?: any) {
+        console.log('🔄 setSearchMode called:', searchMode.value, '->', newMode);
         const currentQuery = searchQuery.value;
         const currentWordlist = selectedWordlist.value;
+        
+        console.log('💾 Saving query for mode:', searchMode.value, 'query:', currentQuery);
+        
+        // Save current query to mode-specific storage BEFORE changing mode
+        const currentModeKey = searchMode.value === 'word-of-the-day' ? 'wordOfTheDay' : searchMode.value;
+        modeQueries.value[currentModeKey] = currentQuery;
         
         // Set flag to indicate we're switching modes via controls
         isSwitchingModes.value = true;
         
-        searchMode.value = newMode;
+        if (searchMode.value !== newMode) {
+            console.log('🔄 Actually changing searchMode from', searchMode.value, 'to', newMode);
+            searchMode.value = newMode;
+        } else {
+            console.log('⚠️ Mode is already', newMode, '- no change needed');
+        }
         
         // Clear search results when changing modes to prevent stale dropdown
         showSearchResults.value = false;
         searchResults.value = [];
         
+        // Restore query for the NEW mode
+        const newModeKey = newMode === 'word-of-the-day' ? 'wordOfTheDay' : newMode;
+        const restoredQuery = modeQueries.value[newModeKey] || '';
+        searchQuery.value = restoredQuery;
+        
+        console.log('🔄 Store setSearchMode - restored query for mode:', newMode, 'query:', restoredQuery);
+        
+        // Force reactivity trigger
+        await nextTick();
+        
+        // Special handling: if switching TO lookup mode with a restored query
+        if (newMode === 'lookup' && restoredQuery && restoredQuery.trim()) {
+            // Check if the restored query should trigger AI mode
+            const shouldBeAI = shouldTriggerAIMode(restoredQuery);
+            console.log('🔄 setSearchMode: restored query in lookup mode:', { 
+                query: restoredQuery, 
+                shouldBeAI,
+                hasCurrentEntry: !!currentEntry.value
+            });
+            
+            // Set AI mode state to match the restored query
+            if (shouldBeAI) {
+                isAIQuery.value = true;
+                showSparkle.value = true;
+            } else {
+                isAIQuery.value = false;
+                showSparkle.value = false;
+            }
+            
+            // Log entry matching for debugging - router update will happen in navigation logic below
+            if (currentEntry.value) {
+                console.log('🔄 setSearchMode: checking entry match:', {
+                    currentEntryWord: currentEntry.value.word,
+                    restoredQuery: restoredQuery.trim(),
+                    matches: currentEntry.value.word === restoredQuery.trim()
+                });
+            } else {
+                console.log('🔄 setSearchMode: no current entry to match against');
+            }
+        }
+        
+        // Handle AI mode based on the new mode and restored query
+        if (newMode === 'lookup') {
+            // Check if restored query should trigger AI mode
+            const restoredQuery = modeQueries.value[newModeKey] || '';
+            if (shouldTriggerAIMode(restoredQuery)) {
+                isAIQuery.value = true;
+                showSparkle.value = true;
+            } else {
+                isAIQuery.value = false;
+                showSparkle.value = false;
+            }
+        } else {
+            // Disable AI mode when switching away from lookup mode
+            isAIQuery.value = false;
+            showSparkle.value = false;
+        }
+        
         // Handle router navigation when setting search mode
         if (router) {
-            // When switching TO lookup mode, preserve the query if we have one
-            if (newMode === 'lookup' && currentQuery && currentQuery.trim()) {
-                router.push(`/definition/${encodeURIComponent(currentQuery)}`);
-            }
-            // When switching TO wordlist mode, preserve the selected wordlist
-            else if (newMode === 'wordlist' && currentWordlist) {
-                if (currentQuery && currentQuery.trim()) {
-                    router.push(`/wordlist/${currentWordlist}/search/${encodeURIComponent(currentQuery)}`);
+            // When switching TO lookup mode, update router to reflect current state
+            if (newMode === 'lookup') {
+                // Check if we're already on a definition/thesaurus route - don't clear it
+                const currentRoute = router.currentRoute?.value;
+                const isOnDefinitionRoute = currentRoute?.name === 'Definition' || currentRoute?.name === 'Thesaurus';
+                const isOnWordlistRoute = currentRoute?.name === 'Wordlist' || currentRoute?.name === 'WordlistSearch';
+                
+                if (currentEntry.value?.word) {
+                    console.log('🧭 setSearchMode: updating router for existing lookup:', currentEntry.value.word);
+                    // Use the router parameter directly instead of the helper function
+                    const targetRoute = mode.value === 'thesaurus' ? 'Thesaurus' : 'Definition';
+                    const targetPath = mode.value === 'thesaurus' ? `/thesaurus/${currentEntry.value.word}` : `/definition/${currentEntry.value.word}`;
+                    console.log('🧭 setSearchMode: navigating to:', targetRoute, targetPath);
+                    router.push(targetPath);
+                } else if (isOnDefinitionRoute) {
+                    // We're on a definition route but don't have currentEntry yet (loading in progress)
+                    // Don't navigate away - let the route load
+                    console.log('🧭 setSearchMode: on definition route, letting it load');
+                } else if (isOnWordlistRoute && restoredQuery && restoredQuery.trim()) {
+                    // We're switching FROM wordlist TO lookup mode with a restored query
+                    // Check if we have a matching entry and update router accordingly
+                    if (currentEntry.value && currentEntry.value.word === restoredQuery.trim()) {
+                        console.log('🧭 setSearchMode: switching from wordlist to lookup with matching entry, updating router');
+                        // Force the router update with more explicit navigation
+                        const targetRoute = mode.value === 'thesaurus' ? 'Thesaurus' : 'Definition';
+                        const targetPath = mode.value === 'thesaurus' ? `/thesaurus/${currentEntry.value.word}` : `/definition/${currentEntry.value.word}`;
+                        console.log('🧭 setSearchMode: forcing navigation to:', targetRoute, targetPath);
+                        router.push(targetPath);
+                    } else {
+                        console.log('🧭 setSearchMode: switching from wordlist to lookup with query but no matching entry, going to home');
+                        router.push('/');
+                    }
+                } else if (isOnWordlistRoute) {
+                    // We're switching FROM wordlist TO lookup mode - should go to home if no current entry
+                    console.log('🧭 setSearchMode: switching from wordlist to lookup, no current entry, going to home');
+                    router.push('/');
                 } else {
+                    // No current entry and not on a definition route, go to home
+                    console.log('🧭 setSearchMode: no current entry, going to home');
+                    router.push('/');
+                }
+            }
+            // When switching TO wordlist mode, ensure we have a wordlist selected
+            else if (newMode === 'wordlist') {
+                if (currentWordlist) {
+                    console.log('🧭 setSearchMode: navigating to existing wordlist:', currentWordlist);
                     router.push(`/wordlist/${currentWordlist}`);
+                } else {
+                    // No wordlist selected, fetch available wordlists and select first one
+                    console.log('🧭 setSearchMode: no wordlist selected, fetching first available');
+                    try {
+                        const response = await wordlistApi.getWordlists({ limit: 1 });
+                        if (response.items && response.items.length > 0) {
+                            const firstWordlist = response.items[0];
+                            selectedWordlist.value = firstWordlist.id;
+                            console.log('🧭 setSearchMode: selected first wordlist:', firstWordlist.name, firstWordlist.id);
+                            router.push(`/wordlist/${firstWordlist.id}`);
+                        } else {
+                            console.log('🧭 setSearchMode: no wordlists available, staying on home');
+                            router.push('/');
+                        }
+                    } catch (error) {
+                        console.error('🧭 setSearchMode: failed to fetch wordlists:', error);
+                        router.push('/');
+                    }
                 }
             }
             // For other modes, go to home for now
@@ -1363,6 +1609,7 @@ export const useAppStore = defineStore('app', () => {
     return {
         // State
         searchQuery,
+        modeQueries,
         isSearching,
         hasSearched,
         searchResults,
@@ -1408,6 +1655,7 @@ export const useAppStore = defineStore('app', () => {
         aiSuggestions,
         searchSelectedIndex,
         isDirectLookup,
+        isSwitchingModes,
         // Enhanced SearchBar state
         searchMode,
         selectedSources,

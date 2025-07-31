@@ -17,32 +17,34 @@
                 class="group relative"
             >
                 <EditableField
-                    v-if="example.type === 'generated'"
                     :model-value="example.text"
                     field-name="example"
                     :multiline="true"
                     :edit-mode="editMode"
-                    :can-regenerate="true"
+                    :can-regenerate="example.type === 'generated'"
                     :is-regenerating="regeneratingIndex === index"
                     @update:model-value="(val) => updateExample(index, String(val))"
                     @regenerate="() => regenerateExample(index)"
                 >
                     <template #display>
                         <p
-                            class="text-base leading-relaxed text-foreground italic px-3 py-2 rounded-md border border-border/30 bg-muted/5 hover:border-border/50 hover:bg-muted/10 transition-all duration-200"
+                            :class="[
+                                'text-base leading-relaxed text-foreground italic px-3 py-2 rounded-md border border-border/30 bg-muted/5 transition-all duration-200',
+                                editMode ? 'hover:border-border/50 hover:bg-muted/10' : ''
+                            ]"
                         >
                             "<span v-html="formatExampleHTML(example.text, word)"></span>"
+                            <!-- Type indicator for literature examples -->
+                            <span 
+                                v-if="example.type === 'literature'" 
+                                class="ml-2 text-xs text-muted-foreground/60"
+                                title="Literature example"
+                            >
+                                📚
+                            </span>
                         </p>
                     </template>
                 </EditableField>
-                
-                <!-- Literature Examples (non-editable) -->
-                <p
-                    v-else
-                    class="text-base leading-relaxed text-foreground italic px-3 py-2 rounded-md border border-border/30 bg-muted/5"
-                >
-                    "<span v-html="formatExampleHTML(example.text, word)"></span>"
-                </p>
             </div>
         </div>
     </div>

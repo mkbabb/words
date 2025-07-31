@@ -1,14 +1,17 @@
 <template>
-    <div class="flex w-full flex-col gap-1 space-y-4">
+    <div :class="[
+        'flex w-full flex-col gap-1',
+        variant === 'thin' ? '' : 'space-y-4'
+    ]">
         <!-- Progress Bar -->
         <div class="relative">
             <div
                 ref="progressBarRef"
-                class="relative h-8 overflow-hidden rounded-full bg-gray-200
+                class="relative overflow-hidden rounded-full bg-gray-200
                     dark:bg-gray-700"
                 :class="[
-                    'shadow-inner',
-                    'border border-gray-300 dark:border-gray-600',
+                    variant === 'thin' ? 'h-1.5' : 'h-8',
+                    variant === 'thin' ? 'bg-background/80 backdrop-blur-sm shadow-sm' : 'shadow-inner border border-gray-300 dark:border-gray-600',
                     interactive ? 'cursor-pointer' : '',
                 ]"
                 @mousedown="handleMouseDown"
@@ -20,9 +23,10 @@
                     :style="{
                         width: `${normalizedProgress}%`,
                         background: rainbowGradient,
+                        boxShadow: variant === 'thin' ? '0 0 10px rgba(255, 255, 255, 0.5)' : undefined,
                     }"
                     :class="[
-                        'shadow-lg',
+                        variant === 'thin' ? '' : 'shadow-lg',
                         normalizedProgress < 100 ? 'animate-pulse' : '',
                     ]"
                     :data-progress="normalizedProgress"
@@ -36,26 +40,25 @@
                     :key="index"
                     class="absolute flex items-center justify-center"
                     :style="{
-                        left:
-                            checkpoint.progress === 0
-                                ? '0%'
-                                : checkpoint.progress === 100
-                                  ? 'calc(100% - 16px)'
-                                  : `${checkpoint.progress}%`,
+                        left: checkpoint.progress === 0 
+                            ? '0%' 
+                            : checkpoint.progress === 100 
+                                ? '100%' 
+                                : `${checkpoint.progress}%`,
                         top: '50%',
-                        transform:
-                            checkpoint.progress === 0 ||
-                            checkpoint.progress === 100
-                                ? 'translateX(-50%) translateY(-50%)'
+                        transform: checkpoint.progress === 0 
+                            ? 'translateY(-50%)' 
+                            : checkpoint.progress === 100 
+                                ? 'translateX(-100%) translateY(-50%)' 
                                 : 'translateX(-50%) translateY(-50%)',
                     }"
                 >
                     <HoverCard :open-delay="100" :close-delay="50">
                         <HoverCardTrigger as-child>
                             <button
-                                class="h-6 w-6 rounded-full border-2
-                                    transition-all duration-300 outline-none"
+                                class="rounded-full transition-all duration-300 outline-none"
                                 :class="[
+                                    variant === 'thin' ? 'h-2 w-2 border' : 'h-6 w-6 border-2',
                                     normalizedProgress >= checkpoint.progress
                                         ? 'scale-110 border-primary bg-primary'
                                         : 'border-gray-400 bg-background dark:border-gray-500',
@@ -66,14 +69,14 @@
                                         ? 'cursor-pointer hover:scale-125'
                                         : 'cursor-help hover:scale-125',
                                 ]"
-                                @click="handleCheckpointClick(checkpoint)"
+                                @click.stop="handleCheckpointClick(checkpoint)"
                                 :aria-label="`${checkpoint.label} - ${checkpoint.progress}%`"
                             />
                         </HoverCardTrigger>
                         <HoverCardContent
                             class="z-[10000] w-60"
                             side="top"
-                            :side-offset="16"
+                            :side-offset="variant === 'thin' ? 8 : 16"
                             align="center"
                             :align-offset="0"
                         >
@@ -151,6 +154,7 @@ interface Props {
     stageMessage?: string;
     mode?: 'lookup' | 'suggestions' | 'upload' | 'image' | string;
     category?: string; // Process category for dynamic descriptions
+    variant?: 'default' | 'thin'; // Add variant prop
 }
 
 // Ensure progress is a number
@@ -175,6 +179,7 @@ const props = withDefaults(defineProps<Props>(), {
     checkpoints: undefined, // Will be computed dynamically
     interactive: false,
     mode: 'lookup',
+    variant: 'default',
 });
 
 // Compute checkpoints dynamically if not provided

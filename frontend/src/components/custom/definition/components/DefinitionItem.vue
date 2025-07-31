@@ -43,15 +43,6 @@
                 <span class="text-xs text-blue-500">loading...</span>
             </div>
             
-            <!-- Add to Wordlist Button -->
-            <button
-                v-if="!isStreaming"
-                @click="handleAddToWordlist"
-                class="ml-auto opacity-60 hover:opacity-100 transition-opacity duration-200 p-1 rounded-md hover:bg-muted/50"
-                title="Add to wordlist"
-            >
-                <Plus class="h-4 w-4 text-muted-foreground hover:text-primary" />
-            </button>
         </div>
 
         <div class="border-l-2 border-accent pl-4">
@@ -129,7 +120,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Plus } from 'lucide-vue-next';
 import { useAppStore } from '@/stores';
 import { useDefinitionEditMode } from '@/composables';
 import type { TransformedDefinition } from '@/types';
@@ -206,13 +196,6 @@ const emit = defineEmits<{
     'addToWordlist': [word: string];
 }>();
 
-// Handle adding word to wordlist
-function handleAddToWordlist() {
-    const word = store.currentEntry?.word;
-    if (word) {
-        emit('addToWordlist', word);
-    }
-}
 
 // Handle example updates
 async function handleExampleUpdate(index: number, value: string) {

@@ -137,6 +137,26 @@ async def create_wordlist(
     )
 
 
+@router.get("/generate-name", response_model=dict[str, str])
+async def generate_wordlist_slug() -> dict[str, str]:
+    """Generate a random slug name for a wordlist.
+    
+    Uses the same algorithm as auto-generated names during wordlist creation.
+    
+    Returns:
+        Dictionary with 'name' key containing the generated slug.
+    """
+    try:
+        # Generate slug using existing utility (empty list for words since name is independent)
+        slug_name = generate_wordlist_name([])
+        return {"name": slug_name}
+    except Exception:
+        # Fallback to a simple timestamp-based name if generation fails
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        return {"name": f"wordlist-{timestamp}"}
+
+
 @router.get("/{wordlist_id}", response_model=ResourceResponse)
 async def get_wordlist(
     wordlist_id: PydanticObjectId,

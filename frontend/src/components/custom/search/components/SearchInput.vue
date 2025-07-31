@@ -77,7 +77,12 @@ const emit = defineEmits<{
 const textareaRef = ref<HTMLTextAreaElement>();
 
 const resizeTextarea = () => {
-    if (!textareaRef.value) return;
+    if (!textareaRef.value) {
+        console.log('🔍 SearchInput: resizeTextarea called but no textareaRef');
+        return;
+    }
+    
+    console.log('🔍 SearchInput: resizeTextarea called, aiMode:', props.aiMode, 'value length:', modelValue.value?.length || 0);
     
     // Reset height to auto to get the natural height
     textareaRef.value.style.height = 'auto';
@@ -91,6 +96,14 @@ const resizeTextarea = () => {
     // In AI mode, allow full expansion; otherwise limit to reasonable height
     const maxHeight = props.aiMode ? 400 : 200;
     const finalHeight = Math.max(minHeightValue, Math.min(scrollHeight, maxHeight));
+    
+    console.log('🔍 SearchInput: Resize calculations:', {
+        scrollHeight,
+        minHeightValue,
+        maxHeight,
+        finalHeight,
+        aiMode: props.aiMode
+    });
     
     // Set the textarea height directly
     textareaRef.value.style.height = `${finalHeight}px`;
@@ -123,12 +136,24 @@ const handleBlur = () => {
 };
 
 // Watch for external value changes
-watch(modelValue, () => {
+watch(modelValue, (newValue, oldValue) => {
+    console.log('🔍 SearchInput: modelValue changed from', oldValue, 'to', newValue);
     nextTick(() => {
         resizeTextarea();
         // Double-check resize for edge cases (like AI mode text from sidebar)
         setTimeout(resizeTextarea, 0);
     });
+});
+
+// Watch for combined changes in AI mode and content
+watch([() => props.aiMode, modelValue], ([newAiMode, newValue], [oldAiMode, oldValue]) => {
+    console.log('🔍 SearchInput: Combined watcher - AI mode:', oldAiMode, '->', newAiMode, 'Value:', oldValue, '->', newValue);
+    if (newAiMode !== oldAiMode || newValue !== oldValue) {
+        nextTick(() => {
+            resizeTextarea();
+            setTimeout(resizeTextarea, 100);
+        });
+    }
 });
 
 // Initial resize
@@ -140,6 +165,28 @@ nextTick(() => {
 watch(() => props.minHeight, () => {
     resizeTextarea();
 }, { immediate: true });
+
+// Watch for AI mode changes and resize accordingly
+watch(() => props.aiMode, (newAiMode, oldAiMode) => {
+    console.log('🔍 SearchInput: AI mode changed from', oldAiMode, 'to', newAiMode, 'triggering resize');
+    console.log('🔍 SearchInput: Current textarea ref exists:', !!textareaRef.value);
+    console.log('🔍 SearchInput: Current model value:', modelValue.value);
+    
+    if (textareaRef.value) {
+        // Force recalculation by temporarily changing height
+        const originalHeight = textareaRef.value.style.height;
+        console.log('🔍 SearchInput: Original height before resize:', originalHeight);
+        
+        nextTick(() => {
+            resizeTextarea();
+            // Extra timeout to ensure proper resize in AI mode
+            setTimeout(() => {
+                console.log('🔍 SearchInput: Final height after resize:', textareaRef.value?.style.height);
+                resizeTextarea();
+            }, 100);
+        });
+    }
+});
 
 // Props are used in template
 void props;

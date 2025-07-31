@@ -1,6 +1,11 @@
 <template>
     <span>
-        {{ displayText }}<span v-if="showCursor" :class="cursorClass">|</span>
+        <span 
+            v-for="(char, index) in displayTextChars" 
+            :key="index"
+            @click="handleCharClick(index)"
+            class="cursor-pointer hover:bg-muted/50 transition-colors duration-150 rounded-sm px-0.5 -mx-0.5"
+        >{{ char }}</span><span v-if="showCursor" :class="cursorClass">|</span>
     </span>
 </template>
 
@@ -48,6 +53,9 @@ const cursorClass = computed(() => ({
     'font-light': true
 }));
 
+// Split display text into clickable characters
+const displayTextChars = computed(() => typewriter.displayText.value.split(''));
+
 // Initialize typewriter
 const typewriter = useTypewriter({
     text: props.text,
@@ -63,7 +71,25 @@ const typewriter = useTypewriter({
     }
 });
 
-const { displayText, isTyping, startTyping, stopTyping, reset, updateText } = typewriter;
+const { displayText, isTyping, startTyping, stopTyping, reset, updateText, backspaceToPosition } = typewriter;
+
+// Handle character click for backspacing
+const handleCharClick = (clickedIndex: number) => {
+    const currentLength = displayText.value.length;
+    if (clickedIndex >= currentLength) return;
+    
+    // If currently typing, stop the animation first
+    if (isTyping.value) {
+        stopTyping();
+        // Small delay to ensure animation stops cleanly
+        setTimeout(() => {
+            backspaceToPosition(clickedIndex + 1);
+        }, 50);
+    } else {
+        // Backspace to the clicked position (keeping the clicked character)
+        backspaceToPosition(clickedIndex + 1);
+    }
+};
 
 // Watch for text changes
 watch(() => props.text, (newText, oldText) => {

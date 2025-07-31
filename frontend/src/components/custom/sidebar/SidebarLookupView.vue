@@ -191,8 +191,8 @@ const handleSearchClick = async (search: { query: string }) => {
 
 const handleAISuggestionClick = async (suggestion: { query: string }) => {
     // Set AI mode first
-    store.sessionState.isAIQuery = true;
-    store.sessionState.aiQueryText = suggestion.query;
+    store.isAIQuery = true;
+    // aiQueryText removed - router handles query persistence
     store.mode = 'suggestions';
     
     // Navigate to home to display suggestions

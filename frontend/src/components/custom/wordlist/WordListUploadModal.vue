@@ -1,5 +1,5 @@
 <template>
-    <Modal v-model="modelValue" :close-on-backdrop="!isUploading">
+    <Modal v-model="modelValue" :close-on-backdrop="!isUploading" max-width="lg" max-height="viewport">
         <div class="w-full max-w-lg mx-auto">
             <!-- Header -->
             <div class="flex items-center justify-between mb-6">
@@ -14,8 +14,8 @@
                 </Button>
             </div>
 
-            <!-- Main Content with scrollable area -->
-            <div class="max-h-[60vh] overflow-y-auto scrollbar-thin space-y-6">
+            <!-- Main Content - scrolling handled by base Modal -->
+            <div class="space-y-6">
                     <!-- File Upload Area -->
                     <div class="space-y-4">
                         <div
@@ -242,17 +242,38 @@
                         </div>
 
                         <!-- New Wordlist Form -->
-                        <div v-if="uploadMode === 'new'" class="space-y-2">
-                            <Input
-                                v-model="newWordlistName"
-                                placeholder="Wordlist name (optional)..."
-                                class="w-full"
-                            />
-                            <Input
-                                v-model="newWordlistDescription"
-                                placeholder="Description (optional)..."
-                                class="w-full"
-                            />
+                        <div v-if="uploadMode === 'new'" class="space-y-3">
+                            <!-- Name with Slug Generation -->
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium">Name</label>
+                                <div class="relative">
+                                    <Input
+                                        v-model="newWordlistName"
+                                        placeholder="Wordlist name (optional)..."
+                                        class="w-full pr-10"
+                                        @input="handleNameInput"
+                                    />
+                                    <div class="absolute right-2 top-1/2 -translate-y-1/2">
+                                        <RefreshButton
+                                            :loading="slugGenerating"
+                                            :disabled="isUploading"
+                                            variant="ghost"
+                                            title="Generate random name"
+                                            @click="generateSlugName"
+                                        />
+                                    </div>
+                                </div>
+                                <p v-if="isSlugGenerated" class="text-xs text-muted-foreground">Random name generated - you can edit it or generate a new one</p>
+                            </div>
+                            <!-- Description -->
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium">Description</label>
+                                <Input
+                                    v-model="newWordlistDescription"
+                                    placeholder="Description (optional)..."
+                                    class="w-full"
+                                />
+                            </div>
                         </div>
                     </div>
             </div>
@@ -314,7 +335,9 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LoadingProgress } from '@/components/custom/loading';
+import RefreshButton from '@/components/custom/common/RefreshButton.vue';
 import { useWordlist } from '@/composables/useWordlist';
+import { useSlugGeneration } from '@/composables/useSlugGeneration';
 import { wordlistApi } from '@/api';
 
 interface Props {
@@ -336,6 +359,9 @@ const emit = defineEmits<{
     'wordlists-updated': [];
 }>();
 
+// Slug generation
+const { isGenerating: slugGenerating, generateSlugWithFallback } = useSlugGeneration();
+
 // Component state
 const fileInput = ref<HTMLInputElement>();
 const uploadedFiles = ref<File[]>([]);
@@ -347,6 +373,7 @@ const newWordlistDescription = ref('');
 const showAllWords = ref(false);
 const isDragging = ref(false);
 const isUploading = ref(false);
+const isSlugGenerated = ref(false);
 const uploadProgress = ref(0);
 const uploadStatus = ref('');
 const uploadStage = ref('');
@@ -364,14 +391,8 @@ const selectedWordlist = computed(() =>
 
 // Computed properties
 const modelValue = computed({
-    get: () => {
-        console.log('Modal get modelValue:', props.modelValue);
-        return props.modelValue;
-    },
-    set: (value) => {
-        console.log('Modal set modelValue:', value);
-        emit('update:modelValue', value);
-    },
+    get: () => props.modelValue,
+    set: (value) => emit('update:modelValue', value),
 });
 
 const displayedWords = computed(() => {
@@ -389,9 +410,7 @@ const canUpload = computed(() => {
 
 // Methods
 const closeModal = () => {
-    console.log('Closing modal - current modelValue:', modelValue.value);
     modelValue.value = false;
-    console.log('Modal closed - new modelValue:', modelValue.value);
     // State reset handled by modelValue watcher
 };
 
@@ -409,6 +428,23 @@ const resetState = () => {
     uploadStage.value = '';
     uploadStageDefinitions.value = [];
     uploadCategory.value = '';
+    isSlugGenerated.value = false;
+};
+
+// Slug generation methods
+const generateSlugName = async () => {
+    const slugName = await generateSlugWithFallback();
+    if (slugName) {
+        newWordlistName.value = slugName;
+        isSlugGenerated.value = true;
+    }
+};
+
+const handleNameInput = () => {
+    // Clear the slug generated flag when user manually types
+    if (isSlugGenerated.value) {
+        isSlugGenerated.value = false;
+    }
 };
 
 const onDrop = (event: DragEvent) => {
@@ -579,7 +615,6 @@ const handleUpload = async () => {
                 type: 'text/plain',
             });
 
-            console.log('Starting uploadWordlistStream...');
             const response = await wordlistApi.uploadWordlistStream(
                 file,
                 {
@@ -588,25 +623,14 @@ const handleUpload = async () => {
                         newWordlistDescription.value.trim() || undefined,
                 },
                 (stage, progress, message) => {
-                    console.log('Upload progress callback:', {
-                        stage,
-                        progress,
-                        message,
-                    });
                     uploadStage.value = stage;
                     uploadProgress.value = progress;
                     uploadStatus.value = message || `${stage}...`;
 
                     // Check if this is completion via progress callback
                     if (stage === 'COMPLETE' || progress === 100) {
-                        console.log(
-                            'Upload completion detected via progress callback'
-                        );
                         // Trigger close from progress callback as backup
                         setTimeout(async () => {
-                            console.log(
-                                'Triggering close from progress callback'
-                            );
                             await loadWordlists();
                             emit('uploaded', words);
                             emit('wordlists-updated');
@@ -615,32 +639,16 @@ const handleUpload = async () => {
                     }
                 },
                 (category, stages) => {
-                    console.log('Upload config callback:', {
-                        category,
-                        stages,
-                    });
                     uploadCategory.value = category;
                     uploadStageDefinitions.value = stages;
                 }
             );
-            console.log(
-                'uploadWordlistStream promise resolved with:',
-                response
-            );
 
             if (response) {
-                console.log(
-                    'Got successful response from uploadWordlistStream:',
-                    response
-                );
                 // Refresh wordlists and emit events
                 await loadWordlists();
                 emit('uploaded', words);
                 emit('wordlists-updated');
-            } else {
-                console.log(
-                    'No response from uploadWordlistStream - upload may have failed silently'
-                );
             }
         } else {
             // Add to existing wordlist - TODO: implement streaming endpoint
@@ -657,26 +665,9 @@ const handleUpload = async () => {
             emit('wordlists-updated');
         }
 
-        // Close modal immediately on completion - multiple approaches
+        // Close modal on completion
         uploadStatus.value = 'Complete!';
-        console.log(
-            'Upload completed successfully - closing modal via multiple methods'
-        );
-        console.log('isUploading before close:', isUploading.value);
-
-        // Method 1: Use closeModal function
         closeModal();
-
-        // Method 2: Direct emit (backup)
-        emit('update:modelValue', false);
-
-        // Method 3: Force modelValue assignment (emergency backup)
-        setTimeout(() => {
-            if (props.modelValue) {
-                console.log('Modal still open - forcing close');
-                modelValue.value = false;
-            }
-        }, 100);
     } catch (err) {
         console.error('Upload error:', err);
         error.value =
@@ -684,34 +675,43 @@ const handleUpload = async () => {
                 ? err.message
                 : 'Failed to upload words. Please try again.';
     } finally {
-        console.log('Finally block - setting isUploading to false');
         isUploading.value = false;
-        console.log('isUploading after finally:', isUploading.value);
     }
 };
+
+// Track if we've already generated on modal open to prevent duplicates
+const hasGeneratedOnOpen = ref(false);
 
 // Load wordlists when modal opens, reset when modal closes
 watch(
     () => props.modelValue,
     async (isOpen, wasOpen) => {
-        console.log('Modal modelValue watcher:', {
-            isOpen,
-            wasOpen,
-            wordlistsLength: wordlists.value.length,
-        });
-        if (isOpen && wordlists.value.length === 0) {
-            console.log('Loading wordlists...');
-            await loadWordlists();
+        if (isOpen) {
+            hasGeneratedOnOpen.value = false; // Reset the flag
+            if (wordlists.value.length === 0) {
+                await loadWordlists();
+            }
+            // Auto-generate slug when modal opens in "new" mode and name is empty
+            if (uploadMode.value === 'new' && !newWordlistName.value.trim()) {
+                await generateSlugName();
+                hasGeneratedOnOpen.value = true;
+            }
         } else if (!isOpen && wasOpen) {
-            console.log('Modal is closing - will reset state in 250ms');
             // Modal is closing - reset state after animation completes (250ms from Modal.vue)
             setTimeout(() => {
-                console.log('Resetting modal state');
                 resetState();
             }, 250);
         }
     }
 );
+
+// Auto-generate slug when switching to "new" mode and name is empty
+// Only if we haven't already generated on modal open
+watch(() => uploadMode.value, async (mode) => {
+    if (mode === 'new' && !newWordlistName.value.trim() && !hasGeneratedOnOpen.value) {
+        await generateSlugName();
+    }
+});
 
 // Watch for prop changes
 watch(

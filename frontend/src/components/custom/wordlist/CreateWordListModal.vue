@@ -1,5 +1,5 @@
 <template>
-  <Modal v-model="modelValue" :close-on-backdrop="false">
+  <Modal v-model="modelValue" :close-on-backdrop="!isCreating" max-width="md" max-height="viewport">
     <div class="w-full max-w-md mx-auto space-y-6">
       <!-- Header -->
       <div class="flex items-center justify-between">
@@ -16,18 +16,31 @@
 
       <!-- Form -->
       <div class="space-y-4">
-        <!-- Name -->
+        <!-- Name with Slug Generation -->
         <div class="space-y-2">
           <label class="text-sm font-medium">
             Name <span class="text-destructive">*</span>
           </label>
-          <Input
-            v-model="form.name"
-            placeholder="e.g., SAT Vocabulary, Business Terms..."
-            class="w-full"
-            :class="{ 'border-destructive': errors.name }"
-          />
+          <div class="relative">
+            <Input
+              v-model="form.name"
+              placeholder="e.g., SAT Vocabulary, Business Terms..."
+              class="w-full pr-10"
+              :class="{ 'border-destructive': errors.name }"
+              @input="handleNameInput"
+            />
+            <div class="absolute right-2 top-1/2 -translate-y-1/2">
+              <RefreshButton
+                :loading="slugGenerating"
+                :disabled="isCreating"
+                variant="ghost"
+                title="Generate random name"
+                @click="generateSlugName"
+              />
+            </div>
+          </div>
           <p v-if="errors.name" class="text-xs text-destructive">{{ errors.name }}</p>
+          <p v-if="isSlugGenerated" class="text-xs text-muted-foreground">Random name generated - you can edit it or generate a new one</p>
         </div>
 
         <!-- Description -->
@@ -83,23 +96,6 @@
           </div>
         </div>
 
-        <!-- Options -->
-        <div class="space-y-3">
-          <div class="flex items-center gap-2">
-            <input
-              id="is-public"
-              v-model="form.isPublic"
-              type="checkbox"
-              class="rounded border-border"
-            />
-            <label for="is-public" class="text-sm">
-              Make this wordlist public
-            </label>
-          </div>
-          <p class="text-xs text-muted-foreground ml-6">
-            Public wordlists can be discovered and used by other users.
-          </p>
-        </div>
 
         <!-- Word Preview -->
         <div v-if="parsedWords.length > 0" class="space-y-2">
@@ -168,11 +164,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { X } from 'lucide-vue-next';
 import { Modal } from '@/components/custom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import RefreshButton from '@/components/custom/common/RefreshButton.vue';
+import { useSlugGeneration } from '@/composables/useSlugGeneration';
+import { useWordlist } from '@/composables/useWordlist';
 import type { WordList, CreateWordListRequest } from '@/types';
 import { MasteryLevel, Temperature } from '@/types';
 
@@ -187,12 +186,17 @@ const emit = defineEmits<{
   created: [wordlist: WordList];
 }>();
 
+// Slug generation
+const { isGenerating: slugGenerating, generateSlugWithFallback } = useSlugGeneration();
+
+// Wordlist management
+const { createWordlist } = useWordlist();
+
 // Component state
 const form = ref({
   name: '',
   description: '',
   tags: [] as string[],
-  isPublic: false,
 });
 
 const initialWordsText = ref('');
@@ -200,6 +204,7 @@ const newTag = ref('');
 const showAllWords = ref(false);
 const isCreating = ref(false);
 const error = ref('');
+const isSlugGenerated = ref(false);
 
 const errors = ref({
   name: '',
@@ -243,13 +248,33 @@ const resetForm = () => {
     name: '',
     description: '',
     tags: [],
-    isPublic: false,
   };
   initialWordsText.value = '';
   newTag.value = '';
   showAllWords.value = false;
   error.value = '';
   errors.value = { name: '' };
+  isSlugGenerated.value = false;
+};
+
+// Slug generation methods
+const generateSlugName = async () => {
+  console.log('🎯 Generating slug for CreateWordListModal...')
+  const slugName = await generateSlugWithFallback();
+  console.log('🎯 Got slug name:', slugName)
+  if (slugName) {
+    console.log('🎯 Setting form name to:', slugName)
+    form.value.name = slugName;
+    isSlugGenerated.value = true;
+    console.log('🎯 Form name is now:', form.value.name)
+  }
+};
+
+const handleNameInput = () => {
+  // Clear the slug generated flag when user manually types
+  if (isSlugGenerated.value) {
+    isSlugGenerated.value = false;
+  }
 };
 
 const addTag = () => {
@@ -287,70 +312,22 @@ const handleCreate = async () => {
   error.value = '';
   
   try {
-    const request: CreateWordListRequest = {
-      name: form.value.name.trim(),
-      description: form.value.description.trim() || undefined,
-      words: parsedWords.value,
-      tags: form.value.tags,
-      is_public: form.value.isPublic,
-    };
+    // Create wordlist using the real API
+    const wordlist = await createWordlist(
+      form.value.name.trim(),
+      form.value.description.trim() || '',
+      parsedWords.value
+    );
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Create mock wordlist response
-    const mockWordlist: WordList = {
-      id: `wl_${Date.now()}`,
-      name: request.name,
-      description: request.description || '',
-      hash_id: `hash_${Date.now()}`,
-      words: request.words.map(word => ({
-        word: word,
-        frequency: 1,
-        selected_definition_ids: [],
-        mastery_level: MasteryLevel.BRONZE,
-        temperature: Temperature.COLD,
-        review_data: {
-          repetitions: 0,
-          ease_factor: 2.5,
-          interval: 1,
-          next_review_date: new Date().toISOString(),
-          last_review_date: null,
-          lapse_count: 0,
-          review_history: [],
-        },
-        last_visited: null,
-        added_date: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        notes: '',
-        tags: [],
-      })),
-      total_words: request.words.length,
-      unique_words: request.words.length,
-      learning_stats: {
-        total_reviews: 0,
-        words_mastered: 0,
-        average_ease_factor: 2.5,
-        retention_rate: 0,
-        streak_days: 0,
-        last_study_date: null,
-        study_time_minutes: 0,
-      },
-      last_accessed: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      metadata: {},
-      tags: request.tags || [],
-      is_public: request.is_public || false,
-      owner_id: 'current_user',
-    };
-    
-    // Emit the created event
-    emit('created', mockWordlist);
-    
-    // Close modal
-    closeModal();
+    if (wordlist) {
+      // Emit the created event
+      emit('created', wordlist);
+      
+      // Close modal
+      closeModal();
+    } else {
+      error.value = 'Failed to create wordlist. Please try again.';
+    }
     
   } catch (err) {
     console.error('Create wordlist error:', err);
@@ -364,6 +341,13 @@ const handleCreate = async () => {
 watch(() => form.value.name, () => {
   if (errors.value.name) {
     errors.value.name = '';
+  }
+});
+
+// Auto-generate slug when modal opens (only if name is empty)
+watch(() => props.modelValue, async (isOpen) => {
+  if (isOpen && !form.value.name.trim()) {
+    await generateSlugName();
   }
 });
 </script>

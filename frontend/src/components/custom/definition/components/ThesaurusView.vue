@@ -1,10 +1,24 @@
 <template>
+    <!-- Empty/Error State for Thesaurus -->
     <CardContent
-        v-if="thesaurusData"
+        v-if="!thesaurusData || !thesaurusData.synonyms || thesaurusData.synonyms.length === 0"
+        class="space-y-6 px-3 sm:px-6"
+    >
+        <ErrorState
+            :title="getEmptyThesaurusTitle()"
+            :message="getEmptyThesaurusMessage()"
+            error-type="no-synonyms"
+            :retryable="true"
+            @retry="$emit('retry-thesaurus')"
+        />
+    </CardContent>
+
+    <!-- Thesaurus Content -->
+    <CardContent
+        v-else-if="thesaurusData && thesaurusData.synonyms.length > 0"
         class="space-y-6 px-3 sm:px-6"
     >
         <div
-            v-if="thesaurusData.synonyms.length > 0"
             class="grid grid-cols-3 gap-1.5 sm:gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
         >
             <HoverCard 
@@ -91,6 +105,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { Sparkles } from 'lucide-vue-next';
 import { cn } from '@/utils';
 import { getHeatmapClass } from '../utils/formatting';
+import { ErrorState } from './';
 import type { ThesaurusEntry, CardVariant } from '@/types';
 
 interface ThesaurusViewProps {
@@ -102,5 +117,15 @@ defineProps<ThesaurusViewProps>();
 
 defineEmits<{
     'word-click': [word: string];
+    'retry-thesaurus': [];
 }>();
+
+// Helper functions for error states
+const getEmptyThesaurusTitle = () => {
+    return 'No Synonyms Found';
+};
+
+const getEmptyThesaurusMessage = () => {
+    return 'No synonyms were found for this word. This might be a specialized term or proper noun that doesn\'t have common alternatives.';
+};
 </script>

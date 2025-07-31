@@ -13,8 +13,13 @@ export function useSearchState() {
   // Reactive state with two-way bindings to store
   const state = reactive({
     // Store state (computed getters/setters)
-    get query() { return store.searchQuery; },
-    set query(value) { store.searchQuery = value; },
+    get query() { 
+        return store.searchQuery;
+    },
+    set query(value) { 
+        console.log('🔄 Setting query via useSearchState:', value);
+        store.searchQuery = value; 
+    },
     get searchResults() { return store.searchResults; },
     set searchResults(value) { store.searchResults = value; },
     get showResults() { return store.showSearchResults; },

@@ -62,6 +62,7 @@
                 @image-error="handleImageError"
                 @image-click="handleImageClick"
                 @images-updated="handleImagesUpdated"
+                @image-deleted="handleImageDeleted"
             />
 
             <!-- Progressive Header with Smart Skeletons -->
@@ -154,6 +155,7 @@
                                 :thesaurusData="store.currentThesaurus"
                                 :cardVariant="store.selectedCardVariant"
                                 @word-click="store.searchWord"
+                                @retry-thesaurus="handleRetryThesaurus"
                             />
                         </template>
 
@@ -392,6 +394,28 @@ const handleImagesUpdated = async (newImages: ImageMedia[]) => {
     }
 };
 
+const handleImageDeleted = async (imageId: string) => {
+    console.log('Image deleted, refreshing synthesized entry:', imageId);
+    
+    try {
+        // Refresh the synthesized entry to remove the deleted image reference
+        await store.refreshSynthEntryImages();
+        
+        store.showNotification({
+            type: 'success',
+            message: 'Image deleted successfully',
+            duration: 3000,
+        });
+    } catch (error) {
+        console.error('Failed to refresh entry after image deletion:', error);
+        store.showNotification({
+            type: 'error',
+            message: 'Image deleted but display may not be current. Try refreshing.',
+            duration: 5000,
+        });
+    }
+};
+
 const handleClusterNameUpdate = async (clusterId: string, newName: string) => {
     // Find the first definition in this cluster to update
     const definition = entry.value?.definitions?.find((def: any) => 
@@ -437,6 +461,21 @@ const handleSuggestAlternatives = () => {
     // Switch to suggestions mode or show alternative suggestions
     store.mode = 'suggestions';
     console.log('Suggesting alternatives for failed lookup');
+};
+
+const handleRetryThesaurus = async () => {
+    if (entry.value?.word) {
+        try {
+            await store.getThesaurusData(entry.value.word);
+        } catch (error) {
+            console.error('Failed to retry thesaurus lookup:', error);
+            store.showNotification({
+                type: 'error',
+                message: 'Failed to load thesaurus data. Please try again.',
+                duration: 3000
+            });
+        }
+    }
 };
 
 // Keyboard shortcuts using VueUse magic keys

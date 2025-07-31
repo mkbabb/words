@@ -98,10 +98,10 @@
                         "
                         :style="{
                             paddingLeft: iconOpacity > 0.1 ? '1rem' : '1.5rem',
-                            paddingRight: state.query.length > 0
-                                ? '5rem'
-                                : state.expandButtonVisible
-                                ? '3rem'
+                            paddingRight: state.query.length > 0 && state.isAIQuery
+                                ? '4.5rem'  // Both clear and expand buttons visible
+                                : state.query.length > 0 || state.isAIQuery
+                                ? '3rem'    // Either clear or expand button visible
                                 : iconOpacity > 0.1
                                   ? '1rem'
                                   : '1.5rem',
@@ -121,69 +121,72 @@
                         @input-click="handleInputClick"
                     />
 
-                    <!-- Clear Button -->
-                    <Transition
-                        enter-active-class="transition-all duration-200 ease-out"
-                        leave-active-class="transition-all duration-200 ease-in"
-                        enter-from-class="opacity-0 scale-90"
-                        leave-to-class="opacity-0 scale-90"
-                    >
-                        <button
-                            v-if="state.query.length > 0 && state.isFocused"
-                            @click.stop="clearQuery"
-                            :class="[
-                                'absolute right-2 top-1/2 -translate-y-1/2 z-20 rounded-md p-1 transition-all duration-200',
-                                'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
-                                state.isAIQuery
-                                    ? 'bg-transparent hover:bg-amber-100/80 dark:hover:bg-amber-900/40'
-                                    : 'bg-transparent hover:bg-muted/80'
-                            ]"
-                            title="Clear search"
+                    <!-- Button Container - positioned in bottom right -->
+                    <div class="absolute right-2 bottom-2 z-20 flex items-center gap-1">
+                        <!-- Expand Button -->
+                        <Transition
+                            enter-active-class="transition-all duration-200 ease-out"
+                            leave-active-class="transition-all duration-200 ease-in"
+                            enter-from-class="opacity-0 scale-90"
+                            leave-to-class="opacity-0 scale-90"
                         >
-                            <X
+                            <button
+                                v-if="state.isAIQuery && state.scrollProgress < 0.3"
                                 :class="[
-                                    'h-4 w-4',
+                                    'rounded-md p-1 transition-all duration-200',
+                                    'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
                                     state.isAIQuery
-                                        ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
-                                        : 'text-foreground/50 hover:text-foreground/70'
+                                        ? 'bg-amber-100/80 hover:bg-amber-200/80 dark:bg-amber-900/40 dark:hover:bg-amber-800/40'
+                                        : 'bg-muted/50 hover:bg-muted/80'
                                 ]"
-                            />
-                        </button>
-                    </Transition>
+                                :style="{
+                                    opacity: 1 - state.scrollProgress * 3,
+                                    transform: `scale(${1 - state.scrollProgress * 0.5})`
+                                }"
+                                @click.stop="handleExpandClick"
+                                title="Expand for longer input"
+                            >
+                                <Maximize2
+                                    :class="[
+                                        'h-4 w-4',
+                                        state.isAIQuery
+                                            ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
+                                            : 'text-foreground/70 hover:text-foreground'
+                                    ]"
+                                />
+                            </button>
+                        </Transition>
 
-                    <!-- Expand Button -->
-                    <Transition
-                        enter-active-class="transition-all duration-200 ease-out"
-                        leave-active-class="transition-all duration-200 ease-in"
-                        enter-from-class="opacity-0 scale-90"
-                        leave-to-class="opacity-0 scale-90"
-                    >
-                        <button
-                            v-if="state.expandButtonVisible && state.scrollProgress < 0.3 && state.query.length === 0"
-                            :class="[
-                                'absolute right-2 bottom-2 z-20 rounded-md p-1 transition-all duration-200',
-                                'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
-                                state.isAIQuery
-                                    ? 'bg-amber-100/80 hover:bg-amber-200/80 dark:bg-amber-900/40 dark:hover:bg-amber-800/40'
-                                    : 'bg-muted/50 hover:bg-muted/80'
-                            ]"
-                            :style="{
-                                opacity: 1 - state.scrollProgress * 3,
-                                transform: `scale(${1 - state.scrollProgress * 0.5})`
-                            }"
-                            @click.stop="handleExpandClick"
-                            title="Expand for longer input"
+                        <!-- Clear Button -->
+                        <Transition
+                            enter-active-class="transition-all duration-200 ease-out"
+                            leave-active-class="transition-all duration-200 ease-in"
+                            enter-from-class="opacity-0 scale-90"
+                            leave-to-class="opacity-0 scale-90"
                         >
-                            <Maximize2
+                            <button
+                                v-if="state.query.length > 0 && state.isFocused"
+                                @click.stop="clearQuery"
                                 :class="[
-                                    'h-4 w-4',
+                                    'rounded-md p-1 transition-all duration-200',
+                                    'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
                                     state.isAIQuery
-                                        ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
-                                        : 'text-foreground/70 hover:text-foreground'
+                                        ? 'bg-transparent hover:bg-amber-100/80 dark:hover:bg-amber-900/40'
+                                        : 'bg-transparent hover:bg-muted/80'
                                 ]"
-                            />
-                        </button>
-                    </Transition>
+                                title="Clear search"
+                            >
+                                <X
+                                    :class="[
+                                        'h-4 w-4',
+                                        state.isAIQuery
+                                            ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
+                                            : 'text-foreground/50 hover:text-foreground/70'
+                                    ]"
+                                />
+                            </button>
+                        </Transition>
+                    </div>
                 </div>
 
                 <!-- Hamburger Button -->
@@ -206,10 +209,14 @@
                 </div>
             </div>
 
-            <!-- Rainbow Progress Bar -->
-            <RainbowProgressBar
+            <!-- Thin Loading Progress Bar -->
+            <ThinLoadingProgress
                 :show="showProgressBar"
                 :progress="store.loadingProgress"
+                :current-stage="store.loadingStage"
+                :mode="state.searchMode"
+                :category="store.loadingCategory"
+                @click="handleProgressBarClick"
             />
 
             <!-- Dropdowns Container -->
@@ -291,7 +298,7 @@ import AutocompleteOverlay from './components/AutocompleteOverlay.vue';
 import SearchControls from './components/SearchControls.vue';
 import SearchResults from './components/SearchResults.vue';
 import ExpandModal from './components/ExpandModal.vue';
-import RainbowProgressBar from './components/RainbowProgressBar.vue';
+import ThinLoadingProgress from './components/ThinLoadingProgress.vue';
 import ConfirmDialog from '../ConfirmDialog.vue';
 
 // Import composables
@@ -306,7 +313,7 @@ import {
     useScrollAnimationSimple,
     useAutocomplete
 } from './composables';
-import { shouldShowExpandButton } from './utils/keyboard';
+import { shouldTriggerAIMode, hasAIModePattern } from './utils/ai-query';
 
 interface SearchBarProps {
     className?: string;
@@ -502,6 +509,11 @@ const handleForceRegenerate = () => {
     state.forceRefreshMode = !state.forceRefreshMode;
 };
 
+const handleProgressBarClick = () => {
+    // Reshow the loading progress modal when clicking the thin progress bar
+    store.showLoadingModal = true;
+};
+
 const clearQuery = () => {
     clearSearch();
     focusInput();
@@ -541,11 +553,6 @@ watch(
     () => {
         updateAutocomplete();
         state.autocompleteText = autocompleteText.value;
-        state.expandButtonVisible = shouldShowExpandButton(
-            state.isAIQuery,
-            state.query.length,
-            state.query.includes('\n')
-        );
     }
 );
 
@@ -629,15 +636,7 @@ onMounted(async () => {
     );
 
     // Watch for AI mode changes from store
-    watch(
-        () => store.sessionState?.isAIQuery,
-        (isAI) => {
-            if (isAI !== state.isAIQuery) {
-                state.isAIQuery = isAI;
-                state.showSparkle = isAI;
-            }
-        }
-    );
+    // AI mode is now non-persisted and dynamically determined by query
     
     // Also watch the store's isAIQuery ref directly
     watch(
@@ -681,13 +680,13 @@ onMounted(async () => {
         }
     });
 
-    // Restore AI state if persisted
-    if (store.sessionState.isAIQuery) {
-        state.isAIQuery = true;
-        state.showSparkle = true;
-        if (store.sessionState.aiQueryText && !state.query) {
-            state.query = store.sessionState.aiQueryText;
-        }
+    // Check current query for AI mode on page load (in lookup mode only)
+    if (store.searchMode === 'lookup' && state.query) {
+        const shouldBeAIMode = shouldTriggerAIMode(state.query);
+        state.isAIQuery = shouldBeAIMode;
+        state.showSparkle = shouldBeAIMode;
+        store.isAIQuery = shouldBeAIMode;
+        store.showSparkle = shouldBeAIMode;
     }
 
     // Get AI suggestions

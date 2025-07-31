@@ -16,10 +16,21 @@
             @click="$emit('interaction')"
             @keydown.enter="handleEnterKey"
         >
-            <!-- Search Mode Toggle -->
-            <div class="border-border/50 px-4 py-3 flex justify-center">
+            <!-- Header: Sidebar Toggle + Search Mode Toggle -->
+            <div class="border-border/50 px-4 py-3 flex justify-between items-center lg:justify-center">
+                <!-- Mobile Sidebar Toggle (far left) -->
+                <button
+                    class="lg:hidden p-2 rounded-lg hover:bg-muted/50 transition-colors duration-200"
+                    @click="$emit('toggle-sidebar')"
+                    title="Toggle Sidebar"
+                >
+                    <PanelLeft :size="20" class="text-muted-foreground" />
+                </button>
+                
+                <!-- Search Mode Toggle (center on mobile, full width on desktop) -->
                 <BouncyToggle
-                    v-model="searchMode"
+                    :model-value="searchMode"
+                    @update:model-value="handleModeChange"
                     :options="[
                         { label: 'Lookup', value: 'lookup' },
                         { label: 'Wordlist', value: 'wordlist' },
@@ -27,6 +38,9 @@
                     ]"
                     class="text-base font-bold"
                 />
+                
+                <!-- Spacer for mobile layout balance -->
+                <div class="lg:hidden w-10"></div>
             </div>
 
             <!-- Sources (Lookup Mode) -->
@@ -275,7 +289,7 @@ import { useRouter } from 'vue-router';
 import { useAppStore } from '@/stores';
 import { Button } from '@/components/ui';
 import { BouncyToggle } from '@/components/custom/animation';
-import { Flame, Clock, Trophy, Calendar, Eye, BarChart3 } from 'lucide-vue-next';
+import { Flame, Clock, Trophy, Calendar, Eye, BarChart3, PanelLeft } from 'lucide-vue-next';
 import ActionsRow from './ActionsRow.vue';
 import WordListSortBuilder from '../../wordlist/WordListSortBuilder.vue';
 import { DICTIONARY_SOURCES, LANGUAGES } from '../constants/sources';
@@ -400,6 +414,14 @@ const handleEnterKey = (event: KeyboardEvent) => {
     emit('execute-search');
 };
 
+// Handle mode change from BouncyToggle
+const handleModeChange = (newMode: SearchMode) => {
+    console.log('🎛️ SearchControls handleModeChange:', searchMode.value, '->', newMode);
+    if (newMode !== searchMode.value) {
+        store.setSearchMode(newMode, router);
+    }
+};
+
 // When noAI mode changes, ensure only one source is selected
 watch(noAI, (newValue) => {
     if (newValue && selectedSources.value.length > 1) {
@@ -453,13 +475,9 @@ onUnmounted(() => {
     document.removeEventListener('keydown', keydownHandler, true);
 });
 
-// Watch for search mode changes and handle router navigation
-watch(searchMode, (newMode, oldMode) => {
-    if (newMode !== oldMode) {
-        // Use the store's setSearchMode function to handle router navigation
-        store.setSearchMode(newMode, router);
-    }
-});
+// Note: SearchMode switching is handled directly via v-model binding to store.searchMode
+// The BouncyToggle component automatically updates the store when user clicks
+// No watcher needed here as the store's reactivity handles the rest
 
 defineExpose({
     element: controlsDropdown

@@ -85,12 +85,16 @@ const handleToggle = () => {
     // Handle router navigation for definition/thesaurus toggle
     if (store.searchMode === 'lookup' && store.searchQuery && store.searchQuery.trim()) {
         const currentWord = store.searchQuery;
-        if (newMode === 'thesaurus') {
-            router.push(`/thesaurus/${encodeURIComponent(currentWord)}`);
-        } else if (newMode === 'dictionary') {
-            router.push(`/definition/${encodeURIComponent(currentWord)}`);
+        try {
+            if (newMode === 'thesaurus') {
+                router.push(`/thesaurus/${encodeURIComponent(currentWord)}`);
+            } else if (newMode === 'dictionary') {
+                router.push(`/definition/${encodeURIComponent(currentWord)}`);
+            }
+            // Note: suggestions mode stays on the same route as it's an overlay mode
+        } catch (error) {
+            console.error('Router navigation error in ModeToggle:', error);
         }
-        // Note: suggestions mode stays on the same route as it's an overlay mode
     }
 };
 </script>

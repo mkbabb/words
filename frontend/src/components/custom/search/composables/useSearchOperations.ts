@@ -37,7 +37,7 @@ export function useSearchOperations(options: UseSearchOperationsOptions) {
       query: query.value,
       queryLength: query.value?.length || 0,
       isDirectLookup: store.isDirectLookup,
-      // isSwitchingModes: store.isSwitchingModes
+      isSwitchingModes: store.isSwitchingModes
     });
     
     clearSearchTimer();
@@ -45,6 +45,14 @@ export function useSearchOperations(options: UseSearchOperationsOptions) {
     // Skip search if this is a direct lookup from sidebar/controls
     if (store.isDirectLookup) {
       console.log('🔍 SEARCH OPERATIONS - Skipping search due to direct lookup');
+      store.searchResults = [];
+      store.showSearchResults = false;
+      return;
+    }
+    
+    // Skip search if we're switching modes
+    if (store.isSwitchingModes) {
+      console.log('🔍 SEARCH OPERATIONS - Skipping search due to mode switching');
       store.searchResults = [];
       store.showSearchResults = false;
       return;
@@ -77,18 +85,18 @@ export function useSearchOperations(options: UseSearchOperationsOptions) {
         // Show results if we have them and not doing a direct lookup
         store.showSearchResults = results.length > 0 && !store.isDirectLookup;
 
-        // Activate AI mode (but not during direct lookups)
-        if (results.length === 0 && shouldTriggerAIMode(query.value) && !store.isDirectLookup) {
+        // Activate AI mode (but only in lookup mode and not during direct lookups)
+        if (store.searchMode === 'lookup' && results.length === 0 && shouldTriggerAIMode(query.value) && !store.isDirectLookup) {
           store.isAIQuery = true;
           store.showSparkle = true;
-          store.sessionState.isAIQuery = true;
-          store.sessionState.aiQueryText = query.value;
+          // AI mode is now non-persisted - already set above
+          // aiQueryText removed - router handles query persistence
         } else if (!store.isDirectLookup) {
-          // Only reset AI mode if not doing a direct lookup (preserve existing state during lookup)
+          // Reset AI mode if not in lookup mode or not meeting AI criteria
           store.isAIQuery = false;
           store.showSparkle = false;
-          store.sessionState.isAIQuery = false;
-          store.sessionState.aiQueryText = '';
+          // AI mode is now non-persisted - already set above
+          // aiQueryText removed - router handles query persistence
         }
 
         // Call completion callback if provided

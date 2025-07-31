@@ -74,8 +74,9 @@ export const useTypewriter = (options: TypewriterOptions) => {
     
     const typeText = async () => {
         const chars = currentText.value.split('');
+        const startPosition = displayText.value.length;
         
-        for (let position = 0; position < chars.length && isTyping.value; position++) {
+        for (let position = startPosition; position < chars.length && isTyping.value; position++) {
             const currentChar = chars[position];
             const nextChar = chars[position + 1] || '';
             const prevChar = position > 0 ? chars[position - 1] : '';
@@ -170,6 +171,23 @@ export const useTypewriter = (options: TypewriterOptions) => {
         }
     };
 
+    const backspaceToPosition = async (targetLength: number) => {
+        if (isTyping.value || targetLength >= displayText.value.length || targetLength < 0) {
+            return;
+        }
+        
+        isTyping.value = true;
+        const charactersToRemove = displayText.value.length - targetLength;
+        
+        // Animate backspace to the target position
+        await animateBackspace(charactersToRemove);
+        
+        // Resume typing from the target position
+        isTyping.value = false;
+        await delay(200);
+        startTyping();
+    };
+
     return {
         displayText,
         isTyping,
@@ -177,6 +195,7 @@ export const useTypewriter = (options: TypewriterOptions) => {
         startTyping,
         stopTyping,
         reset,
-        updateText
+        updateText,
+        backspaceToPosition
     };
 };

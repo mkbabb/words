@@ -149,13 +149,17 @@ class ImageRepository(BaseRepository[ImageMedia, ImageCreate, ImageUpdate]):
 
         return image
 
-    async def delete(self, item_id: PydanticObjectId, cascade: bool = False) -> bool:
-        """Delete image."""
-        image = await self.get(item_id, raise_on_missing=True)
-        assert image is not None
-
-        # Note: cascade not applicable for images, but keeping for consistency
-        await image.delete()
+    async def delete(self, item_id: PydanticObjectId, cascade: bool = True) -> bool:
+        """Delete image with automatic reference cleanup."""
+        doc = await self.get(item_id, raise_on_missing=True)
+        assert doc is not None
+        
+        if cascade:
+            from ..services.cleanup_service import CleanupService
+            await CleanupService.cleanup_image_references(item_id)
+        
+        # Use Beanie's basic delete method
+        await doc.delete()
         return True
 
     async def get_by_format(self, format: str) -> builtins.list[ImageMedia]:
@@ -169,7 +173,7 @@ class ImageRepository(BaseRepository[ImageMedia, ImageCreate, ImageUpdate]):
         return []
 
     async def _cascade_delete(self, doc: ImageMedia) -> None:
-        """Handle cascade deletion of related documents."""
-        # For images, no cascade deletion is needed
-        # But we could clean up references in other documents if needed
+        """Handle cascade deletion - implemented via CleanupService in delete method."""
+        # This method is required by BaseRepository but we handle cascading 
+        # in the delete method using CleanupService for better separation of concerns
         pass

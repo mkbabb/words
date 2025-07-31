@@ -37,7 +37,23 @@
                         :key="image.id"
                         class="pl-1"
                     >
-                        <div class="relative h-32 sm:h-40 md:h-48 bg-muted/10 rounded-lg overflow-hidden">
+                        <div class="relative h-32 sm:h-40 md:h-48 bg-muted/10 rounded-lg overflow-hidden group">
+                            <!-- Delete button (only in edit mode) -->
+                            <button
+                                v-if="editMode"
+                                @click="handleDeleteImage(image.id, index)"
+                                :disabled="deletingImages.has(image.id)"
+                                class="absolute bottom-1 right-1 z-10 w-6 h-6 bg-destructive hover:bg-destructive/80 text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                :aria-label="`Delete image ${index + 1}`"
+                            >
+                                <svg v-if="!deletingImages.has(image.id)" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                                <svg v-else class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                </svg>
+                            </button>
+                            
                             <!-- Lazy Loading Implementation -->
                             <template v-if="shouldLoadImage(index)">
                                 <!-- Image Loaded State -->
@@ -52,8 +68,7 @@
                                                 <img 
                                                     :src="image.url"
                                                     :alt="image.alt_text || fallbackText"
-                                                    class="w-full h-full object-contain transition-all duration-300 hover:scale-105 cursor-pointer"
-                                                    @click="() => handleImageClick(image, index)"
+                                                    class="w-full h-full object-contain"
                                                 />
                                             </HoverCardTrigger>
                                             <HoverCardContent class="w-auto px-2 py-1" side="left" :sideOffset="8">
@@ -64,8 +79,7 @@
                                             v-else
                                             :src="image.url"
                                             :alt="image.alt_text || fallbackText"
-                                            class="w-full h-full object-contain transition-all duration-300 hover:scale-105 cursor-pointer"
-                                            @click="() => handleImageClick(image, index)"
+                                            class="w-full h-full object-contain"
                                         />
                                     </Transition>
                                 </template>
@@ -101,7 +115,7 @@
                     </CarouselItem>
                 </CarouselContent>
                 
-                <!-- Navigation Controls (only show when multiple items) -->
+                <!-- Navigation Controls (show when there are scrollable items) -->
                 <template v-if="totalCarouselItems > 1">
                     <CarouselPrevious
                         v-show="showControls"
@@ -144,6 +158,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import type { CarouselApi } from '@/components/ui/carousel';
 import ImageUploader from './ImageUploader.vue';
 import type { ImageMedia } from '@/types/api';
+import { mediaApi } from '@/api/media';
 
 interface ImageCarouselProps {
     images: ImageMedia[] | null;
@@ -160,6 +175,7 @@ const emit = defineEmits<{
     'image-error': [event: Event, imageIndex: number];
     'image-click': [image: ImageMedia, imageIndex: number];
     'images-updated': [images: ImageMedia[]];
+    'image-deleted': [imageId: string];
 }>();
 
 // State
@@ -167,6 +183,7 @@ const carouselApi = ref<CarouselApi>();
 const currentIndex = ref(0);
 const showControls = ref(false);
 const hideControlsTimeout = ref<NodeJS.Timeout | null>(null);
+const deletingImages = ref(new Set<string>()); // Track images being deleted
 
 // Computed properties
 const totalCarouselItems = computed(() => {
@@ -249,6 +266,39 @@ const handleImagesUpdated = () => {
     emit('images-updated', []);
 };
 
+const handleDeleteImage = async (imageId: string, index: number) => {
+    // Prevent duplicate deletion requests
+    if (deletingImages.value.has(imageId)) {
+        return;
+    }
+    
+    try {
+        // Mark image as being deleted
+        deletingImages.value.add(imageId);
+        
+        await mediaApi.deleteImage(imageId);
+        emit('image-deleted', imageId);
+        
+        // Remove from loaded images set
+        loadedImages.value.delete(index);
+        loadingImages.value.delete(index);
+        
+        // Adjust carousel if needed
+        if (carouselApi.value && props.images && props.images.length > 1) {
+            // If we deleted the last image, go to previous
+            if (currentIndex.value >= props.images.length - 1) {
+                carouselApi.value.scrollPrev();
+            }
+        }
+    } catch (error) {
+        console.error('Failed to delete image:', error);
+        // Could emit an error event here if needed
+    } finally {
+        // Always remove from deleting set
+        deletingImages.value.delete(imageId);
+    }
+};
+
 // Control visibility
 const scheduleHideControls = () => {
     if (hideControlsTimeout.value) {
@@ -261,7 +311,7 @@ const scheduleHideControls = () => {
 
 // Mouse hover handling (used for keyboard navigation context)
 const handleMouseEnter = () => {
-    if (props.images && props.images.length > 1) {
+    if (totalCarouselItems.value > 1) {
         showControls.value = true;
         if (hideControlsTimeout.value) {
             clearTimeout(hideControlsTimeout.value);
@@ -272,7 +322,7 @@ const handleMouseEnter = () => {
 
 // Keyboard navigation
 const handleKeydown = (event: KeyboardEvent) => {
-    if (!props.images || props.images.length <= 1 || !carouselApi.value) return;
+    if (totalCarouselItems.value <= 1 || !carouselApi.value) return;
     
     switch (event.key) {
         case 'ArrowLeft':
@@ -290,16 +340,30 @@ const handleKeydown = (event: KeyboardEvent) => {
 watch(() => props.images, () => {
     loadedImages.value.clear();
     loadingImages.value.clear();
+    deletingImages.value.clear(); // Clear deletion state
     currentIndex.value = 0;
     
     if (carouselApi.value) {
         carouselApi.value.scrollTo(0);
+        // Force carousel to recompute scroll state
+        nextTick(() => {
+            carouselApi.value?.reInit();
+        });
     }
     
     nextTick(() => {
         updateVisibleRange();
     });
 }, { immediate: true });
+
+// Watch for changes in total carousel items to refresh controls
+watch(totalCarouselItems, (newCount, oldCount) => {
+    if (newCount !== oldCount && carouselApi.value) {
+        nextTick(() => {
+            carouselApi.value?.reInit();
+        });
+    }
+});
 
 // Preload first image immediately
 watch(() => props.images, (newImages) => {

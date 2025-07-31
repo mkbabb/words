@@ -4,10 +4,11 @@
       :css="false"
       @enter="modalEnter"
       @leave="modalLeave"
+      @before-enter="beforeEnter"
     >
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-[9999] flex items-center justify-center"
+        class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
         @click="handleBackdropClick"
       >
         <!-- Backdrop with standard blue modal styling -->
@@ -21,12 +22,21 @@
           ]"
         />
         
-        <!-- Clean modal container -->
-        <div ref="contentRef" class="relative z-30 w-full max-w-4xl p-4">
-          <div class="modal-content relative mx-auto max-w-3xl rounded-2xl bg-background/80 backdrop-blur-md shadow-2xl cartoon-shadow-lg border border-border/30 overflow-hidden">
-            <div class="p-8 relative z-20">
-              <slot />
-            </div>
+        <!-- Modal container with proper height management and scrolling -->
+        <div 
+          ref="contentRef"
+          class="modal-content relative z-30 w-full rounded-2xl bg-background/80 backdrop-blur-md shadow-2xl cartoon-shadow-lg border border-border/30 overflow-hidden flex flex-col"
+          :class="[
+            maxWidthClass,
+            maxHeightClass,
+          ]"
+        >
+          <!-- Scrollable content area -->
+          <div 
+            class="flex-1 overflow-y-auto scrollbar-thin"
+            :class="paddingClass"
+          >
+            <slot />
           </div>
         </div>
       </div>
@@ -35,11 +45,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 interface Props {
   modelValue: boolean
   closeOnBackdrop?: boolean
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl'
+  maxHeight?: 'sm' | 'md' | 'lg' | 'xl' | 'screen' | 'viewport'
+  padding?: 'sm' | 'md' | 'lg' | 'xl'
 }
 
 interface Emits {
@@ -48,98 +61,142 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
   closeOnBackdrop: true,
+  maxWidth: '3xl',
+  maxHeight: 'viewport',
+  padding: 'lg',
 })
 
 const emit = defineEmits<Emits>()
+
+// Computed classes for configurability
+const maxWidthClass = computed(() => {
+  const widthMap = {
+    'sm': 'max-w-sm',
+    'md': 'max-w-md', 
+    'lg': 'max-w-lg',
+    'xl': 'max-w-xl',
+    '2xl': 'max-w-2xl',
+    '3xl': 'max-w-3xl',
+    '4xl': 'max-w-4xl',
+    '5xl': 'max-w-5xl',
+  }
+  return widthMap[props.maxWidth]
+})
+
+const maxHeightClass = computed(() => {
+  const heightMap = {
+    'sm': 'max-h-96',
+    'md': 'max-h-[32rem]',
+    'lg': 'max-h-[40rem]',
+    'xl': 'max-h-[48rem]',
+    'screen': 'max-h-screen',
+    'viewport': 'max-h-[calc(100vh-2rem)]',
+  }
+  return heightMap[props.maxHeight]
+})
+
+const paddingClass = computed(() => {
+  const paddingMap = {
+    'sm': 'p-4',
+    'md': 'p-6',
+    'lg': 'p-8',
+    'xl': 'p-10',
+  }
+  return paddingMap[props.padding]
+})
 
 // Refs for animation targets
 const backdropRef = ref<HTMLDivElement>()
 const contentRef = ref<HTMLDivElement>()
 
 const handleBackdropClick = (event: Event) => {
-  console.log('Backdrop click - closeOnBackdrop:', props.closeOnBackdrop)
   if (!props.closeOnBackdrop) return
   
   // Check if the click was on the backdrop (not on modal content)
   const target = event.target as Element
-  console.log('Click target:', target, 'Closest modal-content:', target.closest('.modal-content'))
   if (target.closest('.modal-content')) return
   
-  console.log('Emitting modal close via backdrop click')
   emit('update:modelValue', false)
 }
 
+// Before enter - prepare elements for animation
+const beforeEnter = (el: Element) => {
+  // Use refs directly since beforeEnter happens after element mount
+  if (backdropRef.value && contentRef.value) {
+    // Set initial states without transitions
+    backdropRef.value.style.transition = 'none'
+    contentRef.value.style.transition = 'none'
+    backdropRef.value.style.opacity = '0'
+    contentRef.value.style.opacity = '0'
+    contentRef.value.style.transform = 'scale(0.9) translateY(30px)'
+  }
+}
+
 // Smooth enter animation
-const modalEnter = (_el: Element, done: () => void) => {
-  const backdrop = backdropRef.value
-  const content = contentRef.value
-  
-  if (!backdrop || !content) {
+const modalEnter = (el: Element, done: () => void) => {
+  // Use refs directly for consistent element access
+  if (!backdropRef.value || !contentRef.value) {
     done()
     return
   }
   
-  // Initial states
-  backdrop.style.opacity = '0'
-  content.style.opacity = '0'
-  content.style.transform = 'scale(0.9) translateY(30px) rotate(0.5deg)'
+  // Force reflow to ensure initial styles are applied
+  backdropRef.value.offsetHeight
   
-  // Force reflow
-  backdrop.offsetHeight
-  
-  // Animate
+  // Start animations
   requestAnimationFrame(() => {
     // Backdrop fades in first
-    backdrop.style.transition = 'opacity 250ms cubic-bezier(0.25, 0.1, 0.25, 1)'
-    backdrop.style.opacity = '1'
+    backdropRef.value!.style.transition = 'opacity 250ms cubic-bezier(0.25, 0.1, 0.25, 1)'
+    backdropRef.value!.style.opacity = '1'
     
-    // Content appears slightly after with spring-like easing
+    // Content appears with spring-like easing
     setTimeout(() => {
-      content.style.transition = 'all 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-      content.style.opacity = '1'
-      content.style.transform = 'scale(1) translateY(0) rotate(0)'
+      contentRef.value!.style.transition = 'all 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+      contentRef.value!.style.opacity = '1'
+      contentRef.value!.style.transform = 'scale(1) translateY(0)'
       
       setTimeout(done, 400)
     }, 50)
   })
 }
 
-// Smooth leave animation
+// Smooth leave animation with better lifecycle handling
 const modalLeave = (el: Element, done: () => void) => {
-  const backdrop = backdropRef.value
-  const content = contentRef.value
+  // Find elements directly in the leaving element to avoid ref issues
+  const backdrop = el.querySelector('.absolute.inset-0') as HTMLElement
+  const content = el.querySelector('.modal-content') as HTMLElement
   
   if (!backdrop || !content) {
     done()
     return
   }
   
-  // Force current styles to be computed
-  const currentBackdropOpacity = window.getComputedStyle(backdrop).opacity
-  const currentContentOpacity = window.getComputedStyle(content).opacity
-  const currentContentTransform = window.getComputedStyle(content).transform
+  // Get current computed styles
+  const backdropOpacity = window.getComputedStyle(backdrop).opacity
+  const contentOpacity = window.getComputedStyle(content).opacity
+  const contentTransform = window.getComputedStyle(content).transform
   
-  // Set current state explicitly
-  backdrop.style.opacity = currentBackdropOpacity
-  content.style.opacity = currentContentOpacity
-  content.style.transform = currentContentTransform
+  // Set explicit starting values to prevent jumps
+  backdrop.style.transition = 'none'
+  content.style.transition = 'none'
+  backdrop.style.opacity = backdropOpacity
+  content.style.opacity = contentOpacity
+  content.style.transform = contentTransform
   
   // Force reflow
-  void (el as HTMLElement).offsetHeight
+  void el.offsetHeight
   
-  // Animate out with smooth easing
+  // Animate out
   requestAnimationFrame(() => {
-    content.style.transition = 'all 250ms cubic-bezier(0.6, -0.28, 0.735, 0.045)'
-    content.style.opacity = '0'
-    content.style.transform = 'scale(0.95) translateY(20px) rotate(-0.5deg)'
-    
-    // Backdrop fades out simultaneously
     backdrop.style.transition = 'opacity 250ms cubic-bezier(0.4, 0, 1, 1)'
+    content.style.transition = 'all 250ms cubic-bezier(0.6, -0.28, 0.735, 0.045)'
+    
     backdrop.style.opacity = '0'
+    content.style.opacity = '0'
+    content.style.transform = 'scale(0.95) translateY(20px)'
+    
+    setTimeout(done, 250)
   })
-  
-  // Wait for the longest animation to complete
-  setTimeout(done, 250)
 }
 
 // Handle escape key and body scroll prevention
@@ -169,7 +226,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-
 /* Safari-specific fixes for backdrop blur flickering */
 @supports (-webkit-backdrop-filter: blur(1px)) {
   [style*="backdrop-filter"] {
