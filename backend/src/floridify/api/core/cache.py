@@ -7,27 +7,11 @@ from functools import wraps
 from typing import Any
 
 import orjson
-from beanie import PydanticObjectId
-from bson import ObjectId
 from fastapi import Request, Response
 from pydantic import BaseModel
 
 from ...caching.cache_manager import CacheManager, get_cache_manager
 
-
-def _ensure_json_serializable(obj: Any) -> Any:
-    """Recursively convert ObjectIds to strings for JSON serialization."""
-    if isinstance(obj, (ObjectId, PydanticObjectId)):
-        return str(obj)
-    elif isinstance(obj, dict):
-        return {k: _ensure_json_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [_ensure_json_serializable(item) for item in obj]
-    elif isinstance(obj, tuple):
-        return tuple(_ensure_json_serializable(item) for item in obj)
-    elif hasattr(obj, 'model_dump'):
-        return obj.model_dump(mode="json")
-    return obj
 
 
 class APICacheConfig(BaseModel):
@@ -116,15 +100,13 @@ def cached_endpoint(
                 if isinstance(result, BaseModel):
                     content = result.model_dump_json()
                 else:
-                    # Ensure result is JSON-serializable
-                    json_data = _ensure_json_serializable(result)
-                    content = orjson.dumps(json_data).decode()
+                    content = orjson.dumps(result).decode()
                 etag = hashlib.md5(content.encode()).hexdigest()
                 response.headers["ETag"] = f'"{etag}"'
 
             # Cache the response  
             cache_data = {
-                "data": result.model_dump(mode="json") if isinstance(result, BaseModel) else _ensure_json_serializable(result),
+                "data": result.model_dump(mode="json") if isinstance(result, BaseModel) else result,
                 "etag": response.headers.get("ETag", "").strip('"'),
                 "timestamp": datetime.utcnow().isoformat(),
                 "status_code": response.status_code,

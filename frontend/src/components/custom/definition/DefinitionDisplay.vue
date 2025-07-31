@@ -17,7 +17,7 @@
                 :images="allImages"
                 :fallbackText="entry.word"
                 :editMode="editModeEnabled"
-                :synthEntryId="entry.synth_entry_id || undefined"
+                :synthEntryId="entry.id || undefined"
                 @image-error="handleImageError"
                 @image-click="handleImageClick"
                 @images-updated="handleImagesUpdated"
@@ -100,9 +100,9 @@
             </div>
             
             <!-- Synth Entry ID (for debugging) -->
-            <div v-if="entry.synth_entry_id" class="flex justify-center mt-4">
+            <div v-if="entry.id" class="flex justify-center mt-4">
                 <div class="text-xs text-muted-foreground/50 px-3 py-1 border border-border/30 rounded-md bg-background/50">
-                    {{ entry.synth_entry_id }}
+                    {{ entry.id }}
                 </div>
             </div>
         </ThemedCard>
@@ -198,8 +198,8 @@ const handleImageClick = baseHandleImageClick;
 
 const handleImagesUpdated = async () => {
     // Refresh the current entry to get updated image data
-    if (entry.value?.synth_entry_id) {
-        await store.refreshSynthEntry(entry.value.synth_entry_id);
+    if (entry.value?.id) {
+        await store.refreshSynthEntry(entry.value.id);
     }
 };
 

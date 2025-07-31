@@ -10,7 +10,7 @@ from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..constants import DictionaryProvider, Language
-from .base import BaseMetadata, DocumentWithObjectIdSupport, Etymology, ModelInfo
+from .base import BaseMetadata, Etymology, ModelInfo
 from .relationships import (
     Collocation,
     GrammarPattern,
@@ -20,7 +20,7 @@ from .relationships import (
 )
 
 
-class Pronunciation(DocumentWithObjectIdSupport):
+class Pronunciation(Document, BaseMetadata):
     """Pronunciation with multi-format support."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
@@ -45,7 +45,7 @@ class LiteratureSource(BaseModel):
     context: str | None = None  # Surrounding text for context
 
 
-class Example(DocumentWithObjectIdSupport):
+class Example(Document, BaseMetadata):
     """Example storage with type discrimination."""
 
     definition_id: PydanticObjectId  # FK to Definition - optimized with ObjectId
@@ -63,7 +63,7 @@ class Example(DocumentWithObjectIdSupport):
         name = "examples"
 
 
-class Fact(DocumentWithObjectIdSupport):
+class Fact(Document, BaseMetadata):
     """Interesting fact about a word."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
@@ -76,7 +76,7 @@ class Fact(DocumentWithObjectIdSupport):
         name = "facts"
 
 
-class Definition(DocumentWithObjectIdSupport):
+class Definition(Document, BaseMetadata):
     """Single definition with examples and comprehensive linguistic data."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
@@ -117,7 +117,7 @@ class Definition(DocumentWithObjectIdSupport):
         indexes = ["word_id", "part_of_speech", [("word_id", 1), ("part_of_speech", 1)]]
 
 
-class ProviderData(DocumentWithObjectIdSupport):
+class ProviderData(Document, BaseMetadata):
     """Raw data from a dictionary provider."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
@@ -136,7 +136,7 @@ class ProviderData(DocumentWithObjectIdSupport):
         indexes = ["word_id", "provider", [("word_id", 1), ("provider", 1)]]
 
 
-class Word(DocumentWithObjectIdSupport):
+class Word(Document, BaseMetadata):
     """Core word entity."""
 
     text: str
@@ -159,7 +159,7 @@ class Word(DocumentWithObjectIdSupport):
         ]
 
 
-class SynthesizedDictionaryEntry(DocumentWithObjectIdSupport):
+class SynthesizedDictionaryEntry(Document, BaseMetadata):
     """AI-synthesized entry with full provenance."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId

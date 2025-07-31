@@ -15,10 +15,10 @@ from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, StateTracker
 from ...core.streaming import create_streaming_response
-from ...models import Definition, ImageMedia, Word
+# Models are loaded through the SynthesizedDictionaryEntryLoader
 from ...utils.logging import get_logger
 from ...utils.sanitization import validate_word_input
-from ..services.loaders import DefinitionLoader, PronunciationLoader
+from ..services.loaders import SynthesizedDictionaryEntryLoader
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -29,39 +29,32 @@ router = APIRouter()
 
 
 # Models specific to lookup endpoints
-class DefinitionResponse(BaseModel):
-    """Definition with resolved references for API response."""
+class DictionaryEntryResponse(BaseModel):
+    """Complete dictionary entry response with all resolved data."""
 
-    # Core fields
-    id: str  # Definition ID for frontend editing
-    created_at: datetime
-    updated_at: datetime
-    version: int
-    part_of_speech: str
-    text: str
-    meaning_cluster: dict[str, Any] | None = None
-    sense_number: str | None = None
+    # Entry metadata
+    word: str = Field(..., description="The word that was looked up")
+    id: str | None = Field(None, description="ID of the synthesized dictionary entry")
+    last_updated: datetime = Field(..., description="When this entry was last updated")
+    model_info: dict[str, Any] | None = Field(
+        None, description="AI model information (null for non-AI entries)"
+    )
 
-    # Resolved references (not IDs)
-    word_forms: list[dict[str, Any]] = []
-    examples: list[dict[str, Any]] = []  # Resolved Example objects
-    images: list[dict[str, Any]] = []  # Resolved ImageMedia objects
+    # Pronunciation
+    pronunciation: dict[str, Any] | None = Field(None, description="Pronunciation information")
 
-    # Direct fields
-    synonyms: list[str] = []
-    antonyms: list[str] = []
-    language_register: str | None = None
-    domain: str | None = None
-    region: str | None = None
-    usage_notes: list[dict[str, Any]] = []
-    grammar_patterns: list[dict[str, Any]] = []
-    collocations: list[dict[str, Any]] = []
-    transitivity: str | None = None
-    cefr_level: str | None = None
-    frequency_band: int | None = None
+    # Etymology
+    etymology: dict[str, Any] | None = Field(None, description="Etymology information")
 
-    # Provider info (resolved, not IDs)
-    providers_data: list[dict[str, Any]] = []  # All provider data sources
+    # Images attached to the entry
+    images: list[dict[str, Any]] = Field(
+        default_factory=list, description="Images attached to the synthesized entry"
+    )
+
+    # Definitions with all resolved data
+    definitions: list[dict[str, Any]] = Field(
+        default_factory=list, description="Word definitions with all resolved data"
+    )
 
 
 class LookupParams(BaseModel):
@@ -74,25 +67,6 @@ class LookupParams(BaseModel):
     )
     languages: list[Language] = Field(default=[Language.ENGLISH], description="Languages to query")
     no_ai: bool = Field(default=False, description="Skip AI synthesis")
-
-
-class LookupResponse(BaseModel):
-    """Response for word lookup."""
-
-    word: str = Field(..., description="The word that was looked up")
-    pronunciation: dict[str, Any] | None = Field(None, description="Pronunciation information")
-    definitions: list[DefinitionResponse] = Field(
-        default_factory=list, description="Word definitions with resolved examples"
-    )
-    etymology: dict[str, Any] | None = Field(None, description="Etymology information")
-    last_updated: datetime = Field(..., description="When this entry was last updated")
-    model_info: dict[str, Any] | None = Field(
-        None, description="AI model information (null for non-AI entries)"
-    )
-    synth_entry_id: str | None = Field(None, description="ID of the synthesized dictionary entry")
-    images: list[dict[str, Any]] = Field(
-        default_factory=list, description="Images attached to the synthesized entry"
-    )
 
 
 def parse_lookup_params(
@@ -139,13 +113,14 @@ def parse_lookup_params(
     key_func=lambda word, params: (
         "api_lookup",
         word,
+        params.languages,
         params.force_refresh,
         tuple(params.providers),
         params.no_ai,
     ),
     max_wait_time=60.0,  # Wait up to 60 seconds for AI synthesis
 )
-async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | None:
+async def _cached_lookup(word: str, params: LookupParams) -> DictionaryEntryResponse | None:
     """Cached word lookup implementation."""
     logger.info(f"Looking up word: {word}")
 
@@ -153,7 +128,7 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
     entry = await lookup_word_pipeline(
         word=word,
         providers=params.providers,
-        languages=[Language.ENGLISH],
+        languages=params.languages,
         force_refresh=params.force_refresh,
         no_ai=params.no_ai,
         state_tracker=None,  # No state tracking for cached lookups
@@ -162,73 +137,23 @@ async def _cached_lookup(word: str, params: LookupParams) -> LookupResponse | No
     if not entry:
         return None
 
-    # Load definitions using the centralized loader
-    definitions = []
-    if entry.definition_ids:
-        # Load definitions with all relations
-        for def_id in entry.definition_ids:
-            definition = await Definition.get(def_id)
-            if definition:
-                # Use the loader to get fully resolved definition
-                def_dict = await DefinitionLoader.load_with_relations(
-                    definition=definition,
-                    include_examples=True,
-                    include_images=True,
-                    include_provider_data=True,
-                    provider_data_ids=[str(pid) for pid in entry.source_provider_data_ids] if entry.source_provider_data_ids else None,
-                )
-
-                # Create DefinitionResponse from the loaded data
-                def_response = DefinitionResponse(**def_dict)
-                definitions.append(def_response)
-
-    # Load pronunciation with audio files using the service
-    pronunciation = None
-    if entry.pronunciation_id is not None:
-        pronunciation = await PronunciationLoader.load_with_audio(str(entry.pronunciation_id) if entry.pronunciation_id else None)
-
-    # Load word
-    word_obj = await Word.get(entry.word_id)
-    word_text = word_obj.text if word_obj else "unknown"
-
-    # Load images for the synth entry itself
-    synth_images = []
-    if entry.image_ids:
-        for image_id in entry.image_ids:
-            image = await ImageMedia.get(image_id)
-            if image:
-                image_dict = image.model_dump(mode="json", exclude={"data"})
-                synth_images.append(image_dict)
-
+    # Use the centralized loader to convert to LookupResponse
     try:
-        response = LookupResponse(
-            word=word_text,
-            pronunciation=pronunciation,
-            definitions=definitions,
-            etymology=entry.etymology.model_dump(mode="json") if entry.etymology else None,
-            last_updated=entry.updated_at,  # Use updated_at from BaseMetadata
-            model_info=entry.model_info.model_dump(mode="json") if entry.model_info else None,
-            synth_entry_id=str(entry.id),
-            images=synth_images,  # Images attached to synth entry
+        response_dict = await SynthesizedDictionaryEntryLoader.load_as_lookup_response(
+            entry=entry,
         )
-        return response
+        
+        return DictionaryEntryResponse(**response_dict)
     except Exception as e:
         logger.error(f"Error creating LookupResponse: {e}")
-        logger.error(f"word_text type: {type(word_text)}")
-        logger.error(f"pronunciation type: {type(pronunciation)}")
-        logger.error(f"pronunciation content: {pronunciation}")
-        logger.error(f"definitions type: {type(definitions)}")
-        logger.error(f"definitions count: {len(definitions) if definitions else 0}")
-        if definitions and len(definitions) > 0:
-            logger.error(f"First definition type: {type(definitions[0])}")
         raise
 
 
-@router.get("/lookup/{word}", response_model=LookupResponse)
+@router.get("/lookup/{word}", response_model=DictionaryEntryResponse)
 async def lookup_word(
     word: str,
     params: LookupParams = Depends(parse_lookup_params),
-) -> LookupResponse:
+) -> DictionaryEntryResponse:
     """Comprehensive word definition lookup with AI-enhanced synthesis.
 
     Args:
@@ -283,7 +208,7 @@ async def lookup_word(
 
 async def _lookup_with_tracking(
     word: str, params: LookupParams, state_tracker: StateTracker
-) -> LookupResponse | None:
+) -> DictionaryEntryResponse | None:
     """Perform lookup with state tracking using the generalized system."""
     try:
         # Sanitize and validate word input
@@ -311,59 +236,17 @@ async def _lookup_with_tracking(
             await state_tracker.update_complete(message="Word not found")
             return None
 
-        # Load definitions using the centralized loader
+        # Load the entry using the centralized loader
         await state_tracker.update(
             stage=Stages.COMPLETE, progress=90, message="Loading definition details..."
         )
 
-        definitions = []
-        if entry.definition_ids:
-            # Load definitions with all relations
-            for def_id in entry.definition_ids:
-                definition = await Definition.get(def_id)
-                if definition:
-                    # Use the loader to get fully resolved definition
-                    def_dict = await DefinitionLoader.load_with_relations(
-                        definition=definition,
-                        include_examples=True,
-                        include_images=True,
-                        include_provider_data=True,
-                        provider_data_ids=[str(pid) for pid in entry.source_provider_data_ids] if entry.source_provider_data_ids else None,
-                    )
-
-                    # Create DefinitionResponse from the loaded data
-                    def_response = DefinitionResponse(**def_dict)
-                    definitions.append(def_response)
-
-        # Load pronunciation with audio files
-        pronunciation = None
-        if entry.pronunciation_id:
-            pronunciation = await PronunciationLoader.load_with_audio(str(entry.pronunciation_id) if entry.pronunciation_id else None)
-
-        # Load word
-        word_obj = await Word.get(entry.word_id)
-        word_text = word_obj.text if word_obj else "unknown"
-
-        # Load images for the synth entry
-        synth_images = []
-        if entry.image_ids:
-            for image_id in entry.image_ids:
-                image = await ImageMedia.get(image_id)
-                if image:
-                    image_dict = image.model_dump(mode="json", exclude={"data"})
-                    synth_images.append(image_dict)
-
-        # Convert to response model
-        result = LookupResponse(
-            word=word_text,
-            pronunciation=pronunciation,
-            definitions=definitions,
-            etymology=entry.etymology.model_dump(mode="json") if entry.etymology else None,
-            last_updated=entry.updated_at,  # Use updated_at from BaseMetadata
-            model_info=entry.model_info.model_dump(mode="json") if entry.model_info else None,
-            synth_entry_id=str(entry.id),
-            images=synth_images,  # Include images
+        # Use the centralized loader to convert to LookupResponse
+        response_dict = await SynthesizedDictionaryEntryLoader.load_as_lookup_response(
+            entry=entry,
         )
+        
+        result = DictionaryEntryResponse(**response_dict)
 
         # Mark as complete with result data
         await state_tracker.update_complete(message=f"Found {len(result.definitions)} definitions")
@@ -407,7 +290,7 @@ async def lookup_word_stream(
     # Create state tracker for lookup process
     state_tracker = StateTracker(category="lookup")
 
-    async def lookup_process() -> LookupResponse | None:
+    async def lookup_process() -> DictionaryEntryResponse | None:
         """Perform the lookup process while updating state tracker."""
         return await _lookup_with_tracking(word, params, state_tracker)
 

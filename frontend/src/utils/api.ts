@@ -1,6 +1,6 @@
 import axios, { type AxiosResponse } from 'axios';
 import type {
-  LookupResponse,
+  DictionaryEntryResponse,
   SearchResponse,
   SearchResult,
   AIResponse,
@@ -133,7 +133,7 @@ export const dictionaryApi = {
       if (options?.languages?.length) params.languages = options.languages;
       if (options?.noAI) params.no_ai = true;
       
-      const response = await api.get<LookupResponse>(`/lookup/${encodeURIComponent(word)}`, {
+      const response = await api.get<DictionaryEntryResponse>(`/lookup/${encodeURIComponent(word)}`, {
         params
       });
       
@@ -282,7 +282,7 @@ export const dictionaryApi = {
   async getSynonyms(word: string): Promise<ThesaurusEntry> {
     try {
       // Get word context from lookup
-      const lookupResponse = await api.get<LookupResponse>(`/lookup/${encodeURIComponent(word)}`);
+      const lookupResponse = await api.get<DictionaryEntryResponse>(`/lookup/${encodeURIComponent(word)}`);
       
       if (!lookupResponse.data?.definitions?.length) {
         throw new Error('No definitions found for word');

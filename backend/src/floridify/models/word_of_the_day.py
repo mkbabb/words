@@ -9,7 +9,7 @@ from typing import Any
 from beanie import Document
 from pydantic import BaseModel, Field
 
-from .base import DocumentWithObjectIdSupport
+from .base import BaseMetadata
 
 
 class NotificationFrequency(str, Enum):
@@ -63,7 +63,7 @@ class WordOfTheDayEntry(BaseModel):
     sent_at: datetime | None = Field(default=None, description="When this entry was sent to users")
 
 
-class WordOfTheDayBatch(DocumentWithObjectIdSupport):
+class WordOfTheDayBatch(Document, BaseMetadata):
     """A batch of Word of the Day entries with configuration."""
 
     context: str = Field(default="", description="Context steering for word generation")
@@ -155,7 +155,7 @@ class WordOfTheDayBatch(DocumentWithObjectIdSupport):
             await self.save()
 
 
-class WordOfTheDayConfig(DocumentWithObjectIdSupport):
+class WordOfTheDayConfig(Document, BaseMetadata):
     """Global configuration for Word of the Day system."""
 
     default_batch_size: int = Field(

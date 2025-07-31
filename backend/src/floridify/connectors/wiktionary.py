@@ -12,7 +12,7 @@ import wikitextparser as wtp  # type: ignore[import-untyped]
 from beanie import PydanticObjectId
 
 from ..caching import get_cached_http_client
-from ..constants import Language
+from ..constants import DictionaryProvider, Language
 from ..core.state_tracker import Stages, StateTracker
 from ..models import (
     Collocation,
@@ -29,19 +29,6 @@ from ..utils.logging import get_logger
 from .base import DictionaryConnector
 
 logger = get_logger(__name__)
-
-
-@dataclass
-class WiktionaryExtractedData:
-    """Container for all extracted Wiktionary data."""
-
-    definitions: list[Definition]
-    etymology: str | None = None
-    pronunciation: Pronunciation | None = None
-    alternative_forms: list[str] | None = None
-    related_terms: list[str] | None = None
-    usage_notes: list[str] | None = None
-    quotations: list[dict[str, str]] | None = None
 
 
 class WikitextCleaner:
@@ -88,8 +75,12 @@ class WikitextCleaner:
         # Final cleanup with regex
         cleaned = re.sub(r"<[^>]+>", "", cleaned)  # Remove HTML tags
         cleaned = re.sub(r"\{\{[^}]*\}\}", "", cleaned)  # Remove remaining templates
-        cleaned = re.sub(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]", r"\1", cleaned)  # Clean links
-        cleaned = re.sub(r"<ref[^>]*>.*?</ref>", "", cleaned, flags=re.DOTALL)  # Remove refs
+        cleaned = re.sub(
+            r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]", r"\1", cleaned
+        )  # Clean links
+        cleaned = re.sub(
+            r"<ref[^>]*>.*?</ref>", "", cleaned, flags=re.DOTALL
+        )  # Remove refs
 
         # Decode HTML entities
         cleaned = html.unescape(cleaned)
@@ -135,12 +126,12 @@ class WiktionaryConnector(DictionaryConnector):
         self.cleaner = WikitextCleaner()
 
     @property
-    def provider_name(self) -> str:
-        return "wiktionary"
+    def provider_name(self) -> DictionaryProvider:
+        return DictionaryProvider.WIKTIONARY
 
     async def fetch_definition(
         self,
-        word: str,
+        word_obj: Word,
         state_tracker: StateTracker | None = None,
     ) -> ProviderData | None:
         """Fetch comprehensive definition data from Wiktionary."""
@@ -151,22 +142,10 @@ class WiktionaryConnector(DictionaryConnector):
             if state_tracker:
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
 
-            # First, get or create the Word document
-            storage = await get_storage()
-            word_obj = await storage.get_word(word)
-            if not word_obj:
-                # Create new Word if doesn't exist
-                word_obj = Word(
-                    text=word,
-                    normalized=word.lower(),
-                    language=Language.ENGLISH,
-                )
-                await word_obj.save()
-
             params = {
                 "action": "query",
                 "prop": "revisions",
-                "titles": word,
+                "titles": word_obj.text,
                 "rvslots": "*",
                 "rvprop": "content",
                 "formatversion": "2",
@@ -184,7 +163,7 @@ class WiktionaryConnector(DictionaryConnector):
                         state_tracker.update(
                             stage="PROVIDER_FETCH_HTTP_CONNECTING",
                             message=f"Connecting to {self.provider_name}",
-                            details={"word": word, **metadata},
+                            details={"word": word_obj.text, **metadata},
                         )
                     )
                 elif stage == "downloaded":
@@ -194,7 +173,7 @@ class WiktionaryConnector(DictionaryConnector):
                             state_tracker.update(
                                 stage="PROVIDER_FETCH_HTTP_DOWNLOADING",
                                 message=f"Downloading from {self.provider_name}",
-                                details={"word": word, **metadata},
+                                details={"word": word_obj.text, **metadata},
                             )
                         )
 
@@ -202,7 +181,9 @@ class WiktionaryConnector(DictionaryConnector):
                 self.base_url,
                 params=params,
                 ttl_hours=24.0,
-                headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
+                headers={
+                    "User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"
+                },
                 timeout=120.0,
                 progress_callback=http_progress_callback if state_tracker else None,
             )
@@ -221,7 +202,9 @@ class WiktionaryConnector(DictionaryConnector):
                     self.base_url,
                     params=params,
                     force_refresh=True,
-                    headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
+                    headers={
+                        "User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"
+                    },
                     timeout=120.0,
                     progress_callback=http_progress_callback if state_tracker else None,
                 )
@@ -231,13 +214,17 @@ class WiktionaryConnector(DictionaryConnector):
 
             # Report parsing start
             if state_tracker:
-                await state_tracker.update(stage=Stages.PROVIDER_FETCH_HTTP_PARSING, progress=55)
+                await state_tracker.update(
+                    stage=Stages.PROVIDER_FETCH_HTTP_PARSING, progress=55
+                )
 
-            result = await self._parse_wiktionary_response(word, data, word_obj)
+            result = await self._parse_wiktionary_response(word_obj, data)
 
             # Report completion
             if state_tracker:
-                await state_tracker.update(stage=Stages.PROVIDER_FETCH_HTTP_COMPLETE, progress=58)
+                await state_tracker.update(
+                    stage=Stages.PROVIDER_FETCH_HTTP_COMPLETE, progress=58
+                )
 
             return result
 
@@ -245,11 +232,13 @@ class WiktionaryConnector(DictionaryConnector):
             if state_tracker:
                 await state_tracker.update_error(f"Provider error: {str(e)}")
 
-            logger.error(f"Error fetching {word} from Wiktionary: {e}")
+            logger.error(f"Error fetching {word_obj.text} from Wiktionary: {e}")
             return None
 
     async def _parse_wiktionary_response(
-        self, word: str, data: dict[str, Any], word_obj: Word
+        self,
+        word_obj: Word,
+        data: dict[str, Any],
     ) -> ProviderData | None:
         """Parse Wiktionary response comprehensively."""
         try:
@@ -260,36 +249,15 @@ class WiktionaryConnector(DictionaryConnector):
             content = pages[0]["revisions"][0]["slots"]["main"]["content"]
 
             # Extract all components comprehensively
-            extracted_data = await self._extract_comprehensive_data(content, word_obj)
-
-            # Create raw metadata for base class to use
-            raw_metadata = {
-                "wikitext_sample": content[:1000],
-                "definitions": extracted_data.definitions,
-                "etymology": extracted_data.etymology,
-                "pronunciation": (
-                    extracted_data.pronunciation.model_dump()
-                    if extracted_data.pronunciation
-                    else None
-                ),
-                "alternative_forms": extracted_data.alternative_forms,
-                "related_terms": extracted_data.related_terms,
-                "usage_notes": extracted_data.usage_notes,
-                "quotations": extracted_data.quotations,
-                # Store definition count for debugging, not the actual objects
-                "definition_count": len(extracted_data.definitions),
-            }
-
-            # Use base class method to normalize and save
-            return await self._normalize_response(raw_metadata, word_obj)
+            return await self._extract_comprehensive_data(content, word_obj)
 
         except Exception as e:
-            logger.error(f"Error parsing Wiktionary response for {word}: {e}")
+            logger.error(f"Error parsing Wiktionary response for {word_obj.text}: {e}")
             return None
 
     async def _extract_comprehensive_data(
         self, wikitext: str, word_obj: Word
-    ) -> WiktionaryExtractedData:
+    ) -> ProviderData | None:
         """Extract all available data from wikitext using systematic parsing."""
         try:
             parsed = wtp.parse(wikitext)
@@ -302,38 +270,50 @@ class WiktionaryConnector(DictionaryConnector):
             # Extract all components
             # After save(), word_obj.id is guaranteed to be not None
             assert word_obj.id is not None
+
             definitions = await self._extract_definitions(english_section, word_obj.id)
             etymology = self._extract_etymology(english_section)
             pronunciation = self._extract_pronunciation(english_section, word_obj.id)
-            alternative_forms = self._extract_alternative_forms(english_section)
-            related_terms = self._extract_related_terms(english_section)
-            usage_notes = self._extract_usage_notes(english_section)
-            quotations = self._extract_quotations(english_section)
+
+            # alternative_forms = self._extract_alternative_forms(english_section)
+
+            # related_terms = self._extract_related_terms(english_section)
+
+            # usage_notes = self._extract_usage_notes(english_section)
+
+            # quotations = self._extract_quotations(english_section)
 
             # Extract synonyms from the dedicated section and add to definitions
             section_synonyms = self._extract_section_synonyms(english_section)
 
             # Merge section synonyms with each definition
             for definition in definitions:
-                if section_synonyms and not definition.synonyms:
-                    definition.synonyms = section_synonyms[:5]  # Add up to 5 section synonyms
-                    await definition.save()  # Update the definition
+                assert (
+                    definition.id is not None
+                )  # After save(), id is guaranteed to be not None
 
-            return WiktionaryExtractedData(
-                definitions=definitions,
-                etymology=etymology,
-                pronunciation=pronunciation,
-                alternative_forms=alternative_forms,
-                related_terms=related_terms,
-                usage_notes=usage_notes,
-                quotations=quotations,
+                synonyms = set(definition.synonyms)
+                synonyms.update(section_synonyms)
+
+                definition.synonyms = list(synonyms)
+
+                await definition.save()  # Update the definition
+
+            return ProviderData(
+                word_id=word_obj.id,
+                provider=self.provider_name,
+                definition_ids=[d.id for d in definitions],  # type:ignore
+                etymology=(Etymology(text=etymology) if etymology else None),
+                pronunciation_id=pronunciation.id if pronunciation else None,
             )
 
         except Exception as e:
             logger.error(f"Error in comprehensive extraction: {e}")
-            return WiktionaryExtractedData(definitions=[])
+            return None
 
-    def _find_language_section(self, parsed: wtp.WikiList, language: str) -> wtp.Section | None:
+    def _find_language_section(
+        self, parsed: wtp.WikiList, language: str
+    ) -> wtp.Section | None:
         """Find the specific language section using wtp.Section hierarchy."""
         for section in parsed.sections:
             if (
@@ -397,8 +377,6 @@ class WiktionaryConnector(DictionaryConnector):
                     text=clean_def,
                     sense_number=f"{idx + 1}",
                     synonyms=synonyms,
-                    antonyms=[],
-                    example_ids=[],
                     frequency_band=None,
                     collocations=collocations,
                     usage_notes=usage_notes,
@@ -406,12 +384,18 @@ class WiktionaryConnector(DictionaryConnector):
 
                 # Save definition to get ID
                 await definition.save()
-                assert definition.id is not None  # After save(), id is guaranteed to be not None
+                assert (
+                    definition.id is not None
+                )  # After save(), id is guaranteed to be not None
 
                 # Extract and save examples from both the definition and the full subsection
                 # This ensures we capture quotations that appear after the definition
-                example_objs = await self._extract_examples(subsection_text, definition.id)
-                definition.example_ids = [ex.id for ex in example_objs if ex.id is not None]
+                example_objs = await self._extract_examples(
+                    subsection_text, definition.id
+                )
+                definition.example_ids = [
+                    ex.id for ex in example_objs if ex.id is not None
+                ]
                 await definition.save()  # Update with example IDs
 
                 definitions.append(definition)
@@ -463,7 +447,10 @@ class WiktionaryConnector(DictionaryConnector):
                             await example.save()
                             examples.append(example)
 
-                elif template_name.startswith("quote-") or template_name in ["quote", "quotation"]:
+                elif template_name.startswith("quote-") or template_name in [
+                    "quote",
+                    "quotation",
+                ]:
                     # Quote templates (e.g., quote-book, quote-journal, etc.)
                     # Extract the passage/text parameter
                     passage = None
@@ -482,7 +469,9 @@ class WiktionaryConnector(DictionaryConnector):
                             author = arg_value
 
                     if passage:
-                        clean_passage = self.cleaner.clean_text(passage, preserve_structure=True)
+                        clean_passage = self.cleaner.clean_text(
+                            passage, preserve_structure=True
+                        )
                         if clean_passage and len(clean_passage) > 10:
                             # Format with metadata if available
                             if year or author:
@@ -491,7 +480,9 @@ class WiktionaryConnector(DictionaryConnector):
                                     metadata_parts.append(year)
                                 if author:
                                     metadata_parts.append(author)
-                                full_text = f"({', '.join(metadata_parts)}) {clean_passage}"
+                                full_text = (
+                                    f"({', '.join(metadata_parts)}) {clean_passage}"
+                                )
                             else:
                                 full_text = clean_passage
 
@@ -521,7 +512,11 @@ class WiktionaryConnector(DictionaryConnector):
                     for arg in template.arguments:
                         if not arg.name:  # Positional arguments
                             arg_value = str(arg.value).strip()
-                            if arg_value and len(arg_value) > 1 and arg_value not in ["en", "lang"]:
+                            if (
+                                arg_value
+                                and len(arg_value) > 1
+                                and arg_value not in ["en", "lang"]
+                            ):
                                 clean_syn = self._clean_synonym(arg_value)
                                 if clean_syn:
                                     synonyms.append(clean_syn)
@@ -538,7 +533,8 @@ class WiktionaryConnector(DictionaryConnector):
         # Look for Synonyms and See also subsections
         for subsection in section.sections:
             if subsection.title and any(
-                keyword in subsection.title.lower() for keyword in ["synonym", "see also"]
+                keyword in subsection.title.lower()
+                for keyword in ["synonym", "see also"]
             ):
                 # Extract all wikilist items and plain text
                 items = self._extract_wikilist_items(str(subsection))
@@ -551,7 +547,9 @@ class WiktionaryConnector(DictionaryConnector):
                     template_name = template.name.strip().lower()
                     if template_name in ["l", "link", "syn", "synonym"]:
                         for arg in template.arguments:
-                            if not arg.name or arg.name == "2":  # Second arg is usually the word
+                            if (
+                                not arg.name or arg.name == "2"
+                            ):  # Second arg is usually the word
                                 value = str(arg.value).strip()
                                 if value and value not in ["en", "English"]:
                                     clean_syn = self._clean_synonym(value)
@@ -607,7 +605,9 @@ class WiktionaryConnector(DictionaryConnector):
                 text_parts = []
                 for content in subsection.contents.split("\n"):
                     # Stop at the first subsection marker
-                    if content.strip().startswith("===") or content.strip().startswith("===="):
+                    if content.strip().startswith("===") or content.strip().startswith(
+                        "===="
+                    ):
                         break
                     text_parts.append(content)
 
@@ -615,6 +615,7 @@ class WiktionaryConnector(DictionaryConnector):
                 if etymology_text:
                     # Special cleaning for etymology to preserve language links
                     return self._clean_etymology_text(etymology_text)
+
         return None
 
     def _clean_etymology_text(self, text: str) -> str:
@@ -649,7 +650,16 @@ class WiktionaryConnector(DictionaryConnector):
                 template_name = template.name.strip().lower()
 
                 # Handle specific etymology templates
-                if template_name in ["der", "inh", "bor", "cog", "m", "mention", "l", "lang"]:
+                if template_name in [
+                    "der",
+                    "inh",
+                    "bor",
+                    "cog",
+                    "m",
+                    "mention",
+                    "l",
+                    "lang",
+                ]:
                     args = [str(arg.value).strip() for arg in template.arguments]
 
                     # Common pattern: {{template|en|lang_code|word|...}}
@@ -674,7 +684,12 @@ class WiktionaryConnector(DictionaryConnector):
                     # Look for the gloss/translation argument
                     gloss_text = ""
                     for arg in template.arguments:
-                        if arg.name and str(arg.name).strip() in ["t", "gloss", "translation", "3"]:
+                        if arg.name and str(arg.name).strip() in [
+                            "t",
+                            "gloss",
+                            "translation",
+                            "3",
+                        ]:
                             gloss_text = str(arg.value).strip()
                             break
                         elif not arg.name and len(str(arg.value).strip()) > 3:
@@ -719,7 +734,9 @@ class WiktionaryConnector(DictionaryConnector):
 
             # Convert wikilinks
             cleaned = re.sub(
-                r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]", lambda m: m.group(2) or m.group(1), cleaned
+                r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]",
+                lambda m: m.group(2) or m.group(1),
+                cleaned,
             )
 
         # Final cleanup
@@ -728,7 +745,9 @@ class WiktionaryConnector(DictionaryConnector):
         # Clean up punctuation and whitespace
         cleaned = re.sub(r"\s*([,;])\s*([,;])", r"\1", cleaned)  # Multiple punctuation
         cleaned = re.sub(r"\s+([,;.!?])", r"\1", cleaned)  # Space before punctuation
-        cleaned = re.sub(r"([,;])\s*$", ".", cleaned)  # Change trailing comma/semicolon to period
+        cleaned = re.sub(
+            r"([,;])\s*$", ".", cleaned
+        )  # Change trailing comma/semicolon to period
         cleaned = re.sub(r"^\s*[,;.]\s*", "", cleaned)  # Remove leading punctuation
         cleaned = re.sub(r"\s+", " ", cleaned)  # Normalize whitespace
         cleaned = re.sub(r"\.\s*\.", ".", cleaned)  # Multiple periods
@@ -737,7 +756,9 @@ class WiktionaryConnector(DictionaryConnector):
         if cleaned and cleaned[-1] not in ".!?":
             cleaned += "."
 
-        return cleaned.strip()
+        cleaned = cleaned.strip()
+
+        return cleaned
 
     def _extract_pronunciation(
         self, section: wtp.Section, word_id: PydanticObjectId
@@ -775,7 +796,14 @@ class WiktionaryConnector(DictionaryConnector):
                             continue
 
                         # Check if this is a dialect indicator
-                        if arg_value.lower() in ["us", "usa", "american", "ame", "gen-am", "genam"]:
+                        if arg_value.lower() in [
+                            "us",
+                            "usa",
+                            "american",
+                            "ame",
+                            "gen-am",
+                            "genam",
+                        ]:
                             dialect = "american"
                         elif arg_value.lower() in ["uk", "british", "rp", "gb", "bre"]:
                             dialect = "british"
@@ -869,7 +897,9 @@ class WiktionaryConnector(DictionaryConnector):
 
         for subsection in section.sections:
             title = subsection.title
-            if title and any(term in title.lower() for term in ["related", "derived", "see also"]):
+            if title and any(
+                term in title.lower() for term in ["related", "derived", "see also"]
+            ):
                 items = self._extract_wikilist_items(str(subsection))
                 for item in items:
                     clean_term = self.cleaner.clean_text(item)
@@ -878,7 +908,9 @@ class WiktionaryConnector(DictionaryConnector):
 
         return related[:20] if related else None  # Limit to 20 terms
 
-    def _extract_collocations_from_definition(self, definition_text: str) -> list[Collocation]:
+    def _extract_collocations_from_definition(
+        self, definition_text: str
+    ) -> list[Collocation]:
         """Extract collocations from definition text."""
         collocations = []
 
@@ -907,7 +939,9 @@ class WiktionaryConnector(DictionaryConnector):
 
         return collocations[:5]  # Limit to 5 collocations
 
-    def _extract_usage_notes_from_definition(self, definition_text: str) -> list[UsageNote]:
+    def _extract_usage_notes_from_definition(
+        self, definition_text: str
+    ) -> list[UsageNote]:
         """Extract usage notes from definition text."""
         notes = []
 
@@ -937,10 +971,19 @@ class WiktionaryConnector(DictionaryConnector):
                                 from typing import Literal
 
                                 usage_type: Literal[
-                                    "grammar", "confusion", "regional", "register", "error"
+                                    "grammar",
+                                    "confusion",
+                                    "regional",
+                                    "register",
+                                    "error",
                                 ]
 
-                                if note_type in ["informal", "formal", "archaic", "technical"]:
+                                if note_type in [
+                                    "informal",
+                                    "formal",
+                                    "archaic",
+                                    "technical",
+                                ]:
                                     usage_type = "register"
                                 elif note_type == "regional":
                                     usage_type = "regional"
@@ -967,7 +1010,9 @@ class WiktionaryConnector(DictionaryConnector):
                 section_text = str(subsection.contents)
 
                 # Clean up the text
-                cleaned_text = self.cleaner.clean_text(section_text, preserve_structure=True)
+                cleaned_text = self.cleaner.clean_text(
+                    section_text, preserve_structure=True
+                )
 
                 # Split by paragraph or list items
                 parts = re.split(r"\n\s*\n|\n\s*[*#]", cleaned_text)
@@ -1077,7 +1122,8 @@ class WiktionaryConnector(DictionaryConnector):
         if (
             len(cleaned) < 2
             or len(cleaned) > 50
-            or cleaned.lower() in {"thesaurus", "see", "also", "compare", "etc", "and", "or"}
+            or cleaned.lower()
+            in {"thesaurus", "see", "also", "compare", "etc", "and", "or"}
         ):
             return None
 
@@ -1086,100 +1132,3 @@ class WiktionaryConnector(DictionaryConnector):
     async def close(self) -> None:
         """Close HTTP client."""
         await self.http_client.close()
-
-    async def extract_pronunciation(
-        self, raw_data: dict[str, Any], word_id: PydanticObjectId
-    ) -> Pronunciation | None:
-        """Extract pronunciation from Wiktionary data.
-
-        Args:
-            raw_data: Raw response metadata containing pronunciation info
-
-        Returns:
-            Pronunciation if found, None otherwise
-        """
-        if not raw_data or "pronunciation" not in raw_data:
-            return None
-
-        pron_data = raw_data["pronunciation"]
-        if not pron_data:
-            return None
-
-        # Extract pronunciation data, filtering out file references
-        phonetic = pron_data.get("phonetic", "")
-
-        # Filter out file extensions from phonetic field
-        if phonetic and any(
-            ext in phonetic.lower() for ext in [".ogg", ".mp3", ".wav", "audio", "file:"]
-        ):
-            phonetic = None
-
-        # Use American IPA as primary, fallback to British
-        ipa_american = pron_data.get("ipa_american")
-        ipa_british = pron_data.get("ipa_british")
-        primary_ipa = ipa_american or ipa_british or "unknown"
-
-        # Create Pronunciation without word_id (will be set by base connector)
-        return Pronunciation(
-            word_id=word_id,
-            phonetic=phonetic if phonetic else "unknown",
-            ipa=primary_ipa,
-            syllables=[],
-            stress_pattern=None,
-        )
-
-    async def extract_definitions(
-        self, raw_data: dict[str, Any], word_id: PydanticObjectId
-    ) -> list[Definition]:
-        """Extract definitions from Wiktionary data.
-
-        Args:
-            raw_data: Raw response from Wiktionary containing extracted definitions
-            word_id: ID of the word these definitions belong to
-
-        Returns:
-            List of Definition objects
-        """
-        # Return the definitions that were already extracted and passed in raw_data
-        definitions = raw_data.get("definitions", [])
-        return definitions if isinstance(definitions, list) else []
-
-    async def extract_etymology(self, raw_data: dict[str, Any]) -> Etymology | None:
-        """Extract etymology from Wiktionary data.
-
-        Args:
-            raw_data: Raw response metadata containing etymology
-
-        Returns:
-            Etymology if found, None otherwise
-        """
-        if not raw_data or "etymology" not in raw_data:
-            return None
-
-        etym_text = raw_data["etymology"]
-        if not etym_text:
-            return None
-
-        # Clean and structure etymology text
-        cleaned_text = self.cleaner.clean_text(etym_text)
-
-        # Try to extract language of origin
-        origin_language = None
-        if "from" in cleaned_text.lower():
-            # Simple pattern matching for common cases
-            patterns = [
-                r"from (\w+) (?:language|word)",
-                r"borrowed from (\w+)",
-                r"derived from (\w+)",
-            ]
-            for pattern in patterns:
-                match = re.search(pattern, cleaned_text, re.IGNORECASE)
-                if match:
-                    origin_language = match.group(1)
-                    break
-
-        return Etymology(
-            text=cleaned_text,
-            origin_language=origin_language,
-            root_words=[],  # Could extract these with more sophisticated parsing
-        )

@@ -6,7 +6,7 @@ from typing import Any, TypeVar
 
 from beanie import Document
 
-from ...models import AudioMedia, Definition, Example, ImageMedia, Pronunciation, ProviderData
+from ...models import AudioMedia, Definition, Example, ImageMedia, Pronunciation, ProviderData, SynthesizedDictionaryEntry, Word
 
 T = TypeVar("T", bound=Document)
 
@@ -137,8 +137,7 @@ class DefinitionLoader(DataLoader):
             for provider_id in provider_data_ids:
                 provider_data = await ProviderData.get(provider_id)
                 if provider_data:
-                    # Exclude raw_data to avoid potential ObjectId serialization issues
-                    providers_data.append(provider_data.model_dump(mode="json", exclude={"id", "raw_data"}))
+                    providers_data.append(provider_data.model_dump(mode="json", exclude={"id"}))
             def_dict["providers_data"] = providers_data
         else:
             def_dict["providers_data"] = []
@@ -176,3 +175,80 @@ class DefinitionLoader(DataLoader):
             loaded_definitions.append(def_dict)
 
         return loaded_definitions
+
+
+class SynthesizedDictionaryEntryLoader(DataLoader):
+    """Service for loading SynthesizedDictionaryEntry and converting to API response."""
+
+    @staticmethod
+    async def load_as_lookup_response(
+        entry: SynthesizedDictionaryEntry,
+    ) -> dict[str, Any]:
+        """Load a SynthesizedDictionaryEntry and convert to LookupResponse format.
+
+        Args:
+            entry: The synthesized dictionary entry to load
+            include_provider_data: Whether to include provider data in definitions
+
+        Returns:
+            Dictionary ready to be used as LookupResponse
+        """
+        # Load word
+        word_obj = await Word.get(entry.word_id)
+        if not word_obj:
+            raise ValueError(f"Word not found for ID: {entry.word_id}")
+
+        # Load definitions with all relations
+        definitions = []
+        if entry.definition_ids:
+            # Prepare provider data IDs for definition loader
+            provider_data_ids = (
+                [str(pid) for pid in entry.source_provider_data_ids]
+                if entry.source_provider_data_ids
+                else None
+            )
+
+            # Load each definition with relations
+            for def_id in entry.definition_ids:
+                definition = await Definition.get(def_id)
+                if definition:
+                    def_dict = await DefinitionLoader.load_with_relations(
+                        definition=definition,
+                        include_examples=True,
+                        include_images=True,
+                        include_provider_data=True,
+                        provider_data_ids=provider_data_ids,
+                    )
+                    definitions.append(def_dict)
+
+        # Load pronunciation with audio files
+        pronunciation = None
+        if entry.pronunciation_id:
+            pronunciation = await PronunciationLoader.load_with_audio(
+                str(entry.pronunciation_id)
+            )
+
+        # Load images for the synth entry itself
+        images = []
+        if entry.image_ids:
+            for image_id in entry.image_ids:
+                image = await ImageMedia.get(image_id)
+                if image:
+                    image_dict = image.model_dump(mode="json", exclude={"data"})
+                    images.append(image_dict)
+
+        # Build the response dictionary
+        return {
+            "word": word_obj.text,
+            "pronunciation": pronunciation,
+            "definitions": definitions,
+            "etymology": (
+                entry.etymology.model_dump(mode="json") if entry.etymology else None
+            ),
+            "last_updated": entry.updated_at,
+            "model_info": (
+                entry.model_info.model_dump(mode="json") if entry.model_info else None
+            ),
+            "id": str(entry.id),
+            "images": images,
+        }

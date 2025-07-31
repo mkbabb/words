@@ -630,8 +630,8 @@ export const useAppStore = defineStore('app', () => {
             );
 
             // Log synth entry ID if available
-            if (entry.synth_entry_id) {
-                console.log('Synthesized Entry ID:', entry.synth_entry_id);
+            if (entry.id) {
+                console.log('Synthesized Entry ID:', entry.id);
             }
 
             currentEntry.value = entry;

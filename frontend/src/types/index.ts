@@ -1,8 +1,8 @@
 // Frontend-specific types that extend or adapt backend types
 import type { 
-  LookupResponse,
-  DefinitionResponse,
-  SearchResult
+  DictionaryEntryResponse,
+  SearchResult,
+  Definition
 } from './api';
 
 // Re-export backend-aligned types
@@ -15,7 +15,7 @@ export {
   Language,
   DictionaryProvider,
   SearchMethod as SearchMethodEnum,
-  type LookupResponse,
+  type DictionaryEntryResponse,
   type SearchResponse,
   type Pronunciation,
   type AudioFile,
@@ -26,19 +26,21 @@ export {
   type Collocation,
   type Etymology,
   type ModelInfo,
-  type LiteratureSource,
-  type DefinitionResponse
+  type LiteratureSource
 } from './api';
 
-// Frontend version of Definition - no transformation needed
-export interface TransformedDefinition extends DefinitionResponse {
+// Frontend version of Definition - extends the definition from a DictionaryEntryResponse
+export interface TransformedDefinition extends Definition {
   definition?: string; // Alias for 'text' to maintain compatibility
   source?: string; // Added for provider tracking
+  examples: Example[]; // Always populated from response
+  images: ImageMedia[]; // Always populated from response
+  providers_data: Array<Record<string, any>>; // Provider data
 }
 
-// Frontend SynthesizedDictionaryEntry is actually the LookupResponse from the API
+// Frontend SynthesizedDictionaryEntry is actually the DictionaryEntryResponse from the API
 // with optional UI-specific fields
-export interface SynthesizedDictionaryEntry extends LookupResponse {
+export interface SynthesizedDictionaryEntry extends DictionaryEntryResponse {
   // UI-specific fields
   lookup_count?: number; // Number of times accessed (optional for backward compatibility)
   regeneration_count?: number; // Number of times content was regenerated (optional)

@@ -1,5 +1,5 @@
 import type { Component } from 'vue';
-import type { DefinitionResponse } from '@/types/api';
+import type { Definition } from '@/types/api';
 import { PROVIDER_CONFIG } from '../constants/providers';
 import { RefreshCw } from 'lucide-vue-next';
 
@@ -27,7 +27,7 @@ export function getProviderSearchUrl(provider: string, word: string): string {
 /**
  * Extracts unique providers from definitions
  */
-export function extractUniqueProviders(definitions: DefinitionResponse[]): string[] {
+export function extractUniqueProviders(definitions: Array<Definition & { providers_data: any[] }>): string[] {
     if (!definitions) return [];
     
     const providers = new Set<string>();

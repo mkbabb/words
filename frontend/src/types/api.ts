@@ -232,8 +232,8 @@ export interface ErrorResponse {
   request_id?: string;
 }
 
-// Lookup Response Types
-export interface LookupResponse {
+// Dictionary Entry Response Types
+export interface DictionaryEntryResponse {
   word: string;
   pronunciation?: {
     phonetic: string;
@@ -242,18 +242,16 @@ export interface LookupResponse {
     syllables: string[];
     stress_pattern?: string;
   };
-  definitions: DefinitionResponse[];
+  definitions: Array<Definition & {
+    examples: Example[]; // Always populated
+    images: ImageMedia[]; // Always populated
+    providers_data: Array<Record<string, any>>;
+  }>;
   etymology?: Etymology;
   last_updated: string;
   model_info?: ModelInfo | null;
-  synth_entry_id?: string | null;
+  id?: string | null;
   images?: ImageMedia[];
-}
-
-export interface DefinitionResponse extends Definition {
-  examples: Example[]; // Always populated
-  images: ImageMedia[]; // Always populated
-  providers_data: Array<Record<string, any>>;
 }
 
 
@@ -323,11 +321,11 @@ export interface BatchLookupRequest {
   };
 }
 
-export interface BatchLookupResponse {
+export interface BatchDictionaryEntryResponse {
   results: Array<{
     word: string;
     success: boolean;
-    data?: LookupResponse;
+    data?: DictionaryEntryResponse;
     error?: string;
   }>;
   summary: {

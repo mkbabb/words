@@ -353,7 +353,7 @@ class DefinitionSynthesizer:
             # Synthesize definition text
             synthesis_result = await synthesize_definition_text(
                 clustered_definitions=def_dicts,
-                word=word.text,
+                word=word,
                 ai=self.ai,
                 state_tracker=state_tracker,
             )

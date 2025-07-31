@@ -7,7 +7,7 @@ from typing import Literal
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
-from .base import DocumentWithObjectIdSupport
+from .base import BaseMetadata
 
 
 class WordForm(BaseModel):
@@ -57,7 +57,7 @@ class MeaningCluster(BaseModel):
     relevance: float = Field(ge=0.0, le=1.0)  # Usage frequency
 
 
-class WordRelationship(DocumentWithObjectIdSupport):
+class WordRelationship(Document, BaseMetadata):
     """Relationships between words."""
 
     from_word_id: PydanticObjectId  # FK to Word - optimized with ObjectId

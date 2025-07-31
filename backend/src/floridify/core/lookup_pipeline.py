@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 import platform
 import time
+import traceback
 
 import orjson
+from src.floridify.connectors.base import DictionaryConnector
 
 from ..ai import get_definition_synthesizer
 from ..ai.synthesis_functions import cluster_definitions
@@ -17,7 +19,7 @@ from ..connectors.wiktionary import WiktionaryConnector
 from ..constants import DictionaryProvider, Language
 from ..models.base import Etymology
 from ..models.models import Definition, ProviderData, SynthesizedDictionaryEntry, Word
-from ..storage.mongodb import get_synthesized_entry
+from ..storage.mongodb import get_storage, get_synthesized_entry
 from ..utils.config import Config
 from ..utils.logging import (
     get_logger,
@@ -94,7 +96,9 @@ async def lookup_word_pipeline(
             await state_tracker.update_stage(Stages.SEARCH_COMPLETE)
 
         if not best_match_result:
-            logger.warning(f"No search results found for '{word}' after {search_duration:.2f}s")
+            logger.warning(
+                f"No search results found for '{word}' after {search_duration:.2f}s"
+            )
             # Try AI fallback if no results and AI is enabled
             if not no_ai:
                 logger.info(f"No search results, trying AI fallback for '{word}'")
@@ -136,22 +140,36 @@ async def lookup_word_pipeline(
 
         # Fetch from all providers in parallel
         provider_tasks = [
-            _get_provider_definition(best_match, provider, force_refresh, state_tracker)
+            _get_provider_definition(
+                word=best_match,
+                provider=provider,
+                language=languages[0],  # Use first language for provider fetch
+                force_refresh=force_refresh,
+                state_tracker=state_tracker,
+            )
             for provider in providers
         ]
-        providers_results = await asyncio.gather(*provider_tasks, return_exceptions=True)
+        providers_results = await asyncio.gather(
+            *provider_tasks, return_exceptions=True
+        )
 
         # Filter out None results and exceptions
         providers_data = []
         for i, result in enumerate(providers_results):
             provider = providers[i]
             if isinstance(result, Exception):
-                logger.warning(f"❌ Provider {provider.value} failed with exception: {result}")
+                logger.warning(
+                    f"❌ Provider {provider.value} failed with exception: {result}"
+                )
             elif result is None:
-                logger.warning(f"❌ Provider {provider.value} returned no data for '{best_match}'")
+                logger.warning(
+                    f"❌ Provider {provider.value} returned no data for '{best_match}'"
+                )
             else:
                 providers_data.append(result)
-                logger.debug(f"✅ Provider {provider.value} returned data for '{best_match}'")
+                logger.debug(
+                    f"✅ Provider {provider.value} returned data for '{best_match}'"
+                )
 
         total_provider_time = time.perf_counter() - provider_fetch_start
         logger.info(
@@ -211,11 +229,15 @@ async def lookup_word_pipeline(
                         f"after {ai_duration:.2f}s"
                     )
                     # Try fallback if synthesis fails
-                    return await _ai_fallback_lookup(best_match, force_refresh, state_tracker)
+                    return await _ai_fallback_lookup(
+                        best_match, force_refresh, state_tracker
+                    )
             except Exception as e:
                 logger.error(f"❌ AI synthesis failed: {e}")
                 # Try fallback if synthesis fails
-                return await _ai_fallback_lookup(best_match, force_refresh, state_tracker)
+                return await _ai_fallback_lookup(
+                    best_match, force_refresh, state_tracker
+                )
         else:
             # When AI is disabled, create a non-AI synthesized entry from provider data
             logger.info(f"🔧 Creating non-AI synthesized entry for '{best_match}'")
@@ -233,11 +255,6 @@ async def lookup_word_pipeline(
 
     except Exception as e:
         logger.error(f"❌ Lookup pipeline failed for '{word}': {e}")
-        log_metrics(
-            word=word,
-            error=str(e),
-            total_time=(time.perf_counter() - search_start if "search_start" in locals() else 0),
-        )
         return None
 
 
@@ -245,6 +262,7 @@ async def lookup_word_pipeline(
 async def _get_provider_definition(
     word: str,
     provider: DictionaryProvider,
+    language: Language = Language.ENGLISH,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
 ) -> ProviderData | None:
@@ -254,16 +272,9 @@ async def _get_provider_definition(
         Tuple of (provider_data, provider_metrics)
     """
     logger.debug(f"📖 Fetching definition from {provider.value} for '{word}'")
-    start_time = time.perf_counter()
 
     try:
-        connector: (
-            WiktionaryConnector
-            | DictionaryComConnector
-            | AppleDictionaryConnector
-            | OxfordConnector
-            | None
-        ) = None
+        connector: DictionaryConnector
 
         if provider == DictionaryProvider.WIKTIONARY:
             connector = WiktionaryConnector(force_refresh=force_refresh)
@@ -274,7 +285,9 @@ async def _get_provider_definition(
                     "Oxford Dictionary API credentials not configured. "
                     "Please update auth/config.toml with your Oxford app_id and api_key."
                 )
-            connector = OxfordConnector(app_id=config.oxford.app_id, api_key=config.oxford.api_key)
+            connector = OxfordConnector(
+                app_id=config.oxford.app_id, api_key=config.oxford.api_key
+            )
         elif provider == DictionaryProvider.DICTIONARY_COM:
             config = Config.from_file()
             if not config.dictionary_com.authorization:
@@ -291,21 +304,30 @@ async def _get_provider_definition(
             logger.warning(f"Unsupported provider: {provider.value}")
             return None
 
+        storage = await get_storage()
+        word_obj = await storage.get_word(word)
+
+        if not word_obj:
+            # Create new Word if doesn't exist
+            word_obj = Word(
+                text=word,
+                normalized=word.lower(),
+                language=language,
+            )
+            await word_obj.save()
+
         if connector:
             fetch_start = time.perf_counter()
-            result = await connector.fetch_definition(word, state_tracker)
+
+            result = await connector.fetch_definition(word_obj, state_tracker)
+
             fetch_duration = time.perf_counter() - fetch_start
 
             if result:
-                # Skip serialization for metrics - just use a rough estimate
-                # This avoids ObjectId serialization issues
-                response_size = 1000  # Rough estimate for metrics
-
                 log_provider_fetch(
                     provider_name=provider.value,
                     word=word,
                     success=True,
-                    response_size=response_size,
                     duration=fetch_duration,
                 )
             else:
@@ -315,19 +337,20 @@ async def _get_provider_definition(
                     success=False,
                     duration=fetch_duration,
                 )
-                logger.debug(f"⚠️  Provider {provider.value} returned no results for '{word}'")
+                logger.debug(
+                    f"⚠️  Provider {provider.value} returned no results for '{word}'"
+                )
 
             return result
 
         return None
 
     except Exception as e:
-        duration = time.perf_counter() - start_time
+        log_provider_fetch(provider_name=provider.value, word=word, success=False)
 
-        log_provider_fetch(
-            provider_name=provider.value, word=word, success=False, duration=duration
-        )
         logger.error(f"❌ Provider {provider.value} failed for '{word}': {e}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
         return None
 
 
@@ -341,10 +364,14 @@ async def _synthesize_with_ai(
     state_tracker: StateTracker | None = None,
 ) -> SynthesizedDictionaryEntry | None:
     """Synthesize definition using AI."""
-    logger.debug(f"🤖 Starting AI synthesis for '{word}' with {len(providers)} providers")
+    logger.debug(
+        f"🤖 Starting AI synthesis for '{word}' with {len(providers)} providers"
+    )
 
     # Log provider data quality
-    total_definitions = sum(len(p.definition_ids) if p.definition_ids else 0 for p in providers)
+    total_definitions = sum(
+        len(p.definition_ids) if p.definition_ids else 0 for p in providers
+    )
     logger.debug(f"📊 Total definitions to synthesize: {total_definitions}")
 
     try:
@@ -368,6 +395,7 @@ async def _synthesize_with_ai(
         return result
     except Exception as e:
         import traceback
+
         logger.error(f"❌ AI synthesis failed for '{word}': {e}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")
         return None
@@ -384,7 +412,9 @@ async def _create_provider_mapped_entry(
 
     Uses AI only for deduplication and clustering, but not for content generation.
     """
-    logger.info(f"📦 Creating provider-mapped entry for '{word}' from {provider_data.provider}")
+    logger.info(
+        f"📦 Creating provider-mapped entry for '{word}' from {provider_data.provider}"
+    )
 
     try:
         # Get Word object
@@ -405,7 +435,9 @@ async def _create_provider_mapped_entry(
             return None
 
         # Use AI for deduplication only
-        logger.info(f"🔍 Deduplicating {len(all_definitions)} definitions (AI-assisted)")
+        logger.info(
+            f"🔍 Deduplicating {len(all_definitions)} definitions (AI-assisted)"
+        )
         synthesizer = get_definition_synthesizer()
 
         dedup_response = await synthesizer.ai.deduplicate_definitions(
@@ -464,7 +496,9 @@ async def _create_provider_mapped_entry(
             etymology=provider_data.etymology or etymology,
             fact_ids=[],  # No facts in non-AI mode
             model_info=None,  # No AI model info
-            source_provider_data_ids=[provider_data.id] if provider_data.id is not None else [],
+            source_provider_data_ids=(
+                [provider_data.id] if provider_data.id is not None else []
+            ),
         )
 
         # Save the entry

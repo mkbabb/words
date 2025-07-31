@@ -5,8 +5,6 @@ import json
 from collections.abc import AsyncGenerator, Callable
 from typing import Any
 
-from beanie import PydanticObjectId
-from bson import ObjectId
 from fastapi.responses import StreamingResponse
 
 from ..utils.logging import get_logger
@@ -23,12 +21,6 @@ class SSEEvent:
         self.data = data
         self.event_id = event_id
     
-    @staticmethod
-    def _json_serializer(obj: Any) -> str:
-        """Custom JSON serializer for ObjectId types."""
-        if isinstance(obj, (ObjectId, PydanticObjectId)):
-            return str(obj)
-        raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
     def format(self) -> str:
         """Format as SSE string."""
@@ -38,7 +30,7 @@ class SSEEvent:
             lines.append(f"id: {self.event_id}")
 
         lines.append(f"event: {self.event_type}")
-        lines.append(f"data: {json.dumps(self.data, default=self._json_serializer)}")
+        lines.append(f"data: {json.dumps(self.data)}")
         lines.append("")  # Empty line to end event
 
         return "\n".join(lines)
@@ -293,7 +285,7 @@ async def create_streaming_response(
                     "category": state_tracker.category,
                     "stages": stages_data,
                 }
-                yield f"data: {json.dumps(config_data, default=SSEEvent._json_serializer)}\n\n"
+                yield f"data: {json.dumps(config_data)}\n\n"
 
             # Reset state tracker
             state_tracker.reset()
@@ -318,7 +310,7 @@ async def create_streaming_response(
                                 if include_completion_data and result is not None:
                                     completion_data["result"] = result
 
-                                yield f"data: {json.dumps(completion_data, default=SSEEvent._json_serializer)}\n\n"
+                                yield f"data: {json.dumps(completion_data)}\n\n"
                                 break
 
                             # Wait for state update with short timeout
@@ -326,7 +318,7 @@ async def create_streaming_response(
 
                             # Send progress update
                             progress_data = {"type": "progress", **state.model_dump_optimized()}
-                            yield f"data: {json.dumps(progress_data, default=SSEEvent._json_serializer)}\n\n"
+                            yield f"data: {json.dumps(progress_data)}\n\n"
 
                             if state.is_complete or state.error:
                                 if state.error:
@@ -335,7 +327,7 @@ async def create_streaming_response(
                                         "type": "error",
                                         "message": state.error,
                                     }
-                                    yield f"data: {json.dumps(error_data, default=SSEEvent._json_serializer)}\n\n"
+                                    yield f"data: {json.dumps(error_data)}\n\n"
                                 break
 
                         except TimeoutError:
@@ -350,12 +342,12 @@ async def create_streaming_response(
                     "type": "error",
                     "message": str(e),
                 }
-                yield f"data: {json.dumps(error_data, default=SSEEvent._json_serializer)}\n\n"
+                yield f"data: {json.dumps(error_data)}\n\n"
 
         except Exception as e:
             logger.error(f"Streaming error: {e}")
             error_data = {"type": "error", "message": f"Streaming error: {str(e)}"}
-            yield f"data: {json.dumps(error_data, default=SSEEvent._json_serializer)}\n\n"
+            yield f"data: {json.dumps(error_data)}\n\n"
 
     return StreamingResponse(
         simple_generator(),

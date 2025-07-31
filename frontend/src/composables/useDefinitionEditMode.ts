@@ -1,6 +1,6 @@
 import { ref, reactive, computed, watch, toRaw, type Ref } from 'vue';
 import { useAppStore } from '@/stores';
-import type { Definition, DefinitionResponse } from '@/types/api';
+import type { Definition } from '@/types/api';
 import { useDebounce } from '@vueuse/core';
 
 interface EditableField<T = any> {
@@ -37,7 +37,7 @@ const REGENERATABLE_COMPONENTS = new Set([
 ]);
 
 export function useDefinitionEditMode(
-  definition: Ref<Definition | DefinitionResponse>,
+  definition: Ref<Definition & { examples: any[]; images: any[]; providers_data: any[] }>,
   options: EditModeOptions = {}
 ) {
   const store = useAppStore();

@@ -6,10 +6,10 @@ from typing import Literal
 
 from beanie import Document, PydanticObjectId
 
-from .base import DocumentWithObjectIdSupport
+from .base import BaseMetadata
 
 
-class PhrasalExpression(DocumentWithObjectIdSupport):
+class PhrasalExpression(Document, BaseMetadata):
     """Phrasal verbs, idioms, and multi-word expressions."""
 
     base_word_id: PydanticObjectId  # FK to main Word - optimized with ObjectId

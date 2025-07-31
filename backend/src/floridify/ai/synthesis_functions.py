@@ -628,7 +628,7 @@ async def generate_examples(
 
 async def synthesize_definition_text(
     clustered_definitions: list[dict[str, Any]],
-    word: str,
+    word: Word,
     ai: OpenAIConnector,
     state_tracker: StateTracker | None = None,
 ) -> dict[str, Any]:
@@ -636,7 +636,7 @@ async def synthesize_definition_text(
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, message=f"Synthesizing definition for {word}"
+                stage=Stages.AI_SYNTHESIS, message=f"Synthesizing definition for {word.text}"
             )
 
         # Convert dict definitions to Definition objects for the AI method
@@ -644,7 +644,7 @@ async def synthesize_definition_text(
         for d in clustered_definitions:
             # Create a minimal Definition object for the synthesis
             def_obj = Definition(
-                word_id=PydanticObjectId(),  # Temporary ObjectId for synthesis
+                word_id=word.id if word.id else PydanticObjectId(),
                 part_of_speech=d.get("part_of_speech", "unknown"),
                 text=d["text"],
                 frequency_band=None,
@@ -653,7 +653,7 @@ async def synthesize_definition_text(
 
         # Use the existing synthesize_definitions method which uses templates
         response = await ai.synthesize_definitions(
-            word=word,
+            word=word.text,
             definitions=definition_objects,
             meaning_cluster=None,  # Will synthesize across all
         )

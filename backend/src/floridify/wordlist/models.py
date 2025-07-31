@@ -8,7 +8,7 @@ from typing import Any
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
-from ..models.base import DocumentWithObjectIdSupport
+from ..models.base import BaseMetadata
 from .constants import MasteryLevel, Temperature
 from .review import ReviewData
 from .stats import LearningStats
@@ -83,7 +83,7 @@ class WordListItem(BaseModel):
         return self.review_data.get_overdue_days()
 
 
-class WordList(DocumentWithObjectIdSupport):
+class WordList(Document, BaseMetadata):
     """Word list with learning metadata and statistics."""
 
     name: str = Field(..., description="Human-readable list name")
