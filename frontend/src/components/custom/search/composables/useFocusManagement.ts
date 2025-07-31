@@ -44,7 +44,7 @@ export function useFocusManagement(options: UseFocusManagementOptions) {
       searchQuery: store.searchQuery,
       queryLength: store.searchQuery.length,
       isDirectLookup: store.isDirectLookup,
-      isSwitchingModes: store.isSwitchingModes
+      // isSwitchingModes: store.isSwitchingModes
     });
     
     if (

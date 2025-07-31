@@ -352,7 +352,7 @@ watch(() => store.isSearching, (newVal) => {
 // Hide progress only when loading truly completes
 watch(() => [store.loadingProgress, store.isSearching], ([progress, searching]) => {
     // Only hide if we're at 100% AND not searching anymore
-    if (progress >= 100 && !searching) {
+    if (typeof progress === 'number' && progress >= 100 && !searching) {
         // Delay hiding to show completion
         setTimeout(() => {
             isLoadingInProgress.value = false;
@@ -661,7 +661,7 @@ onMounted(async () => {
                 isAI,
                 resultsLength: results?.length || 0,
                 isDirectLookup,
-                isSwitchingModes: store.isSwitchingModes
+                // isSwitchingModes: store.isSwitchingModes
             });
             
             if (focused && query && query.length > 0 && !isAI && results && results.length > 0 && !isDirectLookup) {

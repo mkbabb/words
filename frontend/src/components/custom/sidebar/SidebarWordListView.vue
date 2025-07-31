@@ -129,8 +129,7 @@ import { useAppStore } from '@/stores';
 import { 
   FileText, 
   Plus, 
-  Upload, 
-  Loader2
+  Upload
 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import SidebarWordListItem from './SidebarWordListItem.vue';

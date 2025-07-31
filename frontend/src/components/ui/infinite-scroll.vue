@@ -1,5 +1,5 @@
 <template>
-  <div ref="triggerRef" :class="cn('w-full', $attrs.class)" v-bind="$attrs">
+  <div ref="triggerRef" :class="cn('w-full', $attrs.class as string)" v-bind="$attrs">
     <slot v-if="$slots.default" />
     <div v-else-if="loading" class="flex items-center justify-center py-4">
       <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>

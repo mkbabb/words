@@ -66,8 +66,8 @@
                 :is-regenerating="fields.text.isRegenerating"
                 :errors="fields.text.errors"
                 @regenerate="regenerateComponent('text')"
-                @update:model-value="(val) => { 
-                    fields.text.value = val;
+                @update:model-value="(val: string | number | string[]) => { 
+                    fields.text.value = String(val);
                     fields.text.isDirty = true;
                     save(); 
                 }"

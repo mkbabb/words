@@ -244,7 +244,7 @@ const handleQuickCreate = async () => {
       words: [{
         word: props.word,
         frequency: 1,
-        selected_definitions: [],
+        selected_definition_ids: [],
         mastery_level: MasteryLevel.BRONZE,
         temperature: Temperature.COLD,
         review_data: {

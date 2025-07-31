@@ -151,7 +151,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Trash2, PanelLeft, RefreshCw, Wand2, Download, Bell, BellDot } from 'lucide-vue-next';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import ActionButton from './ActionButton.vue';
-import { usePWA } from '@/composables';
+// import { usePWA } from '@/composables';
 import { useAppStore } from '@/stores';
 
 interface ActionsRowProps {
@@ -171,7 +171,7 @@ const emit = defineEmits<{
 }>();
 
 // PWA composables
-const { subscribeToPush } = usePWA();
+// const { subscribeToPush } = usePWA();
 const store = useAppStore();
 
 // Reactive window width
@@ -289,47 +289,47 @@ const handleShowNotificationPrompt = () => {
 };
 
 // Test push notification via service worker
-const handleTestPushNotification = async () => {
-    try {
-        // Check if we have a push subscription
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
-        
-        if (!subscription) {
-            store.showNotification({
-                type: 'error',
-                message: 'No push subscription. Enable notifications first!'
-            });
-            return;
-        }
-        
-        // Send test push via backend
-        const response = await fetch(`${window.location.origin}/notifications/api/test`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                endpoint: subscription.endpoint
-            })
-        });
-        
-        if (response.ok) {
-            store.showNotification({
-                type: 'success',
-                message: 'Push notification sent! Check your notifications.'
-            });
-        } else {
-            throw new Error('Failed to send push');
-        }
-    } catch (error) {
-        console.error('Push test error:', error);
-        store.showNotification({
-            type: 'error',
-            message: 'Failed to send push notification'
-        });
-    }
-};
+// const handleTestPushNotification = async () => {
+//     try {
+//         // Check if we have a push subscription
+//         const registration = await navigator.serviceWorker.ready;
+//         const subscription = await registration.pushManager.getSubscription();
+//         
+//         if (!subscription) {
+//             store.showNotification({
+//                 type: 'error',
+//                 message: 'No push subscription. Enable notifications first!'
+//             });
+//             return;
+//         }
+//         
+//         // Send test push via backend
+//         const response = await fetch(`${window.location.origin}/notifications/api/test`, {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json'
+//             },
+//             body: JSON.stringify({
+//                 endpoint: subscription.endpoint
+//             })
+//         });
+//         
+//         if (response.ok) {
+//             store.showNotification({
+//                 type: 'success',
+//                 message: 'Push notification sent! Check your notifications.'
+//             });
+//         } else {
+//             throw new Error('Failed to send push');
+//         }
+//     } catch (error) {
+//         console.error('Push test error:', error);
+//         store.showNotification({
+//             type: 'error',
+//             message: 'Failed to send push notification'
+//         });
+//     }
+// };
 
 // Handle window resize
 const handleResize = () => {

@@ -121,22 +121,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '@/stores';
 // Removed infinite scroll import
 import { 
   BookOpen, 
-  FileText, 
-  Plus, 
-  Upload 
+  FileText
 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import type { WordListItem, WordList } from '@/types';
-import { MasteryLevel, Temperature } from '@/types/wordlist';
+// import { MasteryLevel, Temperature } from '@/types/wordlist';
 import { wordlistApi } from '@/api';
 import { useToast } from '@/components/ui/toast/use-toast';
-import { formatRelativeTime } from '@/utils';
+// import { formatRelativeTime } from '@/utils';
 import WordListCard from './WordListCard.vue';
 import WordListUploadModal from './WordListUploadModal.vue';
 import CreateWordListModal from './CreateWordListModal.vue';

@@ -1,4 +1,4 @@
-import { ref, Ref, watch } from 'vue';
+import { ref, Ref } from 'vue';
 import { useAppStore } from '@/stores';
 import { shouldTriggerAIMode } from '../utils/ai-query';
 
@@ -37,7 +37,7 @@ export function useSearchOperations(options: UseSearchOperationsOptions) {
       query: query.value,
       queryLength: query.value?.length || 0,
       isDirectLookup: store.isDirectLookup,
-      isSwitchingModes: store.isSwitchingModes
+      // isSwitchingModes: store.isSwitchingModes
     });
     
     clearSearchTimer();

@@ -271,7 +271,7 @@ const entry = computed(() => {
 
 // Streaming state indicators
 const isStreaming = computed(() => store.isStreamingData);
-const hasPartialData = computed(() => !!store.partialEntry);
+// const hasPartialData = computed(() => !!store.partialEntry);
 
 // Smart skeleton logic
 const expectedDefinitionCount = computed(() => {
@@ -394,7 +394,7 @@ const handleImagesUpdated = async (newImages: ImageMedia[]) => {
 
 const handleClusterNameUpdate = async (clusterId: string, newName: string) => {
     // Find the first definition in this cluster to update
-    const definition = entry.value?.definitions?.find(def => 
+    const definition = entry.value?.definitions?.find((def: any) => 
         def.meaning_cluster?.id === clusterId || 
         def.meaning_cluster?.name === clusterId
     );
