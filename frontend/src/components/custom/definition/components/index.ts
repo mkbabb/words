@@ -9,3 +9,5 @@ export { default as SynonymList } from './SynonymList.vue';
 export { default as ThemeSelector } from './ThemeSelector.vue';
 export { default as ThesaurusView } from './ThesaurusView.vue';
 export { default as WordHeader } from './WordHeader.vue';
+export { default as ErrorState } from './ErrorState.vue';
+export { default as EmptyState } from './EmptyState.vue';

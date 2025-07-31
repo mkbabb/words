@@ -1,6 +1,6 @@
 import { ref, computed, watch } from 'vue'
 import { useAppStore } from '@/stores'
-import { wordlistApi } from '@/utils/api'
+import { wordlistApi } from '@/api'
 import { useToast } from '@/components/ui/toast/use-toast'
 import type { WordList, WordListItem, MasteryLevel, Temperature } from '@/types'
 

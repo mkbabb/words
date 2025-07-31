@@ -33,10 +33,18 @@ export function useSearchOperations(options: UseSearchOperationsOptions) {
    * Perform debounced search operation
    */
   const performSearch = () => {
+    console.log('🔍 SEARCH OPERATIONS - performSearch called', {
+      query: query.value,
+      queryLength: query.value?.length || 0,
+      isDirectLookup: store.isDirectLookup,
+      isSwitchingModes: store.isSwitchingModes
+    });
+    
     clearSearchTimer();
     
     // Skip search if this is a direct lookup from sidebar/controls
     if (store.isDirectLookup) {
+      console.log('🔍 SEARCH OPERATIONS - Skipping search due to direct lookup');
       store.searchResults = [];
       store.showSearchResults = false;
       return;
@@ -66,16 +74,17 @@ export function useSearchOperations(options: UseSearchOperationsOptions) {
           store.sessionState.searchResults = results;
         }
 
-        // Show results if we have them
-        store.showSearchResults = results.length > 0;
+        // Show results if we have them and not doing a direct lookup
+        store.showSearchResults = results.length > 0 && !store.isDirectLookup;
 
-        // Activate AI mode
-        if (results.length === 0 && shouldTriggerAIMode(query.value)) {
+        // Activate AI mode (but not during direct lookups)
+        if (results.length === 0 && shouldTriggerAIMode(query.value) && !store.isDirectLookup) {
           store.isAIQuery = true;
           store.showSparkle = true;
           store.sessionState.isAIQuery = true;
           store.sessionState.aiQueryText = query.value;
-        } else {
+        } else if (!store.isDirectLookup) {
+          // Only reset AI mode if not doing a direct lookup (preserve existing state during lookup)
           store.isAIQuery = false;
           store.showSparkle = false;
           store.sessionState.isAIQuery = false;

@@ -304,7 +304,7 @@ async def get_synthesized_entry(word_text: str) -> SynthesizedDictionaryEntry | 
             return None
         # Then find the synthesized entry
         return await SynthesizedDictionaryEntry.find_one(
-            SynthesizedDictionaryEntry.word_id == str(word.id)
+            SynthesizedDictionaryEntry.word_id == word.id
         )
     except Exception:
         return None

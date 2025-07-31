@@ -30,7 +30,6 @@ from ...repositories import (
     WordListRepository,
     WordListUpdate,
 )
-from .utils import search_wordlist_names
 
 router = APIRouter()
 
@@ -430,37 +429,5 @@ async def upload_wordlist_stream(
     )
 
 
-@router.get("/search/{query}", response_model=ListResponse[dict[str, Any]])
-async def search_wordlists(
-    query: str,
-    limit: int = 10,
-    repo: WordListRepository = Depends(get_wordlist_repo),
-) -> ListResponse[dict[str, Any]]:
-    """Search wordlists by name using fuzzy search with TTL corpus caching.
 
-    Path Parameters:
-        - query: Search query
 
-    Query Parameters:
-        - limit: Maximum results
-
-    Returns:
-        Matching wordlists with search scores.
-    """
-    # Use corpus-based fuzzy search (no TTL expiration)
-    search_results = await search_wordlist_names(
-        query=query,
-        repo=repo,
-        max_results=limit,
-        min_score=0.3,  # Allow broader matches for name search
-    )
-
-    # Convert to expected format
-    wordlists = [result["wordlist"] for result in search_results]
-    
-    return ListResponse(
-        items=wordlists,
-        total=len(wordlists),
-        offset=0,
-        limit=limit,
-    )

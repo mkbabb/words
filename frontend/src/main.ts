@@ -35,6 +35,18 @@ const router = createRouter({
       component: Home,
       props: true,
     },
+    {
+      path: '/wordlist/:wordlistId',
+      name: 'Wordlist',
+      component: Home,
+      props: true,
+    },
+    {
+      path: '/wordlist/:wordlistId/search/:query?',
+      name: 'WordlistSearch',
+      component: Home,
+      props: true,
+    },
   ],
 });
 

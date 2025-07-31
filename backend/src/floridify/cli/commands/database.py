@@ -160,7 +160,7 @@ async def _get_quality_metrics() -> dict[str, str]:
                 total_providers = 0
                 for word in sample_entries:
                     provider_count = await ProviderData.find(
-                        ProviderData.word_id == str(word.id)
+                        ProviderData.word_id == word.id
                     ).count()
                     total_providers += provider_count
                 avg_providers = total_providers / len(sample_entries)

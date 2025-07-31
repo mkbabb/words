@@ -1,6 +1,6 @@
 <template>
   <Modal v-model="modelValue" :close-on-backdrop="false">
-    <div class="w-full max-w-md mx-auto space-y-6 p-6">
+    <div class="w-full max-w-md mx-auto space-y-6">
       <!-- Header -->
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-semibold">Add "{{ word }}" to Wordlist</h2>
@@ -105,7 +105,7 @@ import Modal from '@/components/custom/Modal.vue';
 import CreateWordListModal from '../../wordlist/CreateWordListModal.vue';
 import type { WordList } from '@/types';
 import { MasteryLevel, Temperature } from '@/types';
-import { wordlistApi } from '@/utils/api';
+import { wordlistApi } from '@/api';
 
 interface Props {
   modelValue: boolean;
@@ -171,7 +171,7 @@ const isWordInWordlist = (wordlist: WordList): boolean => {
 };
 
 const getWordFrequency = (wordlist: WordList): number => {
-  const wordItem = wordlist.words.find(w => w.text.toLowerCase() === props.word.toLowerCase());
+  const wordItem = wordlist.words.find(w => w.word?.toLowerCase() === props.word.toLowerCase());
   return wordItem?.frequency || 0;
 };
 

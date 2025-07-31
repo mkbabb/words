@@ -169,7 +169,7 @@ class AnkiCardGenerator:
 
         examples = (
             await Example.find(
-                Example.definition_id == str(definition.id), Example.type == "generated"
+                Example.definition_id == definition.id, Example.type == "generated"
             )
             .limit(limit)
             .to_list()

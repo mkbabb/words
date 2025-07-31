@@ -271,6 +271,8 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAppStore } from '@/stores';
 import { Button } from '@/components/ui';
 import { BouncyToggle } from '@/components/custom/animation';
 import { Flame, Clock, Trophy, Calendar, Eye, BarChart3 } from 'lucide-vue-next';
@@ -290,6 +292,8 @@ interface SearchControlsProps {
 const props = defineProps<SearchControlsProps>();
 
 // Modern Vue 3.4+ patterns - using defineModel for two-way bindings
+const router = useRouter();
+const store = useAppStore();
 const searchMode = defineModel<SearchMode>('searchMode', { required: true });
 const selectedSources = defineModel<string[]>('selectedSources', { required: true });
 const selectedLanguages = defineModel<string[]>('selectedLanguages', { required: true });
@@ -447,6 +451,14 @@ onMounted(() => {
 
 onUnmounted(() => {
     document.removeEventListener('keydown', keydownHandler, true);
+});
+
+// Watch for search mode changes and handle router navigation
+watch(searchMode, (newMode, oldMode) => {
+    if (newMode !== oldMode) {
+        // Use the store's setSearchMode function to handle router navigation
+        store.setSearchMode(newMode, router);
+    }
 });
 
 defineExpose({

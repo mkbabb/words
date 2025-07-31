@@ -30,10 +30,12 @@ from .routers import (
     suggestions,
     word_of_the_day,
     wordlist_reviews,
+    wordlist_search,
     wordlist_words,
     wordlists,
     words,
 )
+from .routers.words import entries_router
 
 # Configure logging for the application
 setup_logging("DEBUG")
@@ -113,9 +115,11 @@ app.include_router(definitions, prefix=f"{API_V1_PREFIX}/definitions", tags=["de
 app.include_router(examples, prefix=API_V1_PREFIX, tags=["examples"])
 app.include_router(batch, prefix=f"{API_V1_PREFIX}/batch", tags=["batch"])
 app.include_router(words, prefix=f"{API_V1_PREFIX}/words", tags=["words"])
+app.include_router(entries_router, prefix=f"{API_V1_PREFIX}/words/entries", tags=["entries"])
 app.include_router(wordlists, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
 app.include_router(wordlist_words, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-words"])
 app.include_router(wordlist_reviews, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-reviews"])
+app.include_router(wordlist_search, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-search"])
 app.include_router(word_of_the_day, prefix=f"{API_V1_PREFIX}/word-of-day", tags=["word-of-day"])
 app.include_router(audio, prefix=API_V1_PREFIX, tags=["audio"])
 app.include_router(images, prefix=f"{API_V1_PREFIX}/images", tags=["images"])

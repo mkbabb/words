@@ -6,7 +6,16 @@ from typing import Any, TypeVar
 
 from beanie import Document
 
-from ...models import AudioMedia, Definition, Example, ImageMedia, Pronunciation, ProviderData, SynthesizedDictionaryEntry, Word
+from ...models import (
+    AudioMedia,
+    Definition,
+    Example,
+    ImageMedia,
+    Pronunciation,
+    ProviderData,
+    SynthesizedDictionaryEntry,
+    Word,
+)
 
 T = TypeVar("T", bound=Document)
 

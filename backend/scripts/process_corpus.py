@@ -5,7 +5,7 @@ import asyncio
 import json
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 import nltk
 from nltk.corpus import wordnet
@@ -41,9 +41,9 @@ class CorpusProcessor:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         self.lemmatizer = WordNetLemmatizer()
-        self.base_forms: Set[str] = set()
-        self.inflection_map: Dict[str, List[str]] = defaultdict(list)
-        self.stats: Dict[str, Any] = {
+        self.base_forms: set[str] = set()
+        self.inflection_map: dict[str, list[str]] = defaultdict(list)
+        self.stats: dict[str, Any] = {
             "total_words": 0,
             "unique_base_forms": 0,
             "reduction_percentage": 0.0,
@@ -62,7 +62,7 @@ class CorpusProcessor:
         else:
             return wordnet.NOUN
     
-    def lemmatize_word(self, word: str) -> Tuple[str, str]:
+    def lemmatize_word(self, word: str) -> tuple[str, str]:
         """Lemmatize a word and determine inflection type."""
         word_lower = word.lower()
         
@@ -102,7 +102,7 @@ class CorpusProcessor:
         """Process the entire corpus with progress tracking."""
         # Load all words
         console.print("[cyan]Loading corpus...[/cyan]")
-        with open(self.corpus_path, "r") as f:
+        with open(self.corpus_path) as f:
             all_words = [line.strip() for line in f if line.strip()]
         
         self.stats["total_words"] = len(all_words)

@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 
 interface Props {
   modelValue: boolean
@@ -57,12 +57,15 @@ const backdropRef = ref<HTMLDivElement>()
 const contentRef = ref<HTMLDivElement>()
 
 const handleBackdropClick = (event: Event) => {
+  console.log('Backdrop click - closeOnBackdrop:', props.closeOnBackdrop)
   if (!props.closeOnBackdrop) return
   
   // Check if the click was on the backdrop (not on modal content)
   const target = event.target as Element
+  console.log('Click target:', target, 'Closest modal-content:', target.closest('.modal-content'))
   if (target.closest('.modal-content')) return
   
+  console.log('Emitting modal close via backdrop click')
   emit('update:modelValue', false)
 }
 
@@ -139,7 +142,7 @@ const modalLeave = (el: Element, done: () => void) => {
   setTimeout(done, 250)
 }
 
-// Handle escape key
+// Handle escape key and body scroll prevention
 onMounted(() => {
   const handleEscape = (event: KeyboardEvent) => {
     if (event.key === 'Escape' && props.modelValue) {
@@ -149,8 +152,18 @@ onMounted(() => {
   
   document.addEventListener('keydown', handleEscape)
   
+  // Prevent body scroll when modal is open
+  watch(() => props.modelValue, (isOpen) => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+  }, { immediate: true })
+  
   onUnmounted(() => {
     document.removeEventListener('keydown', handleEscape)
+    document.body.style.overflow = '' // Restore scroll on unmount
   })
 })
 </script>

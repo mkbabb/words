@@ -2,7 +2,9 @@
 import type { 
   DictionaryEntryResponse,
   SearchResult,
-  Definition
+  Definition,
+  Example,
+  ImageMedia
 } from './api';
 
 // Re-export backend-aligned types

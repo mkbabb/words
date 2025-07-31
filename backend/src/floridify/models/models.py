@@ -6,8 +6,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from beanie import Document, PydanticObjectId
-from bson import ObjectId
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from ..constants import DictionaryProvider, Language
 from .base import BaseMetadata, Etymology, ModelInfo

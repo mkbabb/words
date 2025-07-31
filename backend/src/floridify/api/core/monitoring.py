@@ -4,7 +4,7 @@ import time
 from collections import defaultdict
 from collections.abc import Callable
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import Request, Response
@@ -31,7 +31,7 @@ class PerformanceMetrics:
         self.cache_stats: dict[str, int] = defaultdict(int)
         self.db_query_times: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self.error_counts: dict[str, int] = defaultdict(int)
-        self.start_time = datetime.utcnow()
+        self.start_time = datetime.now(UTC)
 
     def record_request(self, endpoint: str, duration: float, status_code: int) -> None:
         """Record request timing."""
@@ -39,7 +39,7 @@ class PerformanceMetrics:
             {
                 "duration": duration,
                 "status_code": status_code,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(UTC),
             }
         )
 
@@ -61,7 +61,7 @@ class PerformanceMetrics:
         self.db_query_times[key].append(
             {
                 "duration": duration,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(UTC),
             }
         )
 
@@ -76,7 +76,7 @@ class PerformanceMetrics:
 
     def get_stats(self) -> dict[str, Any]:
         """Get current performance statistics."""
-        uptime = (datetime.utcnow() - self.start_time).total_seconds()
+        uptime = (datetime.now(UTC) - self.start_time).total_seconds()
 
         # Calculate request stats
         request_stats = {}
@@ -200,7 +200,7 @@ class SlowQueryDetector:
             query_info = {
                 "description": query_description,
                 "duration_ms": duration_ms,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(UTC),
             }
 
             self.slow_queries.append(query_info)
@@ -228,7 +228,7 @@ class RequestRateLimiter:
 
     async def check_rate_limit(self, key: str, max_requests: int, window_seconds: int) -> bool:
         """Check if request is within rate limit."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         cutoff = now - timedelta(seconds=window_seconds)
 
         # Clean old requests
@@ -244,7 +244,7 @@ class RequestRateLimiter:
 
     def get_remaining(self, key: str, max_requests: int, window_seconds: int) -> int:
         """Get remaining requests in current window."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         cutoff = now - timedelta(seconds=window_seconds)
 
         # Count recent requests

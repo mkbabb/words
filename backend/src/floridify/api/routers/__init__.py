@@ -17,6 +17,9 @@ from .wordlists import (
     reviews_router as wordlist_reviews,
 )
 from .wordlists import (
+    search_router as wordlist_search,
+)
+from .wordlists import (
     words_router as wordlist_words,
 )
 from .words import (
@@ -50,6 +53,7 @@ __all__ = [
     "suggestions",
     "word_of_the_day",
     "wordlist_reviews",
+    "wordlist_search",
     "wordlist_words",
     "wordlists",
     "words",

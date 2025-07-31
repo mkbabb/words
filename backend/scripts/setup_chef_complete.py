@@ -4,23 +4,20 @@
 import asyncio
 import sys
 from pathlib import Path
-from datetime import datetime
 
 # Add backend src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from floridify.api.main import app
-from floridify.core.lookup_pipeline import lookup_word_pipeline
 from floridify.constants import DictionaryProvider, Language
-from floridify.models import Definition, ImageMedia, SynthesizedDictionaryEntry, Word, Example
+from floridify.core.lookup_pipeline import lookup_word_pipeline
+from floridify.models import Definition, Example, ImageMedia, Word
 from floridify.models.relationships import MeaningCluster
 from floridify.storage.mongodb import get_storage
-from beanie import init_beanie
 
 
 async def main():
     # Initialize storage
-    storage = await get_storage()
+    await get_storage()
     print("✅ Storage initialized")
     
     # Step 1: Perform lookup for "chef"
@@ -135,7 +132,7 @@ async def main():
     await entry.save()
     print("✅ Bound image to synth entry")
     
-    print(f"\n🎉 Complete!")
+    print("\n🎉 Complete!")
     print(f"   Synth Entry ID: {entry.id}")
     print(f"   Custom Definition ID: {custom_definition.id}")
     print(f"   Image ID: {image_media.id}")

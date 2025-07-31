@@ -1,6 +1,6 @@
 <template>
   <Modal v-model="modelValue" :close-on-backdrop="false">
-    <div class="w-full max-w-md mx-auto space-y-6 p-6">
+    <div class="w-full max-w-md mx-auto space-y-6">
       <!-- Header -->
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-semibold">Create Wordlist</h2>

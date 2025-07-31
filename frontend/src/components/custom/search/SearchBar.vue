@@ -8,6 +8,8 @@
         :style="containerStyle"
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
+        @mousedown="handleSearchAreaInteraction"
+        @click="handleSearchAreaInteraction"
     >
         <!-- Main Layout -->
         <div class="pointer-events-auto relative overflow-visible pt-2 px-0 sm:px-2 pb-0">
@@ -422,6 +424,7 @@ const { navigateResults, resetSelection } = useSearchNavigation({
 
 // Focus management
 const {
+    isInteractingWithSearchArea,
     handleFocus,
     handleBlur,
     handleSearchAreaInteraction,
@@ -567,11 +570,29 @@ watch(
 
 // Click outside handler
 const handleClickOutside = (event: MouseEvent) => {
-    if (!searchContainer.value || !state.showControls) return;
+    if (!searchContainer.value) return;
     
     const target = event.target as HTMLElement;
+    
+    // If click is outside the search container, handle blur behavior
     if (!searchContainer.value.contains(target)) {
+        // Close controls
         state.showControls = false;
+        
+        // Trigger blur behavior if search bar is focused
+        if (state.isFocused) {
+            // Don't set interaction flag since this is an outside click
+            isInteractingWithSearchArea.value = false;
+            
+            // Immediately trigger blur
+            store.isSearchBarFocused = false;
+            emit('blur');
+            
+            // Hide search results
+            store.showSearchResults = false;
+            store.searchResults = [];
+            store.isSearching = false;
+        }
     }
 };
 
@@ -629,17 +650,36 @@ onMounted(async () => {
         }
     );
 
-    // Show results when focused with query
+    // Show results when focused with query (but not during direct lookups)
     watch(
-        [() => state.isFocused, () => state.query, () => state.isAIQuery, () => state.searchResults],
-        ([focused, query, isAI, results]) => {
-            if (focused && query && query.length > 0 && !isAI && results && results.length > 0) {
+        [() => state.isFocused, () => state.query, () => state.isAIQuery, () => state.searchResults, () => store.isDirectLookup],
+        ([focused, query, isAI, results, isDirectLookup]) => {
+            console.log('🔍 SEARCHBAR WATCHER - focus/query/results changed', {
+                focused,
+                query,
+                queryLength: query?.length || 0,
+                isAI,
+                resultsLength: results?.length || 0,
+                isDirectLookup,
+                isSwitchingModes: store.isSwitchingModes
+            });
+            
+            if (focused && query && query.length > 0 && !isAI && results && results.length > 0 && !isDirectLookup) {
+                console.log('🔍 SEARCHBAR WATCHER - SHOWING SEARCH RESULTS');
                 state.showResults = true;
-            } else if (isAI) {
+            } else if (isAI || isDirectLookup) {
+                console.log('🔍 SEARCHBAR WATCHER - HIDING SEARCH RESULTS (AI or direct lookup)');
                 state.showResults = false;
             }
         }
     );
+
+    // Hide results immediately when direct lookup starts
+    watch(() => store.isDirectLookup, (isDirectLookup) => {
+        if (isDirectLookup) {
+            state.showResults = false;
+        }
+    });
 
     // Restore AI state if persisted
     if (store.sessionState.isAIQuery) {

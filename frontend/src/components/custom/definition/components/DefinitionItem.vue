@@ -12,27 +12,40 @@
         />
 
         <div class="flex items-center gap-2">
-            <EditableField
-                v-model="fields.part_of_speech.value"
-                field-name="part of speech"
-                :edit-mode="props.editModeEnabled"
-                :errors="fields.part_of_speech.errors"
-                @update:model-value="(value) => { 
-                    fields.part_of_speech.value = String(value);
-                    fields.part_of_speech.isDirty = true;
-                    save(); 
-                }"
-            >
-                <template #display>
-                    <span class="text-2xl font-semibold text-primary">
-                        {{ definition.part_of_speech }}
-                    </span>
-                </template>
-            </EditableField>
+            <!-- Part of Speech with Progressive Loading -->
+            <div v-if="definition.part_of_speech">
+                <EditableField
+                    v-model="fields.part_of_speech.value"
+                    field-name="part of speech"
+                    :edit-mode="props.editModeEnabled"
+                    :errors="fields.part_of_speech.errors"
+                    @update:model-value="(value) => { 
+                        fields.part_of_speech.value = String(value);
+                        fields.part_of_speech.isDirty = true;
+                        save(); 
+                    }"
+                >
+                    <template #display>
+                        <span class="text-2xl font-semibold text-primary">
+                            {{ definition.part_of_speech }}
+                        </span>
+                    </template>
+                </EditableField>
+            </div>
+            <!-- Part of Speech Skeleton -->
+            <div v-else-if="isStreaming" class="h-8 w-20 bg-muted rounded animate-pulse" />
+            
             <sup class="text-sm font-normal text-muted-foreground">{{ definitionIndex + 1 }}</sup>
+            
+            <!-- Streaming Indicator -->
+            <div v-if="isStreaming && isPartialDefinition" class="flex items-center gap-1 ml-2">
+                <div class="h-1.5 w-1.5 bg-blue-500 rounded-full animate-pulse" />
+                <span class="text-xs text-blue-500">loading...</span>
+            </div>
             
             <!-- Add to Wordlist Button -->
             <button
+                v-if="!isStreaming"
                 @click="handleAddToWordlist"
                 class="ml-auto opacity-60 hover:opacity-100 transition-opacity duration-200 p-1 rounded-md hover:bg-muted/50"
                 title="Add to wordlist"
@@ -42,12 +55,14 @@
         </div>
 
         <div class="border-l-2 border-accent pl-4">
-            <EditableField
-                v-model="fields.text.value"
-                field-name="definition"
-                :multiline="true"
-                :edit-mode="props.editModeEnabled"
-                :can-regenerate="canRegenerate('text')"
+            <!-- Definition Text with Progressive Loading -->
+            <div v-if="definition.text">
+                <EditableField
+                    v-model="fields.text.value"
+                    field-name="definition"
+                    :multiline="true"
+                    :edit-mode="props.editModeEnabled"
+                    :can-regenerate="canRegenerate('text')"
                 :is-regenerating="fields.text.isRegenerating"
                 :errors="fields.text.errors"
                 @regenerate="regenerateComponent('text')"
@@ -62,19 +77,34 @@
                         {{ definition.definition || definition.text }}
                     </p>
                 </template>
-            </EditableField>
+                </EditableField>
+            </div>
+            <!-- Definition Text Skeleton -->
+            <div v-else-if="isStreaming" class="space-y-2 animate-pulse">
+                <div class="h-6 w-full bg-muted rounded" />
+                <div class="h-4 w-4/5 bg-muted rounded" />
+            </div>
 
-            <!-- Examples -->
+            <!-- Progressive Examples -->
             <ExampleListEditable
-                v-if="definition.examples"
+                v-if="definition.examples && definition.examples.length > 0"
                 :examples="definition.examples"
                 :word="store.currentEntry?.word || ''"
                 :edit-mode="props.editModeEnabled"
+                :isStreaming="isStreaming"
                 @update:example="handleExampleUpdate"
                 @regenerate:example="handleExampleRegenerate"
             />
+            <!-- Examples Skeleton -->
+            <div v-else-if="isStreaming || isPartialDefinition" class="mt-4 space-y-2">
+                <div class="text-sm font-medium text-muted-foreground">Examples</div>
+                <div v-for="i in 2" :key="i" class="bg-muted/50 rounded p-3 animate-pulse">
+                    <div class="h-4 w-full bg-muted rounded mb-1" />
+                    <div class="h-4 w-3/4 bg-muted rounded" />
+                </div>
+            </div>
 
-            <!-- Synonyms -->
+            <!-- Progressive Synonyms -->
             <SynonymListEditable
                 v-if="shouldShowSynonyms"
                 :synonyms="fields.synonyms.value"
@@ -85,6 +115,13 @@
                 @regenerate="regenerateComponent('synonyms')"
                 @synonym-click="emit('searchWord', $event)"
             />
+            <!-- Synonyms Skeleton -->
+            <div v-else-if="isStreaming || isPartialDefinition" class="mt-4 space-y-2">
+                <div class="text-sm font-medium text-muted-foreground">Synonyms</div>
+                <div class="flex flex-wrap gap-1">
+                    <div v-for="i in 4" :key="i" class="h-6 w-16 bg-muted rounded animate-pulse" />
+                </div>
+            </div>
         </div>
     </div>
 </template>
@@ -107,10 +144,17 @@ interface DefinitionItemProps {
     isFirstInGroup?: boolean;
     isAISynthesized?: boolean;
     editModeEnabled?: boolean;
+    isStreaming?: boolean;
 }
 
 const store = useAppStore();
 const props = defineProps<DefinitionItemProps>();
+
+// Streaming indicators
+const isStreaming = computed(() => props.isStreaming || false);
+const isPartialDefinition = computed(() => {
+    return isStreaming.value && (!props.definition.text || !props.definition.examples?.length);
+});
 
 // Debug logging
 console.log('[DefinitionItem] Definition:', props.definition);

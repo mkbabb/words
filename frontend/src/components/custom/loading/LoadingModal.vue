@@ -1,6 +1,6 @@
 <template>
     <Modal v-model="modelValue" :close-on-backdrop="allowDismiss">
-        <div class="flex flex-col items-center space-y-6 px-4">
+        <div class="flex flex-col items-center space-y-6">
             <AnimatedText
                 :text="displayText || word || ''"
                 text-class="text-[clamp(1.5rem,8vw,3.75rem)] font-black pb-8"

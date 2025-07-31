@@ -115,3 +115,70 @@ export interface WordListStats {
   most_frequent: WordListItem[];
   hot_words: WordListItem[];
 }
+
+export interface WordListSearchItem {
+  word: string;
+  score: number;
+  mastery_level: MasteryLevel;
+  review_count: number;
+  notes?: string;
+  tags: string[];
+  frequency?: number;
+}
+
+export interface WordListSearchResponse {
+  items: WordListSearchItem[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+// Query parameter types that match backend models
+export interface WordListQueryParams {
+  // Filters
+  mastery_level?: MasteryLevel;
+  min_views?: number;
+  max_views?: number;
+  reviewed?: boolean;
+  
+  // Sorting
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+  
+  // Pagination
+  offset?: number;
+  limit?: number;
+}
+
+export interface WordListSearchQueryParams extends WordListQueryParams {
+  // Search-specific parameters
+  query: string;
+  max_results?: number;
+  min_score?: number;
+  
+  // Override default sort to use relevance for search
+  sort_by?: 'relevance' | 'added_at' | 'last_visited' | 'mastery_level' | 'view_count';
+}
+
+export interface WordListsQueryParams {
+  // Wordlist filters
+  name?: string;
+  name_pattern?: string;
+  owner_id?: string;
+  is_public?: boolean;
+  has_tag?: string;
+  min_words?: number;
+  max_words?: number;
+  created_after?: string;
+  created_before?: string;
+  
+  // Pagination and sorting
+  offset?: number;
+  limit?: number;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+}
+
+export interface WordListNamesSearchParams {
+  limit?: number;
+}

@@ -56,6 +56,12 @@ export function useSearchBarKeyboard(options: UseSearchBarKeyboardOptions) {
 
     const query = store.searchQuery;
     
+    // If query is blank, just unfocus the search bar
+    if (!query || query.trim() === '') {
+      store.isSearchBarFocused = false;
+      return;
+    }
+    
     // Handle stage mode
     if (store.searchMode === 'stage' && query) {
       // Emit stage-enter event (handled by parent component)

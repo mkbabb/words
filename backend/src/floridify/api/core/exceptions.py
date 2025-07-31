@@ -6,7 +6,7 @@ by providing a consistent, type-safe approach to raising HTTP exceptions.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
@@ -25,7 +25,7 @@ class ErrorResponse(BaseModel):
 
     error: str
     details: list[ErrorDetail] | None = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     request_id: str | None = None
 
 

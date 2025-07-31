@@ -1,35 +1,45 @@
 <template>
-    <CardHeader class="relative pr-36 sm:pr-44 md:pr-52">
-        <div class="flex items-center justify-between">
-            <CardTitle class="relative flex items-center gap-3">
-                <div class="flex-1">
+    <CardHeader class="relative">
+        <CardTitle class="flex items-center">
+            <!-- Container for invisible text and overlay -->
+            <div class="relative">
+                <!-- Invisible text to reserve space -->
+                <span class="text-[clamp(1.5rem,10vw,4.5rem)] leading-tight font-bold invisible" 
+                      style="font-family: 'Fraunces', serif;">
+                    {{ word }}
+                </span>
+                
+                <!-- Animated text overlay with extra space for cursor -->
+                <div class="absolute left-0 top-0 w-[calc(100%+2ch)]">
                     <AnimatedTitle
                         :text="word"
                         :animation-type="animationType"
                         :animation-key="animationKey"
+                        class="block"
                     />
                 </div>
-                <!-- Add to Wordlist Button - Fixed position to prevent shifting -->
-                <HoverCard>
-                    <HoverCardTrigger as-child>
-                        <button 
-                            @click="showAddToWordlistModal = true"
-                            class="group flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-muted/30 hover:bg-muted hover:border-border transition-all duration-200 opacity-60 hover:opacity-100 shrink-0"
-                        >
-                            <Plus :size="14" class="text-muted-foreground group-hover:text-foreground" />
-                        </button>
-                    </HoverCardTrigger>
-                    <HoverCardContent side="top" :sideOffset="4" class="w-48">
-                        <div class="text-sm">
-                            <p class="font-medium">Add to Wordlist</p>
-                            <p class="text-muted-foreground text-xs mt-1">
-                                Save this word to your wordlists for study
-                            </p>
-                        </div>
-                    </HoverCardContent>
-                </HoverCard>
-            </CardTitle>
-        </div>
+            </div>
+            
+            <!-- Plus button flows after invisible text -->
+            <HoverCard>
+                <HoverCardTrigger as-child>
+                    <button 
+                        @click="showAddToWordlistModal = true"
+                        class="ml-3 group flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-muted/30 hover:bg-muted hover:border-border transition-all duration-200 opacity-60 hover:opacity-100 flex-shrink-0"
+                    >
+                        <Plus :size="14" class="text-muted-foreground group-hover:text-foreground" />
+                    </button>
+                </HoverCardTrigger>
+                <HoverCardContent side="top" :sideOffset="4" class="w-48">
+                    <div class="text-sm">
+                        <p class="font-medium">Add to Wordlist</p>
+                        <p class="text-muted-foreground text-xs mt-1">
+                            Save this word to your wordlists for study
+                        </p>
+                    </div>
+                </HoverCardContent>
+            </HoverCard>
+        </CardTitle>
 
         <!-- Pronunciation -->
         <div

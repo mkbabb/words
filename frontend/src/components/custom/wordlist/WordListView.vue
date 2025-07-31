@@ -62,7 +62,7 @@
     <div v-else class="space-y-4">
       <div 
         ref="scrollContainer"
-        class="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+        class="grid gap-4 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
       >
         <WordListCard
           v-for="word in currentWords"
@@ -102,6 +102,7 @@
       v-model="showUploadModal"
       :wordlist-id="currentWordlist?.id"
       @uploaded="handleWordsUploaded"
+      @wordlists-updated="() => {}"
     />
 
     <!-- Create Wordlist Modal -->
@@ -133,7 +134,7 @@ import {
 import { Button } from '@/components/ui/button';
 import type { WordListItem, WordList } from '@/types';
 import { MasteryLevel, Temperature } from '@/types/wordlist';
-import { wordlistApi } from '@/utils/api';
+import { wordlistApi } from '@/api';
 import { useToast } from '@/components/ui/toast/use-toast';
 import { formatRelativeTime } from '@/utils';
 import WordListCard from './WordListCard.vue';
@@ -206,11 +207,8 @@ const dueForReview = computed(() => {
 // Methods
 
 const handleWordClick = async (word: WordListItem) => {
-  // Switch to lookup mode for the animation
-  store.searchMode = 'lookup';
-  
-  // Navigate to definition route with smooth transition
-  await router.push(`/definition/${encodeURIComponent(word.word)}`);
+  // Switch to lookup mode and navigate to definition route
+  store.setSearchMode('lookup', router);
   
   // Perform the word lookup after navigation
   await store.searchWord(word.word);
@@ -292,9 +290,10 @@ const handleWordsUploaded = (words: string[]) => {
   console.log('Refreshing wordlist data...');
 };
 
-const handleWordlistCreated = (wordlist: any) => {
+const handleWordlistCreated = async (wordlist: any) => {
   console.log('Wordlist created:', wordlist.name);
   store.setWordlist(wordlist.id);
+  store.setSearchMode('wordlist', router);
 };
 
 // Clustering removed for simplicity
@@ -342,12 +341,37 @@ const loadWordlistWords = async (id: string, page: number = 0, append: boolean =
   isLoadingWords.value = true;
   
   try {
-    const response = await wordlistApi.getWordlistWords(id, {
-      offset: page * wordsPerPage.value,
-      limit: wordsPerPage.value,
-      sort_by: sortCriteria.value?.[0]?.field || 'added_at',
-      sort_order: sortCriteria.value?.[0]?.direction || 'desc'
-    });
+    let response;
+    
+    if (store.searchQuery && store.searchQuery.trim()) {
+      // Use search endpoint when there's a query - include all filters
+      response = await wordlistApi.searchWordlist(id, {
+        query: store.searchQuery.trim(),
+        offset: page * wordsPerPage.value,
+        limit: wordsPerPage.value,
+        sort_by: sortCriteria.value?.[0]?.field || 'relevance',
+        sort_order: sortCriteria.value?.[0]?.direction || 'desc',
+        min_score: 0.4,
+        // Pass through all active filters
+        mastery_level: filters.value.masteryLevel || undefined,
+        min_views: filters.value.minViews,
+        max_views: filters.value.maxViews,
+        reviewed: filters.value.reviewed,
+      });
+    } else {
+      // Use regular endpoint when no query - include all filters
+      response = await wordlistApi.getWordlistWords(id, {
+        offset: page * wordsPerPage.value,
+        limit: wordsPerPage.value,
+        sort_by: sortCriteria.value?.[0]?.field || 'added_at',
+        sort_order: sortCriteria.value?.[0]?.direction || 'desc',
+        // Pass through all active filters
+        mastery_level: filters.value.masteryLevel || undefined,
+        min_views: filters.value.minViews,
+        max_views: filters.value.maxViews,
+        reviewed: filters.value.reviewed,
+      });
+    }
     
     if (append) {
       // Add unique IDs and append
@@ -417,6 +441,16 @@ watch(() => store.selectedWordlist, (newId) => {
   } else {
     currentWordlistData.value = null;
     currentWords.value = [];
+  }
+});
+
+// Watch for search query changes in wordlist mode
+watch(() => store.searchQuery, (newQuery, oldQuery) => {
+  // Only reload if we're in wordlist mode and have a selected wordlist
+  if (store.searchMode === 'wordlist' && store.selectedWordlist && newQuery !== oldQuery) {
+    // Reset to first page when search changes
+    currentPage.value = 0;
+    loadWordlistWords(store.selectedWordlist, 0, false);
   }
 });
 

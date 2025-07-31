@@ -1,6 +1,6 @@
 """WordList review and study endpoints."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from beanie import PydanticObjectId
@@ -100,7 +100,7 @@ async def get_review_session(
 
     # Select words for review
     review_words = []
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
 
     for word in wordlist.words:
         # Skip if above mastery threshold

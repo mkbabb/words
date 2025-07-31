@@ -7,7 +7,6 @@ import platform
 import time
 import traceback
 
-import orjson
 from src.floridify.connectors.base import DictionaryConnector
 
 from ..ai import get_definition_synthesizer

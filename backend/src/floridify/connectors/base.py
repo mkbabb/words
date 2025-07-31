@@ -7,11 +7,9 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any
 
-from beanie import PydanticObjectId
-
 from ..constants import DictionaryProvider
 from ..core.state_tracker import StateTracker
-from ..models import Definition, Etymology, Pronunciation, ProviderData, Word
+from ..models import ProviderData, Word
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter
@@ -117,7 +117,7 @@ async def health_check() -> HealthResponse:
     return HealthResponse(
         status=overall_status,
         version="0.1.0",  # Version from pyproject.toml
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         services={
             "database": database_status,
             "search_engine": search_status,

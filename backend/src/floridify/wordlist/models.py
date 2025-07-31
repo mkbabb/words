@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
-from ..models.base import BaseMetadata
+from ..models.base import BaseMetadataWithAccess
 from .constants import MasteryLevel, Temperature
 from .review import ReviewData
 from .stats import LearningStats
@@ -40,7 +40,7 @@ class WordListItem(BaseModel):
         default=None, description="Last time word was viewed/studied"
     )
     added_date: datetime = Field(
-        default_factory=lambda: datetime.now(), description="When added to list"
+        default_factory=lambda: datetime.now(timezone.utc), description="When added to list"
     )
 
     # User metadata
@@ -53,13 +53,13 @@ class WordListItem(BaseModel):
 
     def mark_visited(self) -> None:
         """Mark word as visited/viewed."""
-        self.last_visited = datetime.now()
+        self.last_visited = datetime.now(timezone.utc)
         self.temperature = Temperature.HOT
 
     def review(self, quality: int) -> None:
         """Process a review session."""
         self.review_data.update_sm2(quality)
-        self.last_visited = datetime.now()
+        self.last_visited = datetime.now(timezone.utc)
         self.temperature = Temperature.HOT
 
         # Update mastery based on performance
@@ -83,7 +83,7 @@ class WordListItem(BaseModel):
         return self.review_data.get_overdue_days()
 
 
-class WordList(Document, BaseMetadata):
+class WordList(Document, BaseMetadataWithAccess):
     """Word list with learning metadata and statistics."""
 
     name: str = Field(..., description="Human-readable list name")

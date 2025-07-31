@@ -74,17 +74,22 @@ export function sortDefinitions(definitions: TransformedDefinition[]): Transform
 
 /**
  * Formats cluster ID for display
- * e.g., "example_representative" -> "Representative"
+ * e.g., "fork_noun_representative" -> "Representative"
  */
 export function formatClusterLabel(clusterId: string): string {
-    // Remove word prefix and get the cluster name part
+    // Remove word and part of speech prefix, get the cluster name part
     const parts = clusterId.split('_');
-    if (parts.length > 1) {
-        // Get the cluster name part(s) after the word
-        const clusterName = parts.slice(1).join(' ');
+    if (parts.length >= 3) {
+        // Get the cluster name part(s) after the word and part of speech
+        const clusterName = parts.slice(2).join(' ');
         // Capitalize first letter
         return clusterName.charAt(0).toUpperCase() + clusterName.slice(1);
     }
-    // Fallback for non-standard formats
+    // Fallback for non-standard formats (skip first part only)
+    if (parts.length === 2) {
+        const clusterName = parts[1];
+        return clusterName.charAt(0).toUpperCase() + clusterName.slice(1);
+    }
+    // Last fallback for single word
     return clusterId.charAt(0).toUpperCase() + clusterId.slice(1);
 }

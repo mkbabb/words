@@ -119,7 +119,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import SidebarLookupView from './SidebarLookupView.vue';
 import SidebarWordListView from './SidebarWordListView.vue';
 import type { SynthesizedDictionaryEntry, WordList } from '@/types';
-import { wordlistApi } from '@/utils/api';
+import { wordlistApi } from '@/api';
 
 interface Props {
     collapsed: boolean;
@@ -258,9 +258,9 @@ const formatWordlistDate = (dateString: string | null): string => {
     return date.toLocaleDateString();
 };
 
-const handleCollapsedWordlistClick = (wordlistId: string) => {
+const handleCollapsedWordlistClick = async (wordlistId: string) => {
     store.setWordlist(wordlistId);
-    store.searchMode = 'wordlist';
+    store.setSearchMode('wordlist', router);
 };
 
 const loadRecentWordlists = async () => {

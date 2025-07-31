@@ -62,7 +62,7 @@ class DefinitionSynthesizer:
         # Check for existing synthesized entry
         if not force_refresh:
             existing = await SynthesizedDictionaryEntry.find_one(
-                SynthesizedDictionaryEntry.word_id == str(word_obj.id)
+                SynthesizedDictionaryEntry.word_id == word_obj.id
             )
             if existing:
                 logger.info(f"Using existing synthesized entry for '{word}'")
@@ -209,7 +209,7 @@ class DefinitionSynthesizer:
         # Check for existing synthesized entry
         if not force_refresh:
             existing = await SynthesizedDictionaryEntry.find_one(
-                SynthesizedDictionaryEntry.word_id == str(word_obj.id)
+                SynthesizedDictionaryEntry.word_id == word_obj.id
             )
             if existing:
                 logger.info(f"Using existing synthesized entry for '{word}'")

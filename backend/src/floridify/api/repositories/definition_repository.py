@@ -260,3 +260,130 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
             results.append(def_dict)
 
         return results
+
+    async def get_with_images(self, id: PydanticObjectId) -> dict[str, Any]:
+        """Get definition with expanded images."""
+        from ...models import ImageMedia
+
+        definition = await self.get(id, raise_on_missing=True)
+        assert definition is not None
+        definition_dict = definition.model_dump()
+
+        # Fetch and include images
+        if definition.image_ids:
+            images = await ImageMedia.find(In(ImageMedia.id, definition.image_ids)).to_list()
+            definition_dict["images"] = [img.model_dump() for img in images]
+        else:
+            definition_dict["images"] = []
+
+        return definition_dict
+
+    async def get_with_examples_and_images(self, id: PydanticObjectId) -> dict[str, Any]:
+        """Get definition with expanded examples and images."""
+        from ...models import Example, ImageMedia
+
+        definition = await self.get(id, raise_on_missing=True)
+        assert definition is not None
+        definition_dict = definition.model_dump()
+
+        # Fetch and include examples
+        if definition.example_ids:
+            examples = await Example.find(In(Example.id, definition.example_ids)).to_list()
+            definition_dict["examples"] = [ex.model_dump() for ex in examples]
+        else:
+            definition_dict["examples"] = []
+
+        # Fetch and include images
+        if definition.image_ids:
+            images = await ImageMedia.find(In(ImageMedia.id, definition.image_ids)).to_list()
+            definition_dict["images"] = [img.model_dump() for img in images]
+        else:
+            definition_dict["images"] = []
+
+        return definition_dict
+
+    async def get_many_with_images(self, definitions: list[Definition]) -> list[dict[str, Any]]:
+        """Get multiple definitions with expanded images efficiently."""
+        from ...models import ImageMedia
+
+        # Collect all image IDs
+        all_image_ids = []
+        for definition in definitions:
+            if definition.image_ids:
+                all_image_ids.extend(definition.image_ids)
+
+        # Fetch all images in one query
+        images_map = {}
+        if all_image_ids:
+            images = await ImageMedia.find(In(ImageMedia.id, all_image_ids)).to_list()
+            images_map = {str(img.id): img for img in images}
+
+        # Build results with images
+        results = []
+        for definition in definitions:
+            def_dict = definition.model_dump()
+            if definition.image_ids:
+                def_dict["images"] = [
+                    images_map[str(img_id)].model_dump()
+                    for img_id in definition.image_ids
+                    if str(img_id) in images_map
+                ]
+            else:
+                def_dict["images"] = []
+            results.append(def_dict)
+
+        return results
+
+    async def get_many_with_examples_and_images(self, definitions: list[Definition]) -> list[dict[str, Any]]:
+        """Get multiple definitions with expanded examples and images efficiently."""
+        from ...models import Example, ImageMedia
+
+        # Collect all example and image IDs
+        all_example_ids = []
+        all_image_ids = []
+        for definition in definitions:
+            if definition.example_ids:
+                all_example_ids.extend(definition.example_ids)
+            if definition.image_ids:
+                all_image_ids.extend(definition.image_ids)
+
+        # Fetch all examples and images in parallel
+        examples_map = {}
+        images_map = {}
+        
+        if all_example_ids:
+            examples = await Example.find(In(Example.id, all_example_ids)).to_list()
+            examples_map = {str(ex.id): ex for ex in examples}
+            
+        if all_image_ids:
+            images = await ImageMedia.find(In(ImageMedia.id, all_image_ids)).to_list()
+            images_map = {str(img.id): img for img in images}
+
+        # Build results with examples and images
+        results = []
+        for definition in definitions:
+            def_dict = definition.model_dump()
+            
+            # Add examples
+            if definition.example_ids:
+                def_dict["examples"] = [
+                    examples_map[str(ex_id)].model_dump()
+                    for ex_id in definition.example_ids
+                    if str(ex_id) in examples_map
+                ]
+            else:
+                def_dict["examples"] = []
+                
+            # Add images
+            if definition.image_ids:
+                def_dict["images"] = [
+                    images_map[str(img_id)].model_dump()
+                    for img_id in definition.image_ids
+                    if str(img_id) in images_map
+                ]
+            else:
+                def_dict["images"] = []
+                
+            results.append(def_dict)
+
+        return results

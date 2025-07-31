@@ -11,7 +11,7 @@ import type {
     VocabularySuggestion,
     WordSuggestionResponse,
 } from '@/types';
-import { dictionaryApi, wordlistApi } from '@/utils/api';
+import { dictionaryApi, wordlistApi } from '@/api';
 import { generateId, normalizeWord } from '@/utils';
 
 // Define sort criteria type
@@ -31,6 +31,19 @@ export const useAppStore = defineStore('app', () => {
     const showLoadingModal = ref(false);
     const loadingStageDefinitions = ref<Array<{progress: number, label: string, description: string}>>([]);
     const loadingCategory = ref('');
+    
+    // Streaming state for progressive loading
+    const partialEntry = ref<Partial<SynthesizedDictionaryEntry> | null>(null);
+    const isStreamingData = ref(false);
+    
+    // Error state for definition display
+    const definitionError = ref<{
+        hasError: boolean;
+        errorType: 'network' | 'not-found' | 'server' | 'ai-failed' | 'empty' | 'unknown';
+        errorMessage: string;
+        canRetry: boolean;
+        originalWord?: string;
+    } | null>(null);
 
     // SearchBar UI state (not persisted)
     const showSearchResults = ref(false);
@@ -40,6 +53,7 @@ export const useAppStore = defineStore('app', () => {
     const isAIQuery = ref(false);
     const showSparkle = ref(false);
     const showErrorAnimation = ref(false);
+    const isSwitchingModes = ref(false);
     const autocompleteText = ref('');
     const aiSuggestions = ref<string[]>([]);
     const isDirectLookup = ref(false);
@@ -246,7 +260,7 @@ export const useAppStore = defineStore('app', () => {
                 searchMode.value === 'word-of-the-day'
                     ? 'wordOfTheDay'
                     : searchMode.value;
-            return sessionState.value.searchQueries?.[mode] || '';
+            return sessionState.value.searchQueries[mode];
         },
         set: (value) => {
             const mode =
@@ -497,9 +511,26 @@ export const useAppStore = defineStore('app', () => {
 
     // Actions
     async function searchWord(query: string) {
+        console.log('🔍 SEARCHWORD - Called with query:', query, {
+            isSwitchingModes: isSwitchingModes.value,
+            isDirectLookup: isDirectLookup.value,
+            currentShowSearchResults: showSearchResults.value,
+            searchResultsLength: searchResults.value.length
+        });
+        
         if (!query.trim()) return;
 
+        // Hide search results dropdown immediately when starting lookup
+        console.log('🔍 SEARCHWORD - Hiding search results at start');
+        showSearchResults.value = false;
+        searchResults.value = [];
+
         const normalizedQuery = normalizeWord(query);
+        
+        // Clear any existing error state when starting new search (only if not retrying an error)
+        if (!definitionError.value?.hasError || definitionError.value.originalWord !== normalizedQuery) {
+            definitionError.value = null;
+        }
 
         // Set direct lookup flag to prevent search triggering
         isDirectLookup.value = true;
@@ -516,14 +547,20 @@ export const useAppStore = defineStore('app', () => {
         searchResults.value = [];
         sessionState.value.searchResults = [];
         showSearchResults.value = false;
+        
+        // Only hide controls if we're not switching modes via the controls
+        if (!isSwitchingModes.value) {
+            showSearchControls.value = false;
+        }
 
         // Direct lookup - no need for intermediate search
         await getDefinition(normalizedQuery);
 
-        // Reset direct lookup flag after a short delay
+        // Reset direct lookup flag after a longer delay to prevent search operations
         setTimeout(() => {
+            console.log('🔍 SEARCHWORD - Resetting isDirectLookup flag');
             isDirectLookup.value = false;
-        }, 100);
+        }, 2000); // Increased from 100ms to 2000ms
     }
 
     // Search for word suggestions (used by SearchBar)
@@ -535,21 +572,10 @@ export const useAppStore = defineStore('app', () => {
 
             // Handle different search modes
             if (searchMode.value === 'wordlist' && selectedWordlist.value) {
-                // Search within the selected wordlist using corpus API
-                const corpusResults = await wordlistApi.searchWordlist(
-                    selectedWordlist.value,
-                    query,
-                    { max_results: 20, min_score: 0.6 }
-                );
-
-                // Transform corpus results to SearchResult format
-                results =
-                    corpusResults.data.results?.map((result: any) => ({
-                        word: result.word,
-                        score: result.score,
-                        source_method: 'corpus' as const,
-                        highlight_snippet: result.context || '',
-                    })) || [];
+                // For wordlist mode, the search is handled by the WordListView component
+                // which calls either searchWordlist (with query) or getWordlistWords (no query)
+                // We don't need to populate searchResults here
+                results = [];
             } else {
                 // Default dictionary search
                 results = await dictionaryApi.searchWord(query);
@@ -585,6 +611,10 @@ export const useAppStore = defineStore('app', () => {
         try {
             let entry;
 
+            // Reset partial state and start streaming
+            partialEntry.value = null;
+            isStreamingData.value = true;
+
             // Always use streaming endpoint to get pipeline progress
             entry = await dictionaryApi.getDefinitionStream(
                 word,
@@ -613,6 +643,11 @@ export const useAppStore = defineStore('app', () => {
                     loadingCategory.value = category;
                     loadingStageDefinitions.value = stages;
                 },
+                (partialData) => {
+                    // Handle partial results as they stream in
+                    console.log('Received partial data:', partialData);
+                    partialEntry.value = partialData;
+                },
                 noAI.value // Pass noAI flag
             );
 
@@ -635,6 +670,20 @@ export const useAppStore = defineStore('app', () => {
             }
 
             currentEntry.value = entry;
+            
+            // Check for empty results and set error state if needed
+            if (!entry || !entry.definitions || entry.definitions.length === 0) {
+                definitionError.value = {
+                    hasError: true,
+                    errorType: 'empty',
+                    errorMessage: `No definitions found for "${word}"`,
+                    canRetry: true,
+                    originalWord: word
+                };
+            } else {
+                // Clear error state on successful lookup with results
+                definitionError.value = null;
+            }
 
             // Update current word in session
             sessionState.value.currentWord = word;
@@ -646,8 +695,14 @@ export const useAppStore = defineStore('app', () => {
             window.dispatchEvent(new CustomEvent('word-searched'));
             window.dispatchEvent(new CustomEvent('definition-viewed'));
 
-            // Refresh suggestions if this is a new word
-            if (word !== suggestionsCache.value.lastWord) {
+            // Refresh suggestions if this is a new word, but throttle it
+            const FIVE_MINUTES = 5 * 60 * 1000;
+            const cache = suggestionsCache.value;
+            const isNewWord = word !== cache.lastWord;
+            const shouldRefresh = isNewWord && (!cache.timestamp || 
+                                 Date.now() - cache.timestamp > FIVE_MINUTES);
+            
+            if (shouldRefresh) {
                 refreshVocabularySuggestions();
             }
 
@@ -667,14 +722,56 @@ export const useAppStore = defineStore('app', () => {
             }
         } catch (error) {
             console.error('Definition error:', error);
+            
             loadingProgress.value = 0;
             loadingStage.value = '';
+            // Reset streaming state on error
+            partialEntry.value = null;
+            
+            // Set error state based on error type
+            const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+            let errorType: 'network' | 'not-found' | 'server' | 'ai-failed' | 'empty' | 'unknown' = 'unknown';
+            let canRetry = true;
+            
+            if (errorMessage.includes('404') || errorMessage.includes('not found')) {
+                errorType = 'not-found';
+                canRetry = false;
+            } else if (errorMessage.includes('network') || errorMessage.includes('fetch') || 
+                       errorMessage.includes('Stream ended without completion') ||
+                       errorMessage.includes('connection')) {
+                errorType = 'network';
+            } else if (errorMessage.includes('500') || errorMessage.includes('server')) {
+                errorType = 'server';
+            } else if (errorMessage.includes('AI') || errorMessage.includes('synthesis')) {
+                errorType = 'ai-failed';
+            }
+            
+            definitionError.value = {
+                hasError: true,
+                errorType,
+                errorMessage: errorType === 'not-found' 
+                    ? `No definitions found for "${word}"`
+                    : errorMessage,
+                canRetry,
+                originalWord: word
+            };
+            
+            // Force clear current entry to ensure error state shows
+            currentEntry.value = null;
         } finally {
             isSearching.value = false;
+            // Reset streaming state
+            isStreamingData.value = false;
+            
+            // Hide search results dropdown upon successful lookup completion
+            showSearchResults.value = false;
+            searchResults.value = [];
+            
             // Reset progress after a delay to show completion
             setTimeout(() => {
                 loadingProgress.value = 0;
                 loadingStage.value = '';
+                // Keep partialEntry until next search to allow smooth transitions
             }, 1000);
         }
     }
@@ -782,8 +879,16 @@ export const useAppStore = defineStore('app', () => {
             lookupHistory.value = lookupHistory.value.slice(0, 50);
         }
 
-        // Refresh vocabulary suggestions with new history
-        refreshVocabularySuggestions();
+        // Refresh vocabulary suggestions with new history, but throttle it
+        // Only refresh if we haven't refreshed in the last 5 minutes
+        const FIVE_MINUTES = 5 * 60 * 1000;
+        const cache = suggestionsCache.value;
+        const shouldRefresh = !cache.timestamp || 
+                             Date.now() - cache.timestamp > FIVE_MINUTES;
+        
+        if (shouldRefresh) {
+            refreshVocabularySuggestions();
+        }
     }
 
     function clearLookupHistory() {
@@ -795,6 +900,11 @@ export const useAppStore = defineStore('app', () => {
         const ONE_HOUR = 60 * 60 * 1000;
         const currentWord = sessionState.value.currentWord;
         const cache = suggestionsCache.value;
+
+        // Prevent concurrent calls
+        if (isLoadingSuggestions.value && !forceRefresh) {
+            return; // Already loading, skip this call
+        }
 
         // Use cache if:
         // 1. Not forcing refresh
@@ -946,13 +1056,18 @@ export const useAppStore = defineStore('app', () => {
     const sessionStartTime = ref(Date.now());
 
     // Enhanced SearchBar functions
-    function toggleSearchMode() {
+    function toggleSearchMode(router?: any) {
         // Don't allow mode switching during active search
         if (isSearching.value || isSuggestingWords.value) {
             return;
         }
 
+        // Store current state before switching
+        const currentQuery = searchQuery.value;
+        const currentWordlist = selectedWordlist.value;
+        
         // Cycle through modes: lookup -> wordlist -> word-of-the-day -> stage -> lookup
+        const oldMode = searchMode.value;
         if (searchMode.value === 'lookup') {
             searchMode.value = 'wordlist';
         } else if (searchMode.value === 'wordlist') {
@@ -961,6 +1076,30 @@ export const useAppStore = defineStore('app', () => {
             searchMode.value = 'stage';
         } else {
             searchMode.value = 'lookup';
+        }
+        
+        // Clear search results when changing modes to prevent stale dropdown
+        showSearchResults.value = false;
+        searchResults.value = [];
+        
+        // Handle router navigation when switching modes
+        if (router) {
+            // When switching TO lookup mode, preserve the query from the previous mode
+            if (searchMode.value === 'lookup' && currentQuery && currentQuery.trim()) {
+                router.push(`/definition/${encodeURIComponent(currentQuery)}`);
+            }
+            // When switching TO wordlist mode, preserve the selected wordlist
+            else if (searchMode.value === 'wordlist' && currentWordlist) {
+                if (currentQuery && currentQuery.trim()) {
+                    router.push(`/wordlist/${currentWordlist}/search/${encodeURIComponent(currentQuery)}`);
+                } else {
+                    router.push(`/wordlist/${currentWordlist}`);
+                }
+            }
+            // For other modes, go to home for now
+            else if (searchMode.value !== 'lookup' && searchMode.value !== 'wordlist') {
+                router.push('/');
+            }
         }
 
         // Reset suggestion mode when changing search modes
@@ -1000,6 +1139,45 @@ export const useAppStore = defineStore('app', () => {
 
     function setWordlist(wordlist: string | null) {
         selectedWordlist.value = wordlist;
+    }
+
+    function setSearchMode(newMode: 'lookup' | 'wordlist' | 'word-of-the-day' | 'stage', router?: any) {
+        const currentQuery = searchQuery.value;
+        const currentWordlist = selectedWordlist.value;
+        
+        // Set flag to indicate we're switching modes via controls
+        isSwitchingModes.value = true;
+        
+        searchMode.value = newMode;
+        
+        // Clear search results when changing modes to prevent stale dropdown
+        showSearchResults.value = false;
+        searchResults.value = [];
+        
+        // Handle router navigation when setting search mode
+        if (router) {
+            // When switching TO lookup mode, preserve the query if we have one
+            if (newMode === 'lookup' && currentQuery && currentQuery.trim()) {
+                router.push(`/definition/${encodeURIComponent(currentQuery)}`);
+            }
+            // When switching TO wordlist mode, preserve the selected wordlist
+            else if (newMode === 'wordlist' && currentWordlist) {
+                if (currentQuery && currentQuery.trim()) {
+                    router.push(`/wordlist/${currentWordlist}/search/${encodeURIComponent(currentQuery)}`);
+                } else {
+                    router.push(`/wordlist/${currentWordlist}`);
+                }
+            }
+            // For other modes, go to home for now
+            else if (newMode !== 'lookup' && newMode !== 'wordlist') {
+                router.push('/');
+            }
+        }
+        
+        // Reset the mode switching flag after a short delay
+        setTimeout(() => {
+            isSwitchingModes.value = false;
+        }, 500);
     }
 
     // Regenerate examples for a specific definition
@@ -1080,10 +1258,11 @@ export const useAppStore = defineStore('app', () => {
             // Set direct lookup flag for AI suggestions
             isDirectLookup.value = true;
 
-            // Hide search dropdown when getting AI suggestions
+            // Hide search dropdown and controls when getting AI suggestions
             searchResults.value = [];
             sessionState.value.searchResults = [];
             showSearchResults.value = false;
+            showSearchControls.value = false;
 
             isSuggestingWords.value = true;
             suggestionsProgress.value = 0;
@@ -1205,6 +1384,10 @@ export const useAppStore = defineStore('app', () => {
         loadingStageDefinitions,
         loadingCategory,
         showLoadingModal,
+        // Streaming state
+        partialEntry,
+        isStreamingData,
+        definitionError,
         searchCursorPosition,
         forceRefreshMode,
         sessionState,
@@ -1274,6 +1457,7 @@ export const useAppStore = defineStore('app', () => {
         toggleSource,
         toggleLanguage,
         setWordlist,
+        setSearchMode,
         // Regeneration functions
         regenerateExamples,
         regenerateAllExamples,
@@ -1418,6 +1602,53 @@ export const useAppStore = defineStore('app', () => {
                 return response;
             } catch (error) {
                 console.error('Failed to fetch definition:', error);
+                throw error;
+            }
+        },
+
+        async refreshSynthEntryImages() {
+            console.log('[Store] Refreshing synthesized entry images');
+            if (!currentEntry.value?.id) {
+                console.warn('[Store] No current entry ID available for image refresh');
+                return;
+            }
+
+            try {
+                const refreshedEntry = await dictionaryApi.refreshSynthEntry(currentEntry.value.id);
+                console.log('[Store] Refreshed entry with updated images:', refreshedEntry);
+                
+                // Update the current entry with refreshed data, especially images
+                // Merge with existing entry data to ensure all required fields are present
+                currentEntry.value = {
+                    ...currentEntry.value,
+                    ...refreshedEntry,
+                } as SynthesizedDictionaryEntry;
+                
+                // Also update in lookup history
+                const historyIndex = lookupHistory.value.findIndex(
+                    (h) => h.entry.id === refreshedEntry.id
+                );
+                if (historyIndex >= 0) {
+                    lookupHistory.value[historyIndex].entry = {
+                        ...lookupHistory.value[historyIndex].entry,
+                        ...refreshedEntry,
+                    } as SynthesizedDictionaryEntry;
+                }
+
+                showNotification({
+                    type: 'success',
+                    message: 'Images updated successfully',
+                    duration: 3000,
+                });
+
+                return refreshedEntry;
+            } catch (error) {
+                console.error('[Store] Failed to refresh entry images:', error);
+                showNotification({
+                    type: 'error',
+                    message: 'Failed to update images',
+                    duration: 3000,
+                });
                 throw error;
             }
         },

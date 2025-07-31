@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import base64
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal
+from uuid import UUID
 
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, ConfigDict, Field
@@ -16,12 +19,46 @@ class BaseMetadata(BaseModel):
         # Performance optimizations
         arbitrary_types_allowed=True,
         str_strip_whitespace=True,
-        use_enum_values=True
+        use_enum_values=True,
+        # JSON serialization configuration
+        json_encoders={
+            datetime: lambda v: v.isoformat(),
+            PydanticObjectId: str,
+            UUID: str,
+            Path: str,
+            bytes: lambda v: base64.b64encode(v).decode('utf-8'),
+        }
     )
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     version: int = Field(default=1, ge=1)
+
+    def mark_updated(self) -> None:
+        """Update the timestamp and increment version."""
+        self.updated_at = datetime.now(timezone.utc)
+        self.version += 1
+
+
+class AccessTrackingMixin(BaseModel):
+    """Mixin for entities that need access tracking functionality."""
+    
+    # Access tracking
+    last_accessed: datetime | None = Field(default=None, description="Last time accessed")
+    access_count: int = Field(default=0, ge=0, description="Number of times accessed")
+
+    def mark_accessed(self) -> None:
+        """Mark entity as accessed."""
+        self.last_accessed = datetime.now(timezone.utc)
+        self.access_count += 1
+        # Also mark as updated if this entity has that capability
+        if hasattr(self, 'mark_updated'):
+            self.mark_updated()
+
+
+class BaseMetadataWithAccess(BaseMetadata, AccessTrackingMixin):
+    """Base metadata with access tracking for entities that need both."""
+    pass
 
 
 
@@ -33,7 +70,7 @@ class ModelInfo(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     temperature: float = Field(ge=0.0, le=2.0, default=0.7)
     generation_count: int = Field(default=1, ge=1)  # Times regenerated
-    last_generated: datetime = Field(default_factory=datetime.utcnow)
+    last_generated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ImageMedia(Document, BaseMetadata):

@@ -11,7 +11,6 @@ Usage:
 
 import asyncio
 import sys
-from typing import Any
 
 from beanie import PydanticObjectId, init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient

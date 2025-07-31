@@ -5,14 +5,13 @@ from __future__ import annotations
 import asyncio
 import html
 import re
-from dataclasses import dataclass
 from typing import Any
 
 import wikitextparser as wtp  # type: ignore[import-untyped]
 from beanie import PydanticObjectId
 
 from ..caching import get_cached_http_client
-from ..constants import DictionaryProvider, Language
+from ..constants import DictionaryProvider
 from ..core.state_tracker import Stages, StateTracker
 from ..models import (
     Collocation,
@@ -24,7 +23,6 @@ from ..models import (
     UsageNote,
     Word,
 )
-from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger
 from .base import DictionaryConnector
 
@@ -44,20 +42,69 @@ class WikitextCleaner:
             # Parse with wikitextparser for proper handling
             parsed = wtp.parse(text)
 
-            # Remove templates but preserve their content where appropriate
+            # Handle templates with specialized logic
             for template in parsed.templates:
                 template_name = template.name.strip().lower()
 
-                # Preserve content from certain templates
-                if template_name in ["term", "mention", "lang"]:
+                # Handle templates with general approach
+                if template_name.startswith("quote-") or template_name in ["quote", "quotation"]:
+                    # Quote templates should be completely removed from definitions
+                    # They will be handled separately as examples
+                    template.string = ""
+
+                elif template_name in ["term", "mention", "lang", "l", "link"]:
                     # Keep the main content, remove the template wrapper
                     if template.arguments:
-                        # Usually the last argument is the display text
-                        content = str(template.arguments[-1].value).strip()
+                        # Usually the last argument is the display text, or second for {{l|lang|word}}
+                        if len(template.arguments) >= 2:
+                            content = str(template.arguments[1].value).strip()
+                        else:
+                            content = str(template.arguments[-1].value).strip()
                         template.string = content
+                    else:
+                        template.string = ""
+
+                elif template_name in ["gloss", "gl"]:
+                    # Gloss templates: {{gloss|meaning}} -> "(meaning)"
+                    if template.arguments:
+                        gloss_text = str(template.arguments[0].value).strip()
+                        template.string = f"({gloss_text})"
+                    else:
+                        template.string = ""
+
+                elif template_name in ["lb", "label", "qualifier", "q"]:
+                    # Label/qualifier templates: {{lb|en|informal}} -> "(informal)"
+                    labels = []
+                    for arg in template.arguments:
+                        arg_val = str(arg.value).strip()
+                        if arg_val and arg_val not in ["en", "eng"]:  # Skip language codes
+                            labels.append(arg_val)
+                    if labels:
+                        template.string = f"({', '.join(labels)})"
+                    else:
+                        template.string = ""
+
                 else:
-                    # Remove template entirely
-                    template.string = ""
+                    # For other templates, try to extract meaningful content from arguments
+                    # This handles templates like {{synonym of|en|word}}, {{form of|...}}, etc.
+                    if template.arguments:
+                        # Skip language codes and template metadata, look for actual content
+                        content_args = []
+                        for arg in template.arguments:
+                            arg_val = str(arg.value).strip()
+                            # Skip language codes and common metadata
+                            if (arg_val and len(arg_val) > 1 and 
+                                arg_val not in ["en", "eng", "1", "2", "3"] and
+                                not arg_val.startswith("http")):
+                                content_args.append(arg_val)
+                        
+                        if content_args:
+                            # Use the first meaningful content argument
+                            template.string = content_args[0]
+                        else:
+                            template.string = ""
+                    else:
+                        template.string = ""
 
             # Convert wikilinks to plain text
             for wikilink in parsed.wikilinks:
@@ -72,7 +119,7 @@ class WikitextCleaner:
             # Fallback to regex cleaning if wtp fails
             cleaned = text
 
-        # Final cleanup with regex
+        # Final cleanup with regex for any remaining templates
         cleaned = re.sub(r"<[^>]+>", "", cleaned)  # Remove HTML tags
         cleaned = re.sub(r"\{\{[^}]*\}\}", "", cleaned)  # Remove remaining templates
         cleaned = re.sub(
@@ -91,9 +138,12 @@ class WikitextCleaner:
         cleaned = re.sub(r"\[\.\.\.\.?\]", "...", cleaned)  # [...] to ...
         cleaned = re.sub(r"&[a-zA-Z]+;", "", cleaned)  # Remove any remaining entities
 
+        # Clean up extra whitespace and punctuation
+        cleaned = re.sub(r"\s*\.\s*$", "", cleaned)  # Remove trailing period
+        cleaned = re.sub(r"^\s*[.,;:]\s*", "", cleaned)  # Remove leading punctuation
+
         if not preserve_structure:
             cleaned = re.sub(r"\s+", " ", cleaned)  # Normalize whitespace
-            cleaned = re.sub(r"^[^\w]*", "", cleaned)  # Remove leading punctuation
 
         return cleaned.strip()
 
@@ -403,18 +453,59 @@ class WiktionaryConnector(DictionaryConnector):
         return definitions
 
     def _extract_wikilist_items(self, section_text: str) -> list[str]:
-        """Extract numbered definition items from section text."""
+        """Extract numbered definition items from section text, separating definitions from examples."""
         items = []
 
-        # Use regex to find numbered definitions (more reliable than wtp for this)
-        pattern = r"^#\s*([^#\n]+)"
-        matches = re.findall(pattern, section_text, re.MULTILINE)
-
-        for match in matches:
-            # Clean up the definition text
-            content = match.strip()
-            if content and len(content) > 5:  # Basic quality filter
-                items.append(content)
+        # Split section into lines for more precise processing
+        lines = section_text.split('\n')
+        
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            
+            # Look for numbered definition lines starting with #
+            if re.match(r'^#\s+', line):
+                # Extract the definition part (everything after # until we hit a quote template or new definition)
+                definition_text = line[1:].strip()  # Remove the # and leading whitespace
+                
+                # Check if this line contains quote templates - if so, extract only the part before quotes
+                quote_match = re.search(r'\{\{quote-', definition_text)
+                if quote_match:
+                    # Take only the part before the quote template
+                    definition_text = definition_text[:quote_match.start()].strip()
+                
+                # Continue collecting the definition if it spans multiple lines (before hitting quotes)
+                i += 1
+                while i < len(lines):
+                    next_line = lines[i].strip()
+                    
+                    # Stop if we hit another definition, quote template, or section header
+                    if (re.match(r'^#', next_line) or 
+                        next_line.startswith('{{quote-') or
+                        next_line.startswith('==') or
+                        next_line.startswith('===')):
+                        break
+                    
+                    # Add non-quote content to definition
+                    if next_line and not next_line.startswith('{{quote-'):
+                        # Check if this line contains quote templates
+                        quote_match = re.search(r'\{\{quote-', next_line)
+                        if quote_match:
+                            # Take only the part before the quote template
+                            definition_text += ' ' + next_line[:quote_match.start()].strip()
+                            break
+                        else:
+                            definition_text += ' ' + next_line
+                    i += 1
+                
+                # Clean and validate the definition text
+                if definition_text and len(definition_text.strip()) > 5:
+                    items.append(definition_text.strip())
+                
+                # Don't increment i again since we already processed multiple lines
+                continue
+            
+            i += 1
 
         return items
 
@@ -465,10 +556,14 @@ class WiktionaryConnector(DictionaryConnector):
                             passage = arg_value
                         elif arg_name == "year":
                             year = arg_value
-                        elif arg_name in ["author", "last"]:
-                            author = arg_value
+                        elif arg_name in ["author", "last", "1"]:  # Add "1" as potential author field
+                            if not author:  # Only set if we don't already have an author
+                                author = arg_value
 
                     if passage:
+                        # Clean up {{...}} placeholders commonly found in quotes
+                        passage = re.sub(r'\{\{\.\.\.+\}\}', '...', passage)
+                        
                         clean_passage = self.cleaner.clean_text(
                             passage, preserve_structure=True
                         )

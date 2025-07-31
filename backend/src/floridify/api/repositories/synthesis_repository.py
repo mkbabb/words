@@ -1,12 +1,12 @@
 """Repository for SynthesizedDictionaryEntry model operations."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
-from ...models import Etymology, ModelInfo, SynthesizedDictionaryEntry
+from ...models import Etymology, ModelInfo, SynthesizedDictionaryEntry, ImageMedia
 from ..core.base import BaseRepository
 
 
@@ -30,6 +30,10 @@ class SynthesisUpdate(BaseModel):
     etymology: Etymology | None = None
     fact_ids: list[str] | None = None
     model_info: ModelInfo | None = None
+    image_ids: list[PydanticObjectId] | None = None
+    status: str | None = None
+    tags: list[str] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class SynthesisFilter(BaseModel):
@@ -151,10 +155,48 @@ class SynthesisRepository(
         entry = await self.get(entry_id, raise_on_missing=True)
         if entry is None:
             raise ValueError(f"Entry with id {entry_id} not found")
-        entry.accessed_at = datetime.utcnow()
+        entry.accessed_at = datetime.now(UTC)
         entry.access_count += 1
         await entry.save()
 
     async def _cascade_delete(self, entry: SynthesizedDictionaryEntry) -> None:
         """Delete is handled at word level, no cascade needed here."""
         pass
+
+    async def get_with_expansion(
+        self,
+        entry_id: PydanticObjectId,
+        expand: set[str] | None = None,
+        include: set[str] | None = None,
+        exclude: set[str] | None = None,
+    ) -> dict[str, Any] | None:
+        """Get entry with field selection and expansions as dictionary."""
+        # Get the entry directly from the model
+        try:
+            entry = await SynthesizedDictionaryEntry.get(entry_id)
+            if not entry:
+                return None
+                
+            # Convert to dictionary
+            entry_dict = entry.model_dump(mode="json")
+                
+            # If images expansion is requested, populate the images field
+            if expand and "images" in expand:
+                # Load images from image_ids
+                images = []
+                if entry.image_ids:
+                    for image_id in entry.image_ids:
+                        image = await ImageMedia.get(image_id)
+                        if image:
+                            image_dict = image.model_dump(mode="json", exclude={"data"})
+                            images.append(image_dict)
+                
+                entry_dict["images"] = images
+            else:
+                # Ensure images field exists but is empty
+                entry_dict["images"] = []
+                
+            return entry_dict
+        except Exception as e:
+            print(f"Error getting entry {entry_id}: {e}")
+            return None

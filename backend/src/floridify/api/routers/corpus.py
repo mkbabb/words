@@ -81,7 +81,7 @@ class CacheStatsResponse(BaseModel):
     message: str = Field(..., description="Status message")
 
 
-@router.post("/corpus", response_model=CreateCorpusResponse)
+@router.post("/corpus", response_model=CreateCorpusResponse, status_code=201)
 async def create_corpus(
     request: CreateCorpusRequest,
     repo: CorpusRepository = Depends(get_corpus_repo),
@@ -112,6 +112,58 @@ async def create_corpus(
     except Exception as e:
         logger.error(f"Failed to create corpus: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create corpus: {e}")
+
+
+@router.get("/corpus/stats", response_model=CacheStatsResponse)
+async def get_cache_stats(
+    repo: CorpusRepository = Depends(get_corpus_repo),
+) -> CacheStatsResponse:
+    """
+    Get cache statistics.
+
+    Returns overall cache usage and performance metrics.
+    """
+    try:
+        stats = await repo.get_stats()
+
+        return CacheStatsResponse(
+            status="active", cache=stats, message="Simplified corpus cache is active"
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get cache stats: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get cache stats")
+
+
+@router.get("/corpus", response_model=ListResponse[CorpusInfoResponse])
+async def list_corpora(
+    repo: CorpusRepository = Depends(get_corpus_repo),
+    pagination: PaginationParams = Depends(get_pagination),
+) -> ListResponse[CorpusInfoResponse]:
+    """
+    List all active corpora with pagination.
+
+    Returns summary of all non-expired corpora with basic metadata.
+    """
+    try:
+        corpora_data = await repo.list_all()
+
+        # Apply pagination
+        total = len(corpora_data)
+        start = pagination.offset
+        end = start + pagination.limit
+        paginated_data = corpora_data[start:end]
+
+        return ListResponse(
+            items=[CorpusInfoResponse(**corpus) for corpus in paginated_data],
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to list corpora: {e}")
+        raise HTTPException(status_code=500, detail="Failed to list corpora")
 
 
 @router.post("/corpus/{corpus_id}/search", response_model=SearchCorpusResponse)
@@ -166,55 +218,3 @@ async def get_corpus_info(
     except Exception as e:
         logger.error(f"Failed to get corpus info: {e}")
         raise HTTPException(status_code=500, detail="Failed to get corpus info")
-
-
-@router.get("/corpus", response_model=ListResponse[CorpusInfoResponse])
-async def list_corpora(
-    repo: CorpusRepository = Depends(get_corpus_repo),
-    pagination: PaginationParams = Depends(get_pagination),
-) -> ListResponse[CorpusInfoResponse]:
-    """
-    List all active corpora with pagination.
-
-    Returns summary of all non-expired corpora with basic metadata.
-    """
-    try:
-        corpora_data = await repo.list_all()
-
-        # Apply pagination
-        total = len(corpora_data)
-        start = pagination.offset
-        end = start + pagination.limit
-        paginated_data = corpora_data[start:end]
-
-        return ListResponse(
-            items=[CorpusInfoResponse(**corpus) for corpus in paginated_data],
-            total=total,
-            offset=pagination.offset,
-            limit=pagination.limit,
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to list corpora: {e}")
-        raise HTTPException(status_code=500, detail="Failed to list corpora")
-
-
-@router.get("/corpus/stats", response_model=CacheStatsResponse)
-async def get_cache_stats(
-    repo: CorpusRepository = Depends(get_corpus_repo),
-) -> CacheStatsResponse:
-    """
-    Get cache statistics.
-
-    Returns overall cache usage and performance metrics.
-    """
-    try:
-        stats = await repo.get_stats()
-
-        return CacheStatsResponse(
-            status="active", cache=stats, message="Simplified corpus cache is active"
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to get cache stats: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get cache stats")

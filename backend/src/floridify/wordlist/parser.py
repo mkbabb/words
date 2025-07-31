@@ -7,7 +7,7 @@ import json
 import re
 import unicodedata
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -472,7 +472,7 @@ def parse_file(file_path: Path) -> ParsedWordList:
         logger.info(f"✅ Successfully parsed {len(result.words)} words")
 
         # Add parse timestamp
-        result.metadata["parse_date"] = datetime.utcnow().isoformat() + "Z"
+        result.metadata["parse_date"] = datetime.now(UTC).isoformat() + "Z"
 
         return result
     except Exception as e:

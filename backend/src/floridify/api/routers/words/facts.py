@@ -225,7 +225,7 @@ async def generate_facts_for_word(
     ai = get_openai_connector()
 
     # Get definitions for the word
-    definitions = await Definition.find(Definition.word_id == str(word.id)).to_list()
+    definitions = await Definition.find(Definition.word_id == word.id).to_list()
 
     # Generate facts
     facts = await generate_facts(

@@ -22,25 +22,24 @@ Usage:
 
 import asyncio
 import sys
-from typing import Any, Dict, List, Type
 
-from beanie import Document, PydanticObjectId, init_beanie
+from beanie import PydanticObjectId, init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 from rich.table import Table
 
 # Import all models that need migration
 from src.floridify.models.models import (
     Definition,
-    Example, 
-    Pronunciation,
+    Example,
     Fact,
+    Pronunciation,
     ProviderData,
     SynthesizedDictionaryEntry,
 )
-from src.floridify.models.relationships import WordRelationship
 from src.floridify.models.phrasal import PhrasalExpression
+from src.floridify.models.relationships import WordRelationship
 from src.floridify.wordlist.models import WordList
 
 console = Console()
@@ -81,7 +80,7 @@ async def convert_string_to_objectid(id_string: str | None) -> PydanticObjectId 
         return None
 
 
-async def convert_string_list_to_objectids(id_list: List[str]) -> List[PydanticObjectId]:
+async def convert_string_list_to_objectids(id_list: list[str]) -> list[PydanticObjectId]:
     """Convert list of string IDs to ObjectIds."""
     result = []
     for id_string in id_list:

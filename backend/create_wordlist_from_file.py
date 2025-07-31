@@ -17,7 +17,7 @@ def main():
     
     # Parse words from file
     words = []
-    with open(words_file, 'r', encoding='utf-8') as f:
+    with open(words_file, encoding='utf-8') as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -71,7 +71,7 @@ def main():
                     
                     # Display first 10 words as sample
                     if 'words' in wordlist and wordlist['words']:
-                        print(f"\nFirst 10 words:")
+                        print("\nFirst 10 words:")
                         for i, word_item in enumerate(wordlist['words'][:10]):
                             print(f"   {i+1}. {word_item['text']}")
                 else:

@@ -10,7 +10,7 @@
         'rounded-lg border-2 border-dashed p-4 text-center transition-all duration-200 cursor-pointer',
         isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/30 hover:border-muted-foreground/50'
       ]"
-      @click="fileInput?.click()"
+      @click="showUploadModal = true"
     >
       <input
         ref="fileInput"
@@ -99,6 +99,7 @@
       v-model="showUploadModal"
       :uploaded-files="pendingFiles"
       @uploaded="handleWordsUploaded"
+      @wordlists-updated="loadWordlists"
       @cancel="handleUploadCancel"
     />
 
@@ -123,6 +124,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAppStore } from '@/stores';
 import { 
   FileText, 
@@ -136,10 +138,11 @@ import WordListUploadModal from '../wordlist/WordListUploadModal.vue';
 import CreateWordListModal from '../wordlist/CreateWordListModal.vue';
 import ConfirmDialog from '../ConfirmDialog.vue';
 import type { WordList } from '@/types';
-import { wordlistApi } from '@/utils/api';
+import { wordlistApi } from '@/api';
 import { useToast } from '@/components/ui/toast/use-toast';
 
 const store = useAppStore();
+const router = useRouter();
 const { toast } = useToast();
 
 // Component state
@@ -305,8 +308,9 @@ const loadWordlists = async () => {
   }
 };
 
-const handleWordlistSelect = (wordlist: WordList) => {
+const handleWordlistSelect = async (wordlist: WordList) => {
   store.setWordlist(wordlist.id);
+  store.setSearchMode('wordlist', router);
 };
 
 const handleWordlistEdit = (wordlist: WordList) => {
@@ -400,9 +404,10 @@ const handleUploadCancel = () => {
   pendingFiles.value = [];
 };
 
-const handleWordlistCreated = (wordlist: WordList) => {
+const handleWordlistCreated = async (wordlist: WordList) => {
   wordlists.value.unshift(wordlist);
   store.setWordlist(wordlist.id);
+  store.setSearchMode('wordlist', router);
 };
 
 // Lifecycle

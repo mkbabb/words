@@ -43,7 +43,7 @@
                     </div>
                     
                     <!-- Main Content -->
-                    <div :class="['flex-1 max-w-5xl mx-auto', store.mode === 'suggestions' ? 'px-4 sm:px-2' : '']">
+                    <div :class="['flex-1 max-w-5xl mx-auto', (store.mode === 'suggestions' || store.searchMode === 'wordlist') ? 'px-4 sm:px-2' : '']">
                         <!-- Animated Content Cards -->
                         <Transition
                     name="content-switch"
@@ -51,21 +51,17 @@
                 >
                     <!-- Definition Content -->
                     <div v-if="store.searchMode === 'lookup' && store.mode !== 'suggestions'" key="lookup">
-                        <!-- Loading State - only show skeleton if modal is visible -->
-                        <div v-if="isSearching && showLoadingModal" class="space-y-8">
+                        <!-- Loading State - only show skeleton if modal is visible and no partial data -->
+                        <div v-if="isSearching && showLoadingModal && !store.partialEntry" class="space-y-8">
                             <DefinitionSkeleton />
                         </div>
 
-                        <!-- Definition Display with Fade Transition -->
-                        <Transition
-                            v-else-if="currentEntry || previousEntry"
-                            name="definition-switch"
-                            mode="out-in"
-                        >
-                            <div :key="currentEntry?.word || 'empty'" class="space-y-8">
-                                <DefinitionDisplay v-if="currentEntry" />
-                            </div>
-                        </Transition>
+                        <!-- Enhanced Definition Display - handles both streaming and complete data -->
+                        <div v-else-if="store.isStreamingData || store.partialEntry || currentEntry || previousEntry || store.definitionError?.hasError" class="space-y-8">
+                            <DefinitionDisplay 
+                                v-if="store.isStreamingData || store.partialEntry || currentEntry || store.definitionError?.hasError" 
+                            />
+                        </div>
 
                         <!-- Empty State -->
                         <div v-else class="py-16 text-center">
@@ -142,7 +138,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useAppStore } from '@/stores';
 import { useScroll } from '@vueuse/core';
 import { cn } from '@/utils';
@@ -157,6 +153,7 @@ import { ProgressiveSidebar } from '@/components/custom/navigation';
 
 const store = useAppStore();
 const route = useRoute();
+const router = useRouter();
 
 // Component refs
 const stageTestRef = ref();
@@ -172,26 +169,70 @@ const handleStageEnter = (_query: string) => {
 
 // Watch for route changes
 watch(() => route.name, async (routeName) => {
+    console.log('🔍 ROUTE WATCHER - Route changed to:', routeName, 'params:', route.params);
+    
     if (routeName === 'Definition' && route.params.word) {
         const word = route.params.word as string;
+        console.log('🔍 ROUTE WATCHER - Loading Definition for:', word);
+        
+        store.setSearchMode('lookup', router);  // Pass router to indicate mode switching
         store.mode = 'dictionary';
+        
+        // Hide search results immediately when loading definition via route
+        console.log('🔍 ROUTE WATCHER - Hiding search results before searchWord');
+        store.showSearchResults = false;
+        store.searchResults = [];
+        
         await store.searchWord(word);
+        console.log('🔍 ROUTE WATCHER - searchWord completed');
     } else if (routeName === 'Thesaurus' && route.params.word) {
         const word = route.params.word as string;
+        console.log('🔍 ROUTE WATCHER - Loading Thesaurus for:', word);
+        
+        store.setSearchMode('lookup', router);  // Pass router to indicate mode switching
         store.mode = 'thesaurus';
+        
+        // Hide search results immediately when loading thesaurus via route
+        console.log('🔍 ROUTE WATCHER - Hiding search results before searchWord');
+        store.showSearchResults = false;
+        store.searchResults = [];
+        
         await store.searchWord(word);
+        console.log('🔍 ROUTE WATCHER - searchWord completed');
+    } else if ((routeName === 'Wordlist' || routeName === 'WordlistSearch') && route.params.wordlistId) {
+        const wordlistId = route.params.wordlistId as string;
+        console.log('🔍 ROUTE WATCHER - Loading Wordlist:', wordlistId);
+        
+        store.setSearchMode('wordlist', router);  // Pass router to indicate mode switching
+        store.setWordlist(wordlistId);
+        
+        // Handle search query if present
+        if (routeName === 'WordlistSearch' && route.params.query) {
+            const query = decodeURIComponent(route.params.query as string);
+            store.searchQuery = query;
+        }
     }
 }, { immediate: true });
+
+// Watch for wordlist route parameter changes
+watch(() => route.params.wordlistId, (newWordlistId) => {
+    if (route.name === 'Wordlist' || route.name === 'WordlistSearch') {
+        if (newWordlistId && typeof newWordlistId === 'string') {
+            store.setWordlist(newWordlistId);
+        } else {
+            store.setWordlist(null);
+        }
+    }
+}, { immediate: true });
+
 
 onMounted(async () => {
     console.log('Home component mounted');
     console.log('Has searched:', store.hasSearched);
     console.log('Search results:', store.searchResults);
 
-    // Ensure vocabulary suggestions are loaded
-    if (store.vocabularySuggestions.length === 0) {
-        await store.refreshVocabularySuggestions();
-    }
+    // Note: Vocabulary suggestions are initialized automatically by the store
+    // No need to refresh them here as the store already handles initialization
 });
 
 // Track loading modal visibility separately from search state

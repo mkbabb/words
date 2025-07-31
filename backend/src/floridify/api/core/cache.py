@@ -2,7 +2,7 @@
 
 import hashlib
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import wraps
 from typing import Any
 
@@ -11,7 +11,6 @@ from fastapi import Request, Response
 from pydantic import BaseModel
 
 from ...caching.cache_manager import CacheManager, get_cache_manager
-
 
 
 class APICacheConfig(BaseModel):
@@ -108,7 +107,7 @@ def cached_endpoint(
             cache_data = {
                 "data": result.model_dump(mode="json") if isinstance(result, BaseModel) else result,
                 "etag": response.headers.get("ETag", "").strip('"'),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "status_code": response.status_code,
             }
 
@@ -143,7 +142,7 @@ class CacheInvalidator:
         invalidation_key = f"invalidation:{pattern}"
         self.cache_manager.set(
             (invalidation_key,),
-            datetime.utcnow().isoformat(),
+            datetime.now(UTC).isoformat(),
             ttl_hours=24.0,  # Keep for 24 hours
         )
 
@@ -210,7 +209,7 @@ class ResponseCache:
         self.start_time: datetime | None = None
 
     async def __aenter__(self) -> Any:
-        self.start_time = datetime.utcnow()
+        self.start_time = datetime.now(UTC)
         config = APICacheConfig(ttl=self.ttl)
         self.cache_key = generate_cache_key(self.request, config, self.key_prefix)
 
@@ -226,5 +225,5 @@ class ResponseCache:
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         if exc_type is None and self.cache_key and self.start_time:
             # Cache successful response
-            elapsed = (datetime.utcnow() - self.start_time).total_seconds()
+            elapsed = (datetime.now(UTC) - self.start_time).total_seconds()
             self.response.headers["X-Response-Time"] = f"{elapsed:.3f}s"

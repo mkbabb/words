@@ -1,5 +1,5 @@
 <template>
-    <div v-if="images && images.length > 0" class="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
+    <div v-if="(images && images.length > 0) || editMode" class="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
         <div class="relative group" @mouseenter="handleMouseEnter">
             <Carousel
                 v-slot="{ canScrollNext, canScrollPrev }"
@@ -13,6 +13,25 @@
                 @init-api="onCarouselInit"
             >
                 <CarouselContent class="-ml-1">
+                    <!-- Upload box as first item in edit mode -->
+                    <CarouselItem 
+                        v-if="editMode"
+                        key="upload-box"
+                        class="pl-1"
+                    >
+                        <div class="relative h-32 sm:h-40 md:h-48 bg-muted/10 rounded-lg overflow-hidden border-2 border-dashed border-muted-foreground/30">
+                            <ImageUploader 
+                                :synth-entry-id="synthEntryId"
+                                class="w-full h-full"
+                                size="lg"
+                                variant="empty"
+                                @upload-success="handleUploadSuccess"
+                                @images-updated="handleImagesUpdated"
+                            />
+                        </div>
+                    </CarouselItem>
+                    
+                    <!-- Regular image items -->
                     <CarouselItem 
                         v-for="(image, index) in images" 
                         :key="image.id"
@@ -78,20 +97,12 @@
                                 </div>
                             </template>
 
-                            <!-- Upload button (edit mode) -->
-                            <ImageUploader 
-                                v-if="editMode"
-                                :synth-entry-id="synthEntryId"
-                                class="absolute top-1 right-1"
-                                size="sm"
-                                @upload-success="handleUploadSuccess"
-                            />
                         </div>
                     </CarouselItem>
                 </CarouselContent>
                 
-                <!-- Navigation Controls (only show when multiple images) -->
-                <template v-if="images.length > 1">
+                <!-- Navigation Controls (only show when multiple items) -->
+                <template v-if="totalCarouselItems > 1">
                     <CarouselPrevious
                         v-show="showControls"
                         class="absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8 bg-black/50 border-none hover:bg-black/70 transition-all duration-300 hover:scale-110 backdrop-blur-sm hover:backdrop-blur-md"
@@ -117,28 +128,17 @@
                         @mouseenter="showControls = true"
                         @mouseleave="scheduleHideControls"
                     >
-                        {{ currentIndex + 1 }} / {{ images.length }}
+                        {{ currentIndex + 1 }} / {{ totalCarouselItems }}
                     </div>
                 </template>
             </Carousel>
         </div>
     </div>
 
-    <!-- Empty State with Upload Option (Edit Mode Only) -->
-    <div v-else-if="editMode" class="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
-        <div class="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center bg-muted/10 hover:bg-muted/20 transition-colors">
-            <ImageUploader 
-                :synth-entry-id="synthEntryId"
-                size="lg"
-                variant="empty"
-                @upload-success="handleUploadSuccess"
-            />
-        </div>
-    </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import type { CarouselApi } from '@/components/ui/carousel';
@@ -168,6 +168,13 @@ const currentIndex = ref(0);
 const showControls = ref(false);
 const hideControlsTimeout = ref<NodeJS.Timeout | null>(null);
 
+// Computed properties
+const totalCarouselItems = computed(() => {
+    const imageCount = props.images?.length || 0;
+    const uploadBoxCount = props.editMode ? 1 : 0;
+    return imageCount + uploadBoxCount;
+});
+
 // Lazy loading state - optimize bandwidth by only loading visible + adjacent images
 const loadedImages = ref(new Set<number>());
 const loadingImages = ref(new Set<number>());
@@ -184,11 +191,18 @@ const isImageLoaded = (index: number): boolean => {
 
 // Update visible range based on current position
 const updateVisibleRange = () => {
-    if (!props.images) return;
+    if (!props.images || props.images.length === 0) return;
+    
+    // Account for upload box offset in edit mode
+    const imageIndexOffset = props.editMode ? 1 : 0;
+    const currentImageIndex = currentIndex.value - imageIndexOffset;
+    
+    // Only calculate range if we're viewing actual images (not upload box)
+    if (currentImageIndex < 0) return;
     
     const buffer = 1; // Load 1 image before and after current
-    const start = Math.max(0, currentIndex.value - buffer);
-    const end = Math.min(props.images.length - 1, currentIndex.value + buffer + 1);
+    const start = Math.max(0, currentImageIndex - buffer);
+    const end = Math.min(props.images.length - 1, currentImageIndex + buffer + 1);
     
     visibleRange.value = { start, end };
 };
@@ -227,6 +241,12 @@ const handleImageClick = (image: ImageMedia, index: number) => {
 
 const handleUploadSuccess = (newImages: ImageMedia[]) => {
     emit('images-updated', newImages);
+};
+
+const handleImagesUpdated = () => {
+    // Pass the event up to the parent component (DefinitionDisplay)
+    // The parent will handle refreshing the synthesized entry
+    emit('images-updated', []);
 };
 
 // Control visibility

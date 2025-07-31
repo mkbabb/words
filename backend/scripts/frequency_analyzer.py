@@ -2,12 +2,12 @@
 """Analyze word frequencies from multiple sources to prioritize corpus processing."""
 
 import asyncio
+import gzip
 import json
-from collections import defaultdict, Counter
+import urllib.request
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
-import gzip
-import urllib.request
 from urllib.error import URLError
 
 from rich.console import Console
@@ -101,7 +101,7 @@ class FrequencyAnalyzer:
         """Parse a frequency file and return word frequencies."""
         frequencies: dict[str, float] = {}
         
-        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        with open(path, encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
             
             # Skip header lines if specified
@@ -151,7 +151,7 @@ class FrequencyAnalyzer:
         
         for text_file in text_files:
             try:
-                with open(text_file, "r", encoding="utf-8", errors="ignore") as f:
+                with open(text_file, encoding="utf-8", errors="ignore") as f:
                     content = f.read().lower()
                     
                 # Simple tokenization
@@ -316,10 +316,10 @@ class FrequencyAnalyzer:
             console.print("[red]Corpus processor output not found[/red]")
             return {}
         
-        with open(mappings_path, "r") as f:
+        with open(mappings_path) as f:
             inflection_map = json.load(f)
         
-        with open(base_forms_path, "r") as f:
+        with open(base_forms_path) as f:
             base_forms = set(line.strip() for line in f)
         
         # Create frequency-ordered base form list

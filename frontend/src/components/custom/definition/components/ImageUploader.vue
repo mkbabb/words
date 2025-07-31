@@ -55,7 +55,7 @@ import { ref, computed } from 'vue';
 import { CameraIcon, LoaderIcon } from 'lucide-vue-next';
 import { useToast } from '@/components/ui/toast/use-toast';
 import type { ImageMedia } from '@/types/api';
-import { imageApi } from '@/utils/api';
+import { imageApi, entriesApi } from '@/api';
 
 interface ImageUploaderProps {
     synthEntryId?: string;
@@ -76,6 +76,8 @@ const emit = defineEmits<{
     'upload-progress': [progress: number];
     'upload-success': [images: ImageMedia[]];
     'upload-error': [error: string];
+    'synth-entry-image-uploaded': [{ synthEntryId: string; image: ImageMedia }];
+    'images-updated': [];
 }>();
 
 // State
@@ -88,7 +90,7 @@ const { toast } = useToast();
 const buttonClasses = computed(() => {
     const base = "flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110";
     const sizes = {
-        sm: "w-6 h-6 bg-black/50 hover:bg-black/70",
+        sm: "w-8 h-8 bg-black/50 hover:bg-black/70 p-1",
         lg: "w-12 h-12 bg-primary/80 hover:bg-primary"
     };
     return `${base} ${sizes[props.size]}`;
@@ -96,7 +98,7 @@ const buttonClasses = computed(() => {
 
 const iconClasses = computed(() => {
     const sizes = {
-        sm: "w-3 h-3",
+        sm: "w-4 h-4",
         lg: "w-6 h-6"
     };
     return `${sizes[props.size]} text-white`;
@@ -214,13 +216,17 @@ const uploadSingleFile = async (file: File): Promise<ImageMedia> => {
             alt_text: file.name.replace(/\.[^/.]+$/, ""), // Remove extension for alt text
         });
 
-        // Then bind it to the definition if we have a definitionId
+        // Bind image to definition or synthesized entry
         if (props.definitionId) {
+            // Direct definition binding
             await imageApi.bindImageToDefinition(props.definitionId, uploadedImage.id);
+        } else if (props.synthEntryId) {
+            // Bind image directly to synthesized entry using the new API
+            await entriesApi.addImagesToEntry(props.synthEntryId, [uploadedImage.id]);
+            // Emit event to notify parent that images were updated
+            emit('images-updated');
         }
         
-        // For synth entries, we'll need to handle this differently
-        // For now, just return the uploaded image
         return uploadedImage;
         
     } catch (error) {

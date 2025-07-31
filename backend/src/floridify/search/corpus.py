@@ -13,6 +13,7 @@ from asyncio import Task
 from datetime import datetime, timedelta
 from typing import Any
 
+from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
 from ..utils.logging import get_logger
@@ -330,7 +331,7 @@ async def invalidate_wordlist_names_corpus() -> None:
         logger.debug(f"Invalidated {removed_count} wordlist names corpus(es)")
 
 
-async def invalidate_wordlist_corpus(wordlist_id: str) -> None:
+async def invalidate_wordlist_corpus(wordlist_id: PydanticObjectId) -> None:
     """
     Invalidate corpus cache for a specific wordlist.
     

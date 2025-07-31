@@ -136,13 +136,23 @@ async def list_definitions(
     )
 
     # Apply field selection and expansions
-    items = []
-    for definition in definitions:
-        item = definition.model_dump()
-        if fields.include or fields.exclude:
-            # Apply field filtering if needed
-            pass
-        items.append(item)
+    expand_examples = fields.expand and "examples" in fields.expand
+    expand_images = fields.expand and "images" in fields.expand
+    
+    if expand_examples and expand_images:
+        items = await repo.get_many_with_examples_and_images(definitions)
+    elif expand_examples:
+        items = await repo.get_many_with_examples(definitions)
+    elif expand_images:
+        items = await repo.get_many_with_images(definitions)
+    else:
+        items = []
+        for definition in definitions:
+            item = definition.model_dump()
+            if fields.include or fields.exclude:
+                # Apply field filtering if needed
+                pass
+            items.append(item)
 
     # Build response
     return ListResponse(
@@ -189,15 +199,22 @@ async def get_definition(
     """Retrieve definition with optional expansions.
 
     Query Parameters:
-        - expand: 'examples' to include example data
+        - expand: 'examples' to include example data, 'images' to include image data
         - Field selection: include, exclude parameters
 
     Returns:
         Definition with completeness score and ETag.
     """
     # Get definition with optional expansions
-    if fields.expand and "examples" in fields.expand:
+    expand_examples = fields.expand and "examples" in fields.expand
+    expand_images = fields.expand and "images" in fields.expand
+    
+    if expand_examples and expand_images:
+        definition_data = await repo.get_with_examples_and_images(definition_id)
+    elif expand_examples:
         definition_data = await repo.get_with_examples(definition_id)
+    elif expand_images:
+        definition_data = await repo.get_with_images(definition_id)
     else:
         definition = await repo.get(definition_id, raise_on_missing=True)
         assert definition is not None
@@ -213,6 +230,7 @@ async def get_definition(
             "version": definition_data.get("version", 1),
             "last_modified": definition_data.get("updated_at"),
             "has_examples": bool(definition_data.get("example_ids")),
+            "has_images": bool(definition_data.get("image_ids")),
             "completeness": _calculate_completeness(definition_data),
         },
         links={
@@ -629,6 +647,7 @@ def _calculate_completeness(definition_data: dict[str, Any]) -> float:
         "part_of_speech",
         "word_forms",
         "example_ids",
+        "image_ids",
         "synonyms",
         "antonyms",
         "cefr_level",

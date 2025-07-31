@@ -1,6 +1,6 @@
 <template>
   <Modal v-model="modelValue" :close-on-backdrop="false">
-    <div class="w-full max-w-lg mx-auto space-y-6 p-6">
+    <div class="w-full max-w-lg mx-auto space-y-6">
       <!-- Header -->
       <div class="flex items-center justify-between">
         <div>
@@ -194,7 +194,7 @@ const resetForm = () => {
 
 const isWordAlreadyInList = (wordlist: WordList): boolean => {
   // Check if the current word is already in this wordlist
-  return wordlist.words?.some(w => w.text.toLowerCase() === props.word.toLowerCase()) || false;
+  return wordlist.words?.some(w => w.word?.toLowerCase() === props.word.toLowerCase()) || false;
 };
 
 const getMasteryStats = (wordlist: WordList) => {
@@ -242,7 +242,7 @@ const handleQuickCreate = async () => {
       description: `Created for "${props.word}"`,
       hash_id: `hash_${Date.now()}`,
       words: [{
-        text: props.word,
+        word: props.word,
         frequency: 1,
         selected_definitions: [],
         mastery_level: MasteryLevel.BRONZE,

@@ -46,15 +46,37 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         ws: true, // Proxy websockets
-        timeout: 30000, // 30 second timeout for OpenAI API calls
-        proxyTimeout: 30000, // 30 second proxy timeout
+        timeout: 120000, // 2 minute timeout for AI processing
+        proxyTimeout: 120000, // 2 minute proxy timeout
         configure: (proxy, _options) => {
           // Proxy error handling
           proxy.on('error', (err, _req, _res) => {
             console.log('proxy error', err);
           });
-          proxy.on('proxyReq', (_proxyReq, req, _res) => {
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
             console.log('Sending Request:', req.method, req.url);
+            // Handle Server-Sent Events properly
+            if (req.url?.includes('/stream')) {
+              proxyReq.setHeader('Accept', 'text/event-stream');
+              proxyReq.setHeader('Cache-Control', 'no-cache');
+            }
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            // Handle SSE responses
+            if (req.url?.includes('/stream')) {
+              proxyRes.headers['content-type'] = 'text/event-stream';
+              proxyRes.headers['cache-control'] = 'no-cache';
+              proxyRes.headers['connection'] = 'keep-alive';
+              proxyRes.headers['x-accel-buffering'] = 'no';
+              
+              // Ensure proper SSE headers are set on the response
+              res.setHeader('Content-Type', 'text/event-stream');
+              res.setHeader('Cache-Control', 'no-cache');
+              res.setHeader('Connection', 'keep-alive');
+              res.setHeader('X-Accel-Buffering', 'no');
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
+            }
           });
         },
       },
