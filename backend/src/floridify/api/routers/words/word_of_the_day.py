@@ -122,11 +122,14 @@ async def send_current_word(
 
     # Check if due for sending (can be overridden)
     if not batch.is_due_for_sending():
-        time_until_due = batch.next_send_time - datetime.now()
-        raise HTTPException(
-            409,
-            f"Word not due for sending yet. Next word in {time_until_due.total_seconds():.0f} seconds",
-        )
+        if batch.next_send_time:
+            time_until_due = batch.next_send_time - datetime.now()
+            raise HTTPException(
+                409,
+                f"Word not due for sending yet. Next word in {time_until_due.total_seconds():.0f} seconds",
+            )
+        else:
+            raise HTTPException(409, "Word not due for sending yet")
 
     # Mark as sent
     word_text = current_word.word
@@ -199,7 +202,7 @@ async def get_word_batch(
         / max(1, batch.total_words_sent + len(batch.current_batch)),
         "days_active": (datetime.now() - batch.created_at).days,
         "average_words_per_day": batch.total_words_sent
-        / max(1, (datetime.now() - batch.created_at).days),
+        / max(1, (datetime.now() - batch.created_at).days) if batch.created_at else 0,
     }
 
     return ResourceResponse(
@@ -347,7 +350,7 @@ async def get_word_history(
                 batch.last_sent
                 - timedelta(minutes=batch.frequency.minutes * (len(batch.sent_words) - i - 1))
                 if batch.last_sent
-                else batch.created_at
+                else batch.created_at or datetime.now()
             )
 
             if estimated_date >= cutoff_date:
@@ -361,7 +364,7 @@ async def get_word_history(
                 )
 
     # Sort by date and limit
-    sent_history.sort(key=lambda x: x["estimated_sent_date"], reverse=True)
+    sent_history.sort(key=lambda x: x["estimated_sent_date"], reverse=True)  # type: ignore[arg-type,return-value]
     sent_history = sent_history[:limit]
 
     return ListResponse(

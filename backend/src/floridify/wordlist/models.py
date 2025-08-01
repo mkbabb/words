@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from beanie import Document, PydanticObjectId
@@ -40,7 +40,7 @@ class WordListItem(BaseModel):
         default=None, description="Last time word was viewed/studied"
     )
     added_date: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), description="When added to list"
+        default_factory=lambda: datetime.now(UTC), description="When added to list"
     )
 
     # User metadata
@@ -53,13 +53,13 @@ class WordListItem(BaseModel):
 
     def mark_visited(self) -> None:
         """Mark word as visited/viewed."""
-        self.last_visited = datetime.now(timezone.utc)
+        self.last_visited = datetime.now(UTC)
         self.temperature = Temperature.HOT
 
     def review(self, quality: int) -> None:
         """Process a review session."""
         self.review_data.update_sm2(quality)
-        self.last_visited = datetime.now(timezone.utc)
+        self.last_visited = datetime.now(UTC)
         self.temperature = Temperature.HOT
 
         # Update mastery based on performance

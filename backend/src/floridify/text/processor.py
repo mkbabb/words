@@ -12,13 +12,13 @@ logger = get_logger(__name__)
 
 # Optional dependency handling
 try:
-    import spacy  # type: ignore[import-not-found]
-    from spacy.language import Language  # type: ignore[import-not-found]
+    import spacy
+    from spacy.language import Language as SpacyLanguage
 
     SPACY_AVAILABLE = True
 except ImportError:
     SPACY_AVAILABLE = False
-    Language = type("Language", (), {})
+    SpacyLanguage = type("Language", (), {})  # type: ignore[assignment,misc]
 
 try:
     import nltk  # type: ignore[import-untyped]
@@ -64,7 +64,7 @@ class SpacyProcessor:
             raise RuntimeError("Spacy not available")
 
         self.model_name = model
-        self.nlp = None
+        self.nlp: SpacyLanguage | None = None
         self._load_model()
 
     def _load_model(self) -> None:

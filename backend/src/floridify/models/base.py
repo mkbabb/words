@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import base64
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 from uuid import UUID
@@ -30,13 +30,13 @@ class BaseMetadata(BaseModel):
         }
     )
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     version: int = Field(default=1, ge=1)
 
     def mark_updated(self) -> None:
         """Update the timestamp and increment version."""
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
         self.version += 1
 
 
@@ -49,7 +49,7 @@ class AccessTrackingMixin(BaseModel):
 
     def mark_accessed(self) -> None:
         """Mark entity as accessed."""
-        self.last_accessed = datetime.now(timezone.utc)
+        self.last_accessed = datetime.now(UTC)
         self.access_count += 1
         # Also mark as updated if this entity has that capability
         if hasattr(self, 'mark_updated'):
@@ -70,7 +70,7 @@ class ModelInfo(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     temperature: float = Field(ge=0.0, le=2.0, default=0.7)
     generation_count: int = Field(default=1, ge=1)  # Times regenerated
-    last_generated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_generated: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ImageMedia(Document, BaseMetadata):

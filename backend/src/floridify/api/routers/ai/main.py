@@ -727,7 +727,7 @@ async def suggest_words_stream(
             await state_tracker.update_complete(message="Suggestions generated successfully!")
 
             # Return result data
-            return result
+            return result.model_dump()
 
         except Exception as e:
             await state_tracker.update_error(f"Failed to generate suggestions: {str(e)}")

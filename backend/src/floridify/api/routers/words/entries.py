@@ -7,10 +7,10 @@ including component-level updates and image management.
 
 from typing import Any
 
+from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from beanie import PydanticObjectId
 from ...core import (
     FieldSelection,
     NotFoundException,
@@ -18,7 +18,6 @@ from ...core import (
     get_fields,
 )
 from ...repositories.synthesis_repository import SynthesisRepository, SynthesisUpdate
-from ....models import SynthesizedDictionaryEntry, ImageMedia
 
 router = APIRouter()
 

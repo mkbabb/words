@@ -117,7 +117,7 @@ class AudioSynthesizer:
         """Get or create the TTS client."""
         if self._client is None:
             if self.config.credentials_path and self.config.credentials_path.exists():
-                credentials = service_account.Credentials.from_service_account_file(  # type: ignore[no-untyped-call]
+                credentials = service_account.Credentials.from_service_account_file(
                     str(self.config.credentials_path)
                 )
                 self._client = texttospeech.TextToSpeechClient(credentials=credentials)

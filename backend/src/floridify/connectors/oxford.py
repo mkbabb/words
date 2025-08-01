@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 from beanie import PydanticObjectId
 
-from ..constants import Language
+from ..constants import DictionaryProvider, Language
 from ..core.state_tracker import StateTracker
 from ..models import (
     Definition,
@@ -51,9 +51,9 @@ class OxfordConnector(DictionaryConnector):
         )
 
     @property
-    def provider_name(self) -> str:
+    def provider_name(self) -> DictionaryProvider:
         """Name of the dictionary provider."""
-        return "oxford"
+        return DictionaryProvider.OXFORD
 
     async def fetch_definition(
         self,
@@ -119,8 +119,29 @@ class OxfordConnector(DictionaryConnector):
         Returns:
             Parsed ProviderData
         """
-        # Use base class method to normalize and save
-        return await self._normalize_response(data, word_obj)
+        # Extract all components using the new API pattern
+        assert word_obj.id is not None  # After save(), id is guaranteed to be not None
+        
+        # Extract definitions and save them
+        definitions = await self.extract_definitions(data, word_obj.id)
+        
+        # Extract pronunciation and save it
+        pronunciation = await self.extract_pronunciation(data, word_obj.id)
+        if pronunciation:
+            await pronunciation.save()
+        
+        # Extract etymology
+        etymology = await self.extract_etymology(data)
+        
+        # Create and return ProviderData
+        return ProviderData(
+            word_id=word_obj.id,
+            provider=self.provider_name,
+            definition_ids=[d.id for d in definitions if d.id is not None],
+            pronunciation_id=pronunciation.id if pronunciation else None,
+            etymology=etymology,
+            raw_data=data,
+        )
 
     def _map_oxford_pos_to_part_of_speech(self, oxford_pos: str) -> str | None:
         """Map Oxford part of speech to our part of speech string.

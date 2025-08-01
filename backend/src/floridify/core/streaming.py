@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Generator
 from typing import Any
 
 from fastapi.responses import StreamingResponse
@@ -13,7 +13,7 @@ from .state_tracker import StateTracker
 logger = get_logger(__name__)
 
 
-def _send_chunked_completion(result_data: dict[str, Any]):
+def _send_chunked_completion(result_data: dict[str, Any]) -> Generator[str, None, None]:
     """Send large completion data in manageable chunks."""
     # Split the result into logical chunks (definitions, examples, etc.)
     
@@ -97,7 +97,7 @@ class SSEEvent:
 class StreamingProgressHandler:
     """Handles streaming progress updates for any process."""
 
-    def __init__(self, state_tracker: StateTracker):
+    def __init__(self, state_tracker: StateTracker) -> None:
         self.state_tracker = state_tracker
         self.logger = get_logger(f"{__name__}.{state_tracker.category}")
 
@@ -392,6 +392,7 @@ async def create_streaming_response(
                                         
                                         # Check if payload is too large (> 32KB)
                                         if len(result_json) > 32768:
+                                            # Send completion in chunks
                                             # Send completion in chunks
                                             for chunk in _send_chunked_completion(result_data):
                                                 yield chunk

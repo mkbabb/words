@@ -88,10 +88,13 @@ async def _similar_async(
 
         # Generate synonyms using AI
         # Create a minimal Definition object for the synthesis function
+        from beanie import PydanticObjectId
+        from bson import ObjectId
+
         from ...ai.synthesis_functions import synthesize_synonyms
         from ...models import Definition
         definition_obj = Definition(
-            word_id=None,  # No word_id needed for synonym generation
+            word_id=PydanticObjectId(ObjectId()),  # Dummy ObjectId for synthesis
             part_of_speech=part_of_speech,
             text=base_definition,
             synonyms=[],

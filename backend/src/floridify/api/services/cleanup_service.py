@@ -3,9 +3,9 @@
 import asyncio
 import logging
 from typing import Any
+
 from beanie import PydanticObjectId
 from motor.motor_asyncio import AsyncIOMotorCollection
-
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ class CleanupService:
     
     @staticmethod
     async def remove_object_id_from_arrays(
-        collections: list[AsyncIOMotorCollection],
+        collections: list[AsyncIOMotorCollection[Any]],
         array_field: str,
         object_id: PydanticObjectId
     ) -> int:
@@ -63,7 +63,7 @@ class CleanupService:
         
         logger.warning(f"Starting cleanup of image references for image {image_id}")
         total_cleaned = await CleanupService.remove_object_id_from_arrays(
-            collections, "image_ids", image_id
+            collections, "image_ids", image_id  # type: ignore[arg-type]
         )
         
         logger.warning(f"Completed cleanup: removed image {image_id} from {total_cleaned} documents")

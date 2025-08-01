@@ -11,6 +11,7 @@ from typing import Any
 
 from beanie import PydanticObjectId
 
+from ..constants import DictionaryProvider
 from ..core.state_tracker import Stages, StateTracker
 from ..models import (
     Definition,
@@ -42,9 +43,9 @@ class DictionaryComConnector(DictionaryConnector):
         self.force_refresh = force_refresh
 
     @property
-    def provider_name(self) -> str:
+    def provider_name(self) -> DictionaryProvider:
         """Name of the dictionary provider."""
-        return "dictionary_com"
+        return DictionaryProvider.DICTIONARY_COM
 
     async def fetch_definition(
         self,

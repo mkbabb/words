@@ -16,11 +16,11 @@ from typing import Any
 # Heavy ML dependencies - Comment out for lightweight deployment
 try:
     # Core semantic search dependencies (2025 best practices)
-    import faiss  # type: ignore[import-not-found]
-    import numpy as np  # type: ignore[import-not-found]
+    import faiss  # type: ignore[import-untyped]
+    import numpy as np
     from sentence_transformers import SentenceTransformer  # type: ignore[import-not-found]
-    from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import-not-found]
-    from sklearn.metrics.pairwise import cosine_similarity  # type: ignore[import-not-found]
+    from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore[import-untyped]
+    from sklearn.metrics.pairwise import cosine_similarity  # type: ignore[import-untyped]
 
     SEMANTIC_SEARCH_AVAILABLE = True
 

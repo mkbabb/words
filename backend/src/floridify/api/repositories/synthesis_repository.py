@@ -6,7 +6,7 @@ from typing import Any
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
-from ...models import Etymology, ModelInfo, SynthesizedDictionaryEntry, ImageMedia
+from ...models import Etymology, ImageMedia, ModelInfo, SynthesizedDictionaryEntry
 from ..core.base import BaseRepository
 
 

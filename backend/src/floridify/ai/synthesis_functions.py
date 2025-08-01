@@ -721,8 +721,8 @@ async def cluster_definitions(
                 provider_data = await ProviderData.get(definition.provider_data_id)
                 
                 if provider_data:
-                    # provider_data.provider is already a string due to use_enum_values=True
-                    provider_name = provider_data.provider
+                    # Convert enum to string for display
+                    provider_name = provider_data.provider.value
 
             definition_tuples.append(
                 (
