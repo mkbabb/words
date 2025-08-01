@@ -2,8 +2,16 @@ import { defineStore } from 'pinia'
 import { ref, readonly, nextTick } from 'vue'
 import { useRouterSync } from '../composables/useRouterSync'
 import { wordlistApi } from '@/api'
-
-type SearchMode = 'lookup' | 'wordlist' | 'word-of-the-day' | 'stage'
+import type { 
+  SearchMode, 
+  ModeOperationOptions, 
+  ModeTransitionResult,
+  LookupModeConfig,
+  WordlistModeConfig,
+  WordOfTheDayModeConfig,
+  StageModeConfig,
+  DEFAULT_MODE_CONFIGS
+} from '@/types'
 
 /**
  * SearchConfigStore - Search configuration and mode management
@@ -27,24 +35,125 @@ export const useSearchConfigStore = defineStore('searchConfig', () => {
   // ROUTER INTEGRATION
   // ==========================================================================
   
-  const { updateRouterForCurrentEntry, navigateToWordlist, navigateToHome } = useRouterSync()
+  const { 
+    navigateToLookupMode, 
+    navigateToWordlist, 
+    navigateToHome,
+    navigateToWordOfTheDay,
+    navigateToStage,
+    updateRouterForCurrentEntry 
+  } = useRouterSync()
+
+  // ==========================================================================
+  // INTERNAL HELPERS
+  // ==========================================================================
+
+  /**
+   * Type-safe mode navigation handler
+   * Eliminates the need for mode-specific parameter passing
+   */
+  const handleModeNavigation = async <T extends SearchMode>(
+    mode: T, 
+    config: any // Will be properly typed based on mode
+  ) => {
+    switch (mode) {
+      case 'lookup': {
+        const lookupConfig = config as LookupModeConfig
+        if (lookupConfig.query?.trim()) {
+          console.log('🧭 Navigating to lookup with query:', lookupConfig.query)
+          navigateToLookupMode(lookupConfig.query, lookupConfig.displayMode || 'dictionary')
+        } else if (lookupConfig.currentEntry?.word) {
+          console.log('🧭 Updating router for existing lookup:', lookupConfig.currentEntry.word)
+          updateRouterForCurrentEntry(
+            lookupConfig.currentEntry, 
+            lookupConfig.displayMode || 'dictionary', 
+            'lookup'
+          )
+        } else {
+          console.log('🧭 No query or entry, going to home')
+          navigateToHome()
+        }
+        break
+      }
+      
+      case 'wordlist': {
+        const wordlistConfig = config as WordlistModeConfig
+        const targetWordlistId = wordlistConfig.wordlistId || selectedWordlist.value
+        
+        if (targetWordlistId) {
+          console.log('🧭 Navigating to wordlist:', targetWordlistId, 'with config')
+          
+          // Build filters object from config
+          const filters = wordlistConfig.filters ? {
+            ...wordlistConfig.filters,
+            ...(wordlistConfig.chunking && { chunking: wordlistConfig.chunking }),
+            ...(wordlistConfig.sortCriteria && { sortCriteria: wordlistConfig.sortCriteria })
+          } : undefined
+          
+          navigateToWordlist(targetWordlistId, filters, wordlistConfig.query)
+        } else {
+          // Auto-fetch first available wordlist
+          console.log('🧭 No wordlist selected, fetching first available')
+          try {
+            const response = await wordlistApi.getWordlists({ limit: 1 })
+            if (response.items?.length > 0) {
+              const firstWordlist = response.items[0]
+              selectedWordlist.value = firstWordlist.id
+              console.log('🧭 Selected first wordlist:', firstWordlist.name)
+              navigateToWordlist(firstWordlist.id, undefined, wordlistConfig.query)
+            } else {
+              console.log('🧭 No wordlists available, staying on home')
+              navigateToHome()
+            }
+          } catch (error) {
+            console.error('🧭 Failed to fetch wordlists:', error)
+            navigateToHome()
+          }
+        }
+        break
+      }
+      
+      case 'word-of-the-day': {
+        const wotdConfig = config as WordOfTheDayModeConfig
+        console.log('🧭 Navigating to word-of-the-day with query:', wotdConfig.query)
+        navigateToWordOfTheDay(wotdConfig.query)
+        break
+      }
+      
+      case 'stage': {
+        const stageConfig = config as StageModeConfig
+        console.log('🧭 Navigating to stage with query:', stageConfig.query)
+        navigateToStage(stageConfig.query)
+        break
+      }
+      
+      default:
+        console.log('🧭 Unknown mode, going to home')
+        navigateToHome()
+    }
+  }
 
   // ==========================================================================
   // ACTIONS
   // ==========================================================================
   
-  // Search mode management
-  const setSearchMode = async (
-    newMode: SearchMode,
-    router?: any,
-    currentEntry?: any,
-    mode?: string
-  ) => {
-    console.log('🔄 setSearchMode called:', searchMode.value, '->', newMode)
+  // Enhanced search mode management with type-safe configuration
+  const setSearchMode = async <T extends SearchMode>(
+    options: ModeOperationOptions<T>
+  ): Promise<ModeTransitionResult> => {
+    const { mode: newMode, config, saveCurrentQuery = true, force = false } = options
+    const previousMode = searchMode.value
     
-    if (searchMode.value === newMode) {
+    console.log('🔄 setSearchMode called:', previousMode, '->', newMode)
+    
+    if (searchMode.value === newMode && !force) {
       console.log('⚠️ Mode is already', newMode, '- no change needed')
-      return
+      return {
+        success: true,
+        previousMode,
+        newMode,
+        navigationSuccess: true
+      }
     }
 
     console.log('🔄 Actually changing searchMode from', searchMode.value, 'to', newMode)
@@ -53,50 +162,58 @@ export const useSearchConfigStore = defineStore('searchConfig', () => {
     // Force reactivity trigger
     await nextTick()
     
-    // Handle router navigation when setting search mode
-    if (router) {
-      if (newMode === 'lookup') {
-        // Check if we're already on a definition/thesaurus route
-        const currentRoute = router.currentRoute?.value
-        const isOnDefinitionRoute = currentRoute?.name === 'Definition' || currentRoute?.name === 'Thesaurus'
-        
-        if (currentEntry?.word) {
-          console.log('🧭 setSearchMode: updating router for existing lookup:', currentEntry.word)
-          updateRouterForCurrentEntry(currentEntry, (mode as 'dictionary' | 'thesaurus' | 'suggestions') || 'dictionary', 'lookup')
-        } else if (isOnDefinitionRoute) {
-          console.log('🧭 setSearchMode: on definition route, letting it load')
-        } else {
-          console.log('🧭 setSearchMode: no current entry, going to home')
-          navigateToHome()
-        }
-      } else if (newMode === 'wordlist') {
-        if (selectedWordlist.value) {
-          console.log('🧭 setSearchMode: navigating to existing wordlist:', selectedWordlist.value)
-          navigateToWordlist(selectedWordlist.value)
-        } else {
-          // No wordlist selected, fetch available wordlists and select first one
-          console.log('🧭 setSearchMode: no wordlist selected, fetching first available')
-          try {
-            const response = await wordlistApi.getWordlists({ limit: 1 })
-            if (response.items && response.items.length > 0) {
-              const firstWordlist = response.items[0]
-              selectedWordlist.value = firstWordlist.id
-              console.log('🧭 setSearchMode: selected first wordlist:', firstWordlist.name, firstWordlist.id)
-              navigateToWordlist(firstWordlist.id)
-            } else {
-              console.log('🧭 setSearchMode: no wordlists available, staying on home')
-              navigateToHome()
-            }
-          } catch (error) {
-            console.error('🧭 setSearchMode: failed to fetch wordlists:', error)
-            navigateToHome()
-          }
-        }
-      } else {
-        // For other modes, go to home for now
-        navigateToHome()
+    // Handle type-safe router navigation
+    let navigationSuccess = true
+    
+    if (config?.router) {
+      try {
+        await handleModeNavigation(newMode, config)
+      } catch (error) {
+        console.error('🧭 setSearchMode: navigation failed:', error)
+        navigationSuccess = false
       }
     }
+    
+    // Return structured result
+    return {
+      success: true,
+      previousMode,
+      newMode,
+      navigationSuccess
+    }
+  }
+
+  /**
+   * Convenience function for legacy compatibility
+   * @deprecated Use setSearchMode with ModeOperationOptions instead
+   */
+  const setSearchModeLegacy = async (
+    newMode: SearchMode,
+    router?: any,
+    currentEntry?: any,
+    mode?: string,
+    modeQuery?: string,
+    currentFilters?: Record<string, any>
+  ): Promise<ModeTransitionResult> => {
+    console.warn('⚠️ setSearchModeLegacy is deprecated. Please use setSearchMode with ModeOperationOptions.')
+    
+    // Convert legacy parameters to new format
+    const config: any = {
+      router,
+      currentEntry,
+      query: modeQuery
+    }
+    
+    // Add mode-specific configurations
+    if (newMode === 'lookup' && mode) {
+      config.displayMode = mode
+    } else if (newMode === 'wordlist' && currentFilters) {
+      config.filters = currentFilters.filters
+      config.chunking = currentFilters.chunking
+      config.sortCriteria = currentFilters.sortCriteria
+    }
+    
+    return setSearchMode({ mode: newMode, config })
   }
 
   const toggleSearchMode = async (router?: any, currentEntry?: any, mode?: string) => {
@@ -191,8 +308,9 @@ export const useSearchConfigStore = defineStore('searchConfig', () => {
     noAI: readonly(noAI),
     showControls: readonly(showControls),
     
-    // Actions
+    // Actions - Enhanced with type safety
     setSearchMode,
+    setSearchModeLegacy,  // Deprecated - for backward compatibility
     toggleSearchMode,
     toggleSource,
     setSources,

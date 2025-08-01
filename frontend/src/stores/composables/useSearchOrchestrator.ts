@@ -7,6 +7,15 @@ import { useHistoryStore } from '../content/history'
 import { useNotificationStore } from '../utils/notifications'
 import { useUIStore } from '../ui/ui-state'
 import { normalizeWord } from '@/utils'
+import type { 
+  SearchMode, 
+  ModeOperationOptions, 
+  ModeTransitionResult,
+  LookupModeConfig,
+  WordlistModeConfig,
+  WordOfTheDayModeConfig,
+  StageModeConfig 
+} from '@/types'
 
 /**
  * Search Orchestrator Composable
@@ -225,22 +234,22 @@ export function useSearchOrchestrator() {
     // Save current query to mode-specific storage BEFORE changing mode
     searchBar.saveModeQuery(searchConfig.searchMode, currentQuery)
     
-    // Use search config store to handle the mode cycling and router navigation
-    await searchConfig.toggleSearchMode(router, searchResults.currentEntry, ui.mode)
+    // Determine the next mode in the cycle
+    let targetMode: SearchMode
+    if (searchConfig.searchMode === 'lookup') {
+      targetMode = 'wordlist'
+    } else if (searchConfig.searchMode === 'wordlist') {
+      targetMode = 'word-of-the-day'
+    } else if (searchConfig.searchMode === 'word-of-the-day') {
+      targetMode = 'stage'
+    } else {
+      targetMode = 'lookup'
+    }
     
-    // Restore query for the NEW mode
-    const restoredQuery = searchBar.restoreModeQuery(searchConfig.searchMode)
-    searchBar.setQuery(restoredQuery)
+    // Use the enhanced type-safe setSearchMode (handles all the logic)
+    const result = await setSearchMode(targetMode, { router })
     
-    console.log('🔄 Restored query for mode:', searchConfig.searchMode, 'query:', restoredQuery)
-    
-    // Clear search results when changing modes to prevent stale dropdown
-    searchBar.clearResults()
-    
-    // Force reactivity trigger
-    await nextTick()
-    
-    // Handle AI mode based on the new mode and restored query
+    // Handle AI mode based on the new mode
     if (searchConfig.searchMode === 'lookup') {
       // AI mode detection is handled by the searchBar store automatically
       console.log('✨ AI mode state will be updated based on query')
@@ -259,26 +268,60 @@ export function useSearchOrchestrator() {
         ui.setMode('dictionary')
       }
     }
+    
+    return result
   }
 
-  const setSearchMode = async (
-    newMode: 'lookup' | 'wordlist' | 'word-of-the-day' | 'stage',
-    router?: any
-  ) => {
+  /**
+   * Enhanced type-safe mode switching
+   * Replaces the problematic multi-parameter setSearchMode approach
+   */
+  const setSearchMode = async <T extends SearchMode>(
+    mode: T,
+    options: {
+      router?: any
+      saveCurrentQuery?: boolean
+      config?: Partial<
+        T extends 'lookup' ? LookupModeConfig :
+        T extends 'wordlist' ? WordlistModeConfig :
+        T extends 'word-of-the-day' ? WordOfTheDayModeConfig :
+        T extends 'stage' ? StageModeConfig :
+        never
+      >
+    } = {}
+  ): Promise<ModeTransitionResult> => {
+    const { router, saveCurrentQuery = true, config = {} } = options
     const currentQuery = searchBar.searchQuery
     
-    // Save current query before switching
-    searchBar.saveModeQuery(searchConfig.searchMode, currentQuery)
+    // Save current query before switching modes  
+    if (saveCurrentQuery) {
+      console.log('💾 Saving current query for mode:', searchConfig.searchMode, 'query:', currentQuery)
+      searchBar.saveModeQuery(searchConfig.searchMode, currentQuery)
+    }
     
     // Set switching modes flag
     searchBar.setSwitchingModes(true)
     
-    // Use search config store to handle the mode setting and router navigation
-    await searchConfig.setSearchMode(newMode, router, searchResults.currentEntry, ui.mode)
+    // Get the mode query for the target mode
+    const targetModeQuery = searchBar.restoreModeQuery(mode)
+    console.log('🔄 Target mode query for', mode, ':', targetModeQuery)
     
-    // Restore query for the new mode
-    const restoredQuery = searchBar.restoreModeQuery(newMode)
-    searchBar.setQuery(restoredQuery)
+    // Build type-safe configuration based on the target mode
+    const modeConfig = await buildModeConfig(mode, targetModeQuery, config)
+    
+    // Use the enhanced search config store function
+    const result = await searchConfig.setSearchMode({
+      mode,
+      config: {
+        ...modeConfig,
+        router
+      },
+      saveCurrentQuery
+    })
+    
+    // Set the restored query in the search bar
+    searchBar.setQuery(targetModeQuery)
+    console.log('🔄 Set query for new mode:', mode, 'query:', targetModeQuery)
     
     // Clear search results when changing modes
     searchBar.clearResults()
@@ -290,6 +333,61 @@ export function useSearchOrchestrator() {
     setTimeout(() => {
       searchBar.setSwitchingModes(false)
     }, 500)
+    
+    return result
+  }
+
+  /**
+   * Helper to build mode-specific configurations without tight coupling
+   */
+  const buildModeConfig = async <T extends SearchMode>(
+    mode: T, 
+    targetModeQuery: string,
+    userConfig: any
+  ): Promise<any> => {
+    const baseConfig = {
+      query: targetModeQuery,
+      currentEntry: searchResults.currentEntry
+    }
+    
+    switch (mode) {
+      case 'lookup':
+        return {
+          ...baseConfig,
+          displayMode: ui.mode,
+          sources: [...searchConfig.selectedSources],
+          languages: [...searchConfig.selectedLanguages],
+          noAI: searchConfig.noAI,
+          ...userConfig
+        }
+        
+      case 'wordlist':
+        return {
+          ...baseConfig,
+          wordlistId: searchConfig.selectedWordlist,
+          filters: ui.wordlistFilters,
+          chunking: ui.wordlistChunking,
+          sortCriteria: [...ui.wordlistSortCriteria],
+          ...userConfig
+        }
+        
+      case 'word-of-the-day':
+        return {
+          ...baseConfig,
+          date: new Date(),
+          ...userConfig
+        }
+        
+      case 'stage':
+        return {
+          ...baseConfig,
+          debugLevel: 'minimal' as const,
+          ...userConfig
+        }
+        
+      default:
+        return { ...baseConfig, ...userConfig }
+    }
   }
 
   // ==========================================================================

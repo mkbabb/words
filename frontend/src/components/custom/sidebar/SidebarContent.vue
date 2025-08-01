@@ -260,7 +260,7 @@ const formatWordlistDate = (dateString: string | null): string => {
 
 const handleCollapsedWordlistClick = async (wordlistId: string) => {
     searchConfig.setWordlist(wordlistId);
-    searchConfig.setSearchMode('wordlist');
+    searchConfig.setSearchModeLegacy('wordlist', router);
     router.push({ name: 'Home' });
 };
 

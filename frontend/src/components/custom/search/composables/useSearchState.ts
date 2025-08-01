@@ -42,7 +42,7 @@ export function useSearchState() {
     get mode() { return ui.mode; },
     set mode(value) { ui.setMode(value); },
     get searchMode() { return searchConfig.searchMode; },
-    set searchMode(value) { searchConfig.setSearchMode(value); },
+    set searchMode(value) { searchConfig.setSearchModeLegacy(value); },
     get selectedSources() { return [...searchConfig.selectedSources]; },
     set selectedSources(value) { searchConfig.setSources([...value]); },
     get selectedLanguages() { return [...searchConfig.selectedLanguages]; },

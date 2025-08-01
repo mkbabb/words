@@ -7,6 +7,13 @@ import type {
   ImageMedia
 } from './api';
 
+// Import centralized mode types for internal use in this file
+import type {
+  LookupMode,
+  ThemeMode,
+  PronunciationMode
+} from './modes';
+
 // Re-export backend-aligned types
 export { 
   type Example,
@@ -113,8 +120,8 @@ export interface ApiResponse<T> {
   timestamp: Date;
 }
 
-export interface PronunciationMode {
-  current: 'phonetic' | 'ipa';
+export interface PronunciationState {
+  current: PronunciationMode;
   toggle: () => void;
 }
 
@@ -124,14 +131,14 @@ export interface SearchState {
   hasSearched: boolean;
   results: SearchResult[];
   currentEntry?: SynthesizedDictionaryEntry;
-  mode: 'dictionary' | 'thesaurus';
+  mode: LookupMode;
 }
 
 export interface AppState {
   search: SearchState;
   history: SearchHistory[];
-  pronunciation: PronunciationMode;
-  theme: 'light' | 'dark';
+  pronunciation: PronunciationState;
+  theme: ThemeMode;
 }
 
 // Card variant types
@@ -185,3 +192,49 @@ export interface LatexFillOptions extends AnimationOptions {
 
 // Re-export wordlist types
 export * from './wordlist';
+
+// ==========================================================================
+// CENTRALIZED MODE AND CONFIGURATION TYPES
+// ==========================================================================
+
+// Re-export centralized mode and configuration types
+export type {
+  // Core mode types (replaces 76+ inline union type instances)
+  LookupMode,           // Replaces 11 instances of 'dictionary' | 'thesaurus' | 'suggestions'
+  SearchMode,           // Replaces 9 instances of 'lookup' | 'wordlist' | 'word-of-the-day' | 'stage'
+  LoadingMode,          // Replaces 4 instances across loading components
+  
+  // Configuration types
+  ErrorType,            // Replaces scattered error type definitions
+  NotificationType,     // Replaces 6 instances across notification system
+  ThemeMode,            // Replaces 3 instances: 'light' | 'dark'
+  PronunciationMode,    // Replaces 4 instances: 'phonetic' | 'ipa'
+  SortDirection,        // Replaces 4 instances: 'asc' | 'desc'
+  ComponentSize,        // Replaces multiple size-related patterns
+  
+  // Mode configuration interfaces
+  BaseModeConfig,
+  LookupModeConfig,
+  WordlistModeConfig,
+  WordOfTheDayModeConfig,
+  StageModeConfig,
+  ModeConfigMap,
+  
+  // Operation interfaces
+  ModeOperationOptions,
+  ModeTransitionResult,
+  
+  // Utility types
+  ConfigForMode,
+  AnyModeConfig,
+  ModeConfigKeys
+} from './modes';
+
+// Export type guards and utilities
+export {
+  isSearchMode,
+  isLookupMode,
+  isLoadingMode,
+  isErrorType,
+  DEFAULT_MODE_CONFIGS
+} from './modes';

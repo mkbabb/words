@@ -419,7 +419,7 @@ const handleModeChange = (newMode: string | SearchMode) => {
     console.log('🎛️ SearchControls handleModeChange:', searchMode.value, '->', newMode);
     const typedMode = newMode as SearchMode;
     if (typedMode !== searchMode.value) {
-        searchConfig.setSearchMode(typedMode);
+        searchConfig.setSearchModeLegacy(typedMode, router);
         // Handle router navigation
         if (typedMode === 'lookup') {
             router.push({ name: 'Home' });

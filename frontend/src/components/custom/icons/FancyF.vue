@@ -57,10 +57,11 @@
 import { ref, nextTick } from 'vue';
 import { gsap } from 'gsap';
 import { LaTeX } from '@/components/custom/latex';
+import type { LookupMode, ComponentSize } from '@/types';
 
 interface FancyFProps {
-  mode: 'dictionary' | 'thesaurus' | 'suggestions';
-  size?: 'sm' | 'base' | 'lg' | 'xl';
+  mode: LookupMode;
+  size?: ComponentSize;
   clickable?: boolean;
 }
 
