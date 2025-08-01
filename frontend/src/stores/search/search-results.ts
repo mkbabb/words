@@ -8,7 +8,8 @@ import type {
   ThesaurusEntry,
   WordSuggestionResponse
 } from '@/types'
-import type { DictionaryProvider, Language, SynthesizedDictionaryEntry } from '@/types/api'
+import type { DictionaryProvider, Language } from '@/types/api'
+import type { SynthesizedDictionaryEntry } from '@/types'
 
 /**
  * SearchResultsStore - Search results, current content, and streaming data

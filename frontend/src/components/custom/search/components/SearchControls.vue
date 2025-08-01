@@ -307,7 +307,7 @@ const props = defineProps<SearchControlsProps>();
 
 // Modern Vue 3.4+ patterns - using defineModel for two-way bindings
 const router = useRouter();
-const { searchConfig, ui, loading, searchResults, orchestrator } = useStores();
+const { searchConfig } = useStores();
 const searchMode = defineModel<SearchMode>('searchMode', { required: true });
 const selectedSources = defineModel<string[]>('selectedSources', { required: true });
 const selectedLanguages = defineModel<string[]>('selectedLanguages', { required: true });

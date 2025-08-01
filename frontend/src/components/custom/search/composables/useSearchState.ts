@@ -33,7 +33,7 @@ export function useSearchState() {
     set aiSuggestions(value) { searchBar.setAISuggestions([...value]); },
 
     // Search results store bindings
-    get searchResults() { return searchResults.searchResults; },
+    get searchResults() { return [...searchResults.searchResults]; },
     get isSearching() { return loading.isSearching; },
     get forceRefreshMode() { return loading.forceRefreshMode; },
     set forceRefreshMode(value) { value ? loading.enableForceRefresh() : loading.disableForceRefresh(); },

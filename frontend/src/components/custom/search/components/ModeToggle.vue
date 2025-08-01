@@ -62,7 +62,7 @@ const modelValue = defineModel<'dictionary' | 'thesaurus' | 'suggestions'>({ req
 
 // Initialize router and stores at component level
 const router = useRouter();
-const { ui, searchConfig, searchBar, searchResults } = useStores();
+const { searchConfig, searchBar, searchResults } = useStores();
 
 const handleToggle = async () => {
     if (!props.canToggle) return;

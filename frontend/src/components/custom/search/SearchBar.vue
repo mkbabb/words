@@ -314,7 +314,7 @@ import {
     useScrollAnimationSimple,
     useAutocomplete
 } from './composables';
-import { shouldTriggerAIMode, hasAIModePattern } from './utils/ai-query';
+import { shouldTriggerAIMode } from './utils/ai-query';
 
 interface SearchBarProps {
     className?: string;
@@ -683,9 +683,8 @@ onMounted(async () => {
 
     // Check current query for AI mode on page load (in lookup mode only)
     if (searchConfig.searchMode === 'lookup' && state.query) {
-        const shouldBeAIMode = shouldTriggerAIMode(state.query);
         // AI mode is automatically computed by useAIMode composable based on query
-        // No manual setting needed
+        shouldTriggerAIMode(state.query); // Validate query pattern
     }
 
     // Initialize AI suggestions (method removed in modular architecture)

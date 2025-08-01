@@ -132,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { Trash2, RefreshCw, Wand2, Download, Bell, BellDot } from 'lucide-vue-next';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import ActionButton from './ActionButton.vue';
@@ -157,7 +157,7 @@ const emit = defineEmits<{
 
 // PWA composables
 // const { subscribeToPush } = usePWA();
-const { searchConfig, loading, notifications } = useStores();
+const { notifications } = useStores();
 
 // Reactive window width for potential future use
 const windowWidth = ref(window.innerWidth);
