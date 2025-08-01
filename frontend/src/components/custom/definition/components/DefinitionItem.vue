@@ -80,7 +80,7 @@
             <ExampleListEditable
                 v-if="definition.examples && definition.examples.length > 0"
                 :examples="definition.examples"
-                :word="store.currentEntry?.word || ''"
+                :word="searchResultsStore.currentEntry?.word || ''"
                 :edit-mode="props.editModeEnabled"
                 :isStreaming="isStreaming"
                 @update:example="handleExampleUpdate"
@@ -120,7 +120,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useAppStore } from '@/stores';
+import { useSearchResultsStore, useNotificationStore } from '@/stores';
 import { useDefinitionEditMode } from '@/composables';
 import type { TransformedDefinition } from '@/types';
 import ExampleListEditable from './ExampleListEditable.vue';
@@ -137,7 +137,8 @@ interface DefinitionItemProps {
     isStreaming?: boolean;
 }
 
-const store = useAppStore();
+const searchResultsStore = useSearchResultsStore();
+const notificationStore = useNotificationStore();
 const props = defineProps<DefinitionItemProps>();
 
 // Streaming indicators
@@ -164,15 +165,15 @@ const {
     onSave: async (updates) => {
         console.log('[DefinitionItem] onSave called with updates:', updates);
         if (props.definition.id) {
-            console.log('[DefinitionItem] Calling store.updateDefinition with id:', props.definition.id);
-            await store.updateDefinition(props.definition.id, updates);
+            console.log('[DefinitionItem] Calling searchResultsStore.updateDefinition with id:', props.definition.id);
+            await searchResultsStore.updateDefinition(props.definition.id, updates);
         } else {
             console.error('[DefinitionItem] No definition ID available!');
         }
     },
     onRegenerate: async (component) => {
         if (props.definition.id) {
-            await store.regenerateDefinitionComponent(props.definition.id, component);
+            await searchResultsStore.regenerateDefinitionComponent(props.definition.id, component);
         }
     },
 });
@@ -206,12 +207,12 @@ async function handleExampleUpdate(index: number, value: string) {
             console.log('[DefinitionItem] Updating example with ID:', example.id);
             try {
                 // Update via the examples API endpoint
-                await store.updateExample(example.id, { text: value });
+                await searchResultsStore.updateExample(example.id, { text: value });
                 // Update local state after successful save
                 example.text = value;
             } catch (error) {
                 console.error('[DefinitionItem] Failed to update example:', error);
-                store.showNotification({
+                notificationStore.showNotification({
                     type: 'error',
                     message: 'Failed to update example',
                     duration: 3000

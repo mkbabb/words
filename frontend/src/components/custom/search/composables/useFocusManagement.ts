@@ -1,5 +1,5 @@
 import { ref, nextTick, Ref } from 'vue';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 
 interface UseFocusManagementOptions {
   searchInputComponent: Ref<any>;
@@ -11,7 +11,7 @@ interface UseFocusManagementOptions {
  * Handles session restoration and interaction tracking
  */
 export function useFocusManagement(options: UseFocusManagementOptions) {
-  const store = useAppStore();
+  const { searchBar } = useStores();
   const { searchInputComponent, emit } = options;
 
   const isInteractingWithSearchArea = ref(false);
@@ -21,7 +21,7 @@ export function useFocusManagement(options: UseFocusManagementOptions) {
    * Handle focus event with textarea resizing and session restoration
    */
   const handleFocus = () => {
-    store.isSearchBarFocused = true;
+    searchBar.setFocused(true);
     emit('focus');
 
     // Force textarea resize on focus
@@ -38,24 +38,24 @@ export function useFocusManagement(options: UseFocusManagementOptions) {
 
     // Only restore search results if we're in lookup mode and there's an active query
     // Don't auto-show results when just switching modes or focusing
+    const { searchConfig, searchResults } = useStores();
     console.log('🔍 FOCUS MANAGEMENT - handleFocus called', {
-      searchMode: store.searchMode,
-      sessionResults: store.sessionState?.searchResults?.length || 0,
-      searchQuery: store.searchQuery,
-      queryLength: store.searchQuery.length,
-      isDirectLookup: store.isDirectLookup,
-      // isSwitchingModes: store.isSwitchingModes
+      searchMode: searchConfig.searchMode,
+      sessionResults: searchResults.searchResults?.length || 0,
+      searchQuery: searchBar.searchQuery,
+      queryLength: searchBar.searchQuery.length,
+      isDirectLookup: searchBar.isDirectLookup,
     });
     
     if (
-      store.searchMode === 'lookup' &&
-      store.sessionState?.searchResults?.length > 0 &&
-      store.searchQuery.length >= 2 &&
-      !store.isDirectLookup // Don't show if we're doing a direct lookup
+      searchConfig.searchMode === 'lookup' &&
+      searchResults.searchResults?.length > 0 &&
+      searchBar.searchQuery.length >= 2 &&
+      !searchBar.isDirectLookup // Don't show if we're doing a direct lookup
     ) {
       console.log('🔍 FOCUS MANAGEMENT - RESTORING SEARCH RESULTS AND SHOWING DROPDOWN');
-      store.searchResults = store.sessionState.searchResults.slice(0, 8);
-      store.showSearchResults = true;
+      // Search results are already stored, just show the dropdown
+      searchBar.showDropdown();
     }
   };
 
@@ -71,13 +71,13 @@ export function useFocusManagement(options: UseFocusManagementOptions) {
       // If user is still interacting with search area, don't blur
       if (isInteractingWithSearchArea.value) return;
 
-      store.isSearchBarFocused = false;
+      searchBar.setFocused(false);
       emit('blur');
 
       // Hide results on blur only if we're not interacting with search area
-      store.showSearchResults = false;
-      store.searchResults = [];
-      store.isSearching = false;
+      searchBar.hideDropdown();
+      const { searchResults, loading } = useStores();
+      searchResults.clearSearchResults();
     }, 200); // Increased delay to 200ms for better UX
   };
 

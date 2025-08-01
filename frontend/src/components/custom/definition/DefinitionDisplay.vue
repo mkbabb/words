@@ -1,13 +1,13 @@
 <template>
     <!-- Error State -->
-    <div v-if="store.definitionError?.hasError" class="relative">
-        <ThemedCard :variant="store.selectedCardVariant" class="relative">
+    <div v-if="searchResultsStore.definitionError?.hasError" class="relative">
+        <ThemedCard :variant="uiStore.selectedCardVariant" class="relative">
             <ErrorState 
-                :title="getErrorTitle(store.definitionError.errorType)"
-                :message="store.definitionError.errorMessage"
-                :error-type="store.definitionError.errorType"
-                :retryable="store.definitionError.canRetry"
-                :show-help="store.definitionError.errorType === 'unknown'"
+                :title="getErrorTitle(searchResultsStore.definitionError.errorType)"
+                :message="searchResultsStore.definitionError.errorMessage"
+                :error-type="searchResultsStore.definitionError.errorType"
+                :retryable="searchResultsStore.definitionError.canRetry"
+                :show-help="searchResultsStore.definitionError.errorType === 'unknown'"
                 @retry="handleRetryLookup"
                 @help="handleShowHelp"
             />
@@ -16,7 +16,7 @@
     
     <!-- Empty State -->
     <div v-else-if="isEmpty && !isStreaming" class="relative">
-        <ThemedCard :variant="store.selectedCardVariant" class="relative">
+        <ThemedCard :variant="uiStore.selectedCardVariant" class="relative">
             <EmptyState
                 :title="getEmptyTitle()"
                 :message="getEmptyMessage()"
@@ -42,10 +42,10 @@
     <!-- Normal Content -->
     <div v-else-if="entry" class="relative">
         <!-- Main Card -->
-        <ThemedCard :variant="store.selectedCardVariant" class="relative">
+        <ThemedCard :variant="uiStore.selectedCardVariant" class="relative">
             <!-- Theme Selector (includes edit button) -->
             <ThemeSelector 
-                v-model="store.selectedCardVariant"
+                v-model="selectedCardVariant"
                 :isMounted="isMounted"
                 :showDropdown="showThemeDropdown"
                 :editModeEnabled="editModeEnabled"
@@ -70,13 +70,13 @@
                 v-if="entry.word"
                 :word="entry.word"
                 :pronunciation="entry.pronunciation"
-                :pronunciationMode="store.pronunciationMode"
+                :pronunciationMode="uiStore.pronunciationMode"
                 :providers="usedProviders"
                 :animationType="'typewriter'"
                 :animationKey="animationKey"
                 :isAISynthesized="!!entry.model_info"
                 :isStreaming="isStreaming"
-                @toggle-pronunciation="store.togglePronunciation"
+                @toggle-pronunciation="uiStore.togglePronunciation"
             />
             <!-- Header Skeleton -->
             <div v-else-if="isStreaming" class="space-y-4 p-6">
@@ -100,9 +100,9 @@
                     mode="out-in"
                 >
                     <!-- Wrapper div with key that changes on mode switch -->
-                    <div :key="store.mode" class="space-y-4">
+                    <div :key="uiStore.mode" class="space-y-4">
                         <!-- Dictionary Mode with Progressive Loading -->
-                        <template v-if="store.mode === 'dictionary'">
+                        <template v-if="uiStore.mode === 'dictionary'">
                             <!-- Render available definition clusters -->
                             <DefinitionCluster
                                 v-for="(cluster, clusterIndex) in groupedDefinitions"
@@ -110,7 +110,7 @@
                                 :cluster="cluster"
                                 :clusterIndex="clusterIndex"
                                 :totalClusters="groupedDefinitions.length"
-                                :cardVariant="store.selectedCardVariant"
+                                :cardVariant="uiStore.selectedCardVariant"
                                 :editModeEnabled="editModeEnabled"
                                 :isStreaming="isStreaming"
                                 @update:cluster-name="handleClusterNameUpdate"
@@ -126,7 +126,7 @@
                                     :editModeEnabled="editModeEnabled"
                                     :isStreaming="isStreaming"
                                     @regenerate="handleRegenerateExamples"
-                                    @searchWord="store.searchWord"
+                                    @searchWord="handleWordSearch"
                                     @addToWordlist="handleAddToWordlist"
                                 />
                             </DefinitionCluster>
@@ -150,17 +150,17 @@
                         </template>
 
                         <!-- Thesaurus Mode -->
-                        <template v-else-if="store.mode === 'thesaurus'">
+                        <template v-else-if="uiStore.mode === 'thesaurus'">
                             <ThesaurusView
-                                :thesaurusData="store.currentThesaurus"
-                                :cardVariant="store.selectedCardVariant"
-                                @word-click="store.searchWord"
+                                :thesaurusData="thesaurusData"
+                                :cardVariant="uiStore.selectedCardVariant"
+                                @word-click="handleWordSearch"
                                 @retry-thesaurus="handleRetryThesaurus"
                             />
                         </template>
 
                         <!-- AI Suggestions Mode -->
-                        <template v-else-if="store.mode === 'suggestions'">
+                        <template v-else-if="uiStore.mode === 'suggestions'">
                             <!-- This mode is handled by WordSuggestionDisplay in Home.vue -->
                             <div class="text-center text-muted-foreground">
                                 Switching to suggestions mode...
@@ -207,7 +207,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useMagicKeys, whenever } from '@vueuse/core';
-import { useAppStore } from '@/stores';
+import { useSearchResultsStore, useUIStore, useNotificationStore } from '@/stores';
 import { CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -227,8 +227,10 @@ import { useDefinitionGroups, useAnimationCycle, useProviders, useImageManagemen
 import { normalizeEtymology } from '@/utils/guards';
 import type { ImageMedia } from '@/types/api';
 
-// Store
-const store = useAppStore();
+// Stores
+const searchResultsStore = useSearchResultsStore();
+const uiStore = useUIStore();
+const notificationStore = useNotificationStore();
 
 // Reactive state
 const regeneratingIndex = ref<number | null>(null);
@@ -242,38 +244,55 @@ const wordToAdd = ref('');
 // Smart computed properties - merge streaming and complete data
 const entry = computed(() => {
     // If there's an error, don't return entry data
-    if (store.definitionError?.hasError) {
+    if (searchResultsStore.definitionError?.hasError) {
         return null;
     }
     
     // When streaming, merge partial data with current entry
-    if (store.isStreamingData && store.partialEntry) {
+    if (searchResultsStore.isStreamingData && searchResultsStore.partialEntry) {
         return {
             // Use partial data as primary source, fallback to current entry
-            word: store.partialEntry.word || store.currentEntry?.word,
-            id: store.partialEntry.id || store.currentEntry?.id,
-            last_updated: store.partialEntry.last_updated || store.currentEntry?.last_updated,
-            model_info: store.partialEntry.model_info || store.currentEntry?.model_info,
-            pronunciation: store.partialEntry.pronunciation || store.currentEntry?.pronunciation,
-            etymology: store.partialEntry.etymology || store.currentEntry?.etymology,
-            images: [...(store.partialEntry.images || []), ...(store.currentEntry?.images || [])],
-            definitions: store.partialEntry.definitions || store.currentEntry?.definitions || [],
+            word: searchResultsStore.partialEntry.word || searchResultsStore.currentEntry?.word,
+            id: searchResultsStore.partialEntry.id || searchResultsStore.currentEntry?.id,
+            last_updated: searchResultsStore.partialEntry.last_updated || searchResultsStore.currentEntry?.last_updated,
+            model_info: searchResultsStore.partialEntry.model_info || searchResultsStore.currentEntry?.model_info,
+            pronunciation: searchResultsStore.partialEntry.pronunciation || searchResultsStore.currentEntry?.pronunciation,
+            etymology: searchResultsStore.partialEntry.etymology || searchResultsStore.currentEntry?.etymology,
+            images: [...(searchResultsStore.partialEntry.images || []), ...(searchResultsStore.currentEntry?.images || [])],
+            definitions: searchResultsStore.partialEntry.definitions || searchResultsStore.currentEntry?.definitions || [],
             // Add streaming metadata
             _isStreaming: true,
-            _streamingProgress: store.loadingProgress,
+            _streamingProgress: 0, // We'll need to get this from loading store if needed
         } as any;
     }
     
     // When not streaming, use complete current entry
-    return store.currentEntry ? {
-        ...store.currentEntry,
+    return searchResultsStore.currentEntry ? {
+        ...searchResultsStore.currentEntry,
         _isStreaming: false,
     } as any : null;
 });
 
 // Streaming state indicators
-const isStreaming = computed(() => store.isStreamingData);
-// const hasPartialData = computed(() => !!store.partialEntry);
+const isStreaming = computed(() => searchResultsStore.isStreamingData);
+// const hasPartialData = computed(() => !!searchResultsStore.partialEntry);
+
+// UI State computed properties
+const selectedCardVariant = computed({
+    get: () => uiStore.selectedCardVariant,
+    set: (value) => uiStore.setCardVariant(value)
+});
+
+// Convert readonly thesaurus to mutable type for component compatibility
+const thesaurusData = computed(() => {
+    const data = searchResultsStore.currentThesaurus;
+    if (!data) return null;
+    return {
+        word: data.word,
+        synonyms: [...data.synonyms], // Convert readonly array to mutable
+        confidence: data.confidence
+    };
+});
 
 // Smart skeleton logic
 const expectedDefinitionCount = computed(() => {
@@ -313,8 +332,8 @@ const getErrorTitle = (errorType: string) => {
 };
 
 const getEmptyTitle = () => {
-    return store.definitionError?.originalWord 
-        ? `No definitions found for "${store.definitionError.originalWord}"`
+    return searchResultsStore.definitionError?.originalWord 
+        ? `No definitions found for "${searchResultsStore.definitionError.originalWord}"`
         : 'No definitions found';
 };
 
@@ -365,7 +384,7 @@ const handleRegenerateExamples = async (definitionIndex: number) => {
     
     regeneratingIndex.value = definitionIndex;
     try {
-        await store.regenerateExamples(definitionIndex);
+        await searchResultsStore.regenerateExamples(definitionIndex);
     } catch (error) {
         console.error('Failed to regenerate examples:', error);
     } finally {
@@ -382,11 +401,11 @@ const handleImagesUpdated = async (newImages: ImageMedia[]) => {
     
     try {
         // Refresh the synthesized entry to get updated images from the backend
-        await store.refreshSynthEntryImages();
+        await searchResultsStore.refreshSynthEntryImages();
     } catch (error) {
         console.error('Failed to refresh entry images:', error);
         // Fallback - still show a success message since the upload itself succeeded
-        store.showNotification({
+        notificationStore.showNotification({
             type: 'warning',
             message: 'Images uploaded but display may not be current. Try refreshing.',
             duration: 5000,
@@ -399,16 +418,16 @@ const handleImageDeleted = async (imageId: string) => {
     
     try {
         // Refresh the synthesized entry to remove the deleted image reference
-        await store.refreshSynthEntryImages();
+        await searchResultsStore.refreshSynthEntryImages();
         
-        store.showNotification({
+        notificationStore.showNotification({
             type: 'success',
             message: 'Image deleted successfully',
             duration: 3000,
         });
     } catch (error) {
         console.error('Failed to refresh entry after image deletion:', error);
-        store.showNotification({
+        notificationStore.showNotification({
             type: 'error',
             message: 'Image deleted but display may not be current. Try refreshing.',
             duration: 5000,
@@ -424,10 +443,17 @@ const handleClusterNameUpdate = async (clusterId: string, newName: string) => {
     );
     
     if (definition?.id) {
-        await store.updateDefinition(definition.id, {
+        await searchResultsStore.updateDefinition(definition.id, {
             meaning_cluster_name: newName
         });
     }
+};
+
+const handleWordSearch = (word: string) => {
+    // This should trigger a search for the new word
+    // We'll emit this to parent or handle through router
+    console.log('Searching for word:', word);
+    // TODO: Implement word search navigation
 };
 
 const handleAddToWordlist = (word: string) => {
@@ -443,11 +469,11 @@ const handleWordAddedToList = (wordlist: any, word: string) => {
 
 // Error handling methods
 const handleRetryLookup = () => {
-    if (store.definitionError?.originalWord) {
-        const wordToRetry = store.definitionError.originalWord;
+    if (searchResultsStore.definitionError?.originalWord) {
+        const wordToRetry = searchResultsStore.definitionError.originalWord;
         // Clear the error state and retry the lookup
-        store.definitionError = null;
-        store.searchWord(wordToRetry);
+        searchResultsStore.clearError();
+        handleWordSearch(wordToRetry);
     }
 };
 
@@ -459,17 +485,17 @@ const handleShowHelp = () => {
 
 const handleSuggestAlternatives = () => {
     // Switch to suggestions mode or show alternative suggestions
-    store.mode = 'suggestions';
+    uiStore.setMode('suggestions');
     console.log('Suggesting alternatives for failed lookup');
 };
 
 const handleRetryThesaurus = async () => {
     if (entry.value?.word) {
         try {
-            await store.getThesaurusData(entry.value.word);
+            await searchResultsStore.getThesaurusData(entry.value.word);
         } catch (error) {
             console.error('Failed to retry thesaurus lookup:', error);
-            store.showNotification({
+            notificationStore.showNotification({
                 type: 'error',
                 message: 'Failed to load thesaurus data. Please try again.',
                 duration: 3000
@@ -521,7 +547,7 @@ const saveAllChanges = () => {
 };
 
 // Watch mode changes to ensure thesaurus data is loaded and trigger animations
-watch(() => store.mode, async (newMode, oldMode) => {
+watch(() => uiStore.mode, async (newMode, oldMode) => {
     // Trigger animation by incrementing key
     if (oldMode && newMode !== oldMode) {
         animationKey.value++;
@@ -529,7 +555,7 @@ watch(() => store.mode, async (newMode, oldMode) => {
     
     if (newMode === 'thesaurus' && entry.value) {
         // Ensure thesaurus data is loaded when switching to thesaurus mode
-        await store.getThesaurusData(entry.value.word);
+        await searchResultsStore.getThesaurusData(entry.value.word);
     }
 });
 

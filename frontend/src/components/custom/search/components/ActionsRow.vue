@@ -137,7 +137,7 @@ import { Trash2, RefreshCw, Wand2, Download, Bell, BellDot } from 'lucide-vue-ne
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import ActionButton from './ActionButton.vue';
 // import { usePWA } from '@/composables';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 
 interface ActionsRowProps {
     showRefreshButton?: boolean;
@@ -157,7 +157,7 @@ const emit = defineEmits<{
 
 // PWA composables
 // const { subscribeToPush } = usePWA();
-const store = useAppStore();
+const { searchConfig, loading, notifications } = useStores();
 
 // Reactive window width for potential future use
 const windowWidth = ref(window.innerWidth);
@@ -213,7 +213,7 @@ const handleSendNotification = async () => {
     try {
         // Check if notifications are supported
         if (!('Notification' in window)) {
-            store.showNotification({
+            notifications.showNotification({
                 type: 'error',
                 message: 'Notifications not supported'
             });
@@ -224,7 +224,7 @@ const handleSendNotification = async () => {
         if (Notification.permission === 'default') {
             const permission = await Notification.requestPermission();
             if (permission !== 'granted') {
-                store.showNotification({
+                notifications.showNotification({
                     type: 'error',
                     message: 'Notification permission denied'
                 });
@@ -242,13 +242,13 @@ const handleSendNotification = async () => {
         // });
         
         // Just show in-app notification
-        store.showNotification({
+        notifications.showNotification({
             type: 'success',
             message: 'Notifications are enabled! 🎉'
         });
     } catch (error) {
         console.error('Notification error:', error);
-        store.showNotification({
+        notifications.showNotification({
             type: 'error',
             message: 'Failed to send notification'
         });

@@ -1,7 +1,7 @@
 import { computed, watch } from 'vue';
 import { useSearchBarUI } from './useSearchBarUI';
 import { useScrollAnimationSimple } from './useScrollAnimationSimple';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 
 interface UseSearchBarScrollOptions {
   shrinkPercentage: () => number;
@@ -12,7 +12,7 @@ interface UseSearchBarScrollOptions {
  * Handles scroll progress, container styling, and scroll-based UI updates
  */
 export function useSearchBarScroll(options: UseSearchBarScrollOptions) {
-  const store = useAppStore();
+  const { searchBar } = useStores();
   const { uiState } = useSearchBarUI();
   const { shrinkPercentage } = options;
 
@@ -20,8 +20,8 @@ export function useSearchBarScroll(options: UseSearchBarScrollOptions) {
   const { containerStyle, updateScrollState } = useScrollAnimationSimple(
     computed(() => uiState.scrollProgress),
     computed(() => uiState.isContainerHovered),
-    computed(() => store.isSearchBarFocused),
-    computed(() => store.showSearchControls || store.showSearchResults)
+    computed(() => searchBar.isSearchBarFocused),
+    computed(() => searchBar.showSearchControls || searchBar.showSearchResults)
   );
 
   // Update scroll progress from external prop

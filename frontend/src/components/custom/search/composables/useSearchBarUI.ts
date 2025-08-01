@@ -1,5 +1,5 @@
 import { computed, reactive } from 'vue';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 
 // Local UI state that doesn't need to be shared between components
 const uiState = reactive({
@@ -23,17 +23,17 @@ const uiState = reactive({
 });
 
 export function useSearchBarUI() {
-    const store = useAppStore();
+    const { searchBar } = useStores();
     
     // Icon opacity based on store state and local UI state
     const iconOpacity = computed(() => {
         // Always full opacity when focused or hovered
-        if (store.isSearchBarFocused || uiState.isContainerHovered) {
+        if (searchBar.isSearchBarFocused || uiState.isContainerHovered) {
             return 1;
         }
 
         // Don't fade when either dropdown is showing
-        if (store.showSearchControls || store.showSearchResults) {
+        if (searchBar.showSearchControls || searchBar.showSearchResults) {
             return 1;
         }
 

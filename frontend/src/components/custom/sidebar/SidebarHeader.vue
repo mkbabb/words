@@ -3,7 +3,7 @@
         <div v-if="!collapsed" class="flex items-center justify-between w-full">
             <!-- Left: Floridify + @mbabb -->
             <div class="flex items-center gap-3">
-                <FloridifyIcon :expanded="true" :mode="store.mode" clickable @toggle-mode="store.toggleMode()" />
+                <FloridifyIcon :expanded="true" :mode="ui.mode" clickable @toggle-mode="ui.toggleMode()" />
                 <HoverCard :open-delay="600">
                     <HoverCardTrigger>
                         <Button variant="link" class="h-auto p-0 font-mono text-sm">@mbabb</Button>
@@ -38,14 +38,14 @@
                         'transition-all duration-300 ease-apple-smooth',
                         mobile ? 'cursor-pointer' : 'cursor-ew-resize'
                     )"
-                    @toggle="mobile ? store.toggleSidebar() : store.setSidebarCollapsed(!collapsed)"
+                    @toggle="mobile ? ui.toggleSidebar() : ui.setSidebarCollapsed(!collapsed)"
                 />
             </div>
         </div>
         <div v-else class="flex items-center justify-between w-full">
             <DarkModeToggle class="h-7 w-7" />
             <button
-                @click="store.setSidebarCollapsed(false)"
+                @click="ui.setSidebarCollapsed(false)"
                 class="cursor-ew-resize hover:bg-muted/50 rounded-lg p-2 transition-all duration-300 ease-apple-smooth hover:scale-105"
             >
                 <PanelRight :size="16" class="text-muted-foreground" />
@@ -55,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 import { cn } from '@/utils';
 import { FloridifyIcon, HamburgerIcon } from '@/components/custom/icons';
 import { DarkModeToggle } from '@/components/custom/dark-mode-toggle';
@@ -70,5 +70,5 @@ interface Props {
 
 defineProps<Props>();
 
-const store = useAppStore();
+const { ui } = useStores();
 </script>

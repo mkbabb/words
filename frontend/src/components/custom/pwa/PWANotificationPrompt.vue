@@ -92,9 +92,9 @@
 import { ref, onMounted } from 'vue';
 import { Bell, X, Sparkles, BookOpen, Clock, Info } from 'lucide-vue-next';
 import { useIOSPWA, usePWA } from '@/composables';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 
-const store = useAppStore();
+const { notifications } = useStores();
 const { isIOS, isInstalled } = useIOSPWA();
 const { subscribeToPush, notificationPermission } = usePWA();
 
@@ -109,7 +109,7 @@ const dismissPrompt = () => {
 const enableNotifications = async () => {
   // Check current permission state
   if (Notification.permission === 'denied') {
-    store.showNotification({
+    notifications.showNotification({
       type: 'error',
       message: 'Notifications are blocked. Please enable them in your browser settings.'
     });
@@ -117,7 +117,7 @@ const enableNotifications = async () => {
     // Show instructions
     const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
     if (isChrome) {
-      store.showNotification({
+      notifications.showNotification({
         type: 'info',
         message: 'Click the lock icon in the address bar → Site settings → Notifications → Allow'
       });
@@ -126,7 +126,7 @@ const enableNotifications = async () => {
   }
   
   // Show loading state
-  store.showNotification({
+  notifications.showNotification({
     type: 'info',
     message: 'Requesting notification permission...'
   });
@@ -135,7 +135,7 @@ const enableNotifications = async () => {
   
   if (success) {
     showPrompt.value = false;
-    store.showNotification({
+    notifications.showNotification({
       type: 'success',
       message: 'Notifications enabled! You\'ll receive your first word tomorrow.'
     });
@@ -144,12 +144,12 @@ const enableNotifications = async () => {
     localStorage.setItem('notifications-enabled', 'true');
   } else {
     if (Notification.permission === 'denied') {
-      store.showNotification({
+      notifications.showNotification({
         type: 'error',
         message: 'Notifications blocked. Enable in browser settings and refresh the page.'
       });
     } else {
-      store.showNotification({
+      notifications.showNotification({
         type: 'error',
         message: 'Could not enable notifications. Please try again.'
       });

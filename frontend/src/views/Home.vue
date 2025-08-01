@@ -5,8 +5,8 @@
     <div
         :class="
             cn('min-h-screen transition-all duration-300 ease-in-out', {
-                'lg:ml-80': !store.sidebarCollapsed,
-                'lg:ml-16': store.sidebarCollapsed,
+                'lg:ml-80': !ui.sidebarCollapsed,
+                'lg:ml-16': ui.sidebarCollapsed,
             })
         "
     >
@@ -43,24 +43,23 @@
                     </div>
                     
                     <!-- Main Content -->
-                    <div :class="['flex-1 max-w-5xl mx-auto', (store.mode === 'suggestions' || store.searchMode === 'wordlist') ? 'px-4 sm:px-2' : '']">
+                    <div :class="['flex-1 max-w-5xl mx-auto', (ui.mode === 'suggestions' || searchConfig.searchMode === 'wordlist') ? 'px-4 sm:px-2' : '']">
                         <!-- Animated Content Cards -->
                         <Transition
                     name="content-switch"
                     mode="out-in"
+                    :duration="{ enter: 300, leave: 500 }"
                 >
                     <!-- Definition Content -->
-                    <div v-if="store.searchMode === 'lookup' && store.mode !== 'suggestions'" key="lookup">
-                        <!-- Loading State - only show skeleton if modal is visible and no partial data -->
-                        <div v-if="isSearching && showLoadingModal && !store.partialEntry" class="space-y-8">
+                    <div v-if="searchConfig.searchMode === 'lookup' && ui.mode !== 'suggestions'" key="lookup">
+                        <!-- Loading State -->
+                        <div v-if="isSearching && showLoadingModal && !searchResults.partialEntry" class="space-y-8">
                             <DefinitionSkeleton />
                         </div>
 
-                        <!-- Enhanced Definition Display - handles both streaming and complete data -->
-                        <div v-else-if="store.isStreamingData || store.partialEntry || currentEntry || previousEntry || store.definitionError?.hasError" class="space-y-8">
-                            <DefinitionDisplay 
-                                v-if="store.isStreamingData || store.partialEntry || currentEntry || store.definitionError?.hasError" 
-                            />
+                        <!-- Definition Display -->
+                        <div v-else-if="searchResults.isStreamingData || searchResults.partialEntry || currentEntry || previousEntry || searchResults.definitionError?.hasError" class="space-y-8">
+                            <DefinitionDisplay />
                         </div>
 
                         <!-- Empty State -->
@@ -70,37 +69,28 @@
                     </div>
 
                     <!-- Word Suggestions Content -->
-                    <div v-else-if="store.mode === 'suggestions'" key="suggestions">
+                    <div v-else-if="ui.mode === 'suggestions'" key="suggestions">
                         <div class="space-y-8">
                             <WordSuggestionDisplay />
                         </div>
                     </div>
 
                     <!-- Wordlist Content -->
-                    <div
-                        v-else-if="store.searchMode === 'wordlist'"
-                        key="wordlist"
-                    >
+                    <div v-else-if="searchConfig.searchMode === 'wordlist'" key="wordlist">
                         <WordListView />
                     </div>
 
                     <!-- Word of the Day Content -->
-                    <div
-                        v-else-if="store.searchMode === 'word-of-the-day'"
-                        key="word-of-the-day"
-                    >
+                    <div v-else-if="searchConfig.searchMode === 'word-of-the-day'" key="word-of-the-day">
                         <div class="space-y-8">
-                            <!-- Word of the Day content will go here -->
-                            <div
-                                class="py-16 text-center text-muted-foreground"
-                            >
+                            <div class="py-16 text-center text-muted-foreground">
                                 Word of the Day mode coming soon...
                             </div>
                         </div>
                     </div>
 
                     <!-- Stage Content -->
-                    <div v-else-if="store.searchMode === 'stage'" key="stage">
+                    <div v-else-if="searchConfig.searchMode === 'stage'" key="stage">
                         <div class="space-y-8">
                             <StageTest ref="stageTestRef" />
                         </div>
@@ -115,31 +105,31 @@
     <!-- Loading Modal for Lookup -->
     <LoadingModal
         v-model="showLoadingModal"
-        :word="store.searchQuery || 'searching'"
-        :progress="store.loadingProgress"
-        :current-stage="store.loadingStage"
+        :word="searchBar.searchQuery || 'searching'"
+        :progress="loading.loadingProgress"
+        :current-stage="loading.loadingStage"
         :allow-dismiss="true"
         mode="lookup"
-        :dynamic-checkpoints="store.loadingStageDefinitions"
-        :category="store.loadingCategory"
+        :dynamic-checkpoints="[...loading.loadingStageDefinitions]"
+        :category="loading.loadingCategory"
     />
     
     <!-- Loading Modal for AI Suggestions -->
     <LoadingModal
-        v-model="store.isSuggestingWords"
+        v-model="loading.isSuggestingWords"
         :display-text="'efflorescing'"
-        :progress="store.suggestionsProgress"
-        :current-stage="store.suggestionsStage"
+        :progress="loading.suggestionsProgress"
+        :current-stage="loading.suggestionsStage"
         mode="suggestions"
-        :dynamic-checkpoints="store.suggestionsStageDefinitions"
-        :category="store.suggestionsCategory"
+        :dynamic-checkpoints="[...loading.suggestionsStageDefinitions]"
+        :category="loading.suggestionsCategory"
     />
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { useAppStore } from '@/stores';
+import { useRoute } from 'vue-router';
+import { useStores } from '@/stores';
 import { useScroll } from '@vueuse/core';
 import { cn } from '@/utils';
 import { SearchBar } from '@/components/custom/search';
@@ -151,9 +141,8 @@ import WordListView from '@/components/custom/wordlist/WordListView.vue';
 import { StageTest } from '@/components/custom/test';
 import { ProgressiveSidebar } from '@/components/custom/navigation';
 
-const store = useAppStore();
+const { searchBar, searchConfig, searchResults, ui, loading, orchestrator } = useStores();
 const route = useRoute();
-const router = useRouter();
 
 // Component refs
 const stageTestRef = ref();
@@ -169,103 +158,49 @@ const handleStageEnter = (_query: string) => {
 };
 
 
-// Watch for route changes
+// Route orchestration using modern store API
 watch(() => route.name, async (routeName) => {
-    console.log('🔍 ROUTE WATCHER - Route changed to:', routeName, 'params:', route.params);
-    
     if (routeName === 'Definition' && route.params.word) {
         const word = route.params.word as string;
-        console.log('🔍 ROUTE WATCHER - Loading Definition for:', word);
-        
-        // Only call setSearchMode if we're not already in lookup mode
-        if (store.searchMode !== 'lookup') {
-            console.log('🔍 ROUTE WATCHER - Switching to lookup mode');
-            store.setSearchMode('lookup', router);
-        } else {
-            console.log('🔍 ROUTE WATCHER - Already in lookup mode');
+        if (searchConfig.searchMode !== 'lookup') {
+            searchConfig.setSearchMode('lookup');
         }
-        store.mode = 'dictionary';
-        
-        // Ensure the search query matches the word from the route
-        console.log('🔍 ROUTE WATCHER - Setting search query to:', word);
-        store.searchQuery = word;
-        // Also update the lookup mode query in modeQueries
-        store.modeQueries.lookup = word;
-        
-        // Hide search results immediately when loading definition via route
-        console.log('🔍 ROUTE WATCHER - Hiding search results before searchWord');
-        store.showSearchResults = false;
-        store.searchResults = [];
-        
-        // Just do a normal lookup like any other search
-        await store.searchWord(word);
+        ui.setMode('dictionary');
+        searchBar.setQuery(word);
+        await orchestrator.searchWord(word);
     } else if (routeName === 'Thesaurus' && route.params.word) {
         const word = route.params.word as string;
-        console.log('🔍 ROUTE WATCHER - Loading Thesaurus for:', word);
-        
-        // Only call setSearchMode if we're not already in lookup mode
-        if (store.searchMode !== 'lookup') {
-            console.log('🔍 ROUTE WATCHER - Switching to lookup mode');
-            store.setSearchMode('lookup', router);
-        } else {
-            console.log('🔍 ROUTE WATCHER - Already in lookup mode');
+        if (searchConfig.searchMode !== 'lookup') {
+            searchConfig.setSearchMode('lookup');
         }
-        store.mode = 'thesaurus';
-        
-        // Ensure the search query matches the word from the route
-        console.log('🔍 ROUTE WATCHER - Setting search query to:', word);
-        store.searchQuery = word;
-        // Also update the lookup mode query in modeQueries
-        store.modeQueries.lookup = word;
-        
-        // Hide search results immediately when loading thesaurus via route
-        console.log('🔍 ROUTE WATCHER - Hiding search results before searchWord');
-        store.showSearchResults = false;
-        store.searchResults = [];
-        
-        // Just do a normal lookup like any other search
-        await store.searchWord(word);
+        ui.setMode('thesaurus');
+        searchBar.setQuery(word);
+        await orchestrator.searchWord(word);
     } else if ((routeName === 'Wordlist' || routeName === 'WordlistSearch') && route.params.wordlistId) {
         const wordlistId = route.params.wordlistId as string;
-        console.log('🔍 ROUTE WATCHER - Loading Wordlist:', wordlistId);
-        
-        console.log('🏠 Home.vue route watcher switching to wordlist mode');
-        store.setSearchMode('wordlist', router);  // Pass router to indicate mode switching
-        store.setWordlist(wordlistId);
-        
-        // Handle search query if present
+        searchConfig.setSearchMode('wordlist');
+        searchConfig.setWordlist(wordlistId);
         if (routeName === 'WordlistSearch' && route.params.query) {
-            const query = decodeURIComponent(route.params.query as string);
-            store.searchQuery = query;
+            searchBar.setQuery(decodeURIComponent(route.params.query as string));
         }
     }
 }, { immediate: true });
 
-// Watch for wordlist route parameter changes
+// Simplified wordlist parameter watching
 watch(() => route.params.wordlistId, (newWordlistId) => {
-    if (route.name === 'Wordlist' || route.name === 'WordlistSearch') {
-        if (newWordlistId && typeof newWordlistId === 'string') {
-            store.setWordlist(newWordlistId);
-        } else {
-            store.setWordlist(null);
-        }
+    if ((route.name === 'Wordlist' || route.name === 'WordlistSearch') && newWordlistId) {
+        searchConfig.setWordlist(newWordlistId as string);
     }
 }, { immediate: true });
 
 
 onMounted(async () => {
-    console.log('Home component mounted');
-    console.log('Has searched:', store.hasSearched);
-    console.log('Search results:', store.searchResults);
-
-    // Note: Vocabulary suggestions are initialized automatically by the store
-    // No need to refresh them here as the store already handles initialization
+    // Stores auto-initialize - no manual setup needed
 });
 
-// Track loading modal visibility separately from search state
-// (moved above route watcher to avoid reference error)
-const isSearching = computed(() => store.isSearching);
-const currentEntry = computed(() => store.currentEntry);
+// Reactive state from modular stores
+const isSearching = computed(() => loading.isSearching);
+const currentEntry = computed(() => searchResults.currentEntry);
 const previousEntry = ref<any>(null);
 
 // Track previous entry for smooth transitions
@@ -281,25 +216,9 @@ watch(currentEntry, (newEntry, oldEntry) => {
     }
 });
 
-// Sync loading modal visibility with search state
-watch(isSearching, (newVal) => {
-    if (newVal) {
-        showLoadingModal.value = true;
-    } else {
-        // Also hide modal when searching completes
-        showLoadingModal.value = false;
-    }
-});
-
-
-// Expose loading modal state to store
-watch(showLoadingModal, (newVal) => {
-    store.showLoadingModal = newVal;
-});
-
-// Sync store loading modal state back to local state
-watch(() => store.showLoadingModal, (newVal) => {
-    showLoadingModal.value = newVal;
+// Simplified loading modal sync
+watch(isSearching, (searching) => {
+    showLoadingModal.value = searching;
 });
 
 // Scroll-based shrinking animation
@@ -319,16 +238,13 @@ const searchBarClasses = computed(() => {
     );
 });
 
-// Should show progressive sidebar
+// Progressive sidebar visibility logic
 const shouldShowProgressiveSidebar = computed(() => {
-    // Only show in lookup mode with dictionary content and a current entry
-    if (store.searchMode !== 'lookup' || store.mode !== 'dictionary' || !currentEntry.value) return false;
+    if (searchConfig.searchMode !== 'lookup' || ui.mode !== 'dictionary' || !currentEntry.value) return false;
     
-    // Check if we have multiple clusters
     const definitions = currentEntry.value.definitions;
-    if (!definitions || definitions.length === 0) return false;
+    if (!definitions?.length) return false;
     
-    // Group by cluster to see if we have multiple
     const clusters = new Set(definitions.map(d => d.meaning_cluster?.id || 'default'));
     return clusters.size > 1;
 });

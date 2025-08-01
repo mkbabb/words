@@ -125,7 +125,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 import { 
   FileText, 
   Plus, 
@@ -140,7 +140,7 @@ import type { WordList } from '@/types';
 import { wordlistApi } from '@/api';
 import { useToast } from '@/components/ui/toast/use-toast';
 
-const store = useAppStore();
+const { searchConfig, orchestrator } = useStores();
 const router = useRouter();
 const { toast } = useToast();
 
@@ -166,7 +166,7 @@ const activeUploads = ref<Array<{
 const isLoading = ref(false);
 
 // Computed properties
-const selectedWordlist = computed(() => store.selectedWordlist);
+const selectedWordlist = computed(() => searchConfig.selectedWordlist);
 
 // Methods
 const onDrop = (event: DragEvent) => {
@@ -292,7 +292,7 @@ const loadWordlists = async () => {
     // Auto-select first wordlist if none selected and wordlists exist
     if (!selectedWordlist.value && wordlists.value.length > 0) {
       console.log('Auto-selecting first wordlist:', wordlists.value[0].name, 'ID:', wordlists.value[0].id);
-      store.setWordlist(wordlists.value[0].id);
+      searchConfig.setWordlist(wordlists.value[0].id);
     } else {
       console.log('Wordlist selection state:', {
         selectedWordlist: selectedWordlist.value,
@@ -308,8 +308,8 @@ const loadWordlists = async () => {
 };
 
 const handleWordlistSelect = async (wordlist: WordList) => {
-  store.setWordlist(wordlist.id);
-  store.setSearchMode('wordlist', router);
+  searchConfig.setWordlist(wordlist.id);
+  searchConfig.setSearchMode('wordlist', router);
 };
 
 const handleWordlistEdit = (wordlist: WordList) => {
@@ -354,7 +354,7 @@ const confirmDelete = async () => {
     // Handle graceful fallback if deleted wordlist was selected
     if (selectedWordlist.value === wordlistToDelete.value.id) {
       const firstWordlist = wordlists.value[0];
-      store.setWordlist(firstWordlist?.id || null);
+      searchConfig.setWordlist(firstWordlist?.id || null);
     }
     
     toast({
@@ -405,8 +405,8 @@ const handleUploadCancel = () => {
 
 const handleWordlistCreated = async (wordlist: WordList) => {
   wordlists.value.unshift(wordlist);
-  store.setWordlist(wordlist.id);
-  store.setSearchMode('wordlist', router);
+  searchConfig.setWordlist(wordlist.id);
+  searchConfig.setSearchMode('wordlist', router);
 };
 
 // Lifecycle

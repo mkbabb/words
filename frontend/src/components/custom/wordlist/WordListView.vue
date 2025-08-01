@@ -52,7 +52,7 @@
           <FileText class="h-16 w-16 mx-auto text-muted-foreground/50" />
           <h3 class="text-lg font-semibold">No Words Found</h3>
           <p class="text-muted-foreground">
-            {{ store.searchQuery ? 'Try adjusting your search or filters.' : 'Add some words to get started.' }}
+            {{ searchBar.searchQuery ? 'Try adjusting your search or filters.' : 'Add some words to get started.' }}
           </p>
         </div>
       </div>
@@ -123,7 +123,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 // Removed infinite scroll import
 import { 
   BookOpen, 
@@ -140,7 +140,7 @@ import WordListUploadModal from './WordListUploadModal.vue';
 import CreateWordListModal from './CreateWordListModal.vue';
 import EditWordNotesModal from './EditWordNotesModal.vue';
 
-const store = useAppStore();
+const { searchConfig, orchestrator, loading, ui, searchBar, searchResults } = useStores();
 const router = useRouter();
 const { toast } = useToast();
 
@@ -160,12 +160,12 @@ const scrollContainer = ref<HTMLElement>();
 
 // Sort criteria from store (writeable)
 const sortCriteria = computed({
-  get: () => store.wordlistSortCriteria,
-  set: (value) => { store.wordlistSortCriteria = value; }
+  get: () => ui.wordlistSortCriteria,
+  set: (value) => { ui.setWordlistSortCriteria(value); }
 });
 
 // Filters - use store filters
-const filters = computed(() => store.wordlistFilters);
+const filters = computed(() => ui.wordlistFilters);
 
 // Computed properties
 const currentWordlist = computed(() => currentWordlistData.value);
@@ -206,10 +206,10 @@ const dueForReview = computed(() => {
 
 const handleWordClick = async (word: WordListItem) => {
   // Switch to lookup mode and navigate to definition route
-  store.setSearchMode('lookup', router);
+  searchConfig.setSearchMode('lookup', router);
   
   // Perform the word lookup after navigation
-  await store.searchWord(word.word);
+  await orchestrator.performSearch(word.word);
 };
 
 const handleReview = async (word: WordListItem, quality: number) => {
@@ -290,8 +290,8 @@ const handleWordsUploaded = (words: string[]) => {
 
 const handleWordlistCreated = async (wordlist: any) => {
   console.log('Wordlist created:', wordlist.name);
-  store.setWordlist(wordlist.id);
-  store.setSearchMode('wordlist', router);
+  searchConfig.setWordlist(wordlist.id);
+  searchConfig.setSearchMode('wordlist', router);
 };
 
 // Clustering removed for simplicity
@@ -341,10 +341,10 @@ const loadWordlistWords = async (id: string, page: number = 0, append: boolean =
   try {
     let response;
     
-    if (store.searchQuery && store.searchQuery.trim()) {
+    if (searchBar.searchQuery && searchBar.searchQuery.trim()) {
       // Use search endpoint when there's a query - include all filters
       response = await wordlistApi.searchWordlist(id, {
-        query: store.searchQuery.trim(),
+        query: searchBar.searchQuery.trim(),
         offset: page * wordsPerPage.value,
         limit: wordsPerPage.value,
         sort_by: sortCriteria.value?.[0]?.field || 'relevance',
@@ -400,12 +400,12 @@ const loadWordlistWords = async (id: string, page: number = 0, append: boolean =
 // Clustering is now handled client-side only
 
 const loadMoreWords = async () => {
-  if (!store.selectedWordlist || isLoadingWords.value || !hasMoreWords.value) {
+  if (!searchConfig.selectedWordlist || isLoadingWords.value || !hasMoreWords.value) {
     return;
   }
   
   const nextPage = currentPage.value + 1;
-  await loadWordlistWords(store.selectedWordlist, nextPage, true);
+  await loadWordlistWords(searchConfig.selectedWordlist, nextPage, true);
 };
 
 // Infinite scroll removed - using manual Load More button instead
@@ -423,8 +423,8 @@ const loadWordlist = async (id: string) => {
 
 // Lifecycle
 onMounted(() => {
-  if (store.selectedWordlist) {
-    loadWordlist(store.selectedWordlist);
+  if (searchConfig.selectedWordlist) {
+    loadWordlist(searchConfig.selectedWordlist);
   }
 });
 
@@ -433,7 +433,7 @@ onUnmounted(() => {
 });
 
 // Watch for wordlist changes  
-watch(() => store.selectedWordlist, (newId) => {
+watch(() => searchConfig.selectedWordlist, (newId) => {
   if (newId) {
     loadWordlist(newId);
   } else {
@@ -443,28 +443,28 @@ watch(() => store.selectedWordlist, (newId) => {
 });
 
 // Watch for search query changes in wordlist mode
-watch(() => store.searchQuery, (newQuery, oldQuery) => {
+watch(() => searchBar.searchQuery, (newQuery, oldQuery) => {
   // Only reload if we're in wordlist mode and have a selected wordlist
-  if (store.searchMode === 'wordlist' && store.selectedWordlist && newQuery !== oldQuery) {
+  if (searchConfig.searchMode === 'wordlist' && searchConfig.selectedWordlist && newQuery !== oldQuery) {
     // Reset to first page when search changes
     currentPage.value = 0;
-    loadWordlistWords(store.selectedWordlist, 0, false);
+    loadWordlistWords(searchConfig.selectedWordlist, 0, false);
   }
 });
 
 
 // TEMPORARILY DISABLED - these watchers were causing infinite loops
 // watch(() => filters.value, () => {
-//   if (store.selectedWordlist) {
+//   if (searchConfig.selectedWordlist) {
 //     currentPage.value = 0;
-//     loadWordlistWords(store.selectedWordlist, 0, false);
+//     loadWordlistWords(searchConfig.selectedWordlist, 0, false);
 //   }
 // }, { deep: true });
 
 // watch(() => sortCriteria.value, () => {
-//   if (store.selectedWordlist) {
+//   if (searchConfig.selectedWordlist) {
 //     currentPage.value = 0;
-//     loadWordlistWords(store.selectedWordlist, 0, false);
+//     loadWordlistWords(searchConfig.selectedWordlist, 0, false);
 //   }
 // }, { deep: true });
 

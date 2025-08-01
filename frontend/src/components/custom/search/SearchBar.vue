@@ -212,10 +212,10 @@
             <!-- Thin Loading Progress Bar -->
             <ThinLoadingProgress
                 :show="showProgressBar"
-                :progress="store.loadingProgress"
-                :current-stage="store.loadingStage"
+                :progress="loading.loadingProgress"
+                :current-stage="loading.loadingStage"
                 :mode="state.searchMode"
-                :category="store.loadingCategory"
+                :category="loading.loadingCategory"
                 @click="handleProgressBarClick"
             />
 
@@ -233,12 +233,12 @@
                     v-model:wordlist-sort-criteria="state.wordlistSortCriteria"
                     :ai-suggestions="state.aiSuggestions"
                     :is-development="state.isDevelopment"
-                    :show-refresh-button="!!store.currentEntry && state.searchMode === 'lookup'"
+                    :show-refresh-button="!!searchResults.currentEntry && state.searchMode === 'lookup'"
                     :force-refresh-mode="state.forceRefreshMode"
                     @word-select="selectWord"
                     @clear-storage="clearAllStorage"
                     @interaction="handleSearchAreaInteraction"
-                    @toggle-sidebar="store.toggleSidebar()"
+                    @toggle-sidebar="ui.toggleSidebar()"
                     @toggle-refresh="handleForceRegenerate"
                     @execute-search="handleEnterWrapped"
                 />
@@ -286,7 +286,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import { useAppStore } from '@/stores';
+// Legacy store removed - all functionality migrated to modular stores
+import { useStores } from '@/stores';
 import { Maximize2, X } from 'lucide-vue-next';
 import { HamburgerIcon } from '@/components/custom/icons';
 
@@ -337,8 +338,10 @@ const emit = defineEmits<{
 }>();
 
 // Store & State
-const store = useAppStore();
+const { searchBar, searchConfig, searchResults, ui, loading, orchestrator } = useStores();
 const { iconOpacity } = useSearchBarUI();
+
+// All functionality now uses modular stores - no legacy store needed
 
 // Use centralized state management
 const { state, canToggleMode, placeholder, resultsContainerStyle } = useSearchState();
@@ -350,14 +353,21 @@ const isLoadingInProgress = ref(false);
 const showClearStorageDialog = ref(false);
 
 // Start showing progress when search starts
-watch(() => store.isSearching, (newVal) => {
+watch(() => loading.isSearching, (newVal) => {
     if (newVal) {
         isLoadingInProgress.value = true;
     }
 });
 
-// Hide progress only when loading truly completes
-watch(() => [store.loadingProgress, store.isSearching], ([progress, searching]) => {
+// Hide progress when loading completes
+watch(() => loading.isSearching, (searching) => {
+    if (!searching) {
+        setTimeout(() => isLoadingInProgress.value = false, 500);
+    }
+});
+
+// Watch loading progress from modular stores
+watch(() => [loading.loadingProgress, loading.isSearching], ([progress, searching]) => {
     // Only hide if we're at 100% AND not searching anymore
     if (typeof progress === 'number' && progress >= 100 && !searching) {
         // Delay hiding to show completion
@@ -373,7 +383,7 @@ watch(() => [store.loadingProgress, store.isSearching], ([progress, searching]) 
 
 const showProgressBar = computed(() => {
     // Show progress bar if loading is in progress and modal is not visible
-    return isLoadingInProgress.value && !store.showLoadingModal;
+    return isLoadingInProgress.value && !loading.showLoadingModal;
 });
 
 // Refs
@@ -481,7 +491,7 @@ const handleInputClick = (event: MouseEvent) => {
 // Override handleEnter to handle stage mode
 const handleEnterWrapped = async () => {
     if (state.searchMode === 'stage' && state.query) {
-        store.searchQuery = state.query;
+        searchBar.setQuery(state.query);
         emit('stage-enter', state.query);
         return;
     }
@@ -501,7 +511,7 @@ const handleArrowKey = (event: KeyboardEvent) => {
 };
 
 const selectWord = async (word: string) => {
-    await store.searchWord(word);
+    await orchestrator.searchWord(word);
 };
 
 const handleForceRegenerate = () => {
@@ -511,7 +521,7 @@ const handleForceRegenerate = () => {
 
 const handleProgressBarClick = () => {
     // Reshow the loading progress modal when clicking the thin progress bar
-    store.showLoadingModal = true;
+    loading.showModal();
 };
 
 const clearQuery = () => {
@@ -592,13 +602,12 @@ const handleClickOutside = (event: MouseEvent) => {
             isInteractingWithSearchArea.value = false;
             
             // Immediately trigger blur
-            store.isSearchBarFocused = false;
+            searchBar.setFocused(false);
             emit('blur');
             
             // Hide search results
-            store.showSearchResults = false;
-            store.searchResults = [];
-            store.isSearching = false;
+            searchBar.hideDropdown();
+            searchResults.clearSearchResults();
         }
     }
 };
@@ -617,7 +626,7 @@ onMounted(async () => {
     
     // Watch store searchQuery changes to sync with local state
     watch(
-        () => store.searchQuery,
+        () => searchBar.searchQuery,
         (newQuery) => {
             if (newQuery !== state.query) {
                 state.query = newQuery;
@@ -629,8 +638,8 @@ onMounted(async () => {
     watch(
         () => state.query,
         (newQuery) => {
-            if (newQuery !== store.searchQuery) {
-                store.searchQuery = newQuery;
+            if (newQuery !== searchBar.searchQuery) {
+                searchBar.setQuery(newQuery);
             }
         }
     );
@@ -638,20 +647,12 @@ onMounted(async () => {
     // Watch for AI mode changes from store
     // AI mode is now non-persisted and dynamically determined by query
     
-    // Also watch the store's isAIQuery ref directly
-    watch(
-        () => store.isAIQuery,
-        (isAI) => {
-            if (isAI !== state.isAIQuery) {
-                state.isAIQuery = isAI;
-                state.showSparkle = isAI;
-            }
-        }
-    );
+    // Note: isAIQuery and showSparkle are computed properties from useAIMode composable
+    // They are automatically reactive and don't need manual assignment
 
     // Show results when focused with query (but not during direct lookups)
     watch(
-        [() => state.isFocused, () => state.query, () => state.isAIQuery, () => state.searchResults, () => store.isDirectLookup],
+        [() => state.isFocused, () => state.query, () => state.isAIQuery, () => state.searchResults, () => searchBar.isDirectLookup],
         ([focused, query, isAI, results, isDirectLookup]) => {
             console.log('🔍 SEARCHBAR WATCHER - focus/query/results changed', {
                 focused,
@@ -674,28 +675,21 @@ onMounted(async () => {
     );
 
     // Hide results immediately when direct lookup starts
-    watch(() => store.isDirectLookup, (isDirectLookup) => {
+    watch(() => searchBar.isDirectLookup, (isDirectLookup) => {
         if (isDirectLookup) {
             state.showResults = false;
         }
     });
 
     // Check current query for AI mode on page load (in lookup mode only)
-    if (store.searchMode === 'lookup' && state.query) {
+    if (searchConfig.searchMode === 'lookup' && state.query) {
         const shouldBeAIMode = shouldTriggerAIMode(state.query);
-        state.isAIQuery = shouldBeAIMode;
-        state.showSparkle = shouldBeAIMode;
-        store.isAIQuery = shouldBeAIMode;
-        store.showSparkle = shouldBeAIMode;
+        // AI mode is automatically computed by useAIMode composable based on query
+        // No manual setting needed
     }
 
-    // Get AI suggestions
-    try {
-        const history = await store.getHistoryBasedSuggestions();
-        state.aiSuggestions = history.slice(0, 4);
-    } catch {
-        state.aiSuggestions = [];
-    }
+    // Initialize AI suggestions (method removed in modular architecture)
+    state.aiSuggestions = [];
 });
 
 // Cleanup

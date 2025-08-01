@@ -1,5 +1,5 @@
 import { ref, nextTick, Ref } from 'vue';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 
 interface UseSearchNavigationOptions {
   searchResultsComponent: Ref<any>;
@@ -10,7 +10,7 @@ interface UseSearchNavigationOptions {
  * Manages arrow key navigation and visual feedback
  */
 export function useSearchNavigation(options: UseSearchNavigationOptions) {
-  const store = useAppStore();
+  const { searchResults, searchBar } = useStores();
   const { searchResultsComponent } = options;
   
   const selectedIndex = ref(0);
@@ -19,17 +19,17 @@ export function useSearchNavigation(options: UseSearchNavigationOptions) {
    * Navigate through search results with proper scroll-to-view
    */
   const navigateResults = (direction: number) => {
-    if (store.searchResults.length === 0) return;
+    if (searchResults.searchResults.length === 0) return;
 
     selectedIndex.value = Math.max(
       0,
       Math.min(
-        store.searchResults.length - 1,
+        searchResults.searchResults.length - 1,
         selectedIndex.value + direction
       )
     );
 
-    store.searchSelectedIndex = selectedIndex.value;
+    searchBar.setSelectedIndex(selectedIndex.value);
     
     // Scroll the selected item into view with improved logic
     nextTick(() => {
@@ -74,14 +74,14 @@ export function useSearchNavigation(options: UseSearchNavigationOptions) {
    */
   const resetSelection = () => {
     selectedIndex.value = 0;
-    store.searchSelectedIndex = 0;
+    searchBar.setSelectedIndex(0);
   };
 
   /**
    * Sync selected index with store
    */
   const syncSelectedIndex = () => {
-    selectedIndex.value = store.searchSelectedIndex;
+    selectedIndex.value = searchBar.searchSelectedIndex;
   };
 
   return {

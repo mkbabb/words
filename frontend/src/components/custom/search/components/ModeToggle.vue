@@ -32,7 +32,7 @@
 <script setup lang="ts">
 import { FancyF } from '@/components/custom/icons';
 import { useRouter } from 'vue-router';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 
 interface ModeToggleProps {
     canToggle: boolean;
@@ -60,12 +60,28 @@ const props = withDefaults(defineProps<ModeToggleProps>(), {
 // Using defineModel for two-way binding (modern Vue 3.4+)
 const modelValue = defineModel<'dictionary' | 'thesaurus' | 'suggestions'>({ required: true });
 
-const handleToggle = () => {
+// Initialize router and stores at component level
+const router = useRouter();
+const { ui, searchConfig, searchBar, searchResults } = useStores();
+
+const handleToggle = async () => {
     if (!props.canToggle) return;
     
-    const store = useAppStore();
-    const router = useRouter();
+    console.log('🔄 ModeToggle handleToggle called');
+    
+    // Safety checks
+    if (!router) {
+        console.error('❌ Router is not available in ModeToggle');
+        return;
+    }
+    
+    if (!searchConfig || !searchBar || !searchResults) {
+        console.error('❌ Stores are not available in ModeToggle');
+        return;
+    }
+    
     const current = modelValue.value;
+    console.log('🔄 Current mode:', current);
     
     // Simple state machine with clear transitions
     const transitions: Record<string, 'dictionary' | 'thesaurus' | 'suggestions'> = {
@@ -73,28 +89,45 @@ const handleToggle = () => {
         'dictionary': 'thesaurus',
         
         // From thesaurus
-        'thesaurus': store.wordSuggestions ? 'suggestions' : 'dictionary',
+        'thesaurus': searchResults.wordSuggestions ? 'suggestions' : 'dictionary',
         
         // From suggestions
         'suggestions': 'dictionary'
     };
     
     const newMode = transitions[current] || 'dictionary';
+    console.log('🔄 New mode:', newMode);
     modelValue.value = newMode;
     
     // Handle router navigation for definition/thesaurus toggle
-    if (store.searchMode === 'lookup' && store.searchQuery && store.searchQuery.trim()) {
-        const currentWord = store.searchQuery;
+    if (searchConfig.searchMode === 'lookup' && searchBar.searchQuery && searchBar.searchQuery.trim()) {
+        const currentWord = searchBar.searchQuery;
+        console.log('🧭 Navigation needed for word:', currentWord, 'to mode:', newMode);
+        
         try {
+            // Additional safety check for router
+            if (!router || typeof router.push !== 'function') {
+                console.error('❌ Router is not available or push method is missing');
+                return;
+            }
+            
             if (newMode === 'thesaurus') {
-                router.push(`/thesaurus/${encodeURIComponent(currentWord)}`);
+                console.log('🧭 Navigating to thesaurus route');
+                await router.push(`/thesaurus/${encodeURIComponent(currentWord)}`);
             } else if (newMode === 'dictionary') {
-                router.push(`/definition/${encodeURIComponent(currentWord)}`);
+                console.log('🧭 Navigating to definition route');
+                await router.push(`/definition/${encodeURIComponent(currentWord)}`);
             }
             // Note: suggestions mode stays on the same route as it's an overlay mode
+            console.log('✅ Navigation completed successfully');
         } catch (error) {
-            console.error('Router navigation error in ModeToggle:', error);
+            console.error('❌ Router navigation error in ModeToggle:', error);
+            console.error('Router object:', router);
+            console.error('NewMode:', newMode);
+            console.error('CurrentWord:', currentWord);
         }
+    } else {
+        console.log('🔄 No navigation needed - not in lookup mode or no query');
     }
 };
 </script>

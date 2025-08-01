@@ -1,11 +1,11 @@
 import { ref, computed, watch } from 'vue'
-import { useAppStore } from '@/stores'
+import { useStores } from '@/stores'
 import { wordlistApi } from '@/api'
 import { useToast } from '@/components/ui/toast/use-toast'
 import type { WordList, WordListItem, MasteryLevel, Temperature } from '@/types'
 
 export function useWordlist() {
-  const store = useAppStore()
+  const { searchConfig, orchestrator } = useStores()
   const { toast } = useToast()
   
   // State
@@ -18,7 +18,7 @@ export function useWordlist() {
   const totalWords = ref(0)
   
   // Computed
-  const selectedWordlistId = computed(() => store.selectedWordlist)
+  const selectedWordlistId = computed(() => searchConfig.selectedWordlist)
   
   const wordlistStats = computed(() => {
     if (!currentWordlist.value) return null
@@ -50,7 +50,7 @@ export function useWordlist() {
       // Handle graceful fallback if selected wordlist is deleted
       if (selectedWordlistId.value && !response.items.find(w => w.id === selectedWordlistId.value)) {
         const firstWordlist = response.items[0]
-        store.setWordlist(firstWordlist?.id || null)
+        searchConfig.setWordlist(firstWordlist?.id || null)
       }
       
       return response.items
@@ -155,7 +155,7 @@ export function useWordlist() {
       // Handle graceful fallback if deleted wordlist was selected
       if (selectedWordlistId.value === wordlistId) {
         const firstWordlist = wordlists.value[0]
-        store.setWordlist(firstWordlist?.id || null)
+        searchConfig.setWordlist(firstWordlist?.id || null)
       }
       
       toast({

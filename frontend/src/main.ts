@@ -1,5 +1,6 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
+import { createPersistedState } from 'pinia-plugin-persistedstate';
 import { createRouter, createWebHistory } from 'vue-router';
 import App from './App.vue';
 import Home from './views/Home.vue';
@@ -53,8 +54,12 @@ const router = createRouter({
 // Create app
 const app = createApp(App);
 
+// Create Pinia with persistence plugin
+const pinia = createPinia();
+pinia.use(createPersistedState());
+
 // Use plugins
-app.use(createPinia());
+app.use(pinia);
 app.use(router);
 
 // Register service worker
@@ -73,6 +78,31 @@ if ('serviceWorker' in navigator) {
     console.log('⚠️ Service Worker registration skipped in development mode to prevent caching issues');
   }
 }
+
+// Add global error handler for Reka UI getBoundingClientRect errors
+app.config.errorHandler = (err, vm, info) => {
+  // Check if this is the specific Reka UI getBoundingClientRect error
+  if (err instanceof TypeError && 
+      err.message.includes("Cannot read properties of null (reading 'getBoundingClientRect')")) {
+    console.warn('Reka UI getBoundingClientRect error caught and handled during component transition:', err.message)
+    // Don't rethrow the error - just log it and continue
+    return
+  }
+  
+  // For other errors, log and potentially rethrow
+  console.error('Unhandled Vue error:', err, info)
+  // You could add error reporting here if needed
+}
+
+// Also add window error handler for any errors that escape Vue's error handling
+window.addEventListener('error', (event) => {
+  if (event.error instanceof TypeError && 
+      event.error.message.includes("Cannot read properties of null (reading 'getBoundingClientRect')")) {
+    console.warn('Global getBoundingClientRect error caught and handled:', event.error.message)
+    event.preventDefault()
+    return
+  }
+})
 
 // Mount app
 app.mount('#app');

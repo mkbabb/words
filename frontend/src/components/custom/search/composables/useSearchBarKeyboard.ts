@@ -1,6 +1,6 @@
 import { useMagicKeys, whenever } from '@vueuse/core';
 import { useRouter } from 'vue-router';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 import { showError } from '@/plugins/toast';
 import { extractWordCount } from '../utils/ai-query';
 import type { SearchResult } from '@/types';
@@ -17,132 +17,122 @@ interface UseSearchBarKeyboardOptions {
  * Handles Enter, Escape, navigation, and keyboard shortcuts
  */
 export function useSearchBarKeyboard(options: UseSearchBarKeyboardOptions) {
-  const store = useAppStore();
+  const { searchResults, orchestrator, searchBar, searchConfig, ui } = useStores();
   const router = useRouter();
   const { searchInputRef, onAutocompleteAccept, onAutocompleteSpace, onAutocompleteArrow } = options;
 
   // Navigate through search results with arrow keys
   const navigateResults = (direction: number) => {
-    if (store.searchResults.length === 0) return;
+    if (searchResults.searchResults.length === 0) return;
 
     const newIndex = Math.max(
       0,
       Math.min(
-        store.searchResults.length - 1,
-        store.searchSelectedIndex + direction
+        searchResults.searchResults.length - 1,
+        searchBar.searchSelectedIndex + direction
       )
     );
     
-    store.searchSelectedIndex = newIndex;
+    searchBar.setSelectedIndex(newIndex);
   };
 
   // Select a search result
   const selectResult = async (result: SearchResult) => {
     // Navigate to appropriate route based on mode
-    const routeName = store.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+    const routeName = ui.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
     router.push({ name: routeName, params: { word: result.word } });
     
-    // Use searchWord for direct lookup (sets isDirectLookup flag)
-    await store.searchWord(result.word);
+    // Use orchestrator for direct lookup (sets isDirectLookup flag)
+    await orchestrator.searchWord(result.word);
   };
 
   // Handle Enter key press
   const handleEnter = async () => {
     // Try autocomplete first
-    if (store.autocompleteText) {
+    if (searchBar.autocompleteText) {
       const accepted = await onAutocompleteAccept();
       if (accepted) return;
     }
 
-    const query = store.searchQuery;
+    const query = searchBar.searchQuery;
     
     // If query is blank, just unfocus the search bar
     if (!query || query.trim() === '') {
-      store.isSearchBarFocused = false;
+      searchBar.setFocused(false);
       return;
     }
     
     // Handle stage mode
-    if (store.searchMode === 'stage' && query) {
+    if (searchConfig.searchMode === 'stage' && query) {
       // Emit stage-enter event (handled by parent component)
       return { type: 'stage-enter', query };
     }
 
     // Handle wordlist mode
-    if (store.searchMode === 'wordlist' && query) {
+    if (searchConfig.searchMode === 'wordlist' && query) {
       const words = query
         .split(/[,\s\n]+/)
         .map((word: string) => word.trim())
         .filter((word: string) => word.length > 0);
 
       if (words.length > 0) {
-        const routeName = store.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+        const routeName = ui.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
         router.push({ name: routeName, params: { word: words[0] } });
         
-        // Use searchWord for direct lookup
-        await store.searchWord(words[0]);
+        // Use orchestrator for direct lookup
+        await orchestrator.searchWord(words[0]);
       }
       return;
     }
 
     // Handle AI query mode
-    if (store.isAIQuery && query) {
+    if (searchBar.isAIQuery && query) {
       try {
         const extractedCount = extractWordCount(query);
-        const wordSuggestions = await store.getAISuggestions(query, extractedCount);
+        const wordSuggestions = await orchestrator.getAISuggestions(query, extractedCount);
 
         if (wordSuggestions && wordSuggestions.suggestions.length > 0) {
-          store.wordSuggestions = wordSuggestions;
-          store.mode = 'suggestions';
-          store.hasSearched = true;
+          searchResults.wordSuggestions = wordSuggestions;
+          ui.setMode('suggestions');
+          // hasSearched is handled by orchestrator
           // aiQueryText removed - router handles query persistence
         } else {
-          store.showErrorAnimation = true;
+          searchBar.triggerErrorAnimation();
           showError('No word suggestions found for this query');
-          setTimeout(() => {
-            store.showErrorAnimation = false;
-          }, 600);
         }
       } catch (error: any) {
         console.error('AI suggestion error:', error);
-        store.showErrorAnimation = true;
+        searchBar.triggerErrorAnimation();
         showError(error.message || 'Failed to get word suggestions');
-        setTimeout(() => {
-          store.showErrorAnimation = false;
-        }, 600);
       }
       return;
     }
 
     // Regular search
-    if (store.searchResults.length > 0 && store.searchSelectedIndex >= 0) {
-      await selectResult(store.searchResults[store.searchSelectedIndex]);
+    if (searchResults.searchResults.length > 0 && searchBar.searchSelectedIndex >= 0) {
+      await selectResult(searchResults.searchResults[searchBar.searchSelectedIndex]);
     } else if (query) {
-      const routeName = store.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+      const routeName = ui.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
       router.push({ name: routeName, params: { word: query } });
       
-      // Use searchWord for direct lookup
-      await store.searchWord(query);
+      // Use orchestrator for direct lookup
+      await orchestrator.searchWord(query);
     }
   };
 
   // Handle Shift+Enter for force refresh
   const handleShiftEnter = async () => {
-    const previousForceRefresh = store.forceRefreshMode;
-    store.forceRefreshMode = true;
-    
+    // Force refresh is handled by the orchestrator based on config
     await handleEnter();
-    
-    store.forceRefreshMode = previousForceRefresh;
   };
 
   // Handle Escape key
   const handleEscape = () => {
-    if (store.showSearchControls || store.showSearchResults) {
-      store.showSearchControls = false;
-      store.showSearchResults = false;
+    if (searchBar.showSearchControls || searchBar.showSearchResults) {
+      searchBar.hideControls();
+      searchBar.hideDropdown();
     } else {
-      store.isSearchBarFocused = false;
+      searchBar.setFocused(false);
     }
   };
 
@@ -164,19 +154,19 @@ export function useSearchBarKeyboard(options: UseSearchBarKeyboardOptions) {
 
   // Watch for force refresh shortcuts
   whenever(shiftEnter, () => {
-    if (store.isSearchBarFocused && searchInputRef.value) {
+    if (searchBar.isSearchBarFocused && searchInputRef.value) {
       handleShiftEnter();
     }
   });
 
   whenever(cmdEnter, () => {
-    if (store.isSearchBarFocused && searchInputRef.value) {
+    if (searchBar.isSearchBarFocused && searchInputRef.value) {
       handleShiftEnter();
     }
   });
 
   whenever(ctrlEnter, () => {
-    if (store.isSearchBarFocused && searchInputRef.value) {
+    if (searchBar.isSearchBarFocused && searchInputRef.value) {
       handleShiftEnter();
     }
   });

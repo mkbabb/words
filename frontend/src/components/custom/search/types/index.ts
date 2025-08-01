@@ -41,7 +41,7 @@ export interface LanguageConfig {
 export type SearchBarState = 'normal' | 'hovering' | 'focused';
 
 // Search Mode Types
-export type SearchMode = 'lookup' | 'wordlist' | 'stage';
+export type SearchMode = 'lookup' | 'wordlist' | 'word-of-the-day' | 'stage';
 
 // Animation State
 export interface AnimationState {

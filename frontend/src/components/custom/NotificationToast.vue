@@ -6,7 +6,7 @@
       class="fixed bottom-6 right-6 z-50 space-y-3 max-w-sm"
     >
       <div
-        v-for="notification in notifications"
+        v-for="notification in notificationList"
         :key="notification.id"
         :class="[
           'cartoon-shadow-sm rounded-xl p-4 backdrop-blur-xl border-2',
@@ -30,12 +30,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { CheckCircle2, XCircle, Info, AlertTriangle } from 'lucide-vue-next';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 
-const store = useAppStore();
+const { notifications } = useStores();
 
-const notifications = computed(() => store.notifications);
-const removeNotification = (id: string) => store.removeNotification(id);
+const notificationList = computed(() => notifications.notifications);
+const removeNotification = (id: string) => notifications.removeNotification(id);
 
 const notificationIcons = {
   success: CheckCircle2,

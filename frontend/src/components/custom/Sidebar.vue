@@ -25,7 +25,7 @@
       >
         <div
           v-if="sidebarOpen"
-          @click="store.toggleSidebar()"
+          @click="ui.toggleSidebar()"
           class="pointer-events-auto fixed inset-0 bg-black/60 backdrop-blur-sm"
         />
       </Transition>
@@ -47,13 +47,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 import { cn } from '@/utils';
 import SidebarHeader from './sidebar/SidebarHeader.vue';
 import SidebarContent from './sidebar/SidebarContent.vue';
 import SidebarFooter from './sidebar/SidebarFooter.vue';
 
-const store = useAppStore();
-const sidebarOpen = computed(() => store.sidebarOpen);
-const sidebarCollapsed = computed(() => store.sidebarCollapsed);
+const { ui } = useStores();
+const sidebarOpen = computed(() => ui.sidebarOpen);
+const sidebarCollapsed = computed(() => ui.sidebarCollapsed);
 </script>

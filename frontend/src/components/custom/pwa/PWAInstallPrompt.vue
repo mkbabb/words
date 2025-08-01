@@ -161,9 +161,9 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { Share2, Download, Minus, CheckCircle2 } from 'lucide-vue-next';
 import { useIOSPWA, usePWA } from '@/composables';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 
-const store = useAppStore();
+const { notifications, loading } = useStores();
 const { isIOS, isInstalled } = useIOSPWA();
 const { shouldShowInstallPrompt, installApp } = usePWA();
 
@@ -203,7 +203,7 @@ const installPWA = async () => {
   if (success) {
     showPrompt.value = false;
     // Show success notification
-    store.showNotification({
+    notifications.showNotification({
       type: 'success',
       message: 'App installed successfully!'
     });
@@ -224,7 +224,7 @@ const checkEngagement = () => {
   
   // Check engagement metrics
   const searchCount = parseInt(localStorage.getItem('search-count') || '0');
-  const sessionTime = Date.now() - (store.sessionStartTime || Date.now());
+  const sessionTime = Date.now() - (loading.sessionStartTime || Date.now());
   
   // Show after 3 searches or 2 minutes of engagement
   return searchCount >= 3 || sessionTime > 120000;

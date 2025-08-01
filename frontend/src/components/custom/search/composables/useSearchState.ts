@@ -1,57 +1,62 @@
 import { reactive, computed } from 'vue';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 import { useSearchBarUI } from './useSearchBarUI';
 
 /**
- * Centralized state management for SearchBar component
- * Provides reactive bindings between component state and store
+ * Modern reactive state bridge for SearchBar
+ * Provides clean interface to modular stores
  */
 export function useSearchState() {
-  const store = useAppStore();
+  const { searchBar, searchConfig, searchResults, ui, loading } = useStores();
   const { uiState } = useSearchBarUI();
 
-  // Reactive state with two-way bindings to store
+  // Reactive state binding to modular stores
   const state = reactive({
-    // Store state (computed getters/setters)
-    get query() { 
-        return store.searchQuery;
-    },
-    set query(value) { 
-        console.log('🔄 Setting query via useSearchState:', value);
-        store.searchQuery = value; 
-    },
-    get searchResults() { return store.searchResults; },
-    set searchResults(value) { store.searchResults = value; },
-    get showResults() { return store.showSearchResults; },
-    set showResults(value) { store.showSearchResults = value; },
-    get isFocused() { return store.isSearchBarFocused; },
-    set isFocused(value) { store.isSearchBarFocused = value; },
-    get isSearching() { return store.isSearching; },
-    set isSearching(_) { /* readonly */ },
-    get isAIQuery() { return store.isAIQuery; },
-    set isAIQuery(value) { store.isAIQuery = value; },
-    get showSparkle() { return store.showSparkle; },
-    set showSparkle(value) { store.showSparkle = value; },
-    get showErrorAnimation() { return store.showErrorAnimation; },
-    set showErrorAnimation(value) { store.showErrorAnimation = value; },
-    get selectedIndex() { return store.searchSelectedIndex; },
-    set selectedIndex(value) { store.searchSelectedIndex = value; },
-    get showControls() { return store.showSearchControls; },
-    set showControls(value) { store.showSearchControls = value; },
-    get mode() { return store.mode; },
-    set mode(value) { store.mode = value; },
-    get searchMode() { return store.searchMode; },
-    set searchMode(value) { store.searchMode = value; },
-    get autocompleteText() { return store.autocompleteText; },
-    set autocompleteText(value) { store.autocompleteText = value; },
-    get selectedSources() { return store.selectedSources; },
-    set selectedSources(value) { store.selectedSources = value; },
-    get selectedLanguages() { return store.selectedLanguages; },
-    set selectedLanguages(value) { store.selectedLanguages = value; },
-    get noAI() { return store.noAI; },
-    set noAI(value) { store.noAI = value; },
-    get forceRefreshMode() { return store.forceRefreshMode; },
-    set forceRefreshMode(value) { store.forceRefreshMode = value; },
+    // Search bar store bindings
+    get query() { return searchBar.searchQuery; },
+    set query(value) { searchBar.setQuery(value); },
+    get showResults() { return searchBar.showSearchResults; },
+    set showResults(value) { value ? searchBar.showDropdown() : searchBar.hideDropdown(); },
+    get isFocused() { return searchBar.isSearchBarFocused; },
+    set isFocused(value) { searchBar.setFocused(value); },
+    get isAIQuery() { return searchBar.isAIQuery; },
+    get showSparkle() { return searchBar.showSparkle; },
+    get showErrorAnimation() { return searchBar.showErrorAnimation; },
+    set showErrorAnimation(_) { searchBar.triggerErrorAnimation(); },
+    get selectedIndex() { return searchBar.searchSelectedIndex; },
+    set selectedIndex(value) { searchBar.setSelectedIndex(value); },
+    get showControls() { return searchBar.showSearchControls; },
+    set showControls(value) { value ? searchBar.toggleControls() : searchBar.hideControls(); },
+    get autocompleteText() { return searchBar.autocompleteText; },
+    set autocompleteText(value) { searchBar.setAutocomplete(value); },
+    get aiSuggestions() { return searchBar.aiSuggestions; },
+    set aiSuggestions(value) { searchBar.setAISuggestions([...value]); },
+
+    // Search results store bindings
+    get searchResults() { return searchResults.searchResults; },
+    get isSearching() { return loading.isSearching; },
+    get forceRefreshMode() { return loading.forceRefreshMode; },
+    set forceRefreshMode(value) { value ? loading.enableForceRefresh() : loading.disableForceRefresh(); },
+
+    // Search config store bindings  
+    get mode() { return ui.mode; },
+    set mode(value) { ui.setMode(value); },
+    get searchMode() { return searchConfig.searchMode; },
+    set searchMode(value) { searchConfig.setSearchMode(value); },
+    get selectedSources() { return [...searchConfig.selectedSources]; },
+    set selectedSources(value) { searchConfig.setSources([...value]); },
+    get selectedLanguages() { return [...searchConfig.selectedLanguages]; },
+    set selectedLanguages(value) { searchConfig.setLanguages([...value]); },
+    get noAI() { return searchConfig.noAI; },
+    set noAI(value) { searchConfig.setAI(!value); },
+
+    // Search results bindings - AI suggestions removed as they don't exist in this store
+    get wordlistFilters() { return ui.wordlistFilters; },
+    set wordlistFilters(value) { ui.setWordlistFilters(value); },
+    get wordlistChunking() { return ui.wordlistChunking; },
+    set wordlistChunking(value) { ui.setWordlistChunking(value); },
+    get wordlistSortCriteria() { return [...ui.wordlistSortCriteria]; },
+    set wordlistSortCriteria(value) { ui.setWordlistSortCriteria([...value]); },
     
     // UI state (local)
     get isContainerHovered() { return uiState.isContainerHovered; },
@@ -65,20 +70,12 @@ export function useSearchState() {
     get expandButtonVisible() { return uiState.expandButtonVisible; },
     set expandButtonVisible(value) { uiState.expandButtonVisible = value; },
     get isDevelopment() { return uiState.isDevelopment; },
-    get aiSuggestions() { return store.aiSuggestions; },
-    set aiSuggestions(value) { store.aiSuggestions = value; },
-    get wordlistFilters() { return store.wordlistFilters; },
-    set wordlistFilters(value) { store.wordlistFilters = value; },
-    get wordlistChunking() { return store.wordlistChunking; },
-    set wordlistChunking(value) { store.wordlistChunking = value; },
-    get wordlistSortCriteria() { return store.wordlistSortCriteria; },
-    set wordlistSortCriteria(value) { store.wordlistSortCriteria = value; },
   });
 
   // Computed properties
   const canToggleMode = computed(() => {
-    const hasWordQuery = !!store.currentEntry;
-    const hasSuggestionQuery = !!store.wordSuggestions;
+    const hasWordQuery = !!searchResults.currentEntry;
+    const hasSuggestionQuery = !!searchResults.wordSuggestions;
     
     if (!hasWordQuery && !hasSuggestionQuery) return false;
     if (hasSuggestionQuery && !hasWordQuery) return false;
@@ -111,10 +108,7 @@ export function useSearchState() {
   }));
 
   return {
-    // State
     state,
-    
-    // Computed
     canToggleMode,
     placeholder,
     resultsContainerStyle,

@@ -252,9 +252,7 @@ const handleImageError = (event: Event, index: number) => {
     emit('image-error', event, index);
 };
 
-const handleImageClick = (image: ImageMedia, index: number) => {
-    emit('image-click', image, index);
-};
+// handleImageClick removed - not used in template
 
 const handleUploadSuccess = (newImages: ImageMedia[]) => {
     emit('images-updated', newImages);

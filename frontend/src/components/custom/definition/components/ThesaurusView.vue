@@ -7,7 +7,7 @@
         <ErrorState
             :title="getEmptyThesaurusTitle()"
             :message="getEmptyThesaurusMessage()"
-            error-type="no-synonyms"
+            error-type="empty"
             :retryable="true"
             @retry="$emit('retry-thesaurus')"
         />

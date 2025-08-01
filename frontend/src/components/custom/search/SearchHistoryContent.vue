@@ -143,7 +143,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 import { formatDate, cn } from '@/utils';
 import { History } from 'lucide-vue-next';
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui';
@@ -154,16 +154,16 @@ interface Props {
 
 defineProps<Props>();
 
-const store = useAppStore();
-const recentLookups = computed(() => store.recentLookups);
+const { history, searchBar, orchestrator } = useStores();
+const recentLookups = computed(() => history.recentLookups);
 
 const limitedLookups = computed(() => {
   return recentLookups.value.slice(0, 20); // Limit to prevent performance issues
 });
 
 const lookupWord = async (word: string) => {
-  store.searchQuery = word;
-  await store.searchWord(word);
+  searchBar.setQuery(word);
+  await orchestrator.searchWord(word);
 };
 </script>
 

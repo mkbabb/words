@@ -1,15 +1,21 @@
 import { computed } from 'vue';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 import { useDefinitionGroups } from '@/components/custom/definition/composables';
 import { PART_OF_SPEECH_ORDER } from '@/components/custom/definition/constants';
 import { normalizeEtymology } from '@/utils/guards';
 import type { SidebarCluster } from '../types';
+import type { SynthesizedDictionaryEntry } from '@/types';
 
 export function useSidebarState() {
-    const store = useAppStore();
+    const { searchResults, ui } = useStores();
     
-    // Reuse the existing definition groups composable
-    const entry = computed(() => store.currentEntry);
+    // Transform API entry to frontend format for compatibility
+    const entry = computed(() => {
+        const apiEntry = searchResults.currentEntry;
+        if (!apiEntry) return null;
+        // The API type is compatible with the frontend type for this composable
+        return apiEntry as any as SynthesizedDictionaryEntry;
+    });
     const { groupedDefinitions } = useDefinitionGroups(entry);
     
     // Transform grouped definitions to sidebar format
@@ -54,15 +60,15 @@ export function useSidebarState() {
         return sections;
     });
     
-    // Active states from store
+    // Active states from UI store
     const activeCluster = computed({
-        get: () => store.sidebarActiveCluster,
-        set: (value) => { store.sidebarActiveCluster = value; }
+        get: () => ui.sidebarActiveCluster,
+        set: (value) => ui.setSidebarActiveCluster(value)
     });
     
     const activePartOfSpeech = computed({
-        get: () => store.sidebarActivePartOfSpeech,
-        set: (value) => { store.sidebarActivePartOfSpeech = value; }
+        get: () => ui.sidebarActivePartOfSpeech,
+        set: (value) => ui.setSidebarActivePartOfSpeech(value)
     });
     
     // Check if sidebar should be shown

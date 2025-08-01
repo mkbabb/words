@@ -1,5 +1,5 @@
 import { ref, reactive, computed, watch, toRaw, type Ref } from 'vue';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 import type { Definition } from '@/types/api';
 import { useDebounce } from '@vueuse/core';
 
@@ -40,7 +40,7 @@ export function useDefinitionEditMode(
   definition: Ref<Definition & { examples: any[]; images: any[]; providers_data: any[] }>,
   options: EditModeOptions = {}
 ) {
-  const store = useAppStore();
+  const { searchResults } = useStores();
   const { debounceMs = 500 } = options;
 
   // Core state
@@ -202,7 +202,8 @@ export function useDefinitionEditMode(
         await options.onSave(updateData);
       } else {
         console.log('[useDefinitionEditMode] Calling default store method');
-        await store.updateDefinition(definition.value.id, updateData);
+        // Note: updateDefinition method needs to be implemented in the new store architecture
+        throw new Error('Default updateDefinition method not implemented in new store architecture');
       }
 
       // Update original values on success
@@ -270,18 +271,20 @@ export function useDefinitionEditMode(
       if (options.onRegenerate) {
         await options.onRegenerate(component);
       } else {
-        await store.regenerateDefinitionComponent(definition.value.id, component);
+        // Note: regenerateDefinitionComponent needs to be implemented in new store architecture
+        throw new Error('Default regenerateDefinitionComponent method not implemented in new store architecture');
       }
 
-      // Refresh definition data
-      const updated = await store.fetchDefinition(definition.value.id);
-      if (updated) {
-        // Update field with new value
-        const newValue = updated[component as keyof Definition];
-        field.value = structuredClone(toRaw(newValue));
-        field.originalValue = structuredClone(toRaw(newValue));
-        field.isDirty = false;
-      }
+      // Refresh definition data - needs to be implemented in new store architecture
+      // const updated = await searchResults.fetchDefinition(definition.value.id);
+      // if (updated) {
+      //   // Update field with new value
+      //   const newValue = updated[component as keyof Definition];
+      //   field.value = structuredClone(toRaw(newValue));
+      //   field.originalValue = structuredClone(toRaw(newValue));
+      //   field.isDirty = false;
+      // }
+      throw new Error('fetchDefinition method not implemented in new store architecture');
     } catch (error) {
       console.error(`Failed to regenerate ${component}:`, error);
       throw error;

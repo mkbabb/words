@@ -24,7 +24,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 
 interface Props {
   maxHeight?: string;
@@ -32,8 +32,8 @@ interface Props {
 
 defineProps<Props>();
 
-const store = useAppStore();
-const { selectedCardVariant } = storeToRefs(store);
+const { ui } = useStores();
+const { selectedCardVariant } = storeToRefs(ui);
 
 // Template refs - exposed to content slot
 const navContainer = ref<HTMLElement>();

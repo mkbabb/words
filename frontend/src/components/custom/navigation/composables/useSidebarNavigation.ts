@@ -31,8 +31,8 @@ export function useSidebarNavigation(options: NavigationOptions = {}) {
     };
     
     const getDefinitionsForPartOfSpeech = (clusterId: string, partOfSpeech: string) => {
-        const store = useAppStore();
-        const entry = store.currentEntry;
+        const { searchResults } = useStores();
+        const entry = searchResults.currentEntry;
         if (!entry?.definitions) return [];
         
         return entry.definitions
@@ -50,5 +50,4 @@ export function useSidebarNavigation(options: NavigationOptions = {}) {
     };
 }
 
-// Import store for definition access
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';

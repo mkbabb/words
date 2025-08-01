@@ -184,6 +184,7 @@ export interface Definition extends BaseMetadata {
 export interface SynthesizedDictionaryEntry extends BaseMetadata {
   id: string;
   word_id: string;
+  word: string; // The word text (populated in responses)
   pronunciation_id?: string;
   pronunciation?: Pronunciation; // Populated in responses
   definition_ids: string[];
@@ -196,6 +197,7 @@ export interface SynthesizedDictionaryEntry extends BaseMetadata {
   source_provider_data_ids: string[];
   accessed_at?: string;
   access_count: number;
+  last_updated: string; // Alias for updated_at for frontend compatibility
 }
 
 // API Response Types

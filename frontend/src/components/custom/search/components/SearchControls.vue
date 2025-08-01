@@ -286,7 +286,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 import { Button } from '@/components/ui';
 import { BouncyToggle } from '@/components/custom/animation';
 import { Flame, Clock, Trophy, Calendar, Eye, BarChart3, PanelLeft } from 'lucide-vue-next';
@@ -307,7 +307,7 @@ const props = defineProps<SearchControlsProps>();
 
 // Modern Vue 3.4+ patterns - using defineModel for two-way bindings
 const router = useRouter();
-const store = useAppStore();
+const { searchConfig, ui, loading, searchResults, orchestrator } = useStores();
 const searchMode = defineModel<SearchMode>('searchMode', { required: true });
 const selectedSources = defineModel<string[]>('selectedSources', { required: true });
 const selectedLanguages = defineModel<string[]>('selectedLanguages', { required: true });
@@ -415,10 +415,19 @@ const handleEnterKey = (event: KeyboardEvent) => {
 };
 
 // Handle mode change from BouncyToggle
-const handleModeChange = (newMode: SearchMode) => {
+const handleModeChange = (newMode: string | SearchMode) => {
     console.log('🎛️ SearchControls handleModeChange:', searchMode.value, '->', newMode);
-    if (newMode !== searchMode.value) {
-        store.setSearchMode(newMode, router);
+    const typedMode = newMode as SearchMode;
+    if (typedMode !== searchMode.value) {
+        searchConfig.setSearchMode(typedMode);
+        // Handle router navigation
+        if (typedMode === 'lookup') {
+            router.push({ name: 'Home' });
+        } else if (typedMode === 'wordlist') {
+            router.push({ name: 'Home' });
+        } else if (typedMode === 'stage') {
+            router.push({ name: 'Home' });
+        }
     }
 };
 

@@ -14,8 +14,8 @@
     <ThemedCard class="w-full">
       <CardContent class="space-y-6">
         <!-- Current Word Display -->
-        <div v-if="store.searchQuery" class="text-left space-y-4">
-          <h3 class="text-word-title themed-title">{{ store.searchQuery }}</h3>
+        <div v-if="searchBar.searchQuery" class="text-left space-y-4">
+          <h3 class="text-word-title themed-title">{{ searchBar.searchQuery }}</h3>
           
           <!-- Gradient Divider -->
           <div class="relative h-px w-full overflow-hidden">
@@ -42,7 +42,7 @@
         <div class="flex gap-3 justify-center">
           <Button
             @click="startMockTest"
-            :disabled="isTestRunning || !store.searchQuery"
+            :disabled="isTestRunning || !searchBar.searchQuery"
             variant="outline"
             size="sm"
             class="px-6"
@@ -51,7 +51,7 @@
           </Button>
           <Button
             @click="startRealTest"
-            :disabled="!store.searchQuery || isTestRunning"
+            :disabled="!searchBar.searchQuery || isTestRunning"
             size="sm"
             class="px-6"
           >
@@ -64,9 +64,9 @@
     <!-- Loading Modal -->
     <LoadingModal
       v-model="showLoadingModal"
-      :word="store.searchQuery || 'serendipity'"
-      :progress="isRealPipeline ? store.loadingProgress : simulatedProgress"
-      :current-stage="isRealPipeline ? store.loadingStage : simulatedStage"
+      :word="searchBar.searchQuery || 'serendipity'"
+      :progress="isRealPipeline ? loading.progress : simulatedProgress"
+      :current-stage="isRealPipeline ? loading.currentStage : simulatedStage"
       :allow-dismiss="true"
       @progress-change="handleProgressChange"
     />
@@ -78,9 +78,9 @@ import { ref, watch } from 'vue'
 import { Button, Label, CardContent } from '@/components/ui'
 import { ThemedCard } from '@/components/custom/card'
 import { LoadingModal, LoadingProgress } from '@/components/custom/loading'
-import { useAppStore } from '@/stores'
+import { useStores } from '@/stores'
 
-const store = useAppStore()
+const { loading, orchestrator, searchBar, searchConfig } = useStores()
 
 // State
 const showLoadingModal = ref(false)
@@ -112,23 +112,21 @@ const runMockPipeline = async () => {
   simulatedStage.value = stages[0].stage
 }
 
-// Real pipeline using store
+// Real pipeline using orchestrator
 const runRealPipeline = async () => {
-  if (!store.searchQuery.trim()) return
+  if (!searchBar.searchQuery.trim()) return
   
   isTestRunning.value = true
   isRealPipeline.value = true
   showLoadingModal.value = true
   
   try {
-    // Use store's force refresh to get real pipeline progress
-    store.forceRefreshMode = true
-    await store.getDefinition(store.searchQuery.trim())
+    // Use orchestrator to perform search with real pipeline progress
+    await orchestrator.performSearch(searchBar.searchQuery.trim())
     
   } catch (error) {
     console.error('Pipeline test failed:', error)
   } finally {
-    store.forceRefreshMode = false
     
     setTimeout(() => {
       showLoadingModal.value = false

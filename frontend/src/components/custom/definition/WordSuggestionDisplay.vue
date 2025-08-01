@@ -92,13 +92,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 import { ThemedCard } from '@/components/custom/card';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 
-const store = useAppStore();
+const { searchResults, ui, orchestrator } = useStores();
 
-const wordSuggestions = computed(() => store.wordSuggestions);
+const wordSuggestions = computed(() => searchResults.wordSuggestions);
 
 const sortedSuggestions = computed(() => {
     if (!wordSuggestions.value) return [];
@@ -130,9 +130,9 @@ function formatExampleUsage(example: string): string {
 
 async function handleWordClick(word: string) {
     // After successful lookup, smoothly transition to dictionary mode
-    store.mode = 'dictionary';
+    ui.setMode('dictionary');
     // Use searchWord for direct lookup (sets isDirectLookup flag)
-    await store.searchWord(word);
+    await orchestrator.searchWord(word);
 }
 </script>
 

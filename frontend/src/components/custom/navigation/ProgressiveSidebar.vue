@@ -52,12 +52,12 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 import { useSidebarState, useSidebarNavigation, useActiveTracking } from './composables';
 import SidebarCluster from './components/SidebarCluster.vue';
 
-const store = useAppStore();
-const { selectedCardVariant } = storeToRefs(store);
+const { ui } = useStores();
+const { selectedCardVariant } = storeToRefs(ui);
 
 // Template refs
 const navContainer = ref<HTMLElement>();

@@ -132,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { generateRainbowGradient } from '@/utils/animations';
 import {
     HoverCard,
@@ -217,6 +217,7 @@ watch(
 
 const progressBarRef = ref<HTMLElement>();
 const isDragging = ref(false);
+const isMounted = ref(false);
 
 const rainbowGradient = computed(() => generateRainbowGradient(8));
 
@@ -262,23 +263,36 @@ const handleCheckpointClick = (checkpoint: Checkpoint) => {
 
 // Handle progress bar click/drag
 const handleProgressBarInteraction = (event: MouseEvent) => {
-    if (!props.interactive || !progressBarRef.value) return;
+    if (!props.interactive || !progressBarRef.value || !isMounted.value) return;
 
-    const rect = progressBarRef.value.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+    // Add comprehensive null checks for getBoundingClientRect to prevent runtime errors
+    try {
+        // Additional check: ensure element is still connected to DOM
+        if (!progressBarRef.value.isConnected) {
+            console.warn('LoadingProgress: Element no longer connected to DOM');
+            return;
+        }
 
-    emit('progress-change', percentage);
+        const rect = progressBarRef.value.getBoundingClientRect();
+        if (!rect || rect.width === 0) return;
+        
+        const x = event.clientX - rect.left;
+        const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+
+        emit('progress-change', percentage);
+    } catch (error) {
+        console.warn('LoadingProgress: Failed to get bounding rect during interaction:', error);
+    }
 };
 
 // Mouse drag handlers
 const handleMouseDown = (event: MouseEvent) => {
-    if (!props.interactive) return;
+    if (!props.interactive || !isMounted.value) return;
     isDragging.value = true;
     handleProgressBarInteraction(event);
 
     const handleMouseMove = (e: MouseEvent) => {
-        if (isDragging.value) {
+        if (isDragging.value && isMounted.value) {
             handleProgressBarInteraction(e);
         }
     };
@@ -292,4 +306,24 @@ const handleMouseDown = (event: MouseEvent) => {
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 };
+
+// Lifecycle management
+onMounted(() => {
+    isMounted.value = true;
+});
+
+onUnmounted(() => {
+    isMounted.value = false;
+    
+    // Clean up any ongoing drag operations
+    if (isDragging.value) {
+        isDragging.value = false;
+        // Remove any lingering event listeners
+        document.removeEventListener('mousemove', () => {});
+        document.removeEventListener('mouseup', () => {});
+    }
+    
+    // Clear any refs that might be accessed by Reka UI
+    progressBarRef.value = null;
+});
 </script>

@@ -3,8 +3,8 @@ import { useScrollTracking } from './useScrollTracking';
 import type { SidebarCluster } from '../types';
 
 interface UseActiveTrackingOptions {
-    activeCluster: Ref<string>;
-    activePartOfSpeech: Ref<string>;
+    activeCluster: Ref<string | null>;
+    activePartOfSpeech: Ref<string | null>;
     sidebarSections: Ref<SidebarCluster[]>;
 }
 

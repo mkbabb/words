@@ -1,5 +1,5 @@
 import { ref, Ref } from 'vue';
-import { useAppStore } from '@/stores';
+import { useStores } from '@/stores';
 import { shouldTriggerAIMode } from '../utils/ai-query';
 
 interface UseSearchOperationsOptions {
@@ -12,7 +12,7 @@ interface UseSearchOperationsOptions {
  * Manages search timing and result processing
  */
 export function useSearchOperations(options: UseSearchOperationsOptions) {
-  const store = useAppStore();
+  const { searchBar, searchConfig, searchResults, loading, orchestrator } = useStores();
   const { query, onSearchComplete } = options;
 
   // Timer management
@@ -36,65 +36,62 @@ export function useSearchOperations(options: UseSearchOperationsOptions) {
     console.log('🔍 SEARCH OPERATIONS - performSearch called', {
       query: query.value,
       queryLength: query.value?.length || 0,
-      isDirectLookup: store.isDirectLookup,
-      isSwitchingModes: store.isSwitchingModes
+      isDirectLookup: searchBar.isDirectLookup,
+      isSwitchingModes: searchBar.isSwitchingModes
     });
     
     clearSearchTimer();
     
     // Skip search if this is a direct lookup from sidebar/controls
-    if (store.isDirectLookup) {
+    if (searchBar.isDirectLookup) {
       console.log('🔍 SEARCH OPERATIONS - Skipping search due to direct lookup');
-      store.searchResults = [];
-      store.showSearchResults = false;
+      searchResults.clearSearchResults();
+      searchBar.hideDropdown();
       return;
     }
     
     // Skip search if we're switching modes
-    if (store.isSwitchingModes) {
+    if (searchBar.isSwitchingModes) {
       console.log('🔍 SEARCH OPERATIONS - Skipping search due to mode switching');
-      store.searchResults = [];
-      store.showSearchResults = false;
+      searchResults.clearSearchResults();
+      searchBar.hideDropdown();
       return;
     }
     
-    store.searchQuery = query.value;
+    searchBar.setQuery(query.value);
 
     if (!query.value || query.value.length < 2) {
-      store.searchResults = [];
-      store.showSearchResults = false;
+      searchResults.clearSearchResults();
+      searchBar.hideDropdown();
       isSearching.value = false;
-      store.isAIQuery = false;
-      store.showSparkle = false;
+      searchBar.disableAIMode();
       return;
     }
 
     isSearching.value = true;
-    // Don't set store.isSearching here - that's for actual word lookups, not searches
+    // Don't set loading.isSearching here - that's for actual word lookups, not searches
 
     searchTimer.value = setTimeout(async () => {
       try {
-        const results = await store.search(query.value);
-        store.searchResults = results.slice(0, 8);
-        store.searchSelectedIndex = 0;
-
-        if (store.sessionState) {
-          store.sessionState.searchResults = results;
-        }
+        const results = await orchestrator.search(query.value);
+        // Results are automatically set in the searchResults store by the search method
+        searchBar.setSelectedIndex(0);
 
         // Show results if we have them and not doing a direct lookup
-        store.showSearchResults = results.length > 0 && !store.isDirectLookup;
+        if (results.length > 0 && !searchBar.isDirectLookup) {
+          searchBar.showDropdown();
+        } else {
+          searchBar.hideDropdown();
+        }
 
         // Activate AI mode (but only in lookup mode and not during direct lookups)
-        if (store.searchMode === 'lookup' && results.length === 0 && shouldTriggerAIMode(query.value) && !store.isDirectLookup) {
-          store.isAIQuery = true;
-          store.showSparkle = true;
+        if (searchConfig.searchMode === 'lookup' && results.length === 0 && shouldTriggerAIMode(query.value) && !searchBar.isDirectLookup) {
+          searchBar.enableAIMode();
           // AI mode is now non-persisted - already set above
           // aiQueryText removed - router handles query persistence
-        } else if (!store.isDirectLookup) {
+        } else if (!searchBar.isDirectLookup) {
           // Reset AI mode if not in lookup mode or not meeting AI criteria
-          store.isAIQuery = false;
-          store.showSparkle = false;
+          searchBar.disableAIMode();
           // AI mode is now non-persisted - already set above
           // aiQueryText removed - router handles query persistence
         }
@@ -103,10 +100,10 @@ export function useSearchOperations(options: UseSearchOperationsOptions) {
         onSearchComplete?.(results);
       } catch (error) {
         console.error('Search error:', error);
-        store.searchResults = [];
+        searchResults.clearSearchResults();
       } finally {
         isSearching.value = false;
-        // Don't set store.isSearching here either
+        // Don't set loading.isSearching here either
       }
     }, 200);
   };
@@ -116,11 +113,10 @@ export function useSearchOperations(options: UseSearchOperationsOptions) {
    */
   const clearSearch = () => {
     clearSearchTimer();
-    store.searchQuery = '';
-    store.searchResults = [];
-    store.showSearchResults = false;
-    store.isAIQuery = false;
-    store.showSparkle = false;
+    searchBar.setQuery('');
+    searchResults.clearSearchResults();
+    searchBar.hideDropdown();
+    searchBar.disableAIMode();
     isSearching.value = false;
   };
 
