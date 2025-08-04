@@ -681,7 +681,7 @@ async def suggest_words_stream(
     # Create state tracker for suggestions
     state_tracker = StateTracker(category="suggestions")
 
-    async def suggestions_process() -> dict[str, Any]:
+    async def suggestions_process():
         """Run the suggestion pipeline with state tracking."""
         try:
             await state_tracker.update_stage("START")
@@ -727,7 +727,7 @@ async def suggest_words_stream(
             await state_tracker.update_complete(message="Suggestions generated successfully!")
 
             # Return result data
-            return result.model_dump()
+            return result
 
         except Exception as e:
             await state_tracker.update_error(f"Failed to generate suggestions: {str(e)}")

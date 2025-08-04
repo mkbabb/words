@@ -80,7 +80,7 @@
             <ExampleListEditable
                 v-if="definition.examples && definition.examples.length > 0"
                 :examples="definition.examples"
-                :word="searchResultsStore.currentEntry?.word || ''"
+                :word="contentStore.currentEntry?.word || ''"
                 :edit-mode="props.editModeEnabled"
                 :isStreaming="isStreaming"
                 @update:example="handleExampleUpdate"
@@ -120,7 +120,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useSearchResultsStore, useNotificationStore } from '@/stores';
+import { useContentStore, useNotificationStore } from '@/stores';
 import { useDefinitionEditMode } from '@/composables';
 import type { TransformedDefinition } from '@/types';
 import ExampleListEditable from './ExampleListEditable.vue';
@@ -137,7 +137,7 @@ interface DefinitionItemProps {
     isStreaming?: boolean;
 }
 
-const searchResultsStore = useSearchResultsStore();
+const contentStore = useContentStore();
 const notificationStore = useNotificationStore();
 const props = defineProps<DefinitionItemProps>();
 
@@ -165,15 +165,15 @@ const {
     onSave: async (updates) => {
         console.log('[DefinitionItem] onSave called with updates:', updates);
         if (props.definition.id) {
-            console.log('[DefinitionItem] Calling searchResultsStore.updateDefinition with id:', props.definition.id);
-            await searchResultsStore.updateDefinition(props.definition.id, updates);
+            console.log('[DefinitionItem] Calling contentStore.updateDefinition with id:', props.definition.id);
+            await contentStore.updateDefinition(props.definition.id, updates);
         } else {
             console.error('[DefinitionItem] No definition ID available!');
         }
     },
     onRegenerate: async (component) => {
         if (props.definition.id) {
-            await searchResultsStore.regenerateDefinitionComponent(props.definition.id, component);
+            await contentStore.regenerateDefinitionComponent(props.definition.id, component as 'definition' | 'examples' | 'usage_notes');
         }
     },
 });
@@ -207,7 +207,7 @@ async function handleExampleUpdate(index: number, value: string) {
             console.log('[DefinitionItem] Updating example with ID:', example.id);
             try {
                 // Update via the examples API endpoint
-                await searchResultsStore.updateExample(example.id, { text: value });
+                await contentStore.updateExample(props.definition.id, example.id, value);
                 // Update local state after successful save
                 example.text = value;
             } catch (error) {

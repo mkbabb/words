@@ -1,15 +1,16 @@
 <template>
-    <!-- Sidebar -->
-    <Sidebar />
+    <div>
+        <!-- Sidebar -->
+        <Sidebar />
 
-    <div
-        :class="
-            cn('min-h-screen transition-all duration-300 ease-in-out', {
-                'lg:ml-80': !ui.sidebarCollapsed,
-                'lg:ml-16': ui.sidebarCollapsed,
-            })
-        "
-    >
+        <div
+            :class="
+                cn('min-h-screen transition-all duration-300 ease-in-out', {
+                    'lg:ml-80': !ui.sidebarCollapsed,
+                    'lg:ml-16': ui.sidebarCollapsed,
+                })
+            "
+        >
         <!-- Main View -->
         <div class="relative min-h-screen p-0 lg:p-4">
             <!-- Sticky Search Bar with scroll responsiveness -->
@@ -53,12 +54,12 @@
                     <!-- Definition Content -->
                     <div v-if="searchConfig.searchMode === 'lookup' && ui.mode !== 'suggestions'" key="lookup">
                         <!-- Loading State -->
-                        <div v-if="isSearching && showLoadingModal && !searchResults.partialEntry" class="space-y-8">
+                        <div v-if="isSearching && showLoadingModal && !partialEntry" class="space-y-8">
                             <DefinitionSkeleton />
                         </div>
 
                         <!-- Definition Display -->
-                        <div v-else-if="searchResults.isStreamingData || searchResults.partialEntry || currentEntry || previousEntry || searchResults.definitionError?.hasError" class="space-y-8">
+                        <div v-else-if="isStreamingData || partialEntry || currentEntry || previousEntry || definitionError?.hasError" class="space-y-8">
                             <DefinitionDisplay />
                         </div>
 
@@ -116,7 +117,7 @@
     
     <!-- Loading Modal for AI Suggestions -->
     <LoadingModal
-        v-model="loading.isSuggestingWords"
+        v-model="showSuggestionsModal"
         :display-text="'efflorescing'"
         :progress="loading.suggestionsProgress"
         :current-stage="loading.suggestionsStage"
@@ -124,6 +125,7 @@
         :dynamic-checkpoints="[...loading.suggestionsStageDefinitions]"
         :category="loading.suggestionsCategory"
     />
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -141,7 +143,7 @@ import WordListView from '@/components/custom/wordlist/WordListView.vue';
 import { StageTest } from '@/components/custom/test';
 import { ProgressiveSidebar } from '@/components/custom/navigation';
 
-const { searchBar, searchConfig, searchResults, ui, loading, orchestrator } = useStores();
+const { searchBar, searchConfig, searchResults, content, ui, loading, orchestrator } = useStores();
 const route = useRoute();
 
 // Component refs
@@ -149,6 +151,16 @@ const stageTestRef = ref();
 
 // Track loading modal visibility separately from search state
 const showLoadingModal = ref(false);
+
+// Computed property for suggestions modal visibility
+const showSuggestionsModal = computed({
+    get: () => loading.isSuggestingWords,
+    set: (value: boolean) => {
+        if (!value) {
+            loading.stopSuggestions();
+        }
+    }
+});
 
 // Handle stage mode enter key
 const handleStageEnter = (_query: string) => {
@@ -162,23 +174,34 @@ const handleStageEnter = (_query: string) => {
 watch(() => route.name, async (routeName) => {
     if (routeName === 'Definition' && route.params.word) {
         const word = route.params.word as string;
-        if (searchConfig.searchMode !== 'lookup') {
-            searchConfig.setSearchMode('lookup');
-        }
-        ui.setMode('dictionary');
+        // ✅ Use simple mode system - just change the modes
+        searchConfig.setMode('lookup');
+        searchConfig.setLookupMode('dictionary');
         searchBar.setQuery(word);
-        await orchestrator.searchWord(word);
+        
+        // Only search if we don't have the current entry or it's a different word
+        if (!content.currentEntry || content.currentEntry.word !== word) {
+            await orchestrator.searchWord(word);
+        }
     } else if (routeName === 'Thesaurus' && route.params.word) {
         const word = route.params.word as string;
-        if (searchConfig.searchMode !== 'lookup') {
-            searchConfig.setSearchMode('lookup');
-        }
-        ui.setMode('thesaurus');
+        // ✅ Use simple mode system - just change the modes
+        searchConfig.setMode('lookup');
+        searchConfig.setLookupMode('thesaurus');
         searchBar.setQuery(word);
-        await orchestrator.searchWord(word);
+        
+        // Only search if we don't have the current entry or it's a different word
+        if (!content.currentEntry || content.currentEntry.word !== word) {
+            await orchestrator.searchWord(word);
+        } else if (!content.currentThesaurus) {
+            // If switching to thesaurus mode and we don't have thesaurus data, fetch it
+            console.log('🔍 Fetching thesaurus data for:', word);
+            await orchestrator.getThesaurusData(word);
+        }
     } else if ((routeName === 'Wordlist' || routeName === 'WordlistSearch') && route.params.wordlistId) {
         const wordlistId = route.params.wordlistId as string;
-        searchConfig.setSearchMode('wordlist');
+        // ✅ Use simple mode system - just change the mode
+        searchConfig.setMode('wordlist');
         searchConfig.setWordlist(wordlistId);
         if (routeName === 'WordlistSearch' && route.params.query) {
             searchBar.setQuery(decodeURIComponent(route.params.query as string));
@@ -200,8 +223,13 @@ onMounted(async () => {
 
 // Reactive state from modular stores
 const isSearching = computed(() => loading.isSearching);
-const currentEntry = computed(() => searchResults.currentEntry);
+const currentEntry = computed(() => content.currentEntry);
 const previousEntry = ref<any>(null);
+
+// Content state for template
+const partialEntry = computed(() => content.partialEntry);
+const isStreamingData = computed(() => content.isStreamingData);
+const definitionError = computed(() => content.definitionError);
 
 // Track previous entry for smooth transitions
 watch(currentEntry, (newEntry, oldEntry) => {
@@ -245,7 +273,7 @@ const shouldShowProgressiveSidebar = computed(() => {
     const definitions = currentEntry.value.definitions;
     if (!definitions?.length) return false;
     
-    const clusters = new Set(definitions.map(d => d.meaning_cluster?.id || 'default'));
+    const clusters = new Set(definitions.map((d: any) => d.meaning_cluster?.id || 'default'));
     return clusters.size > 1;
 });
 </script>

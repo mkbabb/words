@@ -106,9 +106,9 @@
                     <button
                         @click="toggleFilter('showBronze')"
                         :class="[
-                            'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-apple-spring',
+                            'cursor-pointer select-none flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-out',
                             wordlistFilters.showBronze
-                                ? 'bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-sm hover:scale-[1.05] active:scale-[0.97]'
+                                ? 'bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-sm hover:shadow-md hover:scale-[1.05] active:scale-[0.97]'
                                 : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03] active:scale-[0.98]',
                         ]"
                     >
@@ -118,9 +118,9 @@
                     <button
                         @click="toggleFilter('showSilver')"
                         :class="[
-                            'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-apple-spring',
+                            'cursor-pointer select-none flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-out',
                             wordlistFilters.showSilver
-                                ? 'bg-gradient-to-r from-gray-400 to-gray-600 text-white shadow-sm hover:scale-[1.05] active:scale-[0.97]'
+                                ? 'bg-gradient-to-r from-gray-400 to-gray-600 text-white shadow-sm hover:shadow-md hover:scale-[1.05] active:scale-[0.97]'
                                 : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03] active:scale-[0.98]',
                         ]"
                     >
@@ -130,9 +130,9 @@
                     <button
                         @click="toggleFilter('showGold')"
                         :class="[
-                            'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-apple-spring',
+                            'cursor-pointer select-none flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-out',
                             wordlistFilters.showGold
-                                ? 'bg-gradient-to-r from-yellow-400 to-amber-600 text-white shadow-sm hover:scale-[1.05] active:scale-[0.97]'
+                                ? 'bg-gradient-to-r from-yellow-400 to-amber-600 text-white shadow-sm hover:shadow-md hover:scale-[1.05] active:scale-[0.97]'
                                 : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03] active:scale-[0.98]',
                         ]"
                     >
@@ -152,9 +152,9 @@
                     <button
                         @click="toggleFilter('showHotOnly')"
                         :class="[
-                            'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-apple-spring',
+                            'cursor-pointer select-none flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-out',
                             wordlistFilters.showHotOnly
-                                ? 'bg-red-500 text-white shadow-sm hover:bg-red-600 hover:scale-[1.05] active:scale-[0.97]'
+                                ? 'bg-red-500 text-white shadow-sm hover:bg-red-600 hover:shadow-md hover:scale-[1.05] active:scale-[0.97]'
                                 : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03] active:scale-[0.98]',
                         ]"
                     >
@@ -164,9 +164,9 @@
                     <button
                         @click="toggleFilter('showDueOnly')"
                         :class="[
-                            'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-apple-spring',
+                            'cursor-pointer select-none flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-out',
                             wordlistFilters.showDueOnly
-                                ? 'bg-blue-500 text-white shadow-sm hover:bg-blue-600 hover:scale-[1.05] active:scale-[0.97]'
+                                ? 'bg-blue-500 text-white shadow-sm hover:bg-blue-600 hover:shadow-md hover:scale-[1.05] active:scale-[0.97]'
                                 : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03] active:scale-[0.98]',
                         ]"
                     >
@@ -185,63 +185,6 @@
                 <WordListSortBuilder v-model="wordlistSortCriteria" />
             </div>
 
-            <!-- Wordlist Chunking Options -->
-            <div
-                v-if="searchMode === 'wordlist'"
-                class="border-t border-border/50 px-4 py-3"
-            >
-                <h3 class="mb-3 text-sm font-medium">Chunk View</h3>
-                <div class="flex flex-wrap gap-2">
-                    <button
-                        @click="toggleChunking('byMastery')"
-                        :class="[
-                            'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-apple-spring',
-                            wordlistChunking.byMastery
-                                ? 'bg-purple-500 text-white shadow-sm hover:bg-purple-600 hover:scale-[1.05] active:scale-[0.97]'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03] active:scale-[0.98]',
-                        ]"
-                    >
-                        <Trophy :size="14" />
-                        By Mastery
-                    </button>
-                    <button
-                        @click="toggleChunking('byDate')"
-                        :class="[
-                            'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-apple-spring',
-                            wordlistChunking.byDate
-                                ? 'bg-green-500 text-white shadow-sm hover:bg-green-600 hover:scale-[1.05] active:scale-[0.97]'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03] active:scale-[0.98]',
-                        ]"
-                    >
-                        <Calendar :size="14" />
-                        By Date Added
-                    </button>
-                    <button
-                        @click="toggleChunking('byLastVisited')"
-                        :class="[
-                            'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-apple-spring',
-                            wordlistChunking.byLastVisited
-                                ? 'bg-blue-500 text-white shadow-sm hover:bg-blue-600 hover:scale-[1.05] active:scale-[0.97]'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03] active:scale-[0.98]',
-                        ]"
-                    >
-                        <Eye :size="14" />
-                        By Last Visited
-                    </button>
-                    <button
-                        @click="toggleChunking('byFrequency')"
-                        :class="[
-                            'hover-lift flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-300 ease-apple-spring',
-                            wordlistChunking.byFrequency
-                                ? 'bg-orange-500 text-white shadow-sm hover:bg-orange-600 hover:scale-[1.05] active:scale-[0.97]'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:scale-[1.03] active:scale-[0.98]',
-                        ]"
-                    >
-                        <BarChart3 :size="14" />
-                        By Frequency
-                    </button>
-                </div>
-            </div>
 
             <!-- Actions Row -->
             <div
@@ -284,12 +227,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStores } from '@/stores';
 import { Button } from '@/components/ui';
 import { BouncyToggle } from '@/components/custom/animation';
-import { Flame, Clock, Trophy, Calendar, Eye, BarChart3, PanelLeft } from 'lucide-vue-next';
+import { Flame, Clock, PanelLeft } from 'lucide-vue-next';
 import ActionsRow from './ActionsRow.vue';
 import WordListSortBuilder from '../../wordlist/WordListSortBuilder.vue';
 import { DICTIONARY_SOURCES, LANGUAGES } from '../constants/sources';
@@ -307,8 +250,9 @@ const props = defineProps<SearchControlsProps>();
 
 // Modern Vue 3.4+ patterns - using defineModel for two-way bindings
 const router = useRouter();
-const { searchConfig } = useStores();
-const searchMode = defineModel<SearchMode>('searchMode', { required: true });
+const { searchConfig, searchBar } = useStores();
+// ✅ Make component reactive to store changes instead of using defineModel
+const searchMode = computed(() => searchConfig.searchMode);
 const selectedSources = defineModel<string[]>('selectedSources', { required: true });
 const selectedLanguages = defineModel<string[]>('selectedLanguages', { required: true });
 const noAI = defineModel<boolean>('noAI', { required: true });
@@ -329,20 +273,6 @@ const wordlistFilters = defineModel<{
     })
 });
 
-const wordlistChunking = defineModel<{
-    byMastery: boolean;
-    byDate: boolean;
-    byLastVisited: boolean;
-    byFrequency: boolean;
-}>('wordlistChunking', { 
-    required: false,
-    default: () => ({
-        byMastery: false,
-        byDate: false,
-        byLastVisited: false,
-        byFrequency: false,
-    })
-});
 
 const wordlistSortCriteria = defineModel<any[]>('wordlistSortCriteria', { 
     required: false,
@@ -391,15 +321,11 @@ const toggleLanguage = (languageCode: string) => {
 };
 
 const toggleFilter = (filterKey: keyof typeof wordlistFilters.value) => {
-    wordlistFilters.value[filterKey] = !wordlistFilters.value[filterKey];
-};
-
-const toggleChunking = (chunkKey: keyof typeof wordlistChunking.value) => {
-    // Only allow one chunking method at a time
-    Object.keys(wordlistChunking.value).forEach(key => {
-        wordlistChunking.value[key as keyof typeof wordlistChunking.value] = false;
-    });
-    wordlistChunking.value[chunkKey] = true;
+    // Create a new object with the toggled value to trigger reactivity
+    wordlistFilters.value = {
+        ...wordlistFilters.value,
+        [filterKey]: !wordlistFilters.value[filterKey]
+    };
 };
 
 const controlsDropdown = ref<HTMLDivElement>();
@@ -415,19 +341,26 @@ const handleEnterKey = (event: KeyboardEvent) => {
 };
 
 // Handle mode change from BouncyToggle
-const handleModeChange = (newMode: string | SearchMode) => {
+const handleModeChange = async (newMode: string | SearchMode) => {
     console.log('🎛️ SearchControls handleModeChange:', searchMode.value, '->', newMode);
     const typedMode = newMode as SearchMode;
     if (typedMode !== searchMode.value) {
-        searchConfig.setSearchModeLegacy(typedMode, router);
-        // Handle router navigation
-        if (typedMode === 'lookup') {
-            router.push({ name: 'Home' });
-        } else if (typedMode === 'wordlist') {
-            router.push({ name: 'Home' });
-        } else if (typedMode === 'stage') {
-            router.push({ name: 'Home' });
+        console.log('✅ Using simple mode setter with query management');
+        // ✅ Save current query and switch mode - returns saved query for new mode
+        const currentQuery = searchBar.searchQuery;
+        const savedQuery = await searchConfig.setMode(typedMode, currentQuery);
+        
+        // Update search bar with the saved query for the new mode
+        if (savedQuery) {
+            searchBar.setQuery(savedQuery);
+        } else if (typedMode !== 'lookup') {
+            // Clear query for non-lookup modes if no saved query
+            searchBar.setQuery('');
         }
+        
+        // ✅ Basic navigation - just go to Home to reflect mode change
+        router.push({ name: 'Home' });
+        console.log('🧭 Navigated to Home for mode:', typedMode);
     }
 };
 

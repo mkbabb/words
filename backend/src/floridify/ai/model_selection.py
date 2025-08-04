@@ -35,11 +35,12 @@ class ModelTier(Enum):
 
 # Task-to-complexity mapping based on prompt analysis
 TASK_COMPLEXITY_MAP: dict[str, ModelComplexity] = {
-    "synthesize_definitions": ModelComplexity.MEDIUM,
-    "extract_cluster_mapping": ModelComplexity.LOW,
+    # High complexity - reasoning, synthesis, clustering
+    "synthesize_definitions": ModelComplexity.HIGH,
     "suggest_words": ModelComplexity.HIGH,
-    "generate_synonyms": ModelComplexity.MEDIUM,
+    "extract_cluster_mapping": ModelComplexity.HIGH,
     # Medium complexity - creative generation, pedagogical tasks
+    "generate_synonyms": ModelComplexity.MEDIUM,
     "generate_facts": ModelComplexity.MEDIUM,
     "generate_examples": ModelComplexity.MEDIUM,
     "generate_anki_best_describes": ModelComplexity.MEDIUM,
@@ -50,6 +51,7 @@ TASK_COMPLEXITY_MAP: dict[str, ModelComplexity] = {
     "generate_antonyms": ModelComplexity.MEDIUM,
     "generate_suggestions": ModelComplexity.MEDIUM,
     "lookup_word": ModelComplexity.MEDIUM,
+    "deduplicate_definitions": ModelComplexity.MEDIUM,
     # Low complexity - simple classification, basic generation
     "assess_frequency": ModelComplexity.LOW,
     "assess_cefr_level": ModelComplexity.LOW,
@@ -60,7 +62,6 @@ TASK_COMPLEXITY_MAP: dict[str, ModelComplexity] = {
     "validate_query": ModelComplexity.LOW,
     "identify_grammar_patterns": ModelComplexity.LOW,
     "identify_regional_variants": ModelComplexity.LOW,
-    "deduplicate_definitions": ModelComplexity.LOW,
 }
 
 
@@ -91,7 +92,9 @@ def get_model_for_task(task_name: str, override: ModelTier | None = None) -> Mod
     return COMPLEXITY_TO_MODEL[complexity]
 
 
-def get_temperature_for_model(model: ModelTier, task_name: str | None = None) -> float | None:
+def get_temperature_for_model(
+    model: ModelTier, task_name: str | None = None
+) -> float | None:
     """
     Get appropriate temperature for a model and task.
 

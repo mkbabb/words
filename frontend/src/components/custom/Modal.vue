@@ -120,7 +120,7 @@ const handleBackdropClick = (event: Event) => {
 }
 
 // Before enter - prepare elements for animation
-const beforeEnter = (el: Element) => {
+const beforeEnter = () => {
   // Use refs directly since beforeEnter happens after element mount
   if (backdropRef.value && contentRef.value) {
     // Set initial states without transitions
@@ -133,7 +133,7 @@ const beforeEnter = (el: Element) => {
 }
 
 // Smooth enter animation
-const modalEnter = (el: Element, done: () => void) => {
+const modalEnter = (_el: Element, done: () => void) => {
   // Use refs directly for consistent element access
   if (!backdropRef.value || !contentRef.value) {
     done()
@@ -145,15 +145,27 @@ const modalEnter = (el: Element, done: () => void) => {
   
   // Start animations
   requestAnimationFrame(() => {
+    // Check refs are still valid before animating
+    if (!backdropRef.value || !contentRef.value) {
+      done()
+      return
+    }
+    
     // Backdrop fades in first
-    backdropRef.value!.style.transition = 'opacity 250ms cubic-bezier(0.25, 0.1, 0.25, 1)'
-    backdropRef.value!.style.opacity = '1'
+    backdropRef.value.style.transition = 'opacity 250ms cubic-bezier(0.25, 0.1, 0.25, 1)'
+    backdropRef.value.style.opacity = '1'
     
     // Content appears with spring-like easing
     setTimeout(() => {
-      contentRef.value!.style.transition = 'all 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-      contentRef.value!.style.opacity = '1'
-      contentRef.value!.style.transform = 'scale(1) translateY(0)'
+      // Check refs are still valid before animating content
+      if (!contentRef.value) {
+        done()
+        return
+      }
+      
+      contentRef.value.style.transition = 'all 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+      contentRef.value.style.opacity = '1'
+      contentRef.value.style.transform = 'scale(1) translateY(0)'
       
       setTimeout(done, 400)
     }, 50)
@@ -184,7 +196,7 @@ const modalLeave = (el: Element, done: () => void) => {
   content.style.transform = contentTransform
   
   // Force reflow
-  void el.offsetHeight
+  void (el as HTMLElement).offsetHeight
   
   // Animate out
   requestAnimationFrame(() => {

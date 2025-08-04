@@ -1,425 +1,256 @@
-import { nextTick } from 'vue'
-import { useSearchBarStore } from '../search/search-bar'
-import { useSearchConfigStore } from '../search/search-config'
-import { useSearchResultsStore } from '../search/search-results'
-import { useLoadingStore } from '../ui/loading'
-import { useHistoryStore } from '../content/history'
-import { useNotificationStore } from '../utils/notifications'
-import { useUIStore } from '../ui/ui-state'
-import { normalizeWord } from '@/utils'
-import type { 
-  SearchMode, 
-  ModeOperationOptions, 
-  ModeTransitionResult,
-  LookupModeConfig,
-  WordlistModeConfig,
-  WordOfTheDayModeConfig,
-  StageModeConfig 
-} from '@/types'
+import { useStores } from '..';
+import type { SearchResult } from '@/types';
 
 /**
- * Search Orchestrator Composable
- * Coordinates complex search operations across multiple stores
- * Provides high-level actions that replace the monolithic store functions
+ * Unified search orchestrator that handles all search operations across modes
+ * No debouncing - direct API calls for performance
  */
 export function useSearchOrchestrator() {
-  // Get all the stores
-  const searchBar = useSearchBarStore()
-  const searchConfig = useSearchConfigStore()
-  const searchResults = useSearchResultsStore()
-  const loading = useLoadingStore()
-  const history = useHistoryStore()
-  const notifications = useNotificationStore()
-  const ui = useUIStore()
+  const { searchResults, searchBar, searchConfig, loading, ui } = useStores();
 
-  // ==========================================================================
-  // COMPLEX SEARCH OPERATIONS
-  // ==========================================================================
-
-  const searchWord = async (query: string) => {
-    console.log('🔍 SEARCHWORD - Called with query:', query, {
-      isSwitchingModes: searchBar.isSwitchingModes,
-      isDirectLookup: searchBar.isDirectLookup,
-      currentShowSearchResults: searchBar.showSearchResults,
-      searchResultsLength: searchResults.searchResults.length
-    })
-    
-    if (!query.trim()) return
-
-    const normalizedQuery = normalizeWord(query)
-    
-    // Set up search bar state for direct lookup
-    searchBar.resetForDirectLookup()
-    searchBar.setQuery(normalizedQuery)
-    loading.setHasSearched(true)
-
-    // Clear search results dropdown
-    searchResults.clearSearchResults()
-    
-    // Only hide controls if we're not switching modes via the controls
-    if (!searchBar.isSwitchingModes) {
-      searchBar.hideControls()
-    }
-
-    // Perform the definition lookup
-    await getDefinition(normalizedQuery)
-
-    // Reset direct lookup flag after a delay
-    setTimeout(() => {
-      console.log('🔍 SEARCHWORD - Resetting isDirectLookup flag')
-      searchBar.setDirectLookup(false)
-    }, 2000)
-  }
-
-  const search = async (query: string) => {
-    if (!query.trim()) return []
-
-    try {
-      const results = await searchResults.search(query)
+  // Mode-specific search handlers
+  const searchHandlers = {
+    /**
+     * Lookup mode handler - dictionary/thesaurus search
+     */
+    lookup: {
+      canSearch: (query: string) => query.trim().length >= 2,
       
-      // Add to history if we have results
-      if (results.length > 0) {
-        history.addToHistory(query, results)
-      }
-
-      return results
-    } catch (error) {
-      console.error('Search error:', error)
-      return []
-    }
-  }
-
-  const getDefinition = async (word: string, forceRefresh?: boolean) => {
-    const shouldForceRefresh = forceRefresh ?? loading.forceRefreshMode
-
-    // Set up loading state
-    loading.startLoading(
-      shouldForceRefresh ? 'Regenerating word...' : 'Looking up word...',
-      false
-    )
-
-    try {
-      const entry = await searchResults.getDefinition(
-        word,
-        shouldForceRefresh,
-        [...searchConfig.selectedSources], // Convert readonly to mutable
-        [...searchConfig.selectedLanguages], // Convert readonly to mutable
-        searchConfig.noAI,
-        // Progress callback
-        (stage, progress, message, _details) => {
-          loading.updateProgress(progress, stage, message)
-        },
-        // Stage config callback
-        (category, stages) => {
-          loading.setStageDefinitions(category, stages)
+      search: async (query: string): Promise<SearchResult[]> => {
+        console.log('🔍 LOOKUP - searching for:', query);
+        
+        // Clear previous results immediately
+        searchResults.clearSearchResults();
+        
+        // Perform search
+        const results = await searchResults.search(query);
+        
+        // Show dropdown if we have results
+        if (results.length > 0) {
+          searchBar.openDropdown();
+          searchBar.setSelectedIndex(0);
+        } else {
+          searchBar.hideDropdown();
         }
-      )
+        
+        return results;
+      }
+    },
 
-      console.log('Definition lookup completed:', entry)
+    /**
+     * Wordlist mode handler - list all or search within wordlist
+     */
+    wordlist: {
+      canSearch: () => true, // Always allow search (empty query shows all)
       
-      // Auto-adjust AI mode based on model_info presence
-      if (entry?.model_info) {
-        searchConfig.setAI(true)
-        console.log('Auto-enabled AI mode: definition has model_info')
-      } else if (entry && !entry.model_info) {
-        searchConfig.setAI(false)
-        console.log('Auto-disabled AI mode: definition has no model_info')
+      search: async (query: string): Promise<any[]> => {
+        const wordlistId = searchConfig.selectedWordlist;
+        if (!wordlistId) {
+          console.warn('🔍 WORDLIST - no wordlist selected');
+          return [];
+        }
+
+        console.log('🔍 WORDLIST - searching:', query || '(all words)');
+        
+        // Use the appropriate endpoint based on query
+        const trimmedQuery = query.trim();
+        let results: any[] = [];
+        
+        if (!trimmedQuery) {
+          // Empty query - get all words
+          results = await searchResults.getWordlistWords(wordlistId);
+        } else {
+          // Search within wordlist
+          results = await searchResults.searchWordlist(wordlistId, trimmedQuery);
+        }
+        
+        // Update wordlist-specific results (store ALL results, not just first 10)
+        searchResults.setSearchResults('wordlist', results);
+        
+        // Show dropdown if we have results and a query
+        if (results.length > 0 && trimmedQuery) {
+          searchBar.openDropdown();
+          searchBar.setSelectedIndex(0);
+        } else if (!trimmedQuery) {
+          searchBar.hideDropdown();
+        }
+        
+        return results;
       }
+    },
 
-      // Add to lookup history
-      if (entry) {
-        history.addToLookupHistory(word, entry)
+    /**
+     * Stage mode handler - no search operations
+     */
+    stage: {
+      canSearch: () => false,
+      search: async () => []
+    }
+  };
+
+  /**
+   * Main search execution - handles all modes
+   * No debouncing for immediate responsiveness
+   */
+  const executeSearch = async (query: string = ''): Promise<void> => {
+    const mode = searchConfig.searchMode;
+    const handler = searchHandlers[mode as keyof typeof searchHandlers];
+    
+    if (!handler) {
+      console.warn(`🔍 Unknown search mode: ${mode}`);
+      return;
+    }
+
+    // Store the query
+    searchBar.setQuery(query);
+
+    // Check if we can search in this mode
+    if (!handler.canSearch(query)) {
+      console.log(`🔍 ${mode.toUpperCase()} - cannot search with query:`, query);
+      
+      // Clear results for invalid queries in lookup mode
+      if (mode === 'lookup') {
+        searchResults.clearSearchResults();
+        searchBar.hideDropdown();
       }
+      return;
+    }
 
-      // Emit events for engagement tracking
-      window.dispatchEvent(new CustomEvent('word-searched'))
-      window.dispatchEvent(new CustomEvent('definition-viewed'))
+    // Disable AI mode (will be re-enabled if needed)
+    searchBar.disableAIMode();
 
-      // Auto-switch from suggestions mode to dictionary mode after successful lookup
-      if (ui.mode === 'suggestions') {
-        ui.setMode('dictionary')
+    try {
+      // Execute mode-specific search
+      const results = await handler.search(query);
+      
+      // Handle AI mode for lookup searches with no results
+      if (mode === 'lookup' && results.length === 0 && shouldTriggerAIMode(query)) {
+        searchBar.enableAIMode();
       }
+    } catch (error) {
+      console.error(`🔍 ${mode.toUpperCase()} - search error:`, error);
+      searchResults.clearSearchResults();
+      searchBar.hideDropdown();
+    }
+  };
 
-      // Also get thesaurus data if we're in thesaurus mode
+  /**
+   * Search for a specific word - used for direct navigation
+   */
+  const searchWord = async (word: string): Promise<void> => {
+    console.log('🔍 ORCHESTRATOR - searchWord:', word);
+    
+    // Set direct lookup flag to prevent dropdown
+    searchBar.isDirectLookup = true;
+    
+    try {
+      // Update query
+      searchBar.setQuery(word);
+      
+      // Clear search results
+      searchResults.clearSearchResults();
+      
+      // Get definition based on current UI mode
       if (ui.mode === 'thesaurus') {
-        await getThesaurusData(word)
-      }
-
-      // Reset force refresh mode after successful lookup
-      if (shouldForceRefresh && loading.forceRefreshMode) {
-        loading.disableForceRefresh()
-      }
-
-      return entry
-    } catch (error) {
-      console.error('Definition error:', error)
-      
-      notifications.showError(
-        error instanceof Error ? error.message : 'Failed to get definition'
-      )
-      
-      throw error
-    } finally {
-      loading.stopLoading()
-    }
-  }
-
-  const getThesaurusData = async (word: string) => {
-    try {
-      await searchResults.getThesaurusData(word)
-    } catch (error) {
-      console.error('Thesaurus error:', error)
-      notifications.showError('Failed to get thesaurus data')
-    }
-  }
-
-  const getAISuggestions = async (query: string, count: number = 12) => {
-    try {
-      // Set up loading state for AI suggestions
-      loading.startSuggestions('Generating word suggestions...')
-      
-      // Set up search bar state
-      searchBar.setDirectLookup(true)
-      searchBar.hideDropdown()
-      searchBar.hideControls()
-
-      const response = await searchResults.getAISuggestions(
-        query,
-        count,
-        // Progress callback
-        (stage, progress, message, _details) => {
-          loading.updateSuggestionsProgress(progress, stage, message)
-        },
-        // Stage config callback
-        (category, stages) => {
-          loading.setSuggestionsStageDefinitions(category, stages)
-        }
-      )
-
-      // Add to AI query history
-      history.addToAIQueryHistory(query)
-
-      // Reset direct lookup flag
-      setTimeout(() => {
-        searchBar.setDirectLookup(false)
-      }, 100)
-
-      return response
-    } catch (error) {
-      console.error('AI suggestions error:', error)
-      notifications.showError('Failed to generate word suggestions')
-      throw error
-    } finally {
-      loading.stopSuggestions()
-    }
-  }
-
-  // ==========================================================================
-  // MODE SWITCHING OPERATIONS
-  // ==========================================================================
-
-  const toggleSearchMode = async (router?: any) => {
-    // Don't allow mode switching during active search
-    if (loading.isSearching || loading.isSuggestingWords) {
-      return
-    }
-
-    console.log('🔄 toggleSearchMode called:', searchConfig.searchMode)
-    
-    // Store current state before switching
-    const currentQuery = searchBar.searchQuery
-    
-    console.log('💾 Saving query for mode:', searchConfig.searchMode, 'query:', currentQuery)
-    
-    // Save current query to mode-specific storage BEFORE changing mode
-    searchBar.saveModeQuery(searchConfig.searchMode, currentQuery)
-    
-    // Determine the next mode in the cycle
-    let targetMode: SearchMode
-    if (searchConfig.searchMode === 'lookup') {
-      targetMode = 'wordlist'
-    } else if (searchConfig.searchMode === 'wordlist') {
-      targetMode = 'word-of-the-day'
-    } else if (searchConfig.searchMode === 'word-of-the-day') {
-      targetMode = 'stage'
-    } else {
-      targetMode = 'lookup'
-    }
-    
-    // Use the enhanced type-safe setSearchMode (handles all the logic)
-    const result = await setSearchMode(targetMode, { router })
-    
-    // Handle AI mode based on the new mode
-    if (searchConfig.searchMode === 'lookup') {
-      // AI mode detection is handled by the searchBar store automatically
-      console.log('✨ AI mode state will be updated based on query')
-    } else {
-      // Disable AI mode when switching away from lookup mode
-      searchBar.disableAIMode()
-      console.log('❌ AI mode disabled - not in lookup mode')
-    }
-
-    // Reset suggestion mode when changing search modes
-    if (ui.mode === 'suggestions' && searchConfig.searchMode !== 'lookup') {
-      // Only reset if we don't have a current entry to fall back to
-      if (!searchResults.currentEntry) {
-        reset()
+        await getThesaurusData(word);
       } else {
-        ui.setMode('dictionary')
+        await getDefinition(word);
       }
+    } finally {
+      // Reset direct lookup flag
+      searchBar.isDirectLookup = false;
     }
-    
-    return result
-  }
+  };
 
   /**
-   * Enhanced type-safe mode switching
-   * Replaces the problematic multi-parameter setSearchMode approach
+   * Get definition with streaming progress
    */
-  const setSearchMode = async <T extends SearchMode>(
-    mode: T,
-    options: {
-      router?: any
-      saveCurrentQuery?: boolean
-      config?: Partial<
-        T extends 'lookup' ? LookupModeConfig :
-        T extends 'wordlist' ? WordlistModeConfig :
-        T extends 'word-of-the-day' ? WordOfTheDayModeConfig :
-        T extends 'stage' ? StageModeConfig :
-        never
-      >
-    } = {}
-  ): Promise<ModeTransitionResult> => {
-    const { router, saveCurrentQuery = true, config = {} } = options
-    const currentQuery = searchBar.searchQuery
+  const getDefinition = async (word: string, forceRefresh: boolean = false): Promise<void> => {
+    console.log('🔍 ORCHESTRATOR - getDefinition:', word, { forceRefresh });
     
-    // Save current query before switching modes  
-    if (saveCurrentQuery) {
-      console.log('💾 Saving current query for mode:', searchConfig.searchMode, 'query:', currentQuery)
-      searchBar.saveModeQuery(searchConfig.searchMode, currentQuery)
+    loading.startLoading(`Looking up "${word}"...`);
+    
+    try {
+      await searchResults.getDefinition(word, {
+        forceRefresh,
+        onProgress: (progress: any) => {
+          loading.updateProgress(progress.progress, progress.stage);
+        },
+        onStageConfig: (config: any) => {
+          if (config?.stages) {
+            loading.setStageDefinitions('definition', config.stages);
+          }
+        }
+      });
+      
+      loading.stopLoading();
+    } catch (error) {
+      loading.stopLoading();
+      throw error;
     }
-    
-    // Set switching modes flag
-    searchBar.setSwitchingModes(true)
-    
-    // Get the mode query for the target mode
-    const targetModeQuery = searchBar.restoreModeQuery(mode)
-    console.log('🔄 Target mode query for', mode, ':', targetModeQuery)
-    
-    // Build type-safe configuration based on the target mode
-    const modeConfig = await buildModeConfig(mode, targetModeQuery, config)
-    
-    // Use the enhanced search config store function
-    const result = await searchConfig.setSearchMode({
-      mode,
-      config: {
-        ...modeConfig,
-        router
-      },
-      saveCurrentQuery
-    })
-    
-    // Set the restored query in the search bar
-    searchBar.setQuery(targetModeQuery)
-    console.log('🔄 Set query for new mode:', mode, 'query:', targetModeQuery)
-    
-    // Clear search results when changing modes
-    searchBar.clearResults()
-    
-    // Force reactivity trigger
-    await nextTick()
-    
-    // Reset the mode switching flag after a short delay
-    setTimeout(() => {
-      searchBar.setSwitchingModes(false)
-    }, 500)
-    
-    return result
-  }
+  };
 
   /**
-   * Helper to build mode-specific configurations without tight coupling
+   * Get thesaurus data
    */
-  const buildModeConfig = async <T extends SearchMode>(
-    mode: T, 
-    targetModeQuery: string,
-    userConfig: any
-  ): Promise<any> => {
-    const baseConfig = {
-      query: targetModeQuery,
-      currentEntry: searchResults.currentEntry
-    }
+  const getThesaurusData = async (word: string): Promise<void> => {
+    console.log('🔍 ORCHESTRATOR - getThesaurusData:', word);
     
-    switch (mode) {
-      case 'lookup':
-        return {
-          ...baseConfig,
-          displayMode: ui.mode,
-          sources: [...searchConfig.selectedSources],
-          languages: [...searchConfig.selectedLanguages],
-          noAI: searchConfig.noAI,
-          ...userConfig
-        }
-        
-      case 'wordlist':
-        return {
-          ...baseConfig,
-          wordlistId: searchConfig.selectedWordlist,
-          filters: ui.wordlistFilters,
-          chunking: ui.wordlistChunking,
-          sortCriteria: [...ui.wordlistSortCriteria],
-          ...userConfig
-        }
-        
-      case 'word-of-the-day':
-        return {
-          ...baseConfig,
-          date: new Date(),
-          ...userConfig
-        }
-        
-      case 'stage':
-        return {
-          ...baseConfig,
-          debugLevel: 'minimal' as const,
-          ...userConfig
-        }
-        
-      default:
-        return { ...baseConfig, ...userConfig }
+    loading.startLoading(`Finding synonyms for "${word}"...`);
+    
+    try {
+      await searchResults.getThesaurusData(word);
+      loading.stopLoading();
+    } catch (error) {
+      loading.stopLoading();
+      throw error;
     }
-  }
+  };
 
-  // ==========================================================================
-  // UTILITY FUNCTIONS
-  // ==========================================================================
+  /**
+   * Get AI suggestions with streaming
+   */
+  const getAISuggestions = async (query: string, count: number = 12) => {
+    console.log('🔍 ORCHESTRATOR - getAISuggestions:', { query, count });
+    
+    loading.startSuggestions('Generating AI suggestions...');
+    
+    try {
+      const result = await searchResults.getAISuggestions(query, count, {
+        onProgress: (progress: any) => {
+          loading.updateSuggestionsProgress(progress.progress, progress.stage);
+        }
+      });
+      
+      loading.stopSuggestions();
+      return result;
+    } catch (error) {
+      loading.stopSuggestions();
+      throw error;
+    }
+  };
 
-  const reset = () => {
-    searchBar.clearQuery()
-    loading.resetAllLoading()
-    searchResults.clearSearchResults()
-    searchResults.clearCurrentEntry()
-    searchResults.clearWordSuggestions()
-    ui.setMode('dictionary')
-  }
-
-  // ==========================================================================
-  // RETURN API
-  // ==========================================================================
+  // Utility functions
+  const shouldTriggerAIMode = (query: string): boolean => {
+    if (!query || query.length < 5) return false;
+    
+    const isQuestion = /^(what|how|why|when|where|who|which|whose|whom)\s/i.test(query);
+    const hasQuestionMark = query.includes('?');
+    const isLongPhrase = query.split(' ').length > 3;
+    const hasSpecialPattern = /(\s(is|are|was|were|means?|definition|define)\s)/i.test(query);
+    
+    return isQuestion || hasQuestionMark || (isLongPhrase && hasSpecialPattern);
+  };
 
   return {
-    // Search operations
+    // Main search method
+    executeSearch,
+    
+    // Direct word operations
     searchWord,
-    search,
+    search: executeSearch, // Alias for backward compatibility
     getDefinition,
     getThesaurusData,
     getAISuggestions,
-    
-    // Mode operations
-    toggleSearchMode,
-    setSearchMode,
-    
-    // Utility
-    reset
-  }
+  };
 }

@@ -9,7 +9,7 @@ interface TrackedElement {
 }
 
 interface UseScrollTrackingOptions {
-    activeStates: Map<number, Ref<string>>; // level -> active ID ref
+    activeStates: Map<number, Ref<string | null>>; // level -> active ID ref
     rootMargin?: string;
 }
 

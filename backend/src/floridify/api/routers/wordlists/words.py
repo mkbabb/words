@@ -1,5 +1,6 @@
 """WordList words management endpoints."""
 
+from datetime import UTC, datetime
 from typing import Any
 
 from beanie import PydanticObjectId
@@ -7,7 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ....models import Word
-from ....wordlist.constants import MasteryLevel
+from ....utils.text_utils import normalize_word
+from ....wordlist.constants import MasteryLevel, Temperature
 from ...core import ListResponse, ResourceResponse
 from ...repositories import WordAddRequest, WordListRepository
 from .utils import search_words_in_wordlist
@@ -17,16 +19,18 @@ class WordListQueryParams(BaseModel):
     """Common query parameters for wordlist operations."""
 
     # Filters
-    mastery_level: MasteryLevel | None = Field(None, description="Filter by mastery level")
+    mastery_levels: list[str] | None = Field(None, description="Filter by mastery levels (bronze, silver, gold)")
+    hot_only: bool | None = Field(None, description="Show only hot items")
+    due_only: bool | None = Field(None, description="Show only items due for review")
     min_views: int | None = Field(None, ge=0, description="Minimum view count")
     max_views: int | None = Field(None, ge=0, description="Maximum view count")
     reviewed: bool | None = Field(None, description="Filter reviewed/unreviewed")
 
     # Sorting
     sort_by: str = Field(
-        "added_at", description="Sort field (added_at, last_viewed, mastery_level, relevance)"
+        "added_at", description="Sort field (word, added_at, last_visited, mastery_level, frequency, next_review). Can be comma-separated for multiple criteria"
     )
-    sort_order: str = Field("desc", pattern="^(asc|desc)$", description="Sort order")
+    sort_order: str = Field("desc", description="Sort order (asc|desc). Can be comma-separated to match sort_by fields")
 
     # Pagination
     offset: int = Field(0, ge=0, description="Skip first N results")
@@ -57,9 +61,22 @@ def passes_wordlist_filters(word_item: Any, params: WordListQueryParams) -> bool
     Returns:
         True if item passes all filters, False otherwise
     """
-    # Apply mastery level filter
-    if params.mastery_level and word_item.mastery_level != params.mastery_level:
+    # Apply mastery levels filter
+    if params.mastery_levels:
+        if word_item.mastery_level not in params.mastery_levels:
+            return False
+    
+    # Apply hot_only filter
+    if params.hot_only and word_item.temperature != Temperature.HOT:
         return False
+    
+    # Apply due_only filter
+    if params.due_only:
+        # Item is due if it has a next_review date that's in the past
+        if not word_item.review_data.next_review_date:
+            return False
+        if word_item.review_data.next_review_date > datetime.now(UTC):
+            return False
     
     # Apply view count filters
     if params.min_views is not None and word_item.review_data.repetitions < params.min_views:
@@ -76,7 +93,7 @@ def passes_wordlist_filters(word_item: Any, params: WordListQueryParams) -> bool
     return True
 
 
-def apply_wordlist_filters_and_sort(
+async def apply_wordlist_filters_and_sort(
     wordlist_items: list[Any],
     params: WordListQueryParams
 ) -> list[Any]:
@@ -92,15 +109,42 @@ def apply_wordlist_filters_and_sort(
     # Apply filters using shared logic
     filtered_items = [item for item in wordlist_items if passes_wordlist_filters(item, params)]
 
-    # Sort items
+    # Sort items - handle multiple sort criteria
+    sort_fields = [f.strip() for f in params.sort_by.split(',')]
+    sort_orders = [o.strip() for o in params.sort_order.split(',')]
+    
+    # Pad sort_orders if not enough values provided
+    while len(sort_orders) < len(sort_fields):
+        sort_orders.append(sort_orders[-1] if sort_orders else "desc")
+    
+    # Define sort key functions
     sort_key_map = {
         "added_at": lambda w: w.added_date or "",
         "last_visited": lambda w: w.last_visited or "",
-        "mastery_level": lambda w: w.mastery_level.value,
+        "mastery_level": lambda w: w.mastery_level,
         "view_count": lambda w: w.review_data.repetitions,
+        "frequency": lambda w: w.frequency,  # Match frontend field name
+        "next_review": lambda w: w.review_data.next_review_date or "",  # Match frontend field name
+        "word": lambda w: "",  # Will be filled in after fetching word text
     }
-    sort_key = sort_key_map.get(params.sort_by, lambda w: w.added_date or "")
-    filtered_items.sort(key=sort_key, reverse=(params.sort_order == "desc"))
+    
+    # If sorting by word, we need to fetch word texts first
+    if "word" in sort_fields:
+        word_ids = [w.word_id for w in filtered_items if w.word_id]
+        words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+        # Create map with normalized text for proper sorting of diacritics and phrases
+        word_text_map = {str(word.id): word.text for word in words}
+        word_normalized_map = {str(word.id): normalize_word(word.text) for word in words}
+        
+        # Update the word sort key to use normalized text
+        sort_key_map["word"] = lambda w: word_normalized_map.get(str(w.word_id), "")
+    
+    # Sort using multiple keys with proper handling of desc order
+    for field, order in reversed(list(zip(sort_fields, sort_orders))):
+        # Get the sort key function
+        key_func = sort_key_map.get(field, lambda w: w.added_date or "")
+        # Sort by this field
+        filtered_items.sort(key=key_func, reverse=(order == "desc"))
 
     return filtered_items
 
@@ -182,6 +226,16 @@ async def list_words(
         - sort_order: Sort direction
         - Standard pagination params
 
+    Query Parameters:
+        - mastery_levels: Filter by mastery levels (can specify multiple)
+        - hot_only: Show only hot items
+        - due_only: Show only items due for review
+        - min/max_views: View count range
+        - reviewed: Filter by review status
+        - sort_by: Field(s) to sort by (comma-separated for multiple)
+        - sort_order: Sort direction(s) (comma-separated to match sort_by)
+        - Standard pagination params
+
     Returns:
         Paginated list of words with metadata.
     """
@@ -190,7 +244,7 @@ async def list_words(
     assert wordlist is not None
 
     # Apply shared filtering and sorting logic
-    filtered_words = apply_wordlist_filters_and_sort(wordlist.words, params)
+    filtered_words = await apply_wordlist_filters_and_sort(wordlist.words, params)
 
     # Convert to response format with pagination
     items, total = await convert_wordlist_items_to_response(

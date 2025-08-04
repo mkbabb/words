@@ -1,258 +1,362 @@
 import { defineStore } from 'pinia'
-import { ref, computed, nextTick, readonly } from 'vue'
-import { useAIMode } from '../composables/useAIMode'
+import { ref, readonly, computed } from 'vue'
+import { useSearchConfigStore } from './search-config'
+import { useLookupMode } from './modes/lookup'
+import { useWordlistMode } from './modes/wordlist'
+import type { SearchMode } from '@/types'
 
 /**
- * SearchBarStore - Pure UI state and interactions for the search bar
- * Handles dropdown visibility, focus state, autocomplete, and AI indicators
+ * Refactored SearchBarStore with mode-specific encapsulation
+ * Handles search input, dropdown state, and mode-specific UI features
  */
 export const useSearchBarStore = defineStore('searchBar', () => {
   // ==========================================================================
-  // UI STATE (Non-persisted)
+  // SHARED SEARCH BAR STATE
   // ==========================================================================
   
-  // Dropdown and selection state
-  const showSearchResults = ref(false)
-  const searchSelectedIndex = ref(0)
-  
-  // Focus management
-  const isSearchBarFocused = ref(false)
-  
-  // Control visibility
-  const showSearchControls = ref(false)
-  
-  // Animation and feedback states
-  const showErrorAnimation = ref(false)
-  const isSwitchingModes = ref(false)
-  
-  // Autocomplete and suggestions
-  const autocompleteText = ref('')
-  const aiSuggestions = ref<string[]>([])
-  
-  // Operation flags
-  const isDirectLookup = ref(false)
-  
-  // Current query (non-persisted - router handles persistence)
   const searchQuery = ref('')
+  const searchSelectedIndex = ref(0)
+  const showDropdown = ref(false)
+  const showSearchControls = ref(false)
+  const isFocused = ref(false)
+  const isHovered = ref(false)
+  const hasErrorAnimation = ref(false)
+  const modeSwitchAnimation = ref(false)
+  const isDirectLookup = ref(false)
+  const autocompleteText = ref('')
   
-  // Mode-specific queries for switching contexts
-  const modeQueries = ref({
-    lookup: '',
-    wordlist: '',
-    wordOfTheDay: '',
-    stage: '',
-  })
-
   // ==========================================================================
-  // AI MODE INTEGRATION
+  // MODE-SPECIFIC STATES
   // ==========================================================================
   
-  // Use the AI mode composable for reactive AI detection
-  const { isAIQuery, showSparkle, enableAIMode, disableAIMode } = useAIMode(searchQuery)
-
+  const lookupMode = useLookupMode()
+  const wordlistMode = useWordlistMode()
+  
+  // Mode state registry
+  const modeStates = {
+    lookup: lookupMode,
+    wordlist: wordlistMode,
+    'word-of-the-day': null, // No specific state for WOTD
+    stage: null, // No specific state for stage
+  }
+  
   // ==========================================================================
   // COMPUTED PROPERTIES
   // ==========================================================================
   
-  // Combined search bar state for easy access
-  const searchBarState = computed(() => ({
-    query: searchQuery.value,
-    showResults: showSearchResults.value,
-    selectedIndex: searchSelectedIndex.value,
-    isFocused: isSearchBarFocused.value,
-    showControls: showSearchControls.value,
-    isAIQuery: isAIQuery.value,
-    showSparkle: showSparkle.value,
-    showErrorAnimation: showErrorAnimation.value,
-    autocompleteText: autocompleteText.value,
-    isDirectLookup: isDirectLookup.value,
-    isSwitchingModes: isSwitchingModes.value
-  }))
+  const searchConfig = useSearchConfigStore()
+  const currentMode = computed(() => searchConfig.searchMode)
+  
+  // Get current mode's state
+  const currentModeState = computed(() => {
+    return modeStates[currentMode.value]
+  })
+  
+  // Expose mode-specific properties based on current mode
+  const isAIQuery = computed(() => 
+    currentMode.value === 'lookup' ? lookupMode.isAIQuery.value : false
+  )
+  
+  const showSparkle = computed(() => 
+    currentMode.value === 'lookup' ? lookupMode.showSparkle.value : false
+  )
+  
+  const aiSuggestions = computed(() => 
+    currentMode.value === 'lookup' ? lookupMode.aiSuggestions.value : []
+  )
+  
+  const batchMode = computed(() => 
+    currentMode.value === 'wordlist' ? wordlistMode.batchMode.value : false
+  )
+  
+  const processingQueue = computed(() => 
+    currentMode.value === 'wordlist' ? wordlistMode.processingQueue.value : []
+  )
 
+  // Legacy computed properties for backward compatibility
+  const showSearchResults = computed(() => showDropdown.value)
+  const isSearchBarFocused = computed(() => isFocused.value)
+  
   // ==========================================================================
-  // ACTIONS
+  // SHARED ACTIONS
   // ==========================================================================
   
-  // Query management
   const setQuery = (query: string) => {
     searchQuery.value = query
   }
-
+  
   const clearQuery = () => {
     searchQuery.value = ''
-  }
-
-  // Mode query management
-  const saveModeQuery = (mode: string, query: string) => {
-    const modeKey = mode === 'word-of-the-day' ? 'wordOfTheDay' : mode
-    modeQueries.value[modeKey as keyof typeof modeQueries.value] = query
-  }
-
-  const restoreModeQuery = (mode: string): string => {
-    const modeKey = mode === 'word-of-the-day' ? 'wordOfTheDay' : mode
-    return modeQueries.value[modeKey as keyof typeof modeQueries.value] || ''
-  }
-
-  // Dropdown management
-  const showDropdown = () => {
-    showSearchResults.value = true
-  }
-
-  const hideDropdown = () => {
-    showSearchResults.value = false
     searchSelectedIndex.value = 0
   }
-
-  const clearResults = () => {
-    hideDropdown()
-  }
-
-  // Selection management
+  
   const setSelectedIndex = (index: number) => {
     searchSelectedIndex.value = index
   }
-
-  const selectNext = (maxResults: number) => {
-    if (searchSelectedIndex.value < maxResults - 1) {
-      searchSelectedIndex.value++
-    }
+  
+  const toggleDropdown = () => {
+    showDropdown.value = !showDropdown.value
+  }
+  
+  const setDropdown = (show: boolean) => {
+    showDropdown.value = show
   }
 
-  const selectPrevious = () => {
-    if (searchSelectedIndex.value > 0) {
-      searchSelectedIndex.value--
-    }
+  const openDropdown = () => {
+    showDropdown.value = true
   }
 
-  const resetSelection = () => {
-    searchSelectedIndex.value = 0
+  const hideDropdown = () => {
+    showDropdown.value = false
   }
-
-  // Focus management
-  const setFocused = (focused: boolean) => {
-    isSearchBarFocused.value = focused
-  }
-
-  // Control management
-  const toggleControls = () => {
+  
+  const toggleSearchControls = () => {
     showSearchControls.value = !showSearchControls.value
+  }
+  
+  const setSearchControls = (show: boolean) => {
+    showSearchControls.value = show
+  }
+  
+  const setFocused = (focused: boolean) => {
+    isFocused.value = focused
+    if (!focused) {
+      // Hide dropdown when losing focus
+      showDropdown.value = false
+    }
+  }
+  
+  const setHovered = (hovered: boolean) => {
+    isHovered.value = hovered
+  }
+
+  const setDirectLookup = (directLookup: boolean) => {
+    isDirectLookup.value = directLookup
+  }
+
+  const setAutocompleteText = (text: string) => {
+    autocompleteText.value = text
   }
 
   const hideControls = () => {
     showSearchControls.value = false
   }
 
-  // Animation management
+  const resetSelection = () => {
+    searchSelectedIndex.value = 0
+  }
+  
   const triggerErrorAnimation = () => {
-    showErrorAnimation.value = true
+    hasErrorAnimation.value = true
     setTimeout(() => {
-      showErrorAnimation.value = false
-    }, 1000)
+      hasErrorAnimation.value = false
+    }, 600)
   }
-
-  // Mode switching state
-  const setSwitchingModes = (switching: boolean) => {
-    isSwitchingModes.value = switching
+  
+  const triggerModeSwitchAnimation = () => {
+    modeSwitchAnimation.value = true
+    setTimeout(() => {
+      modeSwitchAnimation.value = false
+    }, 400)
+  }
+  
+  // ==========================================================================
+  // MODE TRANSITION HANDLING
+  // ==========================================================================
+  
+  const handleModeChange = async (newMode: SearchMode, previousMode: SearchMode) => {
+    console.log('🔄 Search bar handling mode change:', previousMode, '->', newMode)
     
-    if (switching) {
-      // Auto-reset after timeout to prevent stuck state
-      setTimeout(() => {
-        isSwitchingModes.value = false
-      }, 2000)
+    // Trigger mode switch animation
+    triggerModeSwitchAnimation()
+    
+    // Execute exit handler for previous mode
+    const previousModeState = modeStates[previousMode]
+    if (previousModeState?.handler?.onExit) {
+      await previousModeState.handler.onExit(newMode)
+    }
+    
+    // Execute enter handler for new mode
+    const newModeState = modeStates[newMode]
+    if (newModeState?.handler?.onEnter) {
+      await newModeState.handler.onEnter(previousMode)
+    }
+    
+    // Clear search query when switching modes (optional)
+    // clearQuery()
+  }
+  
+  // ==========================================================================
+  // MODE-SPECIFIC ACTION DELEGATES
+  // ==========================================================================
+  
+  // Lookup mode actions
+  const setAIQuery = (isAI: boolean) => {
+    if (currentMode.value === 'lookup') {
+      lookupMode.setAIQuery(isAI)
     }
   }
-
-  // Direct lookup management
-  const setDirectLookup = (direct: boolean) => {
-    isDirectLookup.value = direct
-    
-    if (direct) {
-      // Auto-reset after timeout
-      setTimeout(() => {
-        isDirectLookup.value = false
-      }, 2000)
+  
+  const setShowSparkle = (show: boolean) => {
+    if (currentMode.value === 'lookup') {
+      lookupMode.setShowSparkle(show)
     }
   }
-
-  // Autocomplete management
-  const setAutocomplete = (text: string) => {
-    autocompleteText.value = text
-  }
-
-  const clearAutocomplete = () => {
-    autocompleteText.value = ''
-  }
-
-  // AI suggestions management
+  
   const setAISuggestions = (suggestions: string[]) => {
-    aiSuggestions.value = suggestions
+    if (currentMode.value === 'lookup') {
+      lookupMode.setAISuggestions(suggestions)
+    }
   }
-
+  
+  const addAISuggestion = (suggestion: string) => {
+    if (currentMode.value === 'lookup') {
+      lookupMode.addAISuggestion(suggestion)
+    }
+  }
+  
   const clearAISuggestions = () => {
-    aiSuggestions.value = []
+    if (currentMode.value === 'lookup') {
+      lookupMode.clearAISuggestions()
+    }
   }
-
-  // Combined reset for search operations
-  const resetForDirectLookup = () => {
-    hideDropdown()
-    setDirectLookup(true)
-    disableAIMode()
+  
+  // Wordlist mode actions
+  const toggleBatchMode = () => {
+    if (currentMode.value === 'wordlist') {
+      wordlistMode.toggleBatchMode()
+    }
   }
-
-  const resetForModeSwitch = async () => {
-    hideDropdown()
-    setSwitchingModes(true)
-    await nextTick()
+  
+  const setBatchMode = (enabled: boolean) => {
+    if (currentMode.value === 'wordlist') {
+      wordlistMode.setBatchMode(enabled)
+    }
   }
-
+  
+  const addToQueue = (word: string) => {
+    if (currentMode.value === 'wordlist') {
+      wordlistMode.addToQueue(word)
+    }
+  }
+  
+  const addBatchToQueue = (words: string[]) => {
+    if (currentMode.value === 'wordlist') {
+      wordlistMode.addBatchToQueue(words)
+    }
+  }
+  
+  const removeFromQueue = (word: string) => {
+    if (currentMode.value === 'wordlist') {
+      wordlistMode.removeFromQueue(word)
+    }
+  }
+  
+  const clearQueue = () => {
+    if (currentMode.value === 'wordlist') {
+      wordlistMode.clearQueue()
+    }
+  }
+  
+  // ==========================================================================
+  // RESET
+  // ==========================================================================
+  
+  const reset = () => {
+    // Reset shared state
+    searchQuery.value = ''
+    searchSelectedIndex.value = 0
+    showDropdown.value = false
+    showSearchControls.value = false
+    isFocused.value = false
+    isHovered.value = false
+    hasErrorAnimation.value = false
+    modeSwitchAnimation.value = false
+    isDirectLookup.value = false
+    autocompleteText.value = ''
+    
+    // Reset mode-specific states
+    lookupMode.reset()
+    wordlistMode.reset()
+  }
+  
   // ==========================================================================
   // RETURN API
   // ==========================================================================
   
   return {
-    // State
+    // Shared State
     searchQuery: readonly(searchQuery),
-    modeQueries: readonly(modeQueries),
-    showSearchResults: readonly(showSearchResults),
     searchSelectedIndex: readonly(searchSelectedIndex),
-    isSearchBarFocused: readonly(isSearchBarFocused),
+    showDropdown: readonly(showDropdown),
     showSearchControls: readonly(showSearchControls),
-    isAIQuery,
-    showSparkle,
-    showErrorAnimation: readonly(showErrorAnimation),
-    isSwitchingModes: readonly(isSwitchingModes),
-    autocompleteText: readonly(autocompleteText),
-    aiSuggestions: readonly(aiSuggestions),
+    isFocused: readonly(isFocused),
+    isHovered: readonly(isHovered),
+    hasErrorAnimation: readonly(hasErrorAnimation),
+    modeSwitchAnimation: readonly(modeSwitchAnimation),
     isDirectLookup: readonly(isDirectLookup),
+    autocompleteText: readonly(autocompleteText),
+    showSearchResults: readonly(showSearchResults),
+    isSearchBarFocused: readonly(isSearchBarFocused),
     
-    // Computed
-    searchBarState,
+    // Mode-Specific State (computed based on current mode)
+    isAIQuery: readonly(isAIQuery),
+    showSparkle: readonly(showSparkle),
+    aiSuggestions: readonly(aiSuggestions),
+    batchMode: readonly(batchMode),
+    processingQueue: readonly(processingQueue),
     
-    // Actions
+    // Shared Actions
     setQuery,
     clearQuery,
-    saveModeQuery,
-    restoreModeQuery,
-    showDropdown,
-    hideDropdown,
-    clearResults,
     setSelectedIndex,
-    selectNext,
-    selectPrevious,
-    resetSelection,
+    toggleDropdown,
+    setDropdown,
+    toggleSearchControls,
+    setSearchControls,
     setFocused,
-    toggleControls,
-    hideControls,
-    triggerErrorAnimation,
-    setSwitchingModes,
+    setHovered,
     setDirectLookup,
-    setAutocomplete,
-    clearAutocomplete,
+    setAutocompleteText,
+    hideControls,
+    resetSelection,
+    openDropdown,
+    hideDropdown,
+    triggerErrorAnimation,
+    triggerModeSwitchAnimation,
+    handleModeChange,
+    
+    // Mode-Specific Actions (delegates)
+    // Lookup
+    setAIQuery,
+    setShowSparkle,
     setAISuggestions,
+    addAISuggestion,
     clearAISuggestions,
-    enableAIMode,
-    disableAIMode,
-    resetForDirectLookup,
-    resetForModeSwitch
+    
+    // Wordlist
+    toggleBatchMode,
+    setBatchMode,
+    addToQueue,
+    addBatchToQueue,
+    removeFromQueue,
+    clearQueue,
+    
+    // Reset
+    reset,
+    
+    // Expose mode states for advanced usage
+    lookupMode,
+    wordlistMode,
+    currentModeState,
+  }
+}, {
+  persist: {
+    key: 'search-bar',
+    pick: [
+      'searchQuery',
+      'showSearchControls',
+      // Note: Mode-specific states handle their own persistence
+    ]
   }
 })

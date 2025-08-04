@@ -73,9 +73,10 @@ export interface LookupHistory {
 
 export interface VocabularySuggestion {
   word: string;
-  reasoning: string;
-  difficulty_level: number;
-  semantic_category: string;
+  reasoning?: string;
+  reason?: string; // Legacy field for backward compatibility
+  difficulty_level?: number;
+  semantic_category?: string;
 }
 
 export interface VocabularySuggestionsResponse {
@@ -145,6 +146,20 @@ export interface AppState {
 export const CARD_VARIANTS = ['default', 'gold', 'silver', 'bronze'] as const;
 export type CardVariant = typeof CARD_VARIANTS[number];
 
+// Provider/Source configuration
+export interface SourceConfig {
+    id: string;
+    name: string;
+    icon: any; // Component type
+}
+
+// Language configuration
+export interface LanguageConfig {
+    value: string;
+    label: string;
+    icon: any; // Component type
+}
+
 // Texture system types
 export const TEXTURE_TYPES = ['clean', 'aged', 'handmade', 'kraft'] as const;
 export type TextureType = typeof TEXTURE_TYPES[number];
@@ -202,6 +217,8 @@ export type {
   // Core mode types (replaces 76+ inline union type instances)
   LookupMode,           // Replaces 11 instances of 'dictionary' | 'thesaurus' | 'suggestions'
   SearchMode,           // Replaces 9 instances of 'lookup' | 'wordlist' | 'word-of-the-day' | 'stage'
+  SearchSubMode,        // Generalized sub-mode type for all search modes
+  SearchSubModeMap,     // Map of search modes to their sub-modes
   LoadingMode,          // Replaces 4 instances across loading components
   
   // Configuration types

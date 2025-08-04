@@ -124,7 +124,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
 import { useStores } from '@/stores';
 import { 
   FileText, 
@@ -140,8 +139,7 @@ import type { WordList } from '@/types';
 import { wordlistApi } from '@/api';
 import { useToast } from '@/components/ui/toast/use-toast';
 
-const { searchConfig, orchestrator } = useStores();
-const router = useRouter();
+const { searchConfig } = useStores();
 const { toast } = useToast();
 
 // Component state
@@ -309,7 +307,8 @@ const loadWordlists = async () => {
 
 const handleWordlistSelect = async (wordlist: WordList) => {
   searchConfig.setWordlist(wordlist.id);
-  searchConfig.setSearchMode('wordlist', router);
+  // ✅ Use simple mode system - just change the mode
+  searchConfig.setMode('wordlist');
 };
 
 const handleWordlistEdit = (wordlist: WordList) => {
@@ -406,7 +405,8 @@ const handleUploadCancel = () => {
 const handleWordlistCreated = async (wordlist: WordList) => {
   wordlists.value.unshift(wordlist);
   searchConfig.setWordlist(wordlist.id);
-  searchConfig.setSearchMode('wordlist', router);
+  // ✅ Use simple mode system - just change the mode
+  searchConfig.setMode('wordlist');
 };
 
 // Lifecycle

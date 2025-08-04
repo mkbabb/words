@@ -8,7 +8,7 @@
                     v-for="(suggestion, index) in sortedSuggestions"
                     :key="suggestion.word"
                     :open-delay="200"
-                    :close-delay="100"
+                    :close-delay="50"
                 >
                     <HoverCardTrigger as-child>
                         <ThemedCard
@@ -95,10 +95,13 @@ import { computed } from 'vue';
 import { useStores } from '@/stores';
 import { ThemedCard } from '@/components/custom/card';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { getCardVariant, formatPercent, formatExampleUsage } from './utils';
+import { useContentStore } from '@/stores';
 
-const { searchResults, ui, orchestrator } = useStores();
+const { orchestrator, searchConfig } = useStores();
+const contentStore = useContentStore();
 
-const wordSuggestions = computed(() => searchResults.wordSuggestions);
+const wordSuggestions = computed(() => contentStore.wordSuggestions);
 
 const sortedSuggestions = computed(() => {
     if (!wordSuggestions.value) return [];
@@ -112,25 +115,10 @@ const sortedSuggestions = computed(() => {
 
 const originalQuery = computed(() => wordSuggestions.value?.original_query || '');
 
-function getCardVariant(index: number): 'default' | 'gold' | 'silver' | 'bronze' {
-    if (index === 0) return 'gold';
-    if (index === 1) return 'silver';
-    if (index === 2) return 'bronze';
-    return 'default';
-}
-
-function formatPercent(value: number): string {
-    return `${Math.round(value * 100)}%`;
-}
-
-function formatExampleUsage(example: string): string {
-    // Bold the suggested word in the example
-    return example.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-foreground">$1</strong>');
-}
-
 async function handleWordClick(word: string) {
-    // After successful lookup, smoothly transition to dictionary mode
-    ui.setMode('dictionary');
+    // ✅ Use simple mode system - just change the mode
+    searchConfig.setMode('lookup');
+    searchConfig.setSubMode('lookup', 'dictionary');
     // Use searchWord for direct lookup (sets isDirectLookup flag)
     await orchestrator.searchWord(word);
 }

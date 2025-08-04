@@ -39,9 +39,10 @@ export function useFocusManagement(options: UseFocusManagementOptions) {
     // Only restore search results if we're in lookup mode and there's an active query
     // Don't auto-show results when just switching modes or focusing
     const { searchConfig, searchResults } = useStores();
+    const currentResults = searchResults.getSearchResults(searchConfig.searchMode);
     console.log('🔍 FOCUS MANAGEMENT - handleFocus called', {
       searchMode: searchConfig.searchMode,
-      sessionResults: searchResults.searchResults?.length || 0,
+      sessionResults: currentResults?.length || 0,
       searchQuery: searchBar.searchQuery,
       queryLength: searchBar.searchQuery.length,
       isDirectLookup: searchBar.isDirectLookup,
@@ -49,13 +50,13 @@ export function useFocusManagement(options: UseFocusManagementOptions) {
     
     if (
       searchConfig.searchMode === 'lookup' &&
-      searchResults.searchResults?.length > 0 &&
+      currentResults?.length > 0 &&
       searchBar.searchQuery.length >= 2 &&
       !searchBar.isDirectLookup // Don't show if we're doing a direct lookup
     ) {
       console.log('🔍 FOCUS MANAGEMENT - RESTORING SEARCH RESULTS AND SHOWING DROPDOWN');
       // Search results are already stored, just show the dropdown
-      searchBar.showDropdown();
+      searchBar.openDropdown();
     }
   };
 
@@ -76,7 +77,7 @@ export function useFocusManagement(options: UseFocusManagementOptions) {
 
       // Hide results on blur only if we're not interacting with search area
       searchBar.hideDropdown();
-      const { searchResults, loading } = useStores();
+      const { searchResults } = useStores();
       searchResults.clearSearchResults();
     }, 200); // Increased delay to 200ms for better UX
   };

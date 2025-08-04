@@ -32,7 +32,7 @@
                     <SidebarCluster
                         :cluster="cluster"
                         :isActive="activeCluster === cluster.clusterId"
-                        :activePartOfSpeech="activePartOfSpeech"
+                        :activePartOfSpeech="activePartOfSpeech || ''"
                         :cardVariant="selectedCardVariant"
                         @cluster-click="handleClusterClick(cluster.clusterId)"
                         @part-of-speech-click="(pos) => handlePartOfSpeechClick(cluster.clusterId, pos)"
@@ -116,7 +116,7 @@ const scrollSidebarToElement = async (selector: string) => {
 };
 
 // Watch for active changes and auto-scroll sidebar
-watch([activeCluster, activePartOfSpeech], async ([newCluster, newPOS]) => {
+watch([activeCluster, activePartOfSpeech], async ([newCluster, newPOS]: [string | null, string | null]) => {
     if (newPOS) {
         // Scroll to the active part of speech button
         await scrollSidebarToElement(`[data-sidebar-pos="${newPOS}"]`);

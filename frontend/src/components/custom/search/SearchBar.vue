@@ -19,67 +19,67 @@
                 :class="[
                     'search-bar relative flex items-center gap-2 overflow-visible px-1 sm:px-1 py-0.5',
                     'cartoon-shadow-sm rounded-2xl transition-all duration-500 ease-out',
-                    state.isAIQuery && !state.showErrorAnimation
+                    searchBar.isAIQuery && !searchBar.hasErrorAnimation
                         ? 'border-2 border-amber-500 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-950/30 backdrop-blur-sm'
-                        : state.showErrorAnimation
+                        : searchBar.hasErrorAnimation
                         ? 'border-2 border-red-400/50 dark:border-red-600/50 bg-gradient-to-br from-red-50/20 to-red-50/10 dark:from-red-900/20 dark:to-red-900/10'
                         : 'border-2 border-border bg-background/20 backdrop-blur-3xl',
                     {
-                        'cartoon-shadow-sm-hover': state.isContainerHovered,
+                        'cartoon-shadow-sm-hover': uiState.isContainerHovered,
                         'bg-background/30':
-                            state.isContainerHovered && !state.isAIQuery,
-                        'shake-error': state.showErrorAnimation,
+                            uiState.isContainerHovered && !searchBar.isAIQuery,
+                        'shake-error': searchBar.hasErrorAnimation,
                     },
                 ]"
                 :style="{
-                    height: state.isAIQuery
+                    height: searchBar.isAIQuery
                         ? 'auto'
-                        : `${state.searchBarHeight}px`,
-                    minHeight: state.isAIQuery
-                        ? `${state.searchBarHeight}px`
+                        : `${uiState.searchBarHeight}px`,
+                    minHeight: searchBar.isAIQuery
+                        ? `${uiState.searchBarHeight}px`
                         : undefined,
-                    maxHeight: state.isAIQuery
+                    maxHeight: searchBar.isAIQuery
                         ? '420px'
                         : undefined,
-                    overflowY: state.isAIQuery
+                    overflowY: searchBar.isAIQuery
                         ? 'visible'
                         : 'visible',
-                    borderColor: state.isAIQuery && !state.showErrorAnimation
+                    borderColor: searchBar.isAIQuery && !searchBar.hasErrorAnimation
                         ? '#fbbf24'
-                        : state.showErrorAnimation
+                        : searchBar.hasErrorAnimation
                         ? '#f87171'
                         : undefined,
                 }"
             >
                 <!-- Sparkle Indicator -->
-                <SparkleIndicator :show="state.showSparkle" />
+                <SparkleIndicator :show="searchBar.showSparkle" />
 
                 <!-- Mode Toggle -->
                 <ModeToggle
-                    v-model="state.mode"
+                    v-model="lookupMode"
                     :can-toggle="canToggleMode"
                     :opacity="iconOpacity"
-                    :ai-mode="state.isAIQuery"
+                    :ai-mode="searchBar.isAIQuery"
                 />
 
                 <!-- Search Input Container with Autocomplete -->
                 <div class="relative max-w-none min-w-0 flex-1 flex-grow">
                     <!-- Autocomplete Overlay -->
                     <AutocompleteOverlay
-                        :query="state.query"
-                        :suggestion="state.autocompleteText"
+                        :query="searchQuery"
+                        :suggestion="searchBar.autocompleteText"
                         :padding-left="iconOpacity > 0.1 ? '1rem' : '1.5rem'"
                         :padding-right="
-                            state.query.length > 0
+                            searchQuery.length > 0
                                 ? '5rem'
-                                : state.expandButtonVisible
+                                : uiState.expandButtonVisible
                                 ? '3rem'
                                 : iconOpacity > 0.1
                                   ? '1rem'
                                   : '1.5rem'
                         "
                         :text-align="
-                            iconOpacity < 0.3 && !state.isAIQuery
+                            iconOpacity < 0.3 && !searchBar.isAIQuery
                                 ? 'center'
                                 : 'left'
                         "
@@ -88,19 +88,19 @@
                     <!-- Main Search Input -->
                     <SearchInput
                         ref="searchInputComponent"
-                        v-model="state.query"
+                        v-model="searchQuery"
                         :placeholder="placeholder"
-                        :ai-mode="state.isAIQuery"
+                        :ai-mode="searchBar.isAIQuery"
                         :text-align="
-                            iconOpacity < 0.3 && !state.isAIQuery
+                            iconOpacity < 0.3 && !searchBar.isAIQuery
                                 ? 'center'
                                 : 'left'
                         "
                         :style="{
                             paddingLeft: iconOpacity > 0.1 ? '1rem' : '1.5rem',
-                            paddingRight: state.query.length > 0 && state.isAIQuery
+                            paddingRight: searchQuery.length > 0 && searchBar.isAIQuery
                                 ? '4.5rem'  // Both clear and expand buttons visible
-                                : state.query.length > 0 || state.isAIQuery
+                                : searchQuery.length > 0 || searchBar.isAIQuery
                                 ? '3rem'    // Either clear or expand button visible
                                 : iconOpacity > 0.1
                                   ? '1rem'
@@ -121,8 +121,11 @@
                         @input-click="handleInputClick"
                     />
 
-                    <!-- Button Container - positioned in bottom right -->
-                    <div class="absolute right-2 bottom-2 z-20 flex items-center gap-1">
+                    <!-- Button Container - positioned based on AI mode -->
+                    <div :class="[
+                        'absolute z-20 flex items-center gap-1',
+                        searchBar.isAIQuery ? 'right-2 bottom-2' : 'right-2 top-1/2 -translate-y-1/2'
+                    ]">
                         <!-- Expand Button -->
                         <Transition
                             enter-active-class="transition-all duration-200 ease-out"
@@ -131,17 +134,17 @@
                             leave-to-class="opacity-0 scale-90"
                         >
                             <button
-                                v-if="state.isAIQuery && state.scrollProgress < 0.3"
+                                v-if="searchBar.isAIQuery && uiState.scrollProgress < 0.3"
                                 :class="[
                                     'rounded-md p-1 transition-all duration-200',
                                     'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
-                                    state.isAIQuery
+                                    searchBar.isAIQuery
                                         ? 'bg-amber-100/80 hover:bg-amber-200/80 dark:bg-amber-900/40 dark:hover:bg-amber-800/40'
                                         : 'bg-muted/50 hover:bg-muted/80'
                                 ]"
                                 :style="{
-                                    opacity: 1 - state.scrollProgress * 3,
-                                    transform: `scale(${1 - state.scrollProgress * 0.5})`
+                                    opacity: 1 - uiState.scrollProgress * 3,
+                                    transform: `scale(${1 - uiState.scrollProgress * 0.5})`
                                 }"
                                 @click.stop="handleExpandClick"
                                 title="Expand for longer input"
@@ -149,7 +152,7 @@
                                 <Maximize2
                                     :class="[
                                         'h-4 w-4',
-                                        state.isAIQuery
+                                        searchBar.isAIQuery
                                             ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
                                             : 'text-foreground/70 hover:text-foreground'
                                     ]"
@@ -165,12 +168,12 @@
                             leave-to-class="opacity-0 scale-90"
                         >
                             <button
-                                v-if="state.query.length > 0 && state.isFocused"
+                                v-if="searchQuery.length > 0 && searchBar.isSearchBarFocused"
                                 @click.stop="clearQuery"
                                 :class="[
                                     'rounded-md p-1 transition-all duration-200',
                                     'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
-                                    state.isAIQuery
+                                    searchBar.isAIQuery
                                         ? 'bg-transparent hover:bg-amber-100/80 dark:hover:bg-amber-900/40'
                                         : 'bg-transparent hover:bg-muted/80'
                                 ]"
@@ -179,7 +182,7 @@
                                 <X
                                     :class="[
                                         'h-4 w-4',
-                                        state.isAIQuery
+                                        searchBar.isAIQuery
                                             ? 'text-amber-700 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200'
                                             : 'text-foreground/50 hover:text-foreground/70'
                                     ]"
@@ -201,8 +204,8 @@
                     }"
                 >
                     <HamburgerIcon
-                        :is-open="state.showControls"
-                        :ai-mode="state.isAIQuery"
+                        :is-open="searchBar.showSearchControls"
+                        :ai-mode="searchBar.isAIQuery"
                         @toggle="toggleControls"
                         @mousedown.prevent
                     />
@@ -214,7 +217,7 @@
                 :show="showProgressBar"
                 :progress="loading.loadingProgress"
                 :current-stage="loading.loadingStage"
-                :mode="state.searchMode"
+                :mode="searchConfig.searchMode"
                 :category="loading.loadingCategory"
                 @click="handleProgressBarClick"
             />
@@ -223,18 +226,16 @@
             <div class="absolute top-full right-0 left-0 z-40 pt-2">
                 <!-- Controls Dropdown -->
                 <SearchControls
-                    :show="state.showControls"
-                    v-model:search-mode="state.searchMode"
-                    v-model:selected-sources="state.selectedSources"
-                    v-model:selected-languages="state.selectedLanguages"
-                    v-model:no-a-i="state.noAI"
-                    v-model:wordlist-filters="state.wordlistFilters"
-                    v-model:wordlist-chunking="state.wordlistChunking"
-                    v-model:wordlist-sort-criteria="state.wordlistSortCriteria"
-                    :ai-suggestions="state.aiSuggestions"
-                    :is-development="state.isDevelopment"
-                    :show-refresh-button="!!searchResults.currentEntry && state.searchMode === 'lookup'"
-                    :force-refresh-mode="state.forceRefreshMode"
+                    :show="searchBar.showSearchControls"
+                    v-model:selected-sources="selectedSources"
+                    v-model:selected-languages="selectedLanguages"
+                    v-model:no-a-i="noAI"
+                    v-model:wordlist-filters="wordlistFilters"
+                    v-model:wordlist-sort-criteria="wordlistSortCriteria"
+                    :ai-suggestions="searchBar.aiSuggestions"
+                    :is-development="uiState.isDevelopment"
+                    :show-refresh-button="!!content.currentEntry && searchConfig.searchMode === 'lookup'"
+                    :force-refresh-mode="loading.forceRefreshMode"
                     @word-select="selectWord"
                     @clear-storage="clearAllStorage"
                     @interaction="handleSearchAreaInteraction"
@@ -250,12 +251,14 @@
                 >
                     <SearchResults
                         ref="searchResultsComponent"
-                        :show="state.showResults"
-                        :results="state.searchResults"
-                        :loading="state.isSearching"
-                        v-model:selected-index="state.selectedIndex"
-                        :query="state.query"
-                        :ai-mode="state.isAIQuery"
+                        :show="searchBar.showSearchResults"
+                        :results="searchResults.getSearchResults('lookup')"
+                        :loading="loading.isSearching"
+                        v-model:selected-index="searchSelectedIndex"
+                        :query="searchQuery"
+                        :ai-mode="searchBar.isAIQuery"
+                        :wordlist-mode="searchConfig.searchMode === 'wordlist'"
+                        :wordlist-results="searchResults.getSearchResults('wordlist')"
                         @select-result="selectResult"
                         @interaction="handleSearchAreaInteraction"
                     />
@@ -266,8 +269,8 @@
 
     <!-- Expanded Input Modal -->
     <ExpandModal
-        :show="state.showExpandModal"
-        :initial-query="state.query"
+        :show="uiState.showExpandModal"
+        :initial-query="searchQuery"
         @close="closeExpandModal"
         @submit="submitExpandedQuery"
     />
@@ -285,7 +288,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, watchEffect, onMounted, onUnmounted, nextTick } from 'vue';
 // Legacy store removed - all functionality migrated to modular stores
 import { useStores } from '@/stores';
 import { Maximize2, X } from 'lucide-vue-next';
@@ -305,13 +308,11 @@ import ConfirmDialog from '../ConfirmDialog.vue';
 // Import composables
 import {
     useSearchBarUI,
-    useSearchState,
     useSearchOperations,
-    useSearchNavigation,
+    useSearchBarNavigation,
     useFocusManagement,
     useModalManagement,
-    useSearchBarKeyboard,
-    useScrollAnimationSimple,
+    useSearchBarScroll,
     useAutocomplete
 } from './composables';
 import { shouldTriggerAIMode } from './utils/ai-query';
@@ -337,49 +338,101 @@ const emit = defineEmits<{
     'stage-enter': [query: string];
 }>();
 
-// Store & State
-const { searchBar, searchConfig, searchResults, ui, loading, orchestrator } = useStores();
-const { iconOpacity } = useSearchBarUI();
+// Store & State - Direct store access for single source of truth
+const { searchBar, searchConfig, searchResults, content, ui, loading, orchestrator } = useStores();
+const { iconOpacity, uiState } = useSearchBarUI();
 
-// All functionality now uses modular stores - no legacy store needed
+// All functionality now uses modular stores directly - no reactive wrapper needed
 
-// Use centralized state management
-const { state, canToggleMode, placeholder, resultsContainerStyle } = useSearchState();
+// Computed properties from stores
+const canToggleMode = computed(() => {
+    // Disable mode toggle in wordlist mode
+    if (searchConfig.searchMode === 'wordlist') return false;
+    
+    const hasWordQuery = !!content.currentEntry;
+    const hasSuggestionQuery = !!content.wordSuggestions;
+    
+    if (!hasWordQuery && !hasSuggestionQuery) return false;
+    if (hasSuggestionQuery && !hasWordQuery) return false;
+    return true;
+});
 
-// Progress bar state - track separately to persist after modal dismiss
-const isLoadingInProgress = ref(false);
+const placeholder = computed(() => {
+    // Hide placeholder when scrolled
+    if (uiState.scrollProgress > 0.3) {
+        return '';
+    }
+    
+    // First check searchMode for specific modes
+    if (searchConfig.searchMode === 'wordlist') {
+        return 'words';
+    } else if (searchConfig.searchMode === 'stage') {
+        return 'staging';
+    }
+
+    // Default to mode-based placeholders for lookup mode
+    return ui.mode === 'dictionary'
+        ? 'definitions'
+        : 'synonyms';
+});
+
+const resultsContainerStyle = computed(() => ({
+    paddingTop: '0px',
+    marginTop: searchBar.showSearchControls ? '0.5rem' : '0px',
+    transition: 'all 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+}));
+
+// Computed properties for v-model bindings
+const searchQuery = computed({
+    get: () => searchBar.searchQuery,
+    set: (value: string) => searchBar.setQuery(value)
+});
+
+const searchSelectedIndex = computed({
+    get: () => searchBar.searchSelectedIndex,
+    set: (value: number) => searchBar.setSelectedIndex(value)
+});
+
+const lookupMode = computed({
+    get: () => ui.mode,
+    set: (value: 'dictionary' | 'thesaurus' | 'suggestions') => searchConfig.setLookupMode(value)
+});
+
+// Computed properties for v-model bindings with searchConfig store
+const selectedSources = computed({
+    get: () => [...searchConfig.selectedSources],
+    set: (value: string[]) => searchConfig.setSources(value)
+});
+
+const selectedLanguages = computed({
+    get: () => [...searchConfig.selectedLanguages],
+    set: (value: string[]) => searchConfig.setLanguages(value)
+});
+
+const noAI = computed({
+    get: () => searchConfig.noAI,
+    set: (value: boolean) => searchConfig.setAI(!value)
+});
+
+// Computed properties for v-model bindings with searchConfig store
+const wordlistFilters = computed({
+    get: () => ({ ...searchConfig.wordlistFilters }),
+    set: (value: any) => searchConfig.setWordlistFilters(value)
+});
+
+
+const wordlistSortCriteria = computed({
+    get: () => [...searchConfig.wordlistSortCriteria],
+    set: (value: any) => searchConfig.setWordlistSortCriteria(value)
+});
+
+// Progress bar state - computed based on loading state
+const isLoadingInProgress = computed(() => {
+    return loading.isSearching || (loading.loadingProgress > 0 && loading.loadingProgress < 100);
+});
 
 // Dialog state
 const showClearStorageDialog = ref(false);
-
-// Start showing progress when search starts
-watch(() => loading.isSearching, (newVal) => {
-    if (newVal) {
-        isLoadingInProgress.value = true;
-    }
-});
-
-// Hide progress when loading completes
-watch(() => loading.isSearching, (searching) => {
-    if (!searching) {
-        setTimeout(() => isLoadingInProgress.value = false, 500);
-    }
-});
-
-// Watch loading progress from modular stores
-watch(() => [loading.loadingProgress, loading.isSearching], ([progress, searching]) => {
-    // Only hide if we're at 100% AND not searching anymore
-    if (typeof progress === 'number' && progress >= 100 && !searching) {
-        // Delay hiding to show completion
-        setTimeout(() => {
-            isLoadingInProgress.value = false;
-        }, 1000);
-    }
-    // Reset immediately if progress goes to 0 and we're not searching
-    else if (progress === 0 && !searching) {
-        isLoadingInProgress.value = false;
-    }
-});
 
 const showProgressBar = computed(() => {
     // Show progress bar if loading is in progress and modal is not visible
@@ -396,21 +449,9 @@ const searchResultsComponent = ref<any>();
 const searchInputRef = computed(() => searchInputComponent.value?.element);
 
 // Scroll animation setup
-const { containerStyle, updateScrollState } = useScrollAnimationSimple(
-    computed(() => state.scrollProgress),
-    computed(() => state.isContainerHovered),
-    computed(() => state.isFocused),
-    computed(() => state.showControls || state.showResults)
-);
-
-// Update scroll progress from prop
-watch(
-    () => props.shrinkPercentage,
-    (newValue) => {
-        state.scrollProgress = newValue;
-    },
-    { immediate: true }
-);
+const { containerStyle } = useSearchBarScroll({
+    shrinkPercentage: () => props.shrinkPercentage,
+});
 
 // Autocomplete setup
 const {
@@ -421,22 +462,39 @@ const {
     handleArrowKey: handleAutocompleteArrowKey,
     handleInputClick: handleAutocompleteInputClick,
 } = useAutocomplete({
-    query: computed(() => state.query),
-    searchResults: computed(() => state.searchResults),
+    query: computed(() => searchBar.searchQuery),
+    searchResults: computed(() => {
+        // Use appropriate results based on search mode
+        if (searchConfig.searchMode === 'wordlist') {
+            return searchResults.getSearchResults('wordlist').slice(0, 10) as any;
+        }
+        return searchResults.getSearchResults('lookup') as any;
+    }),
     searchInput: searchInputRef,
     onQueryUpdate: (newQuery: string) => {
-        state.query = newQuery;
+        searchBar.setQuery(newQuery);
     },
 });
 
 // Search operations
 const { performSearch, clearSearch, cleanup: cleanupSearch } = useSearchOperations({
-    query: computed(() => state.query),
+    query: computed(() => searchBar.searchQuery),
 });
 
-// Navigation setup
-const { navigateResults, resetSelection } = useSearchNavigation({
+// Unified navigation and keyboard handling
+const {
+    navigateResults,
+    handleEnter,
+    handleEscape,
+    selectResult,
+    handleSpaceKey,
+    handleArrowKey,
+} = useSearchBarNavigation({
+    searchInputRef,
     searchResultsComponent,
+    onAutocompleteAccept: acceptAutocomplete,
+    onAutocompleteSpace: handleAutocompleteSpaceKey,
+    onAutocompleteArrow: handleAutocompleteArrowKey,
 });
 
 // Focus management
@@ -460,26 +518,15 @@ const {
     submitExpandedQuery: submitExpandedQueryBase,
 } = useModalManagement();
 
-// Keyboard handling
-const {
-    handleEnter,
-    handleEscape,
-    selectResult,
-} = useSearchBarKeyboard({
-    searchInputRef,
-    onAutocompleteAccept: acceptAutocomplete,
-    onAutocompleteSpace: handleAutocompleteSpaceKey,
-    onAutocompleteArrow: handleAutocompleteArrowKey,
-});
 
 // Event Handlers
 const handleMouseEnter = () => {
-    state.isContainerHovered = true;
+    uiState.isContainerHovered = true;
     emit('mouseenter');
 };
 
 const handleMouseLeave = () => {
-    state.isContainerHovered = false;
+    uiState.isContainerHovered = false;
     emit('mouseleave');
 };
 
@@ -490,25 +537,17 @@ const handleInputClick = (event: MouseEvent) => {
 
 // Override handleEnter to handle stage mode
 const handleEnterWrapped = async () => {
-    if (state.searchMode === 'stage' && state.query) {
-        searchBar.setQuery(state.query);
-        emit('stage-enter', state.query);
+    if (searchConfig.searchMode === 'stage' && searchBar.searchQuery) {
+        emit('stage-enter', searchBar.searchQuery);
         return;
     }
     await handleEnter();
 };
 
 const toggleControls = () => {
-    state.showControls = !state.showControls;
+    searchConfig.toggleControls();
 };
 
-const handleSpaceKey = (event: KeyboardEvent) => {
-    handleAutocompleteSpaceKey(event);
-};
-
-const handleArrowKey = (event: KeyboardEvent) => {
-    handleAutocompleteArrowKey(event);
-};
 
 const selectWord = async (word: string) => {
     await orchestrator.searchWord(word);
@@ -516,7 +555,7 @@ const selectWord = async (word: string) => {
 
 const handleForceRegenerate = () => {
     handleSearchAreaInteraction();
-    state.forceRefreshMode = !state.forceRefreshMode;
+    loading.forceRefreshMode = !loading.forceRefreshMode;
 };
 
 const handleProgressBarClick = () => {
@@ -542,48 +581,29 @@ const confirmClearStorage = () => {
 
 // Expand modal wrapper
 const submitExpandedQuery = (query: string) => {
-    state.query = query;
+    searchBar.setQuery(query);
     submitExpandedQueryBase(query, handleEnterWrapped);
 };
 
-// Sync modal state
-watch(() => showExpandModal.value, (newVal) => {
-    state.showExpandModal = newVal;
-});
+// Modal state is now handled directly by useModalManagement composable
+// No watchers needed - single source of truth
 
-watch(() => state.showExpandModal, (newVal) => {
-    if (newVal !== showExpandModal.value) {
-        showExpandModal.value = newVal;
+// Autocomplete updates are now handled by the useAutocomplete composable
+// which already watches query and results internally
+
+// Scroll state updates are handled by useSearchBarScroll composable
+// which already computes based on props
+
+// Reset selected index when results change
+watchEffect(() => {
+    const results = searchResults.getSearchResults(searchConfig.searchMode);
+    
+    // Reset selected index if out of bounds
+    const maxResults = searchConfig.searchMode === 'wordlist' ? Math.min(10, results.length) : results.length;
+    if (searchBar.searchSelectedIndex >= maxResults) {
+        searchBar.setSelectedIndex(0);
     }
 });
-
-// Watch query for autocomplete
-watch(
-    () => state.query,
-    () => {
-        updateAutocomplete();
-        state.autocompleteText = autocompleteText.value;
-    }
-);
-
-// Watch search results for autocomplete
-watch(
-    () => state.searchResults,
-    () => {
-        resetSelection();
-        updateAutocomplete();
-        state.autocompleteText = autocompleteText.value;
-    }
-);
-
-// Update scroll state
-watch(
-    () => props,
-    () => {
-        updateScrollState();
-    },
-    { deep: true }
-);
 
 // Click outside handler
 const handleClickOutside = (event: MouseEvent) => {
@@ -594,10 +614,10 @@ const handleClickOutside = (event: MouseEvent) => {
     // If click is outside the search container, handle blur behavior
     if (!searchContainer.value.contains(target)) {
         // Close controls
-        state.showControls = false;
+        searchBar.hideControls();
         
         // Trigger blur behavior if search bar is focused
-        if (state.isFocused) {
+        if (searchBar.isSearchBarFocused) {
             // Don't set interaction flag since this is an outside click
             isInteractingWithSearchArea.value = false;
             
@@ -616,33 +636,28 @@ const handleClickOutside = (event: MouseEvent) => {
 onMounted(async () => {
     document.addEventListener('click', handleClickOutside);
     
-    // Watch query changes to trigger search
-    watch(
-        () => state.query,
-        () => {
-            performSearch();
-        }
-    );
-    
-    // Watch store searchQuery changes to sync with local state
+    // Watch query changes for immediate search - NO DEBOUNCING
     watch(
         () => searchBar.searchQuery,
         (newQuery) => {
-            if (newQuery !== state.query) {
-                state.query = newQuery;
-            }
+            // Trigger search immediately for all modes
+            performSearch();
+            
+            // Update autocomplete
+            updateAutocomplete();
+            searchBar.setAutocompleteText(autocompleteText.value);
         }
     );
-    
-    // Watch local query changes to save to store as user types
+
+    // Watch search results for autocomplete updates
     watch(
-        () => state.query,
-        (newQuery) => {
-            if (newQuery !== searchBar.searchQuery) {
-                searchBar.setQuery(newQuery);
-            }
+        () => searchResults.getSearchResults('lookup'),
+        () => {
+            updateAutocomplete();
+            searchBar.setAutocompleteText(autocompleteText.value);
         }
     );
+
 
     // Watch for AI mode changes from store
     // AI mode is now non-persisted and dynamically determined by query
@@ -650,45 +665,42 @@ onMounted(async () => {
     // Note: isAIQuery and showSparkle are computed properties from useAIMode composable
     // They are automatically reactive and don't need manual assignment
 
-    // Show results when focused with query (but not during direct lookups)
-    watch(
-        [() => state.isFocused, () => state.query, () => state.isAIQuery, () => state.searchResults, () => searchBar.isDirectLookup],
-        ([focused, query, isAI, results, isDirectLookup]) => {
-            console.log('🔍 SEARCHBAR WATCHER - focus/query/results changed', {
-                focused,
-                query,
-                queryLength: query?.length || 0,
-                isAI,
-                resultsLength: results?.length || 0,
-                isDirectLookup,
-                // isSwitchingModes: store.isSwitchingModes
-            });
-            
-            if (focused && query && query.length > 0 && !isAI && results && results.length > 0 && !isDirectLookup) {
-                console.log('🔍 SEARCHBAR WATCHER - SHOWING SEARCH RESULTS');
-                state.showResults = true;
-            } else if (isAI || isDirectLookup) {
-                console.log('🔍 SEARCHBAR WATCHER - HIDING SEARCH RESULTS (AI or direct lookup)');
-                state.showResults = false;
-            }
+    // Use watchEffect for results visibility - more efficient than computed + watch
+    watchEffect(() => {
+        const focused = searchBar.isSearchBarFocused;
+        const query = searchBar.searchQuery;
+        const isAI = searchBar.isAIQuery;
+        const isDirectLookup = searchBar.isDirectLookup;
+        
+        // Check appropriate results based on mode
+        let hasResults = false;
+        if (searchConfig.searchMode === 'wordlist') {
+            hasResults = searchResults.getSearchResults('wordlist').length > 0;
+        } else {
+            hasResults = searchResults.getSearchResults('lookup').length > 0;
         }
-    );
-
-    // Hide results immediately when direct lookup starts
-    watch(() => searchBar.isDirectLookup, (isDirectLookup) => {
-        if (isDirectLookup) {
-            state.showResults = false;
+        
+        const shouldShow = focused && query && query.length > 0 && 
+                          hasResults && 
+                          !isAI && !isDirectLookup;
+        
+        if (shouldShow !== searchBar.showSearchResults) {
+            if (shouldShow) {
+                searchBar.openDropdown();
+            } else {
+                searchBar.hideDropdown();
+            }
         }
     });
 
     // Check current query for AI mode on page load (in lookup mode only)
-    if (searchConfig.searchMode === 'lookup' && state.query) {
+    if (searchConfig.searchMode === 'lookup' && searchBar.searchQuery) {
         // AI mode is automatically computed by useAIMode composable based on query
-        shouldTriggerAIMode(state.query); // Validate query pattern
+        shouldTriggerAIMode(searchBar.searchQuery); // Validate query pattern
     }
 
-    // Initialize AI suggestions (method removed in modular architecture)
-    state.aiSuggestions = [];
+    // Initialize AI suggestions using the store action
+    searchBar.setAISuggestions([]);
 });
 
 // Cleanup

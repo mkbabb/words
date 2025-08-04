@@ -194,6 +194,39 @@ async def search_words_in_wordlist(
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
     
+    # Handle empty query - return all words
+    if not query.strip():
+        # Get all words in the wordlist
+        word_ids = [w.word_id for w in wordlist.words if w.word_id]
+        
+        if not word_ids:
+            return []
+            
+        words = await Word.find({"_id": {"$in": word_ids}}).to_list()
+        word_item_map = {str(w.word_id): w for w in wordlist.words}
+        
+        # Return all words with perfect score
+        matched_words = []
+        for word_doc in words:
+            word_item = word_item_map.get(str(word_doc.id))
+            if not word_item:
+                continue
+            
+            matched_words.append({
+                "word": word_doc.text,
+                "normalized": word_doc.normalized,
+                "score": 1.0,  # Perfect score for empty query
+                "mastery_level": word_item.mastery_level,
+                "review_count": word_item.review_data.repetitions if word_item.review_data else 0,
+                "notes": word_item.notes,
+                "tags": word_item.tags,
+                "frequency": word_item.frequency,
+            })
+        
+        # Sort by frequency descending for empty queries
+        matched_words.sort(key=lambda x: x["frequency"], reverse=True)
+        return matched_words[:max_results]
+    
     # Check if we have a valid corpus for this wordlist
     corpus_info = cache.get_corpus_info(corpus_id)
     if not corpus_info:
@@ -204,7 +237,8 @@ async def search_words_in_wordlist(
             return []
             
         words = await Word.find({"_id": {"$in": word_ids}}).to_list()
-        word_texts = [word.text for word in words if word.text]
+        # Use normalized text for corpus building to ensure proper search matching
+        word_texts = [word.normalized for word in words if word.normalized]
         
         if not word_texts:
             return []
@@ -240,8 +274,8 @@ async def search_words_in_wordlist(
     # Convert search results to word data with metadata
     matched_words = []
     for result in results:
-        # Find the word document and wordlist item
-        word_doc = next((w for w in words if w.text == result["word"]), None)
+        # Find the word document by matching normalized text
+        word_doc = next((w for w in words if w.normalized == result["word"]), None)
         if not word_doc:
             continue
             
@@ -251,6 +285,7 @@ async def search_words_in_wordlist(
         
         matched_words.append({
             "word": word_doc.text,
+            "normalized": word_doc.normalized,
             "score": result["score"],
             "mastery_level": word_item.mastery_level,
             "review_count": word_item.review_data.repetitions if word_item.review_data else 0,

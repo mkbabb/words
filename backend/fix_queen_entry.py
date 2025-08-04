@@ -3,11 +3,11 @@
 
 import asyncio
 import logging
+
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from src.floridify.models import ImageMedia, SynthesizedDictionaryEntry, Word
-from src.floridify.api.repositories.synthesis_repository import SynthesisRepository
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

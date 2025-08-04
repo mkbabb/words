@@ -195,7 +195,9 @@ export const wordlistsApi = {
     };
     
     // Add optional filtering parameters only if they are defined
-    if (searchParams.mastery_level) params.mastery_level = searchParams.mastery_level;
+    if (searchParams.mastery_levels) params.mastery_levels = searchParams.mastery_levels;
+    if (searchParams.hot_only !== undefined) params.hot_only = searchParams.hot_only;
+    if (searchParams.due_only !== undefined) params.due_only = searchParams.due_only;
     if (searchParams.min_views !== undefined) params.min_views = searchParams.min_views;
     if (searchParams.max_views !== undefined) params.max_views = searchParams.max_views;
     if (searchParams.reviewed !== undefined) params.reviewed = searchParams.reviewed;
@@ -214,7 +216,9 @@ export const wordlistsApi = {
     // Add optional parameters
     if (params?.sort_by) queryParams.sort_by = params.sort_by;
     if (params?.sort_order) queryParams.sort_order = params.sort_order;
-    if (params?.mastery_level) queryParams.mastery_level = params.mastery_level;
+    if (params?.mastery_levels) queryParams.mastery_levels = params.mastery_levels;
+    if (params?.hot_only !== undefined) queryParams.hot_only = params.hot_only;
+    if (params?.due_only !== undefined) queryParams.due_only = params.due_only;
     if (params?.min_views !== undefined) queryParams.min_views = params.min_views;
     if (params?.max_views !== undefined) queryParams.max_views = params.max_views;
     if (params?.reviewed !== undefined) queryParams.reviewed = params.reviewed;

@@ -175,11 +175,13 @@ class FuzzySearch:
         search_limit = min(max_results * 3, len(word_list))
 
         # Use process.extract for efficient top-k search
+        # Note: We lowercase query in search() method, but need case-insensitive matching
         results = process.extract(
             query,
             word_list,
             limit=search_limit,
             scorer=fuzz.WRatio,  # Weighted ratio for better results
+            processor=lambda s: s.lower()  # Case-insensitive matching
         )
 
         matches = []
@@ -356,10 +358,21 @@ class FuzzySearch:
         query_len = len(query.strip())
         candidate_len = len(candidate.strip())
         is_candidate_phrase = " " in candidate.strip()
+        query_lower = query.strip().lower()
+        candidate_lower = candidate.strip().lower()
 
         # No correction needed for perfect matches
         if base_score >= 0.99:
             return base_score
+
+        # Check if query is a prefix of the candidate (important for phrases)
+        is_prefix_match = candidate_lower.startswith(query_lower)
+        
+        # Check if query matches the first word of a phrase exactly
+        first_word_match = False
+        if is_candidate_phrase and not is_query_phrase:
+            first_word = candidate_lower.split()[0]
+            first_word_match = query_lower == first_word
 
         # Length ratio penalty for very different lengths
         length_ratio = min(query_len, candidate_len) / max(query_len, candidate_len)
@@ -370,8 +383,13 @@ class FuzzySearch:
             # Query is phrase but candidate is not - significant penalty
             phrase_penalty = 0.7
         elif not is_query_phrase and is_candidate_phrase:
-            # Query is word but candidate is phrase - moderate penalty
-            phrase_penalty = 0.85
+            # Query is word but candidate is phrase
+            if is_prefix_match or first_word_match:
+                # Strong bonus for prefix or first word matches
+                phrase_penalty = 1.2
+            else:
+                # Only slight penalty for non-prefix matches
+                phrase_penalty = 0.95
         elif is_query_phrase and is_candidate_phrase:
             # Both phrases - bonus for length similarity
             phrase_penalty = 1.1 if length_ratio > 0.6 else 1.0
@@ -386,8 +404,14 @@ class FuzzySearch:
         else:
             short_penalty = 1.0
 
+        # Prefix match bonus
+        prefix_bonus = 1.3 if is_prefix_match else 1.0
+        
+        # First word match bonus (for phrases)
+        first_word_bonus = 1.2 if first_word_match else 1.0
+
         # Combined correction
-        corrected_score = base_score * length_ratio * phrase_penalty * short_penalty
+        corrected_score = base_score * length_ratio * phrase_penalty * short_penalty * prefix_bonus * first_word_bonus
 
         # Ensure we don't exceed 1.0 or go below 0.0
         return max(0.0, min(1.0, corrected_score))

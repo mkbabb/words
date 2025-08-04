@@ -164,7 +164,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { X } from 'lucide-vue-next';
 import { Modal } from '@/components/custom';
 import { Button } from '@/components/ui/button';
@@ -172,7 +172,7 @@ import { Input } from '@/components/ui/input';
 import RefreshButton from '@/components/custom/common/RefreshButton.vue';
 import { useSlugGeneration } from '@/composables/useSlugGeneration';
 import { useWordlist } from '@/composables/useWordlist';
-import type { WordList, CreateWordListRequest } from '@/types';
+import type { WordList } from '@/types';
 import { MasteryLevel, Temperature } from '@/types';
 
 interface Props {

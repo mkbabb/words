@@ -25,6 +25,27 @@ export type LookupMode = 'dictionary' | 'thesaurus' | 'suggestions'
 export type SearchMode = 'lookup' | 'wordlist' | 'word-of-the-day' | 'stage'
 
 /**
+ * Generalized search sub-modes for different search modes
+ * Each mode can have its own set of sub-modes
+ */
+export type SearchSubMode<T extends SearchMode = SearchMode> = 
+  T extends 'lookup' ? LookupMode :
+  T extends 'wordlist' ? 'all' | 'filtered' | 'search' :
+  T extends 'word-of-the-day' ? 'current' | 'archive' :
+  T extends 'stage' ? 'test' | 'debug' :
+  never
+
+/**
+ * Map of search modes to their available sub-modes
+ */
+export type SearchSubModeMap = {
+  lookup: LookupMode
+  wordlist: 'all' | 'filtered' | 'search'
+  'word-of-the-day': 'current' | 'archive'
+  stage: 'test' | 'debug'
+}
+
+/**
  * Loading operation types
  * Replaces 4 instances across loading components
  */
@@ -74,7 +95,6 @@ export type ComponentSize = 'sm' | 'base' | 'lg' | 'xl'
  * Card appearance variants (already exists in wordlist.ts but not consistently used)
  * Consolidates 4 instances
  */
-export type CardVariant = 'default' | 'gold' | 'silver' | 'bronze'
 
 // ==========================================================================
 // MODE CONFIGURATION INTERFACES
@@ -100,6 +120,8 @@ export interface BaseModeConfig {
 export interface LookupModeConfig extends BaseModeConfig {
   /** Display sub-mode within lookup */
   displayMode?: LookupMode
+  /** Generalized sub-mode */
+  subMode?: SearchSubMode<'lookup'>
   /** Selected dictionary sources */
   sources?: string[]
   /** Selected languages */
@@ -115,6 +137,8 @@ export interface LookupModeConfig extends BaseModeConfig {
 export interface WordlistModeConfig extends BaseModeConfig {
   /** Target wordlist ID */
   wordlistId?: string | null
+  /** Generalized sub-mode */
+  subMode?: SearchSubMode<'wordlist'>
   /** Display filters */
   filters?: {
     showBronze?: boolean
@@ -144,6 +168,8 @@ export interface WordlistModeConfig extends BaseModeConfig {
 export interface WordOfTheDayModeConfig extends BaseModeConfig {
   /** Optional date for specific word-of-the-day */
   date?: Date
+  /** Generalized sub-mode */
+  subMode?: SearchSubMode<'word-of-the-day'>
 }
 
 /**
@@ -153,6 +179,8 @@ export interface WordOfTheDayModeConfig extends BaseModeConfig {
 export interface StageModeConfig extends BaseModeConfig {
   /** Debug level for stage operations */
   debugLevel?: 'minimal' | 'verbose' | 'full'
+  /** Generalized sub-mode */
+  subMode?: SearchSubMode<'stage'>
 }
 
 // ==========================================================================

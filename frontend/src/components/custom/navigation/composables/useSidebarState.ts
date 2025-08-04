@@ -7,11 +7,11 @@ import type { SidebarCluster } from '../types';
 import type { SynthesizedDictionaryEntry } from '@/types';
 
 export function useSidebarState() {
-    const { searchResults, ui } = useStores();
+    const { content } = useStores();
     
     // Transform API entry to frontend format for compatibility
     const entry = computed(() => {
-        const apiEntry = searchResults.currentEntry;
+        const apiEntry = content.currentEntry;
         if (!apiEntry) return null;
         // The API type is compatible with the frontend type for this composable
         return apiEntry as any as SynthesizedDictionaryEntry;
@@ -60,15 +60,15 @@ export function useSidebarState() {
         return sections;
     });
     
-    // Active states from UI store
+    // Active states from content store
     const activeCluster = computed({
-        get: () => ui.sidebarActiveCluster,
-        set: (value) => ui.setSidebarActiveCluster(value)
+        get: () => content.sidebarActiveCluster,
+        set: (value) => content.setSidebarActiveCluster(value)
     });
     
     const activePartOfSpeech = computed({
-        get: () => ui.sidebarActivePartOfSpeech,
-        set: (value) => ui.setSidebarActivePartOfSpeech(value)
+        get: () => content.sidebarActivePartOfSpeech,
+        set: (value) => content.setSidebarActivePartOfSpeech(value)
     });
     
     // Check if sidebar should be shown

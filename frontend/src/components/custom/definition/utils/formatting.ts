@@ -1,4 +1,6 @@
 import { cn } from '@/utils';
+import { MasteryLevel } from '@/types/wordlist';
+import type { CardVariant } from '@/types';
 
 /**
  * Formats example sentences with bold highlighting for the target word
@@ -54,4 +56,35 @@ export function getHeatmapClass(score: number): string {
  */
 export function getRandomAnimationDelay(min: number, max: number): number {
     return min + Math.random() * (max - min);
+}
+
+/**
+ * Maps a ranking index to a card variant based on mastery levels
+ */
+export function getCardVariant(index: number): CardVariant {
+    switch (index) {
+        case 0:
+            return MasteryLevel.GOLD;
+        case 1:
+            return MasteryLevel.SILVER;
+        case 2:
+            return MasteryLevel.BRONZE;
+        default:
+            return MasteryLevel.DEFAULT;
+    }
+}
+
+/**
+ * Formats a percentage value for display
+ */
+export function formatPercent(value: number): string {
+    return `${Math.round(value * 100)}%`;
+}
+
+/**
+ * Formats example usage text with markdown-style bold syntax
+ */
+export function formatExampleUsage(example: string): string {
+    // Bold the suggested word in the example
+    return example.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-foreground">$1</strong>');
 }

@@ -64,7 +64,7 @@ const modelValue = defineModel<LookupMode>({ required: true });
 
 // Initialize router and stores at component level
 const router = useRouter();
-const { searchConfig, searchBar, searchResults } = useStores();
+const { searchConfig, searchBar, searchResults, content } = useStores();
 const { navigateToLookupMode } = useRouterSync();
 
 const handleToggle = async () => {
@@ -92,7 +92,7 @@ const handleToggle = async () => {
         'dictionary': 'thesaurus',
         
         // From thesaurus
-        'thesaurus': searchResults.wordSuggestions ? 'suggestions' : 'dictionary',
+        'thesaurus': content.wordSuggestions ? 'suggestions' : 'dictionary',
         
         // From suggestions
         'suggestions': 'dictionary'
@@ -107,8 +107,8 @@ const handleToggle = async () => {
         const currentWord = searchBar.searchQuery;
         console.log('🧭 Navigation needed for word:', currentWord, 'to mode:', newMode);
         
-        // Use the enhanced router navigation
-        navigateToLookupMode(currentWord, newMode);
+        // Use the enhanced router navigation with router instance
+        navigateToLookupMode(currentWord, newMode, router);
         console.log('✅ Navigation completed using enhanced router sync');
     } else {
         console.log('🔄 No navigation needed - not in lookup mode or no query');

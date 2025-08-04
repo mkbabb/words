@@ -1,270 +1,203 @@
 import { defineStore } from 'pinia'
-import { ref, readonly } from 'vue'
-
-interface SortCriterion {
-  field: string
-  direction: 'asc' | 'desc'
-}
+import { ref, readonly, computed } from 'vue'
+import { useSearchConfigStore } from '../search/search-config'
+import { useLookupMode } from '../search/modes/lookup'
+import type { SearchMode } from '@/types'
+import { Themes, DEFAULT_THEME, type Theme } from '@/stores/types/constants'
 
 /**
- * UIStore - General UI state and preferences
- * Handles theme, sidebar, card variants, and other UI preferences
- * Uses modern Pinia persistence for automatic state saving
+ * Refactored UIStore with mode-specific encapsulation
+ * Handles theme, sidebar, and mode-specific UI preferences
  */
 export const useUIStore = defineStore('ui', () => {
   // ==========================================================================
-  // PERSISTED UI STATE
+  // SHARED UI STATE
   // ==========================================================================
   
   // Theme and appearance
-  const theme = ref<'light' | 'dark'>('light')
-  const selectedCardVariant = ref<'default' | 'gold' | 'silver' | 'bronze'>('default')
+  const theme = ref<Theme>(DEFAULT_THEME)
   
-  // Display modes
-  const mode = ref<'dictionary' | 'thesaurus' | 'suggestions'>('dictionary')
-  const pronunciationMode = ref<'phonetic' | 'ipa'>('phonetic')
-  
-  // Sidebar state
+  // Sidebar visibility
   const sidebarOpen = ref(false)
   const sidebarCollapsed = ref(true)
-  const sidebarActiveCluster = ref<string | null>('')
-  const sidebarActivePartOfSpeech = ref<string | null>('')
   
-  // Sidebar accordion states for different views
-  const sidebarAccordionState = ref({
-    lookup: [] as string[],
-    wordlist: [] as string[],
-    'word-of-the-day': [] as string[],
-    stage: [] as string[],
-  })
-  
-  // Wordlist display preferences
-  const wordlistFilters = ref({
-    showBronze: true,
-    showSilver: true,
-    showGold: true,
-    showHotOnly: false,
-    showDueOnly: false,
-  })
-  
-  const wordlistChunking = ref({
-    byMastery: false,
-    byDate: false,
-    byLastVisited: false,
-    byFrequency: false,
-  })
-  
-  const wordlistSortCriteria = ref<SortCriterion[]>([])
-
   // ==========================================================================
-  // ACTIONS
+  // MODE-SPECIFIC UI STATES
+  // ==========================================================================
+  
+  const lookupMode = useLookupMode()
+  // Future: Add wordlistUI, wordOfTheDayUI, stageUI as needed
+  
+  // Mode UI registry
+  const modeUIStates = {
+    lookup: lookupMode,
+    wordlist: null, // No specific UI state for wordlist yet
+    'word-of-the-day': null, // No specific UI state for WOTD yet
+    stage: null, // No specific UI state for stage yet
+  }
+  
+  // ==========================================================================
+  // COMPUTED PROPERTIES
+  // ==========================================================================
+  
+  const searchConfig = useSearchConfigStore()
+  const currentMode = computed(() => searchConfig.searchMode)
+  
+  // Get current mode's UI state
+  const currentModeUIState = computed(() => {
+    return modeUIStates[currentMode.value]
+  })
+  
+  // Legacy computed for backward compatibility
+  const mode = computed(() => searchConfig.lookupSubMode)
+  
+  // Expose mode-specific properties based on current mode
+  const selectedCardVariant = computed(() => 
+    currentMode.value === 'lookup' ? lookupMode.selectedCardVariant.value : 'default'
+  )
+  
+  const pronunciationMode = computed(() => 
+    currentMode.value === 'lookup' ? lookupMode.pronunciationMode.value : 'phonetic'
+  )
+  
+  // ==========================================================================
+  // SHARED ACTIONS
   // ==========================================================================
   
   // Theme management
   const toggleTheme = () => {
-    theme.value = theme.value === 'light' ? 'dark' : 'light'
+    theme.value = theme.value === Themes.LIGHT ? Themes.DARK : Themes.LIGHT
   }
-
-  const setTheme = (newTheme: 'light' | 'dark') => {
+  
+  const setTheme = (newTheme: Theme) => {
     theme.value = newTheme
   }
-
-  // Card variant management
-  const setCardVariant = (variant: 'default' | 'gold' | 'silver' | 'bronze') => {
-    selectedCardVariant.value = variant
-  }
-
-  // Mode management
-  const toggleMode = () => {
-    // Cycle through dictionary -> thesaurus -> suggestions -> dictionary
-    if (mode.value === 'dictionary') {
-      mode.value = 'thesaurus'
-    } else if (mode.value === 'thesaurus') {
-      mode.value = 'suggestions'
-    } else {
-      mode.value = 'dictionary'
-    }
-  }
-
-  const setMode = (newMode: 'dictionary' | 'thesaurus' | 'suggestions') => {
-    mode.value = newMode
-  }
-
-  // Pronunciation mode management
-  const togglePronunciation = () => {
-    pronunciationMode.value = pronunciationMode.value === 'phonetic' ? 'ipa' : 'phonetic'
-  }
-
-  const setPronunciationMode = (newMode: 'phonetic' | 'ipa') => {
-    pronunciationMode.value = newMode
-  }
-
+  
   // Sidebar management
   const toggleSidebar = () => {
     sidebarOpen.value = !sidebarOpen.value
   }
-
+  
   const setSidebarOpen = (open: boolean) => {
     sidebarOpen.value = open
   }
-
+  
   const setSidebarCollapsed = (collapsed: boolean) => {
     sidebarCollapsed.value = collapsed
   }
-
-  const setSidebarActiveCluster = (cluster: string | null) => {
-    sidebarActiveCluster.value = cluster
-  }
-
-  const setSidebarActivePartOfSpeech = (partOfSpeech: string | null) => {
-    sidebarActivePartOfSpeech.value = partOfSpeech
-  }
-
-  // Accordion state management
-  const setSidebarAccordionState = (
-    view: 'lookup' | 'wordlist' | 'word-of-the-day' | 'stage',
-    state: string[]
-  ) => {
-    sidebarAccordionState.value[view] = [...state]
-  }
-
-  const toggleAccordionItem = (
-    view: 'lookup' | 'wordlist' | 'word-of-the-day' | 'stage',
-    item: string
-  ) => {
-    const currentState = sidebarAccordionState.value[view]
-    if (currentState.includes(item)) {
-      sidebarAccordionState.value[view] = currentState.filter(i => i !== item)
-    } else {
-      sidebarAccordionState.value[view] = [...currentState, item]
+  
+  // ==========================================================================
+  // MODE TRANSITION HANDLING
+  // ==========================================================================
+  
+  const handleModeChange = async (newMode: SearchMode, previousMode: SearchMode) => {
+    console.log('🔄 UI handling mode change:', previousMode, '->', newMode)
+    
+    // Execute exit handler for previous mode
+    const previousModeUI = modeUIStates[previousMode]
+    if (previousModeUI?.handler?.onExit) {
+      await previousModeUI.handler.onExit(newMode)
+    }
+    
+    // Execute enter handler for new mode
+    const newModeUI = modeUIStates[newMode]
+    if (newModeUI?.handler?.onEnter) {
+      await newModeUI.handler.onEnter(previousMode)
     }
   }
-
-  // Wordlist preferences
-  const setWordlistFilters = (filters: Partial<typeof wordlistFilters.value>) => {
-    wordlistFilters.value = { ...wordlistFilters.value, ...filters }
+  
+  // ==========================================================================
+  // MODE-SPECIFIC ACTION DELEGATES
+  // ==========================================================================
+  
+  // Lookup mode UI actions
+  const setCardVariant = (variant: 'default' | 'gold' | 'silver' | 'bronze') => {
+    if (currentMode.value === 'lookup') {
+      lookupMode.setCardVariant(variant)
+    }
   }
-
-  const toggleWordlistFilter = (filterName: keyof typeof wordlistFilters.value) => {
-    wordlistFilters.value[filterName] = !wordlistFilters.value[filterName]
+  
+  const cycleCardVariant = () => {
+    if (currentMode.value === 'lookup') {
+      lookupMode.cycleCardVariant()
+    }
   }
-
-  const setWordlistChunking = (chunking: Partial<typeof wordlistChunking.value>) => {
-    wordlistChunking.value = { ...wordlistChunking.value, ...chunking }
+  
+  const togglePronunciation = () => {
+    if (currentMode.value === 'lookup') {
+      lookupMode.togglePronunciation()
+    }
   }
-
-  const toggleWordlistChunking = (chunkingName: keyof typeof wordlistChunking.value) => {
-    wordlistChunking.value[chunkingName] = !wordlistChunking.value[chunkingName]
+  
+  const setPronunciationMode = (mode: 'phonetic' | 'ipa') => {
+    if (currentMode.value === 'lookup') {
+      lookupMode.setPronunciationMode(mode)
+    }
   }
-
-  const setWordlistSortCriteria = (criteria: SortCriterion[]) => {
-    wordlistSortCriteria.value = [...criteria]
-  }
-
-  const addSortCriterion = (criterion: SortCriterion) => {
-    wordlistSortCriteria.value.push(criterion)
-  }
-
-  const removeSortCriterion = (index: number) => {
-    wordlistSortCriteria.value.splice(index, 1)
-  }
-
-  const clearSortCriteria = () => {
-    wordlistSortCriteria.value = []
-  }
-
-  // Reset all UI state
+  
+  // ==========================================================================
+  // RESET
+  // ==========================================================================
+  
   const resetUI = () => {
-    theme.value = 'light'
-    selectedCardVariant.value = 'default'
-    mode.value = 'dictionary'
-    pronunciationMode.value = 'phonetic'
+    // Reset shared state
+    theme.value = DEFAULT_THEME
     sidebarOpen.value = false
     sidebarCollapsed.value = true
-    sidebarActiveCluster.value = ''
-    sidebarActivePartOfSpeech.value = ''
-    sidebarAccordionState.value = {
-      lookup: [],
-      wordlist: [],
-      'word-of-the-day': [],
-      stage: [],
-    }
-    wordlistFilters.value = {
-      showBronze: true,
-      showSilver: true,
-      showGold: true,
-      showHotOnly: false,
-      showDueOnly: false,
-    }
-    wordlistChunking.value = {
-      byMastery: false,
-      byDate: false,
-      byLastVisited: false,
-      byFrequency: false,
-    }
-    wordlistSortCriteria.value = []
+    
+    // Reset mode-specific states
+    lookupMode.reset()
+    // Future: Reset other mode UI states
   }
-
+  
   // ==========================================================================
   // RETURN API
   // ==========================================================================
   
   return {
-    // State
+    // Shared State
     theme: readonly(theme),
-    selectedCardVariant: readonly(selectedCardVariant),
-    mode: readonly(mode),
-    pronunciationMode: readonly(pronunciationMode),
     sidebarOpen: readonly(sidebarOpen),
     sidebarCollapsed: readonly(sidebarCollapsed),
-    sidebarActiveCluster: readonly(sidebarActiveCluster),
-    sidebarActivePartOfSpeech: readonly(sidebarActivePartOfSpeech),
-    sidebarAccordionState: readonly(sidebarAccordionState),
-    wordlistFilters: readonly(wordlistFilters),
-    wordlistChunking: readonly(wordlistChunking),
-    wordlistSortCriteria: readonly(wordlistSortCriteria),
     
-    // Actions
+    // Mode-Specific State (computed based on current mode)
+    selectedCardVariant: readonly(selectedCardVariant),
+    pronunciationMode: readonly(pronunciationMode),
+    
+    // Legacy compatibility
+    mode: readonly(mode),
+    
+    // Shared Actions
     toggleTheme,
     setTheme,
-    setCardVariant,
-    toggleMode,
-    setMode,
-    togglePronunciation,
-    setPronunciationMode,
     toggleSidebar,
     setSidebarOpen,
     setSidebarCollapsed,
-    setSidebarActiveCluster,
-    setSidebarActivePartOfSpeech,
-    setSidebarAccordionState,
-    toggleAccordionItem,
-    setWordlistFilters,
-    toggleWordlistFilter,
-    setWordlistChunking,
-    toggleWordlistChunking,
-    setWordlistSortCriteria,
-    addSortCriterion,
-    removeSortCriterion,
-    clearSortCriteria,
-    resetUI
+    
+    // Mode-Specific Actions (delegates)
+    setCardVariant,
+    cycleCardVariant,
+    togglePronunciation,
+    setPronunciationMode,
+    
+    // Mode handling
+    handleModeChange,
+    
+    // Reset
+    resetUI,
+    
+    // Expose mode UI states for advanced usage
+    lookupMode,
+    currentModeUIState,
   }
 }, {
   persist: {
     key: 'ui-state',
     pick: [
       'theme',
-      'selectedCardVariant',
-      'mode',
-      'pronunciationMode',
       'sidebarOpen',
       'sidebarCollapsed',
-      'sidebarActiveCluster',
-      'sidebarActivePartOfSpeech',
-      'sidebarAccordionState',
-      'wordlistFilters',
-      'wordlistChunking',
-      'wordlistSortCriteria'
+      // Note: Mode-specific UI states handle their own persistence
     ]
   }
 })

@@ -324,6 +324,6 @@ onUnmounted(() => {
     }
     
     // Clear any refs that might be accessed by Reka UI
-    progressBarRef.value = null;
+    progressBarRef.value = undefined;
 });
 </script>

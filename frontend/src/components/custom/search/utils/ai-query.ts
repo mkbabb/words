@@ -5,12 +5,34 @@
  */
 
 /**
- * Checks if a query should trigger AI mode based on length and word count
+ * Checks if a query should trigger AI mode based on:
+ * - Query is clearly a question or request (contains question words)
+ * - Query has many words (more than 3) suggesting natural language
+ * - Query explicitly asks for suggestions/words
  * @param queryText The search query text
  * @returns True if query should trigger AI mode
  */
 export function shouldTriggerAIMode(queryText: string): boolean {
-    return queryText.length > 10 || queryText.split(' ').length - 1 > 2;
+    const lowerQuery = queryText.toLowerCase().trim();
+    
+    // Don't trigger for short phrases that are likely dictionary lookups
+    const wordCount = lowerQuery.split(/\s+/).length;
+    if (wordCount <= 3 && lowerQuery.length < 20) {
+        return false;
+    }
+    
+    // Check for question indicators
+    const questionWords = ['what', 'which', 'how', 'why', 'when', 'where', 'who', 'give me', 'show me', 'find me', 'suggest', 'list'];
+    const hasQuestionWord = questionWords.some(word => lowerQuery.includes(word));
+    
+    // Check for AI request patterns
+    const aiPatterns = ['words that', 'words for', 'words about', 'words like', 'synonyms', 'similar to', 'related to'];
+    const hasAIPattern = aiPatterns.some(pattern => lowerQuery.includes(pattern));
+    
+    // Check for number requests (e.g., "10 words about...")
+    const hasNumberRequest = /\b\d+\s+words?\b/.test(lowerQuery);
+    
+    return hasQuestionWord || hasAIPattern || hasNumberRequest || wordCount > 4;
 }
 
 /**

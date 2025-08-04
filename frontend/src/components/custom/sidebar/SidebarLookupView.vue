@@ -113,7 +113,7 @@ import SidebarRecentItem from './SidebarRecentItem.vue';
 import VocabularySuggestionItem from './VocabularySuggestionItem.vue';
 import type { SynthesizedDictionaryEntry } from '@/types';
 
-const { history, orchestrator, ui, searchBar } = useStores();
+const { history, orchestrator, ui, searchBar, searchConfig, content } = useStores();
 const router = useRouter();
 const { recentLookups, vocabularySuggestions, recentSearches, aiQueryHistory } = storeToRefs(history);
 
@@ -127,9 +127,9 @@ const recentAISuggestions = computed(() =>
 
 // Accordion state management - default to collapsed (empty array)
 const accordionValue = computed({
-    get: () => ui.sidebarAccordionState.lookup || [],
+    get: () => content.sidebarAccordionState.lookup || [],
     set: (value) => {
-        ui.setSidebarAccordionState('lookup', value as string[]);
+        content.setSidebarAccordionState('lookup', value as string[]);
     }
 });
 
@@ -158,8 +158,9 @@ const handleLookupClick = async (lookup: SynthesizedDictionaryEntry) => {
 const handleSuggestionClick = async (suggestion: { word: string }) => {
     searchBar.setQuery(suggestion.word);
     
-    // Switch to dictionary mode for word lookup (vocab suggestions are word lookups)
-    ui.setMode('dictionary');
+    // ✅ Use simple mode system - just change the modes
+    searchConfig.setMode('lookup');
+    searchConfig.setLookupMode('dictionary');
     
     // Navigate to Definition route
     router.push({ name: 'Definition', params: { word: suggestion.word } });
@@ -187,8 +188,9 @@ const handleSearchClick = async (search: { query: string }) => {
 };
 
 const handleAISuggestionClick = async (suggestion: { query: string }) => {
-    // Set mode to suggestions
-    ui.setMode('suggestions');
+    // ✅ Use simple mode system - just change the modes
+    searchConfig.setMode('lookup');
+    searchConfig.setLookupMode('suggestions');
     
     // Navigate to home to display suggestions
     router.push({ name: 'Home' });

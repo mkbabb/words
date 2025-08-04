@@ -128,7 +128,7 @@ interface Props {
 
 defineProps<Props>();
 
-const { history, searchConfig, ui, searchBar, searchResults, orchestrator } = useStores();
+const { history, searchConfig, ui, searchBar, searchResults, content, orchestrator } = useStores();
 const router = useRouter();
 const { recentLookups, aiQueryHistory } = storeToRefs(history);
 
@@ -190,8 +190,9 @@ const handleCollapsedWordClick = async (word: string) => {
 const handleCollapsedAIClick = async (query: string) => {
     // Set AI mode first
     searchBar.enableAIMode();
-    // aiQueryText removed - router handles query persistence
-    ui.setMode('suggestions');
+    // ✅ Use simple mode system - just change the modes
+    searchConfig.setMode('lookup');
+    searchConfig.setLookupMode('suggestions');
     
     // Navigate to home to display suggestions
     router.push({ name: 'Home' });
@@ -203,7 +204,7 @@ const handleCollapsedAIClick = async (query: string) => {
         const results = await orchestrator.getAISuggestions(query, wordCount);
         
         if (results && results.suggestions.length > 0) {
-            searchResults.wordSuggestions = results;
+            content.setWordSuggestions(results);
             // hasSearched is handled by orchestrator
             // Set searchQuery after successful AI suggestions to avoid triggering search
             searchBar.setQuery(query);
@@ -259,9 +260,11 @@ const formatWordlistDate = (dateString: string | null): string => {
 };
 
 const handleCollapsedWordlistClick = async (wordlistId: string) => {
+    // Set the wordlist first
     searchConfig.setWordlist(wordlistId);
-    searchConfig.setSearchModeLegacy('wordlist', router);
-    router.push({ name: 'Home' });
+    
+    // ✅ Use simple mode system - just change the mode
+    searchConfig.setMode('wordlist');
 };
 
 const loadRecentWordlists = async () => {

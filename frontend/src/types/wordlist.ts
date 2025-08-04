@@ -68,7 +68,23 @@ export enum Temperature {
   COLD = 'cold'
 }
 
-export type CardVariant = 'default' | 'gold' | 'silver' | 'bronze';
+export type CardVariant = MasteryLevel;
+
+// Sorting types for wordlist components
+export interface SortCriterion {
+  id: string;
+  field: SortField;
+  direction: 'asc' | 'desc';
+}
+
+export type SortField = 'word' | 'mastery_level' | 'frequency' | 'added_at' | 'last_visited' | 'next_review';
+
+export interface SortOption {
+  field: SortField;
+  label: string;
+  icon: any;
+  defaultDirection: 'asc' | 'desc';
+}
 
 export interface CreateWordListRequest {
   name: string;
@@ -136,14 +152,16 @@ export interface WordListSearchResponse {
 // Query parameter types that match backend models
 export interface WordListQueryParams {
   // Filters
-  mastery_level?: MasteryLevel;
+  mastery_levels?: string[];  // Filter by mastery levels (bronze, silver, gold)
+  hot_only?: boolean;         // Show only hot items
+  due_only?: boolean;         // Show only items due for review
   min_views?: number;
   max_views?: number;
   reviewed?: boolean;
   
   // Sorting
-  sort_by?: string;
-  sort_order?: 'asc' | 'desc';
+  sort_by?: string;           // Can be comma-separated for multiple criteria
+  sort_order?: string;        // Can be comma-separated to match sort_by
   
   // Pagination
   offset?: number;

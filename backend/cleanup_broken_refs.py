@@ -8,9 +8,11 @@ import sys
 # Add the src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
-from floridify.models import ImageMedia, SynthesizedDictionaryEntry, Definition
+from motor.motor_asyncio import AsyncIOMotorClient
+
+from floridify.models import Definition, ImageMedia, SynthesizedDictionaryEntry
+
 
 async def cleanup_broken_image_refs():
     """Remove broken image references from all entries and definitions."""
@@ -90,7 +92,7 @@ async def cleanup_broken_image_refs():
     total_updated = updated_entries + updated_definitions
     total_removed = removed_refs + removed_def_refs
     
-    print(f"\n🎉 Cleanup complete!")
+    print("\n🎉 Cleanup complete!")
     print(f"   📊 Total documents updated: {total_updated}")
     print(f"   🗑️  Total broken references removed: {total_removed}")
     

@@ -1,214 +1,275 @@
 import { defineStore } from 'pinia'
-import { ref, readonly, computed } from 'vue'
-import { dictionaryApi } from '@/api'
+import { ref, readonly, computed, shallowRef } from 'vue'
+import { dictionaryApi, wordlistsApi } from '@/api'
 import { normalizeWord } from '@/utils'
-// Router sync is handled by the orchestrator
-import type {
-  SearchResult,
-  ThesaurusEntry,
-  WordSuggestionResponse
-} from '@/types'
-import type { DictionaryProvider, Language } from '@/types/api'
-import type { SynthesizedDictionaryEntry } from '@/types'
+import type { SearchResult, SearchMode } from '@/types'
 
 /**
- * SearchResultsStore - Search results, current content, and streaming data
- * Handles search operations, definition lookups, streaming data, and content management
- * Session-persists critical data like current entry and search results
+ * SearchResultsStore - Manages search results only
+ * Handles search operations and results storage for all search modes
+ * Content display is handled by the ContentStore
  */
 export const useSearchResultsStore = defineStore('searchResults', () => {
   // ==========================================================================
-  // RUNTIME STATE (Non-persisted)
+  // SEARCH STATE
   // ==========================================================================
   
-  // Search results for dropdown
-  const searchResults = ref<SearchResult[]>([])
+  // Generalized search results keyed by mode
+  const searchResults = shallowRef<Record<SearchMode, any[]>>({
+    lookup: [],
+    wordlist: [],
+    'word-of-the-day': [],
+    stage: []
+  })
   
-  // Streaming state for progressive loading
-  const partialEntry = ref<Partial<SynthesizedDictionaryEntry> | null>(null)
-  const isStreamingData = ref(false)
-  
-  // Error state for definition display
-  const definitionError = ref<{
-    hasError: boolean
-    errorType: 'network' | 'not-found' | 'server' | 'ai-failed' | 'empty' | 'unknown'
-    errorMessage: string
-    canRetry: boolean
-    originalWord?: string
-  } | null>(null)
-
-  // ==========================================================================
-  // SESSION-PERSISTED STATE
-  // ==========================================================================
-  
-  // Current content
-  const currentEntry = ref<SynthesizedDictionaryEntry | null>(null)
-  const currentThesaurus = ref<ThesaurusEntry | null>(null)
-  const wordSuggestions = ref<WordSuggestionResponse | null>(null)
-  const currentWord = ref<string | null>(null)
-  
-  // Cursor position for search results navigation
+  // Search cursor position for restoring search state
   const searchCursorPosition = ref(0)
-
-  // Router integration is handled by the orchestrator
-
+  
+  // Abort controllers for cancellable requests
+  let searchAbortController: AbortController | null = null
+  
   // ==========================================================================
-  // COMPUTED PROPERTIES
+  // COMPUTED
   // ==========================================================================
   
-  // Combined search state for easy access
   const searchState = computed(() => ({
-    results: searchResults.value,
-    currentEntry: currentEntry.value || undefined,
-    currentThesaurus: currentThesaurus.value || undefined,
-    wordSuggestions: wordSuggestions.value || undefined,
-    isStreaming: isStreamingData.value,
-    partialEntry: partialEntry.value,
-    hasError: !!definitionError.value?.hasError,
-    error: definitionError.value
+    hasLookupResults: searchResults.value.lookup.length > 0,
+    hasWordlistResults: searchResults.value.wordlist.length > 0,
+    lookupResultCount: searchResults.value.lookup.length,
+    wordlistResultCount: searchResults.value.wordlist.length,
   }))
-
+  
   // ==========================================================================
-  // ACTIONS
+  // SEARCH OPERATIONS
   // ==========================================================================
   
-  // Search operations
+  /**
+   * Get search results for a specific mode
+   */
+  const getSearchResults = (mode: SearchMode) => {
+    return searchResults.value[mode] || []
+  }
+  
+  /**
+   * Set search results for a specific mode
+   */
+  const setSearchResults = (mode: SearchMode, results: any[]) => {
+    searchResults.value = {
+      ...searchResults.value,
+      [mode]: [...results]
+    }
+  }
+  
+  /**
+   * Clear search results for a specific mode or all modes
+   */
+  const clearSearchResults = (mode?: SearchMode) => {
+    if (mode) {
+      searchResults.value = {
+        ...searchResults.value,
+        [mode]: []
+      }
+    } else {
+      // Clear all modes
+      searchResults.value = {
+        lookup: [],
+        wordlist: [],
+        'word-of-the-day': [],
+        stage: []
+      }
+    }
+  }
+  
+  /**
+   * Search for words (lookup mode)
+   */
   const search = async (query: string): Promise<SearchResult[]> => {
-    if (!query.trim()) return []
-
+    const normalizedQuery = normalizeWord(query)
+    
+    // Cancel any existing search
+    cancelSearch()
+    
+    // Create new abort controller
+    searchAbortController = new AbortController()
+    
     try {
-      const results = await dictionaryApi.searchWord(query)
-      searchResults.value = results
+      console.log(`[SearchResults] Searching for: ${query}`)
+      
+      const results = await dictionaryApi.searchWord(normalizedQuery, {
+        signal: searchAbortController.signal
+      })
+      
+      // Store results
+      setSearchResults('lookup', results)
+      
+      console.log(`[SearchResults] Found ${results.length} results`)
       return results
+      
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        console.log('[SearchResults] Search cancelled')
+        return []
+      }
+      
+      console.error('[SearchResults] Search error:', error)
+      clearSearchResults('lookup')
+      throw error
+    } finally {
+      searchAbortController = null
+    }
+  }
+  
+  /**
+   * Cancel ongoing search
+   */
+  const cancelSearch = () => {
+    if (searchAbortController) {
+      searchAbortController.abort()
+      searchAbortController = null
+    }
+  }
+  
+  /**
+   * Get wordlist words (for empty query in wordlist mode)
+   */
+  const getWordlistWords = async (wordlistId: string) => {
+    try {
+      const response = await wordlistsApi.getWordlistWords(wordlistId, {
+        offset: 0,
+        limit: 100
+      })
+      
+      const results = response.items || []
+      setSearchResults('wordlist', results)
+      return results
+      
     } catch (error) {
-      console.error('Search error:', error)
+      console.error('[SearchResults] Failed to get wordlist words:', error)
+      clearSearchResults('wordlist')
       return []
     }
   }
-
-  const clearSearchResults = () => {
-    searchResults.value = []
+  
+  /**
+   * Search within wordlist
+   */
+  const searchWordlist = async (wordlistId: string, query: string) => {
+    try {
+      const response = await wordlistsApi.searchWordlist(wordlistId, {
+        query,
+        max_results: 50,
+        min_score: 0.4,
+        offset: 0,
+        limit: 50
+      })
+      
+      const results = response.items || []
+      setSearchResults('wordlist', results)
+      return results
+      
+    } catch (error) {
+      console.error('[SearchResults] Failed to search wordlist:', error)
+      clearSearchResults('wordlist')
+      return []
+    }
   }
-
-  // Definition operations
-  const getDefinition = async (
-    word: string,
-    forceRefresh = false,
-    selectedSources: string[] = ['wiktionary'],
-    selectedLanguages: string[] = ['en'],
-    noAI = true,
-    onProgress?: (stage: string, progress: number, message?: string, details?: any) => void,
-    onStageConfig?: (category: string, stages: any[]) => void,
-    onPartialData?: (partialData: any) => void
-  ) => {
+  
+  /**
+   * Set cursor position for search restoration
+   */
+  const setCursorPosition = (position: number) => {
+    searchCursorPosition.value = position
+  }
+  
+  // ==========================================================================
+  // CONTENT OPERATIONS (Moved to ContentStore)
+  // ==========================================================================
+  
+  /**
+   * Get definition for a word
+   * Note: This updates the ContentStore, not search results
+   */
+  const getDefinition = async (word: string, options?: any) => {
+    // Import content store to avoid circular dependency
+    const { useContentStore } = await import('../content/content')
+    const contentStore = useContentStore()
+    
     const normalizedWord = normalizeWord(word)
     
-    // Clear any existing error state when starting new search (only if not retrying an error)
-    if (!definitionError.value?.hasError || definitionError.value.originalWord !== normalizedWord) {
-      definitionError.value = null
-    }
-
     try {
-      // Reset partial state and start streaming
-      partialEntry.value = null
-      isStreamingData.value = true
-
-      // Always use streaming endpoint to get pipeline progress
+      console.log(`[SearchResults] Getting definition for: ${word}`)
+      
+      contentStore.setStreamingState(true)
+      contentStore.setPartialEntry(null)
+      
       const entry = await dictionaryApi.getDefinitionStream(
-        word,
-        forceRefresh,
-        selectedSources as DictionaryProvider[],
-        selectedLanguages as Language[],
-        (stage, progress, message, details) => {
-          console.log(`Stage: ${stage}, Progress: ${progress}%, Message: ${message}`)
-          onProgress?.(stage, progress, message, details)
-        },
-        (category, stages) => {
-          console.log(`Received stage config for category: ${category}`, stages)
-          onStageConfig?.(category, stages)
-        },
-        (partialData) => {
-          console.log('Received partial data:', partialData)
-          partialEntry.value = partialData
-          onPartialData?.(partialData)
-        },
-        noAI
+        normalizedWord,
+        options?.forceRefresh || false,
+        undefined, // providers
+        undefined, // languages
+        options?.onProgress, // onProgress
+        options?.onStageConfig, // onConfig
+        (data: any) => { // onPartialResult
+          contentStore.setPartialEntry(data)
+        }
       )
-
-      console.log('Setting currentEntry:', entry)
-      currentEntry.value = entry
-      currentWord.value = normalizedWord
-
-      // Check for empty results and set error state if needed
-      if (!entry || !entry.definitions || entry.definitions.length === 0) {
-        definitionError.value = {
+      
+      if (!entry || Object.keys(entry).length === 0) {
+        contentStore.setError({
           hasError: true,
           errorType: 'empty',
           errorMessage: `No definitions found for "${word}"`,
           canRetry: true,
           originalWord: word
-        }
+        })
       } else {
-        // Clear error state on successful lookup with results
-        definitionError.value = null
+        contentStore.setCurrentEntry(entry)
       }
-
+      
       return entry
-    } catch (error) {
-      console.error('Definition error:', error)
       
-      // Reset streaming state on error
-      partialEntry.value = null
+    } catch (error: any) {
+      console.error('[SearchResults] Definition error:', error)
       
-      // Set error state based on error type
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
       let errorType: 'network' | 'not-found' | 'server' | 'ai-failed' | 'empty' | 'unknown' = 'unknown'
-      let canRetry = true
       
       if (errorMessage.includes('404') || errorMessage.includes('not found')) {
         errorType = 'not-found'
-        canRetry = false
-      } else if (errorMessage.includes('network') || errorMessage.includes('fetch') || 
-                 errorMessage.includes('Stream ended without completion') ||
-                 errorMessage.includes('connection')) {
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
         errorType = 'network'
-      } else if (errorMessage.includes('500') || errorMessage.includes('server')) {
-        errorType = 'server'
-      } else if (errorMessage.includes('AI') || errorMessage.includes('synthesis')) {
-        errorType = 'ai-failed'
       }
       
-      definitionError.value = {
+      contentStore.setError({
         hasError: true,
         errorType,
-        errorMessage: errorType === 'not-found' 
-          ? `No definitions found for "${word}"`
-          : errorMessage,
-        canRetry,
+        errorMessage,
+        canRetry: errorType !== 'not-found',
         originalWord: word
-      }
+      })
       
-      // Force clear current entry to ensure error state shows
-      currentEntry.value = null
       throw error
     } finally {
-      isStreamingData.value = false
+      contentStore.setStreamingState(false)
     }
   }
-
+  
+  /**
+   * Get thesaurus data
+   */
   const getThesaurusData = async (word: string) => {
+    const { useContentStore } = await import('../content/content')
+    const contentStore = useContentStore()
+    
     try {
-      // If we already have the current entry, use its synonyms directly
-      if (currentEntry.value && currentEntry.value.word === word) {
+      // First check if we have synonyms in current entry
+      if (contentStore.currentEntry && contentStore.currentEntry.word === word) {
         const synonymsList: Array<{ word: string; score: number }> = []
-
-        // Collect synonyms from all definitions
-        currentEntry.value.definitions?.forEach((def, index) => {
+        
+        contentStore.currentEntry.definitions?.forEach((def: any, index: number) => {
           if (def.synonyms && Array.isArray(def.synonyms)) {
-            def.synonyms.forEach((syn: string, synIndex) => {
-              // Avoid duplicates
+            def.synonyms.forEach((syn: string, synIndex: number) => {
               if (!synonymsList.some((s) => s.word === syn)) {
-                // Generate varying scores based on definition order and synonym position
                 const baseScore = 0.9 - index * 0.1
                 const positionPenalty = synIndex * 0.02
                 const score = Math.max(0.5, Math.min(0.95, baseScore - positionPenalty))
@@ -217,187 +278,48 @@ export const useSearchResultsStore = defineStore('searchResults', () => {
             })
           }
         })
-
-        currentThesaurus.value = {
+        
+        contentStore.setCurrentThesaurus({
           word: word,
           synonyms: synonymsList,
           confidence: 0.9,
-        }
+        })
       } else {
-        // Fallback to API call if we don't have the entry
+        // Fallback to API
         const thesaurus = await dictionaryApi.getSynonyms(word)
-        currentThesaurus.value = thesaurus
+        contentStore.setCurrentThesaurus(thesaurus)
       }
     } catch (error) {
-      console.error('Thesaurus error:', error)
-      currentThesaurus.value = {
-        word: word,
-        synonyms: [],
-        confidence: 0,
-      }
+      console.error('[SearchResults] Failed to get thesaurus data:', error)
+      throw error
     }
   }
-
-  // AI suggestions
-  const getAISuggestions = async (
-    query: string,
-    count: number = 12,
-    onProgress?: (stage: string, progress: number, message?: string, details?: any) => void,
-    onStageConfig?: (category: string, stages: any[]) => void
-  ): Promise<WordSuggestionResponse | null> => {
+  
+  /**
+   * Get AI suggestions
+   */
+  const getAISuggestions = async (query: string, count: number = 12, options?: any) => {
+    const { useContentStore } = await import('../content/content')
+    const contentStore = useContentStore()
+    
     try {
-      // Use streaming API for real-time progress updates
-      const response = await dictionaryApi.getAISuggestionsStream(
+      console.log(`[SearchResults] Getting AI suggestions for: ${query}`)
+      
+      const suggestions = await dictionaryApi.getAISuggestionsStream(
         query,
         count,
-        (stage, progress, message, details) => {
-          console.log(`AI Suggestions - Stage: ${stage}, Progress: ${progress}%, Message: ${message || ''}`)
-          onProgress?.(stage, progress, message, details)
-        },
-        (category, stages) => {
-          console.log(`Received suggestions stage config for category: ${category}`, stages)
-          onStageConfig?.(category, stages)
-        }
+        options?.onProgress
       )
-
-      wordSuggestions.value = response
-      return response
-    } catch (error) {
-      console.error('AI suggestions error:', error)
-      wordSuggestions.value = null
-      throw error
-    }
-  }
-
-  // Content update operations
-  const updateDefinition = async (definitionId: string, updates: any) => {
-    console.log('[SearchResults] Updating definition:', definitionId, 'with:', updates)
-    try {
-      const response = await dictionaryApi.updateDefinition(definitionId, updates)
-      console.log('[SearchResults] Update response:', response)
-
-      // Update current entry if this definition is part of it
-      if (currentEntry.value) {
-        const defIndex = currentEntry.value.definitions.findIndex((d) => d.id === definitionId)
-        if (defIndex >= 0) {
-          console.log('[SearchResults] Updating local definition at index:', defIndex)
-          Object.assign(currentEntry.value.definitions[defIndex], updates)
-        } else {
-          console.warn('[SearchResults] Definition not found in current entry')
-        }
-      }
-
-      return response
-    } catch (error) {
-      console.error('Failed to update definition:', error)
-      throw error
-    }
-  }
-
-  const updateExample = async (exampleId: string, updates: { text: string }) => {
-    console.log('[SearchResults] Updating example:', exampleId, 'with:', updates)
-    try {
-      const response = await dictionaryApi.updateExample(exampleId, updates)
-      console.log('[SearchResults] Example update response:', response)
-      return response
-    } catch (error) {
-      console.error('[SearchResults] Failed to update example:', error)
-      throw error
-    }
-  }
-
-  const regenerateDefinitionComponent = async (definitionId: string, component: string) => {
-    try {
-      const response = await dictionaryApi.regenerateDefinitionComponent(definitionId, component)
-
-      // Update current entry with regenerated data
-      if (currentEntry.value) {
-        const defIndex = currentEntry.value.definitions.findIndex((d) => d.id === definitionId)
-        if (defIndex >= 0) {
-          const def = currentEntry.value.definitions[defIndex]
-          // Update the specific component
-          if (component === 'language_register') {
-            def.language_register = response[component]
-          } else if (component in def) {
-            (def as any)[component] = response[component]
-          }
-        }
-      }
-
-      return response
-    } catch (error) {
-      console.error(`Failed to regenerate ${component}:`, error)
-      throw error
-    }
-  }
-
-  const regenerateExamples = async (definitionIndex: number, definitionText?: string) => {
-    if (!currentEntry.value) return
-
-    try {
-      const response = await dictionaryApi.regenerateExamples(
-        currentEntry.value.word,
-        definitionIndex,
-        definitionText,
-        2
-      )
-
-      // Update the current entry with new examples
-      if (currentEntry.value.definitions[definitionIndex]) {
-        const def = currentEntry.value.definitions[definitionIndex]
-        // Replace only generated examples, keep literature ones
-        const literatureExamples = def.examples?.filter((ex) => ex.type === 'literature') || []
-        def.examples = [...(response.examples as any[]), ...literatureExamples]
-      }
-
-      return response
-    } catch (error) {
-      console.error('Failed to regenerate examples:', error)
-      throw error
-    }
-  }
-
-  const refreshSynthEntryImages = async () => {
-    console.log('[SearchResults] Refreshing synthesized entry images')
-    if (!currentEntry.value?.id) {
-      console.warn('[SearchResults] No current entry ID available for image refresh')
-      return
-    }
-
-    try {
-      const refreshedEntry = await dictionaryApi.refreshSynthEntry(currentEntry.value.id)
-      console.log('[SearchResults] Refreshed entry with updated images:', refreshedEntry)
       
-      // Replace the current entry with refreshed data
-      currentEntry.value = refreshedEntry
-
-      return refreshedEntry
+      contentStore.setWordSuggestions(suggestions)
+      return suggestions
+      
     } catch (error) {
-      console.error('[SearchResults] Failed to refresh entry images:', error)
+      console.error('[SearchResults] Failed to get AI suggestions:', error)
       throw error
     }
   }
-
-  // State management
-  const clearCurrentEntry = () => {
-    currentEntry.value = null
-    currentThesaurus.value = null
-    currentWord.value = null
-    definitionError.value = null
-  }
-
-  const clearWordSuggestions = () => {
-    wordSuggestions.value = null
-  }
-
-  const clearError = () => {
-    definitionError.value = null
-  }
-
-  const setCursorPosition = (position: number) => {
-    searchCursorPosition.value = position
-  }
-
+  
   // ==========================================================================
   // RETURN API
   // ==========================================================================
@@ -405,43 +327,34 @@ export const useSearchResultsStore = defineStore('searchResults', () => {
   return {
     // State
     searchResults: readonly(searchResults),
-    currentEntry: readonly(currentEntry),
-    currentThesaurus: readonly(currentThesaurus),
-    wordSuggestions: readonly(wordSuggestions),
-    currentWord: readonly(currentWord),
     searchCursorPosition: readonly(searchCursorPosition),
-    partialEntry: readonly(partialEntry),
-    isStreamingData: readonly(isStreamingData),
-    definitionError: readonly(definitionError),
     
     // Computed
     searchState,
     
-    // Actions
-    search,
+    // Search operations
+    getSearchResults,
+    setSearchResults,
     clearSearchResults,
+    search,
+    cancelSearch,
+    getWordlistWords,
+    searchWordlist,
+    setCursorPosition,
+    
+    // Content operations (delegate to ContentStore)
     getDefinition,
     getThesaurusData,
     getAISuggestions,
-    updateDefinition,
-    updateExample,
-    regenerateDefinitionComponent,
-    regenerateExamples,
-    refreshSynthEntryImages,
-    clearCurrentEntry,
-    clearWordSuggestions,
-    clearError,
-    setCursorPosition
+    
+    // Legacy compatibility (deprecated)
+    setWordlistSearchResults: (results: any[]) => setSearchResults('wordlist', results),
+    clearWordlistSearchResults: () => clearSearchResults('wordlist'),
+    get wordlistSearchResults() { return searchResults.value.wordlist },
   }
 }, {
   persist: {
     key: 'search-results',
-    pick: [
-      'currentEntry',
-      'currentThesaurus', 
-      'wordSuggestions',
-      'currentWord',
-      'searchCursorPosition'
-    ]
+    pick: ['searchCursorPosition']
   }
 })

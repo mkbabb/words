@@ -34,9 +34,70 @@
                 </div>
             </div>
 
-            <!-- Search Results -->
+            <!-- Wordlist Search Results -->
             <div
-                v-else-if="results.length > 0"
+                v-else-if="wordlistMode && wordlistResults && wordlistResults.length > 0"
+                ref="searchResultsContainer"
+                class="max-h-64 overflow-y-auto bg-background/20 backdrop-blur-3xl"
+            >
+                <button
+                    v-for="(result, index) in wordlistResults.slice(0, 10)"
+                    :key="result.word"
+                    :ref="(el) => setResultRef(el as HTMLButtonElement, index)"
+                    :class="[
+                        'flex w-full items-center justify-between px-4 py-3 text-left transition-all duration-300 ease-apple-spring',
+                        'border-muted-foreground/50 active:scale-[0.97]',
+                        index === selectedIndex
+                            ? 'scale-[1.02] border-l-8 bg-accent/60 pl-4 shadow-md'
+                            : 'border-l-0 pl-4 hover:bg-accent/20 hover:scale-[1.01]',
+                    ]"
+                    @click="$emit('select-result', { word: result.word, score: result.score || 1.0, method: 'EXACT' as any, is_phrase: false })"
+                    @mouseenter="selectedIndex = index"
+                >
+                    <span
+                        :class="[
+                            'transition-all duration-200',
+                            index === selectedIndex && 'font-semibold text-primary',
+                        ]"
+                    >
+                        {{ result.word.toLowerCase() }}
+                    </span>
+                    <div class="flex items-center gap-2 text-xs">
+                        <span
+                            :class="[
+                                'inline-block px-2 py-0.5 rounded',
+                                result.mastery_level === 'gold' && 'bg-amber-300/10 text-amber-600 dark:text-amber-400',
+                                result.mastery_level === 'silver' && 'bg-gray-300/10 text-gray-600 dark:text-gray-400',
+                                result.mastery_level === 'bronze' && 'bg-orange-300/10 text-orange-600 dark:text-orange-400',
+                                result.mastery_level === 'default' && 'bg-muted text-muted-foreground',
+                                index === selectedIndex && 'font-semibold'
+                            ]"
+                        >
+                            {{ result.mastery_level }}
+                        </span>
+                        <span
+                            :class="[
+                                'text-muted-foreground',
+                                index === selectedIndex && 'font-semibold text-primary',
+                            ]"
+                        >
+                            {{ result.frequency }}x
+                        </span>
+                        <span
+                            :class="[
+                                'text-muted-foreground font-medium',
+                                index === selectedIndex && 'font-semibold text-primary',
+                            ]"
+                        >
+                            {{ Math.round(result.score * 100) }}%
+                        </span>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Regular Search Results -->
+            <div
+                v-else-if="!wordlistMode && results.length > 0"
                 ref="searchResultsContainer"
                 class="max-h-64 overflow-y-auto bg-background/20 backdrop-blur-3xl"
             >
@@ -94,7 +155,7 @@
                 v-else-if="!loading && query.length >= 2 && !aiMode"
                 class="bg-background/50 p-4 text-center text-sm text-muted-foreground backdrop-blur-sm"
             >
-                No matches found
+                {{ wordlistMode ? 'No words found in wordlist' : 'No matches found' }}
             </div>
         </div>
     </Transition>
@@ -102,7 +163,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
-import type { SearchResult } from '@/types';
+import type { SearchResult, SearchMethodEnum } from '@/types';
 
 interface SearchResultsProps {
     show: boolean;
@@ -110,6 +171,8 @@ interface SearchResultsProps {
     loading: boolean;
     query: string;
     aiMode: boolean;
+    wordlistMode?: boolean;
+    wordlistResults?: any[];
 }
 
 defineProps<SearchResultsProps>();

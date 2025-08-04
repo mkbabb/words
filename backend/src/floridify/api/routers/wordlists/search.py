@@ -88,7 +88,7 @@ async def search_wordlist_words(
         filtered_items = [item for item in search_filtered_items if passes_wordlist_filters(item, params)]
     else:
         # For non-relevance sorting, use the shared filter and sort function
-        filtered_items = apply_wordlist_filters_and_sort(search_filtered_items, params)
+        filtered_items = await apply_wordlist_filters_and_sort(search_filtered_items, params)
 
     # Step 4: Convert to response format and paginate using shared helper
     items, total = await convert_wordlist_items_to_response(
@@ -97,6 +97,13 @@ async def search_wordlist_words(
         offset=params.offset,
         limit=params.limit
     )
+    
+    # Step 5: Add search scores back to items when sorting by relevance
+    if params.sort_by == "relevance":
+        # Re-map search scores to the final items
+        word_scores = {result["word"]: result["score"] for result in search_results}
+        for item in items:
+            item["score"] = word_scores.get(item["word"], 0.0)
 
     return ListResponse(
         items=items,

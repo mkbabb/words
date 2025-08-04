@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick, onMounted } from 'vue';
 
 interface SearchInputProps {
     placeholder?: string;
@@ -77,14 +77,9 @@ const emit = defineEmits<{
 const textareaRef = ref<HTMLTextAreaElement>();
 
 const resizeTextarea = () => {
-    if (!textareaRef.value) {
-        console.log('🔍 SearchInput: resizeTextarea called but no textareaRef');
-        return;
-    }
+    if (!textareaRef.value) return;
     
-    console.log('🔍 SearchInput: resizeTextarea called, aiMode:', props.aiMode, 'value length:', modelValue.value?.length || 0);
-    
-    // Reset height to auto to get the natural height
+    // Force a reflow to ensure accurate measurements
     textareaRef.value.style.height = 'auto';
     
     // Get the scroll height (content height)
@@ -97,23 +92,11 @@ const resizeTextarea = () => {
     const maxHeight = props.aiMode ? 400 : 200;
     const finalHeight = Math.max(minHeightValue, Math.min(scrollHeight, maxHeight));
     
-    console.log('🔍 SearchInput: Resize calculations:', {
-        scrollHeight,
-        minHeightValue,
-        maxHeight,
-        finalHeight,
-        aiMode: props.aiMode
-    });
-    
     // Set the textarea height directly
     textareaRef.value.style.height = `${finalHeight}px`;
     
     // Add scrollbar if content exceeds max height
-    if (scrollHeight > maxHeight) {
-        textareaRef.value.style.overflowY = 'auto';
-    } else {
-        textareaRef.value.style.overflowY = 'hidden';
-    }
+    textareaRef.value.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
 };
 
 const handleInput = (event: Event) => {
@@ -135,57 +118,19 @@ const handleBlur = () => {
     emit('blur');
 };
 
-// Watch for external value changes
-watch(modelValue, (newValue, oldValue) => {
-    console.log('🔍 SearchInput: modelValue changed from', oldValue, 'to', newValue);
+// Watch for all changes that should trigger resize
+watch([modelValue, () => props.aiMode], () => {
     nextTick(() => {
         resizeTextarea();
-        // Double-check resize for edge cases (like AI mode text from sidebar)
-        setTimeout(resizeTextarea, 0);
     });
-});
-
-// Watch for combined changes in AI mode and content
-watch([() => props.aiMode, modelValue], ([newAiMode, newValue], [oldAiMode, oldValue]) => {
-    console.log('🔍 SearchInput: Combined watcher - AI mode:', oldAiMode, '->', newAiMode, 'Value:', oldValue, '->', newValue);
-    if (newAiMode !== oldAiMode || newValue !== oldValue) {
-        nextTick(() => {
-            resizeTextarea();
-            setTimeout(resizeTextarea, 100);
-        });
-    }
-});
-
-// Initial resize
-nextTick(() => {
-    resizeTextarea();
-});
-
-// Also resize on mount to ensure proper initial state
-watch(() => props.minHeight, () => {
-    resizeTextarea();
 }, { immediate: true });
 
-// Watch for AI mode changes and resize accordingly
-watch(() => props.aiMode, (newAiMode, oldAiMode) => {
-    console.log('🔍 SearchInput: AI mode changed from', oldAiMode, 'to', newAiMode, 'triggering resize');
-    console.log('🔍 SearchInput: Current textarea ref exists:', !!textareaRef.value);
-    console.log('🔍 SearchInput: Current model value:', modelValue.value);
+// Also resize on mount and when component becomes visible
+onMounted(() => {
+    resizeTextarea();
     
-    if (textareaRef.value) {
-        // Force recalculation by temporarily changing height
-        const originalHeight = textareaRef.value.style.height;
-        console.log('🔍 SearchInput: Original height before resize:', originalHeight);
-        
-        nextTick(() => {
-            resizeTextarea();
-            // Extra timeout to ensure proper resize in AI mode
-            setTimeout(() => {
-                console.log('🔍 SearchInput: Final height after resize:', textareaRef.value?.style.height);
-                resizeTextarea();
-            }, 100);
-        });
-    }
+    // Use a small delay to handle any DOM settling
+    setTimeout(resizeTextarea, 50);
 });
 
 // Props are used in template
@@ -195,6 +140,7 @@ void props;
 defineExpose({
     focus: () => textareaRef.value?.focus(),
     blur: () => textareaRef.value?.blur(),
-    element: textareaRef
+    element: textareaRef,
+    resize: resizeTextarea
 });
 </script>

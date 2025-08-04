@@ -143,7 +143,7 @@ const enableNotifications = async () => {
     // Track in local storage
     localStorage.setItem('notifications-enabled', 'true');
   } else {
-    if (Notification.permission === 'denied') {
+    if (notificationPermission.value === 'denied') {
       notifications.showNotification({
         type: 'error',
         message: 'Notifications blocked. Enable in browser settings and refresh the page.'

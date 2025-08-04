@@ -14,6 +14,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from ..utils.logging import get_logger
+from ..utils.text_utils import normalize_word as text_utils_normalize
 
 logger = get_logger(__name__)
 
@@ -26,7 +27,7 @@ class ParsedWordList(BaseModel):
     source_file: str | None = Field(default=None, description="Source file path")
 
 
-def normalize_text(text: str) -> str:
+def preserve_text_format(text: str) -> str:
     """Normalize text aggressively while preserving word integrity.
 
     - Preserves Unicode characters and diacritics
@@ -83,7 +84,7 @@ def extract_word_from_line(line: str) -> str | list[str] | None:
     for pattern in patterns:
         match = re.match(pattern, line)
         if match:
-            return normalize_text(match.group(1))
+            return preserve_text_format(match.group(1))
 
     # Bullet patterns
     bullet_chars = ["-", "*", "•", "·", "○", "□", "▪", "▫", "►", "▸"]
@@ -92,10 +93,10 @@ def extract_word_from_line(line: str) -> str | list[str] | None:
             # Handle bullet with or without space
             text = line[len(bullet) :].lstrip()
             if text:
-                return normalize_text(text)
+                return preserve_text_format(text)
 
     # Plain text - check if it's a phrase or multiple words
-    normalized = normalize_text(line)
+    normalized = preserve_text_format(line)
 
     # Check if it looks like a phrase
     if _looks_like_phrase(normalized):
@@ -306,7 +307,7 @@ def parse_csv_file(path: Path) -> ParsedWordList:
                     has_header = True
                     continue
 
-            word = normalize_text(row[0])
+            word = preserve_text_format(row[0])
             if is_valid_word(word):
                 words.append(word)
             else:
@@ -354,7 +355,7 @@ def parse_markdown_file(path: Path) -> ParsedWordList:
             # Extract first column from table
             parts = line.split("|")
             if len(parts) >= 2:
-                word = normalize_text(parts[1])
+                word = preserve_text_format(parts[1])
                 if is_valid_word(word):
                     words.append(word)
             continue
@@ -395,11 +396,11 @@ def parse_json_file(path: Path) -> ParsedWordList:
         # Direct list of words
         for item in data:
             if isinstance(item, str):
-                word = normalize_text(item)
+                word = preserve_text_format(item)
                 if is_valid_word(word):
                     words.append(word)
             elif isinstance(item, dict) and "word" in item:
-                word = normalize_text(str(item["word"]))
+                word = preserve_text_format(str(item["word"]))
                 if is_valid_word(word):
                     words.append(word)
     elif isinstance(data, dict):
@@ -408,7 +409,7 @@ def parse_json_file(path: Path) -> ParsedWordList:
             if key in data and isinstance(data[key], list):
                 for item in data[key]:
                     if isinstance(item, str):
-                        word = normalize_text(item)
+                        word = preserve_text_format(item)
                         if is_valid_word(word):
                             words.append(word)
                 break

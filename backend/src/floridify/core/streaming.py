@@ -434,7 +434,7 @@ async def create_streaming_response(
             yield error_event.format()
 
     return StreamingResponse(
-        simple_generator(),
+        event_generator(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

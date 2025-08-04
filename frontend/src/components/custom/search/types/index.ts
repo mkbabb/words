@@ -5,6 +5,7 @@ import type {
     AppleIcon,
 } from '@/components/custom/icons';
 import type { Globe, Languages } from 'lucide-vue-next';
+import type { SearchMode, SourceConfig, LanguageConfig } from '@/types';
 
 // Search Bar Props
 export interface SearchBarProps {
@@ -23,25 +24,14 @@ export interface SearchBarEmits {
     'stage-enter': [query: string];
 }
 
-// Source Configuration
-export interface SourceConfig {
-    id: string;
-    name: string;
-    icon: typeof WiktionaryIcon | typeof OxfordIcon | typeof DictionaryIcon | typeof AppleIcon;
-}
-
-// Language Configuration
-export interface LanguageConfig {
-    value: string;
-    label: string;
-    icon: typeof Globe | typeof Languages;
-}
+// Re-export for convenience
+export type { SourceConfig, LanguageConfig };
 
 // Search Bar State Types
 export type SearchBarState = 'normal' | 'hovering' | 'focused';
 
-// Search Mode Types
-export type SearchMode = 'lookup' | 'wordlist' | 'word-of-the-day' | 'stage';
+// Re-export SearchMode for convenience
+export type { SearchMode };
 
 // Animation State
 export interface AnimationState {

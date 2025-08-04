@@ -1,13 +1,13 @@
 <template>
     <!-- Error State -->
-    <div v-if="searchResultsStore.definitionError?.hasError" class="relative">
+    <div v-if="contentStore.definitionError?.hasError" class="relative">
         <ThemedCard :variant="uiStore.selectedCardVariant" class="relative">
             <ErrorState 
-                :title="getErrorTitle(searchResultsStore.definitionError.errorType)"
-                :message="searchResultsStore.definitionError.errorMessage"
-                :error-type="searchResultsStore.definitionError.errorType"
-                :retryable="searchResultsStore.definitionError.canRetry"
-                :show-help="searchResultsStore.definitionError.errorType === 'unknown'"
+                :title="getErrorTitle(contentStore.definitionError.errorType)"
+                :message="contentStore.definitionError.errorMessage"
+                :error-type="contentStore.definitionError.errorType"
+                :retryable="contentStore.definitionError.canRetry"
+                :show-help="contentStore.definitionError.errorType === 'unknown'"
                 @retry="handleRetryLookup"
                 @help="handleShowHelp"
             />
@@ -207,7 +207,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useMagicKeys, whenever } from '@vueuse/core';
-import { useSearchResultsStore, useUIStore, useNotificationStore } from '@/stores';
+import { useSearchResultsStore, useContentStore, useUIStore, useNotificationStore, useSearchConfigStore } from '@/stores';
 import { CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -229,8 +229,10 @@ import type { ImageMedia } from '@/types/api';
 
 // Stores
 const searchResultsStore = useSearchResultsStore();
+const contentStore = useContentStore();
 const uiStore = useUIStore();
 const notificationStore = useNotificationStore();
+const searchConfigStore = useSearchConfigStore();
 
 // Reactive state
 const regeneratingIndex = ref<number | null>(null);
@@ -244,22 +246,22 @@ const wordToAdd = ref('');
 // Smart computed properties - merge streaming and complete data
 const entry = computed(() => {
     // If there's an error, don't return entry data
-    if (searchResultsStore.definitionError?.hasError) {
+    if (contentStore.definitionError?.hasError) {
         return null;
     }
     
     // When streaming, merge partial data with current entry
-    if (searchResultsStore.isStreamingData && searchResultsStore.partialEntry) {
+    if (contentStore.isStreamingData && contentStore.partialEntry) {
         return {
             // Use partial data as primary source, fallback to current entry
-            word: searchResultsStore.partialEntry.word || searchResultsStore.currentEntry?.word,
-            id: searchResultsStore.partialEntry.id || searchResultsStore.currentEntry?.id,
-            last_updated: searchResultsStore.partialEntry.last_updated || searchResultsStore.currentEntry?.last_updated,
-            model_info: searchResultsStore.partialEntry.model_info || searchResultsStore.currentEntry?.model_info,
-            pronunciation: searchResultsStore.partialEntry.pronunciation || searchResultsStore.currentEntry?.pronunciation,
-            etymology: searchResultsStore.partialEntry.etymology || searchResultsStore.currentEntry?.etymology,
-            images: [...(searchResultsStore.partialEntry.images || []), ...(searchResultsStore.currentEntry?.images || [])],
-            definitions: searchResultsStore.partialEntry.definitions || searchResultsStore.currentEntry?.definitions || [],
+            word: contentStore.partialEntry.word || contentStore.currentEntry?.word,
+            id: contentStore.partialEntry.id || contentStore.currentEntry?.id,
+            last_updated: contentStore.partialEntry.last_updated || contentStore.currentEntry?.last_updated,
+            model_info: contentStore.partialEntry.model_info || contentStore.currentEntry?.model_info,
+            pronunciation: contentStore.partialEntry.pronunciation || contentStore.currentEntry?.pronunciation,
+            etymology: contentStore.partialEntry.etymology || contentStore.currentEntry?.etymology,
+            images: [...(contentStore.partialEntry.images || []), ...(contentStore.currentEntry?.images || [])],
+            definitions: contentStore.partialEntry.definitions || contentStore.currentEntry?.definitions || [],
             // Add streaming metadata
             _isStreaming: true,
             _streamingProgress: 0, // We'll need to get this from loading store if needed
@@ -267,15 +269,15 @@ const entry = computed(() => {
     }
     
     // When not streaming, use complete current entry
-    return searchResultsStore.currentEntry ? {
-        ...searchResultsStore.currentEntry,
+    return contentStore.currentEntry ? {
+        ...contentStore.currentEntry,
         _isStreaming: false,
     } as any : null;
 });
 
 // Streaming state indicators
-const isStreaming = computed(() => searchResultsStore.isStreamingData);
-// const hasPartialData = computed(() => !!searchResultsStore.partialEntry);
+const isStreaming = computed(() => contentStore.isStreamingData);
+// const hasPartialData = computed(() => !!contentStore.partialEntry);
 
 // UI State computed properties
 const selectedCardVariant = computed({
@@ -285,7 +287,7 @@ const selectedCardVariant = computed({
 
 // Convert readonly thesaurus to mutable type for component compatibility
 const thesaurusData = computed(() => {
-    const data = searchResultsStore.currentThesaurus;
+    const data = contentStore.currentThesaurus;
     if (!data) return null;
     return {
         word: data.word,
@@ -332,8 +334,8 @@ const getErrorTitle = (errorType: string) => {
 };
 
 const getEmptyTitle = () => {
-    return searchResultsStore.definitionError?.originalWord 
-        ? `No definitions found for "${searchResultsStore.definitionError.originalWord}"`
+    return contentStore.definitionError?.originalWord 
+        ? `No definitions found for "${contentStore.definitionError.originalWord}"`
         : 'No definitions found';
 };
 
@@ -384,7 +386,7 @@ const handleRegenerateExamples = async (definitionIndex: number) => {
     
     regeneratingIndex.value = definitionIndex;
     try {
-        await searchResultsStore.regenerateExamples(definitionIndex);
+        await contentStore.regenerateExamples(definitionIndex);
     } catch (error) {
         console.error('Failed to regenerate examples:', error);
     } finally {
@@ -401,7 +403,7 @@ const handleImagesUpdated = async (newImages: ImageMedia[]) => {
     
     try {
         // Refresh the synthesized entry to get updated images from the backend
-        await searchResultsStore.refreshSynthEntryImages();
+        await contentStore.refreshEntryImages();
     } catch (error) {
         console.error('Failed to refresh entry images:', error);
         // Fallback - still show a success message since the upload itself succeeded
@@ -418,7 +420,7 @@ const handleImageDeleted = async (imageId: string) => {
     
     try {
         // Refresh the synthesized entry to remove the deleted image reference
-        await searchResultsStore.refreshSynthEntryImages();
+        await contentStore.refreshEntryImages();
         
         notificationStore.showNotification({
             type: 'success',
@@ -443,7 +445,7 @@ const handleClusterNameUpdate = async (clusterId: string, newName: string) => {
     );
     
     if (definition?.id) {
-        await searchResultsStore.updateDefinition(definition.id, {
+        await contentStore.updateDefinition(definition.id, {
             meaning_cluster_name: newName
         });
     }
@@ -469,10 +471,10 @@ const handleWordAddedToList = (wordlist: any, word: string) => {
 
 // Error handling methods
 const handleRetryLookup = () => {
-    if (searchResultsStore.definitionError?.originalWord) {
-        const wordToRetry = searchResultsStore.definitionError.originalWord;
+    if (contentStore.definitionError?.originalWord) {
+        const wordToRetry = contentStore.definitionError.originalWord;
         // Clear the error state and retry the lookup
-        searchResultsStore.clearError();
+        contentStore.clearError();
         handleWordSearch(wordToRetry);
     }
 };
@@ -485,7 +487,7 @@ const handleShowHelp = () => {
 
 const handleSuggestAlternatives = () => {
     // Switch to suggestions mode or show alternative suggestions
-    uiStore.setMode('suggestions');
+    searchConfigStore.setSubMode('lookup', 'suggestions');
     console.log('Suggesting alternatives for failed lookup');
 };
 

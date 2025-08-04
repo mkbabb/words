@@ -41,11 +41,12 @@
 <script setup lang="ts">
 import { cn } from '@/utils';
 import FancyF from './FancyF.vue';
+import type { LookupMode } from '@/types';
 
 interface FloridifyIconProps {
   expanded?: boolean;
   className?: string;
-  mode?: 'dictionary' | 'thesaurus';
+  mode?: LookupMode;
   clickable?: boolean;
 }
 

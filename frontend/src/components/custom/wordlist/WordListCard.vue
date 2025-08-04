@@ -3,7 +3,10 @@
     <HoverCardTrigger as-child>
       <ThemedCard
         :variant="word.mastery_level"
-        class="group relative cursor-pointer transition-all duration-500 ease-apple-spring hover:scale-[1.02] p-3 sm:p-4"
+        :class="[
+          'group relative cursor-pointer transition-all duration-500 ease-apple-spring hover:scale-[1.02] p-3 sm:p-4',
+          word.score >= 1.0 ? 'search-match-gold' : word.score >= 0.9 ? 'search-match-silver' : word.score >= 0.8 ? 'search-match-bronze' : ''
+        ]"
         texture-enabled
         texture-type="clean"
         texture-intensity="subtle"
@@ -16,7 +19,7 @@
           <div class="mb-3">
             <div class="flex items-center justify-between mb-2">
               <h3 class="text-base sm:text-xl font-semibold truncate themed-title transition-colors group-hover:text-primary">
-                {{ word.word }}
+                {{ word.word.toLowerCase() }}
               </h3>
             </div>
 
@@ -79,7 +82,7 @@
         <!-- Header -->
         <div class="flex items-center justify-between">
           <div>
-            <h4 class="font-semibold text-lg">{{ word.word }}</h4>
+            <h4 class="font-semibold text-lg">{{ word.word.toLowerCase() }}</h4>
             <p class="text-sm text-muted-foreground">
               {{ getMasteryLabel(word.mastery_level) }} • {{ word.temperature === Temperature.HOT ? 'Recently studied' : 'Not recently studied' }}
             </p>
@@ -196,7 +199,7 @@ import { Temperature } from '@/types';
 import { formatRelativeTime } from '@/utils';
 
 interface Props {
-  word: WordListItem;
+  word: WordListItem & { score?: number };
 }
 
 const props = defineProps<Props>();

@@ -6,6 +6,7 @@ export const searchApi = {
   async search(query: string, options?: {
     max_results?: number;
     min_score?: number;
+    signal?: AbortSignal;
   }): Promise<SearchResult[]> {
     try {
       // Progressive search parameters based on query length
@@ -23,6 +24,7 @@ export const searchApi = {
           q: query,
           ...params,
         },
+        signal: options?.signal,
       });
       return response.data.results || [];
     } catch (error) {

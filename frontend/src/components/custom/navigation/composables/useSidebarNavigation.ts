@@ -31,12 +31,12 @@ export function useSidebarNavigation(options: NavigationOptions = {}) {
     };
     
     const getDefinitionsForPartOfSpeech = (clusterId: string, partOfSpeech: string) => {
-        const { searchResults } = useStores();
-        const entry = searchResults.currentEntry;
+        const { content } = useStores();
+        const entry = content.currentEntry;
         if (!entry?.definitions) return [];
         
         return entry.definitions
-            .filter(def => {
+            .filter((def) => {
                 const defCluster = def.meaning_cluster?.id || 'default';
                 return defCluster === clusterId && def.part_of_speech === partOfSpeech;
             })

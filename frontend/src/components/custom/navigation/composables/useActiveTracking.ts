@@ -14,7 +14,7 @@ export function useActiveTracking({
     sidebarSections
 }: UseActiveTrackingOptions) {
     // Create active state map for multi-level tracking
-    const activeStates = new Map([
+    const activeStates = new Map<number, Ref<string | null>>([
         [0, activeCluster], // Level 0: clusters
         [1, activePartOfSpeech] // Level 1: parts of speech
     ]);
@@ -67,8 +67,8 @@ export function useActiveTracking({
     watch(() => sidebarSections.value, async () => {
         if (sidebarSections.value.length > 0) {
             // Reset active states when sections change (new word)
-            activeCluster.value = '';
-            activePartOfSpeech.value = '';
+            activeCluster.value = null;
+            activePartOfSpeech.value = null;
             
             // Wait for DOM to update
             await nextTick();

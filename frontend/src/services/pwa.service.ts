@@ -3,6 +3,16 @@ export class PWAService {
   private registration: ServiceWorkerRegistration | null = null;
   private updateAvailable = false;
   private refreshing = false;
+  
+  // Store references to event listeners for cleanup
+  private listeners: Array<{ target: EventTarget; type: string; handler: EventListener }> = [];
+  private abortController = new AbortController();
+
+  // Helper to add event listeners with cleanup tracking
+  private addEventListener(target: EventTarget, type: string, handler: EventListener) {
+    target.addEventListener(type, handler, { signal: this.abortController.signal });
+    this.listeners.push({ target, type, handler });
+  }
 
   async init() {
     if (!('serviceWorker' in navigator)) {
@@ -23,10 +33,10 @@ export class PWAService {
       });
 
       // Check for updates
-      this.registration.addEventListener('updatefound', () => {
+      this.addEventListener(this.registration, 'updatefound', () => {
         const newWorker = this.registration!.installing;
         if (newWorker) {
-          newWorker.addEventListener('statechange', () => {
+          this.addEventListener(newWorker, 'statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
               this.updateAvailable = true;
               this.notifyUpdateAvailable();
@@ -36,7 +46,7 @@ export class PWAService {
       });
 
       // Handle controller changes
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
+      this.addEventListener(navigator.serviceWorker, 'controllerchange', () => {
         if (!this.refreshing) {
           window.location.reload();
           this.refreshing = true;
@@ -60,27 +70,27 @@ export class PWAService {
   private setupIOSLifecycle() {
     // Handle iOS-specific page lifecycle events
     if ('onpageshow' in window) {
-      window.addEventListener('pageshow', (event: PageTransitionEvent) => {
+      this.addEventListener(window, 'pageshow', ((event: PageTransitionEvent) => {
         if (event.persisted) {
           // Page was restored from bfcache
           this.handlePageRestore();
         }
-      });
+      }) as EventListener);
     }
 
     // Handle visibility changes
-    document.addEventListener('visibilitychange', () => {
+    this.addEventListener(document, 'visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         this.checkForUpdates();
       }
     });
 
     // iOS-specific: Handle app switching
-    window.addEventListener('focus', () => {
+    this.addEventListener(window, 'focus', () => {
       this.handleAppFocus();
     });
 
-    window.addEventListener('blur', () => {
+    this.addEventListener(window, 'blur', () => {
       this.handleAppBlur();
     });
   }
@@ -277,6 +287,23 @@ export class PWAService {
         }
       };
     });
+  }
+
+  // Cleanup method to remove all event listeners
+  cleanup() {
+    // Abort all listeners added with AbortController
+    this.abortController.abort();
+    
+    // Clear the listeners array
+    this.listeners = [];
+    
+    // Create new AbortController for potential future use
+    this.abortController = new AbortController();
+    
+    // Clear registration
+    this.registration = null;
+    this.updateAvailable = false;
+    this.refreshing = false;
   }
 }
 

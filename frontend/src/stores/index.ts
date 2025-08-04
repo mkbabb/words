@@ -2,6 +2,7 @@
 export { useSearchBarStore } from './search/search-bar'
 export { useSearchConfigStore } from './search/search-config'
 export { useSearchResultsStore } from './search/search-results'
+export { useContentStore } from './content/content'
 export { useUIStore } from './ui/ui-state'
 export { useLoadingStore } from './ui/loading'
 export { useNotificationStore } from './utils/notifications'
@@ -16,6 +17,7 @@ export { useRouterSync } from './composables/useRouterSync'
 import { useSearchBarStore } from './search/search-bar'
 import { useSearchConfigStore } from './search/search-config'
 import { useSearchResultsStore } from './search/search-results'
+import { useContentStore } from './content/content'
 import { useUIStore } from './ui/ui-state'
 import { useLoadingStore } from './ui/loading'
 import { useNotificationStore } from './utils/notifications'
@@ -31,6 +33,7 @@ export function useStores() {
     searchBar: useSearchBarStore(),
     searchConfig: useSearchConfigStore(),
     searchResults: useSearchResultsStore(),
+    content: useContentStore(),
     ui: useUIStore(),
     loading: useLoadingStore(),
     notifications: useNotificationStore(),

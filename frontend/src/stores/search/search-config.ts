@@ -1,338 +1,345 @@
 import { defineStore } from 'pinia'
-import { ref, readonly, nextTick } from 'vue'
-import { useRouterSync } from '../composables/useRouterSync'
-import { wordlistApi } from '@/api'
-import type { 
-  SearchMode, 
-  ModeOperationOptions, 
-  ModeTransitionResult,
-  LookupModeConfig,
-  WordlistModeConfig,
-  WordOfTheDayModeConfig,
-  StageModeConfig,
-  DEFAULT_MODE_CONFIGS
-} from '@/types'
+import { ref, readonly, computed } from 'vue'
+import type { SearchMode, SearchSubMode, SearchSubModeMap } from '@/types'
+import type { DictionarySource, Language } from '@/stores/types/constants'
+import { useLookupMode } from './modes/lookup'
+import { useWordlistMode } from './modes/wordlist'
+import { useWordOfTheDayModeConfig } from './modes/word-of-the-day'
+import { useStageModeConfig } from './modes/stage'
 
 /**
- * SearchConfigStore - Search configuration and mode management
- * Handles search mode, dictionary sources, languages, wordlist selection, and AI settings
- * Uses modern Pinia persistence for automatic state saving
+ * Refactored SearchConfigStore with mode-specific encapsulation
+ * Central orchestrator for all search modes and their configurations
  */
 export const useSearchConfigStore = defineStore('searchConfig', () => {
   // ==========================================================================
-  // PERSISTED CONFIGURATION STATE
+  // CORE MODE STATE
   // ==========================================================================
   
-  // Search mode configuration
   const searchMode = ref<SearchMode>('lookup')
-  const selectedSources = ref<string[]>(['wiktionary'])
-  const selectedLanguages = ref<string[]>(['en'])
-  const selectedWordlist = ref<string | null>(null)
-  const noAI = ref(true)
+  const previousMode = ref<SearchMode>('lookup')
+  
+  const searchSubMode = ref<Record<SearchMode, SearchSubMode<SearchMode>>>({
+    lookup: 'dictionary',
+    wordlist: 'all',
+    'word-of-the-day': 'current',
+    stage: 'test'
+  })
+  
+  // Query persistence across modes
+  const savedQueries = ref<Record<SearchMode, string>>({
+    'lookup': '',
+    'wordlist': '',
+    'word-of-the-day': '',
+    'stage': ''
+  })
+  
   const showControls = ref(false)
-
+  
   // ==========================================================================
-  // ROUTER INTEGRATION
+  // MODE-SPECIFIC CONFIGURATIONS
   // ==========================================================================
   
-  const { 
-    navigateToLookupMode, 
-    navigateToWordlist, 
-    navigateToHome,
-    navigateToWordOfTheDay,
-    navigateToStage,
-    updateRouterForCurrentEntry 
-  } = useRouterSync()
-
-  // ==========================================================================
-  // INTERNAL HELPERS
-  // ==========================================================================
-
-  /**
-   * Type-safe mode navigation handler
-   * Eliminates the need for mode-specific parameter passing
-   */
-  const handleModeNavigation = async <T extends SearchMode>(
-    mode: T, 
-    config: any // Will be properly typed based on mode
-  ) => {
-    switch (mode) {
-      case 'lookup': {
-        const lookupConfig = config as LookupModeConfig
-        if (lookupConfig.query?.trim()) {
-          console.log('🧭 Navigating to lookup with query:', lookupConfig.query)
-          navigateToLookupMode(lookupConfig.query, lookupConfig.displayMode || 'dictionary')
-        } else if (lookupConfig.currentEntry?.word) {
-          console.log('🧭 Updating router for existing lookup:', lookupConfig.currentEntry.word)
-          updateRouterForCurrentEntry(
-            lookupConfig.currentEntry, 
-            lookupConfig.displayMode || 'dictionary', 
-            'lookup'
-          )
-        } else {
-          console.log('🧭 No query or entry, going to home')
-          navigateToHome()
-        }
-        break
-      }
-      
-      case 'wordlist': {
-        const wordlistConfig = config as WordlistModeConfig
-        const targetWordlistId = wordlistConfig.wordlistId || selectedWordlist.value
-        
-        if (targetWordlistId) {
-          console.log('🧭 Navigating to wordlist:', targetWordlistId, 'with config')
-          
-          // Build filters object from config
-          const filters = wordlistConfig.filters ? {
-            ...wordlistConfig.filters,
-            ...(wordlistConfig.chunking && { chunking: wordlistConfig.chunking }),
-            ...(wordlistConfig.sortCriteria && { sortCriteria: wordlistConfig.sortCriteria })
-          } : undefined
-          
-          navigateToWordlist(targetWordlistId, filters, wordlistConfig.query)
-        } else {
-          // Auto-fetch first available wordlist
-          console.log('🧭 No wordlist selected, fetching first available')
-          try {
-            const response = await wordlistApi.getWordlists({ limit: 1 })
-            if (response.items?.length > 0) {
-              const firstWordlist = response.items[0]
-              selectedWordlist.value = firstWordlist.id
-              console.log('🧭 Selected first wordlist:', firstWordlist.name)
-              navigateToWordlist(firstWordlist.id, undefined, wordlistConfig.query)
-            } else {
-              console.log('🧭 No wordlists available, staying on home')
-              navigateToHome()
-            }
-          } catch (error) {
-            console.error('🧭 Failed to fetch wordlists:', error)
-            navigateToHome()
-          }
-        }
-        break
-      }
-      
-      case 'word-of-the-day': {
-        const wotdConfig = config as WordOfTheDayModeConfig
-        console.log('🧭 Navigating to word-of-the-day with query:', wotdConfig.query)
-        navigateToWordOfTheDay(wotdConfig.query)
-        break
-      }
-      
-      case 'stage': {
-        const stageConfig = config as StageModeConfig
-        console.log('🧭 Navigating to stage with query:', stageConfig.query)
-        navigateToStage(stageConfig.query)
-        break
-      }
-      
-      default:
-        console.log('🧭 Unknown mode, going to home')
-        navigateToHome()
-    }
+  const lookupMode = useLookupMode()
+  const wordlistMode = useWordlistMode()
+  const wordOfTheDayConfig = useWordOfTheDayModeConfig()
+  const stageConfig = useStageModeConfig()
+  
+  // Mode configuration registry
+  const modeConfigs = {
+    lookup: lookupMode,
+    wordlist: wordlistMode,
+    'word-of-the-day': wordOfTheDayConfig,
+    stage: stageConfig
   }
-
+  
   // ==========================================================================
-  // ACTIONS
+  // COMPUTED PROPERTIES
   // ==========================================================================
   
-  // Enhanced search mode management with type-safe configuration
-  const setSearchMode = async <T extends SearchMode>(
-    options: ModeOperationOptions<T>
-  ): Promise<ModeTransitionResult> => {
-    const { mode: newMode, config, saveCurrentQuery = true, force = false } = options
-    const previousMode = searchMode.value
-    
-    console.log('🔄 setSearchMode called:', previousMode, '->', newMode)
-    
-    if (searchMode.value === newMode && !force) {
-      console.log('⚠️ Mode is already', newMode, '- no change needed')
-      return {
-        success: true,
-        previousMode,
-        newMode,
-        navigationSuccess: true
+  // Get current mode configuration
+  const currentModeConfig = computed(() => {
+    return modeConfigs[searchMode.value]
+  })
+  
+  // Legacy compatibility
+  const lookupSubMode = computed(() => searchSubMode.value.lookup)
+  
+  // Expose mode-specific configs as computed properties for convenience
+  const selectedSources = computed(() => lookupMode.selectedSources.value)
+  const selectedLanguages = computed(() => lookupMode.selectedLanguages.value)
+  const noAI = computed(() => lookupMode.noAI.value)
+  const selectedWordlist = computed(() => wordlistMode.selectedWordlist.value)
+  const wordlistFilters = computed(() => wordlistMode.wordlistFilters.value)
+  const wordlistSortCriteria = computed(() => wordlistMode.wordlistSortCriteria.value)
+  
+  // ==========================================================================
+  // MODE MANAGEMENT
+  // ==========================================================================
+  
+  const setMode = async (newMode: SearchMode, currentQuery?: string) => {
+    if (newMode !== searchMode.value) {
+      console.log('🔄 Mode change:', searchMode.value, '->', newMode)
+      
+      // Save current query if provided
+      if (currentQuery !== undefined) {
+        saveCurrentQuery(currentQuery)
       }
+      
+      // Execute exit handler for current mode
+      const currentConfig = modeConfigs[searchMode.value]
+      if (currentConfig.handler?.onExit) {
+        await currentConfig.handler.onExit(newMode)
+      }
+      
+      // Update mode
+      previousMode.value = searchMode.value
+      searchMode.value = newMode
+      
+      // Execute enter handler for new mode
+      const newConfig = modeConfigs[newMode]
+      if (newConfig.handler?.onEnter) {
+        await newConfig.handler.onEnter(previousMode.value)
+      }
+      
+      console.log('✅ Mode changed to:', newMode)
+      
+      // Return saved query for the new mode
+      return getSavedQuery(newMode)
     }
-
-    console.log('🔄 Actually changing searchMode from', searchMode.value, 'to', newMode)
-    searchMode.value = newMode
-    
-    // Force reactivity trigger
-    await nextTick()
-    
-    // Handle type-safe router navigation
-    let navigationSuccess = true
-    
-    if (config?.router) {
+    return ''
+  }
+  
+  const setSubMode = <T extends SearchMode>(mode: T, newSubMode: SearchSubModeMap[T]) => {
+    const currentSubMode = searchSubMode.value[mode]
+    if (newSubMode !== currentSubMode) {
+      console.log(`🔄 ${mode} sub-mode change:`, currentSubMode, '->', newSubMode)
+      
+      // Cancel any in-progress requests when switching modes
       try {
-        await handleModeNavigation(newMode, config)
-      } catch (error) {
-        console.error('🧭 setSearchMode: navigation failed:', error)
-        navigationSuccess = false
+        const { useSearchResultsStore } = require('./search-results')
+        const searchResultsStore = useSearchResultsStore()
+        searchResultsStore.cancelSearch()
+      } catch (e) {
+        console.warn('Could not cancel in-progress requests:', e)
       }
-    }
-    
-    // Return structured result
-    return {
-      success: true,
-      previousMode,
-      newMode,
-      navigationSuccess
+      
+      searchSubMode.value = {
+        ...searchSubMode.value,
+        [mode]: newSubMode
+      }
+      console.log(`✅ ${mode} sub-mode changed to:`, newSubMode)
     }
   }
-
-  /**
-   * Convenience function for legacy compatibility
-   * @deprecated Use setSearchMode with ModeOperationOptions instead
-   */
-  const setSearchModeLegacy = async (
-    newMode: SearchMode,
-    router?: any,
-    currentEntry?: any,
-    mode?: string,
-    modeQuery?: string,
-    currentFilters?: Record<string, any>
-  ): Promise<ModeTransitionResult> => {
-    console.warn('⚠️ setSearchModeLegacy is deprecated. Please use setSearchMode with ModeOperationOptions.')
-    
-    // Convert legacy parameters to new format
-    const config: any = {
-      router,
-      currentEntry,
-      query: modeQuery
-    }
-    
-    // Add mode-specific configurations
-    if (newMode === 'lookup' && mode) {
-      config.displayMode = mode
-    } else if (newMode === 'wordlist' && currentFilters) {
-      config.filters = currentFilters.filters
-      config.chunking = currentFilters.chunking
-      config.sortCriteria = currentFilters.sortCriteria
-    }
-    
-    return setSearchMode({ mode: newMode, config })
+  
+  const getSubMode = <T extends SearchMode>(mode: T): SearchSubModeMap[T] => {
+    return searchSubMode.value[mode] as SearchSubModeMap[T]
   }
-
-  const toggleSearchMode = async (router?: any, currentEntry?: any, mode?: string) => {
-    console.log('🔄 toggleSearchMode called:', searchMode.value)
-    
-    // Cycle through modes: lookup -> wordlist -> word-of-the-day -> stage -> lookup
-    let newMode: SearchMode
-    if (searchMode.value === 'lookup') {
-      newMode = 'wordlist'
-    } else if (searchMode.value === 'wordlist') {
-      newMode = 'word-of-the-day'
-    } else if (searchMode.value === 'word-of-the-day') {
-      newMode = 'stage'
-    } else {
-      newMode = 'lookup'
-    }
-    
-    await setSearchMode(newMode, router, currentEntry, mode)
+  
+  const toggleSearchMode = () => {
+    const modes: SearchMode[] = ['lookup', 'wordlist', 'word-of-the-day', 'stage']
+    const currentIndex = modes.indexOf(searchMode.value)
+    const nextIndex = (currentIndex + 1) % modes.length
+    setMode(modes[nextIndex])
   }
-
-  // Source management
-  const toggleSource = (source: string) => {
-    const sources = selectedSources.value
-    if (sources.includes(source)) {
-      selectedSources.value = sources.filter((s: string) => s !== source)
-    } else {
-      selectedSources.value = [...sources, source]
-    }
+  
+  // ==========================================================================
+  // QUERY MANAGEMENT
+  // ==========================================================================
+  
+  const saveCurrentQuery = (query: string) => {
+    savedQueries.value[searchMode.value] = query
+    console.log('💾 Saved query for', searchMode.value, ':', query)
   }
-
-  const setSources = (sources: string[]) => {
-    selectedSources.value = [...sources]
+  
+  const getSavedQuery = (mode: SearchMode) => {
+    return savedQueries.value[mode] || ''
   }
+  
+  const getPreviousMode = () => previousMode.value
+  
+  // ==========================================================================
+  // MODE-SPECIFIC ACTION DELEGATES
+  // ==========================================================================
+  
+  // Lookup mode actions
+  const toggleSource = (source: DictionarySource) => lookupMode.toggleSource(source)
+  const setSources = (sources: DictionarySource[]) => lookupMode.setSources(sources)
+  const toggleLanguage = (language: Language) => lookupMode.toggleLanguage(language)
+  const setLanguages = (languages: Language[]) => lookupMode.setLanguages(languages)
+  const toggleAI = () => lookupMode.toggleAI()
+  const setAI = (enabled: boolean) => lookupMode.setAI(enabled)
+  
+  // Wordlist mode actions
+  const setWordlist = (wordlistId: string | null) => wordlistMode.setWordlist(wordlistId)
+  const setWordlistFilters = (filters: any) => wordlistMode.setWordlistFilters(filters)
+  const toggleWordlistFilter = (filterName: any) => wordlistMode.toggleWordlistFilter(filterName)
+  const setWordlistSortCriteria = (criteria: any[]) => wordlistMode.setWordlistSortCriteria(criteria)
+  const addSortCriterion = (criterion: any) => wordlistMode.addSortCriterion(criterion)
+  const removeSortCriterion = (index: number) => wordlistMode.removeSortCriterion(index)
+  const clearSortCriteria = () => wordlistMode.clearSortCriteria()
 
-  // Language management
-  const toggleLanguage = (language: string) => {
-    const languages = selectedLanguages.value
-    if (languages.includes(language)) {
-      selectedLanguages.value = languages.filter((l: string) => l !== language)
-    } else {
-      selectedLanguages.value = [...languages, language]
-    }
+  // Legacy compatibility methods
+  const setLookupMode = (mode: any) => {
+    setSubMode('lookup', mode)
   }
-
-  const setLanguages = (languages: string[]) => {
-    selectedLanguages.value = [...languages]
-  }
-
-  // Wordlist management
-  const setWordlist = (wordlistId: string | null) => {
-    selectedWordlist.value = wordlistId
-  }
-
-  // AI configuration
-  const toggleAI = () => {
-    noAI.value = !noAI.value
-  }
-
-  const setAI = (enabled: boolean) => {
-    noAI.value = !enabled
-  }
-
-  // Control visibility
+  
+  // ==========================================================================
+  // CONTROL MANAGEMENT
+  // ==========================================================================
+  
   const toggleControls = () => {
     showControls.value = !showControls.value
   }
-
+  
   const setShowControls = (show: boolean) => {
     showControls.value = show
   }
-
-  // Reset configuration
+  
+  // ==========================================================================
+  // RESET CONFIGURATION
+  // ==========================================================================
+  
   const resetConfig = () => {
+    // Reset core state
     searchMode.value = 'lookup'
-    selectedSources.value = ['wiktionary']
-    selectedLanguages.value = ['en']
-    selectedWordlist.value = null
-    noAI.value = true
+    searchSubMode.value = {
+      lookup: 'dictionary',
+      wordlist: 'all',
+      'word-of-the-day': 'current',
+      stage: 'test'
+    }
     showControls.value = false
+    
+    // Reset all mode configurations
+    lookupMode.reset()
+    wordlistMode.reset()
+    wordOfTheDayConfig.reset()
+    stageConfig.reset()
+    
+    // Clear saved queries
+    savedQueries.value = {
+      'lookup': '',
+      'wordlist': '',
+      'word-of-the-day': '',
+      'stage': ''
+    }
   }
-
+  
+  
   // ==========================================================================
   // RETURN API
   // ==========================================================================
   
   return {
-    // State
+    // Core Mode State
     searchMode: readonly(searchMode),
-    selectedSources: readonly(selectedSources),
-    selectedLanguages: readonly(selectedLanguages),
-    selectedWordlist: readonly(selectedWordlist),
-    noAI: readonly(noAI),
+    searchSubMode: readonly(searchSubMode),
+    lookupSubMode: readonly(lookupSubMode),
+    previousMode: readonly(previousMode),
+    savedQueries: readonly(savedQueries),
     showControls: readonly(showControls),
     
-    // Actions - Enhanced with type safety
-    setSearchMode,
-    setSearchModeLegacy,  // Deprecated - for backward compatibility
+    // Mode-Specific Configurations (read-only exposure)
+    lookupConfig: {
+      selectedSources,
+      selectedLanguages,
+      noAI,
+      // Actions
+      toggleSource,
+      setSources,
+      toggleLanguage,
+      setLanguages,
+      toggleAI,
+      setAI,
+    },
+    
+    wordlistConfig: {
+      selectedWordlist,
+      wordlistFilters,
+      wordlistSortCriteria,
+      // Actions
+      setWordlist,
+      setWordlistFilters,
+      toggleWordlistFilter,
+      setWordlistSortCriteria,
+      addSortCriterion,
+      removeSortCriterion,
+      clearSortCriteria,
+    },
+    
+    wordOfTheDayConfig: {
+      currentDate: wordOfTheDayConfig.currentDate,
+      archiveView: wordOfTheDayConfig.archiveView,
+      // Actions
+      setCurrentDate: wordOfTheDayConfig.setCurrentDate,
+      setToday: wordOfTheDayConfig.setToday,
+      toggleArchiveView: wordOfTheDayConfig.toggleArchiveView,
+      setArchiveView: wordOfTheDayConfig.setArchiveView,
+    },
+    
+    stageConfig: {
+      debugLevel: stageConfig.debugLevel,
+      testMode: stageConfig.testMode,
+      // Actions
+      setDebugLevel: stageConfig.setDebugLevel,
+      toggleTestMode: stageConfig.toggleTestMode,
+      setTestMode: stageConfig.setTestMode,
+    },
+    
+    // Computed convenience properties (for backward compatibility)
+    selectedSources,
+    selectedLanguages,
+    noAI,
+    selectedWordlist,
+    wordlistFilters,
+    wordlistSortCriteria,
+    
+    // Mode Management Actions
+    setMode,
+    setSubMode,
+    getSubMode,
     toggleSearchMode,
+    getPreviousMode,
+    saveCurrentQuery,
+    getSavedQuery,
+    
+    // Control Actions
+    toggleControls,
+    setShowControls,
+    
+    // Reset
+    resetConfig,
+    
+    // Action delegates
     toggleSource,
     setSources,
     toggleLanguage,
     setLanguages,
-    setWordlist,
     toggleAI,
     setAI,
-    toggleControls,
-    setShowControls,
-    resetConfig
+    setWordlist,
+    setWordlistFilters,
+    toggleWordlistFilter,
+    setWordlistSortCriteria,
+    addSortCriterion,
+    removeSortCriterion,
+    clearSortCriteria,
+    setLookupMode,
+    
+    // Expose current mode config for advanced usage
+    currentModeConfig,
   }
 }, {
   persist: {
     key: 'search-config',
     pick: [
       'searchMode',
-      'selectedSources', 
-      'selectedLanguages',
-      'selectedWordlist',
-      'noAI',
-      'showControls'
+      'searchSubMode',
+      'previousMode',
+      'savedQueries',
+      'showControls',
+      // Note: Mode-specific configs have their own persistence
     ]
   }
 })

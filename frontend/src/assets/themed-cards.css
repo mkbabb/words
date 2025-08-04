@@ -179,6 +179,104 @@
         @apply border-orange-400/20;
     }
 
+    /* Search match highlighting borders - reusable classes */
+    .search-match-gold {
+        @apply border-2 border-amber-300/30 relative overflow-hidden;
+    }
+
+    .search-match-silver {
+        @apply border-2 border-gray-300/30 relative overflow-hidden;
+    }
+
+    .search-match-bronze {
+        @apply border-2 border-orange-300/30 relative overflow-hidden;
+    }
+
+    .dark .search-match-gold {
+        @apply border-amber-400/20;
+    }
+
+    .dark .search-match-silver {
+        @apply border-gray-400/20;
+    }
+
+    .dark .search-match-bronze {
+        @apply border-orange-400/20;
+    }
+
+    /* Metallic shimmer effect for search match borders */
+    .search-match-gold::before,
+    .search-match-silver::before,
+    .search-match-bronze::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.4) 45%,
+            rgba(255, 255, 255, 0.6) 50%,
+            rgba(255, 255, 255, 0.4) 55%,
+            transparent 100%
+        );
+        transform: translateX(-100%);
+        animation: border-shimmer 3s ease-in-out infinite;
+        pointer-events: none;
+        z-index: 1;
+        border-radius: inherit;
+        mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        mask-composite: xor;
+        mask-composite: exclude;
+        padding: 2px;
+    }
+
+    /* Different shimmer colors for each metal */
+    .search-match-gold::before {
+        background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(251, 191, 36, 0.4) 45%,
+            rgba(251, 191, 36, 0.7) 50%,
+            rgba(251, 191, 36, 0.4) 55%,
+            transparent 100%
+        );
+    }
+
+    .search-match-silver::before {
+        background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(229, 231, 235, 0.5) 45%,
+            rgba(229, 231, 235, 0.8) 50%,
+            rgba(229, 231, 235, 0.5) 55%,
+            transparent 100%
+        );
+    }
+
+    .search-match-bronze::before {
+        background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(251, 146, 60, 0.4) 45%,
+            rgba(251, 146, 60, 0.6) 50%,
+            rgba(251, 146, 60, 0.4) 55%,
+            transparent 100%
+        );
+    }
+
+    /* Shimmer animation */
+    @keyframes border-shimmer {
+        0% {
+            transform: translateX(-100%);
+        }
+        100% {
+            transform: translateX(200%);
+        }
+    }
+
     /* Themed elements within cards */
     .themed-part-of-speech {
         @apply rounded-md px-2 py-1 text-center text-sm font-medium tracking-wider lowercase;

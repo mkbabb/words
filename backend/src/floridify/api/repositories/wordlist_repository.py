@@ -12,6 +12,7 @@ from ...constants import Language
 from ...models.models import Word
 from ...search.corpus import invalidate_wordlist_corpus, invalidate_wordlist_names_corpus
 from ...utils.logging import get_logger
+from ...utils.text_utils import normalize_word
 from ...wordlist.constants import MasteryLevel, Temperature
 from ...wordlist.models import WordList, WordListItem
 from ...wordlist.utils import generate_wordlist_hash
@@ -209,12 +210,15 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         3. Bulk creating missing words
         4. Returning word IDs in the same order as input
         """
-        # Normalize all words
+        # Normalize all words using the standard normalize_word function
+        # This ensures consistent normalization for search
         normalized_map = {}
         normalized_list = []
         for text in word_texts:
-            normalized = text.lower().strip()
-            normalized_map[normalized] = text.strip()
+            # Keep original text for display, normalize for lookup
+            original = text.strip()
+            normalized = normalize_word(original)
+            normalized_map[normalized] = original
             normalized_list.append(normalized)
 
         # Remove duplicates while preserving order
@@ -255,7 +259,9 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         # Return word IDs in the same order as input
         word_ids: list[PydanticObjectId] = []
         for text in word_texts:
-            normalized = text.lower().strip()
+            # Use the same normalization as above
+            original = text.strip()
+            normalized = normalize_word(original)
             word_id = existing_map.get(normalized)
             if word_id is None:
                 raise ValueError(f"Word ID not found for '{text}' after processing")

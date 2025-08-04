@@ -32,6 +32,13 @@ def normalize_word(word: str) -> str:
 
     # Convert back to composed form
     normalized = unicodedata.normalize("NFC", normalized)
+    
+    # Remove common articles at the start for better sorting of phrases
+    articles = ['the ', 'a ', 'an ', 'le ', 'la ', 'les ', 'un ', 'une ', 'des ']
+    for article in articles:
+        if normalized.startswith(article):
+            normalized = normalized[len(article):]
+            break
 
     return normalized
 

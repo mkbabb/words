@@ -24,12 +24,7 @@
 </template>
 
 <script setup lang="ts">
-interface VocabularySuggestion {
-    word: string;
-    reasoning?: string;
-    reason?: string;
-    difficulty_level?: number;
-}
+import type { VocabularySuggestion } from '@/types';
 
 defineProps<{
     suggestion: VocabularySuggestion;

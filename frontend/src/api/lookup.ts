@@ -50,7 +50,8 @@ export const lookupApi = {
     onProgress?: (stage: string, progress: number, message: string, details?: any) => void,
     onConfig?: (category: string, stages: Array<{progress: number, label: string, description: string}>) => void,
     onPartialResult?: (partialEntry: Partial<SynthesizedDictionaryEntry>) => void,
-    noAI?: boolean
+    noAI?: boolean,
+    abortController?: AbortController
   ): Promise<SynthesizedDictionaryEntry> {
     return new Promise(async (resolve, reject) => {
       const params = new URLSearchParams();
@@ -81,13 +82,14 @@ export const lookupApi = {
       let partialResult: Partial<SynthesizedDictionaryEntry> = {};
       let definitions: any[] = [];
       let isChunkedCompletion = false;
-      let abortController = new AbortController();
+      // Use provided abort controller or create new one
+      const controller = abortController || new AbortController();
       
       // Set a timeout for initial connection (2 minutes for complex AI processing)
       connectionTimeout = setTimeout(() => {
         if (!hasReceivedData) {
           console.error('SSE connection timeout - no data received within 2 minutes');
-          abortController.abort();
+          controller.abort();
           reject(new Error('Connection timeout. Please try again.'));
         }
       }, 120000);
@@ -100,7 +102,7 @@ export const lookupApi = {
             'Accept': 'text/event-stream',
             'Cache-Control': 'no-cache',
           },
-          signal: abortController.signal,
+          signal: controller.signal,
         });
 
         if (!response.ok) {

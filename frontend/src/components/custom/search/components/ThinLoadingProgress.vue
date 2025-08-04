@@ -46,7 +46,7 @@ interface Emits {
     (e: 'progress-change', progress: number): void;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
     mode: 'lookup',
 });
 

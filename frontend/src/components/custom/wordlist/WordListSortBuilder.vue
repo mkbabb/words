@@ -107,24 +107,12 @@ import {
   BarChart3,
   Calendar,
   Eye,
-  Clock
+  Clock,
+  Type
 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 
-export interface SortCriterion {
-  id: string;
-  field: SortField;
-  direction: 'asc' | 'desc';
-}
-
-export type SortField = 'mastery' | 'frequency' | 'dateAdded' | 'lastVisited' | 'nextReview';
-
-interface SortOption {
-  field: SortField;
-  label: string;
-  icon: any;
-  defaultDirection: 'asc' | 'desc';
-}
+import type { SortCriterion, SortField, SortOption } from '@/types';
 
 const props = defineProps<{
   modelValue: SortCriterion[];
@@ -145,7 +133,13 @@ const draggedIndex = ref<number | null>(null);
 // Available sort options
 const availableOptions: SortOption[] = [
   {
-    field: 'mastery',
+    field: 'word',
+    label: 'Alphabetical',
+    icon: Type,
+    defaultDirection: 'asc'
+  },
+  {
+    field: 'mastery_level',
     label: 'Mastery Level',
     icon: Trophy,
     defaultDirection: 'desc'
@@ -157,19 +151,19 @@ const availableOptions: SortOption[] = [
     defaultDirection: 'desc'
   },
   {
-    field: 'dateAdded',
+    field: 'added_at',
     label: 'Date Added',
     icon: Calendar,
     defaultDirection: 'desc'
   },
   {
-    field: 'lastVisited',
+    field: 'last_visited',
     label: 'Last Visited',
     icon: Eye,
     defaultDirection: 'desc'
   },
   {
-    field: 'nextReview',
+    field: 'next_review',
     label: 'Next Review',
     icon: Clock,
     defaultDirection: 'asc'

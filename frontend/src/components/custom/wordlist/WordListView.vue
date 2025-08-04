@@ -140,7 +140,7 @@ import WordListUploadModal from './WordListUploadModal.vue';
 import CreateWordListModal from './CreateWordListModal.vue';
 import EditWordNotesModal from './EditWordNotesModal.vue';
 
-const { searchConfig, orchestrator, loading, ui, searchBar, searchResults } = useStores();
+const { searchConfig, orchestrator, loading, searchBar, searchResults } = useStores();
 const router = useRouter();
 const { toast } = useToast();
 
@@ -160,12 +160,12 @@ const scrollContainer = ref<HTMLElement>();
 
 // Sort criteria from store (writeable)
 const sortCriteria = computed({
-  get: () => ui.wordlistSortCriteria,
-  set: (value) => { ui.setWordlistSortCriteria(value); }
+  get: () => searchConfig.wordlistSortCriteria,
+  set: (value: any[]) => { searchConfig.setWordlistSortCriteria(value); }
 });
 
 // Filters - use store filters
-const filters = computed(() => ui.wordlistFilters);
+const filters = computed(() => searchConfig.wordlistFilters);
 
 // Computed properties
 const currentWordlist = computed(() => currentWordlistData.value);
@@ -204,9 +204,19 @@ const dueForReview = computed(() => {
 
 // Methods
 
+// Convert UI filters to mastery levels array for API
+const getMasteryLevelsFromFilters = () => {
+  const levels = [];
+  if (filters.value.showBronze) levels.push('bronze');
+  if (filters.value.showSilver) levels.push('silver');
+  if (filters.value.showGold) levels.push('gold');
+  // If all are selected or none are selected, return undefined (show all)
+  return levels.length === 3 || levels.length === 0 ? undefined : levels;
+};
+
 const handleWordClick = async (word: WordListItem) => {
   // Switch to lookup mode and navigate to definition route
-  searchConfig.setSearchMode('lookup', router);
+  searchConfig.setMode('lookup');
   
   // Perform the word lookup after navigation
   await orchestrator.performSearch(word.word);
@@ -329,102 +339,48 @@ const loadWordlistMeta = async (id: string) => {
   }
 };
 
-const loadWordlistWords = async (id: string, page: number = 0, append: boolean = false) => {
-  if (!id) return;
-  
-  if (isLoadingWords.value) {
-    return;
-  }
-  
-  isLoadingWords.value = true;
-  
-  try {
-    let response;
-    
-    if (searchBar.searchQuery && searchBar.searchQuery.trim()) {
-      // Use search endpoint when there's a query - include all filters
-      response = await wordlistApi.searchWordlist(id, {
-        query: searchBar.searchQuery.trim(),
-        offset: page * wordsPerPage.value,
-        limit: wordsPerPage.value,
-        sort_by: sortCriteria.value?.[0]?.field || 'relevance',
-        sort_order: sortCriteria.value?.[0]?.direction || 'desc',
-        min_score: 0.4,
-        // Pass through all active filters
-        mastery_level: filters.value.masteryLevel || undefined,
-        min_views: filters.value.minViews,
-        max_views: filters.value.maxViews,
-        reviewed: filters.value.reviewed,
-      });
-    } else {
-      // Use regular endpoint when no query - include all filters
-      response = await wordlistApi.getWordlistWords(id, {
-        offset: page * wordsPerPage.value,
-        limit: wordsPerPage.value,
-        sort_by: sortCriteria.value?.[0]?.field || 'added_at',
-        sort_order: sortCriteria.value?.[0]?.direction || 'desc',
-        // Pass through all active filters
-        mastery_level: filters.value.masteryLevel || undefined,
-        min_views: filters.value.minViews,
-        max_views: filters.value.maxViews,
-        reviewed: filters.value.reviewed,
-      });
-    }
-    
-    if (append) {
-      // Add unique IDs and append
-      const newItems = (response.items || []).map((item: WordListItem, idx: number) => ({
-        ...item,
-        _uniqueId: `${item.word}-${item.added_date}-${Date.now()}-${idx}`
-      }));
-      console.log('Appending items:', newItems.length, 'to existing:', currentWords.value.length);
-      currentWords.value.splice(currentWords.value.length, 0, ...newItems);
-    } else {
-      // Add unique IDs for initial load
-      const initialItems = (response.items || []).map((item: WordListItem, idx: number) => ({
-        ...item,
-        _uniqueId: `${item.word}-${item.added_date}-${Date.now()}-${idx}`
-      }));
-      console.log('Initial load:', initialItems.length, 'items');
-      currentWords.value.splice(0, currentWords.value.length, ...initialItems);
-    }
-    totalWords.value = response.total || 0;
-    currentPage.value = page;
-  } catch (error) {
-    console.error('Failed to load wordlist words:', error);
-  } finally {
-    isLoadingWords.value = false;
+// Simplified loading - just trigger orchestrator search
+const triggerWordlistSearch = () => {
+  if (searchConfig.selectedWordlist) {
+    // The orchestrator will handle the search based on current query
+    orchestrator.executeSearch(searchBar.searchQuery);
   }
 };
 
 // Clustering is now handled client-side only
 
 const loadMoreWords = async () => {
-  if (!searchConfig.selectedWordlist || isLoadingWords.value || !hasMoreWords.value) {
-    return;
-  }
-  
-  const nextPage = currentPage.value + 1;
-  await loadWordlistWords(searchConfig.selectedWordlist, nextPage, true);
+  // Pagination will be handled in a future update
+  // For now, the orchestrator loads all matching results
+  console.log('Load more not yet implemented with new search pipeline');
 };
 
 // Infinite scroll removed - using manual Load More button instead
 
-const loadWordlist = async (id: string) => {
-  // Reset pagination state
-  currentPage.value = 0;
-  
-  await Promise.all([
-    loadWordlistMeta(id),
-    loadWordlistWords(id, 0, false)
-  ]);
-};
 
+// Watch for filter changes and reload
+watch(filters, () => {
+  // Reset to first page and reload when filters change
+  currentPage.value = 0;
+  if (searchConfig.selectedWordlist) {
+    triggerWordlistSearch();
+  }
+}, { deep: true });
+
+// Watch for sort criteria changes and reload
+watch(sortCriteria, () => {
+  // Reset to first page and reload when sort changes
+  currentPage.value = 0;
+  if (searchConfig.selectedWordlist) {
+    triggerWordlistSearch();
+  }
+}, { deep: true });
 
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
   if (searchConfig.selectedWordlist) {
-    loadWordlist(searchConfig.selectedWordlist);
+    await loadWordlistMeta(searchConfig.selectedWordlist);
+    triggerWordlistSearch();
   }
 });
 
@@ -433,22 +389,43 @@ onUnmounted(() => {
 });
 
 // Watch for wordlist changes  
-watch(() => searchConfig.selectedWordlist, (newId) => {
+watch(() => searchConfig.selectedWordlist, async (newId) => {
   if (newId) {
-    loadWordlist(newId);
+    // Load metadata
+    await loadWordlistMeta(newId);
+    // Trigger search through orchestrator
+    triggerWordlistSearch();
   } else {
     currentWordlistData.value = null;
     currentWords.value = [];
   }
 });
 
-// Watch for search query changes in wordlist mode
-watch(() => searchBar.searchQuery, (newQuery, oldQuery) => {
-  // Only reload if we're in wordlist mode and have a selected wordlist
-  if (searchConfig.searchMode === 'wordlist' && searchConfig.selectedWordlist && newQuery !== oldQuery) {
-    // Reset to first page when search changes
-    currentPage.value = 0;
-    loadWordlistWords(searchConfig.selectedWordlist, 0, false);
+// Watch for search results from orchestrator
+// The orchestrator now handles all search operations including wordlist searches
+watch(() => searchResults.wordlistSearchResults, (results) => {
+  if (searchConfig.searchMode === 'wordlist' && results) {
+    console.log('📚 WordListView - received search results:', results.length);
+    // The orchestrator already updated the dropdown results
+    // We just need to update our main display
+    if (searchBar.searchQuery.trim()) {
+      // Search results - update display
+      const newItems = results.map((item: any, idx: number) => ({
+        ...item,
+        _uniqueId: `${item.word}-${item.added_date || Date.now()}-${idx}`
+      }));
+      currentWords.value = newItems;
+      totalWords.value = results.length;
+    }
+  }
+}, { immediate: true });
+
+// Watch for empty queries to reload all words
+watch(() => searchBar.searchQuery, (newQuery) => {
+  if (searchConfig.searchMode === 'wordlist' && searchConfig.selectedWordlist && !newQuery.trim()) {
+    // Empty query - orchestrator will call getWordlistWords
+    // Results will come through wordlistSearchResults watcher
+    console.log('📚 WordListView - empty query detected');
   }
 });
 
