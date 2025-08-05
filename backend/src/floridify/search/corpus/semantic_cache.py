@@ -27,11 +27,11 @@ class IndexType(str, Enum):
 
 class QuantizationType(str, Enum):
     """Quantization methods for embedding compression."""
-    
-    NONE = "none"           # No quantization (float32)
-    BINARY = "binary"       # Binary quantization (24x compression)
-    SCALAR = "scalar"       # Scalar quantization (3.75x compression)
-    PRODUCT = "product"     # Product quantization (variable compression)
+
+    NONE = "none"  # No quantization (float32)
+    BINARY = "binary"  # Binary quantization (24x compression)
+    SCALAR = "scalar"  # Scalar quantization (3.75x compression)
+    PRODUCT = "product"  # Product quantization (variable compression)
 
 
 class SemanticIndexCache(Document, BaseMetadata):
@@ -44,17 +44,22 @@ class SemanticIndexCache(Document, BaseMetadata):
     # Index identification
     vocabulary_hash: str = Field(..., description="Hash of vocabulary for cache validation")
     corpus_name: str | None = Field(None, description="Name of corpus this index belongs to")
-    corpus_id: str | None = Field(None, description="ID of corpus this index belongs to (for cascading deletion)")
+    corpus_id: str | None = Field(
+        None, description="ID of corpus this index belongs to (for cascading deletion)"
+    )
     model_name: str = Field(..., description="Sentence transformer model name")
     index_type: IndexType = Field(..., description="Type of index (sentence/char/subword/word)")
 
     # File paths for cached data (hybrid approach)
     index_file_path: str = Field(..., description="Path to FAISS index file")
-    embeddings_file_path: str | None = Field(None, description="Path to embeddings file")
-    metadata_file_path: str | None = Field(None, description="Path to metadata file")
+    embeddings_file_path: str = Field(..., description="Path to embeddings file")
+    metadata_file_path: str = Field(..., description="Path to metadata file")
+    lemma_file_path: str = Field(..., description="Path to lemmatization data file")
 
     # Modern compression features (2025 optimization)
-    quantization_type: QuantizationType = Field(default=QuantizationType.BINARY, description="Compression method used")
+    quantization_type: QuantizationType = Field(
+        default=QuantizationType.BINARY, description="Compression method used"
+    )
     compression_ratio: float = Field(default=1.0, description="Actual compression ratio achieved")
     original_size_bytes: int = Field(gt=0, description="Size before compression")
 

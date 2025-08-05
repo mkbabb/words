@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from rapidfuzz import fuzz, process
 
 from .constants import FuzzySearchMethod
+from .vocabulary import SharedVocabularyStore
 
 
 class FuzzyMatch(BaseModel):
@@ -55,63 +56,177 @@ class FuzzySearch:
         """
         self.min_score = min_score
 
-        # Cache for performance optimization
-        self._last_vocabulary_hash: int = 0
-        self._cached_lowercase_words: list[str] = []
-        self._phrase_words: set[str] = set()
-        self._single_words: set[str] = set()
 
     def search(
         self,
         query: str,
-        word_list: list[str],
+        vocab_store: SharedVocabularyStore,
         max_results: int = 20,
         method: FuzzySearchMethod = FuzzySearchMethod.AUTO,
         min_score: float | None = None,
     ) -> list[FuzzyMatch]:
         """
-        Perform fuzzy search with automatic or specified method.
-
-        Args:
-            query: Search query
-            word_list: List of words to search against
-            max_results: Maximum number of results
-            method: Search method to use
-            min_score: Override default minimum score
-
-        Returns:
-            List of fuzzy matches sorted by score
+        Fuzzy search using SharedVocabularyStore with candidate filtering.
         """
-        if not query.strip() or not word_list:
+        if not query.strip() or not vocab_store.is_loaded:
             return []
 
         query = query.strip().lower()
-        score_threshold = min_score if min_score is not None else self.min_score
-
-        # Cache vocabulary processing - use object id for performance
-        vocab_id = id(word_list)
-        if vocab_id != self._last_vocabulary_hash:
-            self._cache_vocabulary(word_list)
-            self._last_vocabulary_hash = vocab_id
+        min_score_threshold = min_score if min_score is not None else self.min_score
 
         # Select method automatically if needed
         if method == FuzzySearchMethod.AUTO:
             method = self._select_optimal_method(query)
 
-        # Perform search with selected method
-        matches = self._search_with_method(query, word_list, method, max_results * 2)
+        # Smart candidate selection based on query characteristics
+        candidates = self._select_candidates(query, vocab_store, max_results)
+
+        if not candidates:
+            return []
+
+        # Perform search with selected method on filtered candidates
+        matches = self._search_with_method(
+            query, candidates, vocab_store, method, max_results * 2, min_score_threshold
+        )
 
         # Filter by score and limit results
-        filtered_matches = [m for m in matches if m.score >= score_threshold]
+        filtered_matches = [m for m in matches if m.score >= min_score_threshold]
         filtered_matches.sort(key=lambda m: m.score, reverse=True)
 
         return filtered_matches[:max_results]
 
-    def _cache_vocabulary(self, word_list: list[str]) -> None:
-        """Cache vocabulary preprocessing for performance."""
-        self._cached_lowercase_words = [word.lower() for word in word_list]
-        self._phrase_words = {word for word in word_list if " " in word}
-        self._single_words = {word for word in word_list if " " not in word}
+    def _select_candidates(
+        self, query: str, vocab_store: SharedVocabularyStore, max_results: int
+    ) -> list[int]:
+        """Select promising candidates using vocabulary store indices."""
+        query_len = len(query)
+        candidates = []
+
+        # Strategy 1: Length-based filtering (±2 characters for fuzzy tolerance)
+        length_candidates = vocab_store.get_candidates_by_length(query_len, tolerance=2)
+        candidates.extend(length_candidates)
+
+        # Strategy 2: Prefix matching for short queries (boost performance)
+        if query_len <= 4:
+            prefix_candidates = vocab_store.get_candidates_by_prefix(query[:2], max_candidates=200)
+            candidates.extend(prefix_candidates)
+
+        # Remove duplicates and limit candidates for performance
+        unique_candidates = list(set(candidates))
+
+        # Limit total candidates to prevent performance degradation
+        max_candidates = min(1000, len(unique_candidates))
+        if len(unique_candidates) > max_candidates:
+            # Keep the first max_candidates (length-based candidates are prioritized)
+            unique_candidates = unique_candidates[:max_candidates]
+
+        return unique_candidates
+
+    def _search_with_method(
+        self,
+        query: str,
+        candidate_indices: list[int],
+        vocab_store: SharedVocabularyStore,
+        method: FuzzySearchMethod,
+        max_results: int,
+        min_score_threshold: float,
+    ) -> list[FuzzyMatch]:
+        """Execute search with a specific method on candidate indices."""
+
+        # Get candidate words from vocabulary store
+        candidate_words = vocab_store.get_words(candidate_indices)
+
+        if method == FuzzySearchMethod.RAPIDFUZZ:
+            return self._search_rapidfuzz(query, candidate_words, max_results, min_score_threshold)
+        elif method == FuzzySearchMethod.JARO_WINKLER:
+            return self._search_jaro_winkler(query, candidate_words, max_results, min_score_threshold)
+        else:
+            # Default to RapidFuzz for all other methods
+            return self._search_rapidfuzz(query, candidate_words, max_results, min_score_threshold)
+
+    def _search_rapidfuzz(
+        self,
+        query: str,
+        candidate_words: list[str],
+        max_results: int,
+        min_score_threshold: float,
+    ) -> list[FuzzyMatch]:
+        """RapidFuzz search on pre-filtered candidates."""
+
+        if not candidate_words:
+            return []
+
+        # Use RapidFuzz on filtered candidates (much smaller search space)
+        results = process.extract(
+            query,
+            candidate_words,
+            limit=min(max_results * 2, len(candidate_words)),
+            scorer=fuzz.WRatio,
+            processor=lambda s: s.lower(),
+        )
+
+        matches = []
+        is_query_phrase = " " in query.strip()
+
+        for result in results:
+            if len(result) == 3:
+                word, score, _ = result
+            else:
+                word, score = result
+
+            # Convert 0-100 score to 0.0-1.0
+            base_score = score / 100.0
+
+            # Apply length-aware scoring correction
+            corrected_score = self._apply_length_correction(
+                query, word, base_score, is_query_phrase
+            )
+
+            matches.append(
+                FuzzyMatch(
+                    word=word,
+                    score=corrected_score,
+                    method=FuzzySearchMethod.RAPIDFUZZ,
+                    is_phrase=" " in word,
+                )
+            )
+
+        # Sort by corrected scores
+        matches.sort(key=lambda m: m.score, reverse=True)
+        return matches[:max_results]
+
+    def _search_jaro_winkler(
+        self,
+        query: str,
+        candidate_words: list[str],
+        max_results: int,
+        min_score_threshold: float,
+    ) -> list[FuzzyMatch]:
+        """Jaro-Winkler search on pre-filtered candidates."""
+
+        matches = []
+
+        for word in candidate_words:
+            try:
+                word_lower = word.lower()
+                score = jellyfish.jaro_winkler_similarity(query, word_lower)
+
+                matches.append(
+                    FuzzyMatch(
+                        word=word,
+                        score=score,
+                        method=FuzzySearchMethod.JARO_WINKLER,
+                        is_phrase=" " in word,
+                    )
+                )
+
+            except Exception:
+                continue
+
+        # Sort and return top results
+        matches.sort(key=lambda m: m.score, reverse=True)
+        return matches[:max_results]
+
 
     def _select_optimal_method(self, query: str) -> FuzzySearchMethod:
         """
@@ -143,213 +258,6 @@ class FuzzySearch:
             # Long: RapidFuzz with potential phonetic fallback
             return FuzzySearchMethod.RAPIDFUZZ
 
-    def _search_with_method(
-        self,
-        query: str,
-        word_list: list[str],
-        method: FuzzySearchMethod,
-        max_results: int,
-    ) -> list[FuzzyMatch]:
-        """Execute search with a specific method."""
-
-        if method == FuzzySearchMethod.RAPIDFUZZ:
-            return self._search_rapidfuzz(query, word_list, max_results)
-        elif method == FuzzySearchMethod.JARO_WINKLER:
-            return self._search_jaro_winkler(query, word_list, max_results)
-        elif method == FuzzySearchMethod.SOUNDEX:
-            return self._search_soundex(query, word_list, max_results)
-        elif method == FuzzySearchMethod.METAPHONE:
-            return self._search_metaphone(query, word_list, max_results)
-        elif method == FuzzySearchMethod.LEVENSHTEIN:
-            return self._search_polyleven(query, word_list, max_results)
-        else:
-            # Default to optimized RapidFuzz
-            return self._search_rapidfuzz(query, word_list, max_results)
-
-    def _search_rapidfuzz(
-        self, query: str, word_list: list[str], max_results: int
-    ) -> list[FuzzyMatch]:
-        """Search using RapidFuzz library (C++ optimized) with length bias correction."""
-
-        # Increase limit to get more candidates for re-scoring
-        search_limit = min(max_results * 3, len(word_list))
-
-        # Use process.extract for efficient top-k search
-        # Note: We lowercase query in search() method, but need case-insensitive matching
-        results = process.extract(
-            query,
-            word_list,
-            limit=search_limit,
-            scorer=fuzz.WRatio,  # Weighted ratio for better results
-            processor=lambda s: s.lower(),  # Case-insensitive matching
-        )
-
-        matches = []
-        is_query_phrase = " " in query.strip()
-
-        for result in results:
-            # RapidFuzz returns (string, score, index) tuples
-            if len(result) == 3:
-                word, score, _ = result
-            else:
-                word, score = result
-
-            # Convert 0-100 score to 0.0-1.0
-            base_score = score / 100.0
-
-            # Apply length-aware scoring correction
-            corrected_score = self._apply_length_correction(
-                query, word, base_score, is_query_phrase
-            )
-
-            matches.append(
-                FuzzyMatch(
-                    word=word,
-                    score=corrected_score,
-                    method=FuzzySearchMethod.RAPIDFUZZ,
-                    is_phrase=" " in word,
-                )
-            )
-
-        # Sort by corrected scores and limit results
-        matches.sort(key=lambda m: m.score, reverse=True)
-        return matches[:max_results]
-
-    def _search_jaro_winkler(
-        self, query: str, word_list: list[str], max_results: int
-    ) -> list[FuzzyMatch]:
-        """Search using Jaro-Winkler similarity with early termination."""
-
-        matches: list[FuzzyMatch] = []
-        min_score_seen = 0.0
-
-        for word in word_list:
-            try:
-                # Use cached lowercase if available
-                word_lower = word.lower() if not self._cached_lowercase_words else word.lower()
-                score = jellyfish.jaro_winkler_similarity(query, word_lower)
-
-                # Early termination optimization
-                if score > min_score_seen or len(matches) < max_results:
-                    matches.append(
-                        FuzzyMatch(
-                            word=word,
-                            score=score,
-                            method=FuzzySearchMethod.JARO_WINKLER,
-                            is_phrase=" " in word,
-                        )
-                    )
-
-                    # Keep only top results and track minimum
-                    if len(matches) > max_results * 2:
-                        matches.sort(key=lambda m: m.score, reverse=True)
-                        matches = matches[:max_results]
-                        min_score_seen = matches[-1].score
-
-            except Exception:
-                continue
-
-        # Final sort and return top results
-        matches.sort(key=lambda m: m.score, reverse=True)
-        return matches[:max_results]
-
-    def _search_soundex(
-        self, query: str, word_list: list[str], max_results: int
-    ) -> list[FuzzyMatch]:
-        """Search using Soundex phonetic matching."""
-
-        try:
-            query_soundex = jellyfish.soundex(query)
-        except Exception:
-            return []
-
-        matches = []
-        for word in word_list:
-            try:
-                word_soundex = jellyfish.soundex(word.lower())
-                if query_soundex == word_soundex:
-                    # Phonetic match - calculate additional similarity
-                    similarity = self._calculate_string_similarity(query, word.lower())
-                    matches.append(
-                        FuzzyMatch(
-                            word=word,
-                            score=similarity,
-                            method=FuzzySearchMethod.SOUNDEX,
-                            is_phrase=" " in word,
-                        )
-                    )
-            except Exception:
-                continue
-
-        # Sort and return top results
-        matches.sort(key=lambda m: m.score, reverse=True)
-        return matches[:max_results]
-
-    def _search_metaphone(
-        self, query: str, word_list: list[str], max_results: int
-    ) -> list[FuzzyMatch]:
-        """Search using Metaphone phonetic matching."""
-
-        try:
-            query_metaphone = jellyfish.metaphone(query)
-        except Exception:
-            return []
-
-        matches = []
-        for word in word_list:
-            try:
-                word_metaphone = jellyfish.metaphone(word.lower())
-                if query_metaphone == word_metaphone:
-                    # Phonetic match - calculate additional similarity
-                    similarity = self._calculate_string_similarity(query, word.lower())
-                    matches.append(
-                        FuzzyMatch(
-                            word=word,
-                            score=similarity,
-                            method=FuzzySearchMethod.METAPHONE,
-                            is_phrase=" " in word,
-                        )
-                    )
-            except Exception:
-                continue
-
-        # Sort and return top results
-        matches.sort(key=lambda m: m.score, reverse=True)
-        return matches[:max_results]
-
-    def _search_polyleven(
-        self, query: str, word_list: list[str], max_results: int
-    ) -> list[FuzzyMatch]:
-        """Search using polyleven library (Rust-optimized Levenshtein)."""
-        matches = []
-        query_lower = query.lower()
-
-        for word in word_list:
-            word_lower = word.lower()
-
-            # Calculate edit distance using Rust-optimized polyleven
-            distance = polyleven.levenshtein(query_lower, word_lower)
-            max_length = max(len(query_lower), len(word_lower))
-
-            if max_length == 0:
-                similarity = 1.0
-            else:
-                similarity = 1.0 - (distance / max_length)
-
-            if similarity >= self.min_score:
-                matches.append(
-                    FuzzyMatch(
-                        word=word,
-                        score=similarity,
-                        method=FuzzySearchMethod.LEVENSHTEIN,
-                        edit_distance=distance,
-                        is_phrase=" " in word,
-                    )
-                )
-
-        # Sort and return top results
-        matches.sort(key=lambda m: m.score, reverse=True)
-        return matches[:max_results]
 
     def _apply_length_correction(
         self, query: str, candidate: str, base_score: float, is_query_phrase: bool

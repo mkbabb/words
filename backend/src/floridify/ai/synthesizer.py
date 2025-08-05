@@ -86,9 +86,7 @@ class DefinitionSynthesizer:
             return None
 
         # DEDUPLICATION: Use AI to identify and merge near-duplicates before clustering
-        logger.info(
-            f"Deduplicating {len(all_definitions)} definitions before clustering"
-        )
+        logger.info(f"Deduplicating {len(all_definitions)} definitions before clustering")
 
         dedup_response = await self.ai.deduplicate_definitions(
             word=word,
@@ -138,16 +136,10 @@ class DefinitionSynthesizer:
 
         # Run all synthesis operations in parallel
         synthesized_definitions, pronunciation, etymology, facts = await asyncio.gather(
-            self._synthesize_definitions(
-                word_obj, clustered_definitions, state_tracker
-            ),
-            synthesize_pronunciation(
-                word_obj.text, providers_data, self.ai, state_tracker
-            ),
+            self._synthesize_definitions(word_obj, clustered_definitions, state_tracker),
+            synthesize_pronunciation(word_obj.text, providers_data, self.ai, state_tracker),
             synthesize_etymology(word_obj, providers_data, self.ai, state_tracker),
-            generate_facts(
-                word_obj, unique_definitions, self.ai, self.facts_count, state_tracker
-            ),
+            generate_facts(word_obj, unique_definitions, self.ai, self.facts_count, state_tracker),
         )
 
         # Create synthesized entry
@@ -164,9 +156,7 @@ class DefinitionSynthesizer:
                 generation_count=1,
                 confidence=0,  # Will be set later
             ),
-            source_provider_data_ids=[
-                pd.id for pd in providers_data if pd.id is not None
-            ],
+            source_provider_data_ids=[pd.id for pd in providers_data if pd.id is not None],
         )
 
         # Save entry
@@ -247,9 +237,7 @@ class DefinitionSynthesizer:
                 seen_definitions.add(key)
                 unique_definitions.append(definition)
             else:
-                logger.debug(
-                    f"Skipping duplicate definition: {definition.text[:50]}..."
-                )
+                logger.debug(f"Skipping duplicate definition: {definition.text[:50]}...")
 
         logger.info(
             f"Deduplicated {len(all_definitions)} definitions to {len(unique_definitions)} unique definitions for '{word}'"
@@ -281,9 +269,7 @@ class DefinitionSynthesizer:
             )
 
             # Synthesize etymology
-            etymology = await synthesize_etymology(
-                word_obj, providers_data, self.ai, state_tracker
-            )
+            etymology = await synthesize_etymology(word_obj, providers_data, self.ai, state_tracker)
 
             # Generate facts
             facts = await generate_facts(
@@ -303,9 +289,7 @@ class DefinitionSynthesizer:
                 generation_count=1,
                 confidence=0,  # Will be set later
             ),
-            source_provider_data_ids=[
-                pd.id for pd in providers_data if pd.id is not None
-            ],
+            source_provider_data_ids=[pd.id for pd in providers_data if pd.id is not None],
         )
 
         # Save entry
@@ -349,12 +333,8 @@ class DefinitionSynthesizer:
         # Create tasks for parallel synthesis
         synthesis_tasks = []
 
-        async def synthesize_cluster(
-            cluster_id: str, cluster_defs: list[Definition]
-        ) -> Definition:
-            logger.info(
-                f"Synthesizing cluster '{cluster_id}' with {len(cluster_defs)} definitions"
-            )
+        async def synthesize_cluster(cluster_id: str, cluster_defs: list[Definition]) -> Definition:
+            logger.info(f"Synthesizing cluster '{cluster_id}' with {len(cluster_defs)} definitions")
 
             # Convert definitions to dict format
             def_dicts = [
@@ -433,9 +413,7 @@ class DefinitionSynthesizer:
         definitions: list[Definition] = []
         for idx, ai_def in enumerate(dictionary_entry.provider_data.definitions):
             # Create definition
-            assert (
-                word_obj.id is not None
-            )  # Word should have been saved before this point
+            assert word_obj.id is not None  # Word should have been saved before this point
             definition = Definition(
                 word_id=word_obj.id,
                 part_of_speech=ai_def.part_of_speech,

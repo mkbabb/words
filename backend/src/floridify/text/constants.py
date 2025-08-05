@@ -57,22 +57,18 @@ SUFFIX_RULES = {
     "shes": "sh",
     "men": "man",
     "eet": "oot",
-    
     # Verb forms
     "ing": "",
     "ed": "",
     "ied": "y",
-    
     # Comparative/superlative
     "er": "",
     "est": "",
     "ier": "y",
     "iest": "y",
-    
     # Adverbs
     "ly": "",
     "ily": "y",
-    
     # Simple plural
     "s": "",
 }

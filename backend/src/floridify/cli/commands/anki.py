@@ -149,7 +149,7 @@ async def _export_async(
 
         # First pass: normalize words and build frequency map
         console.print("🔍 Normalizing words and building frequency map...")
-        
+
         search_engine = await get_search_engine(languages=[Language.ENGLISH])
 
         word_frequency_map: dict[str, int] = {}

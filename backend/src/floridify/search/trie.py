@@ -13,6 +13,12 @@ from typing import Any
 
 import marisa_trie  # type: ignore[import-not-found]
 
+from ..caching.cache_manager import get_cache_manager
+from ..text.search import get_vocabulary_hash
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class TrieSearch:
     """
@@ -40,15 +46,39 @@ class TrieSearch:
         self._word_count = 0
         self._max_frequency = 0
         self._stats_dirty = True  # Flag to track when stats need recalculation
+        self._vocabulary_hash: str | None = None
+        self.cache_manager = get_cache_manager()
 
     def build_index(self, words: list[str], frequencies: dict[str, int] | None = None) -> None:
         """
-        Build the optimized trie index from a list of words.
+        Build the optimized trie index with content-hash based caching.
 
         Args:
             words: List of words and phrases to index
             frequencies: Optional frequency data for ranking
         """
+        # Generate vocabulary hash for caching
+        vocab_hash = get_vocabulary_hash(words)
+
+        # Check if we already have this vocabulary loaded
+        if vocab_hash == self._vocabulary_hash and self._trie is not None:
+            logger.debug(f"Trie already built for vocabulary: {vocab_hash[:8]}")
+            return
+
+        # Try to load from cache
+        cached_trie = self._load_from_cache(vocab_hash)
+        if cached_trie:
+            logger.info(f"Loaded trie from cache: {vocab_hash[:8]}")
+            self._trie = cached_trie["trie"]
+            self._word_frequencies = cached_trie["frequencies"]
+            self._word_count = cached_trie["word_count"]
+            self._max_frequency = cached_trie["max_frequency"]
+            self._vocabulary_hash = vocab_hash
+            self._stats_dirty = True
+            return
+
+        logger.info(f"Building new trie: {vocab_hash[:8]} ({len(words)} words)")
+
         self._word_frequencies.clear()
         self._word_count = 0
         self._stats_dirty = True  # Mark stats as needing recalculation
@@ -75,8 +105,12 @@ class TrieSearch:
         # Build the marisa-trie (C++ optimized)
         if normalized_words:
             self._trie = marisa_trie.Trie(normalized_words)
+            # Cache the built trie
+            self._save_to_cache(vocab_hash)
         else:
             self._trie = None
+
+        self._vocabulary_hash = vocab_hash
 
     def _calculate_default_frequency(self, word: str) -> int:
         """
@@ -108,6 +142,34 @@ class TrieSearch:
             pattern_bonus = 50
 
         return max(1, base_score - length_penalty + phrase_bonus + pattern_bonus)
+
+
+    def _save_to_cache(self, vocab_hash: str) -> None:
+        """Save trie to cache."""
+        if not self._trie:
+            return
+
+        cache_data = {
+            "trie": self._trie,
+            "frequencies": self._word_frequencies.copy(),
+            "word_count": self._word_count,
+            "max_frequency": self._max_frequency,
+        }
+
+        cache_key = f"trie_{vocab_hash}"
+        self.cache_manager.set((cache_key,), cache_data, ttl_hours=168)  # 1 week
+        logger.debug(f"Saved trie to cache: {cache_key}")
+
+    def _load_from_cache(self, vocab_hash: str) -> dict[str, Any] | None:
+        """Load trie from cache."""
+        cache_key = f"trie_{vocab_hash}"
+        cached_data = self.cache_manager.get((cache_key,))
+
+        if cached_data:
+            logger.debug(f"Loaded trie from cache: {cache_key}")
+            return cached_data
+
+        return None
 
     def search_exact(self, query: str) -> list[str]:
         """

@@ -4,18 +4,18 @@ Comprehensive tests for quantization and MongoDB caching improvements.
 Tests binary quantization, compression ratios, and cache performance.
 """
 
-import asyncio
+from unittest.mock import patch
+
 import numpy as np
 import pytest
-from unittest.mock import patch, MagicMock
 
-from src.floridify.search.semantic import SemanticSearch
-from src.floridify.models.semantic_cache import QuantizationType
 from src.floridify.models.lexicon_cache import (
-    CorpusCacheEntry, 
-    CompressionType, 
-    CorpusCompressionUtils
+    CompressionType,
+    CorpusCacheEntry,
+    CorpusCompressionUtils,
 )
+from src.floridify.models.semantic_cache import QuantizationType
+from src.floridify.search.semantic import SemanticSearch
 
 
 class TestQuantizationImprovements:
@@ -173,8 +173,9 @@ class TestLexiconCaching:
 
     def test_lexicon_cache_entry_validation(self):
         """Test CorpusCacheEntry model validation."""
+        from datetime import UTC, datetime, timedelta
+
         from src.floridify.models.definition import Language
-        from datetime import datetime, UTC, timedelta
         
         # Valid entry
         entry_data = {

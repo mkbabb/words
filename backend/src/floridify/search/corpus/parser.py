@@ -72,8 +72,7 @@ def parse_frequency_list(content: str, language: Language) -> ParseResult:
     return words, phrases
 
 
-def parse_json_idioms(
-    content: str, language: Language) -> ParseResult:
+def parse_json_idioms(content: str, language: Language) -> ParseResult:
     """Parse JSON file containing idioms and phrases."""
     try:
         data = json.loads(content)
@@ -112,8 +111,7 @@ def parse_json_idioms(
     return [], phrases
 
 
-def parse_json_dict(
-    content: str, language: Language) -> ParseResult:
+def parse_json_dict(content: str, language: Language) -> ParseResult:
     """Parse JSON dictionary format."""
     try:
         data = json.loads(content)
@@ -137,8 +135,7 @@ def parse_json_dict(
     return words, phrases
 
 
-def parse_json_array(
-    content: str, language: Language) -> ParseResult:
+def parse_json_array(content: str, language: Language) -> ParseResult:
     """Parse JSON array format."""
     try:
         data = json.loads(content)
@@ -163,8 +160,7 @@ def parse_json_array(
     return words, phrases
 
 
-def parse_github_api(
-    content: str, language: Language) -> ParseResult:
+def parse_github_api(content: str, language: Language) -> ParseResult:
     """Parse GitHub API response format."""
     try:
         data = json.loads(content)
@@ -178,8 +174,7 @@ def parse_github_api(
     return [], []
 
 
-def parse_csv_idioms(
-    content: str, language: Language) -> ParseResult:
+def parse_csv_idioms(content: str, language: Language) -> ParseResult:
     """Parse CSV format with idiom/definition columns."""
     phrases = []
 
@@ -210,8 +205,7 @@ def parse_csv_idioms(
     return [], phrases
 
 
-def parse_json_phrasal_verbs(
-    content: str, language: Language) -> ParseResult:
+def parse_json_phrasal_verbs(content: str, language: Language) -> ParseResult:
     """Parse JSON format with phrasal verbs."""
     phrases = []
 
@@ -244,7 +238,9 @@ def parse_json_phrasal_verbs(
 
 
 def parse_scraped_data(
-    content: dict[str, Any], language: Language, ) -> ParseResult:
+    content: dict[str, Any],
+    language: Language,
+) -> ParseResult:
     """Parse data returned by custom scrapers."""
     words = []
     phrases = []

@@ -36,9 +36,26 @@ services:
     build:
       target: production
     image: floridify-notification-server:latest
-    volumes: []
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: warn
+    volumes:
+      - notification_logs:/app/logs
     command: ["node", "dist/server.js"]
     deploy:
+      mode: replicated
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 30s
+        max_failure_ratio: 0.3
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
       resources:
         limits:
           cpus: '0.5'
@@ -46,6 +63,12 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=notification"
 
   # Nginx with SSL (optional - only if not using external load balancer)
   nginx:
@@ -74,4 +97,6 @@ services:
 
 volumes:
   nginx_secrets:
+    driver: local
+  notification_logs:
     driver: local

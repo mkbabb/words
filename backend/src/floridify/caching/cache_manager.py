@@ -67,9 +67,19 @@ class CacheManager:
 
     def _generate_cache_key(self, key_parts: tuple[Any, ...]) -> str:
         """Generate a deterministic cache key from parts."""
-        # Convert all parts to strings and hash them
-        key_str = "|".join(str(part) for part in key_parts)
-        return hashlib.sha256(key_str.encode()).hexdigest()[:16]
+        # Fast path for simple string keys
+        if len(key_parts) == 1 and isinstance(key_parts[0], str):
+            return hashlib.md5(key_parts[0].encode()).hexdigest()[:16]
+
+        # Use Python's hash() for efficiency when possible
+        try:
+            # Try to hash the tuple directly (works for hashable types)
+            key_hash = hash(key_parts)
+            return f"{key_hash:x}"[:16]
+        except TypeError:
+            # Fallback for unhashable types - use repr instead of str for better performance
+            key_str = "|".join(repr(part) for part in key_parts)
+            return hashlib.md5(key_str.encode()).hexdigest()[:16]
 
     def _cleanup_memory_cache(self) -> None:
         """Remove expired entries and enforce size limits."""

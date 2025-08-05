@@ -29,6 +29,18 @@ T = TypeVar("T")
 _configured = False
 
 
+def _format_path(record: dict[str, Any]) -> str:
+    """Format file path to be relative to project root."""
+    file_path = record["file"].path
+    # Remove container path prefix if present
+    if file_path.startswith("/app/"):
+        file_path = file_path[5:]  # Remove /app/
+    # Make path relative to backend directory
+    if file_path.startswith("src/"):
+        file_path = "backend/" + file_path
+    return file_path
+
+
 def _configure_loguru() -> None:
     """Configure loguru with VSCode-compatible format and performance optimizations."""
     global _configured
@@ -46,15 +58,20 @@ def _configure_loguru() -> None:
     console_format = (
         "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
         "<level>{level: <8}</level> | "
-        '"<cyan>{file.path}</cyan>", line <cyan>{line}</cyan> in <cyan>{function}</cyan>(): '
-        "<level>{message}</level>"
+        '"<cyan>{extra[formatted_path]}</cyan>", line <cyan>{line}</cyan> in <cyan>{function}</cyan>(): '
+        "<level>{message}</level>\n"
     )
+
+    # Add custom formatter
+    def formatter(record: dict[str, Any]) -> str:
+        record["extra"]["formatted_path"] = _format_path(record)
+        return console_format
 
     # Add console handler with colors and VSCode support
     loguru_logger.add(
         sys.stderr,
         level=log_level,
-        format=console_format,
+        format=formatter,
         colorize=True,
         backtrace=is_dev,
         diagnose=is_dev,
@@ -65,7 +82,7 @@ def _configure_loguru() -> None:
     loguru_logger.add(
         "logs/floridify.log",
         level="DEBUG",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}",
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}\n",
         rotation="50 MB",
         retention="7 days",
         compression="gz",
@@ -76,7 +93,7 @@ def _configure_loguru() -> None:
     loguru_logger.add(
         "logs/floridify_errors.log",
         level="ERROR",
-        format='{time:YYYY-MM-DD HH:mm:ss} | {level} | "{file.path}", line {line} in {function}(): {message}',
+        format='{time:YYYY-MM-DD HH:mm:ss} | {level} | "{file.path}", line {line} in {function}(): {message}\n',
         rotation="10 MB",
         retention="30 days",
         backtrace=True,

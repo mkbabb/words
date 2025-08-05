@@ -82,7 +82,7 @@ __all__ = [
     # Cache models
     "CompressionType",
     "CorpusData",
-    "CorpusCacheEntry", 
+    "CorpusCacheEntry",
     "CorpusCompressionUtils",
     "IndexType",
     "QuantizationType",

@@ -73,29 +73,39 @@ class RebuildIndexRequest(BaseModel):
         default=[Language.ENGLISH], description="Languages to rebuild (defaults to English)"
     )
     force_download: bool = Field(default=True, description="Force re-download of lexicon sources")
-    
+
     # Unified corpus management options
     corpus_types: list[str] = Field(
-        default=["language_search"], 
-        description="Corpus types to rebuild: 'language_search', 'wordlist', 'wordlist_names', 'custom'"
+        default=["language_search"],
+        description="Corpus types to rebuild: 'language_search', 'wordlist', 'wordlist_names', 'custom'",
     )
     rebuild_all_corpora: bool = Field(default=False, description="Rebuild all corpus types")
-    
+
     # Semantic search options
     rebuild_semantic: bool = Field(default=True, description="Rebuild semantic search indices")
-    semantic_force_rebuild: bool = Field(default=False, description="Force rebuild semantic even if cached")
-    quantization_type: str = Field(default="binary", description="Quantization method: 'binary', 'scalar', 'none'")
-    auto_semantic_small_corpora: bool = Field(default=True, description="Auto-enable semantic for small corpora (<10k words)")
-    
+    semantic_force_rebuild: bool = Field(
+        default=False, description="Force rebuild semantic even if cached"
+    )
+    quantization_type: str = Field(
+        default="binary", description="Quantization method: 'binary', 'scalar', 'none'"
+    )
+    auto_semantic_small_corpora: bool = Field(
+        default=True, description="Auto-enable semantic for small corpora (<10k words)"
+    )
+
     # Cache management options
-    clear_existing_cache: bool = Field(default=False, description="Clear all existing caches before rebuild")
+    clear_existing_cache: bool = Field(
+        default=False, description="Clear all existing caches before rebuild"
+    )
     clear_semantic_cache: bool = Field(default=False, description="Clear only semantic caches")
     clear_lexicon_cache: bool = Field(default=False, description="Clear only lexicon caches")
-    
+
     # Performance options
-    enable_lemmatization_cache: bool = Field(default=True, description="Enable lemmatization memoization")
+    enable_lemmatization_cache: bool = Field(
+        default=True, description="Enable lemmatization memoization"
+    )
     batch_size: int = Field(default=1000, ge=100, le=5000, description="Batch size for processing")
-    
+
     # Validation options
     validate_vocabulary: bool = Field(default=True, description="Validate vocabulary quality")
     min_word_length: int = Field(default=2, ge=1, le=10, description="Minimum word length")
@@ -109,23 +119,37 @@ class RebuildIndexResponse(BaseModel):
     languages: list[Language] = Field(..., description="Languages rebuilt")
     statistics: dict[str, Any] = Field(default_factory=dict, description="Index statistics")
     message: str = Field(..., description="Status message")
-    
+
     # Performance metrics
     total_time_seconds: float = Field(..., description="Total rebuild time in seconds")
     semantic_build_time_seconds: float = Field(default=0.0, description="Semantic index build time")
-    vocabulary_optimization_ratio: float = Field(default=1.0, description="Vocabulary reduction ratio")
-    
+    vocabulary_optimization_ratio: float = Field(
+        default=1.0, description="Vocabulary reduction ratio"
+    )
+
     # Unified corpus management results
-    corpus_results: dict[str, Any] = Field(default_factory=dict, description="Corpus rebuild results by type")
-    corpus_manager_stats: dict[str, Any] = Field(default_factory=dict, description="Corpus manager statistics")
-    
+    corpus_results: dict[str, Any] = Field(
+        default_factory=dict, description="Corpus rebuild results by type"
+    )
+    corpus_manager_stats: dict[str, Any] = Field(
+        default_factory=dict, description="Corpus manager statistics"
+    )
+
     # Cache management results
-    caches_cleared: dict[str, int] = Field(default_factory=dict, description="Caches cleared counts")
-    compression_stats: dict[str, float] = Field(default_factory=dict, description="Compression statistics")
-    
+    caches_cleared: dict[str, int] = Field(
+        default_factory=dict, description="Caches cleared counts"
+    )
+    compression_stats: dict[str, float] = Field(
+        default_factory=dict, description="Compression statistics"
+    )
+
     # Quality metrics
-    vocabulary_quality: dict[str, Any] = Field(default_factory=dict, description="Vocabulary validation results")
-    lemmatization_stats: dict[str, int] = Field(default_factory=dict, description="Lemmatization cache statistics")
+    vocabulary_quality: dict[str, Any] = Field(
+        default_factory=dict, description="Vocabulary validation results"
+    )
+    lemmatization_stats: dict[str, int] = Field(
+        default_factory=dict, description="Lemmatization cache statistics"
+    )
 
 
 def parse_search_params(
@@ -154,15 +178,7 @@ def parse_search_params(
 
 @cached_api_call(
     ttl_hours=1.0,
-    key_func=lambda query, params: (
-        "api_search",
-        query,
-        params.language.value,
-        params.max_results,
-        params.min_score,
-        params.semantic,
-        params.semantic_weight,
-    ),
+    key_func=lambda query, params: f"search:{query}:{params.language.value}:{params.max_results}:{int(params.min_score*100)}:{params.semantic}",
 )
 async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
     """Cached search implementation."""
@@ -172,9 +188,7 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
 
     try:
         # Get language search instance (always has semantic support)
-        language_search = await get_language_search(
-            languages=[params.language]
-        )
+        language_search = await get_language_search(languages=[params.language])
 
         # Perform search with semantic option
         results = await language_search.search(
@@ -308,15 +322,19 @@ async def rebuild_search_index(
         f"corpus_types={request.corpus_types}, semantic={request.rebuild_semantic}"
     )
     start_time = time.perf_counter()
-    
+
     try:
         # Initialize unified corpus manager
         corpus_manager = await get_corpus_manager()
-        
+
         # Determine corpus types to rebuild
         target_corpus_types = []
         if request.rebuild_all_corpora:
-            target_corpus_types = [CorpusType.LANGUAGE_SEARCH, CorpusType.WORDLIST, CorpusType.WORDLIST_NAMES]
+            target_corpus_types = [
+                CorpusType.LANGUAGE_SEARCH,
+                CorpusType.WORDLIST,
+                CorpusType.WORDLIST_NAMES,
+            ]
         else:
             corpus_type_map = {
                 "language_search": CorpusType.LANGUAGE_SEARCH,
@@ -325,10 +343,10 @@ async def rebuild_search_index(
                 "custom": CorpusType.CUSTOM,
             }
             target_corpus_types = [
-                corpus_type_map.get(ct.lower(), CorpusType.LANGUAGE_SEARCH) 
+                corpus_type_map.get(ct.lower(), CorpusType.LANGUAGE_SEARCH)
                 for ct in request.corpus_types
             ]
-        
+
         # Cache cleanup if requested
         caches_cleared = {}
         if request.clear_existing_cache or request.clear_semantic_cache:
@@ -345,7 +363,7 @@ async def rebuild_search_index(
         # Rebuild each corpus type using unified manager
         corpus_results = {}
         semantic_start = time.perf_counter()
-        
+
         for corpus_type in target_corpus_types:
             if corpus_type == CorpusType.LANGUAGE_SEARCH:
                 # Rebuild language search corpus (main search engine)
@@ -369,17 +387,19 @@ async def rebuild_search_index(
                     "invalidated_entries": invalidated_count,
                     "note": "Will rebuild automatically on next use",
                 }
-        
+
         semantic_build_time = time.perf_counter() - semantic_start
 
         # Get corpus manager statistics
         corpus_manager_stats = await corpus_manager.get_stats()
-        
+
         # Compression statistics
         compression_stats: dict[str, float] = {}
         if request.rebuild_semantic:
             compression_stats = {
-                "estimated_compression_ratio": 24.0 if request.quantization_type == "binary" else 3.75,
+                "estimated_compression_ratio": 24.0
+                if request.quantization_type == "binary"
+                else 3.75,
             }
 
         # Vocabulary quality analysis
@@ -390,18 +410,22 @@ async def rebuild_search_index(
             vocabulary_quality = {
                 "total_entries": total_vocab,
                 "validation_passed": total_vocab > 1000,
-                "semantic_auto_enabled": total_vocab <= 10000 and request.auto_semantic_small_corpora,
+                "semantic_auto_enabled": total_vocab <= 10000
+                and request.auto_semantic_small_corpora,
             }
 
         # Final performance metrics
         total_elapsed = time.perf_counter() - start_time
-        
+
         # Update lemmatization stats
         from ...text.normalize import _lemma_cache
-        lemmatization_stats.update({
-            "cache_size": len(_lemma_cache),
-            "cache_enabled": request.enable_lemmatization_cache,
-        })
+
+        lemmatization_stats.update(
+            {
+                "cache_size": len(_lemma_cache),
+                "cache_enabled": request.enable_lemmatization_cache,
+            }
+        )
 
         logger.info(f"Unified corpus rebuild completed in {total_elapsed:.2f}s")
 
@@ -431,12 +455,12 @@ class InvalidateCorpusRequest(BaseModel):
 
     # Unified corpus invalidation options
     corpus_types: list[str] = Field(
-        default=[], 
-        description="Corpus types to invalidate: 'language_search', 'wordlist', 'wordlist_names', 'custom'"
+        default=[],
+        description="Corpus types to invalidate: 'language_search', 'wordlist', 'wordlist_names', 'custom'",
     )
     specific_corpus_id: str | None = Field(None, description="Specific corpus ID to invalidate")
     invalidate_all: bool = Field(default=False, description="Invalidate all corpus types")
-    
+
     cleanup_expired: bool = Field(default=True, description="Also cleanup expired entries")
 
 
@@ -445,7 +469,9 @@ class InvalidateCorpusResponse(BaseModel):
 
     status: str = Field(..., description="Operation status")
     total_invalidated: int = Field(..., description="Total number of entries invalidated")
-    corpus_results: dict[str, int] = Field(default_factory=dict, description="Invalidation results by corpus type")
+    corpus_results: dict[str, int] = Field(
+        default_factory=dict, description="Invalidation results by corpus type"
+    )
     expired_cleaned: int = Field(default=0, description="Number of expired entries cleaned")
     message: str = Field(..., description="Status message")
 
@@ -461,22 +487,29 @@ async def invalidate_corpus_unified(
 ) -> InvalidateCorpusResponse:
     """
     Unified corpus cache invalidation using CorpusManager.
-    
+
     This endpoint provides streamlined invalidation for all corpus types:
     - language_search: Main search engine corpus
-    - wordlist: Individual wordlist corpora  
+    - wordlist: Individual wordlist corpora
     - wordlist_names: Wordlist names corpus
     - custom: User-defined corpora
     """
-    logger.info(f"Unified corpus invalidation: types={request.corpus_types}, all={request.invalidate_all}")
-    
+    logger.info(
+        f"Unified corpus invalidation: types={request.corpus_types}, all={request.invalidate_all}"
+    )
+
     try:
         corpus_manager = await get_corpus_manager()
-        
+
         # Determine corpus types to invalidate
         target_corpus_types = []
         if request.invalidate_all:
-            target_corpus_types = [CorpusType.LANGUAGE_SEARCH, CorpusType.WORDLIST, CorpusType.WORDLIST_NAMES, CorpusType.CUSTOM]
+            target_corpus_types = [
+                CorpusType.LANGUAGE_SEARCH,
+                CorpusType.WORDLIST,
+                CorpusType.WORDLIST_NAMES,
+                CorpusType.CUSTOM,
+            ]
         else:
             corpus_type_map = {
                 "language_search": CorpusType.LANGUAGE_SEARCH,
@@ -485,37 +518,39 @@ async def invalidate_corpus_unified(
                 "custom": CorpusType.CUSTOM,
             }
             target_corpus_types = [
-                corpus_type_map.get(ct.lower(), CorpusType.LANGUAGE_SEARCH) 
+                corpus_type_map.get(ct.lower(), CorpusType.LANGUAGE_SEARCH)
                 for ct in request.corpus_types
             ]
-        
+
         # Invalidate each corpus type
         corpus_results = {}
         total_invalidated = 0
-        
+
         for corpus_type in target_corpus_types:
             if request.specific_corpus_id:
                 # Invalidate specific corpus
-                count = await corpus_manager.invalidate_corpus(corpus_type, request.specific_corpus_id)
+                count = await corpus_manager.invalidate_corpus(
+                    corpus_type, request.specific_corpus_id
+                )
                 corpus_results[f"{corpus_type.value}_specific"] = count
             else:
                 # Invalidate all corpora of this type
                 count = await corpus_manager.invalidate_all_corpora(corpus_type)
                 corpus_results[corpus_type.value] = count
-            
+
             total_invalidated += count
             logger.info(f"Invalidated {count} {corpus_type.value} corpus entries")
-        
+
         # Cleanup expired entries
         expired_cleaned = 0
         if request.cleanup_expired:
             expired_cleaned = await SemanticIndexCache.cleanup_expired()
             logger.info(f"Cleaned up {expired_cleaned} expired cache entries")
-        
+
         message = f"Successfully invalidated {total_invalidated} corpus entries"
         if expired_cleaned > 0:
             message += f" and cleaned {expired_cleaned} expired entries"
-        
+
         return InvalidateCorpusResponse(
             status="success",
             total_invalidated=total_invalidated,
@@ -523,9 +558,7 @@ async def invalidate_corpus_unified(
             expired_cleaned=expired_cleaned,
             message=message,
         )
-    
+
     except Exception as e:
         logger.error(f"Failed to invalidate corpus caches: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to invalidate corpus caches: {str(e)}")
-
-

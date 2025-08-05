@@ -79,10 +79,9 @@ __all__ = [
     "is_valid_word",
     "remove_diacritics",
     "lemmatize_word",
-    "batch_lemmatize", 
+    "batch_lemmatize",
     "clear_lemma_cache",
     "basic_lemmatize",
-    
     # Phrase
     "is_phrase",
     "clean_phrase",
@@ -94,7 +93,6 @@ __all__ = [
     "detect_multiword_expressions",
     "normalize_phrase",
     "get_phrase_variants",
-    
     # Search
     "normalize_for_search",
     "generate_word_variants",
@@ -103,7 +101,6 @@ __all__ = [
     "create_subword_text",
     "split_word_into_subwords",
     "get_vocabulary_hash",
-    
     # Tokenization
     "tokenize",
     "word_tokenize",
@@ -111,7 +108,6 @@ __all__ = [
     "advanced_word_tokenize",
     "smart_tokenize",
     "tokenize_for_search",
-    
     # Patterns
     "WHITESPACE_PATTERN",
     "PUNCTUATION_PATTERN",

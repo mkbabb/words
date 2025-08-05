@@ -6,10 +6,9 @@ Provides high-level interface for searching language lexicons.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from ..core.corpus_manager import CorpusManager
+from ..core.corpus_manager import CorpusManager
 from ..models.definition import Language
 from ..search.utils import generate_corpus_id, get_corpus_name
 from ..utils.logging import get_logger
@@ -40,7 +39,9 @@ class LanguageSearch:
             force_rebuild: Force rebuild of indices
             semantic: Enable semantic search capabilities
         """
-        self.languages = sorted(languages or [Language.ENGLISH])  # Sort for deterministic ID
+        self.languages = sorted(
+            languages or [Language.ENGLISH], key=lambda x: x.value
+        )  # Sort for deterministic ID
         self.min_score = min_score
         self.force_rebuild = force_rebuild
         self.semantic = semantic
@@ -59,15 +60,15 @@ class LanguageSearch:
         )
 
         # Import at runtime to avoid circular imports
-        from ..core.corpus_manager import CorpusType, get_corpus_manager, get_corpus_entry
-        
+        from ..core.corpus_manager import CorpusType, get_corpus_entry, get_corpus_manager
+
         # Initialize corpus manager
         self._corpus_manager = await get_corpus_manager()
 
         # Generate deterministic corpus ID and name
         corpus_id = generate_corpus_id(CorpusType.LANGUAGE_SEARCH, self.languages)
         corpus_name = get_corpus_name(CorpusType.LANGUAGE_SEARCH, corpus_id)
-        
+
         # Create corpus through manager - it will handle loading from sources
         await self._corpus_manager.create_corpus(
             corpus_type=CorpusType.LANGUAGE_SEARCH,
@@ -77,15 +78,15 @@ class LanguageSearch:
             semantic=self.semantic,
             force_rebuild=self.force_rebuild,
         )
-        
+
         # Get the loaded corpus data - use the display name format
         # Corpus manager uses display names like "Language Search (en)"
         display_corpus_name = f"Language Search ({corpus_id})"
         corpus_entry = await get_corpus_entry(display_corpus_name)
-        
+
         if not corpus_entry:
             raise RuntimeError(f"Failed to load corpus {display_corpus_name}")
-        
+
         # Initialize search engine with corpus data
         self.search_engine = SearchEngine(
             words=corpus_entry["words"],
@@ -95,12 +96,17 @@ class LanguageSearch:
             corpus_name=corpus_name,
         )
 
+        # Initialize search engine components
+        await self.search_engine.initialize()
+
         # Initialize semantic indices if enabled
         if self.semantic and self.search_engine.semantic_search:
             await self.search_engine.initialize_semantic()
 
         self._initialized = True
-        logger.info(f"Language search initialized for {self.languages} with unified corpus management")
+        logger.info(
+            f"Language search initialized for {self.languages} with unified corpus management"
+        )
 
     async def search(
         self,
@@ -170,9 +176,7 @@ async def get_language_search(
     # Create or recreate if languages changed or force rebuild requested
     target_languages = languages or [Language.ENGLISH]
     needs_recreate = (
-        _language_search is None
-        or _language_search.languages != target_languages
-        or force_rebuild
+        _language_search is None or _language_search.languages != target_languages or force_rebuild
     )
 
     if needs_recreate:

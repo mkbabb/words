@@ -21,6 +21,40 @@ AF = TypeVar("AF", bound=Callable[..., Awaitable[Any]])
 logger = get_logger(__name__)
 
 
+def _efficient_cache_key_parts(
+    func: Any, args: tuple[Any, ...], kwargs: dict[str, Any]
+) -> tuple[Any, ...]:
+    """Generate efficient cache key parts avoiding expensive operations."""
+    key_parts: list[Any] = [func.__module__, func.__name__, args]
+
+    # Process kwargs efficiently without sorting
+    if len(kwargs) <= 3:  # Fast path for simple kwargs (most API calls)
+        for key, value in kwargs.items():
+            if value is None or isinstance(value, str | int | float | bool):
+                key_parts.append((key, value))
+            elif hasattr(value, "value"):  # Enum-like objects
+                key_parts.append((key, value.value))
+            else:
+                key_parts.append((key, hash(value)))
+    else:  # Fallback with sorting only for complex cases
+        for key in sorted(kwargs.keys()):
+            value = kwargs[key]
+            if value is None or isinstance(value, str | int | float | bool):
+                key_parts.append((key, value))
+            elif hasattr(value, "value"):  # Enum-like objects
+                key_parts.append((key, value.value))
+            elif isinstance(value, list | tuple) and len(value) < 10:
+                key_parts.append((key, tuple(value) if isinstance(value, list) else value))
+            else:
+                # For complex objects, use hash instead of string representation
+                try:
+                    key_parts.append((key, f"_hash_{hash(value)}_"))
+                except TypeError:
+                    key_parts.append((key, f"_id_{id(value)}_"))
+
+    return tuple(key_parts)
+
+
 class RequestDeduplicator:
     """Manages in-flight requests to prevent duplicate executions."""
 
@@ -135,13 +169,7 @@ def cached_api_call(
             if key_func:
                 key_parts = key_func(*args, **kwargs)
             else:
-                # Default key generation: function name + args + sorted kwargs
-                key_parts = (
-                    func.__module__,
-                    func.__name__,
-                    args,
-                    tuple(sorted(kwargs.items())),
-                )
+                key_parts = _efficient_cache_key_parts(func, args, kwargs)
 
             # Check cache first (unless forcing refresh)
             if not force_refresh:
@@ -202,13 +230,7 @@ def cached_computation(
             if key_func:
                 key_parts = key_func(*args, **kwargs)
             else:
-                # Default key generation: function name + args + sorted kwargs
-                key_parts = (
-                    func.__module__,
-                    func.__name__,
-                    args,
-                    tuple(sorted(kwargs.items())),
-                )
+                key_parts = _efficient_cache_key_parts(func, args, kwargs)
 
             # Check cache first (unless forcing refresh)
             if not force_refresh:
@@ -245,13 +267,7 @@ def cached_computation(
             if key_func:
                 key_parts = key_func(*args, **kwargs)
             else:
-                # Default key generation: function name + args + sorted kwargs
-                key_parts = (
-                    func.__module__,
-                    func.__name__,
-                    args,
-                    tuple(sorted(kwargs.items())),
-                )
+                key_parts = _efficient_cache_key_parts(func, args, kwargs)
 
             # Check cache first (unless forcing refresh)
             if not force_refresh:
@@ -310,7 +326,13 @@ def http_cache_key(*args: Any, **kwargs: Any) -> tuple[Any, ...]:
     headers = kwargs.get("headers", {})
 
     # Create deterministic key from URL and important parameters
-    return ("http_request", method, url, tuple(sorted(headers.items())))
+    # Only include key headers that affect caching (avoid sorting all headers)
+    important_headers = []
+    for header in ["authorization", "accept", "content-type", "user-agent"]:
+        if header in headers:
+            important_headers.append((header, headers[header]))
+
+    return ("http_request", method, url, tuple(important_headers))
 
 
 def lexicon_cache_key(*args: Any, **kwargs: Any) -> tuple[Any, ...]:
@@ -388,12 +410,7 @@ def cached_api_call_with_dedup(
             if key_func:
                 key_parts = key_func(*args, **kwargs)
             else:
-                key_parts = (
-                    func.__module__,
-                    func.__name__,
-                    args,
-                    tuple(sorted(kwargs.items())),
-                )
+                key_parts = _efficient_cache_key_parts(func, args, kwargs)
 
             # Check cache first (unless forcing refresh)
             if not force_refresh:

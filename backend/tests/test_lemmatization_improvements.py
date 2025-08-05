@@ -4,8 +4,7 @@ Comprehensive tests for improved lemmatization system.
 Tests the modern NLTK WordNet + POS tagging approach vs old basic rules.
 """
 
-import pytest
-from src.floridify.text import lemmatize_word, batch_lemmatize, clear_lemma_cache
+from src.floridify.text import batch_lemmatize, clear_lemma_cache, lemmatize_word
 
 
 class TestLemmatizationImprovements:

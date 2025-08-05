@@ -53,7 +53,6 @@ async def lifespan(app: FastAPI) -> Any:
         await get_language_search([Language.ENGLISH], semantic=True)
         print("✅ Language search engine initialized successfully with semantic support")
 
-
         # Initialize AI components (singletons)
         get_openai_connector()
         print("✅ OpenAI connector initialized successfully")

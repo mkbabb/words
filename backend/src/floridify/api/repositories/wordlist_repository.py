@@ -124,7 +124,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         super().__init__(WordList)
         self.corpus_repo = CorpusRepository()
         self._corpus_manager: CorpusManager | None = None
-    
+
     async def _get_corpus_manager(self) -> CorpusManager:
         """Get or create corpus manager instance."""
         if self._corpus_manager is None:

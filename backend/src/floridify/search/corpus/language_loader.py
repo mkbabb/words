@@ -25,7 +25,7 @@ from ...models.definition import Language
 from ...text import normalize_comprehensive
 from ...utils.logging import get_logger
 from ..constants import LexiconFormat
-from ..models import CompressionType, CorpusCacheEntry, CorpusCompressionUtils
+from ..models import CorpusCacheEntry, CorpusCompressionUtils
 from ..utils import normalize_lexicon_entry
 from .sources import LEXICON_SOURCES, LexiconSourceConfig
 
@@ -34,12 +34,12 @@ logger = get_logger(__name__)
 
 class MultiWordExpression(BaseModel):
     """Simple multi-word expression data structure."""
-    
+
     expression: str = Field(..., description="The multi-word expression")
     normalized: str = Field(..., description="Normalized form")
     frequency: int = Field(default=1, description="Frequency count")
     variants: list[str] = Field(default_factory=list, description="Alternative forms")
-    
+
     model_config = {"frozen": True}
 
 
@@ -77,7 +77,7 @@ class CorpusLanguageLoader:
             force_rebuild: If True, rebuild corpora even if cache exists
         """
         self.force_rebuild = force_rebuild
-        
+
         # Loaded data
         self.lexicons: dict[Language, LexiconData] = {}
         self._all_words: list[str] = []
@@ -106,26 +106,26 @@ class CorpusLanguageLoader:
     async def _load_language(self, language: Language) -> None:
         """Load corpus data for a specific language from MongoDB or sources."""
         source_hash = self._get_source_hash(language)
-        
+
         # Try to load from MongoDB cache first (unless force rebuild)
         if not self.force_rebuild:
-            cached = await CorpusCacheEntry.get_cached_corpus(language.value, source_hash)
+            cached = await CorpusCacheEntry.get_cached_corpus(language, source_hash)
             if cached:
                 # Decompress and load data
-                words_json = CorpusCompressionUtils.decompress_data(
-                    cached.words_data
-                ).decode('utf-8')
-                phrases_json = CorpusCompressionUtils.decompress_data(
-                    cached.phrases_data
-                ).decode('utf-8')
-                metadata_json = CorpusCompressionUtils.decompress_data(
-                    cached.metadata_data
-                ).decode('utf-8')
-                
+                words_json = CorpusCompressionUtils.decompress_data(cached.words_data).decode(
+                    "utf-8"
+                )
+                phrases_json = CorpusCompressionUtils.decompress_data(cached.phrases_data).decode(
+                    "utf-8"
+                )
+                metadata_json = CorpusCompressionUtils.decompress_data(cached.metadata_data).decode(
+                    "utf-8"
+                )
+
                 words = json.loads(words_json)
                 phrases = [MultiWordExpression(**p) for p in json.loads(phrases_json)]
                 metadata = json.loads(metadata_json)
-                
+
                 self.lexicons[language] = LexiconData(
                     words=words,
                     phrases=phrases,
@@ -136,11 +136,11 @@ class CorpusLanguageLoader:
                     last_updated=metadata.get("last_updated", ""),
                 )
                 return
-        
+
         # Load from sources
         lexicon_data = await self._load_from_sources(language)
         self.lexicons[language] = lexicon_data
-        
+
         # Save to MongoDB cache
         await self._save_to_cache(language, lexicon_data)
 
@@ -704,7 +704,6 @@ class CorpusLanguageLoader:
 
         return stats
 
-
     async def close(self) -> None:
         """Clean up resources."""
         # HTTP client resources are now managed by the caching layer
@@ -716,35 +715,29 @@ class CorpusLanguageLoader:
         source_info = []
         for source in sources:
             source_info.append(f"{source.name}:{source.url}:{source.format.value}")
-        
+
         source_str = "|".join(sorted(source_info))
         return hashlib.sha256(source_str.encode()).hexdigest()
 
     async def _save_to_cache(self, language: Language, lexicon_data: LexiconData) -> None:
         """Save lexicon data to MongoDB cache."""
         # Prepare data for compression
-        words_json = json.dumps(lexicon_data.words).encode('utf-8')
-        phrases_json = json.dumps([p.model_dump() for p in lexicon_data.phrases]).encode('utf-8')
-        metadata_json = json.dumps(lexicon_data.metadata).encode('utf-8')
-        
+        words_json = json.dumps(lexicon_data.words).encode("utf-8")
+        phrases_json = json.dumps([p.model_dump() for p in lexicon_data.phrases]).encode("utf-8")
+        metadata_json = json.dumps(lexicon_data.metadata).encode("utf-8")
+
         # Compress data
-        words_compressed, words_ratio = CorpusCompressionUtils.compress_data(
-            words_json
-        )
-        phrases_compressed, phrases_ratio = CorpusCompressionUtils.compress_data(
-            phrases_json
-        )
-        metadata_compressed, metadata_ratio = CorpusCompressionUtils.compress_data(
-            metadata_json
-        )
-        
+        words_compressed, words_ratio = CorpusCompressionUtils.compress_data(words_json)
+        phrases_compressed, phrases_ratio = CorpusCompressionUtils.compress_data(phrases_json)
+        metadata_compressed, metadata_ratio = CorpusCompressionUtils.compress_data(metadata_json)
+
         # Calculate sizes
         original_size = len(words_json) + len(phrases_json) + len(metadata_json)
         compressed_size = len(words_compressed) + len(phrases_compressed) + len(metadata_compressed)
-        
+
         # Create cache entry
         cache_entry = CorpusCacheEntry(
-            language=language.value,
+            language=language,
             source_hash=self._get_source_hash(language),
             words_data=words_compressed,
             phrases_data=phrases_compressed,
@@ -759,6 +752,6 @@ class CorpusLanguageLoader:
             compression_time_ms=0.0,  # Could track actual compression time
             expires_at=dt.now(UTC) + timedelta(hours=168),  # 1 week
         )
-        
+
         # Save to MongoDB
         await cache_entry.save()

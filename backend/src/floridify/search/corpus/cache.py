@@ -158,21 +158,21 @@ class CorpusCache:
 
     def get_corpus(self, corpus_id: str) -> CorpusEntry | None:
         """Get corpus entry by ID.
-        
+
         Args:
             corpus_id: Corpus identifier
-            
+
         Returns:
             CorpusEntry or None if not found/expired
         """
         entry = self._cache.get(corpus_id)
         if not entry:
             return None
-            
+
         if entry.is_expired():
             del self._cache[corpus_id]
             return None
-            
+
         entry.touch()
         return entry
 

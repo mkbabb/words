@@ -34,11 +34,11 @@ def generate_wordlist_name(words: list[str]) -> str:
     """
     # Use the unified slug generator from utils
     slug = generate_slug(3)  # 3 words: adjective-animal-verb
-    
+
     # If slug generation somehow returns a UUID fallback, prepend 'wordlist-'
-    if len(slug) == 8 and all(c in '0123456789abcdef-' for c in slug):
+    if len(slug) == 8 and all(c in "0123456789abcdef-" for c in slug):
         # Looks like a UUID fragment, use hash-based name instead
         hash_id = generate_wordlist_hash(words)
         return f"wordlist-{hash_id}"
-    
+
     return slug

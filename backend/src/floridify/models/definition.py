@@ -64,11 +64,11 @@ class OutputFormat(Enum):
 
 class CorpusType(str, Enum):
     """Types of corpora in the system."""
-    
+
     LANGUAGE_SEARCH = "language_search"  # Main search engine corpus
-    WORDLIST = "wordlist"               # Individual wordlist corpus
-    WORDLIST_NAMES = "wordlist_names"   # All wordlist names corpus
-    CUSTOM = "custom"                   # User-defined corpus
+    WORDLIST = "wordlist"  # Individual wordlist corpus
+    WORDLIST_NAMES = "wordlist_names"  # All wordlist names corpus
+    CUSTOM = "custom"  # User-defined corpus
 
 
 class LiteratureSourceType(Enum):

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
 
 from ..models.definition import Language
 from ..search.core import SearchResult
@@ -15,9 +14,6 @@ from ..utils.logging import (
     log_stage,
     log_timing,
 )
-
-if TYPE_CHECKING:
-    pass
 
 logger = get_logger(__name__)
 

@@ -4,11 +4,8 @@ Comprehensive REST API tests for improved lemmatization and quantization.
 Tests all API endpoints with new features enabled.
 """
 
-import pytest
-import asyncio
-import json
-from unittest.mock import patch, AsyncMock
-from httpx import AsyncClient
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 
 from src.floridify.api.main import app
@@ -369,7 +366,6 @@ class TestAPIPerformance:
     def test_concurrent_search_requests(self):
         """Test handling of concurrent search requests."""
         import concurrent.futures
-        import threading
         
         def make_request(query):
             return self.client.get(f"/api/v1/search?q={query}&max_results=5")
