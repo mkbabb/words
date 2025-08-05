@@ -93,11 +93,11 @@ export const WordlistFilterTypes = {
 export type WordlistFilterType = typeof WordlistFilterTypes[keyof typeof WordlistFilterTypes]
 
 export type WordlistFilters = {
-  [WordlistFilterTypes.SHOW_BRONZE]: boolean
-  [WordlistFilterTypes.SHOW_SILVER]: boolean
-  [WordlistFilterTypes.SHOW_GOLD]: boolean
-  [WordlistFilterTypes.SHOW_HOT_ONLY]: boolean
-  [WordlistFilterTypes.SHOW_DUE_ONLY]: boolean
+  showBronze: boolean
+  showSilver: boolean
+  showGold: boolean
+  showHotOnly: boolean
+  showDueOnly: boolean
 }
 
 export const SortDirections = {
@@ -135,11 +135,11 @@ export const DEFAULT_SOURCES: DictionarySource[] = [DictionarySources.WIKTIONARY
 export const DEFAULT_LANGUAGES: Language[] = [Languages.EN]
 
 export const DEFAULT_WORDLIST_FILTERS: WordlistFilters = {
-  [WordlistFilterTypes.SHOW_BRONZE]: true,
-  [WordlistFilterTypes.SHOW_SILVER]: true,
-  [WordlistFilterTypes.SHOW_GOLD]: true,
-  [WordlistFilterTypes.SHOW_HOT_ONLY]: false,
-  [WordlistFilterTypes.SHOW_DUE_ONLY]: false
+  showBronze: true,
+  showSilver: true,
+  showGold: true,
+  showHotOnly: false,
+  showDueOnly: false
 }
 
 // ==========================================================================

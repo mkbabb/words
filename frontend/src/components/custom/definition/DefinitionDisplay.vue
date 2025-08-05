@@ -1,7 +1,7 @@
 <template>
     <!-- Error State -->
     <div v-if="contentStore.definitionError?.hasError" class="relative">
-        <ThemedCard :variant="uiStore.selectedCardVariant" class="relative">
+        <ThemedCard :variant="selectedCardVariant" class="relative">
             <ErrorState 
                 :title="getErrorTitle(contentStore.definitionError.errorType)"
                 :message="contentStore.definitionError.errorMessage"
@@ -16,7 +16,7 @@
     
     <!-- Empty State -->
     <div v-else-if="isEmpty && !isStreaming" class="relative">
-        <ThemedCard :variant="uiStore.selectedCardVariant" class="relative">
+        <ThemedCard :variant="selectedCardVariant" class="relative">
             <EmptyState
                 :title="getEmptyTitle()"
                 :message="getEmptyMessage()"
@@ -42,7 +42,7 @@
     <!-- Normal Content -->
     <div v-else-if="entry" class="relative">
         <!-- Main Card -->
-        <ThemedCard :variant="uiStore.selectedCardVariant" class="relative">
+        <ThemedCard :variant="selectedCardVariant" class="relative">
             <!-- Theme Selector (includes edit button) -->
             <ThemeSelector 
                 v-model="selectedCardVariant"
@@ -70,13 +70,10 @@
                 v-if="entry.word"
                 :word="entry.word"
                 :pronunciation="entry.pronunciation"
-                :pronunciationMode="uiStore.pronunciationMode"
+                :pronunciationMode="lookupMode.pronunciationMode"
                 :providers="usedProviders"
-                :animationType="'typewriter'"
-                :animationKey="animationKey"
                 :isAISynthesized="!!entry.model_info"
-                :isStreaming="isStreaming"
-                @toggle-pronunciation="uiStore.togglePronunciation"
+                @toggle-pronunciation="lookupMode.togglePronunciation"
             />
             <!-- Header Skeleton -->
             <div v-else-if="isStreaming" class="space-y-4 p-6">
@@ -100,9 +97,9 @@
                     mode="out-in"
                 >
                     <!-- Wrapper div with key that changes on mode switch -->
-                    <div :key="uiStore.mode" class="space-y-4">
+                    <div :key="searchBar.getSubMode('lookup')" class="space-y-4">
                         <!-- Dictionary Mode with Progressive Loading -->
-                        <template v-if="uiStore.mode === 'dictionary'">
+                        <template v-if="searchBar.getSubMode('lookup') === 'dictionary'">
                             <!-- Render available definition clusters -->
                             <DefinitionCluster
                                 v-for="(cluster, clusterIndex) in groupedDefinitions"
@@ -110,7 +107,7 @@
                                 :cluster="cluster"
                                 :clusterIndex="clusterIndex"
                                 :totalClusters="groupedDefinitions.length"
-                                :cardVariant="uiStore.selectedCardVariant"
+                                :cardVariant="selectedCardVariant"
                                 :editModeEnabled="editModeEnabled"
                                 :isStreaming="isStreaming"
                                 @update:cluster-name="handleClusterNameUpdate"
@@ -120,7 +117,7 @@
                                     :key="`${cluster.clusterId}-${defIndex}`"
                                     :definition="definition"
                                     :definitionIndex="getGlobalDefinitionIndex(clusterIndex, defIndex)"
-                                    :isRegenerating="regeneratingIndex === getGlobalDefinitionIndex(clusterIndex, defIndex)"
+                                    :isRegenerating="contentStore.regeneratingDefinitionIndex === getGlobalDefinitionIndex(clusterIndex, defIndex)"
                                     :isFirstInGroup="defIndex === 0"
                                     :isAISynthesized="!!entry.model_info"
                                     :editModeEnabled="editModeEnabled"
@@ -150,17 +147,17 @@
                         </template>
 
                         <!-- Thesaurus Mode -->
-                        <template v-else-if="uiStore.mode === 'thesaurus'">
+                        <template v-else-if="searchBar.getSubMode('lookup') === 'thesaurus'">
                             <ThesaurusView
                                 :thesaurusData="thesaurusData"
-                                :cardVariant="uiStore.selectedCardVariant"
+                                :cardVariant="selectedCardVariant"
                                 @word-click="handleWordSearch"
                                 @retry-thesaurus="handleRetryThesaurus"
                             />
                         </template>
 
                         <!-- AI Suggestions Mode -->
-                        <template v-else-if="uiStore.mode === 'suggestions'">
+                        <template v-else-if="searchBar.getSubMode('lookup') === 'suggestions'">
                             <!-- This mode is handled by WordSuggestionDisplay in Home.vue -->
                             <div class="text-center text-muted-foreground">
                                 Switching to suggestions mode...
@@ -207,7 +204,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useMagicKeys, whenever } from '@vueuse/core';
-import { useSearchResultsStore, useContentStore, useUIStore, useNotificationStore, useSearchConfigStore } from '@/stores';
+import { useContentStore, useNotificationStore } from '@/stores';
+import { useLookupMode } from '@/stores/search/modes/lookup';
+import { useSearchBarStore } from '@/stores/search/search-bar';
+import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -223,25 +223,30 @@ import {
 } from './components';
 import { ThemedCard } from '@/components/custom/card';
 import { WordlistSelectionModal } from '@/components/custom/wordlist';
-import { useDefinitionGroups, useAnimationCycle, useProviders, useImageManagement } from './composables';
+import { useDefinitionGroups, useProviders, useImageManagement } from './composables';
 import { normalizeEtymology } from '@/utils/guards';
 import type { ImageMedia } from '@/types/api';
 
 // Stores
-const searchResultsStore = useSearchResultsStore();
 const contentStore = useContentStore();
-const uiStore = useUIStore();
 const notificationStore = useNotificationStore();
-const searchConfigStore = useSearchConfigStore();
+const lookupMode = useLookupMode();
+const searchBar = useSearchBarStore();
+
+// Orchestrator for API operations
+const orchestrator = useSearchOrchestrator({
+    query: computed(() => searchBar.searchQuery)
+});
 
 // Reactive state
-const regeneratingIndex = ref<number | null>(null);
-const animationKey = ref(0);
-const isMounted = ref(false);
-const showThemeDropdown = ref(false);
+const isMounted = ref(true);
 const editModeEnabled = ref(false);
 const showWordlistModal = ref(false);
 const wordToAdd = ref('');
+const showThemeDropdown = ref(false);
+
+// Use UI store state for regeneration
+// const regeneratingIndex = computed(() => ui.regeneratingIndex); // Used in template
 
 // Smart computed properties - merge streaming and complete data
 const entry = computed(() => {
@@ -281,8 +286,8 @@ const isStreaming = computed(() => contentStore.isStreamingData);
 
 // UI State computed properties
 const selectedCardVariant = computed({
-    get: () => uiStore.selectedCardVariant,
-    set: (value) => uiStore.setCardVariant(value)
+    get: () => lookupMode.selectedCardVariant,
+    set: (value) => lookupMode.setCardVariant(value)
 });
 
 // Convert readonly thesaurus to mutable type for component compatibility
@@ -343,12 +348,6 @@ const getEmptyMessage = () => {
     return 'This word might not exist in our dictionary, or it could be a specialized term. Try searching for a similar word or check your spelling.';
 };
 
-// Force animation key update when word changes
-watch(entry, (newEntry, oldEntry) => {
-    if (newEntry?.word !== oldEntry?.word) {
-        animationKey.value++;
-    }
-});
 
 // Clean up debug logging
 // watch(() => store.definitionError, (newError, oldError) => {
@@ -365,7 +364,6 @@ const normalizedEtymology = computed(() => {
 
 // Composables
 const { groupedDefinitions } = useDefinitionGroups(entry);
-const { startCycle, stopCycle } = useAnimationCycle(() => animationKey.value++);
 const { usedProviders } = useProviders(entry);
 const { allImages, handleImageClick: baseHandleImageClick, handleImageError: baseHandleImageError } = useImageManagement(entry);
 
@@ -382,15 +380,10 @@ const getGlobalDefinitionIndex = (clusterIndex: number, defIndex: number): numbe
 
 // Event handlers
 const handleRegenerateExamples = async (definitionIndex: number) => {
-    if (regeneratingIndex.value !== null) return;
-    
-    regeneratingIndex.value = definitionIndex;
     try {
         await contentStore.regenerateExamples(definitionIndex);
     } catch (error) {
         console.error('Failed to regenerate examples:', error);
-    } finally {
-        regeneratingIndex.value = null;
     }
 };
 
@@ -446,7 +439,10 @@ const handleClusterNameUpdate = async (clusterId: string, newName: string) => {
     
     if (definition?.id) {
         await contentStore.updateDefinition(definition.id, {
-            meaning_cluster_name: newName
+            meaning_cluster: {
+                ...definition.meaning_cluster,
+                name: newName
+            } as any
         });
     }
 };
@@ -487,14 +483,14 @@ const handleShowHelp = () => {
 
 const handleSuggestAlternatives = () => {
     // Switch to suggestions mode or show alternative suggestions
-    searchConfigStore.setSubMode('lookup', 'suggestions');
+    searchBar.setSubMode('lookup', 'suggestions');
     console.log('Suggesting alternatives for failed lookup');
 };
 
 const handleRetryThesaurus = async () => {
     if (entry.value?.word) {
         try {
-            await searchResultsStore.getThesaurusData(entry.value.word);
+            await orchestrator.getThesaurusData(entry.value.word);
         } catch (error) {
             console.error('Failed to retry thesaurus lookup:', error);
             notificationStore.showNotification({
@@ -548,30 +544,14 @@ const saveAllChanges = () => {
     document.dispatchEvent(new CustomEvent('save-all-edits'));
 };
 
-// Watch mode changes to ensure thesaurus data is loaded and trigger animations
-watch(() => uiStore.mode, async (newMode, oldMode) => {
-    // Trigger animation by incrementing key
-    if (oldMode && newMode !== oldMode) {
-        animationKey.value++;
-    }
-    
+// Watch mode changes to ensure thesaurus data is loaded
+watch(() => searchBar.getSubMode('lookup'), async (newMode) => {
     if (newMode === 'thesaurus' && entry.value) {
         // Ensure thesaurus data is loaded when switching to thesaurus mode
-        await searchResultsStore.getThesaurusData(entry.value.word);
+        await orchestrator.getThesaurusData(entry.value.word);
     }
 });
 
-// Lifecycle
-watch(() => isMounted.value, (mounted) => {
-    if (mounted) {
-        startCycle();
-    } else {
-        stopCycle();
-    }
-}, { immediate: true });
-
-// Set mounted state
-isMounted.value = true;
 
 // Watch edit mode changes to save
 watch(editModeEnabled, (newVal, oldVal) => {

@@ -11,10 +11,12 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from ...ai.factory import get_openai_connector
 from ...anki.constants import CardType
 from ...anki.generator import AnkiCardGenerator
-from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
+from ...core.search_pipeline import get_search_engine
 from ...models import Word
+from ...models.definition import DictionaryProvider, Language
 from ...storage.mongodb import _ensure_initialized
+from ...text import normalize_word
 from ...utils.logging import get_logger
 from ...wordlist import WordList
 from ..utils.formatting import console
@@ -147,19 +149,17 @@ async def _export_async(
 
         # First pass: normalize words and build frequency map
         console.print("🔍 Normalizing words and building frequency map...")
-        from ...core.search_pipeline import get_search_engine
-        from ...utils.text_utils import normalize_word
-
+        
         search_engine = await get_search_engine(languages=[Language.ENGLISH])
 
         word_frequency_map: dict[str, int] = {}
         original_word_map: dict[str, str] = {}  # normalized -> first original word seen
 
         # Get word texts for all words in the list
-        word_ids = [w.word_id for w in word_list.words]  
+        word_ids = [w.word_id for w in word_list.words]
         words = await Word.find({"_id": {"$in": word_ids}}).to_list()
         word_text_map = {str(word.id): word.text for word in words}
-        
+
         for word_freq in word_list.words:
             word_text = word_text_map.get(str(word_freq.word_id), "")
             normalized = normalize_word(word_text)

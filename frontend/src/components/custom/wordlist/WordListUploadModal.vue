@@ -336,9 +336,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LoadingProgress } from '@/components/custom/loading';
 import RefreshButton from '@/components/custom/common/RefreshButton.vue';
-import { useWordlist } from '@/composables/useWordlist';
+import { useToast } from '@/components/ui/toast/use-toast';
 import { useSlugGeneration } from '@/composables/useSlugGeneration';
 import { wordlistApi } from '@/api';
+import type { WordList } from '@/types';
 
 interface Props {
     modelValue: boolean;
@@ -383,8 +384,32 @@ const uploadStageDefinitions = ref<
 const uploadCategory = ref('');
 const error = ref('');
 
-// Real wordlist integration
-const { wordlists, loadWordlists, isLoadingWordlist } = useWordlist();
+// Toast notifications
+const { toast } = useToast();
+
+// Wordlist state
+const wordlists = ref<WordList[]>([]);
+const isLoadingWordlist = ref(false);
+
+// Load wordlists function
+const loadWordlists = async () => {
+  try {
+    isLoadingWordlist.value = true;
+    const response = await wordlistApi.getWordlists();
+    wordlists.value = response.items;
+    return response.items;
+  } catch (error) {
+    console.error('Failed to load wordlists:', error);
+    toast({
+      title: "Error",
+      description: "Failed to load wordlists",
+      variant: "destructive",
+    });
+    return [];
+  } finally {
+    isLoadingWordlist.value = false;
+  }
+};
 const selectedWordlist = computed(() =>
     wordlists.value.find((w) => w.id === selectedWordlistId.value)
 );

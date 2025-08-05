@@ -7,9 +7,9 @@ import asyncio
 import click
 from rich.console import Console
 
-from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...models import Definition
+from ...models.definition import DictionaryProvider, Language
 from ...utils.logging import get_logger
 from ..utils.formatting import (
     format_error,

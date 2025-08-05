@@ -15,9 +15,15 @@ from ..connectors.apple_dictionary import AppleDictionaryConnector
 from ..connectors.dictionary_com import DictionaryComConnector
 from ..connectors.oxford import OxfordConnector
 from ..connectors.wiktionary import WiktionaryConnector
-from ..constants import DictionaryProvider, Language
 from ..models.base import Etymology
-from ..models.models import Definition, ProviderData, SynthesizedDictionaryEntry, Word
+from ..models.definition import (
+    Definition,
+    DictionaryProvider,
+    Language,
+    ProviderData,
+    SynthesizedDictionaryEntry,
+    Word,
+)
 from ..storage.mongodb import get_storage, get_synthesized_entry
 from ..utils.config import Config
 from ..utils.logging import (
@@ -95,9 +101,7 @@ async def lookup_word_pipeline(
             await state_tracker.update_stage(Stages.SEARCH_COMPLETE)
 
         if not best_match_result:
-            logger.warning(
-                f"No search results found for '{word}' after {search_duration:.2f}s"
-            )
+            logger.warning(f"No search results found for '{word}' after {search_duration:.2f}s")
             # Try AI fallback if no results and AI is enabled
             if not no_ai:
                 logger.info(f"No search results, trying AI fallback for '{word}'")
@@ -148,27 +152,19 @@ async def lookup_word_pipeline(
             )
             for provider in providers
         ]
-        providers_results = await asyncio.gather(
-            *provider_tasks, return_exceptions=True
-        )
+        providers_results = await asyncio.gather(*provider_tasks, return_exceptions=True)
 
         # Filter out None results and exceptions
         providers_data = []
         for i, result in enumerate(providers_results):
             provider = providers[i]
             if isinstance(result, Exception):
-                logger.warning(
-                    f"❌ Provider {provider.value} failed with exception: {result}"
-                )
+                logger.warning(f"❌ Provider {provider.value} failed with exception: {result}")
             elif result is None:
-                logger.warning(
-                    f"❌ Provider {provider.value} returned no data for '{best_match}'"
-                )
+                logger.warning(f"❌ Provider {provider.value} returned no data for '{best_match}'")
             else:
                 providers_data.append(result)
-                logger.debug(
-                    f"✅ Provider {provider.value} returned data for '{best_match}'"
-                )
+                logger.debug(f"✅ Provider {provider.value} returned data for '{best_match}'")
 
         total_provider_time = time.perf_counter() - provider_fetch_start
         logger.info(
@@ -228,15 +224,11 @@ async def lookup_word_pipeline(
                         f"after {ai_duration:.2f}s"
                     )
                     # Try fallback if synthesis fails
-                    return await _ai_fallback_lookup(
-                        best_match, force_refresh, state_tracker
-                    )
+                    return await _ai_fallback_lookup(best_match, force_refresh, state_tracker)
             except Exception as e:
                 logger.error(f"❌ AI synthesis failed: {e}")
                 # Try fallback if synthesis fails
-                return await _ai_fallback_lookup(
-                    best_match, force_refresh, state_tracker
-                )
+                return await _ai_fallback_lookup(best_match, force_refresh, state_tracker)
         else:
             # When AI is disabled, create a non-AI synthesized entry from provider data
             logger.info(f"🔧 Creating non-AI synthesized entry for '{best_match}'")
@@ -284,9 +276,7 @@ async def _get_provider_definition(
                     "Oxford Dictionary API credentials not configured. "
                     "Please update auth/config.toml with your Oxford app_id and api_key."
                 )
-            connector = OxfordConnector(
-                app_id=config.oxford.app_id, api_key=config.oxford.api_key
-            )
+            connector = OxfordConnector(app_id=config.oxford.app_id, api_key=config.oxford.api_key)
         elif provider == DictionaryProvider.DICTIONARY_COM:
             config = Config.from_file()
             if not config.dictionary_com.authorization:
@@ -336,9 +326,7 @@ async def _get_provider_definition(
                     success=False,
                     duration=fetch_duration,
                 )
-                logger.debug(
-                    f"⚠️  Provider {provider.value} returned no results for '{word}'"
-                )
+                logger.debug(f"⚠️  Provider {provider.value} returned no results for '{word}'")
 
             return result
 
@@ -363,14 +351,10 @@ async def _synthesize_with_ai(
     state_tracker: StateTracker | None = None,
 ) -> SynthesizedDictionaryEntry | None:
     """Synthesize definition using AI."""
-    logger.debug(
-        f"🤖 Starting AI synthesis for '{word}' with {len(providers)} providers"
-    )
+    logger.debug(f"🤖 Starting AI synthesis for '{word}' with {len(providers)} providers")
 
     # Log provider data quality
-    total_definitions = sum(
-        len(p.definition_ids) if p.definition_ids else 0 for p in providers
-    )
+    total_definitions = sum(len(p.definition_ids) if p.definition_ids else 0 for p in providers)
     logger.debug(f"📊 Total definitions to synthesize: {total_definitions}")
 
     try:
@@ -411,9 +395,7 @@ async def _create_provider_mapped_entry(
 
     Uses AI only for deduplication and clustering, but not for content generation.
     """
-    logger.info(
-        f"📦 Creating provider-mapped entry for '{word}' from {provider_data.provider}"
-    )
+    logger.info(f"📦 Creating provider-mapped entry for '{word}' from {provider_data.provider}")
 
     try:
         # Get Word object
@@ -434,9 +416,7 @@ async def _create_provider_mapped_entry(
             return None
 
         # Use AI for deduplication only
-        logger.info(
-            f"🔍 Deduplicating {len(all_definitions)} definitions (AI-assisted)"
-        )
+        logger.info(f"🔍 Deduplicating {len(all_definitions)} definitions (AI-assisted)")
         synthesizer = get_definition_synthesizer()
 
         dedup_response = await synthesizer.ai.deduplicate_definitions(
@@ -495,9 +475,7 @@ async def _create_provider_mapped_entry(
             etymology=provider_data.etymology or etymology,
             fact_ids=[],  # No facts in non-AI mode
             model_info=None,  # No AI model info
-            source_provider_data_ids=(
-                [provider_data.id] if provider_data.id is not None else []
-            ),
+            source_provider_data_ids=([provider_data.id] if provider_data.id is not None else []),
         )
 
         # Save the entry

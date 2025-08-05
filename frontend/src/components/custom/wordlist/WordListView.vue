@@ -122,7 +122,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
+// import { useRouter } from 'vue-router'; // Unused
 import { useStores } from '@/stores';
 // Removed infinite scroll import
 import { 
@@ -139,9 +139,19 @@ import WordListCard from './WordListCard.vue';
 import WordListUploadModal from './WordListUploadModal.vue';
 import CreateWordListModal from './CreateWordListModal.vue';
 import EditWordNotesModal from './EditWordNotesModal.vue';
+import { useWordlistMode } from '@/stores/search/modes/wordlist';
+import { useSearchBarStore } from '@/stores/search/search-bar';
+import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 
-const { searchConfig, orchestrator, loading, searchBar, searchResults } = useStores();
-const router = useRouter();
+const { searchBar } = useStores();
+const wordlistMode = useWordlistMode();
+const searchBarStore = useSearchBarStore();
+// const router = useRouter(); // Unused
+
+// Create orchestrator for API operations
+const orchestrator = useSearchOrchestrator({
+    query: computed(() => searchBarStore.searchQuery)
+});
 const { toast } = useToast();
 
 // Component state
@@ -155,17 +165,17 @@ const currentWordlistData = ref<WordList | null>(null);
 const currentWords = ref<any[]>([]);
 const totalWords = ref(0);
 const currentPage = ref(0);
-const wordsPerPage = ref(25);
+// const wordsPerPage = ref(25); // Unused
 const scrollContainer = ref<HTMLElement>();
 
-// Sort criteria from store (writeable)
+// Sort criteria from wordlist mode store (writeable)
 const sortCriteria = computed({
-  get: () => searchConfig.wordlistSortCriteria,
-  set: (value: any[]) => { searchConfig.setWordlistSortCriteria(value); }
+  get: () => wordlistMode.wordlistSortCriteria,
+  set: (value: any[]) => { wordlistMode.setWordlistSortCriteria(value); }
 });
 
-// Filters - use store filters
-const filters = computed(() => searchConfig.wordlistFilters);
+// Filters - use wordlist mode store filters
+const filters = computed(() => wordlistMode.wordlistFilters);
 
 // Computed properties
 const currentWordlist = computed(() => currentWordlistData.value);
@@ -206,20 +216,26 @@ const dueForReview = computed(() => {
 
 // Convert UI filters to mastery levels array for API
 const getMasteryLevelsFromFilters = () => {
+  const filterValues = filters.value;
   const levels = [];
-  if (filters.value.showBronze) levels.push('bronze');
-  if (filters.value.showSilver) levels.push('silver');
-  if (filters.value.showGold) levels.push('gold');
+  if (filterValues.showBronze) levels.push('bronze');
+  if (filterValues.showSilver) levels.push('silver');
+  if (filterValues.showGold) levels.push('gold');
   // If all are selected or none are selected, return undefined (show all)
   return levels.length === 3 || levels.length === 0 ? undefined : levels;
 };
 
 const handleWordClick = async (word: WordListItem) => {
   // Switch to lookup mode and navigate to definition route
-  searchConfig.setMode('lookup');
+  searchBarStore.setMode('lookup');
   
   // Perform the word lookup after navigation
-  await orchestrator.performSearch(word.word);
+  searchBar.isDirectLookup = true;
+  try {
+    await orchestrator.getDefinition(word.word);
+  } finally {
+    searchBar.isDirectLookup = false;
+  }
 };
 
 const handleReview = async (word: WordListItem, quality: number) => {
@@ -300,8 +316,8 @@ const handleWordsUploaded = (words: string[]) => {
 
 const handleWordlistCreated = async (wordlist: any) => {
   console.log('Wordlist created:', wordlist.name);
-  searchConfig.setWordlist(wordlist.id);
-  searchConfig.setSearchMode('wordlist', router);
+  wordlistMode.setWordlist(wordlist.id);
+  searchBarStore.setMode('wordlist');
 };
 
 // Clustering removed for simplicity
@@ -339,11 +355,33 @@ const loadWordlistMeta = async (id: string) => {
   }
 };
 
-// Simplified loading - just trigger orchestrator search
-const triggerWordlistSearch = () => {
-  if (searchConfig.selectedWordlist) {
-    // The orchestrator will handle the search based on current query
-    orchestrator.executeSearch(searchBar.searchQuery);
+// Simplified loading - just trigger wordlist search
+const triggerWordlistSearch = async () => {
+  if (wordlistMode.selectedWordlist) {
+    const wordlistId = wordlistMode.selectedWordlist;
+    const query = searchBar.searchQuery.trim();
+    
+    try {
+      let results: any[] = [];
+      if (!query) {
+        results = await wordlistMode.getWordlistWords(wordlistId);
+      } else {
+        results = await wordlistMode.searchWordlist(wordlistId, query);
+      }
+      
+      wordlistMode.setResults(results);
+      
+      if (results.length > 0 && query) {
+        searchBar.openDropdown();
+        searchBar.setSelectedIndex(0);
+      } else if (!query) {
+        searchBar.hideDropdown();
+      }
+    } catch (error) {
+      console.error('Wordlist search error:', error);
+      wordlistMode.clearResults();
+      searchBar.hideDropdown();
+    }
   }
 };
 
@@ -362,7 +400,7 @@ const loadMoreWords = async () => {
 watch(filters, () => {
   // Reset to first page and reload when filters change
   currentPage.value = 0;
-  if (searchConfig.selectedWordlist) {
+  if (wordlistMode.selectedWordlist) {
     triggerWordlistSearch();
   }
 }, { deep: true });
@@ -371,15 +409,15 @@ watch(filters, () => {
 watch(sortCriteria, () => {
   // Reset to first page and reload when sort changes
   currentPage.value = 0;
-  if (searchConfig.selectedWordlist) {
+  if (wordlistMode.selectedWordlist) {
     triggerWordlistSearch();
   }
 }, { deep: true });
 
 // Lifecycle
 onMounted(async () => {
-  if (searchConfig.selectedWordlist) {
-    await loadWordlistMeta(searchConfig.selectedWordlist);
+  if (wordlistMode.selectedWordlist) {
+    await loadWordlistMeta(wordlistMode.selectedWordlist);
     triggerWordlistSearch();
   }
 });
@@ -389,7 +427,7 @@ onUnmounted(() => {
 });
 
 // Watch for wordlist changes  
-watch(() => searchConfig.selectedWordlist, async (newId) => {
+watch(() => wordlistMode.selectedWordlist, async (newId) => {
   if (newId) {
     // Load metadata
     await loadWordlistMeta(newId);
@@ -403,8 +441,8 @@ watch(() => searchConfig.selectedWordlist, async (newId) => {
 
 // Watch for search results from orchestrator
 // The orchestrator now handles all search operations including wordlist searches
-watch(() => searchResults.wordlistSearchResults, (results) => {
-  if (searchConfig.searchMode === 'wordlist' && results) {
+watch(() => wordlistMode.results, (results) => {
+  if (searchBarStore.searchMode === 'wordlist' && results) {
     console.log('📚 WordListView - received search results:', results.length);
     // The orchestrator already updated the dropdown results
     // We just need to update our main display
@@ -422,7 +460,7 @@ watch(() => searchResults.wordlistSearchResults, (results) => {
 
 // Watch for empty queries to reload all words
 watch(() => searchBar.searchQuery, (newQuery) => {
-  if (searchConfig.searchMode === 'wordlist' && searchConfig.selectedWordlist && !newQuery.trim()) {
+  if (searchBarStore.searchMode === 'wordlist' && wordlistMode.selectedWordlist && !newQuery.trim()) {
     // Empty query - orchestrator will call getWordlistWords
     // Results will come through wordlistSearchResults watcher
     console.log('📚 WordListView - empty query detected');
@@ -432,16 +470,16 @@ watch(() => searchBar.searchQuery, (newQuery) => {
 
 // TEMPORARILY DISABLED - these watchers were causing infinite loops
 // watch(() => filters.value, () => {
-//   if (searchConfig.selectedWordlist) {
+//   if (wordlistMode.selectedWordlist) {
 //     currentPage.value = 0;
-//     loadWordlistWords(searchConfig.selectedWordlist, 0, false);
+//     loadWordlistWords(wordlistMode.selectedWordlist, 0, false);
 //   }
 // }, { deep: true });
 
 // watch(() => sortCriteria.value, () => {
-//   if (searchConfig.selectedWordlist) {
+//   if (wordlistMode.selectedWordlist) {
 //     currentPage.value = 0;
-//     loadWordlistWords(searchConfig.selectedWordlist, 0, false);
+//     loadWordlistWords(wordlistMode.selectedWordlist, 0, false);
 //   }
 // }, { deep: true });
 

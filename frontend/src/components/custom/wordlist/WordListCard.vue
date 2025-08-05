@@ -5,7 +5,7 @@
         :variant="word.mastery_level"
         :class="[
           'group relative cursor-pointer transition-all duration-500 ease-apple-spring hover:scale-[1.02] p-3 sm:p-4',
-          word.score >= 1.0 ? 'search-match-gold' : word.score >= 0.9 ? 'search-match-silver' : word.score >= 0.8 ? 'search-match-bronze' : ''
+          (word.score ?? 0) >= 1.0 ? 'search-match-gold' : (word.score ?? 0) >= 0.9 ? 'search-match-silver' : (word.score ?? 0) >= 0.8 ? 'search-match-bronze' : ''
         ]"
         texture-enabled
         texture-type="clean"

@@ -144,6 +144,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useStores } from '@/stores';
+import { useSearchBarStore } from '@/stores/search/search-bar';
+import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { formatDate, cn } from '@/utils';
 import { History } from 'lucide-vue-next';
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui';
@@ -154,16 +156,31 @@ interface Props {
 
 defineProps<Props>();
 
-const { history, searchBar, orchestrator } = useStores();
+const { history } = useStores();
+const searchBarStore = useSearchBarStore();
 const recentLookups = computed(() => history.recentLookups);
+
+// Create orchestrator for API operations
+const orchestrator = useSearchOrchestrator({
+    query: computed(() => searchBarStore.searchQuery)
+});
 
 const limitedLookups = computed(() => {
   return recentLookups.value.slice(0, 20); // Limit to prevent performance issues
 });
 
 const lookupWord = async (word: string) => {
-  searchBar.setQuery(word);
-  await orchestrator.searchWord(word);
+  searchBarStore.setQuery(word);
+  searchBarStore.setDirectLookup(true);
+  try {
+    if (searchBarStore.getSubMode('lookup') === 'thesaurus') {
+      await orchestrator.getThesaurusData(word);
+    } else {
+      await orchestrator.getDefinition(word);
+    }
+  } finally {
+    searchBarStore.setDirectLookup(false);
+  }
 };
 </script>
 

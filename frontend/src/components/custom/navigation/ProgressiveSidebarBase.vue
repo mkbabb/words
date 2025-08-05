@@ -22,9 +22,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { storeToRefs } from 'pinia';
-import { useStores } from '@/stores';
+import { ref, computed } from 'vue';
+import { useLookupMode } from '@/stores/search/modes/lookup';
 
 interface Props {
   maxHeight?: string;
@@ -32,8 +31,8 @@ interface Props {
 
 defineProps<Props>();
 
-const { ui } = useStores();
-const { selectedCardVariant } = storeToRefs(ui);
+const lookupMode = useLookupMode();
+const selectedCardVariant = computed(() => lookupMode.selectedCardVariant);
 
 // Template refs - exposed to content slot
 const navContainer = ref<HTMLElement>();

@@ -56,10 +56,11 @@
 
                 <!-- Mode Toggle -->
                 <ModeToggle
-                    v-model="lookupMode"
+                    :model-value="searchBar.getSubMode('lookup') as any"
                     :can-toggle="canToggleMode"
                     :opacity="iconOpacity"
                     :ai-mode="searchBar.isAIQuery"
+                    @update:model-value="(value: any) => searchBar.setSubMode('lookup', value)"
                 />
 
                 <!-- Search Input Container with Autocomplete -->
@@ -134,7 +135,7 @@
                             leave-to-class="opacity-0 scale-90"
                         >
                             <button
-                                v-if="searchBar.isAIQuery && uiState.scrollProgress < 0.3"
+                                v-if="searchBar.isAIQuery && props.scrollProgress < 0.3"
                                 :class="[
                                     'rounded-md p-1 transition-all duration-200',
                                     'hover:scale-105 focus:ring-2 focus:ring-primary/50 focus:outline-none',
@@ -143,8 +144,8 @@
                                         : 'bg-muted/50 hover:bg-muted/80'
                                 ]"
                                 :style="{
-                                    opacity: 1 - uiState.scrollProgress * 3,
-                                    transform: `scale(${1 - uiState.scrollProgress * 0.5})`
+                                    opacity: 1 - props.scrollProgress * 3,
+                                    transform: `scale(${1 - props.scrollProgress * 0.5})`
                                 }"
                                 @click.stop="handleExpandClick"
                                 title="Expand for longer input"
@@ -168,7 +169,7 @@
                             leave-to-class="opacity-0 scale-90"
                         >
                             <button
-                                v-if="searchQuery.length > 0 && searchBar.isSearchBarFocused"
+                                v-if="searchQuery.length > 0 && searchBar.isFocused"
                                 @click.stop="clearQuery"
                                 :class="[
                                     'rounded-md p-1 transition-all duration-200',
@@ -217,7 +218,7 @@
                 :show="showProgressBar"
                 :progress="loading.loadingProgress"
                 :current-stage="loading.loadingStage"
-                :mode="searchConfig.searchMode"
+                :mode="searchBar.searchMode"
                 :category="loading.loadingCategory"
                 @click="handleProgressBarClick"
             />
@@ -231,10 +232,11 @@
                     v-model:selected-languages="selectedLanguages"
                     v-model:no-a-i="noAI"
                     v-model:wordlist-filters="wordlistFilters"
-                    v-model:wordlist-sort-criteria="wordlistSortCriteria"
-                    :ai-suggestions="searchBar.aiSuggestions"
+                    :wordlist-sort-criteria="wordlistSortCriteria"
+                    @update:wordlist-sort-criteria="(value: any) => wordlistSortCriteria = value"
+                    :ai-suggestions="searchBar.aiSuggestions as string[]"
                     :is-development="uiState.isDevelopment"
-                    :show-refresh-button="!!content.currentEntry && searchConfig.searchMode === 'lookup'"
+                    :show-refresh-button="!!content.currentEntry && searchBar.searchMode === 'lookup'"
                     :force-refresh-mode="loading.forceRefreshMode"
                     @word-select="selectWord"
                     @clear-storage="clearAllStorage"
@@ -251,14 +253,14 @@
                 >
                     <SearchResults
                         ref="searchResultsComponent"
-                        :show="searchBar.showSearchResults"
-                        :results="searchResults.getSearchResults('lookup')"
+                        :show="searchBar.showDropdown"
+                        :results="(searchBar.currentResults || []) as any[]"
                         :loading="loading.isSearching"
                         v-model:selected-index="searchSelectedIndex"
                         :query="searchQuery"
                         :ai-mode="searchBar.isAIQuery"
-                        :wordlist-mode="searchConfig.searchMode === 'wordlist'"
-                        :wordlist-results="searchResults.getSearchResults('wordlist')"
+                        :wordlist-mode="searchBar.searchMode === 'wordlist'"
+                        :wordlist-results="searchBar.getResults('wordlist') as any[] || []"
                         @select-result="selectResult"
                         @interaction="handleSearchAreaInteraction"
                     />
@@ -288,9 +290,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, watchEffect, onMounted, onUnmounted, nextTick } from 'vue';
-// Legacy store removed - all functionality migrated to modular stores
-import { useStores } from '@/stores';
+import { ref, computed, watch, watchEffect, onMounted, onUnmounted } from 'vue';
+// Modular stores - direct imports
+import { useSearchBarStore } from '@/stores/search/search-bar';
+import { useLookupMode } from '@/stores/search/modes/lookup';
+import { useWordlistMode } from '@/stores/search/modes/wordlist';
+import { useContentStore } from '@/stores/content/content';
+import { useUIStore } from '@/stores/ui/ui-state';
+import { useLoadingStore } from '@/stores/ui/loading';
 import { Maximize2, X } from 'lucide-vue-next';
 import { HamburgerIcon } from '@/components/custom/icons';
 
@@ -308,7 +315,6 @@ import ConfirmDialog from '../ConfirmDialog.vue';
 // Import composables
 import {
     useSearchBarUI,
-    useSearchOperations,
     useSearchBarNavigation,
     useFocusManagement,
     useModalManagement,
@@ -319,15 +325,19 @@ import { shouldTriggerAIMode } from './utils/ai-query';
 
 interface SearchBarProps {
     className?: string;
-    shrinkPercentage?: number;
     hideDelay?: number;
     scrollThreshold?: number;
+    scrollY?: number;
+    shrinkPercentage?: number;
+    scrollProgress?: number;
 }
 
 const props = withDefaults(defineProps<SearchBarProps>(), {
-    shrinkPercentage: 0,
     hideDelay: 3000,
     scrollThreshold: 100,
+    scrollY: 0,
+    shrinkPercentage: 0,
+    scrollProgress: 0,
 });
 
 const emit = defineEmits<{
@@ -339,7 +349,12 @@ const emit = defineEmits<{
 }>();
 
 // Store & State - Direct store access for single source of truth
-const { searchBar, searchConfig, searchResults, content, ui, loading, orchestrator } = useStores();
+const searchBar = useSearchBarStore();
+const lookupMode = useLookupMode();
+const wordlistMode = useWordlistMode();
+const content = useContentStore();
+const ui = useUIStore();
+const loading = useLoadingStore();
 const { iconOpacity, uiState } = useSearchBarUI();
 
 // All functionality now uses modular stores directly - no reactive wrapper needed
@@ -347,7 +362,7 @@ const { iconOpacity, uiState } = useSearchBarUI();
 // Computed properties from stores
 const canToggleMode = computed(() => {
     // Disable mode toggle in wordlist mode
-    if (searchConfig.searchMode === 'wordlist') return false;
+    if (searchBar.searchMode === 'wordlist') return false;
     
     const hasWordQuery = !!content.currentEntry;
     const hasSuggestionQuery = !!content.wordSuggestions;
@@ -359,19 +374,19 @@ const canToggleMode = computed(() => {
 
 const placeholder = computed(() => {
     // Hide placeholder when scrolled
-    if (uiState.scrollProgress > 0.3) {
+    if (props.scrollProgress > 0.3) {
         return '';
     }
     
     // First check searchMode for specific modes
-    if (searchConfig.searchMode === 'wordlist') {
+    if (searchBar.searchMode === 'wordlist') {
         return 'words';
-    } else if (searchConfig.searchMode === 'stage') {
+    } else if (searchBar.searchMode === 'stage') {
         return 'staging';
     }
 
     // Default to mode-based placeholders for lookup mode
-    return ui.mode === 'dictionary'
+    return searchBar.getSubMode('lookup') === 'dictionary'
         ? 'definitions'
         : 'synonyms';
 });
@@ -393,37 +408,32 @@ const searchSelectedIndex = computed({
     set: (value: number) => searchBar.setSelectedIndex(value)
 });
 
-const lookupMode = computed({
-    get: () => ui.mode,
-    set: (value: 'dictionary' | 'thesaurus' | 'suggestions') => searchConfig.setLookupMode(value)
-});
 
-// Computed properties for v-model bindings with searchConfig store
+// Computed properties for v-model bindings with mode stores directly
 const selectedSources = computed({
-    get: () => [...searchConfig.selectedSources],
-    set: (value: string[]) => searchConfig.setSources(value)
+    get: () => Array.from(lookupMode.selectedSources) as string[],
+    set: (value: string[]) => lookupMode.setSources(value as any)
 });
 
 const selectedLanguages = computed({
-    get: () => [...searchConfig.selectedLanguages],
-    set: (value: string[]) => searchConfig.setLanguages(value)
+    get: () => Array.from(lookupMode.selectedLanguages) as string[],
+    set: (value: string[]) => lookupMode.setLanguages(value as any)
 });
 
 const noAI = computed({
-    get: () => searchConfig.noAI,
-    set: (value: boolean) => searchConfig.setAI(!value)
+    get: () => lookupMode.noAI,
+    set: (value: boolean) => lookupMode.setAI(!value)
 });
 
-// Computed properties for v-model bindings with searchConfig store
+// Computed properties for v-model bindings with wordlist mode store
 const wordlistFilters = computed({
-    get: () => ({ ...searchConfig.wordlistFilters }),
-    set: (value: any) => searchConfig.setWordlistFilters(value)
+    get: () => ({ ...wordlistMode.wordlistFilters }),
+    set: (value: any) => wordlistMode.setWordlistFilters(value)
 });
-
 
 const wordlistSortCriteria = computed({
-    get: () => [...searchConfig.wordlistSortCriteria],
-    set: (value: any) => searchConfig.setWordlistSortCriteria(value)
+    get: () => [...wordlistMode.wordlistSortCriteria],
+    set: (value: any) => wordlistMode.setWordlistSortCriteria(value)
 });
 
 // Progress bar state - computed based on loading state
@@ -448,7 +458,7 @@ const searchResultsComponent = ref<any>();
 // Computed ref for search input element
 const searchInputRef = computed(() => searchInputComponent.value?.element);
 
-// Scroll animation setup
+// Scroll animation setup - use props for scroll data
 const { containerStyle } = useSearchBarScroll({
     shrinkPercentage: () => props.shrinkPercentage,
 });
@@ -465,10 +475,10 @@ const {
     query: computed(() => searchBar.searchQuery),
     searchResults: computed(() => {
         // Use appropriate results based on search mode
-        if (searchConfig.searchMode === 'wordlist') {
-            return searchResults.getSearchResults('wordlist').slice(0, 10) as any;
+        if (searchBar.searchMode === 'wordlist') {
+            return searchBar.getResults('wordlist')?.slice(0, 10) as any || [];
         }
-        return searchResults.getSearchResults('lookup') as any;
+        return searchBar.getResults('lookup') as any || [];
     }),
     searchInput: searchInputRef,
     onQueryUpdate: (newQuery: string) => {
@@ -476,10 +486,12 @@ const {
     },
 });
 
-// Search operations
-const { performSearch, clearSearch, cleanup: cleanupSearch } = useSearchOperations({
+// Search operations - use orchestrator
+import { useSearchOrchestrator } from './composables/useSearchOrchestrator';
+const orchestrator = useSearchOrchestrator({
     query: computed(() => searchBar.searchQuery),
 });
+const { performSearch, clearSearch, cleanup: cleanupSearch } = orchestrator;
 
 // Unified navigation and keyboard handling
 const {
@@ -512,7 +524,6 @@ const {
 
 // Modal management
 const {
-    showExpandModal,
     handleExpandClick,
     closeExpandModal,
     submitExpandedQuery: submitExpandedQueryBase,
@@ -537,7 +548,7 @@ const handleInputClick = (event: MouseEvent) => {
 
 // Override handleEnter to handle stage mode
 const handleEnterWrapped = async () => {
-    if (searchConfig.searchMode === 'stage' && searchBar.searchQuery) {
+    if (searchBar.searchMode === 'stage' && searchBar.searchQuery) {
         emit('stage-enter', searchBar.searchQuery);
         return;
     }
@@ -545,12 +556,25 @@ const handleEnterWrapped = async () => {
 };
 
 const toggleControls = () => {
-    searchConfig.toggleControls();
+    console.log('🍔 Hamburger toggleControls called');
+    console.log('🍔 Current showControls:', searchBar.showSearchControls);
+    searchBar.toggleSearchControls();
+    console.log('🍔 After toggle showControls:', searchBar.showSearchControls);
 };
 
 
 const selectWord = async (word: string) => {
-    await orchestrator.searchWord(word);
+    searchBar.setDirectLookup(true);
+    try {
+        const subMode = searchBar.getSubMode('lookup');
+        if (subMode === 'thesaurus') {
+            await orchestrator.getThesaurusData(word);
+        } else {
+            await orchestrator.getDefinition(word);
+        }
+    } finally {
+        searchBar.setDirectLookup(false);
+    }
 };
 
 const handleForceRegenerate = () => {
@@ -596,10 +620,10 @@ const submitExpandedQuery = (query: string) => {
 
 // Reset selected index when results change
 watchEffect(() => {
-    const results = searchResults.getSearchResults(searchConfig.searchMode);
+    const results = searchBar.currentResults || [];
     
     // Reset selected index if out of bounds
-    const maxResults = searchConfig.searchMode === 'wordlist' ? Math.min(10, results.length) : results.length;
+    const maxResults = searchBar.searchMode === 'wordlist' ? Math.min(10, results.length) : results.length;
     if (searchBar.searchSelectedIndex >= maxResults) {
         searchBar.setSelectedIndex(0);
     }
@@ -617,7 +641,7 @@ const handleClickOutside = (event: MouseEvent) => {
         searchBar.hideControls();
         
         // Trigger blur behavior if search bar is focused
-        if (searchBar.isSearchBarFocused) {
+        if (searchBar.isFocused) {
             // Don't set interaction flag since this is an outside click
             isInteractingWithSearchArea.value = false;
             
@@ -627,7 +651,7 @@ const handleClickOutside = (event: MouseEvent) => {
             
             // Hide search results
             searchBar.hideDropdown();
-            searchResults.clearSearchResults();
+            searchBar.clearResults();
         }
     }
 };
@@ -639,7 +663,7 @@ onMounted(async () => {
     // Watch query changes for immediate search - NO DEBOUNCING
     watch(
         () => searchBar.searchQuery,
-        (newQuery) => {
+        () => {
             // Trigger search immediately for all modes
             performSearch();
             
@@ -651,7 +675,7 @@ onMounted(async () => {
 
     // Watch search results for autocomplete updates
     watch(
-        () => searchResults.getSearchResults('lookup'),
+        () => searchBar.getResults('lookup'),
         () => {
             updateAutocomplete();
             searchBar.setAutocompleteText(autocompleteText.value);
@@ -662,40 +686,28 @@ onMounted(async () => {
     // Watch for AI mode changes from store
     // AI mode is now non-persisted and dynamically determined by query
     
-    // Note: isAIQuery and showSparkle are computed properties from useAIMode composable
+    // Note: isAIQuery and showSparkle are computed properties from search bar store
     // They are automatically reactive and don't need manual assignment
 
-    // Use watchEffect for results visibility - more efficient than computed + watch
+    // Let search operations handle dropdown visibility directly
+    // Only hide dropdown when focus is lost or query is empty
     watchEffect(() => {
-        const focused = searchBar.isSearchBarFocused;
+        const focused = searchBar.isFocused;
         const query = searchBar.searchQuery;
         const isAI = searchBar.isAIQuery;
-        const isDirectLookup = searchBar.isDirectLookup;
         
-        // Check appropriate results based on mode
-        let hasResults = false;
-        if (searchConfig.searchMode === 'wordlist') {
-            hasResults = searchResults.getSearchResults('wordlist').length > 0;
-        } else {
-            hasResults = searchResults.getSearchResults('lookup').length > 0;
-        }
-        
-        const shouldShow = focused && query && query.length > 0 && 
-                          hasResults && 
-                          !isAI && !isDirectLookup;
-        
-        if (shouldShow !== searchBar.showSearchResults) {
-            if (shouldShow) {
-                searchBar.openDropdown();
-            } else {
+        // Only hide dropdown for specific conditions, let search operations show it
+        if (!focused || !query || query.length === 0 || isAI) {
+            if (searchBar.showDropdown) {
+                console.log('🔍 Hiding dropdown - no focus/query or AI mode');
                 searchBar.hideDropdown();
             }
         }
     });
 
     // Check current query for AI mode on page load (in lookup mode only)
-    if (searchConfig.searchMode === 'lookup' && searchBar.searchQuery) {
-        // AI mode is automatically computed by useAIMode composable based on query
+    if (searchBar.searchMode === 'lookup' && searchBar.searchQuery) {
+        // AI mode is automatically computed by search bar store based on query
         shouldTriggerAIMode(searchBar.searchQuery); // Validate query pattern
     }
 

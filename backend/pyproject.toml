@@ -20,35 +20,38 @@ dependencies = [
     # Modern optimized string matching (Rust-backed)
     "rapidfuzz>=3.0.0",
     "jellyfish>=1.2.0",
-    "polyleven>=0.8",      # Rust-backed Levenshtein
+    "polyleven>=0.8", # Rust-backed Levenshtein
     "editdistance>=0.8.1", # C++ backed edit distance
-    "fuzzywuzzy>=0.18.0",  # Used in CLI utils
+    "fuzzywuzzy>=0.18.0", # Used in CLI utils
     # Modern NLP libraries
-
     "contractions>=0.1.73",
     # Optimized data structures
-    "marisa-trie>=1.2.0",   # C++ backed trie
-    "dawg-python>=0.7.2",   # DAWG (Directed Acyclic Word Graph)
+    "marisa-trie>=1.2.0", # C++ backed trie
+    "dawg-python>=0.7.2", # DAWG (Directed Acyclic Word Graph)
     "pyahocorasick>=2.1.0", # C++ Aho-Corasick automaton
-    "xxhash>=3.4.0",        # Fast hash functions
-
+    "xxhash>=3.4.0", # Fast hash functions
     # Essential text processing only
-    "ftfy>=6.1.0",                       # Fix text encoding issues
-    "jinja2>=3.1.0",                     # Lightweight templating for prompts
-    "loguru>=0.7.0",                     # Modern logging with colors and formatting
-    "regex>=2023.0.0",                   # More advanced regex engine
-    "unicodedata2>=15.0.0",              # Fast Unicode normalization
+    "ftfy>=6.1.0", # Fix text encoding issues
+    "jinja2>=3.1.0", # Lightweight templating for prompts
+    "loguru>=0.7.0", # Modern logging with colors and formatting
+    "regex>=2023.0.0", # More advanced regex engine
+    "unicodedata2>=15.0.0", # Fast Unicode normalization
     "coolname>=2.2.0",
-    "hishel>=0.1.0",                     # Modern HTTP caching client
+    "hishel>=0.1.0", # Modern HTTP caching client
     "google-cloud-texttospeech>=2.16.0", # Google Cloud Text-to-Speech API
-    "orjson>=3.10.0",                    # Fast JSON serialization
+    "orjson>=3.10.0", # Fast JSON serialization
     # REST API framework
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
     "python-multipart>=0.0.13",
     "psutil>=7.0.0",
     "nltk>=3.9.1",
-    "pillow>=10.0.0",  # For image processing in definitions
+    "pillow>=10.0.0", # For image processing in definitions
+    # Semantic search dependencies (CPU-only by default)
+    "faiss-cpu>=1.7.4",
+    "sentence-transformers>=3.0.0",
+    "scikit-learn>=1.5.0",
+    "numpy>=1.26.0",
 ]
 
 

@@ -89,15 +89,17 @@ export function useRouterSync() {
     
     // Check if already on target route
     if (mode === 'suggestions') {
-      if (isSameRoute(target.name, undefined, target.query as Record<string, any>)) {
+      const sugTarget = target as { name: string; query: { q: string; mode: string } }
+      if (isSameRoute(sugTarget.name, undefined, sugTarget.query as Record<string, any>)) {
         return
       }
-      router.push(target as any)
+      router.push(sugTarget as any)
     } else {
-      if (isSameRoute(target.name, target.params as Record<string, any>)) {
+      const wordTarget = target as { name: string; params: { word: string }; path: string }
+      if (isSameRoute(wordTarget.name, wordTarget.params as Record<string, any>)) {
         return
       }
-      router.push(target.path as string)
+      router.push(wordTarget.path)
     }
   }
 

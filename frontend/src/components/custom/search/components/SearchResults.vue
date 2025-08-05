@@ -163,7 +163,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
-import type { SearchResult, SearchMethodEnum } from '@/types';
+import type { SearchResult } from '@/types';
 
 interface SearchResultsProps {
     show: boolean;

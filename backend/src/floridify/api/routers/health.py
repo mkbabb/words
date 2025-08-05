@@ -10,8 +10,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from ...caching.cache_manager import get_cache_manager
-from ...constants import Language
 from ...core.search_pipeline import get_search_engine
+from ...models.definition import Language
 from ...storage.mongodb import _ensure_initialized, get_storage
 from ...utils.logging import get_logger
 

@@ -1,23 +1,26 @@
-import { ref, readonly } from 'vue'
+import { defineStore } from 'pinia'
+import { ref, readonly, computed, shallowRef } from 'vue'
+import { dictionaryApi } from '@/api'
+import { normalizeWord } from '@/utils'
+import { CARD_VARIANTS } from '@/types'
 import type { ModeHandler } from '@/stores/types/mode-types'
-import type { SearchMode } from '@/types'
+import type { SearchMode, SearchResult, CardVariant } from '@/types'
 import { 
   PronunciationModes, 
   DEFAULT_CARD_VARIANT, 
   DEFAULT_PRONUNCIATION_MODE,
   DEFAULT_SOURCES,
   DEFAULT_LANGUAGES,
-  type CardVariant,
   type PronunciationMode,
   type DictionarySource,
   type Language
 } from '@/stores/types/constants'
 
 /**
- * Lookup mode unified store
- * Contains all lookup-specific configuration, search bar state, and UI preferences
+ * Unified lookup mode store
+ * Combines configuration, search bar state, UI preferences, and search results
  */
-export function useLookupMode() {
+export const useLookupMode = defineStore('lookupMode', () => {
   // ==========================================================================
   // CONFIGURATION STATE
   // ==========================================================================
@@ -25,6 +28,8 @@ export function useLookupMode() {
   const selectedSources = ref<DictionarySource[]>(DEFAULT_SOURCES)
   const selectedLanguages = ref<Language[]>(DEFAULT_LANGUAGES)
   const noAI = ref(true)
+  const enableSemantic = ref(false)
+  const semanticWeight = ref(0.7)
   
   // ==========================================================================
   // SEARCH BAR STATE
@@ -40,6 +45,27 @@ export function useLookupMode() {
   
   const selectedCardVariant = ref<CardVariant>(DEFAULT_CARD_VARIANT)
   const pronunciationMode = ref<PronunciationMode>(DEFAULT_PRONUNCIATION_MODE)
+  
+  // ==========================================================================
+  // RESULTS STATE
+  // ==========================================================================
+  
+  const results = shallowRef<SearchResult[]>([])
+  const cursorPosition = ref(0)
+  const searchMethod = ref<'exact' | 'fuzzy' | 'semantic' | 'ai' | null>(null)
+  let abortController: AbortController | null = null
+  
+  // ==========================================================================
+  // COMPUTED
+  // ==========================================================================
+  
+  const state = computed(() => ({
+    hasResults: results.value.length > 0,
+    resultCount: results.value.length,
+    currentMethod: searchMethod.value,
+    isSearchActive: abortController !== null,
+    isEmpty: results.value.length === 0,
+  }))
   
   // ==========================================================================
   // CONFIGURATION ACTIONS
@@ -77,6 +103,18 @@ export function useLookupMode() {
   
   const setAI = (enabled: boolean) => {
     noAI.value = !enabled
+  }
+  
+  const toggleSemantic = () => {
+    enableSemantic.value = !enableSemantic.value
+  }
+  
+  const setSemantic = (enabled: boolean) => {
+    enableSemantic.value = enabled
+  }
+  
+  const setSemanticWeight = (weight: number) => {
+    semanticWeight.value = Math.min(1, Math.max(0, weight))
   }
   
   // ==========================================================================
@@ -121,7 +159,7 @@ export function useLookupMode() {
   }
   
   const cycleCardVariant = () => {
-    const variants = Object.values(CardVariants) as CardVariant[]
+    const variants = CARD_VARIANTS as unknown as CardVariant[]
     const currentIndex = variants.indexOf(selectedCardVariant.value)
     const nextIndex = (currentIndex + 1) % variants.length
     selectedCardVariant.value = variants[nextIndex]
@@ -138,19 +176,126 @@ export function useLookupMode() {
   }
   
   // ==========================================================================
+  // RESULTS OPERATIONS
+  // ==========================================================================
+  
+  const setResults = (newResults: SearchResult[], method?: typeof searchMethod.value) => {
+    results.value = [...newResults]
+    if (method) {
+      searchMethod.value = method
+    }
+  }
+  
+  const clearResults = () => {
+    results.value = []
+    searchMethod.value = null
+    cursorPosition.value = 0
+  }
+  
+  const addResults = (newResults: SearchResult[]) => {
+    results.value = [...results.value, ...newResults]
+  }
+  
+  const search = async (query: string): Promise<SearchResult[]> => {
+    const normalizedQuery = normalizeWord(query)
+    
+    // Cancel any existing search
+    cancelSearch()
+    
+    // Create new abort controller
+    abortController = new AbortController()
+    
+    try {
+      console.log(`[LookupMode] Searching for: ${query}`)
+      
+      const searchResults = await dictionaryApi.searchWord(normalizedQuery, {
+        signal: abortController.signal,
+        semantic: enableSemantic.value,
+        semantic_weight: semanticWeight.value
+      })
+      
+      // Store results with method detection
+      const method = detectSearchMethod(searchResults, normalizedQuery)
+      setResults(searchResults, method)
+      
+      console.log(`[LookupMode] Found ${searchResults.length} results using ${method} method`)
+      return searchResults
+      
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        console.log('[LookupMode] Search cancelled')
+        return []
+      }
+      
+      console.error('[LookupMode] Search error:', error)
+      clearResults()
+      throw error
+    } finally {
+      abortController = null
+    }
+  }
+  
+  const cancelSearch = () => {
+    if (abortController) {
+      abortController.abort()
+      abortController = null
+    }
+  }
+  
+  const setCursorPosition = (position: number) => {
+    cursorPosition.value = position
+  }
+  
+  const getResultAt = (index: number): SearchResult | null => {
+    return results.value[index] || null
+  }
+  
+  const findResultByWord = (word: string): SearchResult | null => {
+    return results.value.find(result => result.word.toLowerCase() === word.toLowerCase()) || null
+  }
+  
+  // ==========================================================================
+  // UTILITIES
+  // ==========================================================================
+  
+  const detectSearchMethod = (results: SearchResult[], query: string): typeof searchMethod.value => {
+    if (results.length === 0) return null
+    
+    const normalizedQuery = query.toLowerCase()
+    const exactMatch = results.find(result => result.word.toLowerCase() === normalizedQuery)
+    
+    if (exactMatch) return 'exact'
+    
+    // Check if results are fuzzy matches (similar words)
+    const hasFuzzyMatches = results.some(result => 
+      result.word.toLowerCase().includes(normalizedQuery) || 
+      normalizedQuery.includes(result.word.toLowerCase())
+    )
+    
+    if (hasFuzzyMatches) return 'fuzzy'
+    
+    // If no exact or fuzzy matches, assume semantic/AI
+    return 'semantic'
+  }
+  
+  // ==========================================================================
   // STATE MANAGEMENT
   // ==========================================================================
   
   const getConfig = () => ({
     selectedSources: selectedSources.value,
     selectedLanguages: selectedLanguages.value,
-    noAI: noAI.value
+    noAI: noAI.value,
+    enableSemantic: enableSemantic.value,
+    semanticWeight: semanticWeight.value
   })
   
   const setConfig = (config: any) => {
     if (config.selectedSources) setSources(config.selectedSources)
     if (config.selectedLanguages) setLanguages(config.selectedLanguages)
     if (config.noAI !== undefined) noAI.value = config.noAI
+    if (config.enableSemantic !== undefined) enableSemantic.value = config.enableSemantic
+    if (config.semanticWeight !== undefined) semanticWeight.value = config.semanticWeight
   }
   
   const getSearchBarState = () => ({
@@ -189,6 +334,9 @@ export function useLookupMode() {
     // Reset UI
     selectedCardVariant.value = DEFAULT_CARD_VARIANT
     pronunciationMode.value = DEFAULT_PRONUNCIATION_MODE
+    
+    // Reset results
+    clearResults()
   }
   
   // ==========================================================================
@@ -230,6 +378,8 @@ export function useLookupMode() {
     selectedSources: readonly(selectedSources),
     selectedLanguages: readonly(selectedLanguages),
     noAI: readonly(noAI),
+    enableSemantic: readonly(enableSemantic),
+    semanticWeight: readonly(semanticWeight),
     
     // Search Bar State
     isAIQuery: readonly(isAIQuery),
@@ -240,6 +390,14 @@ export function useLookupMode() {
     selectedCardVariant: readonly(selectedCardVariant),
     pronunciationMode: readonly(pronunciationMode),
     
+    // Results State
+    results: readonly(results),
+    cursorPosition: readonly(cursorPosition),
+    searchMethod: readonly(searchMethod),
+    
+    // Computed
+    state,
+    
     // Configuration Actions
     toggleSource,
     setSources,
@@ -247,6 +405,9 @@ export function useLookupMode() {
     setLanguages,
     toggleAI,
     setAI,
+    toggleSemantic,
+    setSemantic,
+    setSemanticWeight,
     
     // Search Bar Actions
     setAIQuery,
@@ -261,6 +422,16 @@ export function useLookupMode() {
     togglePronunciation,
     setPronunciationMode,
     
+    // Results Operations
+    setResults,
+    clearResults,
+    addResults,
+    search,
+    cancelSearch,
+    setCursorPosition,
+    getResultAt,
+    findResultByWord,
+    
     // State Management
     getConfig,
     setConfig,
@@ -270,7 +441,15 @@ export function useLookupMode() {
     setUIState,
     reset,
     
+    // Utilities
+    detectSearchMethod,
+    
     // Mode Handler
     handler
   }
-}
+}, {
+  persist: {
+    key: 'lookup-mode',
+    pick: ['selectedSources', 'selectedLanguages', 'noAI', 'enableSemantic', 'semanticWeight', 'selectedCardVariant', 'pronunciationMode', 'cursorPosition']
+  }
+})

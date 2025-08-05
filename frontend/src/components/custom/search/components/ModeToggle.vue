@@ -64,7 +64,7 @@ const modelValue = defineModel<LookupMode>({ required: true });
 
 // Initialize router and stores at component level
 const router = useRouter();
-const { searchConfig, searchBar, searchResults, content } = useStores();
+const { searchBar, content } = useStores();
 const { navigateToLookupMode } = useRouterSync();
 
 const handleToggle = async () => {
@@ -78,8 +78,8 @@ const handleToggle = async () => {
         return;
     }
     
-    if (!searchConfig || !searchBar || !searchResults) {
-        console.error('❌ Stores are not available in ModeToggle');
+    if (!searchBar) {
+        console.error('❌ SearchBar store is not available in ModeToggle');
         return;
     }
     
@@ -103,7 +103,7 @@ const handleToggle = async () => {
     modelValue.value = newMode;
     
     // Handle router navigation for definition/thesaurus/suggestions toggle
-    if (searchConfig.searchMode === 'lookup' && searchBar.searchQuery && searchBar.searchQuery.trim()) {
+    if (searchBar.searchMode === 'lookup' && searchBar.searchQuery && searchBar.searchQuery.trim()) {
         const currentWord = searchBar.searchQuery;
         console.log('🧭 Navigation needed for word:', currentWord, 'to mode:', newMode);
         

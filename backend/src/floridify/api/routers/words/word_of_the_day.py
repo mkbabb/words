@@ -202,7 +202,9 @@ async def get_word_batch(
         / max(1, batch.total_words_sent + len(batch.current_batch)),
         "days_active": (datetime.now() - batch.created_at).days,
         "average_words_per_day": batch.total_words_sent
-        / max(1, (datetime.now() - batch.created_at).days) if batch.created_at else 0,
+        / max(1, (datetime.now() - batch.created_at).days)
+        if batch.created_at
+        else 0,
     }
 
     return ResourceResponse(

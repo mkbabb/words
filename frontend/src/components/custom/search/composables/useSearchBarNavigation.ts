@@ -1,7 +1,7 @@
 import { Ref, nextTick } from 'vue';
 import { useMagicKeys, whenever } from '@vueuse/core';
 import { useRouter } from 'vue-router';
-import { useStores } from '@/stores';
+import { useSearchBarStore } from '@/stores/search/search-bar';
 import { showError } from '@/plugins/toast';
 import { extractWordCount } from '../utils/ai-query';
 import type { SearchResult } from '@/types';
@@ -19,7 +19,7 @@ interface UseSearchBarNavigationOptions {
  * Handles keyboard interactions, result navigation, and mode-specific behaviors
  */
 export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
-  const { searchResults, orchestrator, searchBar, searchConfig, ui } = useStores();
+  const searchBar = useSearchBarStore();
   const router = useRouter();
   const { 
     searchInputRef, 
@@ -33,9 +33,13 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
    * Get current results based on search mode
    */
   const getCurrentResults = () => {
-    return searchConfig.searchMode === 'wordlist' 
-      ? searchResults.getSearchResults('wordlist').slice(0, 10)
-      : searchResults.getSearchResults('lookup');
+    if (searchBar.searchMode === 'wordlist') {
+      const wordlistResults = searchBar.getResults('wordlist');
+      return wordlistResults ? wordlistResults.slice(0, 10) : [];
+    } else {
+      const lookupResults = searchBar.getResults('lookup');
+      return lookupResults || [];
+    }
   };
 
   /**
@@ -91,7 +95,7 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
         console.log('Selected wordlist item:', result.word);
         searchBar.setQuery('');
         searchBar.hideDropdown();
-        searchResults.clearSearchResults('wordlist');
+        searchBar.clearResults();
         // TODO: Emit event to scroll to word in list
       },
       
@@ -104,9 +108,21 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
     // Lookup mode handlers
     lookup: {
       selectResult: async (result: SearchResult) => {
-        const routeName = ui.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+        const lookupSubMode = searchBar.getSubMode('lookup');
+        const routeName = lookupSubMode === 'thesaurus' ? 'Thesaurus' : 'Definition';
         router.push({ name: routeName, params: { word: result.word } });
-        await orchestrator.searchWord(result.word);
+        searchBar.setDirectLookup(true);
+        try {
+          if (lookupSubMode === 'thesaurus') {
+            // TODO: Implement thesaurus data fetching
+            console.log('Thesaurus data for:', result.word);
+          } else {
+            // TODO: Implement definition data fetching
+            console.log('Definition data for:', result.word);
+          }
+        } finally {
+          searchBar.setDirectLookup(false);
+        }
       },
       
       handleEnter: async () => {
@@ -115,12 +131,13 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
         // Handle AI query mode
         if (searchBar.isAIQuery && query) {
           try {
-            const extractedCount = extractWordCount(query);
-            const wordSuggestions = await orchestrator.getAISuggestions(query, extractedCount);
+            // const extractedCount = extractWordCount(query);
+            // TODO: Implement AI suggestions fetching with extractedCount
+            const wordSuggestions: any = null; // await aiApi.getAISuggestions(query, extractWordCount(query));
 
-            if (wordSuggestions?.suggestions && wordSuggestions.suggestions.length > 0) {
-              searchConfig.setMode('lookup');
-              searchConfig.setLookupMode('suggestions');
+            if (wordSuggestions?.suggestions?.length > 0) {
+              searchBar.setMode('lookup');
+              searchBar.setSubMode('lookup', 'suggestions');
             } else {
               searchBar.triggerErrorAnimation();
               showError('No word suggestions found for this query');
@@ -138,15 +155,27 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
         const selectedIndex = searchBar.searchSelectedIndex;
         
         if (selectedIndex >= 0 && selectedIndex < results.length) {
-          await modeHandlers.lookup.selectResult(results[selectedIndex]);
+          await modeHandlers.lookup.selectResult(results[selectedIndex] as SearchResult);
           return;
         }
 
         // Direct word lookup
         if (query) {
-          const routeName = ui.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+          const lookupSubMode = searchBar.getSubMode('lookup');
+          const routeName = lookupSubMode === 'thesaurus' ? 'Thesaurus' : 'Definition';
           router.push({ name: routeName, params: { word: query } });
-          await orchestrator.searchWord(query);
+          searchBar.setDirectLookup(true);
+          try {
+            if (lookupSubMode === 'thesaurus') {
+              // TODO: Implement thesaurus data fetching
+              console.log('Thesaurus data for:', query);
+            } else {
+              // TODO: Implement definition data fetching
+              console.log('Definition data for:', query);
+            }
+          } finally {
+            searchBar.setDirectLookup(false);
+          }
         }
       }
     },
@@ -170,7 +199,7 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
    * Select a search result based on current mode
    */
   const selectResult = async (result: SearchResult) => {
-    const handler = modeHandlers[searchConfig.searchMode as keyof typeof modeHandlers];
+    const handler = modeHandlers[searchBar.searchMode as keyof typeof modeHandlers];
     if (handler?.selectResult) {
       await handler.selectResult(result);
     }
@@ -195,7 +224,7 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
     }
 
     // Execute mode-specific handler
-    const handler = modeHandlers[searchConfig.searchMode as keyof typeof modeHandlers];
+    const handler = modeHandlers[searchBar.searchMode as keyof typeof modeHandlers];
     if (handler?.handleEnter) {
       return await handler.handleEnter();
     }
@@ -205,7 +234,7 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
    * Handle Escape key
    */
   const handleEscape = () => {
-    if (searchBar.showSearchControls || searchBar.showSearchResults) {
+    if (searchBar.showSearchControls || searchBar.showDropdown) {
       searchBar.hideControls();
       searchBar.hideDropdown();
     } else {
@@ -222,7 +251,7 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
     
     shortcuts.forEach(shortcut => {
       whenever(keys[shortcut], () => {
-        if (searchBar.isSearchBarFocused && searchInputRef.value) {
+        if (searchBar.isFocused && searchInputRef.value) {
           handleEnter(); // Force refresh handled by orchestrator config
         }
       });

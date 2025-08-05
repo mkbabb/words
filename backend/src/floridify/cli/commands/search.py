@@ -8,8 +8,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from ...constants import Language
 from ...core.search_pipeline import get_search_engine, search_word_pipeline
+from ...models.definition import Language
 from ...utils.logging import get_logger
 from ..utils.formatting import format_error, format_warning
 

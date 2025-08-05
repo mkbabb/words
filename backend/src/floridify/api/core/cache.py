@@ -103,7 +103,7 @@ def cached_endpoint(
                 etag = hashlib.md5(content.encode()).hexdigest()
                 response.headers["ETag"] = f'"{etag}"'
 
-            # Cache the response  
+            # Cache the response
             cache_data = {
                 "data": result.model_dump(mode="json") if isinstance(result, BaseModel) else result,
                 "etag": response.headers.get("ETag", "").strip('"'),

@@ -79,6 +79,23 @@ export interface VocabularySuggestion {
   semantic_category?: string;
 }
 
+export interface WordOfTheDayEntry {
+  id: string;
+  date: string;
+  word: string;
+  definition?: string;
+  pronunciation?: {
+    phonetic: string;
+    ipa: string;
+  };
+  etymology?: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  category: string;
+  usage_example?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface VocabularySuggestionsResponse {
   words: string[];
   confidence: number;

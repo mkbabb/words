@@ -1,98 +1,82 @@
 <template>
-    <div class="space-y-4">
-        <!-- AI Vocabulary Suggestions (at the top) -->
-        <div v-if="vocabularySuggestions.length > 0" class="space-y-3">
-            <h3 class="text-muted-foreground text-sm font-medium">
-                Vocabulary Suggestions
-            </h3>
-            <div class="space-y-2">
-                <VocabularySuggestionItem
-                    v-for="suggestion in vocabularySuggestions.slice(0, 3)"
-                    :key="suggestion.word"
-                    :suggestion="suggestion"
-                    @click="handleSuggestionClick"
-                />
-            </div>
-        </div>
-
-        <!-- Gradient separator -->
-        <hr v-if="vocabularySuggestions.length > 0" class="border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30" />
-
-        <!-- Accordion for other sections -->
+    <div class="space-y-0">
         <Accordion 
             type="multiple" 
             v-model="accordionValue"
-            class="w-full"
+            :collapsible="true"
         >
-            <!-- Recent AI Suggestions -->
-            <GoldenSidebarSection
-                v-if="recentAISuggestions.length > 0"
-                title="AI Suggestions"
-                value="ai-suggestions"
-                :items="recentAISuggestions"
-                :count="recentAISuggestions.length"
-                :icon="Wand2"
-                empty-message="No recent AI suggestions"
-            >
-                <template #default="{ items }">
-                    <SidebarRecentItem
-                        v-for="suggestion in items"
-                        :key="`${suggestion.query}-${suggestion.timestamp}`"
-                        :item="suggestion"
-                        :title="suggestion.query"
-                        :timestamp="suggestion.timestamp"
-                        @click="handleAISuggestionClick"
-                    />
-                </template>
-            </GoldenSidebarSection>
-
-            <!-- Gradient separator -->
-            <hr v-if="recentAISuggestions.length > 0" class="my-2 border-0 h-px bg-gradient-to-r from-transparent via-yellow-400/20 to-transparent dark:via-yellow-400/30" />
-
             <!-- Recent Lookups -->
             <SidebarSection
-                title="Lookups"
-                value="lookups"
+                value="recent"
+                title="Recent Lookups"
                 :items="recentLookups"
-                :count="recentLookups.length"
-                :icon="Book"
-                empty-message="No recent lookups"
+                :empty-message="'No recent lookups'"
             >
-                <template #default="{ items }">
+                <template #item="{ item }">
                     <SidebarRecentItem
-                        v-for="lookup in items"
-                        :key="lookup.word"
-                        :item="lookup"
-                        :title="lookup.word"
-                        :subtitle="getFirstDefinition(lookup)"
-                        :timestamp="lookup.timestamp"
-                        @click="handleLookupClick"
+                        :item="item"
+                        :title="item.word"
+                        :subtitle="getFirstDefinition(item)"
+                        :timestamp="item.timestamp"
+                        @click="handleLookupClick(item)"
                     />
                 </template>
             </SidebarSection>
 
-            <!-- Gradient separator -->
-            <hr class="my-2 border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30" />
+            <!-- AI Query History -->
+            <SidebarSection
+                value="ai-queries"
+                title="AI Queries"
+                :items="recentAISuggestions"
+                :empty-message="'No AI queries yet'"
+            >
+                <template #item="{ item }">
+                    <button
+                        class="flex w-full items-start gap-3 rounded px-3 py-2.5 hover:bg-muted/50 text-left"
+                        @click="handleAISuggestionClick(item)"
+                    >
+                        <Sparkles class="mt-0.5 h-3.5 w-3.5 text-amber-500 dark:text-amber-400 flex-shrink-0" />
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs leading-relaxed text-foreground/90 line-clamp-2">
+                                {{ item.query }}
+                            </p>
+                        </div>
+                    </button>
+                </template>
+            </SidebarSection>
+
+            <!-- Vocabulary Suggestions -->
+            <GoldenSidebarSection
+                value="vocabulary"
+                title="Vocabulary Building"
+                :items="vocabularySuggestions"
+                :empty-message="'Look up words to get personalized suggestions'"
+            >
+                <template #item="{ item }">
+                    <VocabularySuggestionItem
+                        :suggestion="item"
+                        @click="handleSuggestionClick(item)"
+                    />
+                </template>
+            </GoldenSidebarSection>
 
             <!-- Recent Searches -->
             <SidebarSection
-                title="Searches"
                 value="searches"
+                title="Recent Searches"
                 :items="recentSearches"
-                :count="recentSearches.length"
-                :icon="Search"
-                empty-message="No recent searches"
+                :empty-message="'No recent searches'"
             >
-                <template #default="{ items }">
-                    <SidebarRecentItem
-                        v-for="search in items"
-                        :key="`${search.query}-${search.timestamp}`"
-                        :item="search"
-                        :title="search.query"
-                        :subtitle="search.mode ? `${capitalizeFirst(search.mode)} search` : undefined"
-                        :timestamp="search.timestamp"
-                        @click="handleSearchClick"
-                    />
+                <template #item="{ item }">
+                    <button
+                        class="flex w-full items-start gap-3 rounded px-3 py-2.5 hover:bg-muted/50 text-left"
+                        @click="handleSearchClick(item)"
+                    >
+                        <Search class="mt-0.5 h-3.5 w-3.5 text-foreground/40 flex-shrink-0" />
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs text-foreground/70">{{ item.query }}</p>
+                        </div>
+                    </button>
                 </template>
             </SidebarSection>
         </Accordion>
@@ -102,20 +86,28 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useRouter } from 'vue-router';
 import { useStores } from '@/stores';
+import { useSearchBarStore } from '@/stores/search/search-bar';
+// import { useLookupMode } from '@/stores/search/modes/lookup'; // Unused
+import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
+import { useRouter } from 'vue-router';
 import { Accordion } from '@/components/ui/accordion';
-import { Book, Search, Wand2 } from 'lucide-vue-next';
-import { capitalizeFirst } from '@/utils';
+import { Search, Sparkles } from 'lucide-vue-next';
 import SidebarSection from './SidebarSection.vue';
 import GoldenSidebarSection from './GoldenSidebarSection.vue';
 import SidebarRecentItem from './SidebarRecentItem.vue';
 import VocabularySuggestionItem from './VocabularySuggestionItem.vue';
 import type { SynthesizedDictionaryEntry } from '@/types';
 
-const { history, orchestrator, ui, searchBar, searchConfig, content } = useStores();
+const { history, ui, content } = useStores();
+const searchBar = useSearchBarStore();
 const router = useRouter();
 const { recentLookups, vocabularySuggestions, recentSearches, aiQueryHistory } = storeToRefs(history);
+
+// Create orchestrator for API operations
+const orchestrator = useSearchOrchestrator({
+    query: computed(() => searchBar.searchQuery)
+});
 
 // Computed property to format AI query history for display
 const recentAISuggestions = computed(() => 
@@ -127,7 +119,7 @@ const recentAISuggestions = computed(() =>
 
 // Accordion state management - default to collapsed (empty array)
 const accordionValue = computed({
-    get: () => content.sidebarAccordionState.lookup || [],
+    get: () => (content.sidebarAccordionState.lookup || []) as string[],
     set: (value) => {
         content.setSidebarAccordionState('lookup', value as string[]);
     }
@@ -145,10 +137,16 @@ const handleLookupClick = async (lookup: SynthesizedDictionaryEntry) => {
     searchBar.setQuery(lookup.word);
     
     // Navigate to appropriate route based on mode
-    const routeName = ui.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+    const subMode = searchBar.getSubMode('lookup');
+    const routeName = subMode === 'thesaurus' ? 'Thesaurus' : 'Definition';
     router.push({ name: routeName, params: { word: lookup.word } });
     
-    await orchestrator.searchWord(lookup.word);
+    searchBar.setDirectLookup(true);
+    try {
+        await orchestrator.getDefinition(lookup.word);
+    } finally {
+        searchBar.setDirectLookup(false);
+    }
     // Close mobile sidebar if open
     if (ui.sidebarOpen) {
         ui.toggleSidebar();
@@ -158,14 +156,19 @@ const handleLookupClick = async (lookup: SynthesizedDictionaryEntry) => {
 const handleSuggestionClick = async (suggestion: { word: string }) => {
     searchBar.setQuery(suggestion.word);
     
-    // ✅ Use simple mode system - just change the modes
-    searchConfig.setMode('lookup');
-    searchConfig.setLookupMode('dictionary');
+    // Use modern mode system - just change the modes
+    searchBar.setMode('lookup');
+    searchBar.setSubMode('lookup', 'dictionary');
     
     // Navigate to Definition route
     router.push({ name: 'Definition', params: { word: suggestion.word } });
     
-    await orchestrator.searchWord(suggestion.word);
+    searchBar.setDirectLookup(true);
+    try {
+        await orchestrator.getDefinition(suggestion.word);
+    } finally {
+        searchBar.setDirectLookup(false);
+    }
     // Close mobile sidebar if open
     if (ui.sidebarOpen) {
         ui.toggleSidebar();
@@ -175,11 +178,17 @@ const handleSuggestionClick = async (suggestion: { word: string }) => {
 
 const handleSearchClick = async (search: { query: string }) => {
     // Navigate to appropriate route based on mode
-    const routeName = ui.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+    const subMode = searchBar.getSubMode('lookup');
+    const routeName = subMode === 'thesaurus' ? 'Thesaurus' : 'Definition';
     router.push({ name: routeName, params: { word: search.query } });
     
-    // Use the centralized searchWord action which handles dropdown hiding
-    await orchestrator.searchWord(search.query);
+    // Use the direct search action which handles dropdown hiding
+    searchBar.setDirectLookup(true);
+    try {
+        await orchestrator.getDefinition(search.query);
+    } finally {
+        searchBar.setDirectLookup(false);
+    }
     
     // Close mobile sidebar if open
     if (ui.sidebarOpen) {
@@ -188,9 +197,9 @@ const handleSearchClick = async (search: { query: string }) => {
 };
 
 const handleAISuggestionClick = async (suggestion: { query: string }) => {
-    // ✅ Use simple mode system - just change the modes
-    searchConfig.setMode('lookup');
-    searchConfig.setLookupMode('suggestions');
+    // Use modern mode system - just change the modes
+    searchBar.setMode('lookup');
+    searchBar.setSubMode('lookup', 'suggestions');
     
     // Navigate to home to display suggestions
     router.push({ name: 'Home' });
@@ -243,61 +252,73 @@ onMounted(async () => {
                 word_id: `test-${word}`,
                 definitions: [{
                     id: `def-${word}`,
-                    word_id: `test-${word}`,
                     text: `Sample definition for ${word}`,
-                    part_of_speech: 'adjective',
+                    part_of_speech: 'adjective' as const,
+                    word_id: `test-${word}`,
+                    word_forms: [],
+                    example_ids: [],
+                    image_ids: [],
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    cefr_level: null,
+                    frequency_band: null,
+                    meaning_cluster: null,
+                    language_register: null,
+                    grammar_patterns: [],
+                    collocations: [],
+                    usage_notes: [],
+                    regional_variants: [],
                     examples: [],
                     images: [],
                     providers_data: []
                 }],
-                synonyms: [],
-                antonyms: [],
-                facts: [],
-                images: [],
-                pronunciations: [],
-                etymology: null,
-                version: 1
-            };
+                last_updated: new Date().toISOString(),
+                lookup_count: 1
+            } as unknown as SynthesizedDictionaryEntry;
             
-            history.addToLookupHistory(word, mockEntry as any);
+            history.addToLookupHistory(word, mockEntry);
         }
         
-        console.log('📝 Added', sampleWords.length, 'test lookups. New count:', history.recentLookups.length);
+        console.log('✅ Added sample lookup history. Recent lookups:', history.recentLookups.length);
     }
     
-    // Always try to refresh vocabulary suggestions
-    try {
-        console.log('🔄 Attempting to refresh vocabulary suggestions...');
-        await history.refreshVocabularySuggestions(true); // Force refresh
-        console.log('✅ Vocabulary suggestions refreshed. Count:', history.vocabularySuggestions.length);
+    // Check if we need to initialize vocabulary suggestions
+    if (history.vocabularySuggestions.length === 0 && history.recentLookups.length > 0) {
+        console.log('🌟 Attempting to generate vocabulary suggestions...');
         
-        if (history.vocabularySuggestions.length === 0) {
-            console.warn('⚠️ No vocabulary suggestions returned from API');
-        }
-    } catch (error) {
-        console.error('❌ Failed to refresh vocabulary suggestions:', error);
-        
-        // If API fails, create some fallback suggestions based on recent lookups
-        console.log('🔄 Creating fallback vocabulary suggestions...');
-        const fallbackSuggestions = history.recentLookupWords.slice(0, 3).map(word => ({
-            word: `related-${word}`,
-            reasoning: `A word related to ${word}`,
-            difficulty_level: 3,
-            semantic_category: 'general'
-        }));
-        
-        // Manually set some test suggestions for development
-        if (fallbackSuggestions.length === 0) {
-            const devSuggestions = [
-                { word: 'mellifluous', reasoning: 'A beautiful word meaning sweet-sounding', difficulty_level: 4, semantic_category: 'descriptive' },
-                { word: 'ineffable', reasoning: 'Something too great to be expressed in words', difficulty_level: 5, semantic_category: 'abstract' },
-                { word: 'susurrus', reasoning: 'A soft murmuring or rustling sound', difficulty_level: 4, semantic_category: 'sensory' }
-            ];
+        try {
+            await history.refreshVocabularySuggestions();
+            const response = { suggestions: history.vocabularySuggestions };
             
-            console.log('📝 Using development vocabulary suggestions:', devSuggestions);
-            // For now, just log them - in a real scenario we'd need to set them in the store
+            if (response && response.suggestions && response.suggestions.length > 0) {
+                console.log('✅ Successfully generated vocabulary suggestions:', response.suggestions.length);
+            } else {
+                console.log('⚠️ No vocabulary suggestions generated from API');
+            }
+        } catch (error) {
+            console.error('❌ Failed to generate vocabulary suggestions:', error);
+            
+            // If API fails, create some fallback suggestions based on recent lookups
+            console.log('🔄 Creating fallback vocabulary suggestions...');
+            const fallbackSuggestions = history.recentLookupWords.slice(0, 3).map(word => ({
+                word: word + '-related',
+                reason: `Explore words related to "${word}"`,
+                difficulty: 'intermediate' as const,
+                relevance_score: 0.8
+            }));
+            
+            // Note: Cannot directly set vocabulary suggestions as there's no setter method
+            // The fallback suggestions will be used only if the API fails
+            console.log('⚠️ Fallback suggestions created but cannot be directly set:', fallbackSuggestions);
+            
+            if (fallbackSuggestions.length === 0) {
+                console.log('💡 No recent lookups available for fallback suggestions');
+            } else {
+                console.log('✅ Created fallback vocabulary suggestions:', fallbackSuggestions.length);
+            }
         }
+    } else {
+        console.log('📚 Vocabulary suggestions already present:', history.vocabularySuggestions.length);
     }
 });
-
 </script>

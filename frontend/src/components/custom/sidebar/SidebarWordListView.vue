@@ -124,7 +124,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useStores } from '@/stores';
+// import { useStores } from '@/stores'; // Unused
+import { useSearchBarStore } from '@/stores/search/search-bar';
+import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { 
   FileText, 
   Plus, 
@@ -139,7 +141,8 @@ import type { WordList } from '@/types';
 import { wordlistApi } from '@/api';
 import { useToast } from '@/components/ui/toast/use-toast';
 
-const { searchConfig } = useStores();
+const searchBarStore = useSearchBarStore();
+const wordlistMode = useWordlistMode();
 const { toast } = useToast();
 
 // Component state
@@ -164,7 +167,7 @@ const activeUploads = ref<Array<{
 const isLoading = ref(false);
 
 // Computed properties
-const selectedWordlist = computed(() => searchConfig.selectedWordlist);
+const selectedWordlist = computed(() => wordlistMode.selectedWordlist);
 
 // Methods
 const onDrop = (event: DragEvent) => {
@@ -288,12 +291,12 @@ const loadWordlists = async () => {
     wordlists.value = response.items.map(transformWordlistFromAPI);
     
     // Auto-select first wordlist if none selected and wordlists exist
-    if (!selectedWordlist.value && wordlists.value.length > 0) {
+    if (!selectedWordlist && wordlists.value.length > 0) {
       console.log('Auto-selecting first wordlist:', wordlists.value[0].name, 'ID:', wordlists.value[0].id);
-      searchConfig.setWordlist(wordlists.value[0].id);
+      wordlistMode.setWordlist(wordlists.value[0].id);
     } else {
       console.log('Wordlist selection state:', {
-        selectedWordlist: selectedWordlist.value,
+        selectedWordlist: selectedWordlist,
         wordlistsCount: wordlists.value.length,
         firstWordlistId: wordlists.value[0]?.id
       });
@@ -306,9 +309,9 @@ const loadWordlists = async () => {
 };
 
 const handleWordlistSelect = async (wordlist: WordList) => {
-  searchConfig.setWordlist(wordlist.id);
+  wordlistMode.setWordlist(wordlist.id);
   // ✅ Use simple mode system - just change the mode
-  searchConfig.setMode('wordlist');
+  searchBarStore.setMode('wordlist');
 };
 
 const handleWordlistEdit = (wordlist: WordList) => {
@@ -351,9 +354,9 @@ const confirmDelete = async () => {
     wordlists.value = wordlists.value.filter(w => w.id !== wordlistToDelete.value!.id);
     
     // Handle graceful fallback if deleted wordlist was selected
-    if (selectedWordlist.value === wordlistToDelete.value.id) {
+    if (selectedWordlist.value === wordlistToDelete.value?.id) {
       const firstWordlist = wordlists.value[0];
-      searchConfig.setWordlist(firstWordlist?.id || null);
+      wordlistMode.setWordlist(firstWordlist?.id || null);
     }
     
     toast({
@@ -404,9 +407,9 @@ const handleUploadCancel = () => {
 
 const handleWordlistCreated = async (wordlist: WordList) => {
   wordlists.value.unshift(wordlist);
-  searchConfig.setWordlist(wordlist.id);
+  wordlistMode.setWordlist(wordlist.id);
   // ✅ Use simple mode system - just change the mode
-  searchConfig.setMode('wordlist');
+  searchBarStore.setMode('wordlist');
 };
 
 // Lifecycle

@@ -92,9 +92,7 @@ def get_model_for_task(task_name: str, override: ModelTier | None = None) -> Mod
     return COMPLEXITY_TO_MODEL[complexity]
 
 
-def get_temperature_for_model(
-    model: ModelTier, task_name: str | None = None
-) -> float | None:
+def get_temperature_for_model(model: ModelTier, task_name: str | None = None) -> float | None:
     """
     Get appropriate temperature for a model and task.
 

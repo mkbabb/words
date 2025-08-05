@@ -1,6 +1,7 @@
 import { ref, readonly, shallowRef } from 'vue'
+import { dictionaryApi } from '@/api'
 import type { LookupContentState, ModeHandler } from '@/stores/types/mode-types'
-import type { SearchMode, SynthesizedDictionaryEntry, ThesaurusEntry, WordSuggestionResponse } from '@/types'
+import type { SearchMode, SynthesizedDictionaryEntry, ThesaurusEntry, WordSuggestionResponse, Definition } from '@/types'
 
 /**
  * Lookup mode content state
@@ -16,6 +17,9 @@ export function useLookupContentState() {
   const wordSuggestions = shallowRef<WordSuggestionResponse | null>(null)
   const partialEntry = shallowRef<Partial<SynthesizedDictionaryEntry> | null>(null)
   const isStreamingData = ref(false)
+  
+  // Operation state
+  const regeneratingDefinitionIndex = ref<number | null>(null)
   
   // ==========================================================================
   // ACTIONS
@@ -45,6 +49,7 @@ export function useLookupContentState() {
     currentEntry.value = null
     currentThesaurus.value = null
     partialEntry.value = null
+    regeneratingDefinitionIndex.value = null
   }
   
   const clearWordSuggestions = () => {
@@ -73,6 +78,101 @@ export function useLookupContentState() {
     wordSuggestions.value = null
     partialEntry.value = null
     isStreamingData.value = false
+    regeneratingDefinitionIndex.value = null
+  }
+  
+  // ==========================================================================
+  // CONTENT OPERATIONS
+  // ==========================================================================
+  
+  const updateDefinition = async (definitionId: string, updates: Partial<Definition>) => {
+    const response = await dictionaryApi.updateDefinition(definitionId, updates)
+    
+    if (currentEntry.value?.definitions?.some(def => def.id === definitionId)) {
+      const updatedEntry = {
+        ...currentEntry.value,
+        definitions: currentEntry.value.definitions.map(def => 
+          def.id === definitionId ? { ...def, ...response } : def
+        )
+      }
+      setCurrentEntry(updatedEntry)
+    }
+    
+    return response
+  }
+
+  const updateExample = async (_definitionId: string, exampleId: string, newText: string) => {
+    const response = await dictionaryApi.updateExample(exampleId, { text: newText })
+    
+    if (currentEntry.value) {
+      // For now, just trigger a refresh since nested updates are complex
+      const updatedEntry = { ...currentEntry.value }
+      setCurrentEntry(updatedEntry)
+    }
+    
+    return response
+  }
+
+  const regenerateDefinitionComponent = async (definitionId: string, component: 'definition' | 'examples' | 'usage_notes') => {
+    const response = await dictionaryApi.regenerateDefinitionComponent(definitionId, component)
+    
+    if (currentEntry.value) {
+      const updatedEntry = {
+        ...currentEntry.value,
+        definitions: currentEntry.value.definitions?.map(def => 
+          def.id === definitionId 
+            ? { ...def, [component]: response[component] } 
+            : def
+        )
+      }
+      setCurrentEntry(updatedEntry)
+    }
+    
+    return response
+  }
+
+  const regenerateExamples = async (definitionIndex: number) => {
+    if (!currentEntry.value?.definitions?.[definitionIndex]) return
+    
+    // Prevent concurrent operations
+    if (regeneratingDefinitionIndex.value !== null) return
+    
+    const definition = currentEntry.value.definitions[definitionIndex]
+    regeneratingDefinitionIndex.value = definitionIndex
+    
+    try {
+      const response = await dictionaryApi.regenerateExamples(
+        currentEntry.value.word,
+        definitionIndex
+      )
+      
+      const updatedEntry = { ...currentEntry.value }
+      if (updatedEntry.definitions) {
+        updatedEntry.definitions[definitionIndex] = {
+          ...definition,
+          examples: response.examples as any
+        }
+        setCurrentEntry(updatedEntry)
+      }
+      
+      return response
+    } finally {
+      regeneratingDefinitionIndex.value = null
+    }
+  }
+
+  const refreshEntryImages = async () => {
+    if (!currentEntry.value) return
+    
+    const response = await dictionaryApi.refreshSynthEntry(currentEntry.value.word)
+    
+    const updatedEntry = {
+      ...currentEntry.value,
+      ...response
+    } as SynthesizedDictionaryEntry
+    
+    setCurrentEntry(updatedEntry)
+    return response
   }
   
   // ==========================================================================
@@ -110,6 +210,7 @@ export function useLookupContentState() {
     wordSuggestions: readonly(wordSuggestions),
     partialEntry: readonly(partialEntry),
     isStreamingData: readonly(isStreamingData),
+    regeneratingDefinitionIndex: readonly(regeneratingDefinitionIndex),
     
     // Actions
     setCurrentEntry,
@@ -119,6 +220,13 @@ export function useLookupContentState() {
     setStreamingState,
     clearCurrentEntry,
     clearWordSuggestions,
+    
+    // Content operations
+    updateDefinition,
+    updateExample,
+    regenerateDefinitionComponent,
+    regenerateExamples,
+    refreshEntryImages,
     
     // State management
     getState,

@@ -121,7 +121,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useContentStore, useNotificationStore } from '@/stores';
-import { useDefinitionEditMode } from '@/composables';
+import { useDefinitionEditMode } from '../composables';
 import type { TransformedDefinition } from '@/types';
 import ExampleListEditable from './ExampleListEditable.vue';
 import SynonymListEditable from './SynonymListEditable.vue';

@@ -12,10 +12,10 @@ from pydantic import BaseModel, Field
 
 from ...api.services.loaders import SynthesizedDictionaryEntryLoader
 from ...caching import cached_api_call_with_dedup
-from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, StateTracker
 from ...core.streaming import create_streaming_response
+from ...models.definition import DictionaryProvider, Language
 from ...storage.mongodb import get_synthesized_entry
 from ...utils.logging import get_logger
 from ...utils.sanitization import validate_word_input
@@ -142,7 +142,7 @@ async def _cached_lookup(word: str, params: LookupParams) -> DictionaryEntryResp
         response_dict = await SynthesizedDictionaryEntryLoader.load_as_lookup_response(
             entry=entry,
         )
-        
+
         return DictionaryEntryResponse(**response_dict)
     except Exception as e:
         logger.error(f"Error creating LookupResponse: {e}")
@@ -219,10 +219,11 @@ async def _lookup_with_tracking(
 
         # Unified cache check: decorator cache first, then MongoDB
         logger.info(f"🔍 Checking unified cache for '{word}', force_refresh={params.force_refresh}")
-        
+
         if not params.force_refresh:
             # First check decorator cache (memory/file) - same as normal endpoint
             from ...caching.cache_manager import get_cache_manager
+
             cache_manager = get_cache_manager()
             key_parts = (
                 "api_lookup",
@@ -232,45 +233,61 @@ async def _lookup_with_tracking(
                 tuple(params.providers),
                 params.no_ai,
             )
-            
+
             cached_result = cache_manager.get(key_parts, use_file_cache=False)
             if cached_result is not None:
                 logger.info(f"🎯 Memory cache hit for '{word}'")
                 # Real streaming progress for cached result
                 await state_tracker.update_stage(Stages.START)
-                await state_tracker.update(stage=Stages.START, message=f"Starting lookup for '{word}'...")
+                await state_tracker.update(
+                    stage=Stages.START, message=f"Starting lookup for '{word}'..."
+                )
                 await state_tracker.update_stage(Stages.SEARCH_START)
-                await state_tracker.update(stage=Stages.SEARCH_START, message="Loading from cache...")
+                await state_tracker.update(
+                    stage=Stages.SEARCH_START, message="Loading from cache..."
+                )
                 await state_tracker.update_stage(Stages.SEARCH_COMPLETE)
                 await state_tracker.update_stage(Stages.COMPLETE)
-                await state_tracker.update_complete(message=f"Found {len(cached_result.definitions)} definitions (cached)")
+                await state_tracker.update_complete(
+                    message=f"Found {len(cached_result.definitions)} definitions (cached)"
+                )
                 return cached_result
-                
+
             # Then check MongoDB cache
             existing = await get_synthesized_entry(word)
             if existing:
                 logger.info(f"📋 DB cache hit for '{word}'")
                 # Real streaming progress for DB cached result
                 await state_tracker.update_stage(Stages.START)
-                await state_tracker.update(stage=Stages.START, message=f"Starting lookup for '{word}'...")
+                await state_tracker.update(
+                    stage=Stages.START, message=f"Starting lookup for '{word}'..."
+                )
                 await state_tracker.update_stage(Stages.SEARCH_START)
-                await state_tracker.update(stage=Stages.SEARCH_START, message="Loading from database cache...")
+                await state_tracker.update(
+                    stage=Stages.SEARCH_START, message="Loading from database cache..."
+                )
                 await state_tracker.update_stage(Stages.SEARCH_COMPLETE)
-                await state_tracker.update(stage=Stages.COMPLETE, progress=90, message="Converting cached entry...")
-                
+                await state_tracker.update(
+                    stage=Stages.COMPLETE, progress=90, message="Converting cached entry..."
+                )
+
                 # Convert MongoDB entry to response format
-                response_dict = await SynthesizedDictionaryEntryLoader.load_as_lookup_response(entry=existing)
+                response_dict = await SynthesizedDictionaryEntryLoader.load_as_lookup_response(
+                    entry=existing
+                )
                 result = DictionaryEntryResponse(**response_dict)
-                
+
                 # Store in memory cache for next time
                 cache_manager.set(key_parts, result, ttl_hours=1.0, use_file_cache=False)
-                
-                await state_tracker.update_complete(message=f"Found {len(result.definitions)} definitions (DB cached)")
+
+                await state_tracker.update_complete(
+                    message=f"Found {len(result.definitions)} definitions (DB cached)"
+                )
                 return result
 
         # No cache hit - run full pipeline with real progress tracking
         logger.info(f"Cache miss - running full lookup pipeline for '{word}'")
-        
+
         await state_tracker.update_stage(Stages.START)
         await state_tracker.update(stage=Stages.START, message=f"Starting lookup for '{word}'...")
 

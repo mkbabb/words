@@ -8,11 +8,10 @@ from beanie.odm.enums import SortDirection
 from beanie.operators import RegEx
 from pydantic import BaseModel, Field
 
-from ...constants import Language
-from ...models.models import Word
-from ...search.corpus import invalidate_wordlist_corpus, invalidate_wordlist_names_corpus
+from ...core.corpus_manager import CorpusManager, CorpusType, get_corpus_manager
+from ...models.definition import Language, Word
+from ...text import normalize_word
 from ...utils.logging import get_logger
-from ...utils.text_utils import normalize_word
 from ...wordlist.constants import MasteryLevel, Temperature
 from ...wordlist.models import WordList, WordListItem
 from ...wordlist.utils import generate_wordlist_hash
@@ -124,6 +123,13 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
     def __init__(self) -> None:
         super().__init__(WordList)
         self.corpus_repo = CorpusRepository()
+        self._corpus_manager: CorpusManager | None = None
+    
+    async def _get_corpus_manager(self) -> CorpusManager:
+        """Get or create corpus manager instance."""
+        if self._corpus_manager is None:
+            self._corpus_manager = await get_corpus_manager()
+        return self._corpus_manager
 
     async def find_by_name(self, name: str, owner_id: str | None = None) -> WordList | None:
         """Find word list by name and optional owner."""
@@ -185,20 +191,21 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             wordlist.add_words(word_ids)
 
         await wordlist.create()
-        
+
         # Only invalidate corpus cache if there were existing wordlists
         # If this is the first wordlist, there's no corpus to invalidate
         existing_count = await WordList.count()
         if existing_count > 1:  # More than just the one we just created
             logger.debug(f"Invalidating wordlist names corpus (total wordlists: {existing_count})")
-            await invalidate_wordlist_names_corpus()
+            corpus_manager = await self._get_corpus_manager()
+            await corpus_manager.invalidate_corpus(CorpusType.WORDLIST_NAMES, "global")
         else:
             logger.debug("Skipping corpus invalidation - this is the first wordlist")
-        
+
         # Create corpus for this wordlist's words immediately
         if data.words:
             await self._create_wordlist_corpus(wordlist)
-        
+
         return wordlist
 
     async def _batch_get_or_create_words(self, word_texts: list[str]) -> list[PydanticObjectId]:
@@ -271,27 +278,28 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
     async def _create_wordlist_corpus(self, wordlist: WordList) -> None:
         """Create corpus for wordlist words immediately upon creation."""
-        from ...search.corpus import get_corpus_cache
-        
         # Get Word documents for this wordlist
         word_ids = [w.word_id for w in wordlist.words if w.word_id]
         if not word_ids:
             return
-            
+
         words = await Word.find({"_id": {"$in": word_ids}}).to_list()
         word_texts = [word.text for word in words if word.text]
-        
+
         if not word_texts:
             return
-            
-        # Create corpus with no TTL (ttl_hours=None means no expiration)
-        cache = await get_corpus_cache()
-        corpus_id = cache.create_corpus(
+
+        # Create unified corpus with automatic semantic embeddings for small corpora
+        corpus_manager = await self._get_corpus_manager()
+        internal_corpus_id = await corpus_manager.create_corpus(
+            corpus_type=CorpusType.WORDLIST,
+            corpus_id=str(wordlist.id),
             words=word_texts,
-            name=wordlist.get_words_corpus_name(),
-            ttl_hours=None,  # No expiration
+            ttl_hours=None,  # No expiration for wordlist corpora
         )
-        logger.debug(f"Created corpus {corpus_id[:8]} for wordlist {wordlist.id} with {len(word_texts)} words")
+        logger.debug(
+            f"Created unified corpus {internal_corpus_id[:8]} for wordlist {wordlist.id} with {len(word_texts)} words"
+        )
 
     async def add_word(self, wordlist_id: PydanticObjectId, request: WordAddRequest) -> WordList:
         """Add words to an existing word list."""
@@ -305,10 +313,11 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         wordlist.add_words(word_ids)
         wordlist.mark_accessed()
         await wordlist.save()
-        
+
         # Invalidate corpus cache for this wordlist since words changed
-        await invalidate_wordlist_corpus(wordlist_id)
-        
+        corpus_manager = await self._get_corpus_manager()
+        await corpus_manager.invalidate_corpus(CorpusType.WORDLIST, str(wordlist_id))
+
         return wordlist
 
     async def remove_word(
@@ -324,38 +333,42 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         wordlist.update_stats()
         wordlist.mark_accessed()
         await wordlist.save()
-        
+
         # Invalidate corpus cache for this wordlist since words changed
-        await invalidate_wordlist_corpus(wordlist_id)
-        
+        corpus_manager = await self._get_corpus_manager()
+        await corpus_manager.invalidate_corpus(CorpusType.WORDLIST, str(wordlist_id))
+
         return wordlist
 
-    async def update(self, id: PydanticObjectId, data: WordListUpdate, version: int | None = None) -> WordList:
+    async def update(
+        self, id: PydanticObjectId, data: WordListUpdate, version: int | None = None
+    ) -> WordList:
         """Update a wordlist and invalidate name corpus cache if name changed."""
         # Get the original wordlist to check if name changed
         original_wordlist = await self.get(id, raise_on_missing=True)
         assert original_wordlist is not None
         original_name = original_wordlist.name
-        
+
         # Use parent's update method
         updated_wordlist = await super().update(id, data, version)
-        
+
         # Invalidate name corpus cache if name changed
         if data.name and data.name != original_name:
-            from ..routers.wordlists.utils import invalidate_wordlist_names_corpus
-            await invalidate_wordlist_names_corpus()
-        
+            corpus_manager = await self._get_corpus_manager()
+            await corpus_manager.invalidate_corpus(CorpusType.WORDLIST_NAMES, "global")
+
         return updated_wordlist
 
     async def delete(self, id: PydanticObjectId, cascade: bool = False) -> bool:
         """Delete a wordlist and invalidate corpus caches."""
         # Call parent's delete method
         result = await super().delete(id, cascade)
-        
-        # Invalidate both corpus caches
-        await invalidate_wordlist_corpus(id)
-        await invalidate_wordlist_names_corpus()
-        
+
+        # Invalidate both corpus caches using unified manager
+        corpus_manager = await self._get_corpus_manager()
+        await corpus_manager.invalidate_corpus(CorpusType.WORDLIST, str(id))
+        await corpus_manager.invalidate_corpus(CorpusType.WORDLIST_NAMES, "global")
+
         return result
 
     async def review_word(
@@ -525,7 +538,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         # Use JSON mode for proper serialization, but work with ObjectIds directly
         wordlist_dict = wordlist.model_dump(mode="json")
-        
+
         # Create a string-based lookup map for JSON-serialized ObjectIds
         word_text_map_str = {str(word_id): text for word_id, text in word_text_map.items()}
 

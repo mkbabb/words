@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from rich.console import Console, Group
@@ -16,15 +17,116 @@ from rich.progress import (
 from rich.table import Table
 from rich.text import Text
 
-from ...constants import DictionaryProvider, Language
 from ...models import Definition, SynthesizedDictionaryEntry
+from ...models.definition import DictionaryProvider, Language
 from ...search import SearchResult
 from ...search.constants import SearchMethod
-from ...utils.text_utils import (
-    bold_word_in_text,
-    clean_markdown,
-    ensure_sentence_case,
-)
+
+
+# CLI-specific text formatting functions
+def clean_markdown(text: str) -> str:
+    """
+    Remove markdown formatting from text.
+    
+    Used for CLI display purposes.
+    
+    Args:
+        text: Text with markdown formatting
+        
+    Returns:
+        Plain text without formatting
+    """
+    if not text:
+        return ""
+    
+    # Remove bold
+    text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
+    
+    # Remove italic
+    text = re.sub(r"\*(.*?)\*", r"\1", text)
+    
+    # Remove code
+    text = re.sub(r"`(.*?)`", r"\1", text)
+    
+    # Remove links
+    text = re.sub(r"\[(.*?)\]\(.*?\)", r"\1", text)
+    
+    # Remove headers
+    text = re.sub(r"^#+\s+", "", text, flags=re.MULTILINE)
+    
+    # Remove horizontal rules
+    text = re.sub(r"^-{3,}$", "", text, flags=re.MULTILINE)
+    
+    # Clean up extra whitespace
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = text.strip()
+    
+    return text
+
+
+def ensure_sentence_case(text: str) -> str:
+    """
+    Ensure text has proper sentence case.
+    
+    Used for CLI display purposes.
+    
+    Args:
+        text: Text to format
+        
+    Returns:
+        Text with proper sentence case
+    """
+    if not text:
+        return ""
+    
+    text = text.strip()
+    
+    # Capitalize first letter
+    if text and text[0].islower():
+        text = text[0].upper() + text[1:]
+    
+    # Add period if missing
+    if text and text[-1] not in ".!?":
+        text = text + "."
+    
+    return text
+
+
+def bold_word_in_text(text: str, word: str) -> list[tuple[str, str]]:
+    """
+    Return formatted parts for displaying text with a bold word.
+    
+    Used for highlighting search terms in CLI examples.
+    
+    Args:
+        text: The full text
+        word: The word to make bold
+        
+    Returns:
+        List of (text_part, style) tuples for Rich Text formatting
+    """
+    if not text or not word:
+        return [(text, "")]
+    
+    # Case-insensitive search
+    pattern = re.compile(re.escape(word), re.IGNORECASE)
+    parts = []
+    last_end = 0
+    
+    for match in pattern.finditer(text):
+        # Add text before the match
+        if match.start() > last_end:
+            parts.append((text[last_end:match.start()], ""))
+        # Add the matched word with bold style
+        parts.append((text[match.start():match.end()], "bold"))
+        last_end = match.end()
+    
+    # Add any remaining text
+    if last_end < len(text):
+        parts.append((text[last_end:], ""))
+    
+    return parts if parts else [(text, "")]
+
 
 # Unicode superscript mapping for meaning counters
 SUPERSCRIPT_MAP = {

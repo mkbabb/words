@@ -1,10 +1,3 @@
-import type {
-    WiktionaryIcon,
-    OxfordIcon,
-    DictionaryIcon,
-    AppleIcon,
-} from '@/components/custom/icons';
-import type { Globe, Languages } from 'lucide-vue-next';
 import type { SearchMode, SourceConfig, LanguageConfig } from '@/types';
 
 // Search Bar Props

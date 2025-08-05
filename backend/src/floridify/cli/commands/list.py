@@ -28,11 +28,11 @@ BATCH_SIZE = 10
 async def _get_or_create_word_ids(word_texts: list[str]) -> list[PydanticObjectId]:
     """Get or create Word documents for given word texts, returning their ObjectIds."""
     word_ids = []
-    
+
     for word_text in word_texts:
         # Try to find existing word
         existing_word = await Word.find_one({"text": word_text})
-        
+
         if existing_word:
             assert existing_word.id is not None
             word_ids.append(existing_word.id)
@@ -42,7 +42,7 @@ async def _get_or_create_word_ids(word_texts: list[str]) -> list[PydanticObjectI
             await new_word.save()
             assert new_word.id is not None
             word_ids.append(new_word.id)
-    
+
     return word_ids
 
 
@@ -106,7 +106,7 @@ async def _create_async(
 
     # Convert words to ObjectIds
     word_ids = await _get_or_create_word_ids(parsed.words)
-    
+
     # Add words to the list
     word_list.add_words(word_ids)
 
@@ -257,10 +257,10 @@ async def _update_async(name: str, input_file: Path) -> None:
     console.print(f"Adding {len(parsed.words)} words to '[cyan]{name}[/cyan]'")
 
     old_count = word_list.unique_words
-    
+
     # Convert words to ObjectIds
     word_ids = await _get_or_create_word_ids(parsed.words)
-    
+
     word_list.add_words(word_ids)
 
     # Process new words with dictionary lookup

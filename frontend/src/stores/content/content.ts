@@ -1,10 +1,12 @@
 import { defineStore } from 'pinia'
-import { ref, readonly, shallowRef } from 'vue'
-import { dictionaryApi } from '@/api'
+import { ref, readonly, shallowRef, computed } from 'vue'
+import { useLookupContentState } from './modes/lookup'
+import { useSearchBarStore } from '../search/search-bar'
 import type {
   SynthesizedDictionaryEntry,
   ThesaurusEntry,
-  WordSuggestionResponse
+  WordSuggestionResponse,
+  Definition
 } from '@/types'
 
 /**
@@ -24,21 +26,14 @@ interface DefinitionErrorState {
  * This store focuses on the "what is currently being displayed" aspect
  */
 export const useContentStore = defineStore('content', () => {
+  const searchBarStore = useSearchBarStore()
+  const lookupContent = useLookupContentState()
+  
   // ==========================================================================
-  // CONTENT STATE
+  // SHARED CONTENT STATE (non-mode-specific)
   // ==========================================================================
   
-  // Current displayed content
-  const currentEntry = shallowRef<SynthesizedDictionaryEntry | null>(null)
-  const currentThesaurus = shallowRef<ThesaurusEntry | null>(null)
-  const wordSuggestions = shallowRef<WordSuggestionResponse | null>(null)
   const currentWord = ref<string | null>(null)
-  
-  // Streaming state for progressive loading
-  const partialEntry = shallowRef<Partial<SynthesizedDictionaryEntry> | null>(null)
-  const isStreamingData = ref(false)
-  
-  // Error state
   const definitionError = ref<DefinitionErrorState | null>(null)
   
   // Sidebar navigation state
@@ -54,11 +49,60 @@ export const useContentStore = defineStore('content', () => {
   })
   
   // ==========================================================================
-  // CONTENT MANAGEMENT
+  // MODE-AWARE COMPUTED PROPERTIES
+  // ==========================================================================
+  
+  // Delegate to current mode's content
+  const currentEntry = computed(() => {
+    if (searchBarStore.searchMode === 'lookup') {
+      return lookupContent.currentEntry.value
+    }
+    return null
+  })
+  
+  const currentThesaurus = computed(() => {
+    if (searchBarStore.searchMode === 'lookup') {
+      return lookupContent.currentThesaurus.value
+    }
+    return null
+  })
+  
+  const wordSuggestions = computed(() => {
+    if (searchBarStore.searchMode === 'lookup') {
+      return lookupContent.wordSuggestions.value
+    }
+    return null
+  })
+  
+  const partialEntry = computed(() => {
+    if (searchBarStore.searchMode === 'lookup') {
+      return lookupContent.partialEntry.value
+    }
+    return null
+  })
+  
+  const isStreamingData = computed(() => {
+    if (searchBarStore.searchMode === 'lookup') {
+      return lookupContent.isStreamingData.value
+    }
+    return false
+  })
+  
+  const regeneratingDefinitionIndex = computed(() => {
+    if (searchBarStore.searchMode === 'lookup') {
+      return lookupContent.regeneratingDefinitionIndex.value
+    }
+    return null
+  })
+  
+  // ==========================================================================
+  // DELEGATED ACTIONS
   // ==========================================================================
   
   const setCurrentEntry = (entry: SynthesizedDictionaryEntry | null) => {
-    currentEntry.value = entry
+    if (searchBarStore.searchMode === 'lookup') {
+      lookupContent.setCurrentEntry(entry)
+    }
     if (entry) {
       currentWord.value = entry.word
       definitionError.value = null
@@ -66,169 +110,76 @@ export const useContentStore = defineStore('content', () => {
   }
   
   const setPartialEntry = (entry: Partial<SynthesizedDictionaryEntry> | null) => {
-    partialEntry.value = entry
+    if (searchBarStore.searchMode === 'lookup') {
+      lookupContent.setPartialEntry(entry)
+    }
   }
   
   const setCurrentThesaurus = (thesaurus: ThesaurusEntry | null) => {
-    currentThesaurus.value = thesaurus
+    if (searchBarStore.searchMode === 'lookup') {
+      lookupContent.setCurrentThesaurus(thesaurus)
+    }
   }
   
   const setWordSuggestions = (suggestions: WordSuggestionResponse | null) => {
-    wordSuggestions.value = suggestions
+    if (searchBarStore.searchMode === 'lookup') {
+      lookupContent.setWordSuggestions(suggestions)
+    }
   }
   
   const setStreamingState = (streaming: boolean) => {
-    isStreamingData.value = streaming
+    if (searchBarStore.searchMode === 'lookup') {
+      lookupContent.setStreamingState(streaming)
+    }
   }
   
   const setError = (error: DefinitionErrorState | null) => {
     definitionError.value = error
-    if (error) {
-      currentEntry.value = null
+    if (error && searchBarStore.searchMode === 'lookup') {
+      lookupContent.setCurrentEntry(null)
     }
   }
   
   // ==========================================================================
-  // CONTENT UPDATES
+  // DELEGATED CONTENT OPERATIONS
   // ==========================================================================
   
-  const updateDefinition = async (definitionId: string, updates: any) => {
-    if (!currentEntry.value) return
-    
-    try {
-      const response = await dictionaryApi.updateDefinition(
-        definitionId,
-        updates
-      )
-      
-      // Update the current entry with the new data
-      const updatedEntry = { ...currentEntry.value }
-      const defIndex = updatedEntry.definitions?.findIndex(d => d.id === definitionId)
-      
-      if (defIndex !== undefined && defIndex >= 0 && updatedEntry.definitions) {
-        updatedEntry.definitions[defIndex] = {
-          ...updatedEntry.definitions[defIndex],
-          ...response
-        }
-        currentEntry.value = updatedEntry
-      }
-      
-      return response
-    } catch (error) {
-      console.error('[Content] Failed to update definition:', error)
-      throw error
+  const updateDefinition = async (definitionId: string, updates: Partial<Definition>) => {
+    if (searchBarStore.searchMode === 'lookup') {
+      return lookupContent.updateDefinition(definitionId, updates)
     }
+    throw new Error('Update definition not supported in current mode')
   }
   
   const updateExample = async (definitionId: string, exampleId: string, newText: string) => {
-    if (!currentEntry.value) return
-    
-    try {
-      const response = await dictionaryApi.updateExample(
-        exampleId,
-        { text: newText }
-      )
-      
-      // Update the current entry with the new example
-      const updatedEntry = { ...currentEntry.value }
-      const defIndex = updatedEntry.definitions?.findIndex(d => d.id === definitionId)
-      
-      if (defIndex !== undefined && defIndex >= 0 && updatedEntry.definitions) {
-        const exampleIndex = updatedEntry.definitions[defIndex].examples?.findIndex(
-          e => e.id === exampleId
-        )
-        
-        if (exampleIndex !== undefined && exampleIndex >= 0 && 
-            updatedEntry.definitions[defIndex].examples) {
-          updatedEntry.definitions[defIndex].examples[exampleIndex] = response
-          currentEntry.value = updatedEntry
-        }
-      }
-      
-      return response
-    } catch (error) {
-      console.error('[Content] Failed to update example:', error)
-      throw error
+    if (searchBarStore.searchMode === 'lookup') {
+      return lookupContent.updateExample(definitionId, exampleId, newText)
     }
+    throw new Error('Update example not supported in current mode')
   }
   
   const regenerateDefinitionComponent = async (
     definitionId: string,
     component: 'definition' | 'examples' | 'usage_notes'
   ) => {
-    if (!currentEntry.value) return
-    
-    try {
-      const response = await dictionaryApi.regenerateDefinitionComponent(
-        definitionId,
-        component
-      )
-      
-      // Update the current entry with regenerated content
-      const updatedEntry = { ...currentEntry.value }
-      const defIndex = updatedEntry.definitions?.findIndex(d => d.id === definitionId)
-      
-      if (defIndex !== undefined && defIndex >= 0 && updatedEntry.definitions) {
-        updatedEntry.definitions[defIndex] = {
-          ...updatedEntry.definitions[defIndex],
-          ...response
-        }
-        currentEntry.value = updatedEntry
-      }
-      
-      return response
-    } catch (error) {
-      console.error('[Content] Failed to regenerate component:', error)
-      throw error
+    if (searchBarStore.searchMode === 'lookup') {
+      return lookupContent.regenerateDefinitionComponent(definitionId, component)
     }
+    throw new Error('Regenerate definition component not supported in current mode')
   }
   
   const regenerateExamples = async (definitionIndex: number) => {
-    if (!currentEntry.value || !currentEntry.value.definitions) return
-    
-    const definition = currentEntry.value.definitions[definitionIndex]
-    if (!definition) return
-    
-    try {
-      const response = await dictionaryApi.regenerateExamples(
-        currentEntry.value.word,
-        definitionIndex
-      )
-      
-      // Update the current entry with new examples
-      const updatedEntry = { ...currentEntry.value }
-      if (updatedEntry.definitions) {
-        updatedEntry.definitions[definitionIndex] = {
-          ...definition,
-          examples: response.examples as any // API returns different format
-        }
-        currentEntry.value = updatedEntry
-      }
-      
-      return response
-    } catch (error) {
-      console.error('[Content] Failed to regenerate examples:', error)
-      throw error
+    if (searchBarStore.searchMode === 'lookup') {
+      return lookupContent.regenerateExamples(definitionIndex)
     }
+    throw new Error('Regenerate examples not supported in current mode')
   }
   
   const refreshEntryImages = async () => {
-    if (!currentEntry.value) return
-    
-    try {
-      const response = await dictionaryApi.refreshSynthEntry(currentEntry.value.word)
-      
-      // Update the current entry with new images
-      currentEntry.value = {
-        ...currentEntry.value,
-        ...response
-      }
-      
-      return response
-    } catch (error) {
-      console.error('[Content] Failed to refresh entry images:', error)
-      throw error
+    if (searchBarStore.searchMode === 'lookup') {
+      return lookupContent.refreshEntryImages()
     }
+    throw new Error('Refresh entry images not supported in current mode')
   }
   
   // ==========================================================================
@@ -236,15 +187,17 @@ export const useContentStore = defineStore('content', () => {
   // ==========================================================================
   
   const clearCurrentEntry = () => {
-    currentEntry.value = null
-    currentThesaurus.value = null
+    if (searchBarStore.searchMode === 'lookup') {
+      lookupContent.clearCurrentEntry()
+    }
     currentWord.value = null
     definitionError.value = null
-    partialEntry.value = null
   }
   
   const clearWordSuggestions = () => {
-    wordSuggestions.value = null
+    if (searchBarStore.searchMode === 'lookup') {
+      lookupContent.clearWordSuggestions()
+    }
   }
   
   const clearError = () => {
@@ -294,13 +247,16 @@ export const useContentStore = defineStore('content', () => {
   // ==========================================================================
   
   return {
-    // State
-    currentEntry: readonly(currentEntry),
-    currentThesaurus: readonly(currentThesaurus),
-    wordSuggestions: readonly(wordSuggestions),
+    // Mode-aware state (computed)
+    currentEntry,
+    currentThesaurus,
+    wordSuggestions,
+    partialEntry,
+    isStreamingData,
+    regeneratingDefinitionIndex,
+    
+    // Shared state
     currentWord: readonly(currentWord),
-    partialEntry: readonly(partialEntry),
-    isStreamingData: readonly(isStreamingData),
     definitionError: readonly(definitionError),
     
     // Sidebar navigation state
@@ -308,7 +264,7 @@ export const useContentStore = defineStore('content', () => {
     sidebarActivePartOfSpeech: readonly(sidebarActivePartOfSpeech),
     sidebarAccordionState: readonly(sidebarAccordionState),
     
-    // Actions
+    // Delegated actions
     setCurrentEntry,
     setPartialEntry,
     setCurrentThesaurus,
@@ -316,7 +272,7 @@ export const useContentStore = defineStore('content', () => {
     setStreamingState,
     setError,
     
-    // Updates
+    // Delegated operations
     updateDefinition,
     updateExample,
     regenerateDefinitionComponent,

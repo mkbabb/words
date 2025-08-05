@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ....models import Word
-from ....utils.text_utils import normalize_word
-from ....wordlist.constants import MasteryLevel, Temperature
+from ....text import normalize_word
+from ....wordlist.constants import Temperature
 from ...core import ListResponse, ResourceResponse
 from ...repositories import WordAddRequest, WordListRepository
 from .utils import search_words_in_wordlist
@@ -19,7 +19,9 @@ class WordListQueryParams(BaseModel):
     """Common query parameters for wordlist operations."""
 
     # Filters
-    mastery_levels: list[str] | None = Field(None, description="Filter by mastery levels (bronze, silver, gold)")
+    mastery_levels: list[str] | None = Field(
+        None, description="Filter by mastery levels (bronze, silver, gold)"
+    )
     hot_only: bool | None = Field(None, description="Show only hot items")
     due_only: bool | None = Field(None, description="Show only items due for review")
     min_views: int | None = Field(None, ge=0, description="Minimum view count")
@@ -28,9 +30,12 @@ class WordListQueryParams(BaseModel):
 
     # Sorting
     sort_by: str = Field(
-        "added_at", description="Sort field (word, added_at, last_visited, mastery_level, frequency, next_review). Can be comma-separated for multiple criteria"
+        "added_at",
+        description="Sort field (word, added_at, last_visited, mastery_level, frequency, next_review). Can be comma-separated for multiple criteria",
     )
-    sort_order: str = Field("desc", description="Sort order (asc|desc). Can be comma-separated to match sort_by fields")
+    sort_order: str = Field(
+        "desc", description="Sort order (asc|desc). Can be comma-separated to match sort_by fields"
+    )
 
     # Pagination
     offset: int = Field(0, ge=0, description="Skip first N results")
@@ -42,7 +47,9 @@ class WordListSearchQueryParams(WordListQueryParams):
 
     # Search-specific parameters
     query: str = Field(..., description="Search query")
-    max_results: int = Field(100, ge=1, le=500, description="Maximum search results before filtering")
+    max_results: int = Field(
+        100, ge=1, le=500, description="Maximum search results before filtering"
+    )
     min_score: float = Field(0.4, ge=0.0, le=1.0, description="Minimum match score")
 
     # Override default sort to use relevance for search
@@ -53,11 +60,11 @@ class WordListSearchQueryParams(WordListQueryParams):
 
 def passes_wordlist_filters(word_item: Any, params: WordListQueryParams) -> bool:
     """Check if a wordlist item passes the filter criteria.
-    
+
     Args:
         word_item: WordListItem to check
         params: Query parameters with filter criteria
-        
+
     Returns:
         True if item passes all filters, False otherwise
     """
@@ -65,11 +72,11 @@ def passes_wordlist_filters(word_item: Any, params: WordListQueryParams) -> bool
     if params.mastery_levels:
         if word_item.mastery_level not in params.mastery_levels:
             return False
-    
+
     # Apply hot_only filter
     if params.hot_only and word_item.temperature != Temperature.HOT:
         return False
-    
+
     # Apply due_only filter
     if params.due_only:
         # Item is due if it has a next_review date that's in the past
@@ -77,13 +84,13 @@ def passes_wordlist_filters(word_item: Any, params: WordListQueryParams) -> bool
             return False
         if word_item.review_data.next_review_date > datetime.now(UTC):
             return False
-    
+
     # Apply view count filters
     if params.min_views is not None and word_item.review_data.repetitions < params.min_views:
         return False
     if params.max_views is not None and word_item.review_data.repetitions > params.max_views:
         return False
-        
+
     # Apply reviewed filter
     if params.reviewed is not None:
         is_reviewed = word_item.review_data.last_review_date is not None
@@ -94,15 +101,14 @@ def passes_wordlist_filters(word_item: Any, params: WordListQueryParams) -> bool
 
 
 async def apply_wordlist_filters_and_sort(
-    wordlist_items: list[Any],
-    params: WordListQueryParams
+    wordlist_items: list[Any], params: WordListQueryParams
 ) -> list[Any]:
     """Apply filters and sorting to wordlist items.
-    
+
     Args:
         wordlist_items: List of wordlist items to filter
         params: Query parameters with filter and sort criteria
-        
+
     Returns:
         Filtered and sorted list of wordlist items
     """
@@ -110,13 +116,13 @@ async def apply_wordlist_filters_and_sort(
     filtered_items = [item for item in wordlist_items if passes_wordlist_filters(item, params)]
 
     # Sort items - handle multiple sort criteria
-    sort_fields = [f.strip() for f in params.sort_by.split(',')]
-    sort_orders = [o.strip() for o in params.sort_order.split(',')]
-    
+    sort_fields = [f.strip() for f in params.sort_by.split(",")]
+    sort_orders = [o.strip() for o in params.sort_order.split(",")]
+
     # Pad sort_orders if not enough values provided
     while len(sort_orders) < len(sort_fields):
         sort_orders.append(sort_orders[-1] if sort_orders else "desc")
-    
+
     # Define sort key functions
     sort_key_map = {
         "added_at": lambda w: w.added_date or "",
@@ -127,18 +133,17 @@ async def apply_wordlist_filters_and_sort(
         "next_review": lambda w: w.review_data.next_review_date or "",  # Match frontend field name
         "word": lambda w: "",  # Will be filled in after fetching word text
     }
-    
+
     # If sorting by word, we need to fetch word texts first
     if "word" in sort_fields:
         word_ids = [w.word_id for w in filtered_items if w.word_id]
         words = await Word.find({"_id": {"$in": word_ids}}).to_list()
         # Create map with normalized text for proper sorting of diacritics and phrases
-        word_text_map = {str(word.id): word.text for word in words}
         word_normalized_map = {str(word.id): normalize_word(word.text) for word in words}
-        
+
         # Update the word sort key to use normalized text
         sort_key_map["word"] = lambda w: word_normalized_map.get(str(w.word_id), "")
-    
+
     # Sort using multiple keys with proper handling of desc order
     for field, order in reversed(list(zip(sort_fields, sort_orders))):
         # Get the sort key function
@@ -150,30 +155,27 @@ async def apply_wordlist_filters_and_sort(
 
 
 async def convert_wordlist_items_to_response(
-    wordlist_items: list[Any],
-    paginated: bool = True,
-    offset: int = 0,
-    limit: int = 20
+    wordlist_items: list[Any], paginated: bool = True, offset: int = 0, limit: int = 20
 ) -> tuple[list[dict[str, Any]], int]:
     """Convert wordlist items to API response format.
-    
+
     Args:
         wordlist_items: List of wordlist items to convert
         paginated: Whether to apply pagination
         offset: Pagination offset
         limit: Pagination limit
-        
+
     Returns:
         Tuple of (response_items, total_count)
     """
     total = len(wordlist_items)
-    
+
     # Apply pagination if requested
     if paginated:
-        items_to_convert = wordlist_items[offset:offset + limit]
+        items_to_convert = wordlist_items[offset : offset + limit]
     else:
         items_to_convert = wordlist_items
-    
+
     # Fetch Word documents for the items
     word_ids = [w.word_id for w in items_to_convert if w.word_id]
     words = await Word.find({"_id": {"$in": word_ids}}).to_list()
@@ -185,7 +187,7 @@ async def convert_wordlist_items_to_response(
         word_text = word_text_map.get(str(word_item.word_id), "")
         if not word_text:
             continue
-            
+
         item_data = {
             "word": word_text,
             "frequency": word_item.frequency,
@@ -201,6 +203,7 @@ async def convert_wordlist_items_to_response(
         response_items.append(item_data)
 
     return response_items, total
+
 
 router = APIRouter()
 
@@ -248,10 +251,7 @@ async def list_words(
 
     # Convert to response format with pagination
     items, total = await convert_wordlist_items_to_response(
-        filtered_words, 
-        paginated=True,
-        offset=params.offset,
-        limit=params.limit
+        filtered_words, paginated=True, offset=params.offset, limit=params.limit
     )
 
     return ListResponse(

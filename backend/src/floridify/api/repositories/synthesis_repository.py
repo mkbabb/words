@@ -176,10 +176,10 @@ class SynthesisRepository(
             entry = await SynthesizedDictionaryEntry.get(entry_id)
             if not entry:
                 return None
-                
+
             # Convert to dictionary
             entry_dict = entry.model_dump(mode="json")
-                
+
             # If images expansion is requested, populate the images field
             if expand and "images" in expand:
                 # Load images from image_ids
@@ -190,12 +190,12 @@ class SynthesisRepository(
                         if image:
                             image_dict = image.model_dump(mode="json", exclude={"data"})
                             images.append(image_dict)
-                
+
                 entry_dict["images"] = images
             else:
                 # Ensure images field exists but is empty
                 entry_dict["images"] = []
-                
+
             return entry_dict
         except Exception as e:
             print(f"Error getting entry {entry_id}: {e}")

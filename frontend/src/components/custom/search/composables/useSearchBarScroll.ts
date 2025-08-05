@@ -48,8 +48,8 @@ export function useSearchBarScroll(options: UseSearchBarScrollOptions) {
     // Priority order: focused/hovered/dropdowns > unfocused > scroll-based
     
     // State 1: Interactive states - always full size
-    if (searchBar.isSearchBarFocused || uiState.isContainerHovered || 
-        searchBar.showSearchControls || searchBar.showSearchResults) {
+    if (searchBar.isFocused || uiState.isContainerHovered || 
+        searchBar.showSearchControls || searchBar.showDropdown) {
       return {
         maxWidth: responsiveMaxWidth,
         transform: 'scale(1)',

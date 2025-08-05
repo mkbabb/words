@@ -96,6 +96,43 @@
                 </div>
             </div>
 
+            <!-- Semantic Search (Lookup Mode) -->
+            <div
+                v-if="searchMode === 'lookup'"
+                class="border-t border-border/50 px-4 py-3"
+            >
+                <h3 class="mb-3 text-sm font-medium">Search Options</h3>
+                <div class="space-y-3">
+                    <!-- Semantic Search Toggle -->
+                    <div class="flex items-center justify-between">
+                        <label class="text-sm font-medium flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                :checked="enableSemantic"
+                                @change="toggleSemantic"
+                                class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            Semantic Search
+                        </label>
+                    </div>
+                    
+                    <!-- Semantic Weight Slider (when enabled) -->
+                    <div v-if="enableSemantic" class="space-y-2">
+                        <label class="text-xs text-muted-foreground">
+                            Similarity Weight: {{ Math.round(semanticWeight * 100) }}%
+                        </label>
+                        <Slider
+                            :model-value="[semanticWeight]"
+                            @update:model-value="(value) => setSemanticWeight(value?.[0] ?? 0.5)"
+                            :min="0.1"
+                            :max="1.0"
+                            :step="0.1"
+                            class="w-full"
+                        />
+                    </div>
+                </div>
+            </div>
+
             <!-- Wordlist Filters -->
             <div
                 v-if="searchMode === 'wordlist'"
@@ -230,7 +267,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStores } from '@/stores';
-import { Button } from '@/components/ui';
+import { Button, Slider } from '@/components/ui';
 import { BouncyToggle } from '@/components/custom/animation';
 import { Flame, Clock, PanelLeft } from 'lucide-vue-next';
 import ActionsRow from './ActionsRow.vue';
@@ -250,9 +287,11 @@ const props = defineProps<SearchControlsProps>();
 
 // Modern Vue 3.4+ patterns - using defineModel for two-way bindings
 const router = useRouter();
-const { searchConfig, searchBar } = useStores();
+const { searchBar, lookupMode } = useStores();
 // ✅ Make component reactive to store changes instead of using defineModel
-const searchMode = computed(() => searchConfig.searchMode);
+const searchMode = computed(() => searchBar.searchMode);
+const enableSemantic = computed(() => lookupMode.enableSemantic);
+const semanticWeight = computed(() => lookupMode.semanticWeight);
 const selectedSources = defineModel<string[]>('selectedSources', { required: true });
 const selectedLanguages = defineModel<string[]>('selectedLanguages', { required: true });
 const noAI = defineModel<boolean>('noAI', { required: true });
@@ -320,6 +359,14 @@ const toggleLanguage = (languageCode: string) => {
     }
 };
 
+const toggleSemantic = () => {
+    lookupMode.toggleSemantic();
+};
+
+const setSemanticWeight = (weight: number) => {
+    lookupMode.setSemanticWeight(weight);
+};
+
 const toggleFilter = (filterKey: keyof typeof wordlistFilters.value) => {
     // Create a new object with the toggled value to trigger reactivity
     wordlistFilters.value = {
@@ -348,7 +395,7 @@ const handleModeChange = async (newMode: string | SearchMode) => {
         console.log('✅ Using simple mode setter with query management');
         // ✅ Save current query and switch mode - returns saved query for new mode
         const currentQuery = searchBar.searchQuery;
-        const savedQuery = await searchConfig.setMode(typedMode, currentQuery);
+        const savedQuery = await searchBar.setMode(typedMode, currentQuery);
         
         // Update search bar with the saved query for the new mode
         if (savedQuery) {

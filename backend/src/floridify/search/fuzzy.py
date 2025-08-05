@@ -181,7 +181,7 @@ class FuzzySearch:
             word_list,
             limit=search_limit,
             scorer=fuzz.WRatio,  # Weighted ratio for better results
-            processor=lambda s: s.lower()  # Case-insensitive matching
+            processor=lambda s: s.lower(),  # Case-insensitive matching
         )
 
         matches = []
@@ -367,7 +367,7 @@ class FuzzySearch:
 
         # Check if query is a prefix of the candidate (important for phrases)
         is_prefix_match = candidate_lower.startswith(query_lower)
-        
+
         # Check if query matches the first word of a phrase exactly
         first_word_match = False
         if is_candidate_phrase and not is_query_phrase:
@@ -406,12 +406,19 @@ class FuzzySearch:
 
         # Prefix match bonus
         prefix_bonus = 1.3 if is_prefix_match else 1.0
-        
+
         # First word match bonus (for phrases)
         first_word_bonus = 1.2 if first_word_match else 1.0
 
         # Combined correction
-        corrected_score = base_score * length_ratio * phrase_penalty * short_penalty * prefix_bonus * first_word_bonus
+        corrected_score = (
+            base_score
+            * length_ratio
+            * phrase_penalty
+            * short_penalty
+            * prefix_bonus
+            * first_word_bonus
+        )
 
         # Ensure we don't exceed 1.0 or go below 0.0
         return max(0.0, min(1.0, corrected_score))

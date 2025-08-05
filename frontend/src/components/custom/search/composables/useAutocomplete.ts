@@ -23,7 +23,7 @@ export function useAutocomplete({
   
   // Methods
   const updateAutocomplete = () => {
-    if (!query.value || query.value.length < 2 || !searchResults.value.length) {
+    if (!query.value || query.value.length < 2 || !searchResults.value || !searchResults.value.length) {
       autocompleteText.value = ''
       return
     }

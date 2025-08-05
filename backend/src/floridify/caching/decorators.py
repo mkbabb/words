@@ -24,7 +24,9 @@ logger = get_logger(__name__)
 class RequestDeduplicator:
     """Manages in-flight requests to prevent duplicate executions."""
 
-    def __init__(self, max_wait_time: float = 120.0, cleanup_interval: float = 60.0):  # Default 2 minutes
+    def __init__(
+        self, max_wait_time: float = 120.0, cleanup_interval: float = 60.0
+    ):  # Default 2 minutes
         self._in_flight: dict[str, asyncio.Future[Any]] = {}
         self._lock = asyncio.Lock()
         self._max_wait_time = max_wait_time

@@ -3,7 +3,7 @@
         <div v-if="!collapsed" class="flex items-center justify-between w-full">
             <!-- Left: Floridify + @mbabb -->
             <div class="flex items-center gap-3">
-                <FloridifyIcon :expanded="true" :mode="ui.mode" clickable @toggle-mode="ui.toggleMode()" />
+                <FloridifyIcon :expanded="true" :mode="searchBarStore.getSubMode('lookup') as any" clickable @toggle-mode="() => searchBarStore.setSubMode('lookup', searchBarStore.getSubMode('lookup') === 'dictionary' ? 'thesaurus' : 'dictionary')" />
                 <HoverCard :open-delay="600">
                     <HoverCardTrigger>
                         <Button variant="link" class="h-auto p-0 font-mono text-sm">@mbabb</Button>
@@ -56,6 +56,7 @@
 
 <script setup lang="ts">
 import { useStores } from '@/stores';
+import { useSearchBarStore } from '@/stores/search/search-bar';
 import { cn } from '@/utils';
 import { FloridifyIcon, HamburgerIcon } from '@/components/custom/icons';
 import { DarkModeToggle } from '@/components/custom/dark-mode-toggle';
@@ -71,4 +72,5 @@ interface Props {
 defineProps<Props>();
 
 const { ui } = useStores();
+const searchBarStore = useSearchBarStore();
 </script>

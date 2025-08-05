@@ -4,7 +4,6 @@ export { useSearchBarNavigation } from './useSearchBarNavigation'
 export { useSearchBarScroll } from './useSearchBarScroll'
 
 // Export state management composables
-export { useSearchOperations } from './useSearchOperations'
 export { useFocusManagement } from './useFocusManagement'
 export { useModalManagement } from './useModalManagement'
 

@@ -171,9 +171,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import RefreshButton from '@/components/custom/common/RefreshButton.vue';
 import { useSlugGeneration } from '@/composables/useSlugGeneration';
-import { useWordlist } from '@/composables/useWordlist';
+import { wordlistApi } from '@/api';
+import { useToast } from '@/components/ui/toast/use-toast';
 import type { WordList } from '@/types';
-import { MasteryLevel, Temperature } from '@/types';
 
 interface Props {
   modelValue: boolean;
@@ -189,8 +189,8 @@ const emit = defineEmits<{
 // Slug generation
 const { isGenerating: slugGenerating, generateSlugWithFallback } = useSlugGeneration();
 
-// Wordlist management
-const { createWordlist } = useWordlist();
+// Toast notifications
+const { toast } = useToast();
 
 // Component state
 const form = ref({
@@ -312,12 +312,17 @@ const handleCreate = async () => {
   error.value = '';
   
   try {
-    // Create wordlist using the real API
-    const wordlist = await createWordlist(
-      form.value.name.trim(),
-      form.value.description.trim() || '',
-      parsedWords.value
-    );
+    // Create wordlist using the API directly
+    const wordlist = await wordlistApi.createWordlist({
+      name: form.value.name.trim(),
+      description: form.value.description.trim() || '',
+      words: parsedWords.value
+    });
+    
+    toast({
+      title: "Success",
+      description: `Wordlist "${form.value.name}" created successfully`,
+    });
     
     if (wordlist) {
       // Emit the created event

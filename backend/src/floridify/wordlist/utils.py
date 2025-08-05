@@ -2,9 +2,8 @@
 
 import hashlib
 
-import coolname  # type: ignore[import-untyped]
-
 from ..utils.logging import get_logger
+from ..utils.utils import generate_slug
 
 logger = get_logger(__name__)
 
@@ -33,13 +32,13 @@ def generate_wordlist_name(words: list[str]) -> str:
     Returns:
         Generated name like 'myrtle-goldfish-swim' or fallback 'wordlist-{hash}'
     """
-    try:
-        # Generate a cool name with adjective + animal + verb format
-        name: str = coolname.generate_slug(3)  # 3 words: adjective-animal-verb
-        logger.debug(f"Generated name: {name}")
-        return name
-    except Exception as e:
-        logger.warning(f"Failed to generate cool name: {e}")
-        # Fallback to hash-based name
+    # Use the unified slug generator from utils
+    slug = generate_slug(3)  # 3 words: adjective-animal-verb
+    
+    # If slug generation somehow returns a UUID fallback, prepend 'wordlist-'
+    if len(slug) == 8 and all(c in '0123456789abcdef-' for c in slug):
+        # Looks like a UUID fragment, use hash-based name instead
         hash_id = generate_wordlist_hash(words)
         return f"wordlist-{hash_id}"
+    
+    return slug

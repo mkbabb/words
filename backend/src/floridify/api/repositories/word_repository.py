@@ -8,7 +8,6 @@ from beanie import PydanticObjectId
 from beanie.operators import RegEx
 from pydantic import BaseModel, Field
 
-from ...constants import Language
 from ...models import (
     Definition,
     Example,
@@ -18,6 +17,7 @@ from ...models import (
     SynthesizedDictionaryEntry,
     Word,
 )
+from ...models.definition import Language
 from ..core.base import BaseRepository
 
 

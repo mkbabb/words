@@ -1,25 +1,45 @@
 """Data models for Floridify dictionary entries."""
 
 # Base models and metadata
+from ..search.corpus.semantic_cache import (
+    IndexType,
+    QuantizationType,
+    SemanticIndexCache,
+)
+
+# Cache models
+from ..search.models import (
+    CompressionType,
+    CorpusCacheEntry,
+    CorpusCompressionUtils,
+    CorpusData,
+)
+
+# Word of the Day models
+from ..wordlist.word_of_the_day import (
+    NotificationFrequency,
+    WordOfTheDayBatch,
+    WordOfTheDayConfig,
+    WordOfTheDayEntry,
+)
 from .base import AudioMedia, BaseMetadata, Etymology, ImageMedia, ModelInfo
 
-# Constants
-from .constants import LiteratureSourceType
-
-# Core document models
-from .models import (
+# Core models from definition.py (includes constants)
+from .definition import (
+    CorpusType,
     Definition,
+    DictionaryProvider,
     Example,
     Fact,
+    Language,
     LiteratureSource,
+    LiteratureSourceType,
+    OutputFormat,
     Pronunciation,
     ProviderData,
     SynthesizedDictionaryEntry,
     Word,
 )
-
-# Phrasal expressions
-from .phrasal import PhrasalExpression
 
 # Relationship and supplementary models
 from .relationships import (
@@ -29,14 +49,6 @@ from .relationships import (
     UsageNote,
     WordForm,
     WordRelationship,
-)
-
-# Word of the Day models
-from .word_of_the_day import (
-    NotificationFrequency,
-    WordOfTheDayBatch,
-    WordOfTheDayConfig,
-    WordOfTheDayEntry,
 )
 
 __all__ = [
@@ -62,12 +74,23 @@ __all__ = [
     "UsageNote",
     "MeaningCluster",
     "WordRelationship",
-    "PhrasalExpression",
     # Word of the Day
     "NotificationFrequency",
     "WordOfTheDayBatch",
     "WordOfTheDayConfig",
     "WordOfTheDayEntry",
+    # Cache models
+    "CompressionType",
+    "CorpusData",
+    "CorpusCacheEntry", 
+    "CorpusCompressionUtils",
+    "IndexType",
+    "QuantizationType",
+    "SemanticIndexCache",
     # Constants
+    "Language",
+    "DictionaryProvider",
+    "OutputFormat",
+    "CorpusType",
     "LiteratureSourceType",
 ]

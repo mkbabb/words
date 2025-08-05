@@ -13,8 +13,8 @@
                 <div class="absolute left-0 top-0 w-[calc(100%+2ch)]">
                     <AnimatedTitle
                         :text="word"
-                        :animation-type="animationType"
-                        :animation-key="animationKey"
+                        animation-type="typewriter"
+                        :animation-key="0"
                         class="block"
                     />
                 </div>
@@ -111,6 +111,7 @@ import { Sparkles, Plus } from 'lucide-vue-next';
 import AnimatedTitle from './AnimatedTitle.vue';
 import ProviderIcons from './ProviderIcons.vue';
 import AddToWordlistModal from './AddToWordlistModal.vue';
+import type { PronunciationMode } from '@/types';
 
 interface WordHeaderProps {
     word: string;
@@ -118,10 +119,8 @@ interface WordHeaderProps {
         phonetic: string;
         ipa: string;
     };
-    pronunciationMode: 'phonetic' | 'ipa';
+    pronunciationMode: PronunciationMode;
     providers: string[];
-    animationType: string;
-    animationKey: number;
     isAISynthesized?: boolean;
 }
 

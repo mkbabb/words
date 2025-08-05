@@ -14,7 +14,6 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from ..utils.logging import get_logger
-from ..utils.text_utils import normalize_word as text_utils_normalize
 
 logger = get_logger(__name__)
 

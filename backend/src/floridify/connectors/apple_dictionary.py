@@ -8,9 +8,9 @@ from typing import Any
 
 from beanie import PydanticObjectId
 
-from ..constants import DictionaryProvider, Language
 from ..core.state_tracker import Stages, StateTracker
 from ..models import Definition, Etymology, Example, Pronunciation, ProviderData, Word
+from ..models.definition import DictionaryProvider, Language
 from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger
 from .base import DictionaryConnector
@@ -303,18 +303,18 @@ class AppleDictionaryConnector(DictionaryConnector):
 
             # Extract all components using the new API pattern
             assert word_obj.id is not None  # After save(), id is guaranteed to be not None
-            
+
             # Extract definitions and save them
             definitions = await self.extract_definitions(raw_data, word_obj.id)
-            
+
             # Extract pronunciation and save it
             pronunciation = await self.extract_pronunciation(raw_data, word_obj.id)
             if pronunciation:
                 await pronunciation.save()
-            
+
             # Extract etymology
             etymology = await self.extract_etymology(raw_data)
-            
+
             # Create ProviderData
             provider_data = ProviderData(
                 word_id=word_obj.id,
@@ -506,4 +506,3 @@ class AppleDictionaryConnector(DictionaryConnector):
             phonetic = phonetic.replace(ipa_char, simple)
 
         return phonetic
-

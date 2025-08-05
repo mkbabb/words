@@ -11,7 +11,6 @@ from typing import Any
 
 from beanie import PydanticObjectId
 
-from ..constants import DictionaryProvider
 from ..core.state_tracker import Stages, StateTracker
 from ..models import (
     Definition,
@@ -19,6 +18,7 @@ from ..models import (
     Pronunciation,
     ProviderData,
 )
+from ..models.definition import DictionaryProvider
 from ..utils.logging import get_logger
 from .base import DictionaryConnector
 

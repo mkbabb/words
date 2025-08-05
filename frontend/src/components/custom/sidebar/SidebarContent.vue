@@ -14,7 +14,7 @@
                 >
                     <component 
                         :is="currentView" 
-                        :key="searchConfig.searchMode"
+                        :key="searchBarStore.searchMode"
                     />
                 </Transition>
             </template>
@@ -22,7 +22,7 @@
             <!-- Collapsed state -->
             <div v-else class="flex flex-col items-center gap-2">
                 <!-- Recent words for lookup mode -->
-                <template v-if="searchConfig.searchMode === 'lookup'">
+                <template v-if="searchBarStore.searchMode === 'lookup'">
                     <HoverCard v-for="item in combinedRecentItems" :key="item.id">
                         <HoverCardTrigger as-child>
                             <button 
@@ -59,13 +59,13 @@
                 </template>
                 
                 <!-- Wordlist tiles for wordlist mode -->
-                <template v-else-if="searchConfig.searchMode === 'wordlist'">
+                <template v-else-if="searchBarStore.searchMode === 'wordlist'">
                     <HoverCard v-for="wordlist in recentWordlists" :key="wordlist.id">
                         <HoverCardTrigger as-child>
                             <button 
                                 @click="handleCollapsedWordlistClick(wordlist.id)"
                                 class="flex h-10 w-10 items-center justify-center rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-border transition-all duration-200 text-sm font-medium"
-                                :class="{ 'bg-primary/10 border-primary/20 hover:bg-primary/20': searchConfig.selectedWordlist === wordlist.id }"
+                                :class="{ 'bg-primary/10 border-primary/20 hover:bg-primary/20': wordlistMode.selectedWordlist === wordlist.id }"
                             >
                                 {{ wordlist.name.substring(0, 2).toUpperCase() }}
                             </button>
@@ -113,6 +113,9 @@ import { computed, ref, onMounted, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRouter } from 'vue-router';
 import { useStores } from '@/stores';
+import { useWordlistMode } from '@/stores/search/modes/wordlist';
+import { useSearchBarStore } from '@/stores/search/search-bar';
+import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { FileText } from 'lucide-vue-next';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
@@ -128,9 +131,16 @@ interface Props {
 
 defineProps<Props>();
 
-const { history, searchConfig, ui, searchBar, searchResults, content, orchestrator } = useStores();
+const { history, ui, searchBar, content } = useStores();
+const wordlistMode = useWordlistMode();
+const searchBarStore = useSearchBarStore();
 const router = useRouter();
 const { recentLookups, aiQueryHistory } = storeToRefs(history);
+
+// Create orchestrator for API operations
+const orchestrator = useSearchOrchestrator({
+    query: computed(() => searchBarStore.searchQuery)
+});
 
 // Wordlists state
 const recentWordlists = ref<WordList[]>([]);
@@ -170,7 +180,7 @@ const combinedRecentItems = computed<CombinedItem[]>(() => {
 // Determine which view to show based on search mode
 const currentView = computed(() => {
     // Show word list view for 'wordlist' and 'stage' modes
-    if (searchConfig.searchMode === 'wordlist' || searchConfig.searchMode === 'stage') {
+    if (searchBarStore.searchMode === 'wordlist' || searchBarStore.searchMode === 'stage') {
         return SidebarWordListView;
     }
     // Default to lookup view for 'lookup' mode
@@ -181,18 +191,24 @@ const handleCollapsedWordClick = async (word: string) => {
     searchBar.setQuery(word);
     
     // Navigate to appropriate route based on current mode
-    const routeName = ui.mode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+    const routeName = searchBarStore.getSubMode('lookup') === 'thesaurus' ? 'Thesaurus' : 'Definition';
     router.push({ name: routeName, params: { word } });
     
-    await orchestrator.searchWord(word);
+    searchBar.isDirectLookup = true;
+    try {
+        await orchestrator.getDefinition(word);
+    } finally {
+        searchBar.isDirectLookup = false;
+    }
 };
 
 const handleCollapsedAIClick = async (query: string) => {
     // Set AI mode first
-    searchBar.enableAIMode();
+    searchBar.setAIQuery(true);
+    searchBar.setShowSparkle(true);
     // ✅ Use simple mode system - just change the modes
-    searchConfig.setMode('lookup');
-    searchConfig.setLookupMode('suggestions');
+    searchBarStore.setMode('lookup');
+    searchBarStore.setSubMode('lookup', 'suggestions');
     
     // Navigate to home to display suggestions
     router.push({ name: 'Home' });
@@ -261,10 +277,10 @@ const formatWordlistDate = (dateString: string | null): string => {
 
 const handleCollapsedWordlistClick = async (wordlistId: string) => {
     // Set the wordlist first
-    searchConfig.setWordlist(wordlistId);
+    wordlistMode.setWordlist(wordlistId);
     
     // ✅ Use simple mode system - just change the mode
-    searchConfig.setMode('wordlist');
+    searchBarStore.setMode('wordlist');
 };
 
 const loadRecentWordlists = async () => {
@@ -299,13 +315,13 @@ const loadRecentWordlists = async () => {
 
 // Load wordlists when component mounts
 onMounted(() => {
-    if (searchConfig.searchMode === 'wordlist') {
+    if (searchBarStore.searchMode === 'wordlist') {
         loadRecentWordlists();
     }
 });
 
 // Watch for search mode changes
-watch(() => searchConfig.searchMode, (newMode) => {
+watch(() => searchBarStore.searchMode, (newMode) => {
     if (newMode === 'wordlist') {
         loadRecentWordlists();
     }

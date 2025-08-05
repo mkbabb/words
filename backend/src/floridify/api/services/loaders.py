@@ -101,7 +101,9 @@ class DefinitionLoader(DataLoader):
             "part_of_speech": definition.part_of_speech,
             "text": definition.text,
             "meaning_cluster": (
-                definition.meaning_cluster.model_dump(mode="json") if definition.meaning_cluster else None
+                definition.meaning_cluster.model_dump(mode="json")
+                if definition.meaning_cluster
+                else None
             ),
             "sense_number": definition.sense_number,
             "word_forms": [wf.model_dump(mode="json") for wf in definition.word_forms],
@@ -233,9 +235,7 @@ class SynthesizedDictionaryEntryLoader(DataLoader):
         # Load pronunciation with audio files
         pronunciation = None
         if entry.pronunciation_id:
-            pronunciation = await PronunciationLoader.load_with_audio(
-                str(entry.pronunciation_id)
-            )
+            pronunciation = await PronunciationLoader.load_with_audio(str(entry.pronunciation_id))
 
         # Load images for the synth entry itself
         images = []
@@ -251,13 +251,9 @@ class SynthesizedDictionaryEntryLoader(DataLoader):
             "word": word_obj.text,
             "pronunciation": pronunciation,
             "definitions": definitions,
-            "etymology": (
-                entry.etymology.model_dump(mode="json") if entry.etymology else None
-            ),
+            "etymology": (entry.etymology.model_dump(mode="json") if entry.etymology else None),
             "last_updated": entry.updated_at,
-            "model_info": (
-                entry.model_info.model_dump(mode="json") if entry.model_info else None
-            ),
+            "model_info": (entry.model_info.model_dump(mode="json") if entry.model_info else None),
             "id": str(entry.id),
             "images": images,
         }

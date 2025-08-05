@@ -9,7 +9,6 @@ from typing import Any
 import httpx
 from beanie import PydanticObjectId
 
-from ..constants import DictionaryProvider, Language
 from ..core.state_tracker import StateTracker
 from ..models import (
     Definition,
@@ -19,6 +18,7 @@ from ..models import (
     ProviderData,
     Word,
 )
+from ..models.definition import DictionaryProvider, Language
 from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger
 from .base import DictionaryConnector
@@ -121,18 +121,18 @@ class OxfordConnector(DictionaryConnector):
         """
         # Extract all components using the new API pattern
         assert word_obj.id is not None  # After save(), id is guaranteed to be not None
-        
+
         # Extract definitions and save them
         definitions = await self.extract_definitions(data, word_obj.id)
-        
+
         # Extract pronunciation and save it
         pronunciation = await self.extract_pronunciation(data, word_obj.id)
         if pronunciation:
             await pronunciation.save()
-        
+
         # Extract etymology
         etymology = await self.extract_etymology(data)
-        
+
         # Create and return ProviderData
         return ProviderData(
             word_id=word_obj.id,

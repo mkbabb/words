@@ -176,7 +176,7 @@ class WordList(Document, BaseMetadataWithAccess):
 
     async def get_word_item(self, word_text: str) -> WordListItem | None:
         """Get WordListItem by word text."""
-        from ..models.models import Word
+        from ..models.definition import Word
 
         # Find the word document by text
         word_doc = await Word.find_one({"text": word_text})

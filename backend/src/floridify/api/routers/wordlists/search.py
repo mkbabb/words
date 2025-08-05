@@ -62,7 +62,7 @@ async def search_wordlist_words(
     matched_word_texts = {result["word"] for result in search_results}
     words = await Word.find({"text": {"$in": list(matched_word_texts)}}).to_list()
     word_id_to_item = {word_item.word_id: word_item for word_item in wordlist.words}
-    
+
     # Get search-filtered wordlist items
     search_filtered_items = []
     for word in words:
@@ -77,27 +77,25 @@ async def search_wordlist_words(
         # For relevance, we need to sort by search scores first, then apply other filters
         word_scores = {result["word"]: result["score"] for result in search_results}
         word_id_to_text = {word.id: word.text for word in words if word.id}
-        
+
         # Sort by relevance score (highest first) to preserve search ranking
         search_filtered_items.sort(
-            key=lambda item: word_scores.get(word_id_to_text.get(item.word_id, ""), 0),
-            reverse=True
+            key=lambda item: word_scores.get(word_id_to_text.get(item.word_id, ""), 0), reverse=True
         )
-        
+
         # Apply shared filtering logic to maintain relevance order
-        filtered_items = [item for item in search_filtered_items if passes_wordlist_filters(item, params)]
+        filtered_items = [
+            item for item in search_filtered_items if passes_wordlist_filters(item, params)
+        ]
     else:
         # For non-relevance sorting, use the shared filter and sort function
         filtered_items = await apply_wordlist_filters_and_sort(search_filtered_items, params)
 
     # Step 4: Convert to response format and paginate using shared helper
     items, total = await convert_wordlist_items_to_response(
-        filtered_items,
-        paginated=True,
-        offset=params.offset,
-        limit=params.limit
+        filtered_items, paginated=True, offset=params.offset, limit=params.limit
     )
-    
+
     # Step 5: Add search scores back to items when sorting by relevance
     if params.sort_by == "relevance":
         # Re-map search scores to the final items
@@ -140,7 +138,7 @@ async def search_wordlists(
 
     # Convert to expected format
     wordlists = [result["wordlist"] for result in search_results]
-    
+
     return ListResponse(
         items=wordlists,
         total=len(wordlists),

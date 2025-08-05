@@ -168,9 +168,7 @@ class AnkiCardGenerator:
         from ..models import Example
 
         examples = (
-            await Example.find(
-                Example.definition_id == definition.id, Example.type == "generated"
-            )
+            await Example.find(Example.definition_id == definition.id, Example.type == "generated")
             .limit(limit)
             .to_list()
         )

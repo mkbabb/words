@@ -719,7 +719,7 @@ async def cluster_definitions(
 
             if definition.provider_data_id:
                 provider_data = await ProviderData.get(definition.provider_data_id)
-                
+
                 if provider_data:
                     # Convert enum to string for display
                     provider_name = provider_data.provider.value

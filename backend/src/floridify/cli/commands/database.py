@@ -8,11 +8,11 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from ...constants import DictionaryProvider
 from ...models import (
     SynthesizedDictionaryEntry,
     Word,
 )
+from ...models.definition import DictionaryProvider
 from ...storage.mongodb import MongoDBStorage
 from ..utils.formatting import format_error
 

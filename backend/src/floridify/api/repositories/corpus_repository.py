@@ -22,6 +22,10 @@ class CorpusSearchParams(BaseModel):
     query: str = Field(..., min_length=1, description="Search query")
     max_results: int = Field(default=20, ge=1, le=100, description="Max results")
     min_score: float = Field(default=0.6, ge=0.0, le=1.0, description="Min score")
+    semantic: bool = Field(default=False, description="Enable semantic search")
+    semantic_weight: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="Weight for semantic results"
+    )
 
 
 class CorpusRepository:
@@ -101,6 +105,7 @@ class CorpusRepository:
             query=params.query,
             max_results=params.max_results,
             min_score=params.min_score,
+            semantic=params.semantic,
         )
         return dict(result)
 

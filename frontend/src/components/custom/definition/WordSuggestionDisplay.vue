@@ -92,14 +92,22 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useStores } from '@/stores';
+// import { useStores } from '@/stores'; // Unused
 import { ThemedCard } from '@/components/custom/card';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { getCardVariant, formatPercent, formatExampleUsage } from './utils';
 import { useContentStore } from '@/stores';
+import { useSearchBarStore } from '@/stores/search/search-bar';
+import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 
-const { orchestrator, searchConfig } = useStores();
+// const { searchBar } = useStores(); // Unused
 const contentStore = useContentStore();
+const searchBarStore = useSearchBarStore();
+
+// Create orchestrator for API operations
+const orchestrator = useSearchOrchestrator({
+    query: computed(() => searchBarStore.searchQuery)
+});
 
 const wordSuggestions = computed(() => contentStore.wordSuggestions);
 
@@ -117,10 +125,15 @@ const originalQuery = computed(() => wordSuggestions.value?.original_query || ''
 
 async function handleWordClick(word: string) {
     // ✅ Use simple mode system - just change the mode
-    searchConfig.setMode('lookup');
-    searchConfig.setSubMode('lookup', 'dictionary');
-    // Use searchWord for direct lookup (sets isDirectLookup flag)
-    await orchestrator.searchWord(word);
+    searchBarStore.setMode('lookup');
+    searchBarStore.setSubMode('lookup', 'dictionary');
+    // Use direct lookup (sets isDirectLookup flag)
+    searchBarStore.setDirectLookup(true);
+    try {
+      await orchestrator.getDefinition(word);
+    } finally {
+      searchBarStore.setDirectLookup(false);
+    }
 }
 </script>
 

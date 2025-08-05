@@ -16,14 +16,14 @@ logger = get_logger(__name__)
 def _send_chunked_completion(result_data: dict[str, Any]) -> Generator[str, None, None]:
     """Send large completion data in manageable chunks."""
     # Split the result into logical chunks (definitions, examples, etc.)
-    
+
     # First, send completion start with proper event type
     completion_start = {
         "message": "Sending definition data in chunks",
         "total_definitions": len(result_data.get("definitions", [])),
     }
     yield f"event: completion_start\ndata: {json.dumps(completion_start)}\n\n"
-    
+
     # Send basic info first (word, id, etymology)
     basic_info = {
         "chunk_type": "basic_info",
@@ -34,11 +34,11 @@ def _send_chunked_completion(result_data: dict[str, Any]) -> Generator[str, None
             "model_info": result_data.get("model_info"),
             "pronunciation": result_data.get("pronunciation"),
             "etymology": result_data.get("etymology"),
-            "images": result_data.get("images", [])
-        }
+            "images": result_data.get("images", []),
+        },
     }
     yield f"event: completion_chunk\ndata: {json.dumps(basic_info)}\n\n"
-    
+
     # Send definitions in smaller chunks (avoid sending all examples at once)
     definitions = result_data.get("definitions", [])
     for i, definition in enumerate(definitions):
@@ -46,28 +46,25 @@ def _send_chunked_completion(result_data: dict[str, Any]) -> Generator[str, None
         def_chunk = {
             "chunk_type": "definition",
             "definition_index": i,
-            "data": {k: v for k, v in definition.items() if k != "examples"}
+            "data": {k: v for k, v in definition.items() if k != "examples"},
         }
         yield f"event: completion_chunk\ndata: {json.dumps(def_chunk)}\n\n"
-        
+
         # Send examples in smaller batches (10 at a time)
         examples = definition.get("examples", [])
         batch_size = 10
         for batch_start in range(0, len(examples), batch_size):
-            batch_examples = examples[batch_start:batch_start + batch_size]
+            batch_examples = examples[batch_start : batch_start + batch_size]
             examples_chunk = {
                 "chunk_type": "examples",
                 "definition_index": i,
                 "batch_start": batch_start,
-                "data": batch_examples
+                "data": batch_examples,
             }
             yield f"event: completion_chunk\ndata: {json.dumps(examples_chunk)}\n\n"
-    
+
     # Send final completion
-    final_completion = {
-        "message": "Process completed successfully",
-        "chunked": True
-    }
+    final_completion = {"message": "Process completed successfully", "chunked": True}
     yield f"event: complete\ndata: {json.dumps(final_completion)}\n\n"
 
 
@@ -78,7 +75,6 @@ class SSEEvent:
         self.event_type = event_type
         self.data = data
         self.event_id = event_id
-    
 
     def format(self) -> str:
         """Format as SSE string."""
@@ -147,7 +143,7 @@ class StreamingProgressHandler:
                 }
 
                 if include_completion_data and result is not None:
-                    completion_data["result"] = result.model_dump(mode='json')
+                    completion_data["result"] = result.model_dump(mode="json")
 
                 completion_event = SSEEvent(event_type="complete", data=completion_data)
                 yield completion_event.format()
@@ -290,7 +286,7 @@ async def create_streaming_response(
                 }
 
                 if include_completion_data and result is not None:
-                    completion_data["result"] = result.model_dump(mode='json')
+                    completion_data["result"] = result.model_dump(mode="json")
 
                 completion_event = SSEEvent(event_type="complete", data=completion_data)
                 yield completion_event.format()
@@ -372,24 +368,26 @@ async def create_streaming_response(
                                     error_event = SSEEvent(event_type="error", data=error_data)
                                     yield error_event.format()
                                     break
-                                
+
                                 # State is complete, now wait for and send process result
                                 if not process_task.done():
                                     # Wait a bit more for the process to finish
                                     try:
                                         await asyncio.wait_for(process_task, timeout=1.0)
                                     except TimeoutError:
-                                        logger.warning("Process task did not complete after state marked complete")
-                                
+                                        logger.warning(
+                                            "Process task did not complete after state marked complete"
+                                        )
+
                                 if process_task.done():
                                     result = await process_task
 
                                     # Send final completion with chunking for large payloads
                                     if include_completion_data and result is not None:
                                         # Serialize the result data
-                                        result_data = result.model_dump(mode='json')
+                                        result_data = result.model_dump(mode="json")
                                         result_json = json.dumps(result_data)
-                                        
+
                                         # Check if payload is too large (> 32KB)
                                         if len(result_json) > 32768:
                                             # Send completion in chunks
@@ -400,16 +398,20 @@ async def create_streaming_response(
                                             # Send as single completion event
                                             completion_data = {
                                                 "message": "Process completed successfully",
-                                                "result": result_data
+                                                "result": result_data,
                                             }
-                                            completion_event = SSEEvent(event_type="complete", data=completion_data)
+                                            completion_event = SSEEvent(
+                                                event_type="complete", data=completion_data
+                                            )
                                             yield completion_event.format()
                                     else:
                                         # Send simple completion without data
                                         completion_data = {
                                             "message": "Process completed successfully",
                                         }
-                                        completion_event = SSEEvent(event_type="complete", data=completion_data)
+                                        completion_event = SSEEvent(
+                                            event_type="complete", data=completion_data
+                                        )
                                         yield completion_event.format()
                                 break
 

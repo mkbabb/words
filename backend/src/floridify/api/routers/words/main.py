@@ -6,8 +6,8 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from ....constants import Language
 from ....models import Word
+from ....models.definition import Language
 from ...core import (
     ErrorDetail,
     ErrorResponse,

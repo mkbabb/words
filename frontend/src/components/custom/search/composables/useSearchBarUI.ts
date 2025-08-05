@@ -28,12 +28,12 @@ export function useSearchBarUI() {
     // Icon opacity based on store state and local UI state
     const iconOpacity = computed(() => {
         // Always full opacity when focused or hovered
-        if (searchBar.isSearchBarFocused || uiState.isContainerHovered) {
+        if (searchBar.isFocused || uiState.isContainerHovered) {
             return 1;
         }
 
         // Don't fade when either dropdown is showing
-        if (searchBar.showSearchControls || searchBar.showSearchResults) {
+        if (searchBar.showSearchControls || searchBar.showDropdown) {
             return 1;
         }
 

@@ -9,10 +9,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..ai import get_definition_synthesizer, get_openai_connector
-from ..constants import Language
+from ..models.definition import Language
 from ..search.language import get_language_search
 from ..storage.mongodb import get_storage
-from ..text.processor import get_text_processor
 from ..utils.logging import setup_logging
 from .middleware import CacheHeadersMiddleware, LoggingMiddleware
 from .routers import (
@@ -50,13 +49,10 @@ async def lifespan(app: FastAPI) -> Any:
         await get_storage()
         print("✅ MongoDB storage initialized successfully")
 
-        # Initialize language search engine (singleton)
-        await get_language_search([Language.ENGLISH])
-        print("✅ Language search engine initialized successfully")
+        # Initialize language search engine with semantic search enabled
+        await get_language_search([Language.ENGLISH], semantic=True)
+        print("✅ Language search engine initialized successfully with semantic support")
 
-        # Initialize text processor (singleton)
-        get_text_processor()
-        print("✅ Text processor initialized successfully")
 
         # Initialize AI components (singletons)
         get_openai_connector()

@@ -258,8 +258,6 @@ const handleQuickCreate = async () => {
         },
         last_visited: null,
         added_date: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
         notes: '',
         tags: [],
       }],

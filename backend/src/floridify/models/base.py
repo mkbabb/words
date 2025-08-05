@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class BaseMetadata(BaseModel):
     """Standard metadata for entities requiring CRUD tracking."""
-    
+
     model_config = ConfigDict(
         # Performance optimizations
         arbitrary_types_allowed=True,
@@ -26,8 +26,8 @@ class BaseMetadata(BaseModel):
             PydanticObjectId: str,
             UUID: str,
             Path: str,
-            bytes: lambda v: base64.b64encode(v).decode('utf-8'),
-        }
+            bytes: lambda v: base64.b64encode(v).decode("utf-8"),
+        },
     )
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -42,7 +42,7 @@ class BaseMetadata(BaseModel):
 
 class AccessTrackingMixin(BaseModel):
     """Mixin for entities that need access tracking functionality."""
-    
+
     # Access tracking
     last_accessed: datetime | None = Field(default=None, description="Last time accessed")
     access_count: int = Field(default=0, ge=0, description="Number of times accessed")
@@ -52,15 +52,14 @@ class AccessTrackingMixin(BaseModel):
         self.last_accessed = datetime.now(UTC)
         self.access_count += 1
         # Also mark as updated if this entity has that capability
-        if hasattr(self, 'mark_updated'):
+        if hasattr(self, "mark_updated"):
             self.mark_updated()
 
 
 class BaseMetadataWithAccess(BaseMetadata, AccessTrackingMixin):
     """Base metadata with access tracking for entities that need both."""
+
     pass
-
-
 
 
 class ModelInfo(BaseModel):
@@ -84,7 +83,6 @@ class ImageMedia(Document, BaseMetadata):
     height: int = Field(gt=0)
     alt_text: str | None = None
     description: str | None = None  # Additional description for hover/tooltip
-
 
     class Settings:
         name = "image_media"

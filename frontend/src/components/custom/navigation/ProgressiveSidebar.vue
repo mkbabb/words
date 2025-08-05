@@ -50,14 +50,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue';
-import { storeToRefs } from 'pinia';
-import { useStores } from '@/stores';
+import { ref, watch, nextTick, computed } from 'vue';
+import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useSidebarState, useSidebarNavigation, useActiveTracking } from './composables';
 import SidebarCluster from './components/SidebarCluster.vue';
 
-const { ui } = useStores();
-const { selectedCardVariant } = storeToRefs(ui);
+const lookupMode = useLookupMode();
+const selectedCardVariant = computed(() => lookupMode.selectedCardVariant);
 
 // Template refs
 const navContainer = ref<HTMLElement>();

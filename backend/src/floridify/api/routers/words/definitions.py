@@ -138,7 +138,7 @@ async def list_definitions(
     # Apply field selection and expansions
     expand_examples = fields.expand and "examples" in fields.expand
     expand_images = fields.expand and "images" in fields.expand
-    
+
     if expand_examples and expand_images:
         items = await repo.get_many_with_examples_and_images(definitions)
     elif expand_examples:
@@ -208,7 +208,7 @@ async def get_definition(
     # Get definition with optional expansions
     expand_examples = fields.expand and "examples" in fields.expand
     expand_images = fields.expand and "images" in fields.expand
-    
+
     if expand_examples and expand_images:
         definition_data = await repo.get_with_examples_and_images(definition_id)
     elif expand_examples:
@@ -520,9 +520,7 @@ async def regenerate_components(
             example_docs = []
             for example_text in examples_response.example_sentences:
                 assert definition.id is not None  # Definition from database should have ID
-                example = Example(
-                    definition_id=definition.id, text=example_text, type="generated"
-                )
+                example = Example(definition_id=definition.id, text=example_text, type="generated")
                 await example.save()
                 example_docs.append(example)
             definition.example_ids = [ex.id for ex in example_docs if ex.id is not None]

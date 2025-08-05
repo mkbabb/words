@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-from ..constants import Language
+from ..models.definition import Language
 from ..search.core import SearchResult
 from ..search.language import LanguageSearch, get_language_search
 from ..utils.logging import (

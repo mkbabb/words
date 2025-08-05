@@ -7,13 +7,12 @@ Supports exact, fuzzy, and semantic search with first-class phrase/idiom support
 
 from __future__ import annotations
 
-from ..constants import Language
+from ..models.definition import Language
 from .constants import EmbeddingLevel, FuzzySearchMethod, SearchMethod
 from .core import SearchEngine, SearchResult
+from .corpus import CorpusLanguageLoader, LexiconSourceConfig
 from .fuzzy import FuzzySearch
 from .language import LanguageSearch
-from .lexicon import LexiconLanguageLoader, LexiconSourceConfig
-from .phrase import MultiWordExpression, PhraseNormalizer
 
 # Semantic search with graceful degradation when dependencies unavailable
 from .semantic import SemanticSearch
@@ -24,7 +23,7 @@ __all__ = [
     "SearchResult",
     "SearchMethod",
     "LanguageSearch",
-    "LexiconLanguageLoader",
+    "CorpusLanguageLoader",
     "Language",
     "LexiconSourceConfig",
     "TrieSearch",
@@ -32,6 +31,4 @@ __all__ = [
     "FuzzySearchMethod",
     "SemanticSearch",
     "EmbeddingLevel",
-    "PhraseNormalizer",
-    "MultiWordExpression",
 ]

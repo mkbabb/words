@@ -334,7 +334,9 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
 
         return results
 
-    async def get_many_with_examples_and_images(self, definitions: list[Definition]) -> list[dict[str, Any]]:
+    async def get_many_with_examples_and_images(
+        self, definitions: list[Definition]
+    ) -> list[dict[str, Any]]:
         """Get multiple definitions with expanded examples and images efficiently."""
         from ...models import Example, ImageMedia
 
@@ -350,11 +352,11 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         # Fetch all examples and images in parallel
         examples_map = {}
         images_map = {}
-        
+
         if all_example_ids:
             examples = await Example.find(In(Example.id, all_example_ids)).to_list()
             examples_map = {str(ex.id): ex for ex in examples}
-            
+
         if all_image_ids:
             images = await ImageMedia.find(In(ImageMedia.id, all_image_ids)).to_list()
             images_map = {str(img.id): img for img in images}
@@ -363,7 +365,7 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         results = []
         for definition in definitions:
             def_dict = definition.model_dump()
-            
+
             # Add examples
             if definition.example_ids:
                 def_dict["examples"] = [
@@ -373,7 +375,7 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
                 ]
             else:
                 def_dict["examples"] = []
-                
+
             # Add images
             if definition.image_ids:
                 def_dict["images"] = [
@@ -383,7 +385,7 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
                 ]
             else:
                 def_dict["images"] = []
-                
+
             results.append(def_dict)
 
         return results

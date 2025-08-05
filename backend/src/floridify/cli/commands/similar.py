@@ -11,8 +11,8 @@ from rich.table import Table
 from rich.text import Text
 
 from ...ai import get_openai_connector
-from ...constants import DictionaryProvider, Language
 from ...core.lookup_pipeline import lookup_word_pipeline
+from ...models.definition import DictionaryProvider, Language
 from ...utils.logging import get_logger
 from ..utils.formatting import format_error, format_warning
 
@@ -93,6 +93,7 @@ async def _similar_async(
 
         from ...ai.synthesis_functions import synthesize_synonyms
         from ...models import Definition
+
         definition_obj = Definition(
             word_id=PydanticObjectId(ObjectId()),  # Dummy ObjectId for synthesis
             part_of_speech=part_of_speech,
