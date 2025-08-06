@@ -2,7 +2,7 @@
 
 import hashlib
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from functools import wraps
 from typing import Any
 
@@ -10,7 +10,10 @@ import orjson
 from fastapi import Request, Response
 from pydantic import BaseModel
 
-from ...caching.cache_manager import CacheManager, get_cache_manager
+from ...caching.unified import get_unified
+from ...utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class APICacheConfig(BaseModel):
@@ -65,13 +68,15 @@ def cached_endpoint(
             # Generate cache key
             cache_key = generate_cache_key(request, config, prefix)
 
+            # Get unified cache
+            cache = await get_unified()
+
             # Try to get from cache
-            cache_manager = get_cache_manager()
-            cached_data = cache_manager.get((cache_key,))
+            cached_data = await cache.get("api", cache_key)
 
             if cached_data:
                 # Parse cached response
-                cached_response = orjson.loads(cached_data)
+                cached_response = orjson.loads(cached_data) if isinstance(cached_data, bytes) else cached_data
 
                 # Set cache headers
                 response.headers["X-Cache"] = "HIT"
@@ -111,8 +116,11 @@ def cached_endpoint(
                 "status_code": response.status_code,
             }
 
-            cache_manager.set(
-                (cache_key,), orjson.dumps(cache_data).decode(), ttl_hours=config.ttl / 3600
+            await cache.set(
+                "api", 
+                cache_key, 
+                orjson.dumps(cache_data).decode(),
+                ttl=timedelta(seconds=config.ttl)
             )
 
             # Set cache headers
@@ -129,24 +137,31 @@ def cached_endpoint(
 class CacheInvalidator:
     """Utility for invalidating related caches."""
 
-    def __init__(self, cache_manager: CacheManager | None = None):
-        self.cache_manager = cache_manager or get_cache_manager()
+    def __init__(self):
+        self._cache = None
+
+    async def _get_cache(self):
+        """Get cache instance lazily."""
+        if self._cache is None:
+            self._cache = await get_unified()
+        return self._cache
 
     async def invalidate_pattern(self, pattern: str) -> int:
         """Invalidate all keys matching pattern."""
-        # This would require Redis SCAN command
+        cache = await self._get_cache()
+        
         # For now, we track invalidation patterns
-        invalidated = 0
-
-        # Store invalidation timestamp
+        # In a real implementation with Redis, we'd use SCAN and DEL
         invalidation_key = f"invalidation:{pattern}"
-        self.cache_manager.set(
-            (invalidation_key,),
+        await cache.set(
+            "api",
+            invalidation_key,
             datetime.now(UTC).isoformat(),
-            ttl_hours=24.0,  # Keep for 24 hours
+            ttl=timedelta(hours=24)  # Keep for 24 hours
         )
-
-        return invalidated
+        
+        logger.info(f"Marked pattern for invalidation: {pattern}")
+        return 0  # Return 0 since we don't have actual pattern matching yet
 
     async def invalidate_word(self, word_id: str) -> None:
         """Invalidate all caches related to a word."""
@@ -204,9 +219,15 @@ class ResponseCache:
         self.response = response
         self.ttl = ttl
         self.key_prefix = key_prefix
-        self.cache_manager = get_cache_manager()
+        self.cache = None
         self.cache_key: str | None = None
         self.start_time: datetime | None = None
+
+    async def _get_cache(self):
+        """Get cache instance lazily."""
+        if self.cache is None:
+            self.cache = await get_unified()
+        return self.cache
 
     async def __aenter__(self) -> Any:
         self.start_time = datetime.now(UTC)
@@ -214,10 +235,12 @@ class ResponseCache:
         self.cache_key = generate_cache_key(self.request, config, self.key_prefix)
 
         # Check cache
-        cached = self.cache_manager.get((self.cache_key,))
+        cache = await self._get_cache()
+        cached = await cache.get("api", self.cache_key)
+        
         if cached:
             self.response.headers["X-Cache"] = "HIT"
-            return orjson.loads(cached)
+            return orjson.loads(cached) if isinstance(cached, bytes) else cached
 
         self.response.headers["X-Cache"] = "MISS"
         return None

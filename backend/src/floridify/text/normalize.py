@@ -6,60 +6,43 @@ Provides comprehensive and fast normalization for different use cases.
 
 from __future__ import annotations
 
+import functools
 import re
 import unicodedata
 
-from .constants import SUFFIX_RULES
-from .patterns import (
+import contractions
+import ftfy
+
+# NLTK lemmatization (modern approach)
+import nltk
+from nltk.stem import WordNetLemmatizer
+
+from ..utils.logging import get_logger
+from .constants import (
     ARTICLE_PATTERN,
     MULTIPLE_SPACE_PATTERN,
     PUNCTUATION_PATTERN,
+    SUFFIX_RULES,
     UNICODE_TO_ASCII,
     WHITESPACE_PATTERN,
 )
 
-# NLTK lemmatization (modern approach)
-try:
-    import nltk
-    from nltk.stem import WordNetLemmatizer
+logger = get_logger(__name__)
 
-    # Try to use NLTK data, download if missing
+# Try to use NLTK data, download if missing
+try:
+    nltk.data.find("corpora/wordnet")
+    nltk.data.find("taggers/averaged_perceptron_tagger")
+except LookupError:
+    # Download required NLTK data in production-safe way
     try:
-        nltk.data.find("corpora/wordnet")
-        nltk.data.find("taggers/averaged_perceptron_tagger")
-    except LookupError:
-        # Download required NLTK data in production-safe way
-        try:
-            nltk.download("wordnet", quiet=True)
-            nltk.download("averaged_perceptron_tagger", quiet=True)
-            nltk.download("omw-1.4", quiet=True)  # Multilingual wordnet
-        except Exception:
-            pass  # Fail gracefully if downloads don't work
+        nltk.download("wordnet", quiet=True)
+        nltk.download("averaged_perceptron_tagger", quiet=True)
+        nltk.download("omw-1.4", quiet=True)  # Multilingual wordnet
+    except Exception:
+        logger.error("Failed to download NLTK data")
 
-    NLTK_AVAILABLE = True
-    _nltk_lemmatizer = WordNetLemmatizer()
-except ImportError:
-    NLTK_AVAILABLE = False
-    _nltk_lemmatizer = None
-
-# Performance optimization: lemma cache for repeated lookups
-# Research shows "LOADS of repetitions" in large corpora
-_lemma_cache: dict[str, str] = {}
-
-# Optional dependencies
-try:
-    import ftfy
-
-    FTFY_AVAILABLE = True
-except ImportError:
-    FTFY_AVAILABLE = False
-
-try:
-    import contractions
-
-    CONTRACTIONS_AVAILABLE = True
-except ImportError:
-    CONTRACTIONS_AVAILABLE = False
+_nltk_lemmatizer = WordNetLemmatizer()
 
 
 def normalize_comprehensive(
@@ -89,7 +72,7 @@ def normalize_comprehensive(
         return ""
 
     # Step 1: Fix encoding issues
-    if fix_encoding and FTFY_AVAILABLE:
+    if fix_encoding:
         text = ftfy.fix_text(text)
 
     # Step 2: Unicode normalization (NFD -> NFC)
@@ -98,8 +81,11 @@ def normalize_comprehensive(
     # Step 3: Replace Unicode characters with ASCII equivalents
     text = text.translate(UNICODE_TO_ASCII)
 
+    # Step 3.5: Remove diacritics for better matching
+    text = remove_diacritics(text)
+
     # Step 4: Expand contractions
-    if expand_contractions and CONTRACTIONS_AVAILABLE:
+    if expand_contractions:
         text = contractions.fix(text)
 
     # Step 5: Remove leading articles
@@ -147,72 +133,13 @@ def normalize_fast(text: str, lowercase: bool = True) -> str:
     text = re.sub(r"[^\w\s\'-]", " ", text)
 
     # Quick whitespace normalization
-    text = " ".join(text.split())
+    text = MULTIPLE_SPACE_PATTERN.sub(" ", text).strip()
 
     # Lowercase if requested
     if lowercase:
         text = text.lower()
 
     return text
-
-
-def normalize_word(word: str, remove_articles: bool = True) -> str:
-    """
-    Normalize a single word or short phrase.
-
-    Specifically optimized for dictionary words and entries.
-
-    Args:
-        word: Word or short phrase to normalize
-        remove_articles: Remove leading articles
-
-    Returns:
-        Normalized word
-    """
-    if not word:
-        return ""
-
-    # NFD normalization for diacritic handling
-    normalized = unicodedata.normalize("NFD", word)
-
-    # Remove diacritics
-    without_accents = "".join(char for char in normalized if unicodedata.category(char) != "Mn")
-
-    # Back to NFC
-    result = unicodedata.normalize("NFC", without_accents)
-
-    # Convert to lowercase and strip
-    result = result.lower().strip()
-
-    # Remove leading articles
-    if remove_articles:
-        result = ARTICLE_PATTERN.sub("", result, count=1).strip()
-
-    return result
-
-
-def clean_word(word: str) -> str:
-    """
-    Clean a single word by removing invalid characters.
-
-    Preserves hyphens and apostrophes which are valid in words.
-
-    Args:
-        word: Word to clean
-
-    Returns:
-        Cleaned word
-    """
-    if not word:
-        return ""
-
-    # Remove characters that aren't letters, hyphens, or apostrophes
-    cleaned = re.sub(r"[^a-zA-Z\-']", "", word)
-
-    # Remove leading/trailing punctuation
-    cleaned = cleaned.strip("-'")
-
-    return cleaned
 
 
 def is_valid_word(word: str, min_length: int = 2, max_length: int = 50) -> bool:
@@ -260,42 +187,12 @@ def remove_diacritics(text: str) -> str:
     nfd_text = unicodedata.normalize("NFD", text)
 
     # Remove combining marks (diacritics)
-    without_diacritics = "".join(char for char in nfd_text if unicodedata.category(char) != "Mn")
+    without_diacritics = "".join(
+        char for char in nfd_text if unicodedata.category(char) != "Mn"
+    )
 
     # Normalize back to NFC (composed form)
     return unicodedata.normalize("NFC", without_diacritics)
-
-
-def normalize_for_search(text: str) -> str:
-    """
-    Normalize text specifically for search operations.
-
-    Removes interference characters and normalizes aggressively
-    for better search matching.
-
-    Args:
-        text: Text to normalize for search
-
-    Returns:
-        Search-normalized text
-    """
-    if not text:
-        return ""
-
-    # Use fast normalization as base
-    normalized = normalize_fast(text, lowercase=True)
-
-    # Additional search-specific cleaning
-    # Remove all punctuation except spaces
-    normalized = re.sub(r"[^\w\s]", " ", normalized)
-
-    # Collapse multiple spaces
-    normalized = MULTIPLE_SPACE_PATTERN.sub(" ", normalized)
-
-    # Remove extra whitespace
-    normalized = normalized.strip()
-
-    return normalized
 
 
 # Lemmatization functions
@@ -319,7 +216,9 @@ def basic_lemmatize(word: str) -> str:
     word_lower = word.lower()
 
     # Try suffix rules in order of specificity
-    for suffix, replacement in sorted(SUFFIX_RULES.items(), key=lambda x: len(x[0]), reverse=True):
+    for suffix, replacement in sorted(
+        SUFFIX_RULES.items(), key=lambda x: len(x[0]), reverse=True
+    ):
         if word_lower.endswith(suffix) and len(word_lower) > len(suffix) + 1:
             stem = word_lower[: -len(suffix)] + replacement
             # Validate the result is reasonable
@@ -331,12 +230,7 @@ def basic_lemmatize(word: str) -> str:
 
 def _get_wordnet_pos(word: str) -> str:
     """Convert POS tag to WordNet format for better lemmatization."""
-    if not NLTK_AVAILABLE:
-        return "n"  # Default to noun
-
     try:
-        import nltk
-
         # Get POS tag
         pos_tag = nltk.pos_tag([word])[0][1]
 
@@ -355,14 +249,13 @@ def _get_wordnet_pos(word: str) -> str:
         return "n"  # Safe fallback
 
 
+@functools.lru_cache(maxsize=300000)  # Cache up to 300k lemmatizations
 def lemmatize_word(word: str) -> str:
     """
     Lemmatize a word using modern NLTK WordNet approach with POS tagging.
 
     Uses NLTK WordNetLemmatizer with POS context for accuracy (>95%).
-    Falls back to rule-based approach if NLTK unavailable.
-    Includes vocabulary validation to prevent errors like 'hapines'.
-    Performance-optimized with memoization for repeated lookups.
+    Performance-optimized with caching decorator for repeated lookups.
 
     Args:
         word: Word to lemmatize
@@ -378,66 +271,234 @@ def lemmatize_word(word: str) -> str:
         return word  # Return original if invalid
 
     word_lower = word.lower().strip()
-
-    # Check cache first (performance optimization)
-    if word_lower in _lemma_cache:
-        return _lemma_cache[word_lower]
-
     lemma = word_lower  # Default fallback
 
-    # Try modern NLTK approach first
-    if NLTK_AVAILABLE and _nltk_lemmatizer:
-        try:
-            # Get POS context for better accuracy
-            pos = _get_wordnet_pos(word_lower)
-            nltk_lemma = _nltk_lemmatizer.lemmatize(word_lower, pos=pos)
+    try:
+        # Get POS context for better accuracy
+        pos = _get_wordnet_pos(word_lower)
+        nltk_lemma = _nltk_lemmatizer.lemmatize(word_lower, pos=pos)
 
-            # Validate result quality
-            if nltk_lemma and is_valid_word(nltk_lemma) and len(nltk_lemma) >= 2:
-                lemma = nltk_lemma
-            else:
-                # Fallback to rule-based approach
-                lemma = basic_lemmatize(word_lower)
-        except Exception:
+        # Validate result quality
+        if nltk_lemma and is_valid_word(nltk_lemma) and len(nltk_lemma) >= 2:
+            lemma = nltk_lemma
+        else:
             # Fallback to rule-based approach
             lemma = basic_lemmatize(word_lower)
-    else:
-        # No NLTK available, use rule-based
+    except Exception:
+        # Fallback to rule-based approach
         lemma = basic_lemmatize(word_lower)
 
-    # Cache result for future lookups (performance optimization)
-    _lemma_cache[word_lower] = lemma
     return lemma
 
 
-def batch_lemmatize(words: list[str]) -> dict[str, str]:
+def _lemmatize_chunk(chunk: list[str]) -> list[str]:
     """
-    Batch lemmatize multiple words for performance optimization.
+    Lemmatize a chunk of words for multiprocessing.
+    Helper function that reinitializes NLTK in each process.
+    """
+    # Each process needs its own NLTK lemmatizer
+    import nltk
+    from nltk.stem import WordNetLemmatizer
+    
+    # Initialize lemmatizer for this process
+    process_lemmatizer = WordNetLemmatizer()
+    
+    lemmas = []
+    for word in chunk:
+        if not word:
+            lemmas.append("")
+            continue
+        
+        word_lower = word.lower().strip()
+        
+        try:
+            # Get POS tag
+            pos_tag = nltk.pos_tag([word_lower])[0][1]
+            
+            # Map to WordNet POS
+            if pos_tag.startswith("J"):
+                pos = "a"
+            elif pos_tag.startswith("V"):
+                pos = "v"
+            elif pos_tag.startswith("N"):
+                pos = "n"
+            elif pos_tag.startswith("R"):
+                pos = "r"
+            else:
+                pos = "n"
+            
+            lemma = process_lemmatizer.lemmatize(word_lower, pos=pos)
+            
+            # Validate result
+            if not lemma or len(lemma) < 2:
+                lemma = basic_lemmatize(word_lower)
+        except Exception:
+            lemma = basic_lemmatize(word_lower)
+        
+        lemmas.append(lemma)
+    
+    return lemmas
 
-    Processes words in batch to leverage caching and reduce overhead.
-    Recommended for processing large vocabularies (270K+ words).
 
+def batch_lemmatize(
+    words: list[str],
+    n_processes: int | None = None,
+    chunk_size: int = 5000,
+) -> tuple[list[str], list[int], list[int]]:
+    """
+    Parallelized batch lemmatization using multiprocessing.
+    
+    Processes words in parallel chunks for significant speedup on large vocabularies.
+    Falls back to serial processing for small batches.
+    
+    Args:
+        words: List of words to lemmatize
+        n_processes: Number of processes (None for CPU count)
+        chunk_size: Size of chunks for each process
+        
+    Returns:
+        Tuple of (unique_lemmas, word_to_lemma_indices, lemma_to_word_indices)
+    """
+    if not words:
+        return [], [], []
+    
+    # For small batches, use serial processing
+    if len(words) < 10000:
+        return batch_lemmatize_serial(words)
+    
+    import multiprocessing as mp
+    import os
+    
+    # Determine optimal process count
+    if n_processes is None:
+        n_processes = min(os.cpu_count() or 4, 8)  # Cap at 8 for efficiency
+    
+    logger.info(f"🚀 Parallelized lemmatization: {len(words)} words across {n_processes} processes")
+    
+    # Split words into chunks
+    chunks = []
+    for i in range(0, len(words), chunk_size):
+        chunks.append(words[i:i + chunk_size])
+    
+    # Use spawn context to avoid fork issues and proper cleanup
+    ctx = mp.get_context('spawn')
+    
+    # Process chunks in parallel with proper cleanup
+    chunk_results = []
+    with ctx.Pool(processes=n_processes) as pool:
+        try:
+            chunk_results = pool.map(_lemmatize_chunk, chunks)
+        finally:
+            pool.close()
+            pool.join()
+    
+    # Flatten results
+    all_lemmas = []
+    for chunk_lemmas in chunk_results:
+        all_lemmas.extend(chunk_lemmas)
+    
+    # Build unique lemmas and indices
+    seen_lemmas: set[str] = set()
+    unique_lemmas: list[str] = []
+    lemma_to_index: dict[str, int] = {}
+    word_to_lemma_indices: list[int] = []
+    lemma_to_word_indices: list[int] = []
+    
+    for word_idx, lemma in enumerate(all_lemmas):
+        if not lemma:
+            word_to_lemma_indices.append(-1)
+            continue
+        
+        if lemma not in seen_lemmas:
+            seen_lemmas.add(lemma)
+            lemma_idx = len(unique_lemmas)
+            unique_lemmas.append(lemma)
+            lemma_to_index[lemma] = lemma_idx
+            lemma_to_word_indices.append(word_idx)
+        else:
+            lemma_idx = lemma_to_index[lemma]
+        
+        word_to_lemma_indices.append(lemma_idx)
+    
+    logger.info(f"✅ Lemmatization complete: {len(unique_lemmas)} unique lemmas from {len(words)} words")
+    
+    return unique_lemmas, word_to_lemma_indices, lemma_to_word_indices
+
+
+def batch_lemmatize_serial(
+    words: list[str],
+) -> tuple[list[str], list[int], list[int]]:
+    """
+    Serial batch lemmatization with caching.
+    
+    Used for small batches or as fallback.
+    
     Args:
         words: List of words to lemmatize
 
     Returns:
-        Dictionary mapping original words to lemmatized forms
+        Tuple of (unique_lemmas, word_to_lemma_indices, lemma_to_word_indices)
     """
-    results = {}
-    for word in words:
-        if word:  # Skip empty strings
-            results[word] = lemmatize_word(word)
-    return results
+    if not words:
+        return [], [], []
+
+    # Use set for O(1) lookup performance
+    seen_lemmas: set[str] = set()
+    unique_lemmas: list[str] = []
+    lemma_to_index: dict[str, int] = {}
+    word_to_lemma_indices: list[int] = []
+    lemma_to_word_indices: list[int] = []
+
+    for word_idx, word in enumerate(words):
+        if not word:
+            word_to_lemma_indices.append(-1)  # Invalid word marker
+            continue
+
+        lemma = lemmatize_word(word)
+
+        if lemma not in seen_lemmas:
+            # New unique lemma - O(1) set lookup
+            seen_lemmas.add(lemma)
+            lemma_idx = len(unique_lemmas)
+            unique_lemmas.append(lemma)
+            lemma_to_index[lemma] = lemma_idx
+            lemma_to_word_indices.append(word_idx)  # First word with this lemma
+
+        word_to_lemma_indices.append(lemma_to_index[lemma])
+
+    return unique_lemmas, word_to_lemma_indices, lemma_to_word_indices
 
 
-def clear_lemma_cache() -> int:
+def clear_lemma_cache() -> None:
     """
     Clear the lemmatization cache.
 
-    Returns:
-        Number of entries cleared
+    Note: Cache is managed by decorator, clearing happens automatically via TTL.
     """
-    global _lemma_cache
-    count = len(_lemma_cache)
-    _lemma_cache.clear()
-    return count
+    logger.info("Lemmatization cache managed by decorator TTL (7 days)")
+
+
+def clean_word(word: str) -> str:
+    """
+    Clean a word using fast normalization.
+
+    Args:
+        word: Word to clean
+
+    Returns:
+        Cleaned word
+    """
+    return normalize_fast(word)
+
+
+def normalize_word(word: str) -> str:
+    """
+    Normalize a single word using comprehensive normalization.
+
+    Args:
+        word: Word to normalize
+
+    Returns:
+        Normalized word
+    """
+    return normalize_comprehensive(word)

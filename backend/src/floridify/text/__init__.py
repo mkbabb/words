@@ -5,6 +5,10 @@ Provides comprehensive and fast normalization functions for text processing,
 search operations, and linguistic analysis.
 """
 
+from .constants import (
+    PUNCTUATION_PATTERN,
+    WHITESPACE_PATTERN,
+)
 from .normalize import (
     basic_lemmatize,
     batch_lemmatize,
@@ -21,20 +25,6 @@ from .normalize import (
     # Diacritics
     remove_diacritics,
 )
-from .patterns import (
-    ADVANCED_WORD_PATTERN,
-    COLLOCATION_PATTERN,
-    COMPOUND_PATTERN,
-    HYPHENATED_PATTERN,
-    IDIOM_PATTERN,
-    PREPOSITIONAL_PATTERN,
-    PUNCTUATION_PATTERN,
-    QUOTED_PATTERN,
-    SENTENCE_PATTERN,
-    # Regex patterns
-    WHITESPACE_PATTERN,
-    WORD_PATTERN,
-)
 from .phrase import (
     clean_phrase,
     detect_multiword_expressions,
@@ -50,25 +40,13 @@ from .phrase import (
     split_phrase,
 )
 from .search import (
-    # Semantic search
-    create_subword_text,
     generate_diacritic_variants,
     generate_word_variants,
     get_vocabulary_hash,
-    # Search utilities
     normalize_for_search,
-    normalize_lexicon_entry,
-    split_word_into_subwords,
 )
-from .tokenizer import (
-    advanced_word_tokenize,
-    sentence_tokenize,
-    smart_tokenize,
-    # Tokenization
-    tokenize,
-    tokenize_for_search,
-    word_tokenize,
-)
+
+# Tokenization functions removed - module no longer exists
 
 __all__ = [
     # Core
@@ -97,27 +75,9 @@ __all__ = [
     "normalize_for_search",
     "generate_word_variants",
     "generate_diacritic_variants",
-    "normalize_lexicon_entry",
-    "create_subword_text",
-    "split_word_into_subwords",
     "get_vocabulary_hash",
-    # Tokenization
-    "tokenize",
-    "word_tokenize",
-    "sentence_tokenize",
-    "advanced_word_tokenize",
-    "smart_tokenize",
-    "tokenize_for_search",
+    # Tokenization functions removed - module no longer exists
     # Patterns
     "WHITESPACE_PATTERN",
     "PUNCTUATION_PATTERN",
-    "WORD_PATTERN",
-    "ADVANCED_WORD_PATTERN",
-    "SENTENCE_PATTERN",
-    "HYPHENATED_PATTERN",
-    "QUOTED_PATTERN",
-    "COMPOUND_PATTERN",
-    "IDIOM_PATTERN",
-    "COLLOCATION_PATTERN",
-    "PREPOSITIONAL_PATTERN",
 ]

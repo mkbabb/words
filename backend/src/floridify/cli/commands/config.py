@@ -181,12 +181,12 @@ def list_keys() -> None:
 
 
 @keys_group.command("set")
-@click.argument("service", type=click.Choice(["openai", "oxford", "dictionary_com"]))
+@click.argument("service", type=click.Choice(["openai", "oxford"]))
 @click.argument("api_key")
 def set_key(service: str, api_key: str) -> None:
     """Set an API key for a service.
 
-    SERVICE: The service name (openai, oxford, dictionary_com)
+    SERVICE: The service name (openai, oxford)
     API_KEY: The API key to set
     """
     try:
@@ -220,7 +220,7 @@ def set_key(service: str, api_key: str) -> None:
 @keys_group.command("test")
 @click.option(
     "--service",
-    type=click.Choice(["all", "openai", "oxford", "dictionary_com"]),
+    type=click.Choice(["all", "openai", "oxford"]),
     default="all",
     help="Service to test",
 )
@@ -232,7 +232,7 @@ def test_keys(service: str) -> None:
     console.print(f"[bold blue]Testing API connectivity for: {service}[/bold blue]")
 
     if service == "all":
-        services = ["openai", "oxford", "dictionary_com"]
+        services = ["openai", "oxford"]
     else:
         services = [service]
 
@@ -258,7 +258,6 @@ def edit_config() -> None:
                 "api": {
                     "openai_key": "",
                     "oxford_key": "",
-                    "dictionary_com_key": "",
                     "rate_limit_enabled": True,
                 },
                 "anki": {

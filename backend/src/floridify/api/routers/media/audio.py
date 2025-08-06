@@ -380,13 +380,6 @@ async def delete_audio(
             pass
 
 
-# Keep legacy endpoints for backward compatibility
-@router.get("/files/{audio_id}")
-async def get_audio_file_legacy(audio_id: str) -> FileResponse:
-    """[DEPRECATED] Use GET /audio/{audio_id}/content instead."""
-    return await get_audio_content(audio_id)
-
-
 @router.get("/cache/{subdir}/{filename}")
 async def get_cached_audio(subdir: str, filename: str) -> FileResponse:
     """Get a cached audio file by path.

@@ -8,8 +8,8 @@ from beanie.odm.enums import SortDirection
 from beanie.operators import RegEx
 from pydantic import BaseModel, Field
 
-from ...core.corpus_manager import CorpusManager, CorpusType, get_corpus_manager
-from ...models.definition import Language, Word
+from ...models.definition import CorpusType, Language, Word
+from ...search.corpus.manager import CorpusManager, get_corpus_manager
 from ...text import normalize_word
 from ...utils.logging import get_logger
 from ...wordlist.constants import MasteryLevel, Temperature

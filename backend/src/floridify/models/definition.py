@@ -34,7 +34,6 @@ class DictionaryProvider(Enum):
 
     WIKTIONARY = "wiktionary"
     OXFORD = "oxford"
-    DICTIONARY_COM = "dictionary_com"
     APPLE_DICTIONARY = "apple_dictionary"
     AI_FALLBACK = "ai_fallback"
     SYNTHESIS = "synthesis"

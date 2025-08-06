@@ -1,48 +1,48 @@
 """
-Constants for text processing.
+Consolidated constants and patterns for text processing.
 
-Contains lemmatization rules, diacritic mappings, and other constants
+Contains regex patterns, lemmatization rules, and other constants
 used throughout the text processing system.
 """
 
 from __future__ import annotations
 
-# Common diacritic mappings for reference
-DIACRITIC_MAPPINGS = {
-    # French
-    "à": "a",
-    "á": "a",
-    "â": "a",
-    "ã": "a",
-    "ä": "a",
-    "å": "a",
-    "è": "e",
-    "é": "e",
-    "ê": "e",
-    "ë": "e",
-    "ì": "i",
-    "í": "i",
-    "î": "i",
-    "ï": "i",
-    "ò": "o",
-    "ó": "o",
-    "ô": "o",
-    "õ": "o",
-    "ö": "o",
-    "ù": "u",
-    "ú": "u",
-    "û": "u",
-    "ü": "u",
-    "ý": "y",
-    "ÿ": "y",
-    "ç": "c",
-    "ñ": "n",
-    # German
-    "ß": "ss",
-    # Common ligatures
-    "æ": "ae",
-    "œ": "oe",
-}
+import re
+
+# Basic text patterns
+WHITESPACE_PATTERN = re.compile(r"\s+")
+PUNCTUATION_PATTERN = re.compile(r"[^\w\s\'-]", re.UNICODE)
+MULTIPLE_SPACE_PATTERN = re.compile(r"\s{2,}")
+
+# Article patterns for normalization
+ARTICLE_PATTERN = re.compile(
+    r"^(the|a|an|le|la|les|der|die|das|el|la|los|las|il|lo|gli)\s+", re.IGNORECASE
+)
+
+# Character translation tables
+UNICODE_TO_ASCII = str.maketrans(
+    {
+        # Dashes
+        "—": "-",  # em dash
+        "–": "-",  # en dash
+        "‒": "-",  # figure dash
+        "―": "-",  # horizontal bar
+        # Quotes
+        "\u2018": "'",  # left single quote
+        "\u2019": "'",  # right single quote (also used as apostrophe)
+        "\u201c": '"',  # left double quote
+        "\u201d": '"',  # right double quote
+        "‚": "'",  # single low quote
+        "„": '"',  # double low quote
+        # Apostrophes
+        "´": "'",  # acute accent (sometimes misused as apostrophe)
+        "`": "'",  # grave accent (sometimes misused as apostrophe)
+        # Spaces
+        "\xa0": " ",  # non-breaking space
+        "\u2009": " ",  # thin space
+        "\u200a": " ",  # hair space
+    }
+)
 
 # Lemmatization suffix rules
 SUFFIX_RULES = {
@@ -73,7 +73,7 @@ SUFFIX_RULES = {
     "s": "",
 }
 
-# Subword generation constants
+# Subword generation constants (for search)
 MIN_WORD_LENGTH_FOR_SUBWORDS = 3
 SUBWORD_PREFIX_LENGTH_SHORT = 3
 SUBWORD_PREFIX_LENGTH_LONG = 4
@@ -81,16 +81,17 @@ MIN_WORD_LENGTH_FOR_LONG_PREFIX = 6
 MIN_WORD_LENGTH_FOR_SLIDING_WINDOW = 8
 SLIDING_WINDOW_SIZE = 4
 
-# Article patterns for normalization (language-specific)
-ARTICLES = {
-    "english": ["the", "a", "an"],
-    "french": ["le", "la", "les", "un", "une", "des"],
-    "german": ["der", "die", "das", "ein", "eine"],
-    "spanish": ["el", "la", "los", "las", "un", "una"],
-    "italian": ["il", "lo", "la", "gli", "le", "un", "una"],
+# Common diacritic mappings
+DIACRITIC_MAPPINGS = {
+    # French
+    "à": "a", "á": "a", "â": "a", "ã": "a", "ä": "a", "å": "a",
+    "è": "e", "é": "e", "ê": "e", "ë": "e",
+    "ì": "i", "í": "i", "î": "i", "ï": "i",
+    "ò": "o", "ó": "o", "ô": "o", "õ": "o", "ö": "o",
+    "ù": "u", "ú": "u", "û": "u", "ü": "u",
+    "ý": "y", "ÿ": "y", "ç": "c", "ñ": "n",
+    # German
+    "ß": "ss",
+    # Common ligatures
+    "æ": "ae", "œ": "oe",
 }
-
-# All articles combined for pattern matching
-ALL_ARTICLES = []
-for articles in ARTICLES.values():
-    ALL_ARTICLES.extend(articles)

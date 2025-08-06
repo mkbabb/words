@@ -1,11 +1,8 @@
 """Repository implementations for data models."""
 
 from .audio_repository import AudioCreate, AudioFilter, AudioRepository, AudioUpdate
-from .corpus_repository import (
-    CorpusCreate,
-    CorpusRepository,
-    CorpusSearchParams,
-)
+
+# corpus_repository removed - using corpus_manager directly
 from .definition_repository import (
     DefinitionCreate,
     DefinitionFilter,
@@ -67,9 +64,7 @@ __all__ = [
     "WordAddRequest",
     "WordReviewRequest",
     "StudySessionRequest",
-    "CorpusRepository",
-    "CorpusCreate",
-    "CorpusSearchParams",
+# "CorpusRepository" removed
     "ImageRepository",
     "ImageCreate",
     "ImageUpdate",

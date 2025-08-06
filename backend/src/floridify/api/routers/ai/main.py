@@ -681,7 +681,7 @@ async def suggest_words_stream(
     # Create state tracker for suggestions
     state_tracker = StateTracker(category="suggestions")
 
-    async def suggestions_process():
+    async def suggestions_process() -> None:
         """Run the suggestion pipeline with state tracking."""
         try:
             await state_tracker.update_stage("START")

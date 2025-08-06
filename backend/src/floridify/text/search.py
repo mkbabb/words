@@ -7,18 +7,13 @@ Functions optimized for search operations and variant generation.
 from __future__ import annotations
 
 import hashlib
+import re
 import unicodedata
 
 from .constants import (
-    MIN_WORD_LENGTH_FOR_LONG_PREFIX,
-    MIN_WORD_LENGTH_FOR_SLIDING_WINDOW,
-    MIN_WORD_LENGTH_FOR_SUBWORDS,
-    SLIDING_WINDOW_SIZE,
-    SUBWORD_PREFIX_LENGTH_LONG,
-    SUBWORD_PREFIX_LENGTH_SHORT,
+    WHITESPACE_PATTERN,
 )
 from .normalize import normalize_fast, normalize_word, remove_diacritics
-from .patterns import WHITESPACE_PATTERN
 
 
 def normalize_for_search(text: str) -> str:
@@ -40,8 +35,6 @@ def normalize_for_search(text: str) -> str:
     normalized = normalize_fast(text, lowercase=True)
 
     # Remove all punctuation for search
-    import re
-
     normalized = re.sub(r"[^\w\s]", " ", normalized)
 
     # Collapse whitespace
@@ -118,89 +111,9 @@ def generate_diacritic_variants(text: str) -> set[str]:
     return variants
 
 
-def normalize_lexicon_entry(text: str) -> set[str]:
-    """
-    Comprehensive lexicon entry normalization with variant generation.
-
-    Combines text normalization with diacritic variant generation
-    for maximum search coverage.
-
-    Args:
-        text: Lexicon entry text
-
-    Returns:
-        Set of normalized variants
-    """
-    return generate_diacritic_variants(text)
-
-
-# Semantic search utilities
-
-
-def create_subword_text(word: str) -> str:
-    """
-    Create subword representation for a word or phrase.
-
-    Used for semantic search embeddings.
-
-    Args:
-        word: Word or phrase to process
-
-    Returns:
-        Space-separated subword units
-    """
-    # For phrases, split into words first
-    if " " in word:
-        words = word.split()
-        subwords = []
-        for w in words:
-            subwords.extend(split_word_into_subwords(w))
-        return " ".join(subwords)
-    else:
-        return " ".join(split_word_into_subwords(word))
-
-
-def split_word_into_subwords(word: str) -> list[str]:
-    """
-    Split a word into subword units using configurable parameters.
-
-    This function creates multiple representations of a word:
-    - The full word itself
-    - Prefixes and suffixes of varying lengths
-    - Sliding window subwords for long words
-
-    Args:
-        word: Single word to split
-
-    Returns:
-        List of subword units
-    """
-    if len(word) <= MIN_WORD_LENGTH_FOR_SUBWORDS:
-        return [word]
-
-    subwords = [word]  # Include full word
-
-    # Add short prefixes and suffixes
-    if len(word) >= SUBWORD_PREFIX_LENGTH_SHORT + 1:
-        subwords.append(word[:SUBWORD_PREFIX_LENGTH_SHORT])  # Prefix
-        subwords.append(word[-SUBWORD_PREFIX_LENGTH_SHORT:])  # Suffix
-
-    # Add longer prefixes and suffixes for longer words
-    if len(word) >= MIN_WORD_LENGTH_FOR_LONG_PREFIX:
-        subwords.append(word[:SUBWORD_PREFIX_LENGTH_LONG])  # Longer prefix
-        subwords.append(word[-SUBWORD_PREFIX_LENGTH_LONG:])  # Longer suffix
-
-    # Add sliding window subwords for long words
-    if len(word) >= MIN_WORD_LENGTH_FOR_SLIDING_WINDOW:
-        for i in range(len(word) - SLIDING_WINDOW_SIZE + 1):
-            subwords.append(word[i : i + SLIDING_WINDOW_SIZE])
-
-    return subwords
-
-
 def get_vocabulary_hash(vocabulary: list[str], max_length: int = 16) -> str:
     """
-    Generate a stable hash for vocabulary content using sampling for performance.
+    Generate a stable hash for vocabulary content using deterministic sampling.
 
     Args:
         vocabulary: List of words to hash
@@ -209,12 +122,17 @@ def get_vocabulary_hash(vocabulary: list[str], max_length: int = 16) -> str:
     Returns:
         Truncated hash string for cache key
     """
-    # Use sample words + length for fast, stable hashing (O(1) vs O(n log n) sorting)
-    sample_size = min(20, len(vocabulary))
+    # Sort vocabulary to ensure deterministic hash regardless of input order
+    sorted_vocab = sorted(vocabulary)
+
+    # Use sample words + length for fast, stable hashing
+    sample_size = min(20, len(sorted_vocab))
     sample_words = (
-        vocabulary[: sample_size // 2] + vocabulary[-sample_size // 2 :]
-        if len(vocabulary) > sample_size
-        else vocabulary
+        sorted_vocab[: sample_size // 2] + sorted_vocab[-sample_size // 2 :]
+        if len(sorted_vocab) > sample_size
+        else sorted_vocab
     )
+
     content = f"{len(vocabulary)}:{'|'.join(sample_words)}"
+
     return hashlib.sha256(content.encode()).hexdigest()[:max_length]

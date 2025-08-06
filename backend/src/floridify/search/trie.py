@@ -7,13 +7,15 @@ Provides exact matching and autocomplete functionality with frequency-based rank
 
 from __future__ import annotations
 
+import heapq
 import pickle
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
 import marisa_trie  # type: ignore[import-not-found]
 
-from ..caching.cache_manager import get_cache_manager
+from ..caching.unified import get_unified
 from ..text.search import get_vocabulary_hash
 from ..utils.logging import get_logger
 
@@ -47,9 +49,11 @@ class TrieSearch:
         self._max_frequency = 0
         self._stats_dirty = True  # Flag to track when stats need recalculation
         self._vocabulary_hash: str | None = None
-        self.cache_manager = get_cache_manager()
+        self._cache: Any = None  # Will be initialized on first use
 
-    def build_index(self, words: list[str], frequencies: dict[str, int] | None = None) -> None:
+    async def build_index(
+        self, words: list[str], frequencies: dict[str, int] | None = None
+    ) -> None:
         """
         Build the optimized trie index with content-hash based caching.
 
@@ -66,7 +70,7 @@ class TrieSearch:
             return
 
         # Try to load from cache
-        cached_trie = self._load_from_cache(vocab_hash)
+        cached_trie = await self._load_from_cache(vocab_hash)
         if cached_trie:
             logger.info(f"Loaded trie from cache: {vocab_hash[:8]}")
             self._trie = cached_trie["trie"]
@@ -106,7 +110,7 @@ class TrieSearch:
         if normalized_words:
             self._trie = marisa_trie.Trie(normalized_words)
             # Cache the built trie
-            self._save_to_cache(vocab_hash)
+            await self._save_to_cache(vocab_hash)
         else:
             self._trie = None
 
@@ -143,11 +147,14 @@ class TrieSearch:
 
         return max(1, base_score - length_penalty + phrase_bonus + pattern_bonus)
 
-
-    def _save_to_cache(self, vocab_hash: str) -> None:
+    async def _save_to_cache(self, vocab_hash: str) -> None:
         """Save trie to cache."""
         if not self._trie:
             return
+
+        # Get cache
+        if self._cache is None:
+            self._cache = await get_unified()
 
         cache_data = {
             "trie": self._trie,
@@ -156,18 +163,21 @@ class TrieSearch:
             "max_frequency": self._max_frequency,
         }
 
-        cache_key = f"trie_{vocab_hash}"
-        self.cache_manager.set((cache_key,), cache_data, ttl_hours=168)  # 1 week
-        logger.debug(f"Saved trie to cache: {cache_key}")
+        # Store with 7-day TTL
+        await self._cache.set("trie", vocab_hash, cache_data, ttl=timedelta(days=7))
+        logger.debug(f"Saved trie to cache: {vocab_hash[:8]}")
 
-    def _load_from_cache(self, vocab_hash: str) -> dict[str, Any] | None:
+    async def _load_from_cache(self, vocab_hash: str) -> dict[str, Any] | None:
         """Load trie from cache."""
-        cache_key = f"trie_{vocab_hash}"
-        cached_data = self.cache_manager.get((cache_key,))
+        # Get cache
+        if self._cache is None:
+            self._cache = await get_unified()
+
+        cached_data = await self._cache.get("trie", vocab_hash)
 
         if cached_data:
-            logger.debug(f"Loaded trie from cache: {cache_key}")
-            return cached_data
+            logger.debug(f"Loaded trie from cache: {vocab_hash[:8]}")
+            return cached_data  # type: ignore[no-any-return]
 
         return None
 
@@ -217,8 +227,6 @@ class TrieSearch:
             return [word for word, _ in frequency_pairs]
         else:
             # For many matches, use partial sort for better performance
-            import heapq
-
             heap_items: list[tuple[int, str]] = [
                 (-self._word_frequencies.get(word, 0), word) for word in matches
             ]

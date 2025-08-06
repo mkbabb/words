@@ -13,23 +13,37 @@ import csv
 import datetime
 import hashlib
 import json
-from datetime import UTC, timedelta
-from datetime import datetime as dt
+from datetime import UTC, datetime as dt
 from io import StringIO
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ...caching.core import CacheNamespace, CacheTTL, CompressionType
+from ...caching.unified import get_unified
 from ...models.definition import Language
 from ...text import normalize_comprehensive
 from ...utils.logging import get_logger
-from ..constants import LexiconFormat
-from ..models import CorpusCacheEntry, CorpusCompressionUtils
-from ..utils import normalize_lexicon_entry
+from .constants import LexiconFormat
+
+# Inline normalize_lexicon_entry function - KISS approach
 from .sources import LEXICON_SOURCES, LexiconSourceConfig
 
 logger = get_logger(__name__)
+
+
+def normalize_lexicon_entry(word: str) -> list[str]:
+    """Simple lexicon entry normalization - returns variants of the word."""
+    if not word:
+        return []
+    
+    normalized = normalize_comprehensive(word)
+    if not normalized:
+        return []
+    
+    # Return normalized version - KISS approach
+    return [normalized]
 
 
 class MultiWordExpression(BaseModel):
@@ -104,28 +118,25 @@ class CorpusLanguageLoader:
         self._rebuild_unified_indices()
 
     async def _load_language(self, language: Language) -> None:
-        """Load corpus data for a specific language from MongoDB or sources."""
+        """Load corpus data for a specific language from unified cache or sources."""
         source_hash = self._get_source_hash(language)
+        cache_key = f"{language.value}_{source_hash}"
 
-        # Try to load from MongoDB cache first (unless force rebuild)
+        logger.info(f"Loading {language.value} lexicon - force_rebuild={self.force_rebuild}")
+        
+        # Try to load from unified cache first (unless force rebuild)
         if not self.force_rebuild:
-            cached = await CorpusCacheEntry.get_cached_corpus(language, source_hash)
-            if cached:
-                # Decompress and load data
-                words_json = CorpusCompressionUtils.decompress_data(cached.words_data).decode(
-                    "utf-8"
-                )
-                phrases_json = CorpusCompressionUtils.decompress_data(cached.phrases_data).decode(
-                    "utf-8"
-                )
-                metadata_json = CorpusCompressionUtils.decompress_data(cached.metadata_data).decode(
-                    "utf-8"
-                )
-
-                words = json.loads(words_json)
-                phrases = [MultiWordExpression(**p) for p in json.loads(phrases_json)]
-                metadata = json.loads(metadata_json)
-
+            cache = await get_unified()
+            cached_data = await cache.get_compressed(CacheNamespace.CORPUS, cache_key)
+            
+            if cached_data:
+                # Deserialize cached lexicon data
+                words = cached_data.get("words", [])
+                phrases_data = cached_data.get("phrases", [])
+                metadata = cached_data.get("metadata", {})
+                
+                phrases = [MultiWordExpression(**p) for p in phrases_data]
+                
                 self.lexicons[language] = LexiconData(
                     words=words,
                     phrases=phrases,
@@ -135,14 +146,18 @@ class CorpusLanguageLoader:
                     total_entries=len(words) + len(phrases),
                     last_updated=metadata.get("last_updated", ""),
                 )
+                logger.info(f"Loaded {language.value} lexicon from cache ({len(words)} words, {len(phrases)} phrases)")
                 return
+            else:
+                logger.info(f"No cached data found for {language.value}, loading from sources")
 
         # Load from sources
+        logger.info(f"Loading {language.value} lexicon from external sources (force_rebuild={self.force_rebuild})")
         lexicon_data = await self._load_from_sources(language)
         self.lexicons[language] = lexicon_data
 
-        # Save to MongoDB cache
-        await self._save_to_cache(language, lexicon_data)
+        # Save to unified cache
+        await self._save_to_cache(language, lexicon_data, source_hash)
 
     async def _load_from_sources(self, language: Language) -> LexiconData:
         """Load lexicon data from online sources."""
@@ -219,38 +234,36 @@ class CorpusLanguageLoader:
     ) -> tuple[list[str], list[MultiWordExpression]]:
         """Load data from a specific source."""
         # Use the downloader function (handles both regular URLs and custom scraping)
-        logger.info(f"Downloading data for source: {source.name}")
         result = await source.scraper(source.url)
-        logger.debug(f"Downloaded data for {source.name}, type: {type(result).__name__}")
 
         # Handle custom scraper results (returns dict) vs regular HTTP responses
         if isinstance(result, dict):
             # Custom scraper returned structured data directly
             return self._parse_scraped_data(result, source.language)
 
-        # Regular HTTP response - process as before
-        response = result
-        if not hasattr(response, "text"):
-            logger.warning(f"Invalid response type from downloader for {source.name}")
+        # Regular HTTP response - handle string response from default_scraper
+        response_text = result
+        if not isinstance(response_text, str):
+            logger.warning(f"Invalid response type from downloader for {source.name}: expected string, got {type(response_text)}")
             return [], []
 
         # Parse based on format
         if source.format == LexiconFormat.TEXT_LINES:
-            return self._parse_text_lines(response.text, source.language)
+            return self._parse_text_lines(response_text, source.language)
         elif source.format == LexiconFormat.JSON_IDIOMS:
-            return self._parse_json_idioms(response.text, source.language)
+            return self._parse_json_idioms(response_text, source.language)
         elif source.format == LexiconFormat.FREQUENCY_LIST:
-            return self._parse_frequency_list(response.text, source.language)
+            return self._parse_frequency_list(response_text, source.language)
         elif source.format == LexiconFormat.JSON_DICT:
-            return self._parse_json_dict(response.text, source.language)
+            return self._parse_json_dict(response_text, source.language)
         elif source.format == LexiconFormat.JSON_ARRAY:
-            return self._parse_json_array(response.text, source.language)
+            return self._parse_json_array(response_text, source.language)
         elif source.format == LexiconFormat.JSON_GITHUB_API:
-            return self._parse_github_api_response(response.text, source.language)
+            return self._parse_github_api_response(response_text, source.language)
         elif source.format == LexiconFormat.CSV_IDIOMS:
-            return self._parse_csv_idioms(response.text, source.language)
+            return self._parse_csv_idioms(response_text, source.language)
         elif source.format == LexiconFormat.JSON_PHRASAL_VERBS:
-            return self._parse_json_phrasal_verbs(response.text, source.language)
+            return self._parse_json_phrasal_verbs(response_text, source.language)
         else:
             return [], []
 
@@ -549,14 +562,12 @@ class CorpusLanguageLoader:
                 # Determine if it's a phrase or single word
                 if len(normalized.split()) > 1:
                     phrase = MultiWordExpression(
-                        expression=expression,
+                        expression=normalized,  # Use normalized version for search
                         normalized=normalized,
                     )
                     phrases.append(phrase)
                 else:
                     words.append(normalized)
-
-        logger.info(f"Parsed scraped data: {len(words)} words, {len(phrases)} phrases")
         return words, phrases
 
     async def generate_master_index(self, output_path: Path | None = None) -> dict[str, Any]:
@@ -640,7 +651,7 @@ class CorpusLanguageLoader:
         self._all_words = []
         self._all_phrases = []
 
-        for lexicon_data in self.lexicons.values():
+        for language, lexicon_data in self.lexicons.items():
             self._all_words.extend(lexicon_data.words)
             self._all_phrases.extend(lexicon_data.phrases)
 
@@ -719,39 +730,30 @@ class CorpusLanguageLoader:
         source_str = "|".join(sorted(source_info))
         return hashlib.sha256(source_str.encode()).hexdigest()
 
-    async def _save_to_cache(self, language: Language, lexicon_data: LexiconData) -> None:
-        """Save lexicon data to MongoDB cache."""
-        # Prepare data for compression
-        words_json = json.dumps(lexicon_data.words).encode("utf-8")
-        phrases_json = json.dumps([p.model_dump() for p in lexicon_data.phrases]).encode("utf-8")
-        metadata_json = json.dumps(lexicon_data.metadata).encode("utf-8")
+    async def _save_to_cache(self, language: Language, lexicon_data: LexiconData, source_hash: str) -> None:
+        """Save lexicon data to unified cache with compression."""
+        cache_key = f"{language.value}_{source_hash}"
+        
+        # Prepare data for caching
+        cache_data = {
+            "words": lexicon_data.words,
+            "phrases": [p.model_dump() for p in lexicon_data.phrases],
+            "metadata": {
+                **lexicon_data.metadata,
+                "sources": lexicon_data.sources,
+                "last_updated": dt.now(UTC).isoformat(),
+            },
+        }
 
-        # Compress data
-        words_compressed, words_ratio = CorpusCompressionUtils.compress_data(words_json)
-        phrases_compressed, phrases_ratio = CorpusCompressionUtils.compress_data(phrases_json)
-        metadata_compressed, metadata_ratio = CorpusCompressionUtils.compress_data(metadata_json)
-
-        # Calculate sizes
-        original_size = len(words_json) + len(phrases_json) + len(metadata_json)
-        compressed_size = len(words_compressed) + len(phrases_compressed) + len(metadata_compressed)
-
-        # Create cache entry
-        cache_entry = CorpusCacheEntry(
-            language=language,
-            source_hash=self._get_source_hash(language),
-            words_data=words_compressed,
-            phrases_data=phrases_compressed,
-            metadata_data=metadata_compressed,
-            compression_ratio=original_size / compressed_size if compressed_size > 0 else 1.0,
-            original_size_bytes=original_size,
-            compressed_size_bytes=compressed_size,
-            word_count=len(lexicon_data.words),
-            phrase_count=len(lexicon_data.phrases),
-            total_entries=lexicon_data.total_entries,
-            load_time_ms=0.0,  # Could track actual load time
-            compression_time_ms=0.0,  # Could track actual compression time
-            expires_at=dt.now(UTC) + timedelta(hours=168),  # 1 week
+        # Save to unified cache with compression
+        cache = await get_unified()
+        await cache.set_compressed(
+            namespace=CacheNamespace.CORPUS,
+            key=cache_key,
+            value=cache_data,
+            compression_type=CompressionType.ZLIB,
+            ttl=CacheTTL.CORPUS,
+            tags=[f"{CacheNamespace.CORPUS}:{language.value}"],
         )
-
-        # Save to MongoDB
-        await cache_entry.save()
+        
+        logger.info(f"Cached {language.value} lexicon ({len(lexicon_data.words)} words, {len(lexicon_data.phrases)} phrases)")

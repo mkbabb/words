@@ -60,12 +60,12 @@ CACHE_DIR = PROJECT_ROOT / "backend" / ".cache"
 def get_cache_directory(cache_type: str = "") -> Path:
     """
     Get unified cache directory for different cache types.
-    
+
     Handles Docker, production, and development environments consistently.
-    
+
     Args:
         cache_type: Optional cache type subdirectory (e.g., 'semantic', 'vocabulary', 'trie')
-    
+
     Returns:
         Path to cache directory, created if it doesn't exist
     """
@@ -80,19 +80,14 @@ def get_cache_directory(cache_type: str = "") -> Path:
             # In Docker, use /app/cache (mounted volume)
             base_cache = Path("/app/cache")
         else:
-            # Native development: use project cache or system cache
-            project_cache = PROJECT_ROOT / "cache"
-            if project_cache.exists():
-                base_cache = project_cache
-            else:
-                # Fallback to user cache directory
-                base_cache = Path.home() / ".cache"
-    
+            # Native development: use fixed cache directory in backend
+            base_cache = PROJECT_ROOT / "backend" / "cache"
+
     # Add floridify namespace and cache type
     cache_dir = base_cache / "floridify"
     if cache_type:
         cache_dir = cache_dir / cache_type
-    
+
     # Ensure directory exists
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir

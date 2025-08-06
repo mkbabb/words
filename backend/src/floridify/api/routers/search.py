@@ -3,39 +3,24 @@
 from __future__ import annotations
 
 import time
-from typing import Any, TypeVar
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ...caching.decorators import cached_api_call
-from ...core.corpus_manager import CorpusType, get_corpus_manager
 from ...core.search_pipeline import get_search_engine, reset_search_engine
-from ...models.definition import Language
-from ...search.constants import SearchMethod
-from ...search.corpus.semantic_cache import SemanticIndexCache
+from ...models.definition import CorpusType, Language
+from ...search.corpus.manager import get_corpus_manager
 from ...search.language import get_language_search
+from ...search.models import SearchResult
 from ...text import clear_lemma_cache
 from ...utils.logging import get_logger
-
-T = TypeVar("T")
 
 logger = get_logger(__name__)
 router = APIRouter()
 
 
-class SearchResultResponse[T](BaseModel):
-    """Response for search operations with scoring and metadata."""
-
-    query: str = Field(..., description="Original search query")
-    results: list[T] = Field(..., description="Search results")
-    total_found: int = Field(..., description="Total number of matches")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Search metadata")
-
-    @property
-    def has_results(self) -> bool:
-        """Check if search returned any results."""
-        return len(self.results) > 0
 
 
 class SearchParams(BaseModel):
@@ -50,19 +35,30 @@ class SearchParams(BaseModel):
     )
 
 
-class SearchResponseItem(BaseModel):
-    """Single search result item."""
+class SearchResponse(BaseModel):
+    """Response for search operations with unified SearchResult model."""
 
-    word: str = Field(..., description="Matched word")
-    score: float = Field(..., ge=0.0, le=1.0, description="Relevance score")
-    method: SearchMethod = Field(..., description="Search method used")
-    is_phrase: bool = Field(default=False, description="Is multi-word phrase")
-
-
-class SearchResponse(SearchResultResponse[SearchResponseItem]):
-    """Response for search query with language metadata."""
-
+    query: str = Field(..., description="Original search query")
+    results: list[SearchResult] = Field(..., description="Search results")
+    total_found: int = Field(..., description="Total number of matches")
     language: Language = Field(..., description="Language searched")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Search metadata")
+
+    @property
+    def has_results(self) -> bool:
+        """Check if search returned any results."""
+        return len(self.results) > 0
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "query": "test",
+                "results": [{"word": "test", "score": 1.0, "method": "exact", "is_phrase": False}],
+                "total_found": 1,
+                "language": "en",
+                "metadata": {"search_time_ms": 15},
+            }
+        }
 
 
 class RebuildIndexRequest(BaseModel):
@@ -178,7 +174,7 @@ def parse_search_params(
 
 @cached_api_call(
     ttl_hours=1.0,
-    key_func=lambda query, params: f"search:{query}:{params.language.value}:{params.max_results}:{int(params.min_score*100)}:{params.semantic}",
+    key_prefix="search",
 )
 async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
     """Cached search implementation."""
@@ -198,16 +194,8 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
             semantic=params.semantic,
         )
 
-        # Convert to response format - optimized dictionary creation
-        response_items = [
-            SearchResponseItem(
-                word=result.word,
-                score=result.score,
-                method=result.method,
-                is_phrase=result.is_phrase,
-            )
-            for result in results
-        ]
+        # Results are already in SearchResult format
+        response_items = results
 
         return SearchResponse(
             query=query,
@@ -347,12 +335,25 @@ async def rebuild_search_index(
                 for ct in request.corpus_types
             ]
 
-        # Cache cleanup if requested
+        # Always clear all caches during rebuild to ensure fresh data
         caches_cleared = {}
-        if request.clear_existing_cache or request.clear_semantic_cache:
-            semantic_cleared = await SemanticIndexCache.cleanup_expired()
-            caches_cleared["semantic_expired"] = semantic_cleared
-            logger.info(f"Cleared {semantic_cleared} expired semantic cache entries")
+
+        # Clear vocabulary caches
+        from ...caching.unified import CacheNamespace, get_unified
+
+        cache = await get_unified()
+        vocab_cleared = await cache.invalidate_namespace(CacheNamespace.CORPUS)
+        caches_cleared["vocabulary_caches"] = vocab_cleared
+
+        # Clear semantic caches
+        # Cleanup expired entries in unified cache
+        await get_unified()
+        semantic_cleared = 0  # Unified cache handles expiration automatically
+        caches_cleared["semantic_expired"] = semantic_cleared
+
+        # Clear corpus caches
+        corpus_cleared = await corpus_manager.invalidate_all_corpora(CorpusType.LANGUAGE_SEARCH)
+        caches_cleared["corpus_caches"] = corpus_cleared
 
         # Lemmatization cache management
         lemmatization_stats = {}
@@ -370,7 +371,9 @@ async def rebuild_search_index(
                 await reset_search_engine()
                 search_engine = await get_search_engine(
                     languages=request.languages,
-                    force_rebuild=request.force_download or request.semantic_force_rebuild,
+                    force_rebuild=request.force_download
+                    or request.semantic_force_rebuild
+                    or request.clear_lexicon_cache,
                 )
                 stats = search_engine.get_stats()
                 corpus_results["language_search"] = {
@@ -544,7 +547,8 @@ async def invalidate_corpus_unified(
         # Cleanup expired entries
         expired_cleaned = 0
         if request.cleanup_expired:
-            expired_cleaned = await SemanticIndexCache.cleanup_expired()
+            # Unified cache handles expiration automatically
+            expired_cleaned = 0
             logger.info(f"Cleaned up {expired_cleaned} expired cache entries")
 
         message = f"Successfully invalidated {total_invalidated} corpus entries"

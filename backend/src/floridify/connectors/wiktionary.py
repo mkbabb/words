@@ -7,10 +7,11 @@ import html
 import re
 from typing import Any
 
+import httpx
 import wikitextparser as wtp  # type: ignore[import-untyped]
 from beanie import PydanticObjectId
 
-from ..caching import get_cached_http_client
+from ..caching.decorators import cached_computation_async
 from ..core.state_tracker import Stages, StateTracker
 from ..models import (
     Collocation,
@@ -164,15 +165,26 @@ class WiktionaryConnector(DictionaryConnector):
         "article": "adjective",  # Map to adjective
     }
 
-    def __init__(self, rate_limit: float = 8.0, force_refresh: bool = False) -> None:
+    def __init__(self, rate_limit: float = 8.0) -> None:
         """Initialize enhanced Wiktionary connector."""
         super().__init__(rate_limit=rate_limit / 3600.0)
         self.base_url = "https://en.wiktionary.org/w/api.php"
-        self.http_client = get_cached_http_client(
-            force_refresh=force_refresh,
-            default_ttl_hours=24.0,
-        )
         self.cleaner = WikitextCleaner()
+
+    @cached_computation_async(ttl_hours=24.0, key_prefix="wiktionary_api")
+    async def _cached_get(self, url: str, params: dict[str, Any]) -> str:
+        """Cached HTTP GET for API calls."""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                url, 
+                params=params,
+                headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
+                timeout=120.0
+            )
+            if response.status_code == 429:
+                raise Exception("Rate limited by Wiktionary")
+            response.raise_for_status()
+            return response.text
 
     @property
     def provider_name(self) -> DictionaryProvider:
@@ -226,36 +238,11 @@ class WiktionaryConnector(DictionaryConnector):
                             )
                         )
 
-            response = await self.http_client.get(
-                self.base_url,
-                params=params,
-                ttl_hours=24.0,
-                headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
-                timeout=120.0,
-                progress_callback=http_progress_callback if state_tracker else None,
-            )
-
-            if response.status_code == 429:
-                logger.warning("Rate limited by Wiktionary, waiting 60s...")
-                if state_tracker:
-                    await state_tracker.update(
-                        stage=Stages.PROVIDER_FETCH_HTTP_RATE_LIMITED,
-                        message="Rate limited - waiting 60s",
-                    )
-
-                await asyncio.sleep(60)
-
-                response = await self.http_client.get(
-                    self.base_url,
-                    params=params,
-                    force_refresh=True,
-                    headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
-                    timeout=120.0,
-                    progress_callback=http_progress_callback if state_tracker else None,
-                )
-
-            response.raise_for_status()
-            data = response.json()
+            response_text = await self._cached_get(self.base_url, params)
+            
+            # Parse JSON response
+            import json
+            data = json.loads(response_text)
 
             # Report parsing start
             if state_tracker:
@@ -1189,4 +1176,4 @@ class WiktionaryConnector(DictionaryConnector):
 
     async def close(self) -> None:
         """Close HTTP client."""
-        await self.http_client.close()
+        pass  # No HTTP client to close - using cached decorator

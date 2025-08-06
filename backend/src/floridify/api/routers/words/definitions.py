@@ -2,12 +2,10 @@
 
 from collections import defaultdict
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from PIL import Image
 from pydantic import BaseModel, Field
 
 from ....ai import get_openai_connector
@@ -26,7 +24,7 @@ from ....ai.synthesis_functions import (
     synthesize_synonyms,
     usage_note_generation,
 )
-from ....models import Definition, Example, ImageMedia, Word
+from ....models import Definition, Example, Word
 from ...core import (
     ErrorDetail,
     ErrorResponse,
@@ -319,102 +317,6 @@ async def update_definition_partial(
         links={
             "self": f"/definitions/{definition_id}",
             "word": f"/words/{definition.word_id}",
-        },
-    )
-
-
-# Keep old endpoint for backward compatibility but mark as deprecated
-@router.post("/{definition_id}/images", response_model=ResourceResponse, deprecated=True)
-async def bind_image_to_definition(
-    definition_id: PydanticObjectId,
-    request: DefinitionImageUpdate,
-    repo: DefinitionRepository = Depends(get_definition_repo),
-) -> ResourceResponse:
-    """[DEPRECATED] Use PATCH /definitions/{definition_id} instead.
-
-    Bind an image to a definition.
-
-    Args:
-        definition_id: ID of the definition
-        request: Image binding request with path and optional alt text
-
-    Returns:
-        Updated definition with image
-
-    Raises:
-        404: Definition not found
-        400: Invalid image path
-    """
-
-    # Get the definition
-    definition = await repo.get(definition_id, raise_on_missing=True)
-    assert definition is not None  # Type assertion
-
-    # Validate image path exists
-    image_path = Path(request.image_path)
-    if not image_path.exists():
-        raise HTTPException(
-            400,
-            detail=ErrorResponse(
-                error="Invalid image path",
-                details=[
-                    ErrorDetail(
-                        field="image_path",
-                        message=f"Image file not found: {request.image_path}",
-                        code="file_not_found",
-                    )
-                ],
-            ).model_dump(),
-        )
-
-    # Get image metadata
-    try:
-        with Image.open(image_path) as img:
-            width, height = img.size
-            format = img.format.lower() if img.format else image_path.suffix[1:].lower()
-    except Exception as e:
-        raise HTTPException(
-            400,
-            detail=ErrorResponse(
-                error="Invalid image file",
-                details=[
-                    ErrorDetail(
-                        field="image_path",
-                        message=f"Could not open image file: {str(e)}",
-                        code="invalid_image",
-                    )
-                ],
-            ).model_dump(),
-        )
-
-    # Create ImageMedia document
-    image_media = ImageMedia(
-        url=str(image_path),  # Store as file path for now
-        format=format,
-        size_bytes=image_path.stat().st_size,
-        width=width,
-        height=height,
-        alt_text=request.alt_text,
-    )
-    await image_media.save()
-
-    # Add image ID to definition
-    assert image_media.id is not None  # Saved media should have ID
-    if image_media.id not in definition.image_ids:
-        definition.image_ids.append(image_media.id)
-        definition.version += 1
-        await definition.save()
-
-    return ResourceResponse(
-        data=definition.model_dump(mode="json"),
-        metadata={
-            "image_id": str(image_media.id),
-            "version": definition.version,
-        },
-        links={
-            "self": f"/definitions/{definition_id}",
-            "word": f"/words/{definition.word_id}",
-            "image": f"/images/{image_media.id}",
         },
     )
 

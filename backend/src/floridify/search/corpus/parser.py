@@ -15,7 +15,7 @@ from typing import Any
 from ...models.definition import Language
 from ...text import is_phrase, normalize_comprehensive
 from ...utils.logging import get_logger
-from ..constants import LexiconFormat
+from .constants import LexiconFormat
 
 logger = get_logger(__name__)
 

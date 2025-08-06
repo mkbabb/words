@@ -110,15 +110,7 @@ def parse_lookup_params(
 
 @cached_api_call_with_dedup(
     ttl_hours=1.0,
-    key_func=lambda word, params: (
-        "api_lookup",
-        word,
-        params.languages,
-        params.force_refresh,
-        tuple(params.providers),
-        params.no_ai,
-    ),
-    max_wait_time=60.0,  # Wait up to 60 seconds for AI synthesis
+    key_prefix="api_lookup",
 )
 async def _cached_lookup(word: str, params: LookupParams) -> DictionaryEntryResponse | None:
     """Cached word lookup implementation."""
@@ -222,9 +214,11 @@ async def _lookup_with_tracking(
 
         if not params.force_refresh:
             # First check decorator cache (memory/file) - same as normal endpoint
-            from ...caching.cache_manager import get_cache_manager
+            import hashlib
 
-            cache_manager = get_cache_manager()
+            from ...caching.unified import get_unified
+
+            cache = await get_unified()
             key_parts = (
                 "api_lookup",
                 word,
@@ -233,8 +227,10 @@ async def _lookup_with_tracking(
                 tuple(params.providers),
                 params.no_ai,
             )
+            # Generate cache key from parts
+            cache_key = hashlib.sha256(str(key_parts).encode()).hexdigest()
 
-            cached_result = cache_manager.get(key_parts, use_file_cache=False)
+            cached_result = await cache.get("api", cache_key)
             if cached_result is not None:
                 logger.info(f"🎯 Memory cache hit for '{word}'")
                 # Real streaming progress for cached result
@@ -278,7 +274,8 @@ async def _lookup_with_tracking(
                 result = DictionaryEntryResponse(**response_dict)
 
                 # Store in memory cache for next time
-                cache_manager.set(key_parts, result, ttl_hours=1.0, use_file_cache=False)
+                from datetime import timedelta
+                await cache.set("api", cache_key, result, ttl=timedelta(hours=1.0))
 
                 await state_tracker.update_complete(
                     message=f"Found {len(result.definitions)} definitions (DB cached)"

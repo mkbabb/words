@@ -7,12 +7,10 @@ import platform
 import time
 import traceback
 
-from src.floridify.connectors.base import DictionaryConnector
-
 from ..ai import get_definition_synthesizer
 from ..ai.synthesis_functions import cluster_definitions
 from ..connectors.apple_dictionary import AppleDictionaryConnector
-from ..connectors.dictionary_com import DictionaryComConnector
+from ..connectors.base import DictionaryConnector
 from ..connectors.oxford import OxfordConnector
 from ..connectors.wiktionary import WiktionaryConnector
 from ..models.base import Etymology
@@ -101,12 +99,7 @@ async def lookup_word_pipeline(
             await state_tracker.update_stage(Stages.SEARCH_COMPLETE)
 
         if not best_match_result:
-            logger.warning(f"No search results found for '{word}' after {search_duration:.2f}s")
-            # Try AI fallback if no results and AI is enabled
-            if not no_ai:
-                logger.info(f"No search results, trying AI fallback for '{word}'")
-                return await _ai_fallback_lookup(word, force_refresh, state_tracker)
-
+            logger.error(f"No search results found for '{word}' after {search_duration:.2f}s")
             return None
 
         # Use the best match
@@ -174,12 +167,9 @@ async def lookup_word_pipeline(
         if state_tracker:
             await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
 
-        # Only try AI fallback if ALL providers failed
-        if not providers_data and not no_ai:
-            logger.info(f"All providers failed, trying AI fallback for '{best_match}'")
-            return await _ai_fallback_lookup(best_match, force_refresh, state_tracker)
-        elif not providers_data:
-            logger.error(f"All providers failed and AI is disabled for '{best_match}'")
+        # Fail fast if no provider data available
+        if not providers_data:
+            logger.error(f"All providers failed for '{best_match}'")
             return None
 
         # Synthesize with AI if enabled and we have provider data
@@ -219,16 +209,14 @@ async def lookup_word_pipeline(
                     )
                     return synthesized_entry
                 else:
-                    logger.warning(
-                        f"⚠️  AI synthesis returned empty result for '{best_match}' "
+                    logger.error(
+                        f"❌ AI synthesis returned empty result for '{best_match}' "
                         f"after {ai_duration:.2f}s"
                     )
-                    # Try fallback if synthesis fails
-                    return await _ai_fallback_lookup(best_match, force_refresh, state_tracker)
+                    return None
             except Exception as e:
-                logger.error(f"❌ AI synthesis failed: {e}")
-                # Try fallback if synthesis fails
-                return await _ai_fallback_lookup(best_match, force_refresh, state_tracker)
+                logger.error(f"❌ AI synthesis failed for '{best_match}': {e}")
+                return None
         else:
             # When AI is disabled, create a non-AI synthesized entry from provider data
             logger.info(f"🔧 Creating non-AI synthesized entry for '{best_match}'")
@@ -268,7 +256,7 @@ async def _get_provider_definition(
         connector: DictionaryConnector
 
         if provider == DictionaryProvider.WIKTIONARY:
-            connector = WiktionaryConnector(force_refresh=force_refresh)
+            connector = WiktionaryConnector()
         elif provider == DictionaryProvider.OXFORD:
             config = Config.from_file()
             if not config.oxford.app_id or not config.oxford.api_key:
@@ -277,16 +265,6 @@ async def _get_provider_definition(
                     "Please update auth/config.toml with your Oxford app_id and api_key."
                 )
             connector = OxfordConnector(app_id=config.oxford.app_id, api_key=config.oxford.api_key)
-        elif provider == DictionaryProvider.DICTIONARY_COM:
-            config = Config.from_file()
-            if not config.dictionary_com.authorization:
-                raise ValueError(
-                    "Dictionary.com API authorization not configured. "
-                    "Please update auth/config.toml with your Dictionary.com authorization token."
-                )
-            connector = DictionaryComConnector(
-                api_key=config.dictionary_com.authorization, force_refresh=force_refresh
-            )
         elif provider == DictionaryProvider.APPLE_DICTIONARY:
             connector = AppleDictionaryConnector()
         else:

@@ -11,15 +11,15 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from ..models import (
     AudioMedia,
-    CorpusCacheEntry,
-    CorpusData,
+    # CorpusCacheEntry removed - using unified caching
+    CorpusMetadata,
     Definition,
     Example,
     Fact,
     ImageMedia,
     Pronunciation,
     ProviderData,
-    SemanticIndexCache,
+    SemanticMetadata,
     SynthesizedDictionaryEntry,
     Word,
     WordRelationship,
@@ -93,10 +93,10 @@ class MongoDBStorage:
                 SynthesizedDictionaryEntry,
                 WordRelationship,
                 WordList,
-                SemanticIndexCache,
-                # Cache models
-                CorpusCacheEntry,
-                CorpusData,
+                # Cache models  
+                # CorpusCacheEntry removed - using unified caching
+                CorpusMetadata,
+                SemanticMetadata,
             ],
         )
 

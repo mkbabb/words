@@ -9,31 +9,19 @@ from typing import Any
 
 import httpx
 
-from ....caching import get_cached_http_client
+from ....caching.decorators import cached_computation_async
 
 # Type alias for clarity
-ScraperFunc = Callable[[str], Awaitable[dict[str, Any] | httpx.Response]]
+ScraperFunc = Callable[..., Awaitable[str | dict[str, Any]]]
 
 
-async def default_scraper(url: str = "", **kwargs: Any) -> httpx.Response:
-    """Default HTTP GET downloader with caching."""
+@cached_computation_async(ttl_hours=168.0, key_prefix="http")
+async def default_scraper(url: str, timeout: float = 30.0) -> str:
+    """Cached HTTP GET downloader returning text content."""
     if not url:
-        raise ValueError("URL is required for default downloader")
-
-    # Get cached HTTP client
-    force_refresh = kwargs.get("force_refresh", False)
-    ttl_hours = kwargs.get("ttl_hours", 168.0)  # Cache lexicon files for 1 week by default
-
-    http_client = get_cached_http_client(
-        force_refresh=force_refresh,
-        default_ttl_hours=ttl_hours,
-    )
-
-    response = await http_client.get(
-        url,
-        ttl_hours=ttl_hours,
-        force_refresh=force_refresh,
-        timeout=kwargs.get("timeout", 30.0),
-    )
-    response.raise_for_status()
-    return response
+        raise ValueError("URL is required")
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, timeout=timeout)
+        response.raise_for_status()
+        return response.text

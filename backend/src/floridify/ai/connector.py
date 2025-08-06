@@ -75,14 +75,7 @@ class OpenAIConnector:
 
     @cached_api_call(
         ttl_hours=24.0,  # Cache OpenAI responses for 24 hours
-        use_file_cache=False,  # Use in-memory cache for API responses
-        key_func=lambda self, prompt, response_model, task_name=None, **kwargs: (
-            "openai_structured",
-            get_model_for_task(task_name).value if task_name else self.model_name,
-            hash(prompt),
-            response_model.__name__,
-            tuple(sorted(kwargs.items())),
-        ),
+        key_prefix="openai_structured",
     )
     async def _make_structured_request(
         self,

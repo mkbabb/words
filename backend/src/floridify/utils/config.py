@@ -30,18 +30,10 @@ class OxfordConfig:
 
 
 @dataclass
-class DictionaryComConfig:
-    """Dictionary.com API configuration."""
-
-    authorization: str
-
-
-@dataclass
 class RateLimits:
     """Rate limiting configuration."""
 
     oxford_rps: float = 10.0
-    dictionary_com_rps: float = 20.0
     wiktionary_rps: float = 50.0
     openai_bulk_max_concurrent: int = 5
 
@@ -118,7 +110,6 @@ class Config:
 
     openai: OpenAIConfig
     oxford: OxfordConfig
-    dictionary_com: DictionaryComConfig
     database: DatabaseConfig
     rate_limits: RateLimits
     processing: ProcessingConfig
@@ -173,9 +164,6 @@ class Config:
             api_key=data.get("oxford", {}).get("api_key", ""),
         )
 
-        dictionary_com_config = DictionaryComConfig(
-            authorization=data.get("dictionary_com", {}).get("authorization", "")
-        )
 
         db_data = data.get("database", {})
         database_config = DatabaseConfig(
@@ -189,7 +177,6 @@ class Config:
 
         rate_limits = RateLimits(
             oxford_rps=data.get("rate_limits", {}).get("oxford_rps", 10.0),
-            dictionary_com_rps=data.get("rate_limits", {}).get("dictionary_com_rps", 20.0),
             wiktionary_rps=data.get("rate_limits", {}).get("wiktionary_rps", 50.0),
             openai_bulk_max_concurrent=data.get("rate_limits", {}).get(
                 "openai_bulk_max_concurrent", 5
@@ -222,7 +209,6 @@ class Config:
         config = cls(
             openai=openai_config,
             oxford=oxford_config,
-            dictionary_com=dictionary_com_config,
             database=database_config,
             rate_limits=rate_limits,
             processing=processing,

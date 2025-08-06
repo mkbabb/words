@@ -8,14 +8,15 @@ Supports exact, fuzzy, and semantic search with first-class phrase/idiom support
 from __future__ import annotations
 
 from ..models.definition import Language
-from .constants import EmbeddingLevel, FuzzySearchMethod, SearchMethod
-from .core import SearchEngine, SearchResult
+from .constants import FuzzySearchMethod, SearchMethod
+from .core import SearchEngine
 from .corpus import CorpusLanguageLoader, LexiconSourceConfig
 from .fuzzy import FuzzySearch
 from .language import LanguageSearch
+from .models import SearchResult
 
 # Semantic search with graceful degradation when dependencies unavailable
-from .semantic import SemanticSearch
+from .semantic.core import SemanticSearch
 from .trie import TrieSearch
 
 __all__ = [
@@ -30,5 +31,4 @@ __all__ = [
     "FuzzySearch",
     "FuzzySearchMethod",
     "SemanticSearch",
-    "EmbeddingLevel",
 ]

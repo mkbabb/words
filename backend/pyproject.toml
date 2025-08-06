@@ -52,6 +52,12 @@ dependencies = [
     "sentence-transformers>=3.0.0",
     "scikit-learn>=1.5.0",
     "numpy>=1.26.0",
+    # High-performance caching
+    "diskcache>=5.6.3",
+    # Compression
+    "zstandard>=0.22.0",
+    # ONNX optimization for semantic search
+    "optimum[onnxruntime]>=1.16.0",
 ]
 
 
@@ -109,8 +115,17 @@ target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "UP"]
+select = ["E", "F", "I", "N", "UP", "E402"]  # E402: Module level import not at top of file
 ignore = ["E203", "E501"]
+# Force all imports to be at the top of the file
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.isort]
+# Configure import sorting
+force-single-line = false
+combine-as-imports = true
+split-on-trailing-comma = true
 
 [tool.coverage.run]
 source = ["src"]

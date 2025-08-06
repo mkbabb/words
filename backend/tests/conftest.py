@@ -179,15 +179,15 @@ async def test_app(test_db, mock_storage):
         app.add_middleware(LoggingMiddleware)
         
         # Add routers
-        API_V1_PREFIX = "/api/v1"
+        api_v1_prefix = "/api/v1"
         app.include_router(health, prefix="", tags=["health"])
-        app.include_router(lookup, prefix=API_V1_PREFIX, tags=["lookup"])
-        app.include_router(search, prefix=API_V1_PREFIX, tags=["search"])
-        app.include_router(corpus, prefix=API_V1_PREFIX, tags=["corpus"])
-        app.include_router(suggestions, prefix=API_V1_PREFIX, tags=["suggestions"])
-        app.include_router(ai, prefix=API_V1_PREFIX, tags=["ai"])
-        app.include_router(definitions, prefix=f"{API_V1_PREFIX}/definitions", tags=["definitions"])
-        app.include_router(wordlists, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
+        app.include_router(lookup, prefix=api_v1_prefix, tags=["lookup"])
+        app.include_router(search, prefix=api_v1_prefix, tags=["search"])
+        app.include_router(corpus, prefix=api_v1_prefix, tags=["corpus"])
+        app.include_router(suggestions, prefix=api_v1_prefix, tags=["suggestions"])
+        app.include_router(ai, prefix=api_v1_prefix, tags=["ai"])
+        app.include_router(definitions, prefix=f"{api_v1_prefix}/definitions", tags=["definitions"])
+        app.include_router(wordlists, prefix=f"{api_v1_prefix}/wordlists", tags=["wordlists"])
         
         return app
     except ImportError as e:
@@ -242,7 +242,7 @@ async def word_factory(test_db):
     for word in created_words:
         try:
             await word.delete()
-        except:
+        except Exception:
             pass
 
 
@@ -289,7 +289,7 @@ async def definition_factory(test_db):
     for definition in created_definitions:
         try:
             await definition.delete()
-        except:
+        except Exception:
             pass
 
 
@@ -308,8 +308,6 @@ async def wordlist_factory(test_db):
         **kwargs
     ):
         try:
-            from bson import ObjectId
-
             from src.floridify.models.models import Word
             from src.floridify.wordlist.models import WordList, WordListItem
             
@@ -352,7 +350,7 @@ async def wordlist_factory(test_db):
     for wordlist in created_wordlists:
         try:
             await wordlist.delete()
-        except:
+        except Exception:
             pass
 
 

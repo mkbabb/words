@@ -1,18 +1,11 @@
 """Data models for Floridify dictionary entries."""
 
 # Base models and metadata
-from ..search.corpus.semantic_cache import (
-    IndexType,
-    QuantizationType,
-    SemanticIndexCache,
-)
 
 # Cache models
 from ..search.models import (
-    CompressionType,
-    CorpusCacheEntry,
-    CorpusCompressionUtils,
-    CorpusData,
+    CorpusMetadata,
+    SemanticMetadata,
 )
 
 # Word of the Day models
@@ -80,13 +73,8 @@ __all__ = [
     "WordOfTheDayConfig",
     "WordOfTheDayEntry",
     # Cache models
-    "CompressionType",
-    "CorpusData",
-    "CorpusCacheEntry",
-    "CorpusCompressionUtils",
-    "IndexType",
-    "QuantizationType",
-    "SemanticIndexCache",
+    "CorpusMetadata",
+    "SemanticMetadata",
     # Constants
     "Language",
     "DictionaryProvider",

@@ -51,11 +51,7 @@ def parse_suggestions_params_post(
 
 @cached_api_call(
     ttl_hours=24.0,  # Suggestions are relatively stable
-    key_func=lambda params: (
-        "api_suggestions",
-        tuple(sorted(params.words)) if params.words else None,
-        params.count,
-    ),
+    key_prefix="api_suggestions",
 )
 async def _cached_suggestions(params: SuggestionsParams) -> SuggestionsAPIResponse:
     """Cached suggestions implementation."""

@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ...search.corpus import get_corpus_cache
+from ...search.corpus.manager import get_corpus_manager
 
 
 class CorpusCreate(BaseModel):
@@ -37,7 +37,7 @@ class CorpusRepository:
     async def _get_cache(self) -> Any:
         """Get corpus cache instance."""
         if self._cache is None:
-            self._cache = await get_corpus_cache()
+            self._manager = get_corpus_manager()
         return self._cache
 
     async def create(self, data: CorpusCreate) -> dict[str, Any]:
@@ -98,16 +98,49 @@ class CorpusRepository:
 
     async def search(self, corpus_id: str, params: CorpusSearchParams) -> dict[str, Any]:
         """Search within a corpus."""
-        cache = await self._get_cache()
+        from ...search.core import SearchEngine
 
-        result = await cache.search_corpus(
-            corpus_id=corpus_id,
+        cache = await self._get_cache()
+        entry = cache.get_corpus(corpus_id)
+
+        if not entry:
+            raise ValueError(f"Corpus {corpus_id} not found or expired")
+
+        # Create search engine for this corpus
+        search_engine = SearchEngine(
+            words=entry.words,
+            phrases=entry.phrases,
+            min_score=params.min_score,
+            semantic=params.semantic,
+            corpus_name=entry.metadata.name or f"Corpus {corpus_id[:8]}",
+        )
+
+        # Perform search
+        results = await search_engine.search(
             query=params.query,
             max_results=params.max_results,
             min_score=params.min_score,
             semantic=params.semantic,
         )
-        return dict(result)
+
+        return {
+            "results": [
+                {
+                    "word": result.word,
+                    "score": result.score,
+                    "method": result.method.value,
+                    "is_phrase": result.is_phrase,
+                }
+                for result in results
+            ],
+            "metadata": {
+                "corpus_id": corpus_id,
+                "query": params.query,
+                "result_count": len(results),
+                "semantic_enabled": params.semantic,
+                "corpus_stats": entry.metadata.model_dump(),
+            },
+        }
 
     async def list_all(self) -> list[dict[str, Any]]:
         """List all active corpora."""

@@ -14,8 +14,8 @@ import polyleven  # type: ignore[import-not-found]
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz, process
 
-from .constants import FuzzySearchMethod
-from .vocabulary import SharedVocabularyStore
+from .constants import DEFAULT_MIN_SCORE, FuzzySearchMethod
+from .corpus.core import Corpus
 
 
 class FuzzyMatch(BaseModel):
@@ -47,7 +47,7 @@ class FuzzySearch:
     - Metaphone: Advanced phonetic matching with better accuracy than Soundex
     """
 
-    def __init__(self, min_score: float = 0.6) -> None:
+    def __init__(self, min_score: float = DEFAULT_MIN_SCORE) -> None:
         """
         Initialize fuzzy search engine.
 
@@ -56,21 +56,31 @@ class FuzzySearch:
         """
         self.min_score = min_score
 
-
-    def search(
+    async def search(
         self,
         query: str,
-        vocab_store: SharedVocabularyStore,
+        corpus: Corpus,
         max_results: int = 20,
         method: FuzzySearchMethod = FuzzySearchMethod.AUTO,
         min_score: float | None = None,
     ) -> list[FuzzyMatch]:
         """
-        Fuzzy search using SharedVocabularyStore with candidate filtering.
+        Fuzzy search using corpus object directly.
         """
-        if not query.strip() or not vocab_store.is_loaded:
+        if not query.strip():
             return []
+        
+        return self._perform_search(query, corpus, max_results, method, min_score)
 
+    def _perform_search(
+        self,
+        query: str,
+        corpus: Corpus,
+        max_results: int = 20,
+        method: FuzzySearchMethod = FuzzySearchMethod.AUTO,
+        min_score: float | None = None,
+    ) -> list[FuzzyMatch]:
+        """Internal search implementation with Corpus."""
         query = query.strip().lower()
         min_score_threshold = min_score if min_score is not None else self.min_score
 
@@ -78,15 +88,15 @@ class FuzzySearch:
         if method == FuzzySearchMethod.AUTO:
             method = self._select_optimal_method(query)
 
-        # Smart candidate selection based on query characteristics
-        candidates = self._select_candidates(query, vocab_store, max_results)
+        # Smart candidate selection using corpus indices
+        candidates = self._select_candidates(query, corpus, max_results)
 
         if not candidates:
             return []
 
         # Perform search with selected method on filtered candidates
         matches = self._search_with_method(
-            query, candidates, vocab_store, method, max_results * 2, min_score_threshold
+            query, candidates, corpus, method, max_results * 2, min_score_threshold
         )
 
         # Filter by score and limit results
@@ -96,19 +106,19 @@ class FuzzySearch:
         return filtered_matches[:max_results]
 
     def _select_candidates(
-        self, query: str, vocab_store: SharedVocabularyStore, max_results: int
+        self, query: str, corpus: Corpus, max_results: int
     ) -> list[int]:
-        """Select promising candidates using vocabulary store indices."""
+        """Select promising candidates using corpus indices."""
         query_len = len(query)
         candidates = []
 
         # Strategy 1: Length-based filtering (±2 characters for fuzzy tolerance)
-        length_candidates = vocab_store.get_candidates_by_length(query_len, tolerance=2)
+        length_candidates = corpus.get_candidates_by_length(query_len, tolerance=2)
         candidates.extend(length_candidates)
 
         # Strategy 2: Prefix matching for short queries (boost performance)
         if query_len <= 4:
-            prefix_candidates = vocab_store.get_candidates_by_prefix(query[:2], max_candidates=200)
+            prefix_candidates = corpus.get_candidates_by_prefix(query[:2], max_candidates=200)
             candidates.extend(prefix_candidates)
 
         # Remove duplicates and limit candidates for performance
@@ -126,28 +136,31 @@ class FuzzySearch:
         self,
         query: str,
         candidate_indices: list[int],
-        vocab_store: SharedVocabularyStore,
+        corpus: Corpus,
         method: FuzzySearchMethod,
         max_results: int,
         min_score_threshold: float,
     ) -> list[FuzzyMatch]:
         """Execute search with a specific method on candidate indices."""
 
-        # Get candidate words from vocabulary store
-        candidate_words = vocab_store.get_words(candidate_indices)
+        # Get candidate words from corpus
+        candidate_words = [(idx, corpus.get_word_by_index(idx)) for idx in candidate_indices]
 
         if method == FuzzySearchMethod.RAPIDFUZZ:
-            return self._search_rapidfuzz(query, candidate_words, max_results, min_score_threshold)
+            return self._search_rapidfuzz(query, candidate_words, corpus, max_results, min_score_threshold)
         elif method == FuzzySearchMethod.JARO_WINKLER:
-            return self._search_jaro_winkler(query, candidate_words, max_results, min_score_threshold)
+            return self._search_jaro_winkler(
+                query, candidate_words, corpus, max_results, min_score_threshold
+            )
         else:
             # Default to RapidFuzz for all other methods
-            return self._search_rapidfuzz(query, candidate_words, max_results, min_score_threshold)
+            return self._search_rapidfuzz(query, candidate_words, corpus, max_results, min_score_threshold)
 
     def _search_rapidfuzz(
         self,
         query: str,
-        candidate_words: list[str],
+        candidate_words: list[tuple[int, str]],
+        corpus: Corpus,
         max_results: int,
         min_score_threshold: float,
     ) -> list[FuzzyMatch]:
@@ -156,11 +169,14 @@ class FuzzySearch:
         if not candidate_words:
             return []
 
+        # Extract words for RapidFuzz (it expects strings)
+        words = [word for _, word in candidate_words]
+        
         # Use RapidFuzz on filtered candidates (much smaller search space)
         results = process.extract(
             query,
-            candidate_words,
-            limit=min(max_results * 2, len(candidate_words)),
+            words,
+            limit=min(max_results * 2, len(words)),
             scorer=fuzz.WRatio,
             processor=lambda s: s.lower(),
         )
@@ -198,7 +214,8 @@ class FuzzySearch:
     def _search_jaro_winkler(
         self,
         query: str,
-        candidate_words: list[str],
+        candidate_words: list[tuple[int, str]],
+        corpus: Corpus,
         max_results: int,
         min_score_threshold: float,
     ) -> list[FuzzyMatch]:
@@ -206,7 +223,7 @@ class FuzzySearch:
 
         matches = []
 
-        for word in candidate_words:
+        for _, word in candidate_words:
             try:
                 word_lower = word.lower()
                 score = jellyfish.jaro_winkler_similarity(query, word_lower)
@@ -226,7 +243,6 @@ class FuzzySearch:
         # Sort and return top results
         matches.sort(key=lambda m: m.score, reverse=True)
         return matches[:max_results]
-
 
     def _select_optimal_method(self, query: str) -> FuzzySearchMethod:
         """
@@ -257,7 +273,6 @@ class FuzzySearch:
         else:
             # Long: RapidFuzz with potential phonetic fallback
             return FuzzySearchMethod.RAPIDFUZZ
-
 
     def _apply_length_correction(
         self, query: str, candidate: str, base_score: float, is_query_phrase: bool

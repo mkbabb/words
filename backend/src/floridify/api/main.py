@@ -18,7 +18,7 @@ from .routers import (
     ai,
     audio,
     batch,
-    corpus,
+# corpus disabled
     definitions,
     examples,
     facts,
@@ -49,8 +49,8 @@ async def lifespan(app: FastAPI) -> Any:
         await get_storage()
         print("✅ MongoDB storage initialized successfully")
 
-        # Initialize language search engine with semantic search enabled
-        await get_language_search([Language.ENGLISH], semantic=True)
+        # Initialize language search engine with semantic search enabled - use cache for fast startup
+        await get_language_search([Language.ENGLISH], force_rebuild=False, semantic=True)
         print("✅ Language search engine initialized successfully with semantic support")
 
         # Initialize AI components (singletons)
@@ -101,7 +101,7 @@ API_V1_PREFIX = "/api/v1"
 # Include routers with versioned API prefix
 app.include_router(lookup, prefix=API_V1_PREFIX, tags=["lookup"])
 app.include_router(search, prefix=API_V1_PREFIX, tags=["search"])
-app.include_router(corpus, prefix=API_V1_PREFIX, tags=["corpus"])
+# app.include_router(corpus, prefix=API_V1_PREFIX, tags=["corpus"])  # disabled
 # Old synonyms endpoint removed - now handled by /ai/synthesize/synonyms
 app.include_router(suggestions, prefix=API_V1_PREFIX, tags=["suggestions"])
 app.include_router(ai, prefix=API_V1_PREFIX, tags=["ai"])

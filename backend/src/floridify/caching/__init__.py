@@ -1,23 +1,43 @@
 """Modern generalized caching system for Floridify."""
 
-from .cache_manager import CacheManager, get_cache_manager
+from .core import (
+    CacheBackend,
+    CacheMetadata,
+    CacheNamespace,
+    CacheTTL,
+    CompressionType,
+    QuantizationType,
+)
 from .decorators import (
     cached_api_call,
     cached_api_call_with_dedup,
     cached_computation,
+    cached_computation_async,
+    cached_computation_sync,
     deduplicated,
 )
-from .http_client import get_cached_http_client
-from .unified_cache import UnifiedSearchCache, get_unified_cache
+from .unified import (
+    UnifiedCache,
+    clear_all_cache,
+    get_unified,
+    invalidate_cache_namespace,
+)
 
 __all__ = [
-    "CacheManager",
-    "get_cache_manager",
+    "CacheBackend",
+    "CacheNamespace",
+    "CacheTTL",
+    "CompressionType",
+    "QuantizationType", 
+    "CacheMetadata",
+    "UnifiedCache",
+    "get_unified",
+    "invalidate_cache_namespace",
+    "clear_all_cache",
     "cached_api_call",
     "cached_computation",
+    "cached_computation_async",
+    "cached_computation_sync",
     "deduplicated",
     "cached_api_call_with_dedup",
-    "get_cached_http_client",
-    "UnifiedSearchCache",
-    "get_unified_cache",
 ]
