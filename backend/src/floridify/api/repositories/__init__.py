@@ -64,7 +64,7 @@ __all__ = [
     "WordAddRequest",
     "WordReviewRequest",
     "StudySessionRequest",
-# "CorpusRepository" removed
+    # "CorpusRepository" removed
     "ImageRepository",
     "ImageCreate",
     "ImageUpdate",

@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from ...search.corpus.manager import get_corpus_manager
 from ...utils.logging import get_logger
 from ..core import ListResponse, PaginationParams, get_pagination
 from ..repositories.corpus_repository import CorpusCreate, CorpusRepository, CorpusSearchParams
@@ -49,9 +50,7 @@ class CreateCorpusResponse(BaseModel):
     """Response model for corpus creation."""
 
     corpus_id: str = Field(..., description="Unique corpus identifier")
-    word_count: int = Field(..., description="Number of words added")
-    phrase_count: int = Field(..., description="Number of phrases added")
-    expires_at: str = Field(..., description="Expiration timestamp")
+    vocabulary_size: int = Field(..., description="Total vocabulary size")
 
 
 class SearchCorpusResponse(BaseModel):
@@ -97,20 +96,19 @@ async def create_corpus(
     Returns a unique ID for subsequent search operations.
     """
     try:
+        # Combine words and phrases into vocabulary
+        vocabulary = request.words + request.phrases
+
         data = CorpusCreate(
-            words=request.words,
-            phrases=request.phrases,
+            vocabulary=vocabulary,
             name=request.name,
-            ttl_hours=request.ttl_hours,
         )
 
         result = await repo.create(data)
 
         return CreateCorpusResponse(
             corpus_id=result["corpus_id"],
-            word_count=result["word_count"],
-            phrase_count=result["phrase_count"],
-            expires_at=result["expires_at"],
+            vocabulary_size=result["vocabulary_size"],
         )
 
     except Exception as e:
@@ -224,3 +222,65 @@ async def get_corpus_info(
     except Exception as e:
         logger.error(f"Failed to get corpus info: {e}")
         raise HTTPException(status_code=500, detail="Failed to get corpus info")
+
+
+class InvalidateCorpusRequest(BaseModel):
+    """Request for invalidating corpus caches."""
+
+    specific_corpus_id: str | None = Field(None, description="Specific corpus ID to invalidate")
+    invalidate_all: bool = Field(default=False, description="Invalidate all corpus caches")
+
+
+class InvalidateCorpusResponse(BaseModel):
+    """Response for corpus cache invalidation."""
+
+    status: str = Field(..., description="Operation status")
+    total_invalidated: int = Field(..., description="Total number of entries invalidated")
+    message: str = Field(..., description="Status message")
+
+
+@router.post("/corpus/invalidate", response_model=InvalidateCorpusResponse)
+async def invalidate_corpus(
+    request: InvalidateCorpusRequest = InvalidateCorpusRequest(
+        specific_corpus_id=None, invalidate_all=False
+    ),
+) -> InvalidateCorpusResponse:
+    """
+    Invalidate corpus caches.
+
+    Allows invalidating a specific corpus by ID or all corpus caches.
+    """
+    logger.info(
+        f"Corpus invalidation: specific={request.specific_corpus_id}, all={request.invalidate_all}"
+    )
+
+    try:
+        corpus_manager = get_corpus_manager()
+        total_invalidated = 0
+
+        if request.specific_corpus_id:
+            # Invalidate specific corpus by name
+            success = await corpus_manager.invalidate_corpus(request.specific_corpus_id)
+            total_invalidated = 1 if success else 0
+            message = (
+                f"Invalidated corpus '{request.specific_corpus_id}'"
+                if success
+                else "Corpus not found"
+            )
+        elif request.invalidate_all:
+            # Invalidate all corpora
+            result = await corpus_manager.invalidate_all_corpora()
+            total_invalidated = result.get("total", 0)
+            message = f"Invalidated {total_invalidated} corpus entries"
+        else:
+            message = "No invalidation action specified"
+
+        return InvalidateCorpusResponse(
+            status="success" if total_invalidated > 0 else "no_action",
+            total_invalidated=total_invalidated,
+            message=message,
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to invalidate corpus caches: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to invalidate corpus caches: {str(e)}")

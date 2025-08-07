@@ -23,7 +23,7 @@ __all__ = [
     "CorpusManager",
     "get_corpus_manager",
     # Corpus loaders
-    "CorpusLanguageLoader", 
+    "CorpusLanguageLoader",
     "LexiconData",
     # Configuration
     "LexiconSourceConfig",

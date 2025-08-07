@@ -143,13 +143,11 @@ class CacheBackend[T](ABC):
         return value
 
 
-
-
 __all__ = [
     "CacheBackend",
     "CacheNamespace",
     "CacheTTL",
     "CompressionType",
-    "QuantizationType", 
+    "QuantizationType",
     "CacheMetadata",
 ]

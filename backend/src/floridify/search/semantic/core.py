@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from typing import Any, Literal
 
-import faiss  # type: ignore[import-untyped]
+import faiss
 import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
@@ -60,10 +60,8 @@ class SemanticSearch:
 
         # Semantic metadata reference
         self.semantic_metadata: SemanticMetadata | None = None
-        self._vocabulary_hash: str = (
-            ""  # Start empty, will be set during initialization
-        )
-        
+        self._vocabulary_hash: str = ""  # Start empty, will be set during initialization
+
         # Cache serialized FAISS index to avoid repeated expensive serialization
         self._serialized_index_cache: dict[str, Any] | None = None
         self._index_cache_dirty: bool = True
@@ -77,7 +75,7 @@ class SemanticSearch:
             device_name = f"cuda:{torch.cuda.current_device()}"
             logger.info(f"🚀 GPU acceleration enabled: {torch.cuda.get_device_name()}")
             return device_name
-        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             logger.info("🚀 MPS acceleration enabled (Apple Silicon)")
             return "mps"
         else:
@@ -113,19 +111,18 @@ class SemanticSearch:
     def _encode(self, texts: list[str]) -> np.ndarray:
         """Encode texts with optimizations (ONNX + mixed precision + GPU)."""
         precision: Literal["float32", "int8", "uint8", "binary", "ubinary"] = "float32"
-        
+
         return self.sentence_model.encode(
             sentences=texts,
             batch_size=self.batch_size,
             show_progress_bar=len(texts) > 1000,
-            output_value="sentence_embedding", 
+            output_value="sentence_embedding",
             precision=precision,
             convert_to_numpy=True,
             convert_to_tensor=False,
             device=self.device,
             normalize_embeddings=True,
         )
-
 
     async def initialize(self) -> None:
         """
@@ -190,10 +187,7 @@ class SemanticSearch:
         try:
             await self._create_semantic_metadata(build_time_ms)
         except Exception as e:
-            logger.warning(
-                f"Failed to create semantic metadata (continuing without database): {e}"
-            )
-
+            logger.warning(f"Failed to create semantic metadata (continuing without database): {e}")
 
     def _build_embeddings(self) -> None:
         """Build streamlined semantic embeddings - sentence transformers only."""
@@ -202,36 +196,42 @@ class SemanticSearch:
 
         # Check if lemmatized vocabulary is available
         if not self.corpus.lemmatized_vocabulary:
-            raise ValueError(
-                f"Corpus '{self.corpus.corpus_name}' has empty lemmatized vocabulary"
-            )
+            raise ValueError(f"Corpus '{self.corpus.corpus_name}' has empty lemmatized vocabulary")
 
         # Process entire vocabulary at once for better performance
         vocab_count = len(self.corpus.lemmatized_vocabulary)
-        logger.info(
-            f"🔄 Starting embedding generation: {vocab_count:,} lemmas (full batch)"
-        )
+        logger.info(f"🔄 Starting embedding generation: {vocab_count:,} lemmas (full batch)")
 
         embedding_start = time.time()
 
-        # Generate embedding variants for better diacritic matching
+        # Generate unique normalized forms for embeddings (no duplicates)
         from ...text.normalize import normalize_comprehensive
-        embedding_vocabulary = []
-        self.variant_mapping = {}  # Track which embeddings correspond to which lemmas
-        
+
+        # Track unique normalized forms and their mappings
+        unique_normalized = {}  # normalized -> first lemma index
+        self.variant_mapping = {}  # embedding index -> lemma index
+
         for i, lemma in enumerate(self.corpus.lemmatized_vocabulary):
-            # Always include original lemma
-            embedding_vocabulary.append(lemma)
-            self.variant_mapping[len(embedding_vocabulary) - 1] = i
-            
-            # Add diacritic-free variant if different from original
-            diacritic_free = normalize_comprehensive(lemma)
-            if diacritic_free != lemma and diacritic_free.strip():
-                embedding_vocabulary.append(diacritic_free)
-                self.variant_mapping[len(embedding_vocabulary) - 1] = i
-        
-        logger.info(f"📈 Generated {len(embedding_vocabulary)} embedding variants from {len(self.corpus.lemmatized_vocabulary)} lemmas")
-        
+            # Normalize once and use that for embedding
+            normalized = normalize_comprehensive(lemma)
+            if not normalized.strip():
+                normalized = lemma  # Use original if normalization fails
+
+            # Only add if this normalized form hasn't been seen
+            if normalized not in unique_normalized:
+                unique_normalized[normalized] = i
+
+        # Build embedding vocabulary from unique normalized forms
+        embedding_vocabulary = list(unique_normalized.keys())
+
+        # Build mapping from embedding index to lemma index
+        for embed_idx, normalized in enumerate(embedding_vocabulary):
+            self.variant_mapping[embed_idx] = unique_normalized[normalized]
+
+        logger.info(
+            f"📈 Optimized: {len(embedding_vocabulary)} unique embeddings from {len(self.corpus.lemmatized_vocabulary)} lemmas"
+        )
+
         # Process all variants with optimizations
         self.sentence_embeddings = self._encode(embedding_vocabulary)
 
@@ -251,37 +251,53 @@ class SemanticSearch:
         # Build FAISS index for sentence embeddings with dynamic optimization
         dimension = self.sentence_embeddings.shape[1]
         vocab_size = len(self.corpus.lemmatized_vocabulary)
-        
-        logger.info(f"🔄 Building FAISS index (dimension: {dimension}, vocab_size: {vocab_size:,})...")
-        
-        # Dynamic index selection based on corpus size for 10-100x speedup
-        if vocab_size > 100000:  # Large corpus optimization
-            # Use IVF (Inverted File) for 10-100x search speedup
-            nlist = min(4096, vocab_size // 100)  # Optimal cluster count
+
+        logger.info(
+            f"🔄 Building FAISS index (dimension: {dimension}, vocab_size: {vocab_size:,})..."
+        )
+
+        # Dynamic index selection with INT8 quantization for memory efficiency
+        if vocab_size > 100000:  # Large corpus with Product Quantization
+            # Use IVF with Product Quantization for 8x memory reduction
+            nlist = 8192 if vocab_size >= 200000 else min(4096, vocab_size // 100)
+            m = 48  # Number of subquantizers (dimension must be divisible by m)
+            nbits = 8  # 8 bits per subquantizer
+
+            # Ensure dimension is divisible by m
+            if dimension % m != 0:
+                m = 32  # Fallback to 32 if not divisible
+                if dimension % m != 0:
+                    m = 16  # Further fallback
+
             quantizer = faiss.IndexFlatL2(dimension)
-            self.sentence_index = faiss.IndexIVFFlat(quantizer, dimension, nlist)
-            
-            # Train the index (required for IVF)
-            logger.info(f"🔄 Training IVF index with {nlist} clusters...")
+            self.sentence_index = faiss.IndexIVFPQ(quantizer, dimension, nlist, m, nbits)
+
+            # Train the index (required for IVF and PQ)
+            logger.info(f"🔄 Training IVF-PQ index with {nlist} clusters, {m} subquantizers...")
             self.sentence_index.train(self.sentence_embeddings)
             self.sentence_index.add(self.sentence_embeddings)
-            
-            # Set search parameters for quality vs speed trade-off
-            self.sentence_index.nprobe = min(128, nlist // 8)  # Search 128 clusters
-            logger.info(f"✅ IVF index built with nprobe={self.sentence_index.nprobe}")
-            
-        elif vocab_size > 20000:  # Medium corpus optimization
-            # Use HNSW for fast approximate search
-            m = 16  # Number of connections
-            self.sentence_index = faiss.IndexHNSWFlat(dimension, m)
+
+            # Optimized search parameters for 200k+ corpus
+            self.sentence_index.nprobe = 256 if vocab_size >= 200000 else min(128, nlist // 8)
+            logger.info(
+                f"✅ IVF-PQ index built with nprobe={self.sentence_index.nprobe} (8x memory reduction)"
+            )
+
+        elif vocab_size > 20000:  # Medium corpus with Scalar Quantization
+            # Use Scalar Quantizer for 4x memory reduction
+            self.sentence_index = faiss.IndexScalarQuantizer(
+                dimension, faiss.ScalarQuantizer.QT_8bit
+            )
+            logger.info("🔄 Training Scalar Quantizer index...")
+            self.sentence_index.train(self.sentence_embeddings)
             self.sentence_index.add(self.sentence_embeddings)
-            logger.info("✅ HNSW index built for medium corpus")
-            
-        else:  # Small corpus - keep current approach
+            logger.info("✅ Scalar Quantizer index built (4x memory reduction)")
+
+        else:  # Small corpus - use exact search
             self.sentence_index = faiss.IndexFlatL2(dimension)
             self.sentence_index.add(self.sentence_embeddings)
             logger.info("✅ IndexFlatL2 used for small corpus")
-        
+
         # Mark serialization cache as dirty when index is rebuilt
         self._index_cache_dirty = True
         self._serialized_index_cache = None
@@ -300,9 +316,11 @@ class SemanticSearch:
         # Get existing corpus metadata from MongoDB
         manager = get_corpus_manager()
         corpus_metadata = await manager.get_corpus_metadata(self.corpus.corpus_name)
-        
+
         if not corpus_metadata:
-            raise ValueError(f"Corpus metadata must be created before semantic metadata: {self.corpus.corpus_name}")
+            raise ValueError(
+                f"Corpus metadata must be created before semantic metadata: {self.corpus.corpus_name}"
+            )
 
         # Check if SemanticMetadata already exists
         existing = await SemanticMetadata.find_one(
@@ -324,9 +342,7 @@ class SemanticSearch:
             vocabulary_hash=self.corpus.vocabulary_hash,
             model_name=self.model_name,
             embedding_dimension=(
-                self.sentence_embeddings.shape[1]
-                if self.sentence_embeddings is not None
-                else 0
+                self.sentence_embeddings.shape[1] if self.sentence_embeddings is not None else 0
             ),
             vocabulary_size=len(self.corpus.lemmatized_vocabulary),
             build_time_ms=build_time_ms,
@@ -389,10 +405,16 @@ class SemanticSearch:
             # L2 distance range is [0, 2] for normalized vectors
             similarities = 1 - (distances[0] / L2_DISTANCE_NORMALIZATION)
 
-            # Pre-filter valid indices and scores for batch processing  
+            # Pre-filter valid indices and scores for batch processing
             # Note: indices now refer to embedding vocabulary (with variants)
-            embedding_vocab_size = len(self.sentence_embeddings) if hasattr(self, 'sentence_embeddings') else 0
-            valid_mask = (indices[0] >= 0) & (similarities >= min_score) & (indices[0] < embedding_vocab_size)
+            embedding_vocab_size = (
+                len(self.sentence_embeddings) if hasattr(self, "sentence_embeddings") else 0
+            )
+            valid_mask = (
+                (indices[0] >= 0)
+                & (similarities >= min_score)
+                & (indices[0] < embedding_vocab_size)
+            )
             valid_embedding_indices = indices[0][valid_mask]
             valid_similarities = similarities[valid_mask]
 
@@ -400,20 +422,20 @@ class SemanticSearch:
             results = []
             lemma_to_word_indices = self.corpus.lemma_to_word_indices
             seen_lemma_indices = set()  # Avoid duplicates when variants map to same lemma
-            
+
             for embedding_idx, similarity in zip(valid_embedding_indices, valid_similarities):
                 # Map embedding index back to original lemma index using variant mapping
-                if hasattr(self, 'variant_mapping') and embedding_idx in self.variant_mapping:
+                if hasattr(self, "variant_mapping") and embedding_idx in self.variant_mapping:
                     original_lemma_idx = self.variant_mapping[embedding_idx]
                 else:
                     # Fallback for backward compatibility (no variants)
                     original_lemma_idx = embedding_idx
-                
+
                 # Skip if we've already seen this lemma (from another variant)
                 if original_lemma_idx in seen_lemma_indices:
                     continue
                 seen_lemma_indices.add(original_lemma_idx)
-                
+
                 # Get the original lemma
                 if original_lemma_idx < len(self.corpus.lemmatized_vocabulary):
                     lemma = self.corpus.lemmatized_vocabulary[original_lemma_idx]
@@ -423,7 +445,9 @@ class SemanticSearch:
                 # Map lemma index back to original word using corpus
                 if original_lemma_idx < len(lemma_to_word_indices):
                     original_word_idx = lemma_to_word_indices[original_lemma_idx]
-                    word = self.corpus.get_original_word_by_index(original_word_idx)  # Return original with diacritics
+                    word = self.corpus.get_original_word_by_index(
+                        original_word_idx
+                    )  # Return original with diacritics
                 else:
                     # Fallback: use lemma as word if mapping is missing
                     word = lemma
@@ -457,16 +481,14 @@ class SemanticSearch:
             "batch_size": self.batch_size,
             "device": self.device,
             "sentence_embeddings": (
-                self.sentence_embeddings.tolist()
-                if self.sentence_embeddings is not None
-                else None
+                self.sentence_embeddings.tolist() if self.sentence_embeddings is not None else None
             ),
             "sentence_index_data": self._serialize_faiss_index(),
             "vocabulary_hash": self._vocabulary_hash,
             "semantic_metadata_id": (
                 str(self.semantic_metadata.id) if self.semantic_metadata else None
             ),
-            "variant_mapping": getattr(self, 'variant_mapping', {}),  # Include variant mapping
+            "variant_mapping": getattr(self, "variant_mapping", {}),  # Include variant mapping
         }
 
     @classmethod
@@ -484,20 +506,16 @@ class SemanticSearch:
             force_rebuild=data.get("force_rebuild", False),
             batch_size=data.get("batch_size", DEFAULT_BATCH_SIZE),
         )
-        
+
         # Restore device (will reinitialize model)
         instance.device = data.get("device", "cpu")
-        
+
         # Restore embeddings
         if data.get("sentence_embeddings"):
-            instance.sentence_embeddings = np.array(
-                data["sentence_embeddings"], dtype=np.float32
-            )
+            instance.sentence_embeddings = np.array(data["sentence_embeddings"], dtype=np.float32)
             # Ensure C-contiguous layout
             if not instance.sentence_embeddings.flags.c_contiguous:
-                instance.sentence_embeddings = np.ascontiguousarray(
-                    instance.sentence_embeddings
-                )
+                instance.sentence_embeddings = np.ascontiguousarray(instance.sentence_embeddings)
 
         # Restore FAISS index
         if data.get("sentence_index_data") and instance.sentence_embeddings is not None:
@@ -507,7 +525,7 @@ class SemanticSearch:
 
         # Restore metadata
         instance._vocabulary_hash = data.get("vocabulary_hash", "")
-        
+
         # Restore variant mapping for diacritic variants
         instance.variant_mapping = data.get("variant_mapping", {})
 
@@ -517,32 +535,32 @@ class SemanticSearch:
         """Serialize FAISS index to dictionary with caching."""
         if not self.sentence_index or self.sentence_embeddings is None:
             return None
-        
+
         # Return cached serialization if available and not dirty
         if not self._index_cache_dirty and self._serialized_index_cache is not None:
             return self._serialized_index_cache
-        
+
         # Serialize the actual FAISS index to bytes using faiss's built-in method
         index_bytes = faiss.serialize_index(self.sentence_index)
-        
+
         # Detect index type for proper serialization
         index_type = "IndexFlatL2"  # Default
-        if hasattr(self.sentence_index, 'quantizer'):
-            if hasattr(self.sentence_index, 'nlist'):
+        if hasattr(self.sentence_index, "quantizer"):
+            if hasattr(self.sentence_index, "nlist"):
                 index_type = "IndexIVFFlat"
-        elif hasattr(self.sentence_index, 'hnsw'):
+        elif hasattr(self.sentence_index, "hnsw"):
             index_type = "IndexHNSWFlat"
-        
+
         self._serialized_index_cache = {
             "index_type": index_type,
             "dimension": self.sentence_embeddings.shape[1],
             "size": self.sentence_index.ntotal,
             "index_data": index_bytes.tobytes().hex(),  # Convert numpy uint8 array to hex string for JSON
         }
-        
+
         # Mark cache as clean
         self._index_cache_dirty = False
-        
+
         return self._serialized_index_cache
 
     def _deserialize_faiss_index(
@@ -566,18 +584,12 @@ class SemanticSearch:
         """Get statistics about the semantic search index."""
         return {
             "initialized": bool(self.sentence_index),
-            "vocabulary_size": (
-                len(self.corpus.lemmatized_vocabulary) if self.corpus else 0
-            ),
+            "vocabulary_size": (len(self.corpus.lemmatized_vocabulary) if self.corpus else 0),
             "embedding_dim": (
-                self.sentence_embeddings.shape[1]
-                if self.sentence_embeddings is not None
-                else 0
+                self.sentence_embeddings.shape[1] if self.sentence_embeddings is not None else 0
             ),
             "model_name": self.model_name,
             "corpus_name": self.corpus.corpus_name if self.corpus else "",
-            "semantic_metadata_id": (
-                self.semantic_metadata.id if self.semantic_metadata else None
-            ),
+            "semantic_metadata_id": (self.semantic_metadata.id if self.semantic_metadata else None),
             "batch_size": self.batch_size,
         }

@@ -19,6 +19,25 @@ ARTICLE_PATTERN = re.compile(
     r"^(the|a|an|le|la|les|der|die|das|el|la|los|las|il|lo|gli)\s+", re.IGNORECASE
 )
 
+# ======================================================================
+# Performance-optimized regex patterns (pre-compiled for speed)
+# ======================================================================
+
+# Fast punctuation removal (used in normalize_fast)
+FAST_PUNCTUATION_PATTERN = re.compile(r"[^\w\s\'-]")
+
+# Word validation patterns
+ALPHABETIC_PATTERN = re.compile(r"[a-zA-Z]")
+NON_ALPHABETIC_PATTERN = re.compile(r"[^a-zA-Z\-'\s]")
+
+# Combined cleanup pattern for single-pass optimization
+COMBINED_CLEANUP_PATTERN = re.compile(r"[^\w\s\'-]+|\s+")
+
+# Whitespace normalization (already defined above but documenting usage)
+# WHITESPACE_PATTERN = re.compile(r"\s+")
+# PUNCTUATION_PATTERN = re.compile(r"[^\w\s\'-]", re.UNICODE)
+# MULTIPLE_SPACE_PATTERN = re.compile(r"\s{2,}")
+
 # Character translation tables
 UNICODE_TO_ASCII = str.maketrans(
     {
@@ -84,14 +103,36 @@ SLIDING_WINDOW_SIZE = 4
 # Common diacritic mappings
 DIACRITIC_MAPPINGS = {
     # French
-    "à": "a", "á": "a", "â": "a", "ã": "a", "ä": "a", "å": "a",
-    "è": "e", "é": "e", "ê": "e", "ë": "e",
-    "ì": "i", "í": "i", "î": "i", "ï": "i",
-    "ò": "o", "ó": "o", "ô": "o", "õ": "o", "ö": "o",
-    "ù": "u", "ú": "u", "û": "u", "ü": "u",
-    "ý": "y", "ÿ": "y", "ç": "c", "ñ": "n",
+    "à": "a",
+    "á": "a",
+    "â": "a",
+    "ã": "a",
+    "ä": "a",
+    "å": "a",
+    "è": "e",
+    "é": "e",
+    "ê": "e",
+    "ë": "e",
+    "ì": "i",
+    "í": "i",
+    "î": "i",
+    "ï": "i",
+    "ò": "o",
+    "ó": "o",
+    "ô": "o",
+    "õ": "o",
+    "ö": "o",
+    "ù": "u",
+    "ú": "u",
+    "û": "u",
+    "ü": "u",
+    "ý": "y",
+    "ÿ": "y",
+    "ç": "c",
+    "ñ": "n",
     # German
     "ß": "ss",
     # Common ligatures
-    "æ": "ae", "œ": "oe",
+    "æ": "ae",
+    "œ": "oe",
 }

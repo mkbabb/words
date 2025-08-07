@@ -178,6 +178,7 @@ export interface Definition extends BaseMetadata {
   relevancy?: number;
   validation_status?: string;
   metadata: Record<string, any>;
+  providers_data?: Record<string, any>; // Provider-specific data from dictionary sources
 }
 
 // Synthesized Entry

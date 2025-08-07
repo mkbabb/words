@@ -164,7 +164,6 @@ class Config:
             api_key=data.get("oxford", {}).get("api_key", ""),
         )
 
-
         db_data = data.get("database", {})
         database_config = DatabaseConfig(
             production_url=db_data.get("production_url", ""),

@@ -180,18 +180,14 @@ class InMemoryTTLCache[T]:
             Number of entries removed
         """
         async with self._lock:
-            expired_keys = [
-                key for key, entry in self._cache.items() if entry.is_expired()
-            ]
+            expired_keys = [key for key, entry in self._cache.items() if entry.is_expired()]
 
             for key in expired_keys:
                 del self._cache[key]
 
             self._cleanups += 1
             if expired_keys:
-                logger.debug(
-                    f"{self.name} cleaned up {len(expired_keys)} expired entries"
-                )
+                logger.debug(f"{self.name} cleaned up {len(expired_keys)} expired entries")
 
             return len(expired_keys)
 
@@ -241,9 +237,7 @@ class InMemoryTTLCache[T]:
                     logger.error(f"{self.name} cleanup error: {e}")
 
         self._cleanup_task = asyncio.create_task(cleanup_loop())
-        logger.info(
-            f"{self.name} cleanup task started (interval={self.cleanup_interval_seconds}s)"
-        )
+        logger.info(f"{self.name} cleanup task started (interval={self.cleanup_interval_seconds}s)")
 
     async def stop_cleanup_task(self) -> None:
         """Stop background cleanup task."""
@@ -267,7 +261,9 @@ def get_corpus_ttl_cache() -> InMemoryTTLCache[Any]:
     global _corpus_cache
     if _corpus_cache is None:
         _corpus_cache = InMemoryTTLCache[Any](
-            max_instances=25, default_ttl_seconds=3600.0, name="corpus"  # 1 hour
+            max_instances=25,
+            default_ttl_seconds=3600.0,
+            name="corpus",  # 1 hour
         )
     return _corpus_cache
 
@@ -277,7 +273,9 @@ def get_semantic_ttl_cache() -> InMemoryTTLCache[Any]:
     global _semantic_cache
     if _semantic_cache is None:
         _semantic_cache = InMemoryTTLCache[Any](
-            max_instances=25, default_ttl_seconds=7200.0, name="semantic"  # 2 hours
+            max_instances=25,
+            default_ttl_seconds=7200.0,
+            name="semantic",  # 2 hours
         )
     return _semantic_cache
 

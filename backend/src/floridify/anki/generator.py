@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-import genanki  # type: ignore[import-untyped]
+import genanki
 
 from ..ai.connector import OpenAIConnector
 from ..ai.templates import PromptTemplateManager as PromptLoader

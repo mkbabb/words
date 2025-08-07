@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from ....ai.constants import SynthesisComponent
 from ....ai.factory import get_definition_synthesizer, get_openai_connector
+from ....caching import cached_api_call_with_dedup
 from ....core.state_tracker import StateTracker
 from ....core.streaming import create_streaming_response
 from ....utils.logging import get_logger
@@ -172,6 +173,17 @@ async def generate_pronunciation(
     return {"word": request.word, "pronunciation": result.model_dump()}
 
 
+@cached_api_call_with_dedup(
+    ttl_hours=1.0,
+    key_prefix="api_suggestions",
+)
+async def _cached_suggestions(input_words: list[str], count: int) -> dict[str, Any]:
+    """Cached suggestion generation."""
+    connector = get_openai_connector()
+    result = await connector.suggestions(input_words, count)
+    return result.model_dump()
+
+
 @router.post("/suggestions")
 async def generate_suggestions(
     request: SuggestionsRequest,
@@ -195,10 +207,7 @@ async def generate_suggestions(
     if not allowed:
         raise HTTPException(429, "AI rate limit exceeded", headers=headers)
 
-    connector = get_openai_connector()
-    result = await connector.suggestions(request.input_words, request.count)
-
-    return result.model_dump()
+    return await _cached_suggestions(request.input_words or [], request.count)
 
 
 @router.post("/generate/word-forms")
@@ -681,7 +690,7 @@ async def suggest_words_stream(
     # Create state tracker for suggestions
     state_tracker = StateTracker(category="suggestions")
 
-    async def suggestions_process() -> None:
+    async def suggestions_process() -> dict[str, Any]:
         """Run the suggestion pipeline with state tracking."""
         try:
             await state_tracker.update_stage("START")
@@ -726,8 +735,8 @@ async def suggest_words_stream(
             # Complete successfully
             await state_tracker.update_complete(message="Suggestions generated successfully!")
 
-            # Return result data
-            return result
+            # Return result data as dictionary
+            return result.model_dump()
 
         except Exception as e:
             await state_tracker.update_error(f"Failed to generate suggestions: {str(e)}")

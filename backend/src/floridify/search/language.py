@@ -10,7 +10,7 @@ from typing import Any
 
 from ..models.definition import CorpusType, Language
 from ..utils.logging import get_logger
-from .constants import DEFAULT_MIN_SCORE
+from .constants import DEFAULT_MIN_SCORE, SearchMode
 from .core import SearchEngine, SearchResult
 from .corpus.language_loader import CorpusLanguageLoader
 from .corpus.manager import CorpusManager, get_corpus_manager
@@ -54,38 +54,42 @@ class LanguageSearch:
     async def initialize(self) -> None:
         """Initialize lexicon loading and search engine with unified corpus management."""
         if self.search_engine is not None:
+            logger.debug("Language search already initialized, skipping")
             return
 
         logger.info(
-            f"Initializing language search (semantic={'enabled' if self.semantic else 'disabled'})"
+            f"Initializing language search for {[lang.value for lang in self.languages]} (semantic={'enabled' if self.semantic else 'disabled'})"
         )
 
         # Generate deterministic corpus ID and name - inline simple logic
         lang_codes = "-".join(sorted(lang.value for lang in self.languages))
         corpus_name = f"{CorpusType.LANGUAGE_SEARCH.value}_{lang_codes}"
+        logger.info(f"Corpus name: '{corpus_name}'")
 
         # Load vocabulary from language sources
-        logger.info(f"Starting language loader for {[lang.value for lang in self.languages]}")
+        logger.debug(f"Creating language loader (force_rebuild={self.force_rebuild})")
         loader = CorpusLanguageLoader(force_rebuild=self.force_rebuild)
         await loader.load_languages(self.languages)
-        
+
         # Get vocabulary
         vocabulary = loader.get_vocabulary()
-        logger.info(f"Loaded vocabulary size: {len(vocabulary)}")
-        
+        logger.info(f"Language loader provided {len(vocabulary)} vocabulary items")
+
         if not vocabulary:
+            logger.error(f"No vocabulary loaded for languages {self.languages}")
             raise ValueError(f"No vocabulary loaded for languages {self.languages}")
-        
+
         # Get or create corpus through manager (uses cache if available)
-        logger.info(f"Creating corpus '{corpus_name}' with {len(vocabulary)} items")
+        logger.info(f"Getting or creating corpus '{corpus_name}'")
         corpus = await self._corpus_manager.get_or_create_corpus(
             corpus_name=corpus_name,
             vocabulary=vocabulary,
             force_rebuild=self.force_rebuild,
         )
-        logger.info(f"Corpus created successfully: {corpus.vocabulary_hash[:8]}")
+        logger.info(f"Corpus ready: '{corpus.corpus_name}' (full hash: {corpus.vocabulary_hash}, {len(corpus.vocabulary)} items)")
 
         # Initialize search engine with corpus name
+        logger.info(f"Creating SearchEngine for corpus '{corpus_name}'")
         self.search_engine = SearchEngine(
             corpus_name=corpus_name,
             min_score=self.min_score,
@@ -94,12 +98,13 @@ class LanguageSearch:
         )
 
         # Initialize search engine components
+        logger.info("Initializing SearchEngine components")
         await self.search_engine.initialize()
 
         # Semantic search is initialized during SearchEngine.initialize() if enabled
 
         logger.info(
-            f"Language search initialized for {self.languages} with unified corpus management"
+            f"✅ Language search fully initialized for {[lang.value for lang in self.languages]}"
         )
         self._initialized = True
 
@@ -108,21 +113,40 @@ class LanguageSearch:
         query: str,
         max_results: int = 20,
         min_score: float | None = None,
-        semantic: bool | None = None,
     ) -> list[SearchResult]:
-        """Search the loaded language lexicons.
+        """Search the loaded language lexicons using SMART mode.
 
         Args:
             query: Search query
             max_results: Maximum results to return
             min_score: Minimum score threshold
-            semantic: Override semantic search setting
         """
         if self.search_engine is None:
             await self.initialize()
 
         assert self.search_engine is not None
-        return await self.search_engine.search(query, max_results, min_score, semantic)
+        return await self.search_engine.search(query, max_results, min_score)
+
+    async def search_with_mode(
+        self,
+        query: str,
+        mode: SearchMode,
+        max_results: int = 20,
+        min_score: float | None = None,
+    ) -> list[SearchResult]:
+        """Search the loaded language lexicons with explicit mode.
+
+        Args:
+            query: Search query
+            mode: Search mode (SMART, EXACT, FUZZY, SEMANTIC)
+            max_results: Maximum results to return
+            min_score: Minimum score threshold
+        """
+        if self.search_engine is None:
+            await self.initialize()
+
+        assert self.search_engine is not None
+        return await self.search_engine.search_with_mode(query, mode, max_results, min_score)
 
     async def find_best_match(self, word: str) -> SearchResult | None:
         """Find best matching word for word resolution."""
@@ -177,9 +201,7 @@ async def get_language_search(
     if needs_recreate:
         # Create with semantic support as specified
         _language_search = LanguageSearch(
-            languages=target_languages, 
-            force_rebuild=force_rebuild, 
-            semantic=semantic
+            languages=target_languages, force_rebuild=force_rebuild, semantic=semantic
         )
         await _language_search.initialize()
 

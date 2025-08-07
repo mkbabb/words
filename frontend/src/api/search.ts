@@ -117,28 +117,22 @@ export const searchApi = {
     }
   },
 
-  // Invalidate corpus caches - POST /search/invalidate-corpus
+  // Invalidate corpus caches - POST /corpus/invalidate
   async invalidateCorpus(options?: {
-    corpus_types?: string[];
     specific_corpus_id?: string;
     invalidate_all?: boolean;
-    cleanup_expired?: boolean;
   }): Promise<{
     status: string;
     total_invalidated: number;
-    corpus_results: Record<string, number>;
-    expired_cleaned: number;
     message: string;
   }> {
     try {
       const requestData = {
-        corpus_types: options?.corpus_types || [],
         specific_corpus_id: options?.specific_corpus_id,
         invalidate_all: options?.invalidate_all || false,
-        cleanup_expired: options?.cleanup_expired ?? true,
       };
       
-      const response = await api.post('/search/invalidate-corpus', requestData);
+      const response = await api.post('/corpus/invalidate', requestData);
       return response.data;
     } catch (error) {
       console.error('Invalidate corpus API error:', error);

@@ -30,8 +30,6 @@ from .sources import LEXICON_SOURCES, LexiconSourceConfig
 logger = get_logger(__name__)
 
 
-
-
 class LexiconData(BaseModel):
     """Container for lexicon data with metadata."""
 
@@ -82,6 +80,7 @@ class CorpusLanguageLoader:
         """
         # Initialize HTTP client
         # HTTP client now handled by scrapers
+        logger.info(f"Starting to load {len(languages)} language(s): {[lang.value for lang in languages]}")
 
         # Load each language
         for language in languages:
@@ -89,24 +88,25 @@ class CorpusLanguageLoader:
 
         # Rebuild unified indices
         self._rebuild_unified_indices()
+        logger.info(f"Loaded total vocabulary size: {len(self.vocabulary)} items")
 
     async def _load_language(self, language: Language) -> None:
         """Load corpus data for a specific language from unified cache or sources."""
         source_hash = self._get_source_hash(language)
         cache_key = f"{language.value}_{source_hash}"
 
-        logger.info(f"Loading {language.value} lexicon - force_rebuild={self.force_rebuild}")
-        
+        logger.debug(f"Loading {language.value} lexicon - cache_key={cache_key[:16]}..., force_rebuild={self.force_rebuild}")
+
         # Try to load from unified cache first (unless force rebuild)
         if not self.force_rebuild:
             cache = await get_unified()
             cached_data = await cache.get_compressed(CacheNamespace.CORPUS, cache_key)
-            
+
             if cached_data:
                 # Deserialize cached lexicon data
                 vocabulary = cached_data.get("vocabulary", [])
                 metadata = cached_data.get("metadata", {})
-                
+
                 self.lexicons[language] = LexiconData(
                     vocabulary=vocabulary,
                     metadata=metadata,
@@ -115,15 +115,16 @@ class CorpusLanguageLoader:
                     total_entries=len(vocabulary),
                     last_updated=metadata.get("last_updated", ""),
                 )
-                logger.info(f"Loaded {language.value} lexicon from cache ({len(vocabulary)} items)")
+                logger.debug(f"Loaded {language.value} lexicon from cache ({len(vocabulary)} items)")
                 return
             else:
-                logger.info(f"No cached data found for {language.value}, loading from sources")
+                logger.debug(f"No cached data found for {language.value}, loading from sources")
 
         # Load from sources
-        logger.info(f"Loading {language.value} lexicon from external sources (force_rebuild={self.force_rebuild})")
+        logger.info(f"Loading {language.value} lexicon from external sources")
         lexicon_data = await self._load_from_sources(language)
         self.lexicons[language] = lexicon_data
+        logger.info(f"Loaded {language.value} lexicon: {len(lexicon_data.vocabulary)} items from {len(lexicon_data.sources)} sources")
 
         # Save to unified cache
         await self._save_to_cache(language, lexicon_data, source_hash)
@@ -134,6 +135,7 @@ class CorpusLanguageLoader:
 
         # Get sources for this language
         sources = self._get_sources_for_language(language)
+        logger.debug(f"Found {len(sources)} sources for {language.value}: {[s.name for s in sources]}")
 
         # Load all sources in parallel for performance
         source_tasks = [self._load_source(source) for source in sources]
@@ -144,20 +146,25 @@ class CorpusLanguageLoader:
                 logger.warning(f"Failed to load lexicon source {source.name}: {result}")
                 continue
             if not isinstance(result, list):
-                logger.warning(f"Invalid result type from source {source.name}: expected list[str], got {type(result)}")
+                logger.warning(
+                    f"Invalid result type from source {source.name}: expected list[str], got {type(result)}"
+                )
                 continue
 
+            logger.debug(f"Source {source.name} provided {len(result)} items")
             vocabulary.extend(result)
 
         # Deduplicate and normalize - use comprehensive for compile-time corpus building
+        logger.debug(f"Normalizing {len(vocabulary)} raw items")
         normalized_set = set()
         for item in vocabulary:
             normalized = normalize_comprehensive(item)
             if normalized:
                 normalized_set.add(normalized)
-        
+
         # Sort for consistency
         vocabulary = sorted(normalized_set)
+        logger.debug(f"After normalization and deduplication: {len(vocabulary)} unique items")
 
         return LexiconData(
             vocabulary=vocabulary,
@@ -175,9 +182,7 @@ class CorpusLanguageLoader:
         """Get the file extension for a lexicon source."""
         return ".json" if source.format.value.startswith("json") else ".txt"
 
-    async def _load_source(
-        self, source: LexiconSourceConfig
-    ) -> list[str]:
+    async def _load_source(self, source: LexiconSourceConfig) -> list[str]:
         """Load data from a specific source."""
         # Use the downloader function (handles both regular URLs and custom scraping)
         result = await source.scraper(source.url)
@@ -190,7 +195,9 @@ class CorpusLanguageLoader:
         # Regular HTTP response - handle string response from default_scraper
         response_text = result
         if not isinstance(response_text, str):
-            logger.warning(f"Invalid response type from downloader for {source.name}: expected string, got {type(response_text)}")
+            logger.warning(
+                f"Invalid response type from downloader for {source.name}: expected string, got {type(response_text)}"
+            )
             return []
 
         # Parse based on format
@@ -213,9 +220,7 @@ class CorpusLanguageLoader:
         else:
             return []
 
-    def _parse_text_lines(
-        self, text: str, language: Language
-    ) -> list[str]:
+    def _parse_text_lines(self, text: str, language: Language) -> list[str]:
         """Parse simple text file with one word per line."""
         vocabulary = []
 
@@ -231,9 +236,7 @@ class CorpusLanguageLoader:
 
         return vocabulary
 
-    def _parse_json_idioms(
-        self, text: str, language: Language
-    ) -> list[str]:
+    def _parse_json_idioms(self, text: str, language: Language) -> list[str]:
         """Parse JSON file containing idioms and phrases."""
         try:
             data = json.loads(text)
@@ -268,9 +271,7 @@ class CorpusLanguageLoader:
 
         return vocabulary
 
-    def _parse_frequency_list(
-        self, text: str, language: Language
-    ) -> list[str]:
+    def _parse_frequency_list(self, text: str, language: Language) -> list[str]:
         """Parse frequency list with word and frequency columns."""
         vocabulary = []
 
@@ -289,9 +290,7 @@ class CorpusLanguageLoader:
 
         return vocabulary
 
-    def _parse_json_dict(
-        self, text: str, language: Language
-    ) -> list[str]:
+    def _parse_json_dict(self, text: str, language: Language) -> list[str]:
         """Parse JSON dictionary format."""
         try:
             data = json.loads(text)
@@ -308,9 +307,7 @@ class CorpusLanguageLoader:
 
         return vocabulary
 
-    def _parse_json_array(
-        self, text: str, language: Language
-    ) -> list[str]:
+    def _parse_json_array(self, text: str, language: Language) -> list[str]:
         """Parse JSON array format."""
         try:
             data = json.loads(text)
@@ -328,9 +325,7 @@ class CorpusLanguageLoader:
 
         return vocabulary
 
-    def _parse_github_api_response(
-        self, text: str, language: Language
-    ) -> list[str]:
+    def _parse_github_api_response(self, text: str, language: Language) -> list[str]:
         """Parse GitHub API response for file content."""
         try:
             data = json.loads(text)
@@ -341,13 +336,11 @@ class CorpusLanguageLoader:
         except Exception as e:
             logger.warning(f"Failed to parse GitHub API response: {e}")
             return []
-        
+
         logger.warning("GitHub API response missing 'content' field")
         return []
 
-    def _parse_csv_idioms(
-        self, text: str, language: Language
-    ) -> list[str]:
+    def _parse_csv_idioms(self, text: str, language: Language) -> list[str]:
         """Parse CSV format with idiom,definition columns."""
         vocabulary = []
 
@@ -384,9 +377,7 @@ class CorpusLanguageLoader:
 
         return vocabulary
 
-    def _parse_json_phrasal_verbs(
-        self, text: str, language: Language
-    ) -> list[str]:
+    def _parse_json_phrasal_verbs(self, text: str, language: Language) -> list[str]:
         """Parse JSON format with phrasal verbs, definitions, and examples."""
         vocabulary = []
 
@@ -421,9 +412,7 @@ class CorpusLanguageLoader:
 
         return vocabulary
 
-    def _parse_scraped_data(
-        self, scraped_data: dict[str, Any], language: Language
-    ) -> list[str]:
+    def _parse_scraped_data(self, scraped_data: dict[str, Any], language: Language) -> list[str]:
         """Parse data returned by custom scrapers."""
         vocabulary = []
 
@@ -442,7 +431,7 @@ class CorpusLanguageLoader:
                 normalized = normalize_comprehensive(expression)
                 if normalized:
                     vocabulary.append(normalized)
-                    
+
         return vocabulary
 
     async def generate_master_index(self, output_path: Path | None = None) -> dict[str, Any]:
@@ -509,10 +498,12 @@ class CorpusLanguageLoader:
         """Rebuild unified vocabulary index from all loaded languages."""
         self.vocabulary = []
 
-        for lexicon_data in self.lexicons.values():
+        for lang, lexicon_data in self.lexicons.items():
+            logger.debug(f"Adding {len(lexicon_data.vocabulary)} items from {lang.value}")
             self.vocabulary.extend(lexicon_data.vocabulary)
 
         # Remove duplicates while preserving order
+        initial_count = len(self.vocabulary)
         seen = set()
         unique_vocabulary = []
         for item in self.vocabulary:
@@ -520,6 +511,7 @@ class CorpusLanguageLoader:
                 seen.add(item)
                 unique_vocabulary.append(item)
         self.vocabulary = unique_vocabulary
+        logger.debug(f"Unified vocabulary: {initial_count} total → {len(self.vocabulary)} unique items")
 
     def get_vocabulary(self) -> list[str]:
         """Get all vocabulary from all loaded languages."""
@@ -562,10 +554,12 @@ class CorpusLanguageLoader:
         source_str = "|".join(sorted(source_info))
         return hashlib.sha256(source_str.encode()).hexdigest()
 
-    async def _save_to_cache(self, language: Language, lexicon_data: LexiconData, source_hash: str) -> None:
+    async def _save_to_cache(
+        self, language: Language, lexicon_data: LexiconData, source_hash: str
+    ) -> None:
         """Save lexicon data to unified cache with compression."""
         cache_key = f"{language.value}_{source_hash}"
-        
+
         # Prepare data for caching
         cache_data = {
             "vocabulary": lexicon_data.vocabulary,
@@ -586,5 +580,7 @@ class CorpusLanguageLoader:
             ttl=CacheTTL.CORPUS,
             tags=[f"{CacheNamespace.CORPUS}:{language.value}"],
         )
-        
-        logger.info(f"Cached {language.value} lexicon ({len(lexicon_data.vocabulary)} vocabulary items)")
+
+        logger.info(
+            f"Cached {language.value} lexicon ({len(lexicon_data.vocabulary)} vocabulary items)"
+        )

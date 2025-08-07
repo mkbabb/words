@@ -15,16 +15,14 @@ class SearchMethod(Enum):
     AUTO = "auto"  # Automatic method selection based on query
 
 
-class FuzzySearchMethod(Enum):
-    """Available fuzzy search methods with their characteristics."""
-
-    RAPIDFUZZ = "rapidfuzz"  # General-purpose, C++ optimized
-    LEVENSHTEIN = "levenshtein"  # Classic edit distance
-    JARO_WINKLER = "jaro_winkler"  # Good for names and abbreviations
-    SOUNDEX = "soundex"  # Phonetic matching
-    METAPHONE = "metaphone"  # Advanced phonetic matching
-    AUTO = "auto"  # Automatic method selection
+class SearchMode(Enum):
+    """Search modes for API and direct method routing."""
+    
+    SMART = "smart"  # Smart cascade: exact → fuzzy → semantic
+    EXACT = "exact"  # Only exact matching
+    FUZZY = "fuzzy"  # Only fuzzy matching  
+    SEMANTIC = "semantic"  # Only semantic matching
 
 
-# Search scoring constants  
+# Search scoring constants
 DEFAULT_MIN_SCORE = 0.4  # Default minimum score threshold - lowered for better typo tolerance

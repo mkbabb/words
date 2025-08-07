@@ -166,10 +166,10 @@ export function useLookupContentState() {
     
     const response = await dictionaryApi.refreshSynthEntry(currentEntry.value.word)
     
-    const updatedEntry = {
+    const updatedEntry: SynthesizedDictionaryEntry = {
       ...currentEntry.value,
       ...response
-    } as SynthesizedDictionaryEntry
+    } as any // Type assertion needed due to complex merge
     
     setCurrentEntry(updatedEntry)
     return response

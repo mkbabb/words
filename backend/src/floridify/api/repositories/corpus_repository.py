@@ -22,6 +22,9 @@ class CorpusSearchParams(BaseModel):
     max_results: int = Field(default=20, ge=1, le=100, description="Max results")
     min_score: float = Field(default=0.6, ge=0.0, le=1.0, description="Min score")
     semantic: bool = Field(default=False, description="Enable semantic search")
+    semantic_weight: float = Field(
+        default=0.7, ge=0.0, le=1.0, description="Weight for semantic results"
+    )
 
 
 class CorpusRepository:
@@ -38,6 +41,7 @@ class CorpusRepository:
         )
 
         return {
+            "corpus_id": corpus.corpus_name,
             "corpus_name": corpus.corpus_name,
             "vocabulary_size": len(corpus.vocabulary),
             "vocabulary_hash": corpus.vocabulary_hash,
@@ -47,7 +51,7 @@ class CorpusRepository:
     async def get(self, corpus_name: str) -> dict[str, Any] | None:
         """Get corpus metadata."""
         metadata = await self._manager.get_corpus_metadata(corpus_name)
-        
+
         if not metadata:
             return None
 
@@ -66,7 +70,7 @@ class CorpusRepository:
             min_score=params.min_score,
             semantic=params.semantic,
         )
-        
+
         await search_engine.initialize()
 
         # Perform search
@@ -94,9 +98,7 @@ class CorpusRepository:
             },
         }
 
-    async def create_from_wordlist(
-        self, vocabulary: list[str], name: str = ""
-    ) -> str:
+    async def create_from_wordlist(self, vocabulary: list[str], name: str = "") -> str:
         """Create corpus from vocabulary list."""
         data = CorpusCreate(
             vocabulary=vocabulary,
@@ -106,3 +108,20 @@ class CorpusRepository:
         result = await self.create(data)
         corpus_name: str = result["corpus_name"]
         return corpus_name
+
+    async def get_stats(self) -> dict[str, Any]:
+        """Get statistics about all corpora."""
+        return await self._manager.get_stats()
+
+    async def list_all(self) -> list[dict[str, Any]]:
+        """List all available corpora."""
+        stats = await self._manager.get_stats()
+        corpus_names = stats.get("corpus_names", [])
+
+        corpora = []
+        for name in corpus_names:
+            metadata = await self.get(name)
+            if metadata:
+                corpora.append(metadata)
+
+        return corpora

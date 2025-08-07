@@ -38,7 +38,7 @@ def _format_path(record: dict[str, Any]) -> str:
     # Make path relative to backend directory
     if file_path.startswith("src/"):
         file_path = "backend/" + file_path
-    return file_path
+    return str(file_path)
 
 
 def _configure_loguru() -> None:
@@ -71,7 +71,7 @@ def _configure_loguru() -> None:
     loguru_logger.add(
         sys.stderr,
         level=log_level,
-        format=formatter,
+        format=formatter,  # type: ignore[arg-type]
         colorize=True,
         backtrace=is_dev,
         diagnose=is_dev,

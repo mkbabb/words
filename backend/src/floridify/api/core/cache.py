@@ -10,7 +10,7 @@ import orjson
 from fastapi import Request, Response
 from pydantic import BaseModel
 
-from ...caching.unified import get_unified
+from ...caching.unified import UnifiedCache, get_unified
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -76,7 +76,9 @@ def cached_endpoint(
 
             if cached_data:
                 # Parse cached response
-                cached_response = orjson.loads(cached_data) if isinstance(cached_data, bytes) else cached_data
+                cached_response = (
+                    orjson.loads(cached_data) if isinstance(cached_data, bytes) else cached_data
+                )
 
                 # Set cache headers
                 response.headers["X-Cache"] = "HIT"
@@ -117,10 +119,10 @@ def cached_endpoint(
             }
 
             await cache.set(
-                "api", 
-                cache_key, 
+                "api",
+                cache_key,
                 orjson.dumps(cache_data).decode(),
-                ttl=timedelta(seconds=config.ttl)
+                ttl=timedelta(seconds=config.ttl),
             )
 
             # Set cache headers
@@ -137,10 +139,10 @@ def cached_endpoint(
 class CacheInvalidator:
     """Utility for invalidating related caches."""
 
-    def __init__(self):
-        self._cache = None
+    def __init__(self) -> None:
+        self._cache: UnifiedCache | None = None
 
-    async def _get_cache(self):
+    async def _get_cache(self) -> UnifiedCache:
         """Get cache instance lazily."""
         if self._cache is None:
             self._cache = await get_unified()
@@ -149,7 +151,7 @@ class CacheInvalidator:
     async def invalidate_pattern(self, pattern: str) -> int:
         """Invalidate all keys matching pattern."""
         cache = await self._get_cache()
-        
+
         # For now, we track invalidation patterns
         # In a real implementation with Redis, we'd use SCAN and DEL
         invalidation_key = f"invalidation:{pattern}"
@@ -157,9 +159,9 @@ class CacheInvalidator:
             "api",
             invalidation_key,
             datetime.now(UTC).isoformat(),
-            ttl=timedelta(hours=24)  # Keep for 24 hours
+            ttl=timedelta(hours=24),  # Keep for 24 hours
         )
-        
+
         logger.info(f"Marked pattern for invalidation: {pattern}")
         return 0  # Return 0 since we don't have actual pattern matching yet
 
@@ -223,7 +225,7 @@ class ResponseCache:
         self.cache_key: str | None = None
         self.start_time: datetime | None = None
 
-    async def _get_cache(self):
+    async def _get_cache(self) -> UnifiedCache:
         """Get cache instance lazily."""
         if self.cache is None:
             self.cache = await get_unified()
@@ -237,7 +239,7 @@ class ResponseCache:
         # Check cache
         cache = await self._get_cache()
         cached = await cache.get("api", self.cache_key)
-        
+
         if cached:
             self.response.headers["X-Cache"] = "HIT"
             return orjson.loads(cached) if isinstance(cached, bytes) else cached

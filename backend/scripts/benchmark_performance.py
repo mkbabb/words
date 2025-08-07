@@ -58,14 +58,13 @@ async def benchmark_search_type(search_type: str, iterations: int = 50) -> dict:
             # Set parameters based on search type
             params = {"max_results": 20}
             if search_type == "exact":
-                params.update({"exact": True, "fuzzy": False, "semantic": False})
+                params["mode"] = "exact"
             elif search_type == "fuzzy":
-                params.update({"exact": False, "fuzzy": True, "semantic": False})
+                params["mode"] = "fuzzy"
             elif search_type == "semantic":
-                params.update({"exact": False, "fuzzy": False, "semantic": True})
+                params["mode"] = "semantic"
             elif search_type == "combined":
-                # Default behavior - all search types enabled
-                pass
+                params["mode"] = "smart"  # Smart mode is the new combined mode
             
             # Measure request time
             time_ms = await measure_request_time(client, f"{base_url}/{query}", params)

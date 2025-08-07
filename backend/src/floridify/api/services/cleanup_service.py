@@ -62,9 +62,9 @@ class CleanupService:
 
         logger.warning(f"Starting cleanup of image references for image {image_id}")
         total_cleaned = await CleanupService.remove_object_id_from_arrays(
-            collections,
+            collections,  # type: ignore[arg-type]
             "image_ids",
-            image_id,  # type: ignore[arg-type]
+            image_id,
         )
 
         logger.warning(

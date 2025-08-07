@@ -20,7 +20,7 @@ async def default_scraper(url: str, timeout: float = 30.0) -> str:
     """Cached HTTP GET downloader returning text content."""
     if not url:
         raise ValueError("URL is required")
-    
+
     async with httpx.AsyncClient() as client:
         response = await client.get(url, timeout=timeout)
         response.raise_for_status()

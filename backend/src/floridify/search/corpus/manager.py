@@ -1,7 +1,7 @@
 """
 Cache and retrieval manager for Corpus instances.
 
-Provides get/create/invalidate operations for Corpus objects with 
+Provides get/create/invalidate operations for Corpus objects with
 lightweight MongoDB metadata storage.
 """
 
@@ -12,8 +12,8 @@ from typing import Any
 
 from ...caching.core import CacheNamespace, CacheTTL
 from ...caching.unified import get_unified
-from ...text.search import get_vocabulary_hash
 from ...utils.logging import get_logger
+from ..utils import get_vocabulary_hash
 from ..models import CorpusMetadata
 from .core import Corpus
 
@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 class CorpusManager:
     """
     Cache and retrieval manager for Corpus instances.
-    
+
     Similar to SemanticManager - handles caching and returns Corpus objects
     instead of CorpusMetadata. Stores only metadata in MongoDB.
     """
@@ -56,15 +56,14 @@ class CorpusManager:
 
         cache = await get_unified()
         cache_key = f"corpus:{corpus_name}:{vocab_hash}"
-        cached_data: dict[str, Any] | None = await cache.get(
-            CacheNamespace.CORPUS, cache_key
-        )
+        logger.debug(f"Looking for corpus in cache with key: {cache_key}")
+        cached_data: dict[str, Any] | None = await cache.get(CacheNamespace.CORPUS, cache_key)
         if cached_data:
             corpus = Corpus.model_load(cached_data)
-            logger.debug(f"Cache hit for corpus '{corpus_name}'")
+            logger.info(f"Cache hit for corpus '{corpus_name}' (using hash: {vocab_hash})")
             return corpus
 
-        logger.debug(f"Cache miss for corpus '{corpus_name}'")
+        logger.info(f"Cache miss for corpus '{corpus_name}' (looking for hash: {vocab_hash})")
         return None
 
     async def get_corpus_metadata(self, corpus_name: str) -> CorpusMetadata | None:
@@ -80,7 +79,7 @@ class CorpusManager:
         try:
             corpus_data = await CorpusMetadata.find_one({"corpus_name": corpus_name})
             if corpus_data:
-                logger.debug(f"Found corpus metadata in MongoDB: '{corpus_name}'")
+                logger.info(f"Found corpus metadata in MongoDB: '{corpus_name}' (metadata hash: {corpus_data.vocabulary_hash})")
                 return corpus_data
         except Exception as e:
             logger.warning(f"Error finding corpus metadata '{corpus_name}': {e}")
@@ -101,17 +100,17 @@ class CorpusManager:
         Returns:
             Fully processed Corpus instance
         """
-        logger.info(
-            f"Creating corpus '{corpus_name}' with {len(vocabulary)} vocabulary items"
-        )
+        logger.info(f"Creating new corpus '{corpus_name}' with {len(vocabulary)} vocabulary items")
         start_time = time.perf_counter()
 
         # Create corpus using Corpus.create()
         corpus = await Corpus.create(corpus_name, vocabulary, False)
-        
+        logger.debug(f"Corpus object created with hash: {corpus.vocabulary_hash[:8]}...")
+
         # Cache the corpus instance
         cache = await get_unified()
         cache_key = f"corpus:{corpus_name}:{corpus.vocabulary_hash}"
+        logger.info(f"Caching corpus with key: {cache_key} (full hash: {corpus.vocabulary_hash})")
         await cache.set(
             namespace=CacheNamespace.CORPUS,
             key=cache_key,
@@ -119,6 +118,7 @@ class CorpusManager:
             ttl=CacheTTL.CORPUS,
             tags=[f"{CacheNamespace.CORPUS}:{corpus_name}"],
         )
+        logger.debug("Corpus cached successfully")
 
         # Save lightweight metadata to MongoDB (optional - continue without database if it fails)
         try:
@@ -130,10 +130,11 @@ class CorpusManager:
                 semantic_data_id=None,
             )
             await corpus_data.save()
-            logger.info("Stored corpus metadata in MongoDB")
+            logger.info(f"Stored corpus metadata in MongoDB for '{corpus_name}' (full hash: {corpus.vocabulary_hash})")
         except Exception as e:
-            logger.warning(f"Failed to store corpus metadata in MongoDB (continuing without database): {e}")
-
+            logger.warning(
+                f"Failed to store corpus metadata in MongoDB (continuing without database): {e}"
+            )
 
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
         logger.info(f"Created corpus '{corpus_name}' in {elapsed_ms}ms")
@@ -160,11 +161,14 @@ class CorpusManager:
             Corpus instance with pre-computed indices and embeddings
         """
         if not force_rebuild:
+            logger.debug(f"Checking for existing corpus '{corpus_name}'")
             existing = await self.get_corpus(
                 corpus_name, vocab_hash=vocab_hash, vocabulary=vocabulary
             )
             if existing is not None:
+                logger.info(f"Using existing corpus '{corpus_name}'")
                 return existing
+            logger.debug(f"No existing corpus found, will create new")
 
         return await self.create_corpus(corpus_name, vocabulary)
 
@@ -189,8 +193,9 @@ class CorpusManager:
                 await corpus_data.delete()
                 deleted_count += 1
         except Exception as e:
-            logger.warning(f"Failed to remove corpus metadata from MongoDB (continuing without database): {e}")
-
+            logger.warning(
+                f"Failed to remove corpus metadata from MongoDB (continuing without database): {e}"
+            )
 
         removed = cache_removed > 0 or deleted_count > 0
         if removed:
@@ -199,6 +204,66 @@ class CorpusManager:
             )
 
         return removed
+
+    async def invalidate_all_corpora(self) -> dict[str, int]:
+        """
+        Invalidate all corpus instances and metadata.
+
+        Returns:
+            Dictionary with counts of removed items
+        """
+        # Invalidate all corpus cache entries
+        cache = await get_unified()
+        cache_removed = await cache.invalidate_namespace(CacheNamespace.CORPUS)
+
+        # Remove all CorpusMetadata from MongoDB
+        deleted_count = 0
+        try:
+            async for corpus_data in CorpusMetadata.find():
+                await corpus_data.delete()
+                deleted_count += 1
+        except Exception as e:
+            logger.warning(f"Failed to remove corpus metadata from MongoDB: {e}")
+
+        logger.info(f"Invalidated all corpora (cache: {cache_removed}, db: {deleted_count})")
+
+        return {
+            "cache_removed": cache_removed,
+            "db_removed": deleted_count,
+            "total": cache_removed + deleted_count,
+        }
+
+    async def get_stats(self) -> dict[str, Any]:
+        """
+        Get statistics about cached corpora.
+
+        Returns:
+            Dictionary with corpus statistics
+        """
+        # Get database corpus count and names
+        db_count = 0
+        corpus_names = []
+        total_vocabulary_size = 0
+        try:
+            async for corpus_data in CorpusMetadata.find():
+                db_count += 1
+                corpus_names.append(corpus_data.corpus_name)
+                if corpus_data.vocabulary_stats:
+                    total_vocabulary_size += corpus_data.vocabulary_stats.get("total", 0)
+        except Exception as e:
+            logger.warning(f"Failed to get corpus stats from MongoDB: {e}")
+
+        # Get approximate cache count (based on corpus names)
+        # Since we can't directly count cache entries, estimate based on corpus names
+        cache_count = len(corpus_names)  # Approximate
+
+        return {
+            "cache_entries": cache_count,
+            "db_entries": db_count,
+            "corpus_names": corpus_names,
+            "total_vocabulary_size": total_vocabulary_size,
+            "total_entries": db_count,
+        }
 
 
 # Global instance

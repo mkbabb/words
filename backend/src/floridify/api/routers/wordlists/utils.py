@@ -25,6 +25,7 @@ async def search_wordlist_names(
     owner_id: str | None = None,
     max_results: int = 20,
     min_score: float = 0.6,
+    repo: Any | None = None,
 ) -> list[dict[str, Any]]:
     """Search wordlist names - stubbed."""
     return []
@@ -35,6 +36,7 @@ async def search_words_in_wordlist(
     query: str,
     max_results: int = 20,
     min_score: float = 0.6,
+    repo: Any | None = None,
 ) -> list[dict[str, Any]]:
     """Search words in wordlist - stubbed."""
     return []

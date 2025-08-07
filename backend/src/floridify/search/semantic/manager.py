@@ -12,8 +12,8 @@ from typing import Any
 
 from ...caching.core import CacheNamespace, CacheTTL
 from ...caching.unified import get_unified
-from ...text.search import get_vocabulary_hash
 from ...utils.logging import get_logger
+from ..utils import get_vocabulary_hash
 from ..corpus.core import Corpus
 from ..models import CorpusMetadata, SemanticMetadata
 from .core import SemanticSearch
@@ -55,7 +55,7 @@ class SemanticSearchManager:
             if vocabulary is None:
                 raise ValueError("Must provide either vocab_hash or vocabulary")
             vocab_hash = get_vocabulary_hash(vocabulary)
-        
+
         cache = await get_unified()
         cache_key = f"semantic:{corpus_name}:{vocab_hash}"
         cached_data: dict[str, Any] | None = await cache.get(CacheNamespace.SEMANTIC, cache_key)
@@ -67,13 +67,19 @@ class SemanticSearchManager:
                     logger.debug(f"Cache hit for semantic search '{corpus_name}'")
                     return semantic_search
                 else:
-                    logger.warning(f"Invalid cached data type for semantic search '{corpus_name}': {type(cached_data)}. Invalidating cache.")
+                    logger.warning(
+                        f"Invalid cached data type for semantic search '{corpus_name}': {type(cached_data)}. Invalidating cache."
+                    )
                     await cache.delete(CacheNamespace.SEMANTIC, cache_key)
             except Exception as e:
-                logger.warning(f"Failed to load semantic search from cache for '{corpus_name}': {e}. Invalidating cache.")
+                logger.warning(
+                    f"Failed to load semantic search from cache for '{corpus_name}': {e}. Invalidating cache."
+                )
                 await cache.delete(CacheNamespace.SEMANTIC, cache_key)
-        
-        logger.error(f"🚨 SEMANTIC CACHE MISS: corpus='{corpus_name}', vocab_hash='{vocab_hash[:8]}...', cache_key='{cache_key}'")
+
+        logger.error(
+            f"🚨 SEMANTIC CACHE MISS: corpus='{corpus_name}', vocab_hash='{vocab_hash[:8]}...', cache_key='{cache_key}'"
+        )
         return None
 
     async def create_semantic_search(
@@ -107,7 +113,7 @@ class SemanticSearchManager:
 
         # Initialize with corpus instance directly
         await semantic_search.initialize()
-        
+
         # Cache in unified cache (L1 + L2)
         cache = await get_unified()
         await cache.set(
@@ -115,7 +121,10 @@ class SemanticSearchManager:
             key=cache_key,
             value=semantic_search.model_dump(),
             ttl=CacheTTL.SEMANTIC,
-            tags=[f"{CacheNamespace.CORPUS}:{corpus_name}", f"{CacheNamespace.SEMANTIC}:{corpus_name}"]
+            tags=[
+                f"{CacheNamespace.CORPUS}:{corpus_name}",
+                f"{CacheNamespace.SEMANTIC}:{corpus_name}",
+            ],
         )
 
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
@@ -137,24 +146,26 @@ class SemanticSearchManager:
         # Invalidate ONLY semantic data in unified cache
         cache = await get_unified()
         cache_removed = await cache.invalidate_by_tags([f"{CacheNamespace.SEMANTIC}:{corpus_name}"])
-        
+
         # Update CorpusMetadata to remove semantic reference
         corpus_updated = 0
         async for corpus_metadata in CorpusMetadata.find({"corpus_name": corpus_name}):
             corpus_metadata.semantic_data_id = None
             await corpus_metadata.save()
             corpus_updated += 1
-        
+
         # Cascading deletion: Remove SemanticMetadata from MongoDB
         deleted_count = 0
         async for semantic_metadata in SemanticMetadata.find({"corpus_name": corpus_name}):
             await semantic_metadata.delete()
             deleted_count += 1
-        
+
         removed = cache_removed > 0 or deleted_count > 0
         if removed:
-            logger.info(f"Invalidated semantic search for '{corpus_name}' (cache: {cache_removed}, db: {deleted_count}, corpus_updated: {corpus_updated})")
-        
+            logger.info(
+                f"Invalidated semantic search for '{corpus_name}' (cache: {cache_removed}, db: {deleted_count}, corpus_updated: {corpus_updated})"
+            )
+
         return removed
 
     async def invalidate_all(self) -> int:
@@ -167,21 +178,23 @@ class SemanticSearchManager:
         # Clear semantic data from unified cache
         cache = await get_unified()
         cache_removed = await cache.invalidate_namespace(CacheNamespace.SEMANTIC)
-        
+
         # Cascading deletion: Remove all SemanticMetadata from MongoDB
         deleted_result = await SemanticMetadata.delete_all()
         deleted_count = deleted_result.deleted_count if deleted_result else 0
-        
+
         total_count = cache_removed + deleted_count
-        logger.info(f"Invalidated all semantic search instances (cache: {cache_removed}, db: {deleted_count})")
-        
+        logger.info(
+            f"Invalidated all semantic search instances (cache: {cache_removed}, db: {deleted_count})"
+        )
+
         return total_count
 
     async def get_stats(self) -> dict[str, Any]:
         """Get statistics about managed semantic search instances."""
         cache = await get_unified()
         cache_stats = await cache.get_stats(CacheNamespace.SEMANTIC)
-        
+
         return {
             "architecture": "Unified Cache (Memory TTL + Filesystem)",
             "cache_stats": cache_stats,

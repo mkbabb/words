@@ -12,12 +12,12 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
-import marisa_trie  # type: ignore[import-not-found]
+import marisa_trie
 import numpy as np
 
 from ..caching.unified import get_unified
-from ..text.search import get_vocabulary_hash
 from ..utils.logging import get_logger
+from .utils import get_vocabulary_hash
 
 logger = get_logger(__name__)
 
@@ -99,7 +99,9 @@ class TrieSearch:
             if frequencies is None:
                 frequency = self._calculate_default_frequency(word)
             else:
-                frequency = frequencies.get(word, self._calculate_default_frequency(word))
+                frequency = frequencies.get(
+                    word, self._calculate_default_frequency(word)
+                )
 
             self._word_frequencies[word] = frequency
             self._max_frequency = max(self._max_frequency, frequency)
@@ -191,7 +193,6 @@ class TrieSearch:
         Returns:
             List of exact matches (typically 0 or 1 items)
         """
-        query = query.strip().lower()
         if not query or not self._trie:
             return []
 
@@ -212,7 +213,6 @@ class TrieSearch:
         Returns:
             List of words starting with prefix, ranked by frequency
         """
-        prefix = prefix.strip().lower()
         if not prefix or not self._trie:
             return []
 
@@ -222,12 +222,16 @@ class TrieSearch:
         # Sort by frequency (descending) and return top results
         if len(matches) <= max_results:
             # If we have few matches, simple frequency sort is fine
-            frequency_pairs = [(word, self._word_frequencies.get(word, 0)) for word in matches]
+            frequency_pairs = [
+                (word, self._word_frequencies.get(word, 0)) for word in matches
+            ]
             frequency_pairs.sort(key=lambda x: x[1], reverse=True)
             return [word for word, _ in frequency_pairs]
         else:
             # For many matches, use numpy argsort for better performance than heapq
-            frequencies = np.array([self._word_frequencies.get(word, 0) for word in matches])
+            frequencies = np.array(
+                [self._word_frequencies.get(word, 0) for word in matches]
+            )
             # Get indices of top frequencies (argsort returns ascending, so negate and reverse)
             top_indices = np.argsort(-frequencies)[:max_results]
             return [matches[i] for i in top_indices]
@@ -242,7 +246,6 @@ class TrieSearch:
         Returns:
             True if word exists in the trie
         """
-        word = word.strip().lower()
         if not word or not self._trie:
             return False
         return word in self._trie
@@ -261,7 +264,9 @@ class TrieSearch:
         all_words = list(self._trie)
 
         # Sort by frequency (descending)
-        frequency_words = [(word, self._word_frequencies.get(word, 0)) for word in all_words]
+        frequency_words = [
+            (word, self._word_frequencies.get(word, 0)) for word in all_words
+        ]
         frequency_words.sort(key=lambda x: x[1], reverse=True)
 
         return [word for word, _ in frequency_words]
@@ -284,7 +289,11 @@ class TrieSearch:
         # Cache statistics to avoid expensive recalculation
         if not hasattr(self, "_cached_stats") or self._stats_dirty:
             all_words = list(self._trie)
-            avg_length = sum(len(word) for word in all_words) / len(all_words) if all_words else 0.0
+            avg_length = (
+                sum(len(word) for word in all_words) / len(all_words)
+                if all_words
+                else 0.0
+            )
             self._cached_avg_length = avg_length
             self._cached_word_list_size = len(all_words)
             self._stats_dirty = False

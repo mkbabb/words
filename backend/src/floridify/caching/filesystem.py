@@ -30,18 +30,18 @@ class FilesystemCacheBackend(CacheBackend[T]):
             cache_dir = get_cache_directory() / "unified"
 
         cache_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self.cache_dir = cache_dir
         self.size_limit = size_limit
         self.default_ttl = default_ttl
-        
+
         # Initialize cache with retry logic for development hot reloading
         self.cache = self._initialize_cache()
-        
+
     def _initialize_cache(self) -> dc.Cache:
         """Initialize diskcache with proper error handling and cleanup."""
         import shutil
-        
+
         max_attempts = 3
         for attempt in range(max_attempts):
             try:
@@ -53,7 +53,7 @@ class FilesystemCacheBackend(CacheBackend[T]):
                     tag_index=True,
                     timeout=60,
                 )
-                
+
                 # Test the cache to ensure it's working
                 test_key = "__init_test__"
                 cache[test_key] = "test_value"
@@ -63,7 +63,7 @@ class FilesystemCacheBackend(CacheBackend[T]):
                     return cache
                 else:
                     raise RuntimeError("Cache test failed - get/set not working")
-                    
+
             except Exception as e:
                 logger.warning(f"Cache initialization attempt {attempt + 1} failed: {e}")
                 if attempt < max_attempts - 1:
@@ -75,15 +75,17 @@ class FilesystemCacheBackend(CacheBackend[T]):
                     except Exception as cleanup_error:
                         logger.warning(f"Failed to cleanup cache directory: {cleanup_error}")
                 else:
-                    raise RuntimeError(f"Failed to initialize cache after {max_attempts} attempts: {e}")
-                    
+                    raise RuntimeError(
+                        f"Failed to initialize cache after {max_attempts} attempts: {e}"
+                    )
+
         raise RuntimeError("Unreachable code")
 
     async def get(self, namespace: str, key: str, default: T | None = None) -> T | None:
         """Get value from cache with error recovery."""
         cache_key = f"{namespace}:{key}"
         loop = asyncio.get_event_loop()
-        
+
         try:
             value = await loop.run_in_executor(None, self.cache.get, cache_key, default)
             return cast(T, value)
@@ -120,7 +122,7 @@ class FilesystemCacheBackend(CacheBackend[T]):
         loop = asyncio.get_event_loop()
         # diskcache only supports single tag per entry, use first tag
         tag = all_tags[0] if all_tags else None
-        
+
         try:
             await loop.run_in_executor(None, self.cache.set, cache_key, value, expire, False, tag)
         except Exception as e:
@@ -131,7 +133,9 @@ class FilesystemCacheBackend(CacheBackend[T]):
                 try:
                     self.cache.close()
                     self.cache = self._initialize_cache()
-                    await loop.run_in_executor(None, self.cache.set, cache_key, value, expire, False, tag)
+                    await loop.run_in_executor(
+                        None, self.cache.set, cache_key, value, expire, False, tag
+                    )
                 except Exception as reinit_error:
                     logger.error(f"Cache reinitialization failed: {reinit_error}")
                     # Don't raise - just log and continue without caching

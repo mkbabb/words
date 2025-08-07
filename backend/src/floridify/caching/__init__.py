@@ -28,7 +28,7 @@ __all__ = [
     "CacheNamespace",
     "CacheTTL",
     "CompressionType",
-    "QuantizationType", 
+    "QuantizationType",
     "CacheMetadata",
     "UnifiedCache",
     "get_unified",

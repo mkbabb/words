@@ -2,6 +2,11 @@
 
 import uuid
 
+try:
+    import coolname
+except ImportError:
+    coolname = None  # type: ignore[assignment]
+
 from .logging import get_logger
 
 logger = get_logger(__name__)
@@ -23,16 +28,16 @@ def generate_slug(word_count: int = 3) -> str:
         >>> slug = generate_slug()  # 'happy-penguin-dance'
         >>> slug = generate_slug(2)  # 'blue-tiger'
     """
-    try:
-        import coolname  # type: ignore[import-untyped]
-
-        slug: str = coolname.generate_slug(word_count)
-        logger.debug(f"Generated slug: {slug}")
-        return slug
-    except Exception as e:
-        logger.warning(f"Failed to generate cool name: {e}, falling back to UUID")
-        # Fallback to UUID (first 8 chars for brevity)
-        return str(uuid.uuid4())[:8]
+    if coolname is not None:
+        try:
+            slug: str = coolname.generate_slug(word_count)
+            logger.debug(f"Generated slug: {slug}")
+            return slug
+        except Exception as e:
+            logger.warning(f"Failed to generate cool name: {e}, falling back to UUID")
+    
+    # Fallback to UUID (first 8 chars for brevity)
+    return str(uuid.uuid4())[:8]
 
 
 def generate_deterministic_id(*parts: str) -> str:

@@ -26,7 +26,7 @@ def is_phrase(text: str) -> bool:
     """
     if not text:
         return False
-    
+
     # Check for whitespace (simple phrase detection)
     normalized = text.strip()
     return len(normalized.split()) > 1
@@ -47,10 +47,10 @@ def clean_phrase(phrase: str) -> str:
 
     # Basic normalization
     cleaned = normalize_fast(phrase)
-    
+
     # Normalize whitespace
     cleaned = WHITESPACE_PATTERN.sub(" ", cleaned).strip()
-    
+
     return cleaned
 
 
@@ -66,7 +66,7 @@ def split_phrase(phrase: str) -> list[str]:
     """
     if not phrase:
         return []
-    
+
     cleaned = clean_phrase(phrase)
     return cleaned.split() if cleaned else []
 
@@ -84,7 +84,7 @@ def join_words(words: list[str], separator: str = " ") -> str:
     """
     if not words:
         return ""
-    
+
     return separator.join(str(word).strip() for word in words if word)
 
 
@@ -115,17 +115,17 @@ def get_phrase_variants(phrase: str) -> set[str]:
         return set()
 
     variants = {phrase}
-    
+
     # Add cleaned version
     cleaned = clean_phrase(phrase)
     if cleaned and cleaned != phrase:
         variants.add(cleaned)
-    
+
     # Add lowercase version
     lower = phrase.lower()
     if lower != phrase:
         variants.add(lower)
-    
+
     return variants
 
 
@@ -134,7 +134,7 @@ def extract_phrases(text: str) -> list[str]:
     """Extract phrases from text (simplified)."""
     if not text:
         return []
-    return [phrase.strip() for phrase in text.split('.') if phrase.strip()]
+    return [phrase.strip() for phrase in text.split(".") if phrase.strip()]
 
 
 def find_hyphenated_phrases(text: str) -> list[str]:
@@ -142,7 +142,7 @@ def find_hyphenated_phrases(text: str) -> list[str]:
     if not text:
         return []
     # Simple hyphen detection
-    return re.findall(r'\b\w+(?:-\w+)+\b', text)
+    return re.findall(r"\b\w+(?:-\w+)+\b", text)
 
 
 def find_quoted_phrases(text: str) -> list[str]:

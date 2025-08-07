@@ -93,7 +93,7 @@ class MongoDBStorage:
                 SynthesizedDictionaryEntry,
                 WordRelationship,
                 WordList,
-                # Cache models  
+                # Cache models
                 # CorpusCacheEntry removed - using unified caching
                 CorpusMetadata,
                 SemanticMetadata,

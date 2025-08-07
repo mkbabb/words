@@ -27,7 +27,7 @@ __all__ = [
     "ai",
     "audio",
     "batch",
-# "corpus" disabled
+    # "corpus" disabled
     "definitions",
     "examples",
     "facts",

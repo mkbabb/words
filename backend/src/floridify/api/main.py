@@ -18,7 +18,7 @@ from .routers import (
     ai,
     audio,
     batch,
-# corpus disabled
+    # corpus disabled
     definitions,
     examples,
     facts,

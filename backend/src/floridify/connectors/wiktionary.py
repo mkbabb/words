@@ -8,7 +8,7 @@ import re
 from typing import Any
 
 import httpx
-import wikitextparser as wtp  # type: ignore[import-untyped]
+import wikitextparser as wtp
 from beanie import PydanticObjectId
 
 from ..caching.decorators import cached_computation_async
@@ -176,10 +176,10 @@ class WiktionaryConnector(DictionaryConnector):
         """Cached HTTP GET for API calls."""
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                url, 
+                url,
                 params=params,
                 headers={"User-Agent": "Floridify/1.0 (https://github.com/user/floridify)"},
-                timeout=120.0
+                timeout=120.0,
             )
             if response.status_code == 429:
                 raise Exception("Rate limited by Wiktionary")
@@ -239,9 +239,10 @@ class WiktionaryConnector(DictionaryConnector):
                         )
 
             response_text = await self._cached_get(self.base_url, params)
-            
+
             # Parse JSON response
             import json
+
             data = json.loads(response_text)
 
             # Report parsing start

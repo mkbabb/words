@@ -8,7 +8,7 @@ Supports exact, fuzzy, and semantic search with first-class phrase/idiom support
 from __future__ import annotations
 
 from ..models.definition import Language
-from .constants import FuzzySearchMethod, SearchMethod
+from .constants import SearchMethod
 from .core import SearchEngine
 from .corpus import CorpusLanguageLoader, LexiconSourceConfig
 from .fuzzy import FuzzySearch
@@ -29,6 +29,5 @@ __all__ = [
     "LexiconSourceConfig",
     "TrieSearch",
     "FuzzySearch",
-    "FuzzySearchMethod",
     "SemanticSearch",
 ]
