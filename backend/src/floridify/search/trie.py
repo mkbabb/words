@@ -7,17 +7,16 @@ Provides exact matching and autocomplete functionality with frequency-based rank
 
 from __future__ import annotations
 
-import pickle
 from datetime import timedelta
-from pathlib import Path
 from typing import Any
 
 import marisa_trie
 import numpy as np
 
 from ..caching.unified import get_unified
+from ..text import batch_normalize, normalize_comprehensive
 from ..utils.logging import get_logger
-from .utils import get_vocabulary_hash
+from .utils import calculate_default_frequency, get_vocabulary_hash
 
 logger = get_logger(__name__)
 
@@ -31,14 +30,6 @@ class TrieSearch:
     - Memory: ~20MB for 500k+ words (5x more efficient than Python trie)
     - Build time: O(n*m) where n = number of words, m = average word length
     - Prefix enumeration: Very fast with optimized C++ implementation
-
-    Features:
-    - Exact string matching
-    - Prefix matching for autocomplete
-    - Frequency-based result ranking
-    - Minimal memory footprint with double-array implementation
-    - Support for phrases and multi-word expressions
-    - Persistent storage and loading capability
     """
 
     def __init__(self) -> None:
@@ -47,10 +38,24 @@ class TrieSearch:
         self._word_frequencies: dict[str, int] = {}
         self._word_count = 0
         self._max_frequency = 0
-        self._stats_dirty = True  # Flag to track when stats need recalculation
         self._vocabulary_hash: str | None = None
         self._cache: Any = None  # Will be initialized on first use
 
+    async def initialize(self) -> None:
+        """Initialize the trie search (no-op for compatibility)."""
+        pass
+    
+    async def update_corpus(
+        self, corpus: Any
+    ) -> None:
+        """
+        Update the trie with a new corpus.
+        
+        Args:
+            corpus: Corpus object containing vocabulary
+        """
+        await self.build_index(corpus.vocabulary, corpus.word_frequencies)
+    
     async def build_index(
         self, words: list[str], frequencies: dict[str, int] | None = None
     ) -> None:
@@ -73,44 +78,41 @@ class TrieSearch:
         cached_trie = await self._load_from_cache(vocab_hash)
         if cached_trie:
             logger.info(f"Loaded trie from cache: {vocab_hash[:8]}")
-            self._trie = cached_trie["trie"]
-            self._word_frequencies = cached_trie["frequencies"]
-            self._word_count = cached_trie["word_count"]
-            self._max_frequency = cached_trie["max_frequency"]
+            self.model_load(cached_trie)
             self._vocabulary_hash = vocab_hash
-            self._stats_dirty = True
             return
 
         logger.info(f"Building new trie: {vocab_hash[:8]} ({len(words)} words)")
 
         self._word_frequencies.clear()
         self._word_count = 0
-        self._stats_dirty = True  # Mark stats as needing recalculation
         self._max_frequency = 0
 
-        # Process and normalize words
-        normalized_words = []
-        for word in words:
-            word = word.strip().lower()
-            if not word:
+        # Batch normalize all words in parallel
+        normalized_words = batch_normalize(words)
+        
+        # Build frequency map and filter empty words
+        valid_words = []
+        for normalized in normalized_words:
+            if not normalized:
                 continue
-
+            
             # Get frequency (default based on word characteristics)
             if frequencies is None:
-                frequency = self._calculate_default_frequency(word)
+                frequency = calculate_default_frequency(normalized)
             else:
                 frequency = frequencies.get(
-                    word, self._calculate_default_frequency(word)
+                    normalized, calculate_default_frequency(normalized)
                 )
-
-            self._word_frequencies[word] = frequency
+            
+            self._word_frequencies[normalized] = frequency
             self._max_frequency = max(self._max_frequency, frequency)
-            normalized_words.append(word)
+            valid_words.append(normalized)
             self._word_count += 1
 
         # Build the marisa-trie (C++ optimized)
-        if normalized_words:
-            self._trie = marisa_trie.Trie(normalized_words)
+        if valid_words:
+            self._trie = marisa_trie.Trie(valid_words)
             # Cache the built trie
             await self._save_to_cache(vocab_hash)
         else:
@@ -118,36 +120,111 @@ class TrieSearch:
 
         self._vocabulary_hash = vocab_hash
 
-    def _calculate_default_frequency(self, word: str) -> int:
+    def search_exact(self, query: str) -> str | None:
         """
-        Calculate default frequency based on word characteristics.
+        Find exact matches for the query using optimized marisa-trie.
 
-        Heuristics:
-        - Shorter words are typically more common
-        - Common patterns get higher scores
-        - Phrases get moderate scores
+        Args:
+            query: Exact string to search for
+
+        Returns:
+            List of exact matches (typically 0 or 1 items)
         """
-        base_score = 1000
+        if not query or not self._trie:
+            return None
 
-        # Length penalty (shorter = more common)
-        length_penalty = len(word) * 10
+        # Normalize query using comprehensive normalization
+        normalized_query = normalize_comprehensive(query)
+        if not normalized_query:
+            return None
 
-        # Phrase bonus/penalty
-        if " " in word:
-            # Phrases: moderate frequency
-            phrase_bonus = 200
+        # Use marisa-trie's optimized exact search
+        if normalized_query in self._trie:
+            return normalized_query
+
+        return None
+
+    def search_prefix(self, prefix: str, max_results: int = 20) -> list[str]:
+        """
+        Find all words that start with the given prefix using optimized marisa-trie.
+
+        Args:
+            prefix: Prefix to search for
+            max_results: Maximum number of results to return
+
+        Returns:
+            List of words starting with prefix, ranked by frequency
+        """
+        if not prefix or not self._trie:
+            return []
+
+        # Normalize prefix using comprehensive normalization
+        normalized_prefix = normalize_comprehensive(prefix)
+        if not normalized_prefix:
+            return []
+
+        # Use marisa-trie's optimized prefix search
+        matches = list(self._trie.keys(normalized_prefix))
+
+        # Sort by frequency (descending) and return top results
+        if len(matches) <= max_results:
+            # If we have few matches, simple frequency sort is fine
+            frequency_pairs = [
+                (word, self._word_frequencies.get(word, 0)) for word in matches
+            ]
+            frequency_pairs.sort(key=lambda x: x[1], reverse=True)
+            return [word for word, _ in frequency_pairs]
         else:
-            # Single words: base frequency
-            phrase_bonus = 0
+            # For many matches, use numpy argsort for better performance
+            frequencies = np.array(
+                [self._word_frequencies.get(word, 0) for word in matches]
+            )
+            # Get indices of top frequencies
+            top_indices = np.argsort(-frequencies)[:max_results]
+            return [matches[i] for i in top_indices]
 
-        # Common word patterns
-        pattern_bonus = 0
-        if word.endswith(("ing", "ed", "er", "est", "ly")):
-            pattern_bonus = 100
-        elif word.startswith(("un", "pre", "re")):
-            pattern_bonus = 50
+    def model_dump(self) -> dict[str, Any]:
+        """
+        Export trie state in a format similar to Pydantic's model_dump.
 
-        return max(1, base_score - length_penalty + phrase_bonus + pattern_bonus)
+        Returns:
+            Dictionary containing trie state
+        """
+        if not self._trie:
+            return {
+                "trie_data": [],
+                "frequencies": {},
+                "word_count": 0,
+                "max_frequency": 0,
+                "vocabulary_hash": self._vocabulary_hash,
+            }
+
+        return {
+            "trie_data": list(self._trie),
+            "frequencies": self._word_frequencies.copy(),
+            "word_count": self._word_count,
+            "max_frequency": self._max_frequency,
+            "vocabulary_hash": self._vocabulary_hash,
+        }
+
+    def model_load(self, data: dict[str, Any]) -> None:
+        """
+        Load trie state from a dictionary, similar to Pydantic.
+
+        Args:
+            data: Dictionary containing trie state
+        """
+        words = data.get("trie_data", [])
+        self._word_frequencies = data.get("frequencies", {})
+        self._word_count = data.get("word_count", 0)
+        self._max_frequency = data.get("max_frequency", 0)
+        self._vocabulary_hash = data.get("vocabulary_hash")
+
+        if words:
+            self._trie = marisa_trie.Trie(words)
+        else:
+            self._trie = None
+
 
     async def _save_to_cache(self, vocab_hash: str) -> None:
         """Save trie to cache."""
@@ -158,12 +235,7 @@ class TrieSearch:
         if self._cache is None:
             self._cache = await get_unified()
 
-        cache_data = {
-            "trie": self._trie,
-            "frequencies": self._word_frequencies.copy(),
-            "word_count": self._word_count,
-            "max_frequency": self._max_frequency,
-        }
+        cache_data = self.model_dump()
 
         # Store with 7-day TTL
         await self._cache.set("trie", vocab_hash, cache_data, ttl=timedelta(days=7))
@@ -182,173 +254,3 @@ class TrieSearch:
             return cached_data  # type: ignore[no-any-return]
 
         return None
-
-    def search_exact(self, query: str) -> list[str]:
-        """
-        Find exact matches for the query using optimized marisa-trie.
-
-        Args:
-            query: Exact string to search for
-
-        Returns:
-            List of exact matches (typically 0 or 1 items)
-        """
-        if not query or not self._trie:
-            return []
-
-        # Use marisa-trie's optimized exact search
-        if query in self._trie:
-            return [query]
-
-        return []
-
-    def search_prefix(self, prefix: str, max_results: int = 20) -> list[str]:
-        """
-        Find all words that start with the given prefix using optimized marisa-trie.
-
-        Args:
-            prefix: Prefix to search for
-            max_results: Maximum number of results to return
-
-        Returns:
-            List of words starting with prefix, ranked by frequency
-        """
-        if not prefix or not self._trie:
-            return []
-
-        # Use marisa-trie's optimized prefix search
-        matches = list(self._trie.keys(prefix))
-
-        # Sort by frequency (descending) and return top results
-        if len(matches) <= max_results:
-            # If we have few matches, simple frequency sort is fine
-            frequency_pairs = [
-                (word, self._word_frequencies.get(word, 0)) for word in matches
-            ]
-            frequency_pairs.sort(key=lambda x: x[1], reverse=True)
-            return [word for word, _ in frequency_pairs]
-        else:
-            # For many matches, use numpy argsort for better performance than heapq
-            frequencies = np.array(
-                [self._word_frequencies.get(word, 0) for word in matches]
-            )
-            # Get indices of top frequencies (argsort returns ascending, so negate and reverse)
-            top_indices = np.argsort(-frequencies)[:max_results]
-            return [matches[i] for i in top_indices]
-
-    def contains(self, word: str) -> bool:
-        """
-        Check if a word exists in the trie using optimized marisa-trie.
-
-        Args:
-            word: Word to check
-
-        Returns:
-            True if word exists in the trie
-        """
-        if not word or not self._trie:
-            return False
-        return word in self._trie
-
-    def get_all_words(self) -> list[str]:
-        """
-        Get all words in the trie, sorted by frequency.
-
-        Returns:
-            List of all words sorted by frequency (descending)
-        """
-        if not self._trie:
-            return []
-
-        # Get all words from the trie
-        all_words = list(self._trie)
-
-        # Sort by frequency (descending)
-        frequency_words = [
-            (word, self._word_frequencies.get(word, 0)) for word in all_words
-        ]
-        frequency_words.sort(key=lambda x: x[1], reverse=True)
-
-        return [word for word, _ in frequency_words]
-
-    def get_statistics(self) -> dict[str, Any]:
-        """
-        Get trie statistics and performance metrics.
-
-        Returns:
-            Dictionary with trie statistics
-        """
-        if not self._trie:
-            return {
-                "word_count": 0,
-                "max_frequency": 0,
-                "memory_efficiency": "N/A",
-                "average_word_length": 0.0,
-            }
-
-        # Cache statistics to avoid expensive recalculation
-        if not hasattr(self, "_cached_stats") or self._stats_dirty:
-            all_words = list(self._trie)
-            avg_length = (
-                sum(len(word) for word in all_words) / len(all_words)
-                if all_words
-                else 0.0
-            )
-            self._cached_avg_length = avg_length
-            self._cached_word_list_size = len(all_words)
-            self._stats_dirty = False
-        else:
-            avg_length = self._cached_avg_length
-
-        return {
-            "word_count": self._word_count,
-            "memory_nodes": getattr(
-                self, "_cached_word_list_size", self._word_count
-            ),  # Use cached size
-            "average_depth": avg_length,  # Use average word length as depth approximation
-            "max_frequency": self._max_frequency,
-            "memory_efficiency": "5x better than Python trie",
-            "average_word_length": avg_length,
-            "backend": "marisa-trie (C++)",
-        }
-
-    def save_to_file(self, filepath: Path) -> None:
-        """
-        Save the trie and frequency data to a file for persistence.
-
-        Args:
-            filepath: Path to save the trie data
-        """
-        if not self._trie:
-            raise ValueError("No trie built to save")
-
-        data = {
-            "trie_data": list(self._trie),
-            "frequencies": self._word_frequencies,
-            "word_count": self._word_count,
-            "max_frequency": self._max_frequency,
-        }
-
-        with filepath.open("wb") as f:
-            pickle.dump(data, f)
-
-    def load_from_file(self, filepath: Path) -> None:
-        """
-        Load the trie and frequency data from a file.
-
-        Args:
-            filepath: Path to load the trie data from
-        """
-        with filepath.open("rb") as f:
-            data = pickle.load(f)
-
-        # Rebuild the trie from saved data
-        words = data["trie_data"]
-        self._word_frequencies = data["frequencies"]
-        self._word_count = data["word_count"]
-        self._max_frequency = data["max_frequency"]
-
-        if words:
-            self._trie = marisa_trie.Trie(words)
-        else:
-            self._trie = None

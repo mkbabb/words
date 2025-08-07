@@ -350,16 +350,42 @@ def _lemmatize_chunk(chunk: list[str]) -> list[str]:
     return lemmas
 
 
+def _build_lemma_indices(
+    lemmas: list[str],
+) -> tuple[list[str], list[int], list[int]]:
+    """Build unique lemmas and indices from a list of lemmas."""
+    seen_lemmas: set[str] = set()
+    unique_lemmas: list[str] = []
+    lemma_to_index: dict[str, int] = {}
+    word_to_lemma_indices: list[int] = []
+    lemma_to_word_indices: list[int] = []
+
+    for word_idx, lemma in enumerate(lemmas):
+        if not lemma:
+            word_to_lemma_indices.append(-1)
+            continue
+
+        if lemma not in seen_lemmas:
+            seen_lemmas.add(lemma)
+            lemma_idx = len(unique_lemmas)
+            unique_lemmas.append(lemma)
+            lemma_to_index[lemma] = lemma_idx
+            lemma_to_word_indices.append(word_idx)
+        else:
+            lemma_idx = lemma_to_index[lemma]
+
+        word_to_lemma_indices.append(lemma_idx)
+
+    return unique_lemmas, word_to_lemma_indices, lemma_to_word_indices
+
+
 def batch_lemmatize(
     words: list[str],
     n_processes: int | None = None,
     chunk_size: int = 5000,
 ) -> tuple[list[str], list[int], list[int]]:
     """
-    Parallelized batch lemmatization using multiprocessing.
-
-    Processes words in parallel chunks for significant speedup on large vocabularies.
-    Falls back to serial processing for small batches.
+    Batch lemmatization with automatic parallelization for large inputs.
 
     Args:
         words: List of words to lemmatize
@@ -374,7 +400,8 @@ def batch_lemmatize(
 
     # For small batches, use serial processing
     if len(words) < 10000:
-        return batch_lemmatize_serial(words)
+        lemmas = [lemmatize_word(word) if word else "" for word in words]
+        return _build_lemma_indices(lemmas)
 
     import multiprocessing as mp
     import os
@@ -407,76 +434,11 @@ def batch_lemmatize(
     for chunk_lemmas in chunk_results:
         all_lemmas.extend(chunk_lemmas)
 
-    # Build unique lemmas and indices
-    seen_lemmas: set[str] = set()
-    unique_lemmas: list[str] = []
-    lemma_to_index: dict[str, int] = {}
-    word_to_lemma_indices: list[int] = []
-    lemma_to_word_indices: list[int] = []
-
-    for word_idx, lemma in enumerate(all_lemmas):
-        if not lemma:
-            word_to_lemma_indices.append(-1)
-            continue
-
-        if lemma not in seen_lemmas:
-            seen_lemmas.add(lemma)
-            lemma_idx = len(unique_lemmas)
-            unique_lemmas.append(lemma)
-            lemma_to_index[lemma] = lemma_idx
-            lemma_to_word_indices.append(word_idx)
-        else:
-            lemma_idx = lemma_to_index[lemma]
-
-        word_to_lemma_indices.append(lemma_idx)
+    unique_lemmas, word_to_lemma_indices, lemma_to_word_indices = _build_lemma_indices(all_lemmas)
 
     logger.info(
         f"✅ Lemmatization complete: {len(unique_lemmas)} unique lemmas from {len(words)} words"
     )
-
-    return unique_lemmas, word_to_lemma_indices, lemma_to_word_indices
-
-
-def batch_lemmatize_serial(
-    words: list[str],
-) -> tuple[list[str], list[int], list[int]]:
-    """
-    Serial batch lemmatization with caching.
-
-    Used for small batches or as fallback.
-
-    Args:
-        words: List of words to lemmatize
-
-    Returns:
-        Tuple of (unique_lemmas, word_to_lemma_indices, lemma_to_word_indices)
-    """
-    if not words:
-        return [], [], []
-
-    # Use set for O(1) lookup performance
-    seen_lemmas: set[str] = set()
-    unique_lemmas: list[str] = []
-    lemma_to_index: dict[str, int] = {}
-    word_to_lemma_indices: list[int] = []
-    lemma_to_word_indices: list[int] = []
-
-    for word_idx, word in enumerate(words):
-        if not word:
-            word_to_lemma_indices.append(-1)  # Invalid word marker
-            continue
-
-        lemma = lemmatize_word(word)
-
-        if lemma not in seen_lemmas:
-            # New unique lemma - O(1) set lookup
-            seen_lemmas.add(lemma)
-            lemma_idx = len(unique_lemmas)
-            unique_lemmas.append(lemma)
-            lemma_to_index[lemma] = lemma_idx
-            lemma_to_word_indices.append(word_idx)  # First word with this lemma
-
-        word_to_lemma_indices.append(lemma_to_index[lemma])
 
     return unique_lemmas, word_to_lemma_indices, lemma_to_word_indices
 
@@ -507,48 +469,22 @@ def get_lemma_cache_stats() -> dict[str, int]:
     }
 
 
-def clean_word(word: str) -> str:
+
+
+
+
+
+def _normalize_chunk_comprehensive(words: list[str]) -> list[str]:
+    """Normalize a chunk of words for parallel processing."""
+    return [normalize_comprehensive(word) for word in words if word]
+
+
+def batch_normalize(vocabulary: list[str]) -> list[str]:
     """
-    Clean a word using fast normalization.
-
-    Args:
-        word: Word to clean
-
-    Returns:
-        Cleaned word
-    """
-    return normalize_fast(word)
-
-
-def normalize_word(word: str) -> str:
-    """
-    Normalize a single word using comprehensive normalization.
-
-    Args:
-        word: Word to normalize
-
-    Returns:
-        Normalized word
-    """
-    return normalize_comprehensive(word)
-
-
-def _normalize_chunk_comprehensive(words: list[str], use_comprehensive: bool = False) -> list[str]:
-    """Normalize a chunk of words for parallel processing with configurable strategy."""
-    if use_comprehensive:
-        return [normalize_comprehensive(word) for word in words if word]
-    else:
-        return [normalize_fast(word) for word in words if word]
-
-
-def batch_normalize(vocabulary: list[str], use_comprehensive: bool = False) -> list[str]:
-    """
-    Parallel normalization helper with configurable comprehensive normalization.
+    Parallel normalization using comprehensive normalization.
 
     Args:
         vocabulary: List of words to normalize
-        use_comprehensive: If True, uses normalize_comprehensive (slower but more thorough)
-                          If False, uses normalize_fast (faster, optimized for search)
 
     Returns:
         List of normalized words
@@ -561,10 +497,7 @@ def batch_normalize(vocabulary: list[str], use_comprehensive: bool = False) -> l
 
     if len(valid_words) < 5000:
         # Fall back to serial for small datasets
-        if use_comprehensive:
-            return [normalize_comprehensive(word) for word in valid_words]
-        else:
-            return [normalize_fast(word) for word in valid_words]
+        return [normalize_comprehensive(word) for word in valid_words]
 
     # Split into chunks for parallel processing
     chunk_size = max(1000, len(valid_words) // (os.cpu_count() or 4))
@@ -573,10 +506,7 @@ def batch_normalize(vocabulary: list[str], use_comprehensive: bool = False) -> l
     # Process chunks in parallel
     normalized_words = []
     with ProcessPoolExecutor(max_workers=min(8, os.cpu_count() or 4)) as executor:
-        futures = [
-            executor.submit(_normalize_chunk_comprehensive, chunk, use_comprehensive)
-            for chunk in chunks
-        ]
+        futures = [executor.submit(_normalize_chunk_comprehensive, chunk) for chunk in chunks]
         for future in futures:
             normalized_words.extend(future.result())
 

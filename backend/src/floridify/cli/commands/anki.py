@@ -16,7 +16,7 @@ from ...core.search_pipeline import get_search_engine
 from ...models import Word
 from ...models.definition import DictionaryProvider, Language
 from ...storage.mongodb import _ensure_initialized
-from ...text import normalize_word
+from ...text import normalize_comprehensive
 from ...utils.logging import get_logger
 from ...wordlist import WordList
 from ..utils.formatting import console
@@ -162,7 +162,7 @@ async def _export_async(
 
         for word_freq in word_list.words:
             word_text = word_text_map.get(str(word_freq.word_id), "")
-            normalized = normalize_word(word_text)
+            normalized = normalize_comprehensive(word_text)
 
             # Try to get the canonical form from search engine
             search_results = await search_engine.search(normalized, max_results=1)

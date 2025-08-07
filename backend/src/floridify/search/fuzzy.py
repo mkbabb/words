@@ -6,7 +6,7 @@ Streamlined fuzzy search using TheFuzz backend with direct corpus vocabulary acc
 
 from __future__ import annotations
 
-from thefuzz import fuzz, process
+from rapidfuzz import fuzz, process
 
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE
@@ -19,10 +19,9 @@ logger = get_logger(__name__)
 
 class FuzzySearch:
     """
-    Streamlined fuzzy search using TheFuzz backend.
+    Streamlined fuzzy search using RapidFuzz backend.
 
-    Directly searches the corpus vocabulary without candidate pre-selection
-    for simplicity and consistent performance.
+    Optimized with candidate pre-selection for better performance.
     """
 
     def __init__(self, min_score: float = DEFAULT_MIN_SCORE) -> None:
@@ -43,51 +42,61 @@ class FuzzySearch:
     ) -> list[SearchResult]:
         """
         Fuzzy search using corpus vocabulary directly.
-        
+
         Simplified implementation without candidate pre-selection.
-        
+
         Args:
             query: Search query
             corpus: Corpus containing vocabulary to search
             max_results: Maximum number of results
             min_score: Minimum score threshold (overrides default)
-        
+
         Returns:
             List of fuzzy search results
         """
         min_score_threshold = min_score if min_score is not None else self.min_score
-        
+
         # Smart candidate selection using corpus indices
         candidates = self._select_candidates(query, corpus, max_results)
         if not candidates:
             return []
-        # Get candidate words from corpus using batch retrieval  
+        # Get candidate words from corpus using batch retrieval
         candidate_words = corpus.get_words_by_indices(candidates)
-        
+
         # Use candidate words for better performance
         vocabulary = candidate_words
-        
+
         if not vocabulary:
             return []
-        
-        # Use TheFuzz with score_cutoff for early termination
-        results = process.extractBests(
+
+        # Use RapidFuzz with score_cutoff for early termination
+        results = process.extract(
             query,
             vocabulary,
             limit=min(max_results, len(vocabulary)),
             scorer=fuzz.WRatio,
             score_cutoff=min_score_threshold * 100,  # Convert to 0-100 scale
         )
-        
+
         matches = []
-        
-        for word, score, _ in results:
+        is_query_phrase = " " in query  # Pre-compute once
+
+        for result in results:
+            # RapidFuzz returns (string, score, index) tuples
+            if len(result) == 3:
+                word, score, _ = result
+            else:
+                word, score = result
             # Convert 0-100 score to 0.0-1.0
             base_score = score / 100.0
-            
-            # Apply length-aware scoring correction
-            corrected_score = apply_length_correction(query, word, base_score)
-            
+
+            # Apply length-aware scoring correction with pre-computed phrase info
+            corrected_score = apply_length_correction(
+                query, word, base_score, 
+                is_query_phrase=is_query_phrase,
+                is_candidate_phrase=" " in word
+            )
+
             if corrected_score >= min_score_threshold:
                 matches.append(
                     SearchResult(
@@ -99,12 +108,12 @@ class FuzzySearch:
                         metadata=None,
                     )
                 )
-        
+
         # Sort by corrected scores
-        matches.sort(key=lambda m: m.score, reverse=True)
-        
-        return matches[:max_results]
-    
+        # matches.sort(key=lambda m: m.score, reverse=True)
+
+        return matches
+
     def _select_candidates(
         self, query: str, corpus: Corpus, max_results: int
     ) -> list[int]:

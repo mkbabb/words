@@ -13,8 +13,8 @@ from typing import Any
 from ...caching.core import CacheNamespace, CacheTTL
 from ...caching.unified import get_unified
 from ...utils.logging import get_logger
-from ..utils import get_vocabulary_hash
 from ..models import CorpusMetadata
+from ..utils import get_vocabulary_hash
 from .core import Corpus
 
 logger = get_logger(__name__)
@@ -168,7 +168,7 @@ class CorpusManager:
             if existing is not None:
                 logger.info(f"Using existing corpus '{corpus_name}'")
                 return existing
-            logger.debug(f"No existing corpus found, will create new")
+            logger.debug("No existing corpus found, will create new")
 
         return await self.create_corpus(corpus_name, vocabulary)
 

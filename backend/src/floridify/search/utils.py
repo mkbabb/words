@@ -47,18 +47,24 @@ def get_vocabulary_hash(
 
 
 def apply_length_correction(
-    query: str, candidate: str, base_score: float
+    query: str, 
+    candidate: str, 
+    base_score: float,
+    is_query_phrase: bool = None,
+    is_candidate_phrase: bool = None
 ) -> float:
     """
     Apply length-aware correction to fuzzy search scores.
-    
+
     Prevents short fragment bias and improves phrase matching.
-    
+
     Args:
         query: Search query
         candidate: Candidate word being scored
         base_score: Raw fuzzy match score (0.0-1.0)
-    
+        is_query_phrase: Whether query is a phrase (computed if None)
+        is_candidate_phrase: Whether candidate is a phrase (computed if None)
+
     Returns:
         Corrected score (0.0-1.0)
     """
@@ -66,26 +72,26 @@ def apply_length_correction(
     if base_score >= 0.99:
         return base_score
 
-    # Pre-compute lengths and lowercase versions (minimize string operations)
+    # Pre-compute lengths
     query_len = len(query)
     candidate_len = len(candidate)
-    is_query_phrase = " " in query
-    is_candidate_phrase = " " in candidate
 
-    # Only compute lowercase versions when needed
-    query_lower = query.lower()
-    candidate_lower = candidate.lower()
+    # Use provided phrase info or compute if not provided
+    if is_query_phrase is None:
+        is_query_phrase = " " in query
+    if is_candidate_phrase is None:
+        is_candidate_phrase = " " in candidate
 
     # Check if query is a prefix of the candidate (important for phrases)
-    is_prefix_match = candidate_lower.startswith(query_lower)
+    is_prefix_match = candidate.startswith(query)
 
     # Check if query matches the first word of a phrase exactly
     first_word_match = False
     if is_candidate_phrase and not is_query_phrase:
         # Find first space index instead of split() to avoid list allocation
-        space_idx = candidate_lower.find(" ")
+        space_idx = candidate.find(" ")
         if space_idx > 0:
-            first_word_match = query_lower == candidate_lower[:space_idx]
+            first_word_match = query == candidate[:space_idx]
 
     # Length ratio penalty for very different lengths
     min_len = min(query_len, candidate_len)
@@ -137,3 +143,99 @@ def apply_length_correction(
 
     # Ensure we don't exceed 1.0 or go below 0.0
     return max(0.0, min(1.0, corrected_score))
+
+
+def calculate_default_frequency(word: str) -> int:
+    """
+    Calculate default frequency based on word characteristics.
+    
+    More robust heuristics:
+    - Shorter words are typically more common
+    - Common suffixes and prefixes get higher scores
+    - Phrases get moderate scores based on word count
+    - Very long words get lower scores
+    
+    Args:
+        word: Word or phrase to calculate frequency for
+        
+    Returns:
+        Estimated frequency score (higher = more common)
+    """
+    if not word:
+        return 1
+    
+    base_score = 1000
+    word_lower = word.lower()
+    length = len(word_lower)
+    
+    # Length-based scoring (shorter = more common)
+    if length <= 3:
+        length_penalty = 0  # Very short words are often common
+    elif length <= 5:
+        length_penalty = 50
+    elif length <= 8:
+        length_penalty = 100
+    elif length <= 12:
+        length_penalty = 200
+    else:
+        length_penalty = 300 + (length - 12) * 10  # Progressive penalty for very long words
+    
+    # Phrase handling
+    phrase_adjustment = 0
+    if " " in word_lower:
+        word_count = word_lower.count(" ") + 1
+        if word_count == 2:
+            phrase_adjustment = 150  # Two-word phrases are common
+        elif word_count == 3:
+            phrase_adjustment = 100  # Three-word phrases moderate
+        else:
+            phrase_adjustment = -50 * (word_count - 3)  # Longer phrases less common
+    
+    # Common suffix patterns (English-biased but generally applicable)
+    suffix_bonus = 0
+    common_suffixes = [
+        ("ing", 150), ("ed", 140), ("er", 130), ("est", 120),
+        ("ly", 110), ("tion", 100), ("able", 90), ("ness", 80),
+        ("ment", 70), ("ful", 60), ("less", 50), ("ish", 40)
+    ]
+    for suffix, bonus in common_suffixes:
+        if word_lower.endswith(suffix) and length > len(suffix):
+            suffix_bonus = bonus
+            break  # Take first matching suffix
+    
+    # Common prefix patterns
+    prefix_bonus = 0
+    common_prefixes = [
+        ("un", 80), ("re", 70), ("pre", 60), ("dis", 50),
+        ("over", 40), ("under", 30), ("out", 30), ("sub", 20)
+    ]
+    for prefix, bonus in common_prefixes:
+        if word_lower.startswith(prefix) and length > len(prefix) + 2:
+            prefix_bonus = bonus
+            break  # Take first matching prefix
+    
+    # Vowel density (words with balanced vowel-consonant ratio are more common)
+    vowel_count = sum(1 for c in word_lower if c in "aeiou")
+    if length > 0:
+        vowel_ratio = vowel_count / length
+        if 0.35 <= vowel_ratio <= 0.45:  # Optimal vowel ratio
+            vowel_bonus = 50
+        elif 0.25 <= vowel_ratio <= 0.55:  # Acceptable ratio
+            vowel_bonus = 20
+        else:
+            vowel_bonus = -20  # Too many or too few vowels
+    else:
+        vowel_bonus = 0
+    
+    # Calculate final score
+    final_score = (
+        base_score
+        - length_penalty
+        + phrase_adjustment
+        + suffix_bonus
+        + prefix_bonus
+        + vowel_bonus
+    )
+    
+    # Ensure minimum score of 1
+    return max(1, final_score)

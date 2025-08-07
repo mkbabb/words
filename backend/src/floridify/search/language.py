@@ -12,6 +12,7 @@ from ..models.definition import CorpusType, Language
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMode
 from .core import SearchEngine, SearchResult
+from .corpus import Corpus
 from .corpus.language_loader import CorpusLanguageLoader
 from .corpus.manager import CorpusManager, get_corpus_manager
 
@@ -107,6 +108,45 @@ class LanguageSearch:
             f"✅ Language search fully initialized for {[lang.value for lang in self.languages]}"
         )
         self._initialized = True
+    
+    async def update_corpus(self, corpus: Corpus) -> None:
+        """
+        Update the language search with a new corpus.
+        
+        Args:
+            corpus: New corpus to use
+        """
+        if self.search_engine is None:
+            await self.initialize()
+        
+        if self.search_engine:
+            await self.search_engine.update_corpus()
+    
+    def model_dump(self) -> dict[str, Any]:
+        """
+        Export language search state.
+        
+        Returns:
+            Dictionary containing state
+        """
+        return {
+            "languages": [lang.value for lang in self.languages],
+            "min_score": self.min_score,
+            "semantic": self.semantic,
+            "initialized": self._initialized,
+        }
+    
+    def model_load(self, data: dict[str, Any]) -> None:
+        """
+        Load language search state.
+        
+        Args:
+            data: Dictionary containing state
+        """
+        self.languages = [Language(lang) for lang in data.get("languages", ["en"])]
+        self.min_score = data.get("min_score", DEFAULT_MIN_SCORE)
+        self.semantic = data.get("semantic", True)
+        self._initialized = data.get("initialized", False)
 
     async def search(
         self,

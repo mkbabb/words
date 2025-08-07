@@ -205,8 +205,6 @@ class SemanticSearch:
         embedding_start = time.time()
 
         # Generate unique normalized forms for embeddings (no duplicates)
-        from ...text.normalize import normalize_comprehensive
-
         # Track unique normalized forms and their mappings
         unique_normalized = {}  # normalized -> first lemma index
         self.variant_mapping = {}  # embedding index -> lemma index
@@ -358,7 +356,7 @@ class SemanticSearch:
             f"Created SemanticMetadata for corpus '{self.corpus.corpus_name}' (vocabulary_hash: {self.corpus.vocabulary_hash})"
         )
 
-    async def search(
+    def search(
         self, query: str, max_results: int = 20, min_score: float = 0.0
     ) -> list[SearchResult]:
         """

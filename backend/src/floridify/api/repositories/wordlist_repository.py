@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from ...models.definition import Language, Word
 from ...search.corpus.manager import CorpusManager, get_corpus_manager
-from ...text import normalize_word
+from ...text import normalize_comprehensive
 from ...utils.logging import get_logger
 from ...wordlist.constants import MasteryLevel, Temperature
 from ...wordlist.models import WordList, WordListItem
@@ -217,14 +217,14 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         3. Bulk creating missing words
         4. Returning word IDs in the same order as input
         """
-        # Normalize all words using the standard normalize_word function
+        # Normalize all words using the standard normalize_comprehensive function
         # This ensures consistent normalization for search
         normalized_map = {}
         normalized_list = []
         for text in word_texts:
             # Keep original text for display, normalize for lookup
             original = text.strip()
-            normalized = normalize_word(original)
+            normalized = normalize_comprehensive(original)
             normalized_map[normalized] = original
             normalized_list.append(normalized)
 
@@ -268,7 +268,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         for text in word_texts:
             # Use the same normalization as above
             original = text.strip()
-            normalized = normalize_word(original)
+            normalized = normalize_comprehensive(original)
             word_id = existing_map.get(normalized)
             if word_id is None:
                 raise ValueError(f"Word ID not found for '{text}' after processing")

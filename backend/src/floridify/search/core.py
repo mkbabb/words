@@ -8,16 +8,14 @@ from __future__ import annotations
 
 import itertools
 from concurrent.futures import ThreadPoolExecutor
-from datetime import timedelta
 from typing import Any
 
-from ..caching.unified import UnifiedCache, get_unified
 from ..text import normalize_comprehensive
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod, SearchMode
 from .corpus.core import Corpus
 from .corpus.manager import get_corpus_manager
-from .fuzzy import FuzzySearch
+from .fuzzy import FuzzySearch  # Using RapidFuzz implementation
 from .models import SearchResult
 from .semantic.core import SemanticSearch
 from .semantic.manager import get_semantic_search_manager
@@ -68,7 +66,6 @@ class SearchEngine:
         self.trie_search: TrieSearch | None = None
         self.fuzzy_search: FuzzySearch | None = None
         self.semantic_search: SemanticSearch | None = None
-        self._cache: UnifiedCache | None = None
 
         self._initialized = False
 
@@ -92,27 +89,37 @@ class SearchEngine:
         metadata = await manager.get_corpus_metadata(self.corpus_name)
 
         if metadata is not None:
-            logger.info(f"Found metadata for '{self.corpus_name}', fetching corpus with metadata hash: {metadata.vocabulary_hash}")
+            logger.info(
+                f"Found metadata for '{self.corpus_name}', fetching corpus with metadata hash: {metadata.vocabulary_hash}"
+            )
             # Get corpus from cache using the vocab_hash
             self.corpus = await manager.get_corpus(
                 self.corpus_name, vocab_hash=metadata.vocabulary_hash
             )
             if self.corpus:
-                logger.info(f"Successfully loaded corpus '{self.corpus_name}' from cache")
+                logger.info(
+                    f"Successfully loaded corpus '{self.corpus_name}' from cache"
+                )
             else:
-                logger.warning("Could not load corpus from cache despite metadata existing")
+                logger.warning(
+                    "Could not load corpus from cache despite metadata existing"
+                )
         else:
             logger.warning(f"No metadata found for corpus '{self.corpus_name}'")
 
         if self.corpus is None:
-            logger.error(f"Failed to load corpus '{self.corpus_name}' - not found in cache or metadata")
+            logger.error(
+                f"Failed to load corpus '{self.corpus_name}' - not found in cache or metadata"
+            )
             raise ValueError(
                 f"Corpus '{self.corpus_name}' not found. It should have been created by LanguageSearch.initialize() or via get_or_create_corpus()."
             )
 
         self._vocabulary_hash = self.corpus.vocabulary_hash
         combined_vocab = self.corpus.vocabulary
-        logger.info(f"Corpus loaded with {len(combined_vocab)} vocabulary items, corpus hash: {self._vocabulary_hash}")
+        logger.info(
+            f"Corpus loaded with {len(combined_vocab)} vocabulary items, corpus hash: {self._vocabulary_hash}"
+        )
 
         # High-performance search components
         logger.debug("Building Trie index")
@@ -131,9 +138,10 @@ class SearchEngine:
             )
             if not self.semantic_search:
                 # Create semantic search if not found in cache
-                logger.info(f"Creating new semantic search for corpus '{self.corpus_name}'")
+                logger.info(
+                    f"Creating new semantic search for corpus '{self.corpus_name}'"
+                )
                 self.semantic_search = await semantic_manager.create_semantic_search(
-                    corpus_name=self.corpus_name,
                     corpus=self.corpus,
                     force_rebuild=self.force_rebuild,
                 )
@@ -142,9 +150,11 @@ class SearchEngine:
 
         self._initialized = True
 
-        logger.info(f"✅ SearchEngine fully initialized for corpus '{self.corpus_name}' with hash {self._vocabulary_hash} (semantic={'enabled' if self.semantic else 'disabled'})")
+        logger.info(
+            f"✅ SearchEngine fully initialized for corpus '{self.corpus_name}' with hash {self._vocabulary_hash} (semantic={'enabled' if self.semantic else 'disabled'})"
+        )
 
-    async def _check_and_update_corpus(self) -> None:
+    async def update_corpus(self) -> None:
         """Check if corpus has changed and update components if needed."""
         if not self.corpus:
             return
@@ -154,12 +164,16 @@ class SearchEngine:
         corpus_metadata = await manager.get_corpus_metadata(self.corpus_name)
 
         if not corpus_metadata:
-            logger.debug(f"Corpus metadata not found for '{self.corpus_name}' during update check")
+            logger.debug(
+                f"Corpus metadata not found for '{self.corpus_name}' during update check"
+            )
             return
 
         # Check if vocabulary has changed
         if corpus_metadata.vocabulary_hash != self._vocabulary_hash:
-            logger.info(f"Corpus vocabulary changed for '{self.corpus_name}': {self._vocabulary_hash} -> {corpus_metadata.vocabulary_hash}, updating components")
+            logger.info(
+                f"Corpus vocabulary changed for '{self.corpus_name}': {self._vocabulary_hash} -> {corpus_metadata.vocabulary_hash}, updating components"
+            )
 
             # Get updated corpus
             updated_corpus = await manager.get_corpus(
@@ -228,56 +242,40 @@ class SearchEngine:
         await self.initialize()
 
         # Check if corpus has changed and update if needed
-        await self._check_and_update_corpus()
+        await self.update_corpus()
 
         # Normalize query - use comprehensive to match corpus normalization
         normalized_query = normalize_comprehensive(query)
         if not normalized_query:
             return []
 
-        min_score_threshold = min_score if min_score is not None else self.min_score
-
-        # Determine if semantic search should be used (for SMART mode)
-        should_semantic = self.semantic
-
-        # # Get unified cache (L1 memory + L2 filesystem)
-        # if self._cache is None:
-        #     self._cache = await get_unified()
-
-        # # Generate cache key
-        # cache_key = f"{normalized_query}:{mode.value}:{max_results}:{min_score_threshold}:{self.corpus_name}"
-
-        # # Try to get from cache
-        # if self._cache is not None:
-        #     cached_results: list[SearchResult] | None = await self._cache.get("search", cache_key)
-        #     if cached_results is not None:
-        #         logger.debug(f"Search cache hit for query: {query[:50]} mode: {mode.value}")
-        #         return cached_results
+        min_score = min_score if min_score is not None else self.min_score
 
         # Perform search based on mode
         if mode == SearchMode.SMART:
             results = await self._smart_search_cascade(
-                normalized_query, max_results, min_score_threshold, should_semantic
+                normalized_query, max_results, min_score, self.semantic
             )
         elif mode == SearchMode.EXACT:
-            results = await self.search_exact(normalized_query, max_results)
+            results = self.search_exact(normalized_query)
         elif mode == SearchMode.FUZZY:
-            results = await self.search_fuzzy(normalized_query, max_results, min_score_threshold)
+            results = self.search_fuzzy(normalized_query, max_results, min_score)
         elif mode == SearchMode.SEMANTIC:
-            results = await self.search_semantic(normalized_query, max_results, min_score_threshold)
-        else:
-            logger.warning(f"Unknown search mode: {mode}, falling back to SMART")
-            results = await self._smart_search_cascade(
-                normalized_query, max_results, min_score_threshold, should_semantic
-            )
+            if not self.semantic_search:
+                raise ValueError(
+                    "Semantic search is not enabled for this SearchEngine instance"
+                )
 
-        # # Cache results (1 hour TTL for search results)
-        # if self._cache is not None:
-        #     await self._cache.set("search", cache_key, results, ttl=timedelta(hours=1))
+            results = self.search_semantic(normalized_query, max_results, min_score)
+        else:
+            raise ValueError(f"Unsupported search mode: {mode}")
 
         return results
 
-    async def search_exact(self, query: str, max_results: int = 20) -> list[SearchResult]:
+    def search_exact(
+        self,
+        query: str,
+    ) -> list[SearchResult]:
         """
         Search using only exact matching.
 
@@ -287,20 +285,26 @@ class SearchEngine:
         """
         if self.trie_search is None:
             return []
-        matches = self.trie_search.search_exact(query)
+
+        match = self.trie_search.search_exact(query)
+
+        if match is None:
+            return []
+
         return [
             SearchResult(
-                word=self._get_original_word(match),  # Return original word with diacritics
+                word=self._get_original_word(
+                    match
+                ),  # Return original word with diacritics
                 lemmatized_word=None,
                 score=1.0,
                 method=SearchMethod.EXACT,
                 language=None,
                 metadata=None,
             )
-            for match in matches[:max_results]
         ]
 
-    async def search_fuzzy(
+    def search_fuzzy(
         self, query: str, max_results: int = 20, min_score: float = DEFAULT_MIN_SCORE
     ) -> list[SearchResult]:
         """
@@ -326,13 +330,13 @@ class SearchEngine:
             for match in matches:
                 match.method = SearchMethod.FUZZY
                 match.word = self._get_original_word(match.word)
-            
+
             return matches
         except Exception as e:
             logger.warning(f"Fuzzy search failed: {e}")
             return []
 
-    async def search_semantic(
+    def search_semantic(
         self, query: str, max_results: int = 20, min_score: float = DEFAULT_MIN_SCORE
     ) -> list[SearchResult]:
         """
@@ -349,71 +353,62 @@ class SearchEngine:
 
         # Perform semantic search
         try:
-            matches = await self.semantic_search.search(query, max_results, min_score)
+            return self.semantic_search.search(query, max_results, min_score)
         except Exception as e:
             logger.warning(f"Semantic search failed: {e}")
             return []
 
-        # Debug: Log semantic results
-        if matches:
-            logger.debug(f"Semantic search returned {len(matches)} matches: {matches[:3]}")
-        else:
-            logger.debug(f"Semantic search returned no matches for '{query}'")
-
-        return [
-            SearchResult(
-                word=match.word,
-                lemmatized_word=None,
-                score=match.score,
-                method=SearchMethod.SEMANTIC,
-                language=None,
-                metadata=None,
-            )
-            for match in matches
-        ]
-
     async def _smart_search_cascade(
-        self, query: str, max_results: int, min_score_threshold: float, should_semantic: bool
+        self,
+        query: str,
+        max_results: int,
+        min_score: float,
+        semantic: bool,
     ) -> list[SearchResult]:
         """Parallel search cascade using ThreadPoolExecutor for CPU-bound operations."""
 
         # Execute CPU-bound searches in parallel using ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        with ThreadPoolExecutor(max_workers=3) as executor:
             # Submit exact and fuzzy searches to thread pool
-            exact_future = executor.submit(self._search_exact_sync, query)
-            fuzzy_future = executor.submit(self._search_fuzzy_sync, query, max_results * 2)
+            exact_future = executor.submit(self.search_exact, query)
+            fuzzy_future = executor.submit(self.search_fuzzy, query, max_results)
+            semantic_future = (
+                executor.submit(self.search_semantic, query, max_results, min_score)
+                if semantic and self.semantic_search
+                else None
+            )
 
             # Get exact results first for early termination check
-            exact_results = exact_future.result(timeout=0.1)  # 100ms timeout for exact
-            exact_filtered = [r for r in exact_results if r.score >= min_score_threshold]
+            exact_results = exact_future.result(timeout=0.05)  # 50ms timeout for exact
 
             # Early termination for perfect exact matches
-            if len(exact_filtered) >= max_results and all(
-                r.score >= 0.99 for r in exact_filtered[:max_results]
-            ):
-                logger.debug(f"Early exit: {len(exact_filtered)} perfect exact matches found")
-                # Cancel fuzzy if still running (though it should be fast)
+            if len(exact_results):
+                logger.debug(
+                    f"Early exit: {len(exact_results)} perfect exact matches found"
+                )
+                # Cancel the other futures if they are still running
                 fuzzy_future.cancel()
-                return exact_filtered[:max_results]
+                if semantic_future:
+                    semantic_future.cancel()
+
+                return exact_results
 
             # Get fuzzy results
             fuzzy_results = fuzzy_future.result(timeout=0.5)  # 500ms timeout for fuzzy
-
-        # Semantic search remains async (I/O-bound model inference)
-        semantic_results = []
-        if should_semantic and self.semantic_search is not None:
-            semantic_results = await self._search_semantic(query, max_results, min_score_threshold)
+            semantic_results = (
+                semantic_future.result(timeout=0.5) if semantic_future else []
+            )  # 500ms timeout for semantic
 
         # Use generators with itertools.chain for memory efficiency
-        exact_gen = (r for r in exact_filtered)
-        fuzzy_gen = (r for r in fuzzy_results if r.score >= min_score_threshold)
-        semantic_gen = (r for r in semantic_results if r.score >= min_score_threshold)
+        fuzzy_gen = (r for r in fuzzy_results if r.score >= min_score)
+        semantic_gen = (r for r in semantic_results if r.score >= min_score)
 
         # Chain all results without creating intermediate lists
-        all_results = list(itertools.chain(exact_gen, fuzzy_gen, semantic_gen))
+        all_results = list(itertools.chain(exact_results, fuzzy_gen, semantic_gen))
 
         # Deduplicate and sort
         unique_results = self._deduplicate_results(all_results)
+
         return sorted(unique_results, key=lambda r: r.score, reverse=True)[:max_results]
 
     async def find_best_match(self, word: str) -> SearchResult | None:
@@ -433,111 +428,26 @@ class SearchEngine:
 
         return normalized_word
 
-    def _search_exact_sync(self, query: str) -> list[SearchResult]:
-        """Exact string matching - synchronous."""
-        if self.trie_search is None:
-            return []
-        matches = self.trie_search.search_exact(query)
-        return [
-            SearchResult(
-                word=self._get_original_word(match),  # Return original word with diacritics
-                lemmatized_word=None,
-                score=1.0,
-                method=SearchMethod.EXACT,
-                language=None,
-                metadata=None,
-            )
-            for match in matches
-        ]
-
-    def _search_fuzzy_sync(self, query: str, max_results: int) -> list[SearchResult]:
-        """Fuzzy matching using corpus object."""
-        if self.fuzzy_search is None or self.corpus is None:
-            return []
-
-        try:
-            matches = self.fuzzy_search.search(
-                query=query,
-                corpus=self.corpus,
-                max_results=max_results,
-            )
-
-            return [
-                SearchResult(
-                    word=self._get_original_word(
-                        match.word
-                    ),  # Return original word with diacritics
-                    lemmatized_word=None,
-                    score=match.score,
-                    method=SearchMethod.FUZZY,
-                    language=None,
-                    metadata=None,
-                )
-                for match in matches
-            ]
-        except Exception as e:
-            logger.warning(f"Fuzzy search failed: {e}")
-            return []
-
-    async def _search_semantic(
-        self, query: str, max_results: int, min_score: float
-    ) -> list[SearchResult]:
-        """Semantic similarity search using embeddings."""
-        if not self.semantic_search:
-            logger.debug("Semantic search not available")
-            return []
-
-        # Perform semantic search
-        try:
-            matches = await self.semantic_search.search(query, max_results, min_score)
-        except Exception as e:
-            logger.warning(f"Semantic search failed: {e}")
-            return []
-
-        # Debug: Log semantic results
-        if matches:
-            logger.debug(f"Semantic search returned {len(matches)} matches: {matches[:3]}")
-        else:
-            logger.debug(f"Semantic search returned no matches for '{query}'")
-
-        return [
-            SearchResult(
-                word=match.word,
-                lemmatized_word=None,
-                score=match.score,
-                method=SearchMethod.SEMANTIC,
-                language=None,
-                metadata=None,
-            )
-            for match in matches
-        ]
-
     def _deduplicate_results(self, results: list[SearchResult]) -> list[SearchResult]:
         """Remove duplicates, preferring exact matches."""
         word_to_result: dict[str, SearchResult] = {}
 
         for result in results:
-            word_key = result.word.lower().strip()
-
-            if word_key not in word_to_result:
-                word_to_result[word_key] = result
+            if result.word not in word_to_result:
+                word_to_result[result.word] = result
             else:
-                existing = word_to_result[word_key]
+                existing = word_to_result[result.word]
                 # Prefer higher priority methods, then higher scores
                 result_priority = self.METHOD_PRIORITY.get(result.method, 0)
                 existing_priority = self.METHOD_PRIORITY.get(existing.method, 0)
 
                 if (result_priority > existing_priority) or (
-                    result_priority == existing_priority and result.score > existing.score
+                    result_priority == existing_priority
+                    and result.score > existing.score
                 ):
-                    word_to_result[word_key] = result
+                    word_to_result[result.word] = result
 
         return list(word_to_result.values())
-
-    @property
-    def semantic_enabled(self) -> bool:
-        """Check if semantic search is available and enabled."""
-        return self.semantic
 
     def get_stats(self) -> dict[str, Any]:
         """Get search engine statistics."""

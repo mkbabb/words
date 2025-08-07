@@ -10,9 +10,8 @@ from .constants import (
     WHITESPACE_PATTERN,
 )
 from .normalize import (
-    basic_lemmatize,
     batch_lemmatize,
-    clean_word,
+    batch_normalize,
     clear_lemma_cache,
     get_lemma_cache_stats,
     # Validation
@@ -22,24 +21,11 @@ from .normalize import (
     # Core normalization
     normalize_comprehensive,
     normalize_fast,
-    normalize_word,
     # Diacritics
     remove_diacritics,
 )
-from .phrase import (
-    clean_phrase,
-    detect_multiword_expressions,
-    # Advanced phrase processing
-    extract_phrases,
-    find_hyphenated_phrases,
-    find_quoted_phrases,
-    get_phrase_variants,
-    # Phrase detection
-    is_phrase,
-    join_words,
-    normalize_phrase,
-    split_phrase,
-)
+from .phrase import is_phrase
+
 # Search functions moved to search/utils.py
 
 # Tokenization functions removed - module no longer exists
@@ -48,7 +34,7 @@ __all__ = [
     # Core
     "normalize_comprehensive",
     "normalize_fast",
-    "normalize_word",
+    "batch_normalize",
     "clean_word",
     "is_valid_word",
     "remove_diacritics",
@@ -59,15 +45,6 @@ __all__ = [
     "basic_lemmatize",
     # Phrase
     "is_phrase",
-    "clean_phrase",
-    "split_phrase",
-    "join_words",
-    "extract_phrases",
-    "find_hyphenated_phrases",
-    "find_quoted_phrases",
-    "detect_multiword_expressions",
-    "normalize_phrase",
-    "get_phrase_variants",
     # Search functions moved to search/utils.py
     # Tokenization functions removed - module no longer exists
     # Patterns

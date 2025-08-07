@@ -24,5 +24,16 @@ class SearchMode(Enum):
     SEMANTIC = "semantic"  # Only semantic matching
 
 
+class FuzzySearchMethod(Enum):
+    """Available fuzzy search methods with their characteristics."""
+
+    RAPIDFUZZ = "rapidfuzz"  # C++ optimized fuzzy matching
+    JARO_WINKLER = "jaro_winkler"  # Good for names and abbreviations
+    SOUNDEX = "soundex"  # Phonetic matching
+    LEVENSHTEIN = "levenshtein"  # Classic edit distance
+    METAPHONE = "metaphone"  # Advanced phonetic matching
+    AUTO = "auto"  # Automatic method selection
+
+
 # Search scoring constants
 DEFAULT_MIN_SCORE = 0.4  # Default minimum score threshold - lowered for better typo tolerance

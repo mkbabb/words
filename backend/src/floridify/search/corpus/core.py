@@ -79,7 +79,7 @@ class Corpus:
         corpus.original_vocabulary = vocabulary[:]  # Create copy to preserve originals
 
         # Process vocabulary - use comprehensive normalization for compile-time corpus building
-        normalized_vocabulary = batch_normalize(vocabulary, use_comprehensive=True)
+        normalized_vocabulary = batch_normalize(vocabulary)
         corpus.vocabulary_hash = get_vocabulary_hash(normalized_vocabulary)
 
         # Build normalized vocabulary and create mapping

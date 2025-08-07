@@ -58,7 +58,6 @@ dependencies = [
     "zstandard>=0.22.0",
     # ONNX optimization for semantic search
     "optimum[onnxruntime]>=1.16.0",
-    "thefuzz>=0.22.1",
     "python-levenshtein>=0.27.1",
 ]
 

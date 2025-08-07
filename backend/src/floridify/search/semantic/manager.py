@@ -13,9 +13,9 @@ from typing import Any
 from ...caching.core import CacheNamespace, CacheTTL
 from ...caching.unified import get_unified
 from ...utils.logging import get_logger
-from ..utils import get_vocabulary_hash
 from ..corpus.core import Corpus
 from ..models import CorpusMetadata, SemanticMetadata
+from ..utils import get_vocabulary_hash
 from .core import SemanticSearch
 
 logger = get_logger(__name__)
@@ -84,7 +84,6 @@ class SemanticSearchManager:
 
     async def create_semantic_search(
         self,
-        corpus_name: str,
         corpus: Corpus,
         force_rebuild: bool = False,
     ) -> SemanticSearch:
@@ -92,13 +91,13 @@ class SemanticSearchManager:
         Create new semantic search instance with caching.
 
         Args:
-            corpus_name: Unique name for the corpus
             corpus: Corpus instance containing vocabulary data
             force_rebuild: Force rebuild even if cached
 
         Returns:
             Initialized SemanticSearch instance
         """
+        corpus_name = corpus.corpus_name
         logger.info(
             f"Creating semantic search for corpus '{corpus_name}' with {len(corpus.lemmatized_vocabulary)} lemmatized items"
         )
