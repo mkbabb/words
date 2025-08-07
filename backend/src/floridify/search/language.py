@@ -87,7 +87,9 @@ class LanguageSearch:
             vocabulary=vocabulary,
             force_rebuild=self.force_rebuild,
         )
-        logger.info(f"Corpus ready: '{corpus.corpus_name}' (full hash: {corpus.vocabulary_hash}, {len(corpus.vocabulary)} items)")
+        logger.info(
+            f"Corpus ready: '{corpus.corpus_name}' (full hash: {corpus.vocabulary_hash}, {len(corpus.vocabulary)} items)"
+        )
 
         # Initialize search engine with corpus name
         logger.info(f"Creating SearchEngine for corpus '{corpus_name}'")
@@ -108,24 +110,24 @@ class LanguageSearch:
             f"✅ Language search fully initialized for {[lang.value for lang in self.languages]}"
         )
         self._initialized = True
-    
+
     async def update_corpus(self, corpus: Corpus) -> None:
         """
         Update the language search with a new corpus.
-        
+
         Args:
             corpus: New corpus to use
         """
         if self.search_engine is None:
             await self.initialize()
-        
+
         if self.search_engine:
             await self.search_engine.update_corpus()
-    
+
     def model_dump(self) -> dict[str, Any]:
         """
         Export language search state.
-        
+
         Returns:
             Dictionary containing state
         """
@@ -135,11 +137,11 @@ class LanguageSearch:
             "semantic": self.semantic,
             "initialized": self._initialized,
         }
-    
+
     def model_load(self, data: dict[str, Any]) -> None:
         """
         Load language search state.
-        
+
         Args:
             data: Dictionary containing state
         """

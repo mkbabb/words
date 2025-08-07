@@ -75,8 +75,8 @@ class Corpus:
 
         corpus = cls(corpus_name)
 
-        # Store original vocabulary for display purposes
-        corpus.original_vocabulary = vocabulary[:]  # Create copy to preserve originals
+        # Store reference to original vocabulary (no copy needed - we don't modify it)
+        corpus.original_vocabulary = vocabulary  # Reference, not copy
 
         # Process vocabulary - use comprehensive normalization for compile-time corpus building
         normalized_vocabulary = batch_normalize(vocabulary)

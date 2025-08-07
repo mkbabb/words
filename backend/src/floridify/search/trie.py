@@ -44,18 +44,16 @@ class TrieSearch:
     async def initialize(self) -> None:
         """Initialize the trie search (no-op for compatibility)."""
         pass
-    
-    async def update_corpus(
-        self, corpus: Any
-    ) -> None:
+
+    async def update_corpus(self, corpus: Any) -> None:
         """
         Update the trie with a new corpus.
-        
+
         Args:
             corpus: Corpus object containing vocabulary
         """
         await self.build_index(corpus.vocabulary, corpus.word_frequencies)
-    
+
     async def build_index(
         self, words: list[str], frequencies: dict[str, int] | None = None
     ) -> None:
@@ -90,21 +88,19 @@ class TrieSearch:
 
         # Batch normalize all words in parallel
         normalized_words = batch_normalize(words)
-        
+
         # Build frequency map and filter empty words
         valid_words = []
         for normalized in normalized_words:
             if not normalized:
                 continue
-            
+
             # Get frequency (default based on word characteristics)
             if frequencies is None:
                 frequency = calculate_default_frequency(normalized)
             else:
-                frequency = frequencies.get(
-                    normalized, calculate_default_frequency(normalized)
-                )
-            
+                frequency = frequencies.get(normalized, calculate_default_frequency(normalized))
+
             self._word_frequencies[normalized] = frequency
             self._max_frequency = max(self._max_frequency, frequency)
             valid_words.append(normalized)
@@ -169,16 +165,12 @@ class TrieSearch:
         # Sort by frequency (descending) and return top results
         if len(matches) <= max_results:
             # If we have few matches, simple frequency sort is fine
-            frequency_pairs = [
-                (word, self._word_frequencies.get(word, 0)) for word in matches
-            ]
+            frequency_pairs = [(word, self._word_frequencies.get(word, 0)) for word in matches]
             frequency_pairs.sort(key=lambda x: x[1], reverse=True)
             return [word for word, _ in frequency_pairs]
         else:
             # For many matches, use numpy argsort for better performance
-            frequencies = np.array(
-                [self._word_frequencies.get(word, 0) for word in matches]
-            )
+            frequencies = np.array([self._word_frequencies.get(word, 0) for word in matches])
             # Get indices of top frequencies
             top_indices = np.argsort(-frequencies)[:max_results]
             return [matches[i] for i in top_indices]
@@ -224,7 +216,6 @@ class TrieSearch:
             self._trie = marisa_trie.Trie(words)
         else:
             self._trie = None
-
 
     async def _save_to_cache(self, vocab_hash: str) -> None:
         """Save trie to cache."""

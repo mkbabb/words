@@ -17,10 +17,10 @@ class SearchMethod(Enum):
 
 class SearchMode(Enum):
     """Search modes for API and direct method routing."""
-    
+
     SMART = "smart"  # Smart cascade: exact → fuzzy → semantic
     EXACT = "exact"  # Only exact matching
-    FUZZY = "fuzzy"  # Only fuzzy matching  
+    FUZZY = "fuzzy"  # Only fuzzy matching
     SEMANTIC = "semantic"  # Only semantic matching
 
 

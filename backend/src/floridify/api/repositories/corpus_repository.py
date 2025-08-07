@@ -78,7 +78,6 @@ class CorpusRepository:
             query=params.query,
             max_results=params.max_results,
             min_score=params.min_score,
-            semantic=params.semantic,
         )
 
         return {

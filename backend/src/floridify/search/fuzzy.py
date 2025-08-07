@@ -9,7 +9,7 @@ from __future__ import annotations
 from rapidfuzz import fuzz, process
 
 from ..utils.logging import get_logger
-from .constants import DEFAULT_MIN_SCORE
+from .constants import DEFAULT_MIN_SCORE, SearchMethod
 from .corpus.core import Corpus
 from .models import SearchResult
 from .utils import apply_length_correction
@@ -92,9 +92,11 @@ class FuzzySearch:
 
             # Apply length-aware scoring correction with pre-computed phrase info
             corrected_score = apply_length_correction(
-                query, word, base_score, 
+                query,
+                word,
+                base_score,
                 is_query_phrase=is_query_phrase,
-                is_candidate_phrase=" " in word
+                is_candidate_phrase=" " in word,
             )
 
             if corrected_score >= min_score_threshold:
@@ -102,7 +104,7 @@ class FuzzySearch:
                     SearchResult(
                         word=word,
                         score=corrected_score,
-                        method=None,  # Will be set by caller
+                        method=SearchMethod.FUZZY,  # Default to FUZZY, caller can override
                         lemmatized_word=None,
                         language=None,
                         metadata=None,
@@ -114,9 +116,7 @@ class FuzzySearch:
 
         return matches
 
-    def _select_candidates(
-        self, query: str, corpus: Corpus, max_results: int
-    ) -> list[int]:
+    def _select_candidates(self, query: str, corpus: Corpus, max_results: int) -> list[int]:
         """Select promising candidates using optimized corpus indices."""
         query_len = len(query)
         max_candidates = 1000

@@ -47,11 +47,11 @@ def get_vocabulary_hash(
 
 
 def apply_length_correction(
-    query: str, 
-    candidate: str, 
+    query: str,
+    candidate: str,
     base_score: float,
-    is_query_phrase: bool = None,
-    is_candidate_phrase: bool = None
+    is_query_phrase: bool = False,
+    is_candidate_phrase: bool = False,
 ) -> float:
     """
     Apply length-aware correction to fuzzy search scores.
@@ -133,12 +133,7 @@ def apply_length_correction(
 
     # Combined correction
     corrected_score = (
-        base_score
-        * length_ratio
-        * phrase_penalty
-        * short_penalty
-        * prefix_bonus
-        * first_word_bonus
+        base_score * length_ratio * phrase_penalty * short_penalty * prefix_bonus * first_word_bonus
     )
 
     # Ensure we don't exceed 1.0 or go below 0.0
@@ -148,26 +143,26 @@ def apply_length_correction(
 def calculate_default_frequency(word: str) -> int:
     """
     Calculate default frequency based on word characteristics.
-    
+
     More robust heuristics:
     - Shorter words are typically more common
     - Common suffixes and prefixes get higher scores
     - Phrases get moderate scores based on word count
     - Very long words get lower scores
-    
+
     Args:
         word: Word or phrase to calculate frequency for
-        
+
     Returns:
         Estimated frequency score (higher = more common)
     """
     if not word:
         return 1
-    
+
     base_score = 1000
     word_lower = word.lower()
     length = len(word_lower)
-    
+
     # Length-based scoring (shorter = more common)
     if length <= 3:
         length_penalty = 0  # Very short words are often common
@@ -179,7 +174,7 @@ def calculate_default_frequency(word: str) -> int:
         length_penalty = 200
     else:
         length_penalty = 300 + (length - 12) * 10  # Progressive penalty for very long words
-    
+
     # Phrase handling
     phrase_adjustment = 0
     if " " in word_lower:
@@ -190,30 +185,45 @@ def calculate_default_frequency(word: str) -> int:
             phrase_adjustment = 100  # Three-word phrases moderate
         else:
             phrase_adjustment = -50 * (word_count - 3)  # Longer phrases less common
-    
+
     # Common suffix patterns (English-biased but generally applicable)
     suffix_bonus = 0
     common_suffixes = [
-        ("ing", 150), ("ed", 140), ("er", 130), ("est", 120),
-        ("ly", 110), ("tion", 100), ("able", 90), ("ness", 80),
-        ("ment", 70), ("ful", 60), ("less", 50), ("ish", 40)
+        ("ing", 150),
+        ("ed", 140),
+        ("er", 130),
+        ("est", 120),
+        ("ly", 110),
+        ("tion", 100),
+        ("able", 90),
+        ("ness", 80),
+        ("ment", 70),
+        ("ful", 60),
+        ("less", 50),
+        ("ish", 40),
     ]
     for suffix, bonus in common_suffixes:
         if word_lower.endswith(suffix) and length > len(suffix):
             suffix_bonus = bonus
             break  # Take first matching suffix
-    
+
     # Common prefix patterns
     prefix_bonus = 0
     common_prefixes = [
-        ("un", 80), ("re", 70), ("pre", 60), ("dis", 50),
-        ("over", 40), ("under", 30), ("out", 30), ("sub", 20)
+        ("un", 80),
+        ("re", 70),
+        ("pre", 60),
+        ("dis", 50),
+        ("over", 40),
+        ("under", 30),
+        ("out", 30),
+        ("sub", 20),
     ]
     for prefix, bonus in common_prefixes:
         if word_lower.startswith(prefix) and length > len(prefix) + 2:
             prefix_bonus = bonus
             break  # Take first matching prefix
-    
+
     # Vowel density (words with balanced vowel-consonant ratio are more common)
     vowel_count = sum(1 for c in word_lower if c in "aeiou")
     if length > 0:
@@ -226,16 +236,11 @@ def calculate_default_frequency(word: str) -> int:
             vowel_bonus = -20  # Too many or too few vowels
     else:
         vowel_bonus = 0
-    
+
     # Calculate final score
     final_score = (
-        base_score
-        - length_penalty
-        + phrase_adjustment
-        + suffix_bonus
-        + prefix_bonus
-        + vowel_bonus
+        base_score - length_penalty + phrase_adjustment + suffix_bonus + prefix_bonus + vowel_bonus
     )
-    
+
     # Ensure minimum score of 1
     return max(1, final_score)

@@ -158,19 +158,27 @@ def dequantize_embeddings(quantized_data: bytes, metadata: CacheMetadata) -> np.
     if quantization_type == QuantizationType.FLOAT32:
         return np.array(quantized_embeddings, dtype=np.float32)
     elif quantization_type == QuantizationType.FLOAT16:
-        return np.array(quantized_embeddings, dtype=np.float32)  # Convert back to float32 for processing
+        return np.array(
+            quantized_embeddings, dtype=np.float32
+        )  # Convert back to float32 for processing
     elif quantization_type == QuantizationType.INT8:
         # Restore original scale
         if original_range:
             min_val, max_val = original_range
             scale = max(abs(min_val), abs(max_val))
-            return np.array(quantized_embeddings, dtype=np.float32) / 127.0 * scale
+            int8_result: np.ndarray = (
+                np.array(quantized_embeddings, dtype=np.float32) / 127.0 * scale
+            )
+            return int8_result
         return np.array(quantized_embeddings, dtype=np.float32)
     elif quantization_type == QuantizationType.UINT8:
         # Restore original range
         if original_range:
             min_val, max_val = original_range
-            return (np.array(quantized_embeddings, dtype=np.float32) / 255.0 * (max_val - min_val)) + min_val
+            uint8_result: np.ndarray = (
+                np.array(quantized_embeddings, dtype=np.float32) / 255.0 * (max_val - min_val)
+            ) + min_val
+            return uint8_result
         return np.array(quantized_embeddings, dtype=np.float32)
     else:
         raise ValueError(f"Unsupported quantization type: {quantization_type}")

@@ -79,7 +79,9 @@ class CorpusManager:
         try:
             corpus_data = await CorpusMetadata.find_one({"corpus_name": corpus_name})
             if corpus_data:
-                logger.info(f"Found corpus metadata in MongoDB: '{corpus_name}' (metadata hash: {corpus_data.vocabulary_hash})")
+                logger.info(
+                    f"Found corpus metadata in MongoDB: '{corpus_name}' (metadata hash: {corpus_data.vocabulary_hash})"
+                )
                 return corpus_data
         except Exception as e:
             logger.warning(f"Error finding corpus metadata '{corpus_name}': {e}")
@@ -130,7 +132,9 @@ class CorpusManager:
                 semantic_data_id=None,
             )
             await corpus_data.save()
-            logger.info(f"Stored corpus metadata in MongoDB for '{corpus_name}' (full hash: {corpus.vocabulary_hash})")
+            logger.info(
+                f"Stored corpus metadata in MongoDB for '{corpus_name}' (full hash: {corpus.vocabulary_hash})"
+            )
         except Exception as e:
             logger.warning(
                 f"Failed to store corpus metadata in MongoDB (continuing without database): {e}"

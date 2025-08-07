@@ -221,7 +221,7 @@ class ResponseCache:
         self.response = response
         self.ttl = ttl
         self.key_prefix = key_prefix
-        self.cache = None
+        self.cache: UnifiedCache | None = None
         self.cache_key: str | None = None
         self.start_time: datetime | None = None
 

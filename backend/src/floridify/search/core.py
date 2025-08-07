@@ -97,13 +97,9 @@ class SearchEngine:
                 self.corpus_name, vocab_hash=metadata.vocabulary_hash
             )
             if self.corpus:
-                logger.info(
-                    f"Successfully loaded corpus '{self.corpus_name}' from cache"
-                )
+                logger.info(f"Successfully loaded corpus '{self.corpus_name}' from cache")
             else:
-                logger.warning(
-                    "Could not load corpus from cache despite metadata existing"
-                )
+                logger.warning("Could not load corpus from cache despite metadata existing")
         else:
             logger.warning(f"No metadata found for corpus '{self.corpus_name}'")
 
@@ -138,9 +134,7 @@ class SearchEngine:
             )
             if not self.semantic_search:
                 # Create semantic search if not found in cache
-                logger.info(
-                    f"Creating new semantic search for corpus '{self.corpus_name}'"
-                )
+                logger.info(f"Creating new semantic search for corpus '{self.corpus_name}'")
                 self.semantic_search = await semantic_manager.create_semantic_search(
                     corpus=self.corpus,
                     force_rebuild=self.force_rebuild,
@@ -164,9 +158,7 @@ class SearchEngine:
         corpus_metadata = await manager.get_corpus_metadata(self.corpus_name)
 
         if not corpus_metadata:
-            logger.debug(
-                f"Corpus metadata not found for '{self.corpus_name}' during update check"
-            )
+            logger.debug(f"Corpus metadata not found for '{self.corpus_name}' during update check")
             return
 
         # Check if vocabulary has changed
@@ -262,9 +254,7 @@ class SearchEngine:
             results = self.search_fuzzy(normalized_query, max_results, min_score)
         elif mode == SearchMode.SEMANTIC:
             if not self.semantic_search:
-                raise ValueError(
-                    "Semantic search is not enabled for this SearchEngine instance"
-                )
+                raise ValueError("Semantic search is not enabled for this SearchEngine instance")
 
             results = self.search_semantic(normalized_query, max_results, min_score)
         else:
@@ -293,9 +283,7 @@ class SearchEngine:
 
         return [
             SearchResult(
-                word=self._get_original_word(
-                    match
-                ),  # Return original word with diacritics
+                word=self._get_original_word(match),  # Return original word with diacritics
                 lemmatized_word=None,
                 score=1.0,
                 method=SearchMethod.EXACT,
@@ -383,9 +371,7 @@ class SearchEngine:
 
             # Early termination for perfect exact matches
             if len(exact_results):
-                logger.debug(
-                    f"Early exit: {len(exact_results)} perfect exact matches found"
-                )
+                logger.debug(f"Early exit: {len(exact_results)} perfect exact matches found")
                 # Cancel the other futures if they are still running
                 fuzzy_future.cancel()
                 if semantic_future:
@@ -442,8 +428,7 @@ class SearchEngine:
                 existing_priority = self.METHOD_PRIORITY.get(existing.method, 0)
 
                 if (result_priority > existing_priority) or (
-                    result_priority == existing_priority
-                    and result.score > existing.score
+                    result_priority == existing_priority and result.score > existing.score
                 ):
                     word_to_result[result.word] = result
 

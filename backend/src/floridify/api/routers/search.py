@@ -30,7 +30,9 @@ class SearchParams(BaseModel):
     language: Language = Field(default=Language.ENGLISH, description="Search language")
     max_results: int = Field(default=20, ge=1, le=100, description="Maximum results")
     min_score: float = Field(default=0.6, ge=0.0, le=1.0, description="Minimum score")
-    mode: SearchMode = Field(default=SearchMode.SMART, description="Search mode: smart, exact, fuzzy, semantic")
+    mode: SearchMode = Field(
+        default=SearchMode.SMART, description="Search mode: smart, exact, fuzzy, semantic"
+    )
 
 
 class SearchResponse(BaseModel):
@@ -177,9 +179,7 @@ def parse_search_params(
 )
 async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
     """Cached search implementation."""
-    logger.info(
-        f"Searching for '{query}' in {params.language.value} (mode={params.mode.value})"
-    )
+    logger.info(f"Searching for '{query}' in {params.language.value} (mode={params.mode.value})")
 
     try:
         # Get language search instance

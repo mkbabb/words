@@ -469,11 +469,6 @@ def get_lemma_cache_stats() -> dict[str, int]:
     }
 
 
-
-
-
-
-
 def _normalize_chunk_comprehensive(words: list[str]) -> list[str]:
     """Normalize a chunk of words for parallel processing."""
     return [normalize_comprehensive(word) for word in words if word]

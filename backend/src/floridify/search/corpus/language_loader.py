@@ -80,7 +80,9 @@ class CorpusLanguageLoader:
         """
         # Initialize HTTP client
         # HTTP client now handled by scrapers
-        logger.info(f"Starting to load {len(languages)} language(s): {[lang.value for lang in languages]}")
+        logger.info(
+            f"Starting to load {len(languages)} language(s): {[lang.value for lang in languages]}"
+        )
 
         # Load each language
         for language in languages:
@@ -95,7 +97,9 @@ class CorpusLanguageLoader:
         source_hash = self._get_source_hash(language)
         cache_key = f"{language.value}_{source_hash}"
 
-        logger.debug(f"Loading {language.value} lexicon - cache_key={cache_key[:16]}..., force_rebuild={self.force_rebuild}")
+        logger.debug(
+            f"Loading {language.value} lexicon - cache_key={cache_key[:16]}..., force_rebuild={self.force_rebuild}"
+        )
 
         # Try to load from unified cache first (unless force rebuild)
         if not self.force_rebuild:
@@ -115,7 +119,9 @@ class CorpusLanguageLoader:
                     total_entries=len(vocabulary),
                     last_updated=metadata.get("last_updated", ""),
                 )
-                logger.debug(f"Loaded {language.value} lexicon from cache ({len(vocabulary)} items)")
+                logger.debug(
+                    f"Loaded {language.value} lexicon from cache ({len(vocabulary)} items)"
+                )
                 return
             else:
                 logger.debug(f"No cached data found for {language.value}, loading from sources")
@@ -124,7 +130,9 @@ class CorpusLanguageLoader:
         logger.info(f"Loading {language.value} lexicon from external sources")
         lexicon_data = await self._load_from_sources(language)
         self.lexicons[language] = lexicon_data
-        logger.info(f"Loaded {language.value} lexicon: {len(lexicon_data.vocabulary)} items from {len(lexicon_data.sources)} sources")
+        logger.info(
+            f"Loaded {language.value} lexicon: {len(lexicon_data.vocabulary)} items from {len(lexicon_data.sources)} sources"
+        )
 
         # Save to unified cache
         await self._save_to_cache(language, lexicon_data, source_hash)
@@ -135,7 +143,9 @@ class CorpusLanguageLoader:
 
         # Get sources for this language
         sources = self._get_sources_for_language(language)
-        logger.debug(f"Found {len(sources)} sources for {language.value}: {[s.name for s in sources]}")
+        logger.debug(
+            f"Found {len(sources)} sources for {language.value}: {[s.name for s in sources]}"
+        )
 
         # Load all sources in parallel for performance
         source_tasks = [self._load_source(source) for source in sources]
@@ -511,7 +521,9 @@ class CorpusLanguageLoader:
                 seen.add(item)
                 unique_vocabulary.append(item)
         self.vocabulary = unique_vocabulary
-        logger.debug(f"Unified vocabulary: {initial_count} total → {len(self.vocabulary)} unique items")
+        logger.debug(
+            f"Unified vocabulary: {initial_count} total → {len(self.vocabulary)} unique items"
+        )
 
     def get_vocabulary(self) -> list[str]:
         """Get all vocabulary from all loaded languages."""

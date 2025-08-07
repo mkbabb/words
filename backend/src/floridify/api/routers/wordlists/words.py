@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ....models import Word
@@ -12,7 +12,6 @@ from ....text import normalize_comprehensive
 from ....wordlist.constants import Temperature
 from ...core import ListResponse, ResourceResponse
 from ...repositories import WordAddRequest, WordListRepository
-from .utils import search_words_in_wordlist
 
 
 class WordListQueryParams(BaseModel):
@@ -318,35 +317,5 @@ async def remove_word(
     await repo.remove_word(wordlist_id, word_doc.id)
 
 
-@router.get("/{wordlist_id}/words/search", response_model=ListResponse[dict[str, Any]])
-async def search_words_in_list(
-    wordlist_id: PydanticObjectId,
-    query: str = Query(..., description="Search query"),
-    limit: int = Query(50, ge=1, le=100, description="Maximum results"),
-    repo: WordListRepository = Depends(get_wordlist_repo),
-) -> ListResponse[dict[str, Any]]:
-    """Search for words within the wordlist using fuzzy search with TTL corpus caching.
-
-    Query Parameters:
-        - query: Search query
-        - limit: Maximum results
-
-    Returns:
-        Matching words from the list with search scores.
-    """
-    # Use TTL corpus-based fuzzy search
-    search_results = await search_words_in_wordlist(
-        wordlist_id=wordlist_id,
-        query=query,
-        repo=repo,
-        # No TTL expiration - corpus persists until invalidated
-        max_results=limit,
-        min_score=0.4,  # Slightly stricter for word matching
-    )
-
-    return ListResponse(
-        items=search_results,
-        total=len(search_results),
-        offset=0,
-        limit=len(search_results),
-    )
+# Search endpoint removed - use /wordlists/{wordlist_id}/search in search.py instead
+# That endpoint provides advanced filtering and sorting capabilities

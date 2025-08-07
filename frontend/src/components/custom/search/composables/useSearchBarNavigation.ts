@@ -1,7 +1,9 @@
-import { Ref, nextTick } from 'vue';
+import { Ref, nextTick, computed } from 'vue';
 import { useMagicKeys, whenever } from '@vueuse/core';
 import { useRouter } from 'vue-router';
 import { useSearchBarStore } from '@/stores/search/search-bar';
+import { useContentStore } from '@/stores/content/content';
+import { useSearchOrchestrator } from './useSearchOrchestrator';
 import { showError } from '@/plugins/toast';
 import { extractWordCount } from '../utils/ai-query';
 import type { SearchResult } from '@/types';
@@ -20,13 +22,17 @@ interface UseSearchBarNavigationOptions {
  */
 export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
   const searchBar = useSearchBarStore();
+  const contentStore = useContentStore();
   const router = useRouter();
+  const orchestrator = useSearchOrchestrator({
+    query: computed(() => searchBar.searchQuery),
+  });
   const { 
     searchInputRef, 
     searchResultsComponent,
     onAutocompleteAccept, 
     onAutocompleteSpace, 
-    onAutocompleteArrow 
+    onAutocompleteArrow
   } = options;
 
   /**
@@ -114,11 +120,13 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
         searchBar.setDirectLookup(true);
         try {
           if (lookupSubMode === 'thesaurus') {
-            // TODO: Implement thesaurus data fetching
-            console.log('Thesaurus data for:', result.word);
+            // Fetch thesaurus data
+            const thesaurusData = await orchestrator.getThesaurusData(result.word);
+            contentStore.setCurrentThesaurus(thesaurusData);
           } else {
-            // TODO: Implement definition data fetching
-            console.log('Definition data for:', result.word);
+            // Fetch definition data
+            const definition = await orchestrator.getDefinition(result.word);
+            contentStore.setCurrentEntry(definition);
           }
         } finally {
           searchBar.setDirectLookup(false);
@@ -167,11 +175,13 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
           searchBar.setDirectLookup(true);
           try {
             if (lookupSubMode === 'thesaurus') {
-              // TODO: Implement thesaurus data fetching
-              console.log('Thesaurus data for:', query);
+              // Fetch thesaurus data
+              const thesaurusData = await orchestrator.getThesaurusData(query);
+              contentStore.setCurrentThesaurus(thesaurusData);
             } else {
-              // TODO: Implement definition data fetching
-              console.log('Definition data for:', query);
+              // Fetch definition data
+              const definition = await orchestrator.getDefinition(query);
+              contentStore.setCurrentEntry(definition);
             }
           } finally {
             searchBar.setDirectLookup(false);

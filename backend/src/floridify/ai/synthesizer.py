@@ -72,14 +72,15 @@ class DefinitionSynthesizer:
                 return existing
 
         # Extract all definitions from providers
-        all_definitions: list[Definition] = []
-
+        # Collect all definition IDs for batch query
+        all_def_ids = []
         for provider_data in providers_data:
-            # Load definitions
-            for def_id in provider_data.definition_ids:
-                definition = await Definition.get(def_id)
-                if definition:
-                    all_definitions.append(definition)
+            all_def_ids.extend(provider_data.definition_ids)
+
+        # Batch load all definitions in a single query
+        all_definitions: list[Definition] = await Definition.find(
+            {"_id": {"$in": all_def_ids}}
+        ).to_list()
 
         if not all_definitions:
             logger.warning(f"No definitions found for '{word}'")
@@ -212,14 +213,15 @@ class DefinitionSynthesizer:
                 return existing
 
         # Extract all definitions from providers
-        all_definitions: list[Definition] = []
-
+        # Collect all definition IDs for batch query
+        all_def_ids = []
         for provider_data in providers_data:
-            # Load definitions
-            for def_id in provider_data.definition_ids:
-                definition = await Definition.get(def_id)
-                if definition:
-                    all_definitions.append(definition)
+            all_def_ids.extend(provider_data.definition_ids)
+
+        # Batch load all definitions in a single query
+        all_definitions: list[Definition] = await Definition.find(
+            {"_id": {"$in": all_def_ids}}
+        ).to_list()
 
         if not all_definitions:
             logger.warning(f"No definitions found for '{word}'")
