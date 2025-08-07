@@ -360,8 +360,8 @@ def format_search_results_table(query: str, results: list[SearchResult]) -> Tabl
         else:
             score_style = "red"
 
-        # Determine type
-        type_text = "Phrase" if result.is_phrase else "Word"
+        # Determine type - all entries are now vocabulary items
+        type_text = "Entry"
 
         # Add method-specific styling
         method_text = result.method.value.title()

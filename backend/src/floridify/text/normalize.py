@@ -502,3 +502,53 @@ def normalize_word(word: str) -> str:
         Normalized word
     """
     return normalize_comprehensive(word)
+
+
+def _normalize_chunk_comprehensive(words: list[str], use_comprehensive: bool = False) -> list[str]:
+    """Normalize a chunk of words for parallel processing with configurable strategy."""
+    if use_comprehensive:
+        return [normalize_comprehensive(word) for word in words if word]
+    else:
+        return [normalize_fast(word) for word in words if word]
+
+
+def batch_normalize(vocabulary: list[str], use_comprehensive: bool = False) -> list[str]:
+    """
+    Parallel normalization helper with configurable comprehensive normalization.
+    
+    Args:
+        vocabulary: List of words to normalize
+        use_comprehensive: If True, uses normalize_comprehensive (slower but more thorough)
+                          If False, uses normalize_fast (faster, optimized for search)
+    
+    Returns:
+        List of normalized words
+    """
+    import os
+    from concurrent.futures import ProcessPoolExecutor
+    
+    # Filter empty words first
+    valid_words = [word for word in vocabulary if word]
+    
+    if len(valid_words) < 5000:
+        # Fall back to serial for small datasets
+        if use_comprehensive:
+            return [normalize_comprehensive(word) for word in valid_words]
+        else:
+            return [normalize_fast(word) for word in valid_words]
+    
+    # Split into chunks for parallel processing
+    chunk_size = max(1000, len(valid_words) // (os.cpu_count() or 4))
+    chunks = [valid_words[i:i + chunk_size] for i in range(0, len(valid_words), chunk_size)]
+    
+    # Process chunks in parallel
+    normalized_words = []
+    with ProcessPoolExecutor(max_workers=min(8, os.cpu_count() or 4)) as executor:
+        futures = [
+            executor.submit(_normalize_chunk_comprehensive, chunk, use_comprehensive) 
+            for chunk in chunks
+        ]
+        for future in futures:
+            normalized_words.extend(future.result())
+    
+    return normalized_words

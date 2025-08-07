@@ -10,10 +10,9 @@ from __future__ import annotations
 import asyncio
 import base64
 import csv
-import datetime
 import hashlib
 import json
-from datetime import UTC, datetime as dt
+from datetime import UTC, datetime
 from io import StringIO
 from pathlib import Path
 from typing import Any
@@ -23,45 +22,20 @@ from pydantic import BaseModel, Field
 from ...caching.core import CacheNamespace, CacheTTL, CompressionType
 from ...caching.unified import get_unified
 from ...models.definition import Language
-from ...text import normalize_comprehensive
+from ...text.normalize import normalize_fast
 from ...utils.logging import get_logger
 from .constants import LexiconFormat
-
-# Inline normalize_lexicon_entry function - KISS approach
 from .sources import LEXICON_SOURCES, LexiconSourceConfig
 
 logger = get_logger(__name__)
 
 
-def normalize_lexicon_entry(word: str) -> list[str]:
-    """Simple lexicon entry normalization - returns variants of the word."""
-    if not word:
-        return []
-    
-    normalized = normalize_comprehensive(word)
-    if not normalized:
-        return []
-    
-    # Return normalized version - KISS approach
-    return [normalized]
-
-
-class MultiWordExpression(BaseModel):
-    """Simple multi-word expression data structure."""
-
-    expression: str = Field(..., description="The multi-word expression")
-    normalized: str = Field(..., description="Normalized form")
-    frequency: int = Field(default=1, description="Frequency count")
-    variants: list[str] = Field(default_factory=list, description="Alternative forms")
-
-    model_config = {"frozen": True}
 
 
 class LexiconData(BaseModel):
     """Container for lexicon data with metadata."""
 
-    words: list[str] = Field(..., description="Single words")
-    phrases: list[MultiWordExpression] = Field(..., description="Multi-word expressions")
+    vocabulary: list[str] = Field(..., description="All vocabulary items")
     metadata: dict[str, Any] = Field(..., description="Source metadata")
     language: Language = Field(..., description="Language of the lexicon")
     sources: list[str] = Field(default_factory=list, description="Names of loaded sources")
@@ -94,8 +68,7 @@ class CorpusLanguageLoader:
 
         # Loaded data
         self.lexicons: dict[Language, LexiconData] = {}
-        self._all_words: list[str] = []
-        self._all_phrases: list[MultiWordExpression] = []
+        self.vocabulary: list[str] = []
 
         # Use lexicon sources from sources.py
         self.lexicon_sources = LEXICON_SOURCES
@@ -131,22 +104,18 @@ class CorpusLanguageLoader:
             
             if cached_data:
                 # Deserialize cached lexicon data
-                words = cached_data.get("words", [])
-                phrases_data = cached_data.get("phrases", [])
+                vocabulary = cached_data.get("vocabulary", [])
                 metadata = cached_data.get("metadata", {})
                 
-                phrases = [MultiWordExpression(**p) for p in phrases_data]
-                
                 self.lexicons[language] = LexiconData(
-                    words=words,
-                    phrases=phrases,
+                    vocabulary=vocabulary,
                     metadata=metadata,
                     language=language,
                     sources=metadata.get("sources", []),
-                    total_entries=len(words) + len(phrases),
+                    total_entries=len(vocabulary),
                     last_updated=metadata.get("last_updated", ""),
                 )
-                logger.info(f"Loaded {language.value} lexicon from cache ({len(words)} words, {len(phrases)} phrases)")
+                logger.info(f"Loaded {language.value} lexicon from cache ({len(vocabulary)} items)")
                 return
             else:
                 logger.info(f"No cached data found for {language.value}, loading from sources")
@@ -161,8 +130,7 @@ class CorpusLanguageLoader:
 
     async def _load_from_sources(self, language: Language) -> LexiconData:
         """Load lexicon data from online sources."""
-        words: list[str] = []
-        phrases: list[MultiWordExpression] = []
+        vocabulary: list[str] = []
 
         # Get sources for this language
         sources = self._get_sources_for_language(language)
@@ -175,50 +143,28 @@ class CorpusLanguageLoader:
             if isinstance(result, Exception):
                 logger.warning(f"Failed to load lexicon source {source.name}: {result}")
                 continue
-            if not isinstance(result, tuple):
-                logger.warning(f"Invalid result type from source {source.name}")
+            if not isinstance(result, list):
+                logger.warning(f"Invalid result type from source {source.name}: expected list[str], got {type(result)}")
                 continue
 
-            source_words, source_phrases = result
-            words.extend(source_words)
-            phrases.extend(source_phrases)
+            vocabulary.extend(result)
 
-        # Enhanced deduplication with diacritic handling
-        normalized_words_map = {}
-        for word in words:
-            # Generate all diacritic variants
-            variants = normalize_lexicon_entry(word)
-
-            for variant in variants:
-                if variant not in normalized_words_map:
-                    normalized_words_map[variant] = word  # Keep original as reference
-
-        # Create deduplicated word list, sorted
-        words = sorted(normalized_words_map.keys())
-
-        # Deduplicate phrases by normalized text with priority
-        phrase_dict = {}
-
-        for phrase in phrases:
-            # Use existing normalized form, but ensure it's in our map
-            key = phrase.normalized
-            if key not in phrase_dict:
-                phrase_dict[key] = phrase
-            else:
-                # Keep phrase with higher frequency or from better source
-                existing = phrase_dict[key]
-                if phrase.frequency > existing.frequency:
-                    phrase_dict[key] = phrase
-
-        phrases = list(phrase_dict.values())
+        # Deduplicate and normalize
+        normalized_set = set()
+        for item in vocabulary:
+            normalized = normalize_fast(item)
+            if normalized:
+                normalized_set.add(normalized)
+        
+        # Sort for consistency
+        vocabulary = sorted(normalized_set)
 
         return LexiconData(
-            words=words,
-            phrases=phrases,
+            vocabulary=vocabulary,
             metadata={"loaded_sources": [s.name for s in sources]},
             language=language,
             sources=[s.name for s in sources],
-            total_entries=len(words) + len(phrases),
+            total_entries=len(vocabulary),
         )
 
     def _get_sources_for_language(self, language: Language) -> list[LexiconSourceConfig]:
@@ -231,7 +177,7 @@ class CorpusLanguageLoader:
 
     async def _load_source(
         self, source: LexiconSourceConfig
-    ) -> tuple[list[str], list[MultiWordExpression]]:
+    ) -> list[str]:
         """Load data from a specific source."""
         # Use the downloader function (handles both regular URLs and custom scraping)
         result = await source.scraper(source.url)
@@ -245,7 +191,7 @@ class CorpusLanguageLoader:
         response_text = result
         if not isinstance(response_text, str):
             logger.warning(f"Invalid response type from downloader for {source.name}: expected string, got {type(response_text)}")
-            return [], []
+            return []
 
         # Parse based on format
         if source.format == LexiconFormat.TEXT_LINES:
@@ -265,14 +211,13 @@ class CorpusLanguageLoader:
         elif source.format == LexiconFormat.JSON_PHRASAL_VERBS:
             return self._parse_json_phrasal_verbs(response_text, source.language)
         else:
-            return [], []
+            return []
 
     def _parse_text_lines(
         self, text: str, language: Language
-    ) -> tuple[list[str], list[MultiWordExpression]]:
+    ) -> list[str]:
         """Parse simple text file with one word per line."""
-        words = []
-        phrases = []
+        vocabulary = []
 
         for line in text.strip().split("\n"):
             line = line.strip()
@@ -280,32 +225,22 @@ class CorpusLanguageLoader:
                 continue
 
             # Normalize the entry
-            normalized = normalize_comprehensive(line)
-            if not normalized:
-                continue
+            normalized = normalize_fast(line)
+            if normalized:
+                vocabulary.append(normalized)
 
-            # Check if it's a phrase (multiple words)
-            if len(normalized.split()) > 1:
-                phrase = MultiWordExpression(
-                    expression=line,
-                    normalized=normalized,
-                )
-                phrases.append(phrase)
-            else:
-                words.append(normalized)
-
-        return words, phrases
+        return vocabulary
 
     def _parse_json_idioms(
         self, text: str, language: Language
-    ) -> tuple[list[str], list[MultiWordExpression]]:
+    ) -> list[str]:
         """Parse JSON file containing idioms and phrases."""
         try:
             data = json.loads(text)
         except json.JSONDecodeError:
-            return [], []
+            return []
 
-        phrases = []
+        vocabulary = []
 
         # Handle different JSON structures
         if isinstance(data, list):
@@ -315,7 +250,7 @@ class CorpusLanguageLoader:
         elif isinstance(data, dict):
             items = list(data.values())
         else:
-            return [], []
+            return []
 
         for item in items:
             if isinstance(item, str):
@@ -326,121 +261,76 @@ class CorpusLanguageLoader:
             else:
                 continue
 
-            if not phrase_text:
-                continue
+            if phrase_text:
+                normalized = normalize_fast(phrase_text)
+                if normalized:
+                    vocabulary.append(normalized)
 
-            normalized = normalize_comprehensive(phrase_text)
-            if normalized and len(normalized.split()) > 1:
-                phrase = MultiWordExpression(
-                    expression=phrase_text,
-                    normalized=normalized,
-                )
-                phrases.append(phrase)
-
-        return [], phrases  # No single words from idiom sources
+        return vocabulary
 
     def _parse_frequency_list(
         self, text: str, language: Language
-    ) -> tuple[list[str], list[MultiWordExpression]]:
+    ) -> list[str]:
         """Parse frequency list with word and frequency columns."""
-        words = []
-        phrases = []
+        vocabulary = []
 
         for line in text.strip().split("\n"):
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
 
-            # Split by whitespace - first column is word, second is frequency
+            # Split by whitespace - first column is word
             parts = line.split()
-            if len(parts) >= 2:
+            if parts:
                 word = parts[0]
-                try:
-                    frequency = float(parts[1])
-                except ValueError:
-                    frequency = 0.0
-            else:
-                word = parts[0] if parts else ""
-                frequency = 0.0
+                normalized = normalize_fast(word)
+                if normalized:
+                    vocabulary.append(normalized)
 
-            if not word:
-                continue
-
-            # Normalize the entry
-            normalized = normalize_comprehensive(word)
-            if not normalized:
-                continue
-
-            # Check if it's a phrase
-            if len(normalized.split()) > 1:
-                phrase = MultiWordExpression(
-                    expression=word,
-                    normalized=normalized,
-                    frequency=int(frequency),
-                )
-                phrases.append(phrase)
-            else:
-                words.append(normalized)
-
-        return words, phrases
+        return vocabulary
 
     def _parse_json_dict(
         self, text: str, language: Language
-    ) -> tuple[list[str], list[MultiWordExpression]]:
+    ) -> list[str]:
         """Parse JSON dictionary format."""
         try:
             data = json.loads(text)
         except json.JSONDecodeError:
-            return [], []
+            return []
 
-        words = []
-        phrases = []
+        vocabulary = []
 
         if isinstance(data, dict):
-            for key, value in data.items():
-                # Key is the word/phrase, value might be expansion or metadata
-                normalized = normalize_comprehensive(key)
-                if normalized and len(normalized.split()) > 1:
-                    phrase = MultiWordExpression(
-                        expression=key,
-                        normalized=normalized,
-                    )
-                    phrases.append(phrase)
-                elif normalized:
-                    words.append(normalized)
+            for key in data.keys():
+                normalized = normalize_fast(key)
+                if normalized:
+                    vocabulary.append(normalized)
 
-        return words, phrases
+        return vocabulary
 
     def _parse_json_array(
         self, text: str, language: Language
-    ) -> tuple[list[str], list[MultiWordExpression]]:
+    ) -> list[str]:
         """Parse JSON array format."""
         try:
             data = json.loads(text)
         except json.JSONDecodeError:
-            return [], []
+            return []
 
-        words = []
-        phrases = []
+        vocabulary = []
 
         if isinstance(data, list):
             for item in data:
                 if isinstance(item, str):
-                    normalized = normalize_comprehensive(item)
-                    if normalized and len(normalized.split()) > 1:
-                        phrase = MultiWordExpression(
-                            expression=item,
-                            normalized=normalized,
-                        )
-                        phrases.append(phrase)
-                    elif normalized:
-                        words.append(normalized)
+                    normalized = normalize_fast(item)
+                    if normalized:
+                        vocabulary.append(normalized)
 
-        return words, phrases
+        return vocabulary
 
     def _parse_github_api_response(
         self, text: str, language: Language
-    ) -> tuple[list[str], list[MultiWordExpression]]:
+    ) -> list[str]:
         """Parse GitHub API response for file content."""
         try:
             data = json.loads(text)
@@ -448,15 +338,18 @@ class CorpusLanguageLoader:
                 # Decode base64 content
                 content = base64.b64decode(data["content"]).decode("utf-8")
                 return self._parse_json_array(content, language)
-        except Exception:
-            pass
-        return [], []
+        except Exception as e:
+            logger.warning(f"Failed to parse GitHub API response: {e}")
+            return []
+        
+        logger.warning("GitHub API response missing 'content' field")
+        return []
 
     def _parse_csv_idioms(
         self, text: str, language: Language
-    ) -> tuple[list[str], list[MultiWordExpression]]:
+    ) -> list[str]:
         """Parse CSV format with idiom,definition columns."""
-        phrases = []
+        vocabulary = []
 
         try:
             # Parse CSV data
@@ -481,25 +374,21 @@ class CorpusLanguageLoader:
                 ).strip()
 
                 # Normalize the idiom
-                normalized = normalize_comprehensive(idiom_text)
-                if normalized and len(normalized.split()) > 1:
-                    phrase = MultiWordExpression(
-                        expression=idiom_text,
-                        normalized=normalized,
-                    )
-                    phrases.append(phrase)
+                normalized = normalize_fast(idiom_text)
+                if normalized:
+                    vocabulary.append(normalized)
 
         except Exception as e:
             logger.warning(f"Failed to parse CSV idioms: {e}")
-            return [], []
+            return []
 
-        return [], phrases  # CSV idioms only contain phrases, no single words
+        return vocabulary
 
     def _parse_json_phrasal_verbs(
         self, text: str, language: Language
-    ) -> tuple[list[str], list[MultiWordExpression]]:
+    ) -> list[str]:
         """Parse JSON format with phrasal verbs, definitions, and examples."""
-        phrases = []
+        vocabulary = []
 
         try:
             data = json.loads(text)
@@ -522,31 +411,26 @@ class CorpusLanguageLoader:
                         verb_text = verb_text.replace("*", "").replace("+", "").strip()
 
                         # Normalize the phrasal verb
-                        normalized = normalize_comprehensive(verb_text)
-                        if normalized and len(normalized.split()) > 1:
-                            phrase = MultiWordExpression(
-                                expression=verb_text,
-                                normalized=normalized,
-                            )
-                            phrases.append(phrase)
+                        normalized = normalize_fast(verb_text)
+                        if normalized:
+                            vocabulary.append(normalized)
 
         except Exception as e:
             logger.warning(f"Failed to parse JSON phrasal verbs: {e}")
-            return [], []
+            return []
 
-        return [], phrases  # JSON phrasal verbs only contain phrases, no single words
+        return vocabulary
 
     def _parse_scraped_data(
         self, scraped_data: dict[str, Any], language: Language
-    ) -> tuple[list[str], list[MultiWordExpression]]:
+    ) -> list[str]:
         """Parse data returned by custom scrapers."""
-        words = []
-        phrases = []
+        vocabulary = []
 
         data = scraped_data.get("data", [])
         if not isinstance(data, list):
             logger.warning("Scraped data should contain a 'data' list")
-            return [], []
+            return []
 
         for item in data:
             if isinstance(item, dict):
@@ -555,20 +439,11 @@ class CorpusLanguageLoader:
                     continue
 
                 # Normalize the expression
-                normalized = normalize_comprehensive(expression)
-                if not normalized:
-                    continue
-
-                # Determine if it's a phrase or single word
-                if len(normalized.split()) > 1:
-                    phrase = MultiWordExpression(
-                        expression=normalized,  # Use normalized version for search
-                        normalized=normalized,
-                    )
-                    phrases.append(phrase)
-                else:
-                    words.append(normalized)
-        return words, phrases
+                normalized = normalize_fast(expression)
+                if normalized:
+                    vocabulary.append(normalized)
+                    
+        return vocabulary
 
     async def generate_master_index(self, output_path: Path | None = None) -> dict[str, Any]:
         """
@@ -590,49 +465,33 @@ class CorpusLanguageLoader:
         ]
         await self.load_languages(all_languages)
 
-        # Collect all unique words and phrases
-        master_words = set()
-        master_phrases = {}  # normalized -> MultiWordExpression
+        # Collect all unique vocabulary
+        master_vocabulary = set()
         source_stats = {}
 
         for language, lexicon_data in self.lexicons.items():
-            # Add words
-            master_words.update(lexicon_data.words)
-
-            # Add phrases (deduplicate by normalized form)
-            for phrase in lexicon_data.phrases:
-                if phrase.normalized not in master_phrases:
-                    master_phrases[phrase.normalized] = phrase
-                else:
-                    # Keep the phrase with higher frequency
-                    existing = master_phrases[phrase.normalized]
-                    if phrase.frequency > existing.frequency:
-                        master_phrases[phrase.normalized] = phrase
+            # Add vocabulary
+            master_vocabulary.update(lexicon_data.vocabulary)
 
             # Track source statistics
             source_stats[language.value] = {
-                "words": len(lexicon_data.words),
-                "phrases": len(lexicon_data.phrases),
+                "vocabulary": len(lexicon_data.vocabulary),
                 "sources": lexicon_data.metadata.get("loaded_sources", []),
                 "total_entries": lexicon_data.total_entries,
             }
 
-        # Convert to sorted lists
-        sorted_words = sorted(master_words)
-        sorted_phrases = sorted(master_phrases.values(), key=lambda p: p.normalized)
+        # Convert to sorted list
+        sorted_vocabulary = sorted(master_vocabulary)
 
         master_index = {
-            "words": sorted_words,
-            "phrases": [phrase.model_dump() for phrase in sorted_phrases],
+            "vocabulary": sorted_vocabulary,
             "statistics": {
-                "total_words": len(sorted_words),
-                "total_phrases": len(sorted_phrases),
-                "total_entries": len(sorted_words) + len(sorted_phrases),
+                "total_vocabulary": len(sorted_vocabulary),
                 "languages_processed": list(source_stats.keys()),
                 "by_language": source_stats,
             },
             "metadata": {
-                "generated_at": datetime.datetime.now().isoformat(),
+                "generated_at": datetime.now(UTC).isoformat(),
                 "generator": "Floridify LexiconLoader",
                 "version": "1.0.0",
             },
@@ -647,68 +506,41 @@ class CorpusLanguageLoader:
         return master_index
 
     def _rebuild_unified_indices(self) -> None:
-        """Rebuild unified word and phrase indices from all loaded languages."""
-        self._all_words = []
-        self._all_phrases = []
+        """Rebuild unified vocabulary index from all loaded languages."""
+        self.vocabulary = []
 
-        for language, lexicon_data in self.lexicons.items():
-            self._all_words.extend(lexicon_data.words)
-            self._all_phrases.extend(lexicon_data.phrases)
+        for lexicon_data in self.lexicons.values():
+            self.vocabulary.extend(lexicon_data.vocabulary)
 
         # Remove duplicates while preserving order
-        seen_words = set()
-        unique_words = []
-        for word in self._all_words:
-            if word not in seen_words:
-                seen_words.add(word)
-                unique_words.append(word)
-        self._all_words = unique_words
+        seen = set()
+        unique_vocabulary = []
+        for item in self.vocabulary:
+            if item not in seen:
+                seen.add(item)
+                unique_vocabulary.append(item)
+        self.vocabulary = unique_vocabulary
 
-        # Deduplicate phrases by normalized text
-        phrase_dict = {p.normalized: p for p in self._all_phrases}
-        self._all_phrases = list(phrase_dict.values())
+    def get_vocabulary(self) -> list[str]:
+        """Get all vocabulary from all loaded languages."""
+        return self.vocabulary
 
-    def get_all_words(self) -> list[str]:
-        """Get all words from all loaded languages."""
-        return self._all_words  # No copy needed since SearchEngine caches
-
-    def get_all_phrases(self) -> list[str]:
-        """Get all phrases as strings from all loaded languages."""
-        # Cache phrase strings to avoid rebuilding list every time
-        if not hasattr(self, "_phrase_strings") or len(self._phrase_strings) != len(
-            self._all_phrases
-        ):
-            self._phrase_strings: list[str] = [phrase.normalized for phrase in self._all_phrases]
-        return self._phrase_strings
-
-    def get_phrases(self) -> list[MultiWordExpression]:
-        """Get all phrase objects with metadata."""
-        return self._all_phrases.copy()
-
-    def get_words_for_language(self, language: Language) -> list[str]:
-        """Get words for a specific language."""
+    def get_vocabulary_for_language(self, language: Language) -> list[str]:
+        """Get vocabulary for a specific language."""
         if language in self.lexicons:
-            return self.lexicons[language].words.copy()
-        return []
-
-    def get_phrases_for_language(self, language: Language) -> list[MultiWordExpression]:
-        """Get phrases for a specific language."""
-        if language in self.lexicons:
-            return self.lexicons[language].phrases.copy()
+            return self.lexicons[language].vocabulary.copy()
         return []
 
     def get_statistics(self) -> dict[str, Any]:
         """Get loading statistics and metadata."""
         stats: dict[str, Any] = {
-            "total_words": len(self._all_words),
-            "total_phrases": len(self._all_phrases),
+            "total_vocabulary": len(self.vocabulary),
             "languages": {},
         }
 
         for language, lexicon_data in self.lexicons.items():
             stats["languages"][language.value] = {
-                "words": len(lexicon_data.words),
-                "phrases": len(lexicon_data.phrases),
+                "vocabulary": len(lexicon_data.vocabulary),
                 "sources": lexicon_data.metadata.get("loaded_sources", []),
                 "total_entries": lexicon_data.total_entries,
             }
@@ -736,12 +568,11 @@ class CorpusLanguageLoader:
         
         # Prepare data for caching
         cache_data = {
-            "words": lexicon_data.words,
-            "phrases": [p.model_dump() for p in lexicon_data.phrases],
+            "vocabulary": lexicon_data.vocabulary,
             "metadata": {
                 **lexicon_data.metadata,
                 "sources": lexicon_data.sources,
-                "last_updated": dt.now(UTC).isoformat(),
+                "last_updated": datetime.now(UTC).isoformat(),
             },
         }
 
@@ -756,4 +587,4 @@ class CorpusLanguageLoader:
             tags=[f"{CacheNamespace.CORPUS}:{language.value}"],
         )
         
-        logger.info(f"Cached {language.value} lexicon ({len(lexicon_data.words)} words, {len(lexicon_data.phrases)} phrases)")
+        logger.info(f"Cached {language.value} lexicon ({len(lexicon_data.vocabulary)} vocabulary items)")

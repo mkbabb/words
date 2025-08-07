@@ -64,7 +64,7 @@ class CorpusManager:
             logger.debug(f"Cache hit for corpus '{corpus_name}'")
             return corpus
 
-        logger.error(f"🚨 CORPUS CACHE MISS: corpus='{corpus_name}', vocab_hash='{vocab_hash[:8]}...', cache_key='{cache_key}'")
+        logger.debug(f"Cache miss for corpus '{corpus_name}'")
         return None
 
     async def get_corpus_metadata(self, corpus_name: str) -> CorpusMetadata | None:

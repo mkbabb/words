@@ -114,7 +114,7 @@ async def _search_word_async(
             table.add_column("Type", style="blue")
 
             for result in results:
-                word_type = "phrase" if result.is_phrase else "word"
+                word_type = "entry"
                 table.add_row(result.word, f"{result.score:.3f}", result.method.value, word_type)
 
             console.print(table)
@@ -158,7 +158,7 @@ async def _search_similar_async(word: str, language: tuple[str, ...], max_result
             table.add_column("Type", style="blue")
 
             for result in filtered_results:
-                word_type = "phrase" if result.is_phrase else "word"
+                word_type = "entry"
                 table.add_row(result.word, f"{result.score:.3f}", word_type)
 
             console.print(table)

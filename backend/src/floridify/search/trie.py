@@ -7,13 +7,13 @@ Provides exact matching and autocomplete functionality with frequency-based rank
 
 from __future__ import annotations
 
-import heapq
 import pickle
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
 import marisa_trie  # type: ignore[import-not-found]
+import numpy as np
 
 from ..caching.unified import get_unified
 from ..text.search import get_vocabulary_hash
@@ -226,12 +226,11 @@ class TrieSearch:
             frequency_pairs.sort(key=lambda x: x[1], reverse=True)
             return [word for word, _ in frequency_pairs]
         else:
-            # For many matches, use partial sort for better performance
-            heap_items: list[tuple[int, str]] = [
-                (-self._word_frequencies.get(word, 0), word) for word in matches
-            ]
-            top_matches = heapq.nsmallest(max_results, heap_items)
-            return [word for _, word in top_matches]
+            # For many matches, use numpy argsort for better performance than heapq
+            frequencies = np.array([self._word_frequencies.get(word, 0) for word in matches])
+            # Get indices of top frequencies (argsort returns ascending, so negate and reverse)
+            top_indices = np.argsort(-frequencies)[:max_results]
+            return [matches[i] for i in top_indices]
 
     def contains(self, word: str) -> bool:
         """

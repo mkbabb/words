@@ -49,6 +49,7 @@ class LanguageSearch:
 
         self.search_engine: SearchEngine | None = None
         self._corpus_manager: CorpusManager = get_corpus_manager()
+        self._initialized: bool = False
 
     async def initialize(self) -> None:
         """Initialize lexicon loading and search engine with unified corpus management."""
@@ -64,20 +65,27 @@ class LanguageSearch:
         corpus_name = f"{CorpusType.LANGUAGE_SEARCH.value}_{lang_codes}"
 
         # Load vocabulary from language sources
+        logger.info(f"Starting language loader for {[lang.value for lang in self.languages]}")
         loader = CorpusLanguageLoader(force_rebuild=self.force_rebuild)
         await loader.load_languages(self.languages)
         
-        # Get combined vocabulary (words + phrases)
-        vocabulary = loader.get_all_words() + loader.get_all_phrases()
+        # Get vocabulary
+        vocabulary = loader.get_vocabulary()
+        logger.info(f"Loaded vocabulary size: {len(vocabulary)}")
+        
+        if not vocabulary:
+            raise ValueError(f"No vocabulary loaded for languages {self.languages}")
         
         # Get or create corpus through manager (uses cache if available)
-        await self._corpus_manager.get_or_create_corpus(
+        logger.info(f"Creating corpus '{corpus_name}' with {len(vocabulary)} items")
+        corpus = await self._corpus_manager.get_or_create_corpus(
             corpus_name=corpus_name,
             vocabulary=vocabulary,
             force_rebuild=self.force_rebuild,
         )
+        logger.info(f"Corpus created successfully: {corpus.vocabulary_hash[:8]}")
 
-        # Initialize search engine with corpus name (it will load corpus data internally)
+        # Initialize search engine with corpus name
         self.search_engine = SearchEngine(
             corpus_name=corpus_name,
             min_score=self.min_score,
@@ -93,6 +101,7 @@ class LanguageSearch:
         logger.info(
             f"Language search initialized for {self.languages} with unified corpus management"
         )
+        self._initialized = True
 
     async def search(
         self,

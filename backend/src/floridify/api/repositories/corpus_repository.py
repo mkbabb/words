@@ -4,16 +4,15 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ...search.core import SearchEngine
 from ...search.corpus.manager import get_corpus_manager
 
 
 class CorpusCreate(BaseModel):
     """Schema for creating a corpus."""
 
-    words: list[str] = Field(..., min_length=1, description="Words to include")
-    phrases: list[str] = Field(default_factory=list, description="Phrases to include")
+    vocabulary: list[str] = Field(..., min_length=1, description="Vocabulary to include")
     name: str = Field(default="", description="Corpus name")
-    ttl_hours: float = Field(default=2.0, gt=0, le=24, description="TTL in hours")
 
 
 class CorpusSearchParams(BaseModel):
@@ -23,97 +22,52 @@ class CorpusSearchParams(BaseModel):
     max_results: int = Field(default=20, ge=1, le=100, description="Max results")
     min_score: float = Field(default=0.6, ge=0.0, le=1.0, description="Min score")
     semantic: bool = Field(default=False, description="Enable semantic search")
-    semantic_weight: float = Field(
-        default=0.7, ge=0.0, le=1.0, description="Weight for semantic results"
-    )
 
 
 class CorpusRepository:
     """Repository for corpus operations."""
 
     def __init__(self) -> None:
-        self._cache: Any = None
-
-    async def _get_cache(self) -> Any:
-        """Get corpus cache instance."""
-        if self._cache is None:
-            self._manager = get_corpus_manager()
-        return self._cache
+        self._manager = get_corpus_manager()
 
     async def create(self, data: CorpusCreate) -> dict[str, Any]:
         """Create a new corpus."""
-        cache = await self._get_cache()
-
-        corpus_id = cache.create_corpus(
-            words=data.words,
-            phrases=data.phrases,
-            name=data.name,
-            ttl_hours=data.ttl_hours,
+        corpus = await self._manager.create_corpus(
+            corpus_name=data.name,
+            vocabulary=data.vocabulary,
         )
 
-        # Get metadata
-        metadata = cache.get_corpus_info(corpus_id)
-        if not metadata:
-            raise ValueError("Failed to create corpus")
-
         return {
-            "corpus_id": corpus_id,
-            "name": metadata.name,
-            "word_count": metadata.word_count,
-            "phrase_count": metadata.phrase_count,
-            "created_at": metadata.created_at.isoformat(),
-            "expires_at": metadata.expires_at.isoformat(),
+            "corpus_name": corpus.corpus_name,
+            "vocabulary_size": len(corpus.vocabulary),
+            "vocabulary_hash": corpus.vocabulary_hash,
+            "metadata": corpus.metadata,
         }
 
-    async def get(self, corpus_id: str) -> dict[str, Any] | None:
+    async def get(self, corpus_name: str) -> dict[str, Any] | None:
         """Get corpus metadata."""
-        cache = await self._get_cache()
-        metadata = cache.get_corpus_info(corpus_id)
-
+        metadata = await self._manager.get_corpus_metadata(corpus_name)
+        
         if not metadata:
             return None
 
         return {
-            "corpus_id": metadata.corpus_id,
-            "name": metadata.name,
-            "created_at": metadata.created_at.isoformat(),
-            "expires_at": metadata.expires_at.isoformat(),
-            "word_count": metadata.word_count,
-            "phrase_count": metadata.phrase_count,
-            "search_count": metadata.search_count,
-            "last_accessed": metadata.last_accessed.isoformat(),
+            "corpus_name": metadata.corpus_name,
+            "vocabulary_hash": metadata.vocabulary_hash,
+            "vocabulary_stats": metadata.vocabulary_stats,
+            "metadata": metadata.metadata,
         }
 
-    async def get_by_name(self, name: str) -> str | None:
-        """Get corpus ID by name if it exists."""
-        cache = await self._get_cache()
-        corpora = cache.list_corpora()
-
-        for corpus in corpora:
-            if corpus.name == name:
-                corpus_id: str = corpus.corpus_id
-                return corpus_id
-
-        return None
-
-    async def search(self, corpus_id: str, params: CorpusSearchParams) -> dict[str, Any]:
+    async def search(self, corpus_name: str, params: CorpusSearchParams) -> dict[str, Any]:
         """Search within a corpus."""
-        from ...search.core import SearchEngine
-
-        cache = await self._get_cache()
-        entry = cache.get_corpus(corpus_id)
-
-        if not entry:
-            raise ValueError(f"Corpus {corpus_id} not found or expired")
-
         # Create search engine for this corpus
         search_engine = SearchEngine(
-            words=entry.words,
-            phrases=entry.phrases,
+            corpus_name=corpus_name,
             min_score=params.min_score,
             semantic=params.semantic,
-            corpus_name=entry.metadata.name or f"Corpus {corpus_id[:8]}",
         )
+        
+        await search_engine.initialize()
 
         # Perform search
         results = await search_engine.search(
@@ -129,55 +83,26 @@ class CorpusRepository:
                     "word": result.word,
                     "score": result.score,
                     "method": result.method.value,
-                    "is_phrase": result.is_phrase,
                 }
                 for result in results
             ],
             "metadata": {
-                "corpus_id": corpus_id,
+                "corpus_name": corpus_name,
                 "query": params.query,
                 "result_count": len(results),
                 "semantic_enabled": params.semantic,
-                "corpus_stats": entry.metadata.model_dump(),
             },
         }
 
-    async def list_all(self) -> list[dict[str, Any]]:
-        """List all active corpora."""
-        cache = await self._get_cache()
-        corpora = cache.list_corpora()
-
-        return [
-            {
-                "corpus_id": corpus.corpus_id,
-                "name": corpus.name,
-                "created_at": corpus.created_at.isoformat(),
-                "expires_at": corpus.expires_at.isoformat(),
-                "word_count": corpus.word_count,
-                "phrase_count": corpus.phrase_count,
-                "search_count": corpus.search_count,
-                "last_accessed": corpus.last_accessed.isoformat(),
-            }
-            for corpus in corpora
-        ]
-
-    async def get_stats(self) -> dict[str, Any]:
-        """Get cache statistics."""
-        cache = await self._get_cache()
-        stats = cache.get_stats()
-        return dict(stats)
-
     async def create_from_wordlist(
-        self, words: list[str], name: str = "", ttl_hours: float = 2.0
+        self, vocabulary: list[str], name: str = ""
     ) -> str:
-        """Create corpus from word list."""
+        """Create corpus from vocabulary list."""
         data = CorpusCreate(
-            words=words,
-            phrases=[],
+            vocabulary=vocabulary,
             name=name,
-            ttl_hours=ttl_hours,
         )
 
         result = await self.create(data)
-        corpus_id: str = result["corpus_id"]
-        return corpus_id
+        corpus_name: str = result["corpus_name"]
+        return corpus_name

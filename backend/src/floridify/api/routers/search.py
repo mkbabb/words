@@ -313,7 +313,7 @@ async def rebuild_search_index(
 
     try:
         # Initialize unified corpus manager
-        corpus_manager = await get_corpus_manager()
+        corpus_manager = get_corpus_manager()
 
         # Determine corpus types to rebuild
         target_corpus_types = []
@@ -339,7 +339,8 @@ async def rebuild_search_index(
         caches_cleared = {}
 
         # Clear vocabulary caches
-        from ...caching.unified import CacheNamespace, get_unified
+        from ...caching.core import CacheNamespace
+        from ...caching.unified import get_unified
 
         cache = await get_unified()
         vocab_cleared = await cache.invalidate_namespace(CacheNamespace.CORPUS)
@@ -502,7 +503,7 @@ async def invalidate_corpus_unified(
     )
 
     try:
-        corpus_manager = await get_corpus_manager()
+        corpus_manager = get_corpus_manager()
 
         # Determine corpus types to invalidate
         target_corpus_types = []

@@ -44,7 +44,6 @@ class DictionaryProvider(Enum):
         display_names: dict[DictionaryProvider, str] = {
             DictionaryProvider.WIKTIONARY: "Wiktionary",
             DictionaryProvider.OXFORD: "Oxford Dictionary",
-            DictionaryProvider.DICTIONARY_COM: "Dictionary.com",
             DictionaryProvider.APPLE_DICTIONARY: "Apple Dictionary",
             DictionaryProvider.AI_FALLBACK: "AI Fallback",
             DictionaryProvider.SYNTHESIS: "Synthesis",

@@ -68,7 +68,8 @@ class UnifiedCache(CacheBackend[Any]):
 
     def _make_cache_key(self, namespace: str, key: str) -> str:
         """Create unified cache key from namespace and key."""
-        return f"{namespace}:{key}"
+        # Use string concatenation instead of f-string for micro-optimization
+        return namespace + ":" + key
 
     async def get(self, namespace: str, key: str, default: Any | None = None) -> Any | None:
         """

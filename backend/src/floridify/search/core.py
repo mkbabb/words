@@ -6,11 +6,12 @@ Performance-optimized for 100k-1M word searches with KISS principles.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 
 from ..caching.unified import UnifiedCache, get_unified
-from ..text import normalize_comprehensive
+from ..text import normalize_fast
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod
 from .corpus.core import Corpus
@@ -30,6 +31,13 @@ class SearchEngine:
 
     Optimized for 100k-1M word searches with minimal overhead.
     """
+    
+    # Method priority for deduplication (higher = preferred)
+    METHOD_PRIORITY = {
+        SearchMethod.EXACT: 3,
+        SearchMethod.SEMANTIC: 2,
+        SearchMethod.FUZZY: 1,
+    }
 
     def __init__(
         self,
@@ -77,23 +85,18 @@ class SearchEngine:
         # Fetch Corpus from corpus manager
         manager = get_corpus_manager()
         
-        # Get corpus metadata to check if it exists
-        corpus_metadata = await manager.get_corpus_metadata(self.corpus_name)
+        # First try to get corpus metadata to get the vocab_hash
+        metadata = await manager.get_corpus_metadata(self.corpus_name)
         
-        if corpus_metadata is None:
-            raise ValueError(f"Corpus '{self.corpus_name}' not found. Create it first using get_or_create_corpus.")
-            
-        # Get corpus from cache using metadata
-        self.corpus = await manager.get_corpus(
-            self.corpus_name,
-            vocab_hash=corpus_metadata.vocabulary_hash
-        )
+        if metadata is not None:
+            # Get corpus from cache using the vocab_hash
+            self.corpus = await manager.get_corpus(self.corpus_name, vocab_hash=metadata.vocabulary_hash)
         
         if self.corpus is None:
-            raise ValueError(f"Corpus '{self.corpus_name}' not found in cache. Create it first using get_or_create_corpus.")
+            raise ValueError(f"Corpus '{self.corpus_name}' not found. It should have been created by LanguageSearch.initialize() or via get_or_create_corpus().")
         
         self._vocabulary_hash = self.corpus.vocabulary_hash
-        combined_vocab = self.corpus.get_combined_vocabulary()
+        combined_vocab = self.corpus.vocabulary
         
         # High-performance search components
         self.trie_search = TrieSearch()
@@ -153,7 +156,7 @@ class SearchEngine:
             self._vocabulary_hash = updated_corpus.vocabulary_hash
             
             # Update search components
-            combined_vocab = updated_corpus.get_combined_vocabulary()
+            combined_vocab = updated_corpus.vocabulary
             
             if self.trie_search:
                 await self.trie_search.build_index(combined_vocab)
@@ -187,7 +190,7 @@ class SearchEngine:
         await self._check_and_update_corpus()
         
         # Normalize query
-        normalized_query = normalize_comprehensive(query)
+        normalized_query = normalize_fast(query)
         if not normalized_query.strip():
             return []
 
@@ -227,41 +230,67 @@ class SearchEngine:
     async def _smart_search_cascade(
         self, query: str, max_results: int, min_score_threshold: float, should_semantic: bool
     ) -> list[SearchResult]:
-        """Smart search cascade with early termination."""
-        all_results = []
-
-        # Phase 1: Exact search (always fast, <1ms)
-        exact_results = await self._search_exact(query)
+        """Parallel search execution with intelligent early termination."""
+        # Start all searches in parallel
+        # Use run_in_executor for CPU-bound exact search
+        loop = asyncio.get_event_loop()
+        exact_task = loop.run_in_executor(None, self._search_exact_sync, query)
+        fuzzy_task = asyncio.create_task(self._search_fuzzy_direct(query, max_results * 2))
+        
+        # Only create semantic task if needed
+        semantic_task = None
+        if should_semantic and self.semantic_search is not None:
+            semantic_task = asyncio.create_task(
+                self._search_semantic(query, max_results, min_score_threshold)
+            )
+        
+        # Wait for exact results first (fastest, <1ms)
+        exact_results = await exact_task
         exact_filtered = [r for r in exact_results if r.score >= min_score_threshold]
-        all_results.extend(exact_filtered)
-
-        # Early exit if we have enough high-quality exact matches
-        if len(exact_filtered) >= max_results:
-            logger.debug(f"Early exit: {len(exact_filtered)} exact matches found")
-            return exact_filtered[
-                :max_results
-            ]  # No sorting needed - all exact matches have score=1.0
-
-        # Phase 2: Fuzzy search (only if needed)
-        fuzzy_needed = max_results - len(exact_filtered)
-        fuzzy_results = await self._search_fuzzy(
-            query, fuzzy_needed * 2
-        )  # Get extra for deduplication
-        fuzzy_filtered = [r for r in fuzzy_results if r.score >= min_score_threshold]
-        all_results.extend(fuzzy_filtered)
-
-        # Deduplicate after fuzzy
-        unique_results = self._deduplicate_results(all_results)
-
-        # Phase 3: Semantic search (only for poor fuzzy coverage)
-        if should_semantic and len(unique_results) < max_results * 0.7:
-            logger.debug(f"Triggering semantic search: only {len(unique_results)} results so far")
-            semantic_results = await self._search_semantic(query, max_results, min_score_threshold)
+        
+        # If we have perfect exact matches, cancel other tasks
+        if len(exact_filtered) >= max_results and all(r.score >= 0.99 for r in exact_filtered[:max_results]):
+            logger.debug(f"Early exit: {len(exact_filtered)} perfect exact matches found")
+            fuzzy_task.cancel()
+            if semantic_task:
+                semantic_task.cancel()
+            # Clean up cancelled tasks
+            try:
+                await fuzzy_task
+            except asyncio.CancelledError:
+                pass
+            if semantic_task:
+                try:
+                    await semantic_task
+                except asyncio.CancelledError:
+                    pass
+            return exact_filtered[:max_results]
+        
+        # Otherwise, wait for remaining tasks
+        pending_tasks = [fuzzy_task]
+        if semantic_task:
+            pending_tasks.append(semantic_task)
+        
+        # Gather remaining results
+        remaining_results = await asyncio.gather(*pending_tasks, return_exceptions=True)
+        
+        # Process results
+        all_results = list(exact_filtered)
+        
+        # Add fuzzy results
+        if not isinstance(remaining_results[0], Exception):
+            fuzzy_results = cast(list[SearchResult], remaining_results[0])
+            fuzzy_filtered = [r for r in fuzzy_results if r.score >= min_score_threshold]
+            all_results.extend(fuzzy_filtered)
+        
+        # Add semantic results if available
+        if semantic_task and len(remaining_results) > 1 and not isinstance(remaining_results[1], Exception):
+            semantic_results = cast(list[SearchResult], remaining_results[1])
             semantic_filtered = [r for r in semantic_results if r.score >= min_score_threshold]
             all_results.extend(semantic_filtered)
-            unique_results = self._deduplicate_results(all_results)
-
-        # Sort by score and return top results
+        
+        # Deduplicate and sort
+        unique_results = self._deduplicate_results(all_results)
         return sorted(unique_results, key=lambda r: r.score, reverse=True)[:max_results]
 
     async def find_best_match(self, word: str) -> SearchResult | None:
@@ -280,7 +309,6 @@ class SearchEngine:
                 lemmatized_word=None,
                 score=1.0,
                 method=SearchMethod.EXACT,
-                is_phrase=" " in match,
                 language=None,
                 metadata=None,
             )
@@ -293,7 +321,7 @@ class SearchEngine:
             return []
         
         try:
-            matches = await self.fuzzy_search.search(
+            matches = self.fuzzy_search.search(
                 query=query,
                 corpus=self.corpus,
                 max_results=max_results,
@@ -305,7 +333,6 @@ class SearchEngine:
                     lemmatized_word=None,
                     score=match.score,
                     method=SearchMethod.FUZZY,
-                    is_phrase=match.is_phrase,
                     language=None,
                     metadata=None,
                 )
@@ -315,13 +342,6 @@ class SearchEngine:
             logger.warning(f"Fuzzy search failed: {e}")
             return []
 
-    async def _search_exact(self, query: str) -> list[SearchResult]:
-        """Exact string matching."""
-        return self._search_exact_sync(query)
-
-    async def _search_fuzzy(self, query: str, max_results: int) -> list[SearchResult]:
-        """Fuzzy matching using corpus object."""
-        return await self._search_fuzzy_direct(query, max_results)
 
     async def _search_semantic(
         self, query: str, max_results: int, min_score: float
@@ -350,7 +370,6 @@ class SearchEngine:
                 lemmatized_word=None,
                 score=match.score,
                 method=SearchMethod.SEMANTIC,
-                is_phrase=" " in match.word,
                 language=None,
                 metadata=None,
             )
@@ -361,13 +380,6 @@ class SearchEngine:
         """Remove duplicates, preferring exact matches."""
         word_to_result: dict[str, SearchResult] = {}
 
-        # Method priority: EXACT > SEMANTIC > FUZZY
-        method_priority = {
-            SearchMethod.EXACT: 3,
-            SearchMethod.SEMANTIC: 2,
-            SearchMethod.FUZZY: 1,
-        }
-
         for result in results:
             word_key = result.word.lower().strip()
 
@@ -376,8 +388,8 @@ class SearchEngine:
             else:
                 existing = word_to_result[word_key]
                 # Prefer higher priority methods, then higher scores
-                result_priority = method_priority.get(result.method, 0)
-                existing_priority = method_priority.get(existing.method, 0)
+                result_priority = self.METHOD_PRIORITY.get(result.method, 0)
+                existing_priority = self.METHOD_PRIORITY.get(existing.method, 0)
 
                 if (result_priority > existing_priority) or (
                     result_priority == existing_priority and result.score > existing.score
@@ -395,9 +407,7 @@ class SearchEngine:
         """Get search engine statistics."""
         if self.corpus:
             return {
-                "vocabulary_size": self.corpus.get_vocabulary_size(),
-                "words": len(self.corpus.words),
-                "phrases": len(self.corpus.phrases),
+                "vocabulary_size": len(self.corpus.vocabulary),
                 "min_score": self.min_score,
                 "semantic_enabled": self.semantic,
                 "semantic_available": True,

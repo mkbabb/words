@@ -8,7 +8,7 @@ from beanie.odm.enums import SortDirection
 from beanie.operators import RegEx
 from pydantic import BaseModel, Field
 
-from ...models.definition import CorpusType, Language, Word
+from ...models.definition import Language, Word
 from ...search.corpus.manager import CorpusManager, get_corpus_manager
 from ...text import normalize_word
 from ...utils.logging import get_logger
@@ -128,7 +128,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
     async def _get_corpus_manager(self) -> CorpusManager:
         """Get or create corpus manager instance."""
         if self._corpus_manager is None:
-            self._corpus_manager = await get_corpus_manager()
+            self._corpus_manager = get_corpus_manager()
         return self._corpus_manager
 
     async def find_by_name(self, name: str, owner_id: str | None = None) -> WordList | None:
@@ -198,7 +198,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         if existing_count > 1:  # More than just the one we just created
             logger.debug(f"Invalidating wordlist names corpus (total wordlists: {existing_count})")
             corpus_manager = await self._get_corpus_manager()
-            await corpus_manager.invalidate_corpus(CorpusType.WORDLIST_NAMES, "global")
+            await corpus_manager.invalidate_corpus("wordlist_names_global")
         else:
             logger.debug("Skipping corpus invalidation - this is the first wordlist")
 
@@ -291,14 +291,13 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         # Create unified corpus with automatic semantic embeddings for small corpora
         corpus_manager = await self._get_corpus_manager()
-        internal_corpus_id = await corpus_manager.create_corpus(
-            corpus_type=CorpusType.WORDLIST,
-            corpus_id=str(wordlist.id),
-            words=word_texts,
-            ttl_hours=None,  # No expiration for wordlist corpora
+        corpus_name = f"wordlist_{wordlist.id}"
+        corpus = await corpus_manager.create_corpus(
+            corpus_name=corpus_name,
+            vocabulary=word_texts,
         )
         logger.debug(
-            f"Created unified corpus {internal_corpus_id[:8]} for wordlist {wordlist.id} with {len(word_texts)} words"
+            f"Created unified corpus {corpus.vocabulary_hash[:8]} for wordlist {wordlist.id} with {len(word_texts)} vocabulary items"
         )
 
     async def add_word(self, wordlist_id: PydanticObjectId, request: WordAddRequest) -> WordList:
@@ -316,7 +315,8 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         # Invalidate corpus cache for this wordlist since words changed
         corpus_manager = await self._get_corpus_manager()
-        await corpus_manager.invalidate_corpus(CorpusType.WORDLIST, str(wordlist_id))
+        corpus_name = f"wordlist_{wordlist_id}"
+        await corpus_manager.invalidate_corpus(corpus_name)
 
         return wordlist
 
@@ -336,7 +336,8 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         # Invalidate corpus cache for this wordlist since words changed
         corpus_manager = await self._get_corpus_manager()
-        await corpus_manager.invalidate_corpus(CorpusType.WORDLIST, str(wordlist_id))
+        corpus_name = f"wordlist_{wordlist_id}"
+        await corpus_manager.invalidate_corpus(corpus_name)
 
         return wordlist
 
@@ -355,7 +356,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         # Invalidate name corpus cache if name changed
         if data.name and data.name != original_name:
             corpus_manager = await self._get_corpus_manager()
-            await corpus_manager.invalidate_corpus(CorpusType.WORDLIST_NAMES, "global")
+            await corpus_manager.invalidate_corpus("wordlist_names_global")
 
         return updated_wordlist
 
@@ -366,8 +367,9 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         # Invalidate both corpus caches using unified manager
         corpus_manager = await self._get_corpus_manager()
-        await corpus_manager.invalidate_corpus(CorpusType.WORDLIST, str(id))
-        await corpus_manager.invalidate_corpus(CorpusType.WORDLIST_NAMES, "global")
+        corpus_name = f"wordlist_{id}"
+        await corpus_manager.invalidate_corpus(corpus_name)
+        await corpus_manager.invalidate_corpus("wordlist_names_global")
 
         return result
 
@@ -472,10 +474,10 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             raise ValueError(f"WordList with id {wordlist_id} not found")
 
         # Check if corpus already exists for this wordlist
-        corpus_name = f"wordlist-{str(wordlist_id)}"
-        existing_corpus = await self.corpus_repo.get_by_name(corpus_name)
+        corpus_name = f"wordlist_{wordlist_id}"
+        existing_corpus = await self.corpus_repo.get(corpus_name)
         if existing_corpus:
-            return existing_corpus
+            return corpus_name
 
         # Fetch Word documents to get text (word_ids are now ObjectIds)
         word_ids = [item.word_id for item in wordlist.words if item.word_id]
@@ -486,9 +488,8 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         word_texts = [word.text for word in words]
 
         return await self.corpus_repo.create_from_wordlist(
-            words=word_texts,
+            vocabulary=word_texts,
             name=corpus_name,
-            ttl_hours=ttl_hours,
         )
 
     async def search_wordlist_corpus(

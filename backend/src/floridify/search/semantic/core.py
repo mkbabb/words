@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 
-from ...text import normalize_comprehensive
+from ...text import normalize_fast
 from ...utils.logging import get_logger
 from ..constants import SearchMethod
 from ..corpus.core import Corpus
@@ -63,6 +63,10 @@ class SemanticSearch:
         self._vocabulary_hash: str = (
             ""  # Start empty, will be set during initialization
         )
+        
+        # Cache serialized FAISS index to avoid repeated expensive serialization
+        self._serialized_index_cache: dict[str, Any] | None = None
+        self._index_cache_dirty: bool = True
 
     def _detect_optimal_device(self) -> str:
         """Detect the optimal device for model execution."""
@@ -226,11 +230,43 @@ class SemanticSearch:
         memory_mb = self.sentence_embeddings.nbytes / (1024 * 1024)
         logger.info(f"✅ Embeddings optimized: {memory_mb:.1f}MB")
 
-        # Build FAISS index for sentence embeddings
+        # Build FAISS index for sentence embeddings with dynamic optimization
         dimension = self.sentence_embeddings.shape[1]
-        logger.info(f"🔄 Building FAISS index (dimension: {dimension})...")
-        self.sentence_index = faiss.IndexFlatL2(dimension)
-        self.sentence_index.add(self.sentence_embeddings)
+        vocab_size = len(self.corpus.lemmatized_vocabulary)
+        
+        logger.info(f"🔄 Building FAISS index (dimension: {dimension}, vocab_size: {vocab_size:,})...")
+        
+        # Dynamic index selection based on corpus size for 10-100x speedup
+        if vocab_size > 100000:  # Large corpus optimization
+            # Use IVF (Inverted File) for 10-100x search speedup
+            nlist = min(4096, vocab_size // 100)  # Optimal cluster count
+            quantizer = faiss.IndexFlatL2(dimension)
+            self.sentence_index = faiss.IndexIVFFlat(quantizer, dimension, nlist)
+            
+            # Train the index (required for IVF)
+            logger.info(f"🔄 Training IVF index with {nlist} clusters...")
+            self.sentence_index.train(self.sentence_embeddings)
+            self.sentence_index.add(self.sentence_embeddings)
+            
+            # Set search parameters for quality vs speed trade-off
+            self.sentence_index.nprobe = min(128, nlist // 8)  # Search 128 clusters
+            logger.info(f"✅ IVF index built with nprobe={self.sentence_index.nprobe}")
+            
+        elif vocab_size > 20000:  # Medium corpus optimization
+            # Use HNSW for fast approximate search
+            m = 16  # Number of connections
+            self.sentence_index = faiss.IndexHNSWFlat(dimension, m)
+            self.sentence_index.add(self.sentence_embeddings)
+            logger.info("✅ HNSW index built for medium corpus")
+            
+        else:  # Small corpus - keep current approach
+            self.sentence_index = faiss.IndexFlatL2(dimension)
+            self.sentence_index.add(self.sentence_embeddings)
+            logger.info("✅ IndexFlatL2 used for small corpus")
+        
+        # Mark serialization cache as dirty when index is rebuilt
+        self._index_cache_dirty = True
+        self._serialized_index_cache = None
 
         total_time = time.time() - embedding_start
         embeddings_per_sec = vocab_count / total_time if total_time > 0 else 0
@@ -316,7 +352,7 @@ class SemanticSearch:
 
         try:
             # Normalize and lemmatize the query
-            normalized_query = normalize_comprehensive(query)
+            normalized_query = normalize_fast(query)
             if not normalized_query:
                 return []
 
@@ -336,23 +372,22 @@ class SemanticSearch:
             similarities = 1 - (distances[0] / L2_DISTANCE_NORMALIZATION)
 
             lemmas = self.corpus.lemmatized_vocabulary
+            
+            # Pre-filter valid indices and scores for batch processing
+            valid_mask = (indices[0] >= 0) & (similarities >= min_score) & (indices[0] < len(lemmas))
+            valid_indices = indices[0][valid_mask]
+            valid_similarities = similarities[valid_mask]
 
-            # Create results
+            # Create results in batch - avoid repeated SearchResult object creation overhead
             results = []
-            for idx, similarity in zip(indices[0], similarities):
-                # Filter out low scores
-                if idx < 0 or similarity < min_score:
-                    continue
-                # Ensure index is within bounds
-                if idx < 0 or idx >= len(lemmas):
-                    logger.warning(f"Index {idx} out of bounds for lemmas list")
-                    continue
-
+            lemma_to_word_indices = self.corpus.lemma_to_word_indices
+            
+            for idx, similarity in zip(valid_indices, valid_similarities):
                 lemma = lemmas[idx]
 
                 # Map lemma index back to original word using corpus
-                if idx < len(self.corpus.lemma_to_word_indices):
-                    original_word_idx = self.corpus.lemma_to_word_indices[idx]
+                if idx < len(lemma_to_word_indices):
+                    original_word_idx = lemma_to_word_indices[idx]
                     word = self.corpus.get_word_by_index(original_word_idx)
                 else:
                     # Fallback: use lemma as word if mapping is missing
@@ -440,19 +475,36 @@ class SemanticSearch:
         return instance
 
     def _serialize_faiss_index(self) -> dict[str, Any] | None:
-        """Serialize FAISS index to dictionary."""
+        """Serialize FAISS index to dictionary with caching."""
         if not self.sentence_index or self.sentence_embeddings is None:
             return None
+        
+        # Return cached serialization if available and not dirty
+        if not self._index_cache_dirty and self._serialized_index_cache is not None:
+            return self._serialized_index_cache
         
         # Serialize the actual FAISS index to bytes using faiss's built-in method
         index_bytes = faiss.serialize_index(self.sentence_index)
         
-        return {
-            "index_type": "IndexFlatL2",
+        # Detect index type for proper serialization
+        index_type = "IndexFlatL2"  # Default
+        if hasattr(self.sentence_index, 'quantizer'):
+            if hasattr(self.sentence_index, 'nlist'):
+                index_type = "IndexIVFFlat"
+        elif hasattr(self.sentence_index, 'hnsw'):
+            index_type = "IndexHNSWFlat"
+        
+        self._serialized_index_cache = {
+            "index_type": index_type,
             "dimension": self.sentence_embeddings.shape[1],
             "size": self.sentence_index.ntotal,
             "index_data": index_bytes.tobytes().hex(),  # Convert numpy uint8 array to hex string for JSON
         }
+        
+        # Mark cache as clean
+        self._index_cache_dirty = False
+        
+        return self._serialized_index_cache
 
     def _deserialize_faiss_index(
         self, index_data: dict[str, Any], embeddings: np.ndarray

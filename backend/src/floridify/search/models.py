@@ -114,9 +114,6 @@ class SearchResult(BaseModel):
     method: SearchMethod = Field(
         ..., description="Search method used (exact, fuzzy, semantic)"
     )
-    is_phrase: bool = Field(
-        default=False, description="True if this is a multi-word phrase"
-    )
     language: Language | None = Field(None, description="Language code if applicable")
     metadata: dict[str, Any] | None = Field(None, description="Additional metadata")
 
@@ -132,7 +129,6 @@ class SearchResult(BaseModel):
                 "word": "example",
                 "score": 0.95,
                 "method": "exact",
-                "is_phrase": False,
                 "language": "en",
                 "metadata": {"frequency": 1000},
             }
