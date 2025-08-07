@@ -11,7 +11,7 @@ from datetime import timedelta
 from typing import Any, cast
 
 from ..caching.unified import UnifiedCache, get_unified
-from ..text import normalize_fast
+from ..text import normalize_comprehensive
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod
 from .corpus.core import Corpus
@@ -189,8 +189,8 @@ class SearchEngine:
         # Check if corpus has changed and update if needed
         await self._check_and_update_corpus()
         
-        # Normalize query
-        normalized_query = normalize_fast(query)
+        # Normalize query - use comprehensive to match corpus normalization
+        normalized_query = normalize_comprehensive(query)
         if not normalized_query.strip():
             return []
 
@@ -298,6 +298,20 @@ class SearchEngine:
         results = await self.search(word, max_results=1, min_score=0.0)
         return results[0] if results else None
 
+    def _get_original_word(self, normalized_word: str) -> str:
+        """Convert normalized word to original word with diacritics preserved."""
+        if not self.corpus:
+            return normalized_word
+        
+        try:
+            # Find the normalized word's index in vocabulary
+            normalized_idx = self.corpus.vocabulary.index(normalized_word)
+            # Return the original form
+            return self.corpus.get_original_word_by_index(normalized_idx)
+        except (ValueError, IndexError):
+            # Fallback to normalized form if not found
+            return normalized_word
+
     def _search_exact_sync(self, query: str) -> list[SearchResult]:
         """Exact string matching - synchronous."""
         if self.trie_search is None:
@@ -305,7 +319,7 @@ class SearchEngine:
         matches = self.trie_search.search_exact(query)
         return [
             SearchResult(
-                word=match,
+                word=self._get_original_word(match),  # Return original word with diacritics
                 lemmatized_word=None,
                 score=1.0,
                 method=SearchMethod.EXACT,
@@ -329,7 +343,7 @@ class SearchEngine:
             
             return [
                 SearchResult(
-                    word=match.word,
+                    word=self._get_original_word(match.word),  # Return original word with diacritics
                     lemmatized_word=None,
                     score=match.score,
                     method=SearchMethod.FUZZY,

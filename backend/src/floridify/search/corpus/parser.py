@@ -13,7 +13,7 @@ from io import StringIO
 from typing import Any
 
 from ...models.definition import Language
-from ...text import is_phrase, normalize_fast
+from ...text import is_phrase, normalize_comprehensive
 from ...utils.logging import get_logger
 from .constants import LexiconFormat
 
@@ -32,7 +32,7 @@ def parse_text_lines(content: str, language: Language) -> ParseResult:
         if not line or line.startswith("#"):
             continue
 
-        normalized = normalize_fast(line)
+        normalized = normalize_comprehensive(line)
         if not normalized:
             continue
 
@@ -60,7 +60,7 @@ def parse_frequency_list(content: str, language: Language) -> ParseResult:
             continue
 
         word = parts[0]
-        normalized = normalize_fast(word)
+        normalized = normalize_comprehensive(word)
         if not normalized:
             continue
 
@@ -104,7 +104,7 @@ def parse_json_idioms(content: str, language: Language) -> ParseResult:
         if not phrase_text:
             continue
 
-        normalized = normalize_fast(phrase_text)
+        normalized = normalize_comprehensive(phrase_text)
         if normalized and is_phrase(normalized):
             phrases.append(normalized)
 
@@ -123,7 +123,7 @@ def parse_json_dict(content: str, language: Language) -> ParseResult:
 
     if isinstance(data, dict):
         for key in data.keys():
-            normalized = normalize_fast(key)
+            normalized = normalize_comprehensive(key)
             if not normalized:
                 continue
 
@@ -148,7 +148,7 @@ def parse_json_array(content: str, language: Language) -> ParseResult:
     if isinstance(data, list):
         for item in data:
             if isinstance(item, str):
-                normalized = normalize_fast(item)
+                normalized = normalize_comprehensive(item)
                 if not normalized:
                     continue
 
@@ -194,7 +194,7 @@ def parse_csv_idioms(content: str, language: Language) -> ParseResult:
             if not idiom_text:
                 continue
 
-            normalized = normalize_fast(idiom_text)
+            normalized = normalize_comprehensive(idiom_text)
             if normalized and is_phrase(normalized):
                 phrases.append(normalized)
 
@@ -226,7 +226,7 @@ def parse_json_phrasal_verbs(content: str, language: Language) -> ParseResult:
                     # Clean up verb text
                     verb_text = verb_text.replace("*", "").replace("+", "").strip()
 
-                    normalized = normalize_fast(verb_text)
+                    normalized = normalize_comprehensive(verb_text)
                     if normalized and is_phrase(normalized):
                         phrases.append(normalized)
 
@@ -249,7 +249,7 @@ def parse_scraped_data(
     if "words" in content and isinstance(content["words"], list):
         for word in content["words"]:
             if isinstance(word, str):
-                normalized = normalize_fast(word)
+                normalized = normalize_comprehensive(word)
                 if normalized:
                     words.append(normalized)
 
@@ -260,7 +260,7 @@ def parse_scraped_data(
                 phrase_data if isinstance(phrase_data, str) else phrase_data.get("text", "")
             )
             if phrase_text:
-                normalized = normalize_fast(phrase_text)
+                normalized = normalize_comprehensive(phrase_text)
                 if normalized and is_phrase(normalized):
                     phrases.append(normalized)
 

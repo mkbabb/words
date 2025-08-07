@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 
-from ...text import normalize_fast
+from ...text import normalize_comprehensive
 from ...utils.logging import get_logger
 from ..constants import SearchMethod
 from ..corpus.core import Corpus
@@ -214,8 +214,26 @@ class SemanticSearch:
 
         embedding_start = time.time()
 
-        # Process all lemmas with optimizations
-        self.sentence_embeddings = self._encode(self.corpus.lemmatized_vocabulary)
+        # Generate embedding variants for better diacritic matching
+        from ...text.normalize import normalize_comprehensive
+        embedding_vocabulary = []
+        self.variant_mapping = {}  # Track which embeddings correspond to which lemmas
+        
+        for i, lemma in enumerate(self.corpus.lemmatized_vocabulary):
+            # Always include original lemma
+            embedding_vocabulary.append(lemma)
+            self.variant_mapping[len(embedding_vocabulary) - 1] = i
+            
+            # Add diacritic-free variant if different from original
+            diacritic_free = normalize_comprehensive(lemma)
+            if diacritic_free != lemma and diacritic_free.strip():
+                embedding_vocabulary.append(diacritic_free)
+                self.variant_mapping[len(embedding_vocabulary) - 1] = i
+        
+        logger.info(f"📈 Generated {len(embedding_vocabulary)} embedding variants from {len(self.corpus.lemmatized_vocabulary)} lemmas")
+        
+        # Process all variants with optimizations
+        self.sentence_embeddings = self._encode(embedding_vocabulary)
 
         # Safety check for empty embeddings
         if self.sentence_embeddings.size == 0:
@@ -351,8 +369,8 @@ class SemanticSearch:
             return []
 
         try:
-            # Normalize and lemmatize the query
-            normalized_query = normalize_fast(query)
+            # Normalize query to match corpus normalization
+            normalized_query = normalize_comprehensive(query)
             if not normalized_query:
                 return []
 
@@ -371,24 +389,41 @@ class SemanticSearch:
             # L2 distance range is [0, 2] for normalized vectors
             similarities = 1 - (distances[0] / L2_DISTANCE_NORMALIZATION)
 
-            lemmas = self.corpus.lemmatized_vocabulary
-            
-            # Pre-filter valid indices and scores for batch processing
-            valid_mask = (indices[0] >= 0) & (similarities >= min_score) & (indices[0] < len(lemmas))
-            valid_indices = indices[0][valid_mask]
+            # Pre-filter valid indices and scores for batch processing  
+            # Note: indices now refer to embedding vocabulary (with variants)
+            embedding_vocab_size = len(self.sentence_embeddings) if hasattr(self, 'sentence_embeddings') else 0
+            valid_mask = (indices[0] >= 0) & (similarities >= min_score) & (indices[0] < embedding_vocab_size)
+            valid_embedding_indices = indices[0][valid_mask]
             valid_similarities = similarities[valid_mask]
 
             # Create results in batch - avoid repeated SearchResult object creation overhead
             results = []
             lemma_to_word_indices = self.corpus.lemma_to_word_indices
+            seen_lemma_indices = set()  # Avoid duplicates when variants map to same lemma
             
-            for idx, similarity in zip(valid_indices, valid_similarities):
-                lemma = lemmas[idx]
+            for embedding_idx, similarity in zip(valid_embedding_indices, valid_similarities):
+                # Map embedding index back to original lemma index using variant mapping
+                if hasattr(self, 'variant_mapping') and embedding_idx in self.variant_mapping:
+                    original_lemma_idx = self.variant_mapping[embedding_idx]
+                else:
+                    # Fallback for backward compatibility (no variants)
+                    original_lemma_idx = embedding_idx
+                
+                # Skip if we've already seen this lemma (from another variant)
+                if original_lemma_idx in seen_lemma_indices:
+                    continue
+                seen_lemma_indices.add(original_lemma_idx)
+                
+                # Get the original lemma
+                if original_lemma_idx < len(self.corpus.lemmatized_vocabulary):
+                    lemma = self.corpus.lemmatized_vocabulary[original_lemma_idx]
+                else:
+                    continue  # Skip invalid indices
 
                 # Map lemma index back to original word using corpus
-                if idx < len(lemma_to_word_indices):
-                    original_word_idx = lemma_to_word_indices[idx]
-                    word = self.corpus.get_word_by_index(original_word_idx)
+                if original_lemma_idx < len(lemma_to_word_indices):
+                    original_word_idx = lemma_to_word_indices[original_lemma_idx]
+                    word = self.corpus.get_original_word_by_index(original_word_idx)  # Return original with diacritics
                 else:
                     # Fallback: use lemma as word if mapping is missing
                     word = lemma
@@ -431,6 +466,7 @@ class SemanticSearch:
             "semantic_metadata_id": (
                 str(self.semantic_metadata.id) if self.semantic_metadata else None
             ),
+            "variant_mapping": getattr(self, 'variant_mapping', {}),  # Include variant mapping
         }
 
     @classmethod
@@ -471,6 +507,9 @@ class SemanticSearch:
 
         # Restore metadata
         instance._vocabulary_hash = data.get("vocabulary_hash", "")
+        
+        # Restore variant mapping for diacritic variants
+        instance.variant_mapping = data.get("variant_mapping", {})
 
         return instance
 

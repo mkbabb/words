@@ -30,8 +30,12 @@ class Corpus:
         """Initialize empty corpus with given name."""
         self.corpus_name = corpus_name
         
-        # Core vocabulary data - single unified list
-        self.vocabulary: list[str] = []
+        # Core vocabulary data - dual storage for original preservation  
+        self.vocabulary: list[str] = []  # Normalized forms for search indexing
+        self.original_vocabulary: list[str] = []  # Original forms for display
+        
+        # Mapping between normalized and original forms
+        self.normalized_to_original_indices: dict[int, int] = {}  # normalized_idx -> original_idx
         
         # Computed data
         self.vocabulary_hash: str = ""
@@ -70,12 +74,30 @@ class Corpus:
         
         corpus = cls(corpus_name)
         
-        # Process vocabulary - use batch normalization with automatic parallelization
-        normalized_vocabulary = batch_normalize(vocabulary)
+        # Store original vocabulary for display purposes
+        corpus.original_vocabulary = vocabulary[:]  # Create copy to preserve originals
+        
+        # Process vocabulary - use comprehensive normalization for compile-time corpus building  
+        normalized_vocabulary = batch_normalize(vocabulary, use_comprehensive=True)
         corpus.vocabulary_hash = get_vocabulary_hash(normalized_vocabulary)
         
-        # Keep vocabulary unified - no separation
+        # Build normalized vocabulary and create mapping
         corpus.vocabulary = normalized_vocabulary
+        
+        # Create mapping from normalized index to original index
+        # Handle case where normalization might deduplicate entries
+        normalized_to_original_map = {}
+        for orig_idx, (original_word, normalized_word) in enumerate(zip(vocabulary, normalized_vocabulary)):
+            # Find the normalized word's index in the deduplicated vocabulary
+            try:
+                normalized_idx = corpus.vocabulary.index(normalized_word)
+                # Map normalized index to original index (first occurrence wins for duplicates)
+                if normalized_idx not in normalized_to_original_map:
+                    normalized_to_original_map[normalized_idx] = orig_idx
+            except ValueError:
+                continue  # Skip if normalized word not found (shouldn't happen)
+        
+        corpus.normalized_to_original_indices = normalized_to_original_map
         
         # Batch process lemmas with parallelization for large vocabularies
         vocab_count = len(normalized_vocabulary)
@@ -157,12 +179,28 @@ class Corpus:
 
 
     def get_word_by_index(self, index: int) -> str:
-        """Get word by index from vocabulary."""
+        """Get normalized word by index from vocabulary."""
         return self.vocabulary[index]
     
+    def get_original_word_by_index(self, normalized_index: int) -> str:
+        """Get original word by normalized index, preserving diacritics."""
+        if normalized_index in self.normalized_to_original_indices:
+            original_index = self.normalized_to_original_indices[normalized_index]
+            return self.original_vocabulary[original_index]
+        # Fallback to normalized form if mapping not found
+        return self.vocabulary[normalized_index] if 0 <= normalized_index < len(self.vocabulary) else ""
+    
     def get_words_by_indices(self, indices: list[int]) -> list[str]:
-        """Get multiple words by indices in single call - 3-5x faster than individual calls."""
+        """Get multiple normalized words by indices in single call - 3-5x faster than individual calls."""
         return [self.vocabulary[i] for i in indices if 0 <= i < len(self.vocabulary)]
+    
+    def get_original_words_by_indices(self, indices: list[int]) -> list[str]:
+        """Get multiple original words by normalized indices, preserving diacritics."""
+        result = []
+        for i in indices:
+            if 0 <= i < len(self.vocabulary):
+                result.append(self.get_original_word_by_index(i))
+        return result
 
     
     def get_candidates_optimized(
@@ -200,6 +238,8 @@ class Corpus:
         return {
             "corpus_name": self.corpus_name,
             "vocabulary": self.vocabulary,
+            "original_vocabulary": self.original_vocabulary,
+            "normalized_to_original_indices": self.normalized_to_original_indices,
             "vocabulary_hash": self.vocabulary_hash,
             "vocabulary_indices": self.vocabulary_indices,
             "vocabulary_stats": self.vocabulary_stats,
@@ -214,6 +254,8 @@ class Corpus:
         """Deserialize corpus from cached dictionary."""
         corpus = cls(data["corpus_name"])
         corpus.vocabulary = data["vocabulary"]
+        corpus.original_vocabulary = data.get("original_vocabulary", data["vocabulary"])  # Backwards compatibility
+        corpus.normalized_to_original_indices = data.get("normalized_to_original_indices", {})  # Backwards compatibility
         corpus.vocabulary_hash = data["vocabulary_hash"]
         corpus.vocabulary_indices = data["vocabulary_indices"]
         corpus.vocabulary_stats = data["vocabulary_stats"]

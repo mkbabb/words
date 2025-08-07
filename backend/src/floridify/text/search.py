@@ -13,7 +13,7 @@ import unicodedata
 from .constants import (
     WHITESPACE_PATTERN,
 )
-from .normalize import normalize_fast, normalize_word, remove_diacritics
+from .normalize import normalize_comprehensive, normalize_word, remove_diacritics
 
 
 def normalize_for_search(text: str) -> str:
@@ -31,8 +31,8 @@ def normalize_for_search(text: str) -> str:
     if not text:
         return ""
 
-    # Use fast normalization
-    normalized = normalize_fast(text, lowercase=True)
+    # Use comprehensive normalization for search consistency
+    normalized = normalize_comprehensive(text, lowercase=True)
 
     # Remove all punctuation for search
     normalized = re.sub(r"[^\w\s]", " ", normalized)
