@@ -21,9 +21,21 @@ export function useLookupContentState() {
   // Operation state
   const regeneratingDefinitionIndex = ref<number | null>(null)
   
+  // Progressive sidebar state (for scroll-based highlighting)
+  const sidebarActiveCluster = ref<string | null>('')
+  const sidebarActivePartOfSpeech = ref<string | null>('')
+  
   // ==========================================================================
   // ACTIONS
   // ==========================================================================
+  
+  const setSidebarActiveCluster = (cluster: string | null) => {
+    sidebarActiveCluster.value = cluster
+  }
+  
+  const setSidebarActivePartOfSpeech = (partOfSpeech: string | null) => {
+    sidebarActivePartOfSpeech.value = partOfSpeech
+  }
   
   const setCurrentEntry = (entry: SynthesizedDictionaryEntry | null) => {
     currentEntry.value = entry
@@ -212,6 +224,10 @@ export function useLookupContentState() {
     isStreamingData: readonly(isStreamingData),
     regeneratingDefinitionIndex: readonly(regeneratingDefinitionIndex),
     
+    // Progressive sidebar state
+    sidebarActiveCluster: readonly(sidebarActiveCluster),
+    sidebarActivePartOfSpeech: readonly(sidebarActivePartOfSpeech),
+    
     // Actions
     setCurrentEntry,
     setCurrentThesaurus,
@@ -227,6 +243,10 @@ export function useLookupContentState() {
     regenerateDefinitionComponent,
     regenerateExamples,
     refreshEntryImages,
+    
+    // Sidebar actions
+    setSidebarActiveCluster,
+    setSidebarActivePartOfSpeech,
     
     // State management
     getState,

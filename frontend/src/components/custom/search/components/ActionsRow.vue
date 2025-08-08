@@ -21,7 +21,7 @@
                 <p class="text-sm">{{ !noAI ? 'AI synthesis enabled' : 'Raw provider data only' }}</p>
             </HoverCardContent>
         </HoverCard>
-            
+
         <!-- Force Refresh Toggle -->
         <HoverCard v-if="showRefreshButton" :open-delay="200" :close-delay="100">
             <HoverCardTrigger as-child>
@@ -157,7 +157,7 @@ const emit = defineEmits<{
 
 // PWA composables
 // const { subscribeToPush } = usePWA();
-const { notifications } = useStores();
+const { notifications, lookupMode } = useStores();
 
 // Reactive window width for potential future use
 const windowWidth = ref(window.innerWidth);
@@ -178,6 +178,7 @@ const handleAIToggle = () => {
         aiAnimating.value = false;
     }, 600);
 };
+
 
 const handleClearStorage = () => {
     trashAnimating.value = true;

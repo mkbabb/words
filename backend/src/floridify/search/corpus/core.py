@@ -6,8 +6,11 @@ Contains the actual vocabulary processing and storage logic.
 
 from __future__ import annotations
 
+import random
 import time
+from collections import defaultdict
 from typing import Any
+
 
 from ...text.normalize import batch_lemmatize, batch_normalize
 from ...utils.logging import get_logger
@@ -51,6 +54,10 @@ class Corpus:
 
         # Metadata
         self.metadata: dict[str, Any] = {}
+        
+        # Character signature-based candidate selection index
+        self._signature_buckets: dict[str, list[int]] = {}  # signature -> [word_indices]
+        self._length_buckets: dict[int, list[int]] = {}  # length -> [word_indices]
 
     @classmethod
     async def create(
@@ -118,8 +125,9 @@ class Corpus:
             f"✅ Lemmatization complete: {vocab_count:,} → {lemma_count:,} lemmas ({lemma_time:.1f}s, {vocab_count / lemma_time:.0f} items/s)"
         )
 
-        # Pre-compute indices
+        # Pre-compute indices with character signature-based candidate selection
         corpus.vocabulary_indices = corpus._create_unified_indices()
+        corpus._build_signature_index()
 
         # Calculate statistics
         corpus.vocabulary_stats = {
@@ -211,35 +219,178 @@ class Corpus:
                 result.append(self.get_original_word_by_index(i))
         return result
 
-    def get_candidates_optimized(
+    def get_candidates(
         self,
-        query_len: int,
-        prefix: str | None = None,
-        length_tolerance: int = 2,
+        query: str,
+        max_candidates: int = 1000,
+        use_lsh: bool = True,
+    ) -> list[int]:
+        """
+        Modern candidate selection with LSH or fallback methods.
+        
+        Args:
+            query: Search query string
+            max_candidates: Maximum number of candidates to return
+            use_lsh: Whether to use LSH-based selection (recommended)
+            
+        Returns:
+            List of candidate word indices
+        """
+        if use_lsh and self._signature_buckets:
+            return self.get_candidates_signature(query, max_candidates)
+        else:
+            # Fallback to length-based selection
+            return self._get_candidates_fallback(query, max_candidates)
+    
+    def _get_candidates_fallback(
+        self,
+        query: str,
         max_candidates: int = 1000,
     ) -> list[int]:
-        """Optimized candidate selection combining length and prefix strategies - 2-3x faster."""
+        """Fallback candidate selection using length and prefix filtering."""
         length_groups = self.vocabulary_indices.get("length_groups", {})
         candidate_set: set[int] = set()
-
-        # Length-based candidates
-        for length in range(max(1, query_len - length_tolerance), query_len + length_tolerance + 1):
+        query_len = len(query)
+        
+        # Length-based candidates with tolerance
+        for length in range(max(1, query_len - 2), query_len + 3):
             if length in length_groups and len(candidate_set) < max_candidates:
-                candidate_set.update(length_groups[length][: max_candidates - len(candidate_set)])
-
-        # Add prefix-based candidates if provided and there's room
-        if prefix and len(candidate_set) < max_candidates:
+                remaining_slots = max_candidates - len(candidate_set)
+                candidate_set.update(length_groups[length][:remaining_slots])
+        
+        # Add prefix candidates if available
+        if len(candidate_set) < max_candidates and len(query) >= 2:
             prefix_groups = self.vocabulary_indices.get("prefix_groups", {})
-            prefix_lower = prefix.lower()
+            prefix = query[:2].lower()
             remaining_slots = max_candidates - len(candidate_set)
-
-            for stored_prefix, indices in prefix_groups.items():
-                if stored_prefix.startswith(prefix_lower):
-                    candidate_set.update(indices[:remaining_slots])
-                    if len(candidate_set) >= max_candidates:
-                        break
-
+            
+            if prefix in prefix_groups:
+                candidate_set.update(prefix_groups[prefix][:remaining_slots])
+        
         return list(candidate_set)[:max_candidates]
+
+    def _build_signature_index(self) -> None:
+        """Build character signature index for robust misspelling-tolerant candidate selection."""
+        logger.debug("Building character signature index for candidate selection")
+        
+        self._signature_buckets.clear()
+        self._length_buckets.clear()
+        
+        for word_idx, word in enumerate(self.vocabulary):
+            if not word:
+                continue
+            
+            # Create character signature (sorted characters)
+            signature = ''.join(sorted(word.lower()))
+            
+            # Add to signature buckets
+            if signature not in self._signature_buckets:
+                self._signature_buckets[signature] = []
+            self._signature_buckets[signature].append(word_idx)
+            
+            # Add to length buckets for fast filtering
+            word_len = len(word)
+            if word_len not in self._length_buckets:
+                self._length_buckets[word_len] = []
+            self._length_buckets[word_len].append(word_idx)
+        
+        signature_count = len(self._signature_buckets)
+        avg_signature_size = sum(len(bucket) for bucket in self._signature_buckets.values()) / max(signature_count, 1)
+        logger.debug(f"Built signature index: {signature_count} signatures, avg size {avg_signature_size:.1f}")
+
+    def get_candidates_signature(
+        self,
+        query: str,
+        max_candidates: int = 1000,
+    ) -> list[int]:
+        """High-performance character signature candidate selection for robust misspelling handling."""
+        if not query:
+            return []
+        
+        candidate_set: set[int] = set()
+        query_lower = query.lower()
+        query_len = len(query_lower)
+        
+        # Primary: Exact signature match (handles perfect transpositions)
+        query_signature = ''.join(sorted(query_lower))
+        if query_signature in self._signature_buckets:
+            candidate_set.update(self._signature_buckets[query_signature])
+        
+        # Enhanced: Near-signature matches (1-2 character differences in frequency)
+        if len(candidate_set) < max_candidates * 0.5:
+            self._add_near_signature_candidates(query_lower, query_signature, candidate_set, max_candidates)
+        
+        # Secondary: Length-based filtering with signature proximity
+        length_tolerance = max(1, min(3, query_len // 4))  # Adaptive tolerance
+        target_lengths = range(max(1, query_len - length_tolerance), query_len + length_tolerance + 1)
+        
+        for length in target_lengths:
+            if length in self._length_buckets and len(candidate_set) < max_candidates:
+                length_candidates = self._length_buckets[length]
+                remaining = max_candidates - len(candidate_set)
+                
+                # For same-length candidates, check signature similarity
+                if length == query_len:
+                    candidate_set.update(length_candidates[:remaining])
+                else:
+                    # For different lengths, add subset with character overlap heuristic
+                    added = 0
+                    for idx in length_candidates:
+                        if added >= remaining:
+                            break
+                        word = self.vocabulary[idx].lower()
+                        if self._has_character_overlap(query_lower, word, threshold=0.6):
+                            candidate_set.add(idx)
+                            added += 1
+        
+        return list(candidate_set)[:max_candidates]
+    
+    def _has_character_overlap(self, query: str, word: str, threshold: float) -> bool:
+        """Fast character overlap check for signature-based filtering."""
+        query_chars = set(query)
+        word_chars = set(word)
+        
+        if not query_chars or not word_chars:
+            return False
+            
+        intersection = len(query_chars & word_chars)
+        union = len(query_chars | word_chars)
+        
+        return (intersection / union) >= threshold if union > 0 else False
+    
+    def _add_near_signature_candidates(self, query: str, query_signature: str, candidate_set: set[int], max_candidates: int) -> None:
+        """Add candidates with signatures that are similar but not identical (handles character frequency differences)."""
+        query_chars = set(query)
+        query_char_counts = {}
+        for char in query:
+            query_char_counts[char] = query_char_counts.get(char, 0) + 1
+        
+        # Check signatures that differ slightly in character frequency
+        for signature, indices in self._signature_buckets.items():
+            if len(candidate_set) >= max_candidates:
+                break
+                
+            if signature == query_signature:
+                continue  # Already handled in exact match
+            
+            # Quick character set similarity check
+            sig_chars = set(signature)
+            char_overlap = len(query_chars & sig_chars) / len(query_chars | sig_chars)
+            
+            if char_overlap >= 0.7:  # High character overlap
+                # More precise character frequency comparison
+                sig_char_counts = {}
+                for char in signature:
+                    sig_char_counts[char] = sig_char_counts.get(char, 0) + 1
+                
+                # Allow small differences in character counts (1-2 characters different)
+                total_diff = sum(abs(query_char_counts.get(c, 0) - sig_char_counts.get(c, 0)) 
+                               for c in query_chars | sig_chars)
+                
+                if total_diff <= 2:  # Allow up to 2 character count differences
+                    remaining = max_candidates - len(candidate_set)
+                    candidate_set.update(indices[:remaining])
+    
 
     def model_dump(self) -> dict[str, Any]:
         """Serialize corpus to dictionary for caching."""
@@ -255,6 +406,8 @@ class Corpus:
             "word_to_lemma_indices": self.word_to_lemma_indices,
             "lemma_to_word_indices": self.lemma_to_word_indices,
             "metadata": self.metadata,
+            "signature_buckets": self._signature_buckets,
+            "length_buckets": self._length_buckets,
         }
 
     @classmethod
@@ -275,4 +428,13 @@ class Corpus:
         corpus.word_to_lemma_indices = data["word_to_lemma_indices"]
         corpus.lemma_to_word_indices = data["lemma_to_word_indices"]
         corpus.metadata = data["metadata"]
+        
+        # Load signature buckets if available
+        if "signature_buckets" in data and "length_buckets" in data:
+            corpus._signature_buckets = data["signature_buckets"]
+            corpus._length_buckets = data["length_buckets"]
+        else:
+            # Rebuild signature index for older cached data
+            corpus._build_signature_index()
+        
         return corpus

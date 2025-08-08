@@ -51,6 +51,15 @@
                         : undefined,
                 }"
             >
+                <!-- Border shimmer overlay in AI mode -->
+                <BorderShimmer
+                  v-if="searchBar.isAIQuery && !searchBar.hasErrorAnimation"
+                  :active="true"
+                  color="rgb(251 191 36)"
+                  :thickness="3"
+                  :border-width="2"
+                  :duration="2400"
+                />
                 <!-- Sparkle Indicator -->
                 <SparkleIndicator :show="searchBar.showSparkle" />
 
@@ -300,6 +309,7 @@ import { useUIStore } from '@/stores/ui/ui-state';
 import { useLoadingStore } from '@/stores/ui/loading';
 import { Maximize2, X } from 'lucide-vue-next';
 import { HamburgerIcon } from '@/components/custom/icons';
+import { BorderShimmer } from '@/components/custom/animation';
 
 // Import components
 import SearchInput from './components/SearchInput.vue';
@@ -321,7 +331,6 @@ import {
     useSearchBarScroll,
     useAutocomplete
 } from './composables';
-import { shouldTriggerAIMode } from './utils/ai-query';
 
 interface SearchBarProps {
     className?: string;
@@ -694,22 +703,18 @@ onMounted(async () => {
     watchEffect(() => {
         const focused = searchBar.isFocused;
         const query = searchBar.searchQuery;
-        const isAI = searchBar.isAIQuery;
         
         // Only hide dropdown for specific conditions, let search operations show it
-        if (!focused || !query || query.length === 0 || isAI) {
+        // Don't hide for AI mode - let it show AI suggestions
+        if (!focused || !query || query.length === 0) {
             if (searchBar.showDropdown) {
-                console.log('🔍 Hiding dropdown - no focus/query or AI mode');
+                console.log('🔍 Hiding dropdown - no focus/query');
                 searchBar.hideDropdown();
             }
         }
     });
 
-    // Check current query for AI mode on page load (in lookup mode only)
-    if (searchBar.searchMode === 'lookup' && searchBar.searchQuery) {
-        // AI mode is automatically computed by search bar store based on query
-        shouldTriggerAIMode(searchBar.searchQuery); // Validate query pattern
-    }
+    // AI mode detection is now handled in the lookup store itself
 
     // Initialize AI suggestions using the store action
     searchBar.setAISuggestions([]);

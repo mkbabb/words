@@ -173,10 +173,10 @@ def parse_search_params(
     )
 
 
-@cached_api_call(
-    ttl_hours=1.0,
-    key_prefix="search",
-)
+# @cached_api_call(
+#     ttl_hours=1.0,
+#     key_prefix="search",
+# )
 async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
     """Cached search implementation."""
     logger.info(f"Searching for '{query}' in {params.language.value} (mode={params.mode.value})")

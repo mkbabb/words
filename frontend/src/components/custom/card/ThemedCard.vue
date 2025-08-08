@@ -17,6 +17,17 @@
       class="absolute top-1.5 right-1.5 z-30 h-6 w-6"
     />
 
+    <!-- Border Shimmer (optional) -->
+    <BorderShimmer
+      v-if="borderShimmer && variant && variant !== 'default'"
+      class="pointer-events-none"
+      :active="true"
+      :color="borderColor"
+      :thickness="3"
+      :border-width="2"
+      :duration="2800"
+    />
+
     <!-- Sparkle Animation Overlay -->
     <div 
       v-if="variant && variant !== 'default'" 
@@ -32,6 +43,7 @@
 <script setup lang="ts">
 import { toRefs, computed } from 'vue'
 import { StarIcon } from '@/components/custom/icons'
+import { BorderShimmer } from '@/components/custom/animation'
 import Card from './Card.vue'
 import type { CardVariant, TextureType, TextureIntensity } from '@/types'
 
@@ -42,6 +54,7 @@ interface Props {
   textureType?: TextureType
   textureIntensity?: TextureIntensity
   hideStar?: boolean
+  borderShimmer?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -51,23 +64,26 @@ const props = withDefaults(defineProps<Props>(), {
   textureType: 'clean',
   textureIntensity: 'subtle',
   hideStar: false,
+  borderShimmer: true,
 })
 
 // Clean prop handling
-const { variant, className, textureEnabled, textureType, textureIntensity, hideStar } = toRefs(props)
+const { variant, className, textureEnabled, textureType, textureIntensity, hideStar, borderShimmer } = toRefs(props)
 
 // Generate random variations for sparkle animation and gradient patterns
 const sparkleStyle = computed((): Record<string, string | number> => {
   if (!variant.value || variant.value === 'default') return {}
   
   // Generate shorter delays for more visible sparkle animation
-  const delay1 = Math.random() * 2 + 0.5 // 0.5-2.5 seconds
-  const delay2 = Math.random() * 3 + 1 // 1-4 seconds
+  const delay1 = Math.random() * 4 + 2 // 2-6 seconds
+  const delay2 = Math.random() * 6 + 3 // 3-9 seconds
   
   // Generate random offsets for gradient patterns to make each card unique
   const gradientOffset1 = Math.random() * 40 - 20 // -20px to +20px
   const gradientOffset2 = Math.random() * 60 - 30 // -30px to +30px
   const scaleVariation = 0.8 + Math.random() * 0.4 // 0.8 to 1.2 scale
+  const shimmerDuration = Math.floor(14000 + Math.random() * 10000) // 14-24s
+  const sparkleOpacity = (0.14 + Math.random() * 0.08).toFixed(2) // 0.14-0.22
   
   return {
     '--sparkle-delay': `${delay1}s`,
@@ -75,6 +91,22 @@ const sparkleStyle = computed((): Record<string, string | number> => {
     '--gradient-offset-1': `${gradientOffset1}px`,
     '--gradient-offset-2': `${gradientOffset2}px`,
     '--gradient-scale': scaleVariation.toString(),
+    '--shimmer-duration': `${shimmerDuration}ms`,
+    '--sparkle-opacity': sparkleOpacity,
+  }
+})
+
+// Choose border shimmer color based on variant
+const borderColor = computed(() => {
+  switch (variant.value) {
+    case 'gold':
+      return 'rgb(251 191 36)'
+    case 'silver':
+      return 'rgb(203 213 225)'
+    case 'bronze':
+      return 'rgb(251 146 60)'
+    default:
+      return 'rgb(99 102 241)'
   }
 })
 </script>

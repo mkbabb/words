@@ -112,14 +112,14 @@ import {
 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 
-import type { SortCriterion, SortField, SortOption } from '@/types';
+import type { AdvancedSortCriterion, SortField, SortOption } from '@/types';
 
 const props = defineProps<{
-  modelValue: SortCriterion[];
+  modelValue: AdvancedSortCriterion[];
 }>();
 
 const emit = defineEmits<{
-  'update:modelValue': [criteria: SortCriterion[]];
+  'update:modelValue': [criteria: AdvancedSortCriterion[]];
 }>();
 
 // Local state
@@ -189,7 +189,7 @@ const addCriterion = (field: SortField) => {
   const option = availableOptions.find(opt => opt.field === field);
   if (!option) return;
   
-  const newCriterion: SortCriterion = {
+  const newCriterion: AdvancedSortCriterion = {
     id: `${field}-${Date.now()}`,
     field,
     direction: option.defaultDirection

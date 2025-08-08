@@ -1,7 +1,5 @@
 import type { 
-  SearchMode, 
-  SearchSubMode, 
-  SearchSubModeMap,
+  SearchMode,
   SynthesizedDictionaryEntry,
   ThesaurusEntry,
   WordSuggestionResponse,

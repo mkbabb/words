@@ -6,8 +6,7 @@ export const searchApi = {
   async search(query: string, options?: {
     max_results?: number;
     min_score?: number;
-    semantic?: boolean;
-    semantic_weight?: number;
+    mode?: 'smart' | 'exact' | 'fuzzy' | 'semantic';
     signal?: AbortSignal;
   }): Promise<SearchResult[]> {
     try {
@@ -17,8 +16,7 @@ export const searchApi = {
         return {
           max_results: options?.max_results || (length <= 4 ? 12 : 8),
           min_score: options?.min_score || (length <= 4 ? 0.2 : length <= 6 ? 0.25 : 0.3),
-          semantic: options?.semantic || false,
-          semantic_weight: options?.semantic_weight || 0.7,
+          mode: options?.mode || 'smart',
         };
       };
 

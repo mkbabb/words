@@ -1,8 +1,13 @@
 // PWA Service Manager with iOS-specific features
 export class PWAService {
   private registration: ServiceWorkerRegistration | null = null;
-  private updateAvailable = false;
+  private _updateAvailable = false;
   private refreshing = false;
+  
+  // Getter for update availability
+  public get updateAvailable(): boolean {
+    return this._updateAvailable;
+  }
   
   // Store references to event listeners for cleanup
   private listeners: Array<{ target: EventTarget; type: string; handler: EventListener }> = [];
@@ -38,7 +43,7 @@ export class PWAService {
         if (newWorker) {
           this.addEventListener(newWorker, 'statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              this.updateAvailable = true;
+              this._updateAvailable = true;
               this.notifyUpdateAvailable();
             }
           });
@@ -102,7 +107,8 @@ export class PWAService {
     }
 
     try {
-      await this.registration!.sync.register('sync-searches');
+      // @ts-ignore - sync API may not be available in all browsers
+      await this.registration!.sync?.register('sync-searches');
       console.log('Background sync registered');
     } catch (error: unknown) {
       console.error('Background sync registration failed:', error);
@@ -302,7 +308,7 @@ export class PWAService {
     
     // Clear registration
     this.registration = null;
-    this.updateAvailable = false;
+    this._updateAvailable = false;
     this.refreshing = false;
   }
 }

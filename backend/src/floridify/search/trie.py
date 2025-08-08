@@ -7,6 +7,8 @@ Provides exact matching and autocomplete functionality with frequency-based rank
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import timedelta
 from typing import Any
 
@@ -72,13 +74,17 @@ class TrieSearch:
             logger.debug(f"Trie already built for vocabulary: {vocab_hash[:8]}")
             return
 
-        # Try to load from cache
+        # Load from cache with integrity verification
         cached_trie = await self._load_from_cache(vocab_hash)
         if cached_trie:
-            logger.info(f"Loaded trie from cache: {vocab_hash[:8]}")
-            self.model_load(cached_trie)
-            self._vocabulary_hash = vocab_hash
-            return
+            try:
+                self.model_load(cached_trie)
+                self._vocabulary_hash = vocab_hash
+                logger.info(f"Loaded verified trie from cache: {vocab_hash[:8]}")
+                return
+            except ValueError as e:
+                logger.warning(f"Cache integrity failed: {e}, rebuilding trie")
+                # Cache was corrupted, continue to rebuild
 
         logger.info(f"Building new trie: {vocab_hash[:8]} ({len(words)} words)")
 
@@ -177,10 +183,10 @@ class TrieSearch:
 
     def model_dump(self) -> dict[str, Any]:
         """
-        Export trie state in a format similar to Pydantic's model_dump.
+        Export trie state with integrity checks and robust serialization.
 
         Returns:
-            Dictionary containing trie state
+            Dictionary containing trie state with integrity verification
         """
         if not self._trie:
             return {
@@ -189,23 +195,66 @@ class TrieSearch:
                 "word_count": 0,
                 "max_frequency": 0,
                 "vocabulary_hash": self._vocabulary_hash,
+                "format_version": "2.0",
+                "integrity_hash": None,
             }
 
-        return {
-            "trie_data": list(self._trie),
+        # Extract trie data with UTF-8 validation
+        trie_words = []
+        for word in self._trie:
+            try:
+                # Ensure word is valid UTF-8 and can be JSON serialized
+                word.encode('utf-8').decode('utf-8')
+                trie_words.append(word)
+            except (UnicodeError, UnicodeDecodeError, UnicodeEncodeError):
+                logger.warning(f"Skipping non-UTF-8 word during trie serialization: {repr(word)}")
+                continue
+
+        # Sort for deterministic output and integrity
+        trie_words_sorted = sorted(trie_words)
+        
+        # Create data payload
+        data_payload = {
+            "trie_data": trie_words_sorted,
             "frequencies": self._word_frequencies.copy(),
-            "word_count": self._word_count,
+            "word_count": len(trie_words_sorted),
             "max_frequency": self._max_frequency,
             "vocabulary_hash": self._vocabulary_hash,
+            "format_version": "2.0",
         }
+        
+        # Calculate integrity hash for corruption detection
+        data_str = json.dumps(data_payload, sort_keys=True, separators=(',', ':'))
+        integrity_hash = hashlib.sha256(data_str.encode()).hexdigest()
+        data_payload["integrity_hash"] = integrity_hash
+        
+        return data_payload
 
     def model_load(self, data: dict[str, Any]) -> None:
         """
-        Load trie state from a dictionary, similar to Pydantic.
+        Load trie state with integrity verification and corruption detection.
 
         Args:
             data: Dictionary containing trie state
+
+        Raises:
+            ValueError: If cache is corrupted or integrity check fails
         """
+        # Check format version for backwards compatibility
+        format_version = data.get("format_version", "1.0")
+        
+        if format_version == "2.0":
+            # Verify integrity for v2.0 format
+            stored_hash = data.get("integrity_hash")
+            if stored_hash:
+                # Recreate hash without integrity_hash field
+                check_data = {k: v for k, v in data.items() if k != "integrity_hash"}
+                data_str = json.dumps(check_data, sort_keys=True, separators=(',', ':'))
+                computed_hash = hashlib.sha256(data_str.encode()).hexdigest()
+                
+                if computed_hash != stored_hash:
+                    raise ValueError(f"Trie cache integrity check failed: {computed_hash[:8]} != {stored_hash[:8]}")
+
         words = data.get("trie_data", [])
         self._word_frequencies = data.get("frequencies", {})
         self._word_count = data.get("word_count", 0)
@@ -213,7 +262,15 @@ class TrieSearch:
         self._vocabulary_hash = data.get("vocabulary_hash")
 
         if words:
-            self._trie = marisa_trie.Trie(words)
+            # Validate and construct trie
+            valid_words = [w for w in words if isinstance(w, str) and w.strip()]
+            if not valid_words:
+                raise ValueError("No valid words found in trie cache data")
+            
+            # Deduplicate and sort for consistent construction
+            sorted_words = sorted(set(valid_words))
+            self._trie = marisa_trie.Trie(sorted_words)
+            logger.debug(f"Loaded trie from cache: {len(sorted_words)} words, integrity verified")
         else:
             self._trie = None
 
@@ -233,15 +290,30 @@ class TrieSearch:
         logger.debug(f"Saved trie to cache: {vocab_hash[:8]}")
 
     async def _load_from_cache(self, vocab_hash: str) -> dict[str, Any] | None:
-        """Load trie from cache."""
-        # Get cache
+        """Load trie from cache with integrity verification."""
         if self._cache is None:
             self._cache = await get_unified()
 
-        cached_data = await self._cache.get("trie", vocab_hash)
-
-        if cached_data:
-            logger.debug(f"Loaded trie from cache: {vocab_hash[:8]}")
-            return cached_data  # type: ignore[no-any-return]
-
+        try:
+            cached_data = await self._cache.get("trie", vocab_hash)
+            if cached_data:
+                # Verify integrity before returning
+                format_version = cached_data.get("format_version", "1.0")
+                if format_version == "2.0":
+                    stored_hash = cached_data.get("integrity_hash")
+                    if stored_hash:
+                        check_data = {k: v for k, v in cached_data.items() if k != "integrity_hash"}
+                        data_str = json.dumps(check_data, sort_keys=True, separators=(',', ':'))
+                        computed_hash = hashlib.sha256(data_str.encode()).hexdigest()
+                        
+                        if computed_hash != stored_hash:
+                            logger.warning(f"Cache integrity check failed for {vocab_hash[:8]}, discarding")
+                            await self._cache.delete("trie", vocab_hash)
+                            return None
+                
+                logger.debug(f"Loaded verified trie from cache: {vocab_hash[:8]}")
+                return cached_data  # type: ignore[no-any-return]
+        except Exception as e:
+            logger.warning(f"Cache load failed for {vocab_hash[:8]}: {e}")
+            
         return None

@@ -17,7 +17,7 @@ export function shouldTriggerAIMode(queryText: string): boolean {
     
     // Don't trigger for short phrases that are likely dictionary lookups
     const wordCount = lowerQuery.split(/\s+/).length;
-    if (wordCount <= 3 && lowerQuery.length < 20) {
+    if (wordCount <= 2 && lowerQuery.length < 20) {
         return false;
     }
     
@@ -32,7 +32,7 @@ export function shouldTriggerAIMode(queryText: string): boolean {
     // Check for number requests (e.g., "10 words about...")
     const hasNumberRequest = /\b\d+\s+words?\b/.test(lowerQuery);
     
-    return hasQuestionWord || hasAIPattern || hasNumberRequest || wordCount > 4;
+    return hasQuestionWord || hasAIPattern || hasNumberRequest || wordCount > 2;
 }
 
 /**

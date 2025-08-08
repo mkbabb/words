@@ -185,6 +185,12 @@ class SearchEngine:
 
             if self.trie_search:
                 await self.trie_search.build_index(combined_vocab)
+            
+            # Update fuzzy search if it exists
+            if self.fuzzy_search:
+                # Note: FuzzySearch doesn't store vocabulary internally, it uses corpus on demand
+                # So we don't need to rebuild it, but we should ensure it's available
+                pass
 
             # Update semantic search if enabled
             if self.semantic_search and updated_corpus:

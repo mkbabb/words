@@ -80,7 +80,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // Add global error handler for Reka UI getBoundingClientRect errors
-app.config.errorHandler = (err, vm, info) => {
+app.config.errorHandler = (err, _vm, info) => {
   // Check if this is the specific Reka UI getBoundingClientRect error
   if (err instanceof TypeError && 
       err.message.includes("Cannot read properties of null (reading 'getBoundingClientRect')")) {

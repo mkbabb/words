@@ -1,29 +1,69 @@
 <template>
-  <span :class="textClass">
-    {{ text }}
+  <span
+    :class="computedClass"
+    :style="computedStyle"
+    role="status"
+    aria-live="polite"
+  >
+    <slot>{{ text }}</slot>
   </span>
+  
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+
 interface Props {
-  text: string
+  text?: string
   textClass?: string
+  /** Duration in ms for one sweep */
   duration?: number
-  interval?: number
+  /** Delay in ms before starting */
   delay?: number
+  /** If provided, applies Tailwind gradient classes to control colors (e.g. 'from-amber-400/20 via-white/90 to-amber-600/20') */
+  gradientClass?: string | null
+  /** Reverse sweep direction */
+  reverse?: boolean
+  /** Disable animation (e.g. for reduced motion) */
+  disabled?: boolean
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
+  text: '',
   textClass: '',
-  duration: 1000,
-  interval: 5000,
-  delay: 0
+  duration: 2000,
+  delay: 0,
+  gradientClass: null,
+  reverse: false,
+  disabled: false,
 })
 
-// Shimmer functionality commented out for now
-// Will reimplement later
+const computedClass = computed(() => {
+  // If gradientClass provided, use gradient-based shimmer
+  if (props.gradientClass) {
+    return [
+      props.textClass,
+      'bg-clip-text text-transparent bg-gradient-to-r',
+      // Allow consumer control with Tailwind utilities
+      props.gradientClass,
+      props.disabled ? '' : 'animate-[shimmer-sweep_var(--shimmer-duration)_ease-in-out_infinite] bg-[length:200%_100%]'
+    ].filter(Boolean).join(' ')
+  }
+  // Default to CSS utility defined in assets/index.css
+  return [props.textClass, props.disabled ? '' : 'shimmer-text'].filter(Boolean).join(' ')
+})
+
+const computedStyle = computed(() => {
+  const style: Record<string, string> = {}
+  // Control animation timing using CSS var for both modes
+  style['--shimmer-duration'] = `${props.duration}ms`
+  if (props.delay) style.animationDelay = `${props.delay}ms`
+  if (props.reverse) style.animationDirection = 'reverse'
+  return style
+})
 </script>
 
 <style scoped>
-/* Shimmer styles commented out for now */
+/* Fallback keyframes to ensure animation name resolves even if tree-shaken */
+@keyframes shimmer-sweep { from { background-position: -200% 0; } to { background-position: 200% 0; } }
 </style>

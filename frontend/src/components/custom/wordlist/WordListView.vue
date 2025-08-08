@@ -214,17 +214,6 @@ const dueForReview = computed(() => {
 
 // Methods
 
-// Convert UI filters to mastery levels array for API
-const getMasteryLevelsFromFilters = () => {
-  const filterValues = filters.value;
-  const levels = [];
-  if (filterValues.showBronze) levels.push('bronze');
-  if (filterValues.showSilver) levels.push('silver');
-  if (filterValues.showGold) levels.push('gold');
-  // If all are selected or none are selected, return undefined (show all)
-  return levels.length === 3 || levels.length === 0 ? undefined : levels;
-};
-
 const handleWordClick = async (word: WordListItem) => {
   // Switch to lookup mode and navigate to definition route
   searchBarStore.setMode('lookup');
@@ -361,6 +350,7 @@ const triggerWordlistSearch = async () => {
     const wordlistId = wordlistMode.selectedWordlist;
     const query = searchBar.searchQuery.trim();
     
+    isLoadingWords.value = true;
     try {
       let results: any[] = [];
       if (!query) {
@@ -371,7 +361,38 @@ const triggerWordlistSearch = async () => {
       
       wordlistMode.setResults(results);
       
-      if (results.length > 0 && query) {
+      // Apply filters immediately after loading
+      let filteredResults = [...results];
+      
+      // Apply mastery level filters
+      if (!filters.value.showBronze || !filters.value.showSilver || !filters.value.showGold) {
+        filteredResults = filteredResults.filter((word: any) => {
+          if (word.mastery_level === 'bronze' && !filters.value.showBronze) return false;
+          if (word.mastery_level === 'silver' && !filters.value.showSilver) return false;
+          if (word.mastery_level === 'gold' && !filters.value.showGold) return false;
+          return true;
+        });
+      }
+      
+      // Apply hot/due filters
+      if (filters.value.showHotOnly) {
+        filteredResults = filteredResults.filter((word: any) => word.temperature === 'hot');
+      }
+      if (filters.value.showDueOnly) {
+        const now = new Date();
+        filteredResults = filteredResults.filter((word: any) => 
+          new Date(word.review_data?.next_review_date) <= now
+        );
+      }
+      
+      // Update currentWords with filtered results
+      currentWords.value = filteredResults.map((item: any, index: number) => ({
+        ...item,
+        _uniqueId: `${item.word}-${index}-${Date.now()}` // Add unique key for Vue
+      }));
+      totalWords.value = filteredResults.length;
+      
+      if (filteredResults.length > 0 && query) {
         searchBar.openDropdown();
         searchBar.setSelectedIndex(0);
       } else if (!query) {
@@ -381,6 +402,10 @@ const triggerWordlistSearch = async () => {
       console.error('Wordlist search error:', error);
       wordlistMode.clearResults();
       searchBar.hideDropdown();
+      currentWords.value = [];
+      totalWords.value = 0;
+    } finally {
+      isLoadingWords.value = false;
     }
   }
 };
@@ -397,11 +422,41 @@ const loadMoreWords = async () => {
 
 
 // Watch for filter changes and reload
-watch(filters, () => {
+watch(filters, async () => {
   // Reset to first page and reload when filters change
   currentPage.value = 0;
   if (wordlistMode.selectedWordlist) {
-    triggerWordlistSearch();
+    // Apply filters client-side since API doesn't support filtering yet
+    const allResults = wordlistMode.results;
+    let filteredResults = [...allResults];
+    
+    // Apply mastery level filters
+    if (!filters.value.showBronze || !filters.value.showSilver || !filters.value.showGold) {
+      filteredResults = filteredResults.filter((word: any) => {
+        if (word.mastery_level === 'bronze' && !filters.value.showBronze) return false;
+        if (word.mastery_level === 'silver' && !filters.value.showSilver) return false;
+        if (word.mastery_level === 'gold' && !filters.value.showGold) return false;
+        return true;
+      });
+    }
+    
+    // Apply hot/due filters
+    if (filters.value.showHotOnly) {
+      filteredResults = filteredResults.filter((word: any) => word.temperature === 'hot');
+    }
+    if (filters.value.showDueOnly) {
+      const now = new Date();
+      filteredResults = filteredResults.filter((word: any) => 
+        new Date(word.review_data?.next_review_date) <= now
+      );
+    }
+    
+    // Update displayed words
+    currentWords.value = filteredResults.map((item: any, index: number) => ({
+      ...item,
+      _uniqueId: `${item.word}-${index}-${Date.now()}`
+    }));
+    totalWords.value = filteredResults.length;
   }
 }, { deep: true });
 
@@ -409,17 +464,56 @@ watch(filters, () => {
 watch(sortCriteria, () => {
   // Reset to first page and reload when sort changes
   currentPage.value = 0;
-  if (wordlistMode.selectedWordlist) {
-    triggerWordlistSearch();
+  if (wordlistMode.selectedWordlist && currentWords.value.length > 0) {
+    // Apply sorting client-side
+    const sorted = [...currentWords.value];
+    
+    // Sort by each criteria in order
+    sortCriteria.value.forEach((criterion: any) => {
+      sorted.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch (criterion.key) {
+          case 'word':
+            aVal = a.word.toLowerCase();
+            bVal = b.word.toLowerCase();
+            break;
+          case 'mastery':
+            const masteryOrder = { bronze: 0, silver: 1, gold: 2 };
+            aVal = masteryOrder[a.mastery_level as keyof typeof masteryOrder] || 0;
+            bVal = masteryOrder[b.mastery_level as keyof typeof masteryOrder] || 0;
+            break;
+          case 'temperature':
+            const tempOrder = { cold: 0, warm: 1, hot: 2 };
+            aVal = tempOrder[a.temperature as keyof typeof tempOrder] || 0;
+            bVal = tempOrder[b.temperature as keyof typeof tempOrder] || 0;
+            break;
+          case 'next_review':
+            aVal = new Date(a.review_data?.next_review_date || 0).getTime();
+            bVal = new Date(b.review_data?.next_review_date || 0).getTime();
+            break;
+          case 'created':
+            aVal = new Date(a.created_at || 0).getTime();
+            bVal = new Date(b.created_at || 0).getTime();
+            break;
+          default:
+            return 0;
+        }
+        
+        const result = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+        return criterion.order === 'desc' ? -result : result;
+      });
+    });
+    
+    // Update displayed words with sorted results
+    currentWords.value = sorted;
   }
 }, { deep: true });
 
 // Lifecycle
 onMounted(async () => {
-  if (wordlistMode.selectedWordlist) {
-    await loadWordlistMeta(wordlistMode.selectedWordlist);
-    triggerWordlistSearch();
-  }
+  // The watcher with immediate: true will handle initial load
+  console.log('WordListView mounted, selectedWordlist:', wordlistMode.selectedWordlist);
 });
 
 onUnmounted(() => {
@@ -429,13 +523,27 @@ onUnmounted(() => {
 // Watch for wordlist changes  
 watch(() => wordlistMode.selectedWordlist, async (newId) => {
   if (newId) {
+    // Reset state when changing wordlists
+    currentWords.value = [];
+    totalWords.value = 0;
+    currentPage.value = 0;
+    
     // Load metadata
     await loadWordlistMeta(newId);
     // Trigger search through orchestrator
-    triggerWordlistSearch();
+    await triggerWordlistSearch();
   } else {
     currentWordlistData.value = null;
     currentWords.value = [];
+    totalWords.value = 0;
+  }
+}, { immediate: true });
+
+// Watch for search query changes
+watch(() => searchBar.searchQuery, async (newQuery) => {
+  if (searchBarStore.searchMode === 'wordlist' && wordlistMode.selectedWordlist) {
+    console.log('🔍 WordListView - search query changed:', newQuery);
+    await triggerWordlistSearch();
   }
 });
 
@@ -444,6 +552,7 @@ watch(() => wordlistMode.selectedWordlist, async (newId) => {
 watch(() => wordlistMode.results, (results) => {
   if (searchBarStore.searchMode === 'wordlist' && results) {
     console.log('📚 WordListView - received search results:', results.length);
+    // Results are now handled in triggerWordlistSearch with filtering
     // The orchestrator already updated the dropdown results
     // We just need to update our main display
     if (searchBar.searchQuery.trim()) {

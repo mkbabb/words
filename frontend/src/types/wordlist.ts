@@ -56,26 +56,111 @@ export interface WordList {
   owner_id: string | null;
 }
 
-export enum MasteryLevel {
-  DEFAULT = 'default',
-  BRONZE = 'bronze', 
-  SILVER = 'silver',
-  GOLD = 'gold'
+// UI-specific types merged from wordlist-ui.ts
+export type MasteryLevel = 'default' | 'bronze' | 'silver' | 'gold';
+export type Temperature = 'hot' | 'warm' | 'cold';
+
+// Const objects for runtime usage (dual type/value export)
+export const MasteryLevel = {
+  DEFAULT: 'default' as const,
+  BRONZE: 'bronze' as const,
+  SILVER: 'silver' as const,
+  GOLD: 'gold' as const
+} as const;
+
+export const Temperature = {
+  HOT: 'hot' as const,
+  WARM: 'warm' as const,
+  COLD: 'cold' as const
+} as const;
+
+// Filter types
+export interface WordlistFilters {
+  mastery: MasteryLevel[];
+  temperature: Temperature[];
+  showHotOnly: boolean;
+  showDueOnly: boolean;
+  minScore: number;
 }
 
-export enum Temperature {
-  HOT = 'hot',
-  COLD = 'cold'
+// Statistics types
+export interface MasteryStats {
+  bronze: number;
+  silver: number;
+  gold: number;
+  total: number;
+  dueForReview: number;
+}
+
+// File parsing types
+export interface ParsedWord {
+  text: string;
+  frequency?: number;
+  notes?: string;
+  mastery?: MasteryLevel;
+}
+
+// Upload progress types
+export interface UploadProgress {
+  stage: 'parsing' | 'validating' | 'uploading' | 'complete';
+  progress: number;
+  category: string;
+  message?: string;
+}
+
+// Batch processing types
+export interface BatchResult {
+  word: string;
+  success: boolean;
+  entry?: any; // SynthesizedDictionaryEntry
+  error?: string;
+}
+
+export interface BatchProcessingState {
+  isProcessing: boolean;
+  processed: number;
+  total: number;
+  currentWord: string;
+  errors: string[];
+}
+
+// Modal state types
+export interface ModalState {
+  isOpen: boolean;
+  isLoading: boolean;
+  error: string | null;
+}
+
+// Form validation types
+export interface ValidationRules {
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: RegExp;
+}
+
+export interface ValidationErrors {
+  [key: string]: string | undefined;
 }
 
 export type CardVariant = MasteryLevel;
 
-// Sorting types for wordlist components
-export interface SortCriterion {
+// Sorting types for wordlist components - Two variants:
+// Simple version for composables
+export interface SimpleSortCriterion {
+  key: 'word' | 'mastery' | 'temperature' | 'next_review' | 'created';
+  order: 'asc' | 'desc';
+}
+
+// Advanced version for UI components
+export interface AdvancedSortCriterion {
   id: string;
   field: SortField;
   direction: 'asc' | 'desc';
 }
+
+// Union type that supports both
+export type SortCriterion = SimpleSortCriterion | AdvancedSortCriterion;
 
 export type SortField = 'word' | 'mastery_level' | 'frequency' | 'added_at' | 'last_visited' | 'next_review';
 

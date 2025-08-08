@@ -23,7 +23,7 @@
   background-size: 200% 100%;
   background-clip: text;
   -webkit-background-clip: text;
-  animation: shimmer-sweep 2s ease-in-out infinite;
+  animation: shimmer-sweep var(--shimmer-duration, 2000ms) ease-in-out infinite;
 }
 
 .dark .shimmer-text {
@@ -38,6 +38,7 @@
   background-size: 200% 100%;
   background-clip: text;
   -webkit-background-clip: text;
+  animation: shimmer-sweep var(--shimmer-duration, 2000ms) ease-in-out infinite;
 }
 
 @custom-variant dark (&:is(.dark *));

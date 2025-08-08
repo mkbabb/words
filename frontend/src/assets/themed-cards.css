@@ -88,7 +88,7 @@
         background-color: var(--theme-gradient-start);
     }
 
-    /* Tiled gradient overlay system for natural metallic effect with paper texture */
+    /* Organic metallic overlay with paper texture (reduced tiling, softened lines) */
     .themed-card[data-theme]:not([data-theme='default'])::before {
         content: '';
         position: absolute;
@@ -98,34 +98,52 @@
         bottom: 0;
         pointer-events: none;
         z-index: 0;
-        background: 
+        /* Tiled gradient overlay system with paper texture and subtle conic depth */
+        background:
             /* Subtle paper texture overlay */
             var(--paper-clean-texture),
-            /* Primary metallic bands - repeating at fixed intervals */
-                repeating-linear-gradient(
-                    135deg,
-                    transparent 0px,
-                    var(--theme-gradient-mid) 50px,
-                    var(--theme-gradient-end) 100px,
-                    var(--theme-gradient-mid) 150px,
-                    transparent 200px
-                ),
-            /* Secondary overlay for depth */
-                repeating-linear-gradient(
-                    -45deg,
-                    transparent 0px,
-                    var(--theme-gradient-start) 80px,
-                    var(--theme-gradient-mid) 160px,
-                    transparent 240px
-                ),
+            /* Primary metallic bands (soft, large-scale) */
+            repeating-linear-gradient(
+                128deg,
+                color-mix(in srgb, var(--theme-gradient-mid), transparent 80%) 0px,
+                color-mix(in srgb, var(--theme-gradient-mid), transparent 80%) 42px,
+                color-mix(in srgb, var(--theme-gradient-end), transparent 85%) 84px,
+                color-mix(in srgb, var(--theme-gradient-mid), transparent 88%) 126px,
+                transparent 168px
+            ),
+            /* Secondary cross bands to break repetition */
+            repeating-linear-gradient(
+                -42deg,
+                color-mix(in srgb, var(--theme-gradient-start), transparent 84%) 0px,
+                color-mix(in srgb, var(--theme-gradient-start), transparent 84%) 60px,
+                color-mix(in srgb, var(--theme-gradient-mid), transparent 88%) 120px,
+                transparent 180px
+            ),
+            /* Gentle conic highlight for depth */
+            conic-gradient(
+                from 200deg at 50% 50%,
+                transparent 0deg,
+                color-mix(in srgb, var(--theme-gradient-mid), white 14%) 24deg,
+                transparent 48deg,
+                color-mix(in srgb, var(--theme-gradient-end), white 12%) 160deg,
+                transparent 360deg
+            ),
             /* Base metallic gradient */
-                linear-gradient(
-                    135deg,
-                    var(--theme-gradient-start) 0%,
-                    var(--theme-gradient-mid) 50%,
-                    var(--theme-gradient-end) 100%
-                );
-        opacity: 0.7;
+            linear-gradient(
+                135deg,
+                var(--theme-gradient-start) 0%,
+                var(--theme-gradient-mid) 52%,
+                var(--theme-gradient-end) 100%
+            );
+        /* Randomize band offsets to avoid tiling on large cards */
+        background-position:
+            center,
+            calc(var(--gradient-offset-1, 0px)) calc(var(--gradient-offset-1, 0px)),
+            calc(var(--gradient-offset-2, 0px)) calc(var(--gradient-offset-2, 0px)),
+            center;
+        /* Subtle softening to blend bands */
+        filter: blur(0.35px) saturate(1.04);
+        opacity: 0.66;
         border-radius: inherit;
     }
 
@@ -439,31 +457,31 @@
         background: linear-gradient(
             45deg,
             transparent 30%,
-            rgba(255, 255, 255, 0.1) 40%,
-            rgba(255, 255, 255, 0.6) 50%,
-            rgba(255, 255, 255, 0.1) 60%,
+            rgba(255, 255, 255, 0.06) 44%,
+            rgba(255, 255, 255, 0.24) 50%,
+            rgba(255, 255, 255, 0.06) 56%,
             transparent 70%
         );
         transform: translateX(-100%) rotate(45deg);
-        animation: holographic-shimmer var(--shimmer-duration, 12s) ease-in-out
-            infinite;
-        animation-delay: var(--sparkle-delay, 2s);
+        animation: holographic-shimmer var(--shimmer-duration, 16000ms) ease-in-out infinite;
+        animation-delay: var(--sparkle-delay, 2.4s);
+        opacity: var(--sparkle-opacity, 0.18);
     }
 
     @keyframes holographic-shimmer {
         0%,
-        90% {
+        80% {
             transform: translateX(-100%) rotate(45deg);
             opacity: 0;
         }
-        92% {
+        84% {
             opacity: 1;
         }
-        96% {
+        92% {
             transform: translateX(100%) rotate(45deg);
             opacity: 1;
         }
-        98%,
+        96%,
         100% {
             transform: translateX(100%) rotate(45deg);
             opacity: 0;
@@ -700,24 +718,33 @@
     bottom: 0;
     pointer-events: none;
     z-index: 0;
-    background: 
+    /* Hover metallic with subtle conic depth */
+    background:
         /* Paper texture for hover cards */
         var(--paper-clean-texture),
-        /* Smaller scale for hover cards */
-            repeating-linear-gradient(
-                135deg,
-                transparent 0px,
-                var(--theme-gradient-mid) 25px,
-                var(--theme-gradient-end) 50px,
-                var(--theme-gradient-mid) 75px,
-                transparent 100px
-            ),
+        /* Softer bands */
         repeating-linear-gradient(
-            -45deg,
-            transparent 0px,
-            var(--theme-gradient-start) 40px,
-            var(--theme-gradient-mid) 80px,
-            transparent 120px
+            132deg,
+            color-mix(in srgb, var(--theme-gradient-mid), transparent 82%) 0px,
+            color-mix(in srgb, var(--theme-gradient-mid), transparent 82%) 34px,
+            color-mix(in srgb, var(--theme-gradient-end), transparent 86%) 68px,
+            transparent 102px
+        ),
+        repeating-linear-gradient(
+            -38deg,
+            color-mix(in srgb, var(--theme-gradient-start), transparent 86%) 0px,
+            color-mix(in srgb, var(--theme-gradient-start), transparent 86%) 48px,
+            color-mix(in srgb, var(--theme-gradient-mid), transparent 88%) 96px,
+            transparent 144px
+        ),
+        /* Subtle conic hint */
+        conic-gradient(
+            from 180deg at 50% 50%,
+            transparent 0deg,
+            color-mix(in srgb, var(--theme-gradient-mid), white 12%) 24deg,
+            transparent 48deg,
+            color-mix(in srgb, var(--theme-gradient-end), white 10%) 200deg,
+            transparent 360deg
         ),
         linear-gradient(
             135deg,
@@ -725,6 +752,13 @@
             var(--theme-gradient-mid) 50%,
             var(--theme-gradient-end) 100%
         );
+    /* Randomized offsets to reduce visible repetition */
+    background-position:
+        center,
+        calc(var(--gradient-offset-1, 0px)) calc(var(--gradient-offset-1, 0px)),
+        calc(var(--gradient-offset-2, 0px)) calc(var(--gradient-offset-2, 0px)),
+        center;
+    filter: blur(0.3px) saturate(1.03);
     opacity: 0.6;
     border-radius: inherit;
 }

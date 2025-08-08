@@ -3,6 +3,7 @@ import { useMagicKeys, whenever } from '@vueuse/core';
 import { useRouter } from 'vue-router';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useContentStore } from '@/stores/content/content';
+import { useHistoryStore } from '@/stores/content/history';
 import { useSearchOrchestrator } from './useSearchOrchestrator';
 import { showError } from '@/plugins/toast';
 import { extractWordCount } from '../utils/ai-query';
@@ -139,13 +140,19 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
         // Handle AI query mode
         if (searchBar.isAIQuery && query) {
           try {
-            // const extractedCount = extractWordCount(query);
-            // TODO: Implement AI suggestions fetching with extractedCount
-            const wordSuggestions: any = null; // await aiApi.getAISuggestions(query, extractWordCount(query));
+            const extractedCount = extractWordCount(query);
+            // Use orchestrator to get AI suggestions
+            const wordSuggestions = await orchestrator.getAISuggestions(query, extractedCount);
 
             if (wordSuggestions?.suggestions?.length > 0) {
+              contentStore.setWordSuggestions(wordSuggestions);
               searchBar.setMode('lookup');
               searchBar.setSubMode('lookup', 'suggestions');
+              // Add to AI query history
+              const historyStore = useHistoryStore();
+              historyStore.addToAIQueryHistory(query);
+              // Navigate to home to display suggestions
+              router.push({ name: 'Home' });
             } else {
               searchBar.triggerErrorAnimation();
               showError('No word suggestions found for this query');

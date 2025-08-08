@@ -96,41 +96,26 @@
                 </div>
             </div>
 
-            <!-- Semantic Search (Lookup Mode) -->
+            <!-- Search Method (Lookup Mode) -->
             <div
                 v-if="searchMode === 'lookup'"
                 class="border-t border-border/50 px-4 py-3"
             >
-                <h3 class="mb-3 text-sm font-medium">Search Options</h3>
-                <div class="space-y-3">
-                    <!-- Semantic Search Toggle -->
-                    <div class="flex items-center justify-between">
-                        <label class="text-sm font-medium flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                :checked="enableSemantic"
-                                @change="toggleSemantic"
-                                class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                            />
-                            Semantic Search
-                        </label>
-                    </div>
-                    
-                    <!-- Semantic Weight Slider (when enabled) -->
-                    <div v-if="enableSemantic" class="space-y-2">
-                        <label class="text-xs text-muted-foreground">
-                            Similarity Weight: {{ Math.round(semanticWeight * 100) }}%
-                        </label>
-                        <Slider
-                            :model-value="[semanticWeight]"
-                            @update:model-value="(value) => setSemanticWeight(value?.[0] ?? 0.5)"
-                            :min="0.1"
-                            :max="1.0"
-                            :step="0.1"
-                            class="w-full"
-                        />
-                    </div>
-                </div>
+                <h3 class="mb-3 text-sm font-medium">Search Method</h3>
+                <BouncyToggle
+                    :model-value="currentSearchMode"
+                    @update:model-value="handleSearchModeChange"
+                    :options="[
+                        { label: 'Smart', value: 'smart', icon: 'Zap' },
+                        { label: 'Exact', value: 'exact', icon: 'Target' },
+                        { label: 'Fuzzy', value: 'fuzzy', icon: 'Sparkles' },
+                        { label: 'Semantic', value: 'semantic', icon: 'Search' },
+                    ]"
+                    class="text-sm font-medium"
+                />
+                <p class="mt-2 text-xs text-muted-foreground">
+                    {{ searchModeDescriptions[currentSearchMode] }}
+                </p>
             </div>
 
             <!-- Wordlist Filters -->
@@ -290,8 +275,15 @@ const router = useRouter();
 const { searchBar, lookupMode } = useStores();
 // ✅ Make component reactive to store changes instead of using defineModel
 const searchMode = computed(() => searchBar.searchMode);
-const enableSemantic = computed(() => lookupMode.enableSemantic);
-const semanticWeight = computed(() => lookupMode.semanticWeight);
+const currentSearchMode = computed(() => lookupMode.searchMode);
+
+// Search mode descriptions
+const searchModeDescriptions = {
+    smart: 'Adaptive search that combines exact, fuzzy, and semantic matching',
+    exact: 'Find exact word matches only',
+    fuzzy: 'Find similar words and handle typos',
+    semantic: 'Find words with similar meanings using AI'
+};
 const selectedSources = defineModel<string[]>('selectedSources', { required: true });
 const selectedLanguages = defineModel<string[]>('selectedLanguages', { required: true });
 const noAI = defineModel<boolean>('noAI', { required: true });
@@ -359,12 +351,8 @@ const toggleLanguage = (languageCode: string) => {
     }
 };
 
-const toggleSemantic = () => {
-    lookupMode.toggleSemantic();
-};
-
-const setSemanticWeight = (weight: number) => {
-    lookupMode.setSemanticWeight(weight);
+const handleSearchModeChange = (mode: string) => {
+    lookupMode.setSearchMode(mode as 'smart' | 'exact' | 'fuzzy' | 'semantic');
 };
 
 const toggleFilter = (filterKey: keyof typeof wordlistFilters.value) => {

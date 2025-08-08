@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref, readonly, computed, shallowRef } from 'vue'
+import { ref, readonly, computed, shallowRef, watch } from 'vue'
 import { dictionaryApi } from '@/api'
 import { normalizeWord } from '@/utils'
 import { CARD_VARIANTS } from '@/types'
+import { shouldTriggerAIMode } from '@/components/custom/search/utils/ai-query'
+import { useSearchBarStore } from '../search-bar'
 import type { ModeHandler } from '@/stores/types/mode-types'
 import type { SearchMode, SearchResult, CardVariant } from '@/types'
 import { 
@@ -21,6 +23,8 @@ import {
  * Combines configuration, search bar state, UI preferences, and search results
  */
 export const useLookupMode = defineStore('lookupMode', () => {
+  // Get search bar store for query watching
+  const getSearchBarStore = () => useSearchBarStore()
   // ==========================================================================
   // CONFIGURATION STATE
   // ==========================================================================
@@ -28,8 +32,7 @@ export const useLookupMode = defineStore('lookupMode', () => {
   const selectedSources = ref<DictionarySource[]>(DEFAULT_SOURCES)
   const selectedLanguages = ref<Language[]>(DEFAULT_LANGUAGES)
   const noAI = ref(true)
-  const enableSemantic = ref(false)
-  const semanticWeight = ref(0.7)
+  const searchMode = ref<'smart' | 'exact' | 'fuzzy' | 'semantic'>('smart')
   
   // ==========================================================================
   // SEARCH BAR STATE
@@ -38,6 +41,28 @@ export const useLookupMode = defineStore('lookupMode', () => {
   const isAIQuery = ref(false)
   const showSparkle = ref(false)
   const aiSuggestions = ref<string[]>([])
+  
+  // Watch for query changes to detect AI mode
+  watch(() => {
+    const store = getSearchBarStore()
+    return store?.searchQuery || ''
+  }, (newQuery) => {
+    if (newQuery && newQuery.length > 0) {
+      const shouldBeAI = shouldTriggerAIMode(newQuery)
+      if (shouldBeAI !== isAIQuery.value) {
+        setAIQuery(shouldBeAI)
+        if (shouldBeAI) {
+          setShowSparkle(true)
+        }
+      }
+    } else {
+      // Reset AI mode for empty queries
+      if (isAIQuery.value) {
+        setAIQuery(false)
+        setShowSparkle(false)
+      }
+    }
+  })
   
   // ==========================================================================
   // UI STATE
@@ -105,16 +130,15 @@ export const useLookupMode = defineStore('lookupMode', () => {
     noAI.value = !enabled
   }
   
-  const toggleSemantic = () => {
-    enableSemantic.value = !enableSemantic.value
+  const setSearchMode = (mode: 'smart' | 'exact' | 'fuzzy' | 'semantic') => {
+    searchMode.value = mode
   }
   
-  const setSemantic = (enabled: boolean) => {
-    enableSemantic.value = enabled
-  }
-  
-  const setSemanticWeight = (weight: number) => {
-    semanticWeight.value = Math.min(1, Math.max(0, weight))
+  const toggleSearchMode = () => {
+    const modes: Array<'smart' | 'exact' | 'fuzzy' | 'semantic'> = ['smart', 'exact', 'fuzzy', 'semantic']
+    const currentIndex = modes.indexOf(searchMode.value)
+    const nextIndex = (currentIndex + 1) % modes.length
+    searchMode.value = modes[nextIndex]
   }
   
   // ==========================================================================
@@ -208,10 +232,10 @@ export const useLookupMode = defineStore('lookupMode', () => {
     try {
       console.log(`[LookupMode] Searching for: ${query}`)
       
+      // Always perform dictionary search - AI mode is user-initiated only
       const searchResults = await dictionaryApi.searchWord(normalizedQuery, {
         signal: abortController.signal,
-        semantic: enableSemantic.value,
-        semantic_weight: semanticWeight.value
+        mode: searchMode.value
       })
       
       // Store results with method detection
@@ -274,8 +298,8 @@ export const useLookupMode = defineStore('lookupMode', () => {
     
     if (hasFuzzyMatches) return 'fuzzy'
     
-    // If no exact or fuzzy matches, assume semantic/AI
-    return 'semantic'
+    // Return the actual search mode used
+    return searchMode.value as typeof searchMethod.value
   }
   
   // ==========================================================================
@@ -286,16 +310,14 @@ export const useLookupMode = defineStore('lookupMode', () => {
     selectedSources: selectedSources.value,
     selectedLanguages: selectedLanguages.value,
     noAI: noAI.value,
-    enableSemantic: enableSemantic.value,
-    semanticWeight: semanticWeight.value
+    searchMode: searchMode.value
   })
   
   const setConfig = (config: any) => {
     if (config.selectedSources) setSources(config.selectedSources)
     if (config.selectedLanguages) setLanguages(config.selectedLanguages)
     if (config.noAI !== undefined) noAI.value = config.noAI
-    if (config.enableSemantic !== undefined) enableSemantic.value = config.enableSemantic
-    if (config.semanticWeight !== undefined) semanticWeight.value = config.semanticWeight
+    if (config.searchMode !== undefined) searchMode.value = config.searchMode
   }
   
   const getSearchBarState = () => ({
@@ -378,8 +400,7 @@ export const useLookupMode = defineStore('lookupMode', () => {
     selectedSources: readonly(selectedSources),
     selectedLanguages: readonly(selectedLanguages),
     noAI: readonly(noAI),
-    enableSemantic: readonly(enableSemantic),
-    semanticWeight: readonly(semanticWeight),
+    searchMode: readonly(searchMode),
     
     // Search Bar State
     isAIQuery: readonly(isAIQuery),
@@ -405,9 +426,8 @@ export const useLookupMode = defineStore('lookupMode', () => {
     setLanguages,
     toggleAI,
     setAI,
-    toggleSemantic,
-    setSemantic,
-    setSemanticWeight,
+    setSearchMode,
+    toggleSearchMode,
     
     // Search Bar Actions
     setAIQuery,
@@ -450,6 +470,6 @@ export const useLookupMode = defineStore('lookupMode', () => {
 }, {
   persist: {
     key: 'lookup-mode',
-    pick: ['selectedSources', 'selectedLanguages', 'noAI', 'enableSemantic', 'semanticWeight', 'selectedCardVariant', 'pronunciationMode', 'cursorPosition']
+    pick: ['selectedSources', 'selectedLanguages', 'noAI', 'searchMode', 'selectedCardVariant', 'pronunciationMode', 'cursorPosition']
   }
 })

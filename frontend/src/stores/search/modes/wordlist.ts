@@ -2,10 +2,9 @@ import { defineStore } from 'pinia'
 import { ref, readonly, computed, shallowRef } from 'vue'
 import { wordlistsApi } from '@/api'
 import type { ModeHandler } from '@/stores/types/mode-types'
-import type { SearchMode, WordListItem } from '@/types'
+import type { SearchMode, WordListItem, WordlistFilters as WordlistFiltersType, MasteryLevel, Temperature } from '@/types'
 import {
   ViewModes,
-  WordlistFilterTypes,
   DEFAULT_VIEW_MODE,
   DEFAULT_WORDLIST_FILTERS,
   type ViewMode,
@@ -56,11 +55,12 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
   const currentWordlistId = ref<string | null>(null)
   const currentQuery = ref<string>('')
   
-  const filters = ref({
-    mastery: [] as ('bronze' | 'silver' | 'gold')[],
-    temperature: [] as ('hot' | 'due')[],
-    partOfSpeech: [] as string[],
-    minScore: 0.4,
+  const filters = ref<WordlistFiltersType>({
+    mastery: [] as MasteryLevel[],
+    temperature: [] as Temperature[],
+    showHotOnly: false,
+    showDueOnly: false,
+    minScore: 0.4
   })
   
   const batchProcessing = ref({
@@ -355,8 +355,9 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
     filters.value = {
       mastery: [],
       temperature: [],
-      partOfSpeech: [],
-      minScore: 0.4,
+      showHotOnly: false,
+      showDueOnly: false,
+      minScore: 0.4
     }
   }
   
@@ -467,7 +468,7 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
       setBatchMode(false)
     },
     
-    validateConfig: (config: any) => {
+    validateConfig: (_config: any) => {
       return true // Wordlist config is always valid
     },
     

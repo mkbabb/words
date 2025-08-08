@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref, readonly, shallowRef, computed } from 'vue'
+import { ref, readonly, computed, shallowRef } from 'vue'
 import { useLookupContentState } from './modes/lookup'
 import { useSearchBarStore } from '../search/search-bar'
+import { useHistoryStore } from './history'
 import type {
   SynthesizedDictionaryEntry,
   ThesaurusEntry,
@@ -36,16 +37,12 @@ export const useContentStore = defineStore('content', () => {
   const currentWord = ref<string | null>(null)
   const definitionError = ref<DefinitionErrorState | null>(null)
   
-  // Sidebar navigation state
-  const sidebarActiveCluster = ref<string | null>('')
-  const sidebarActivePartOfSpeech = ref<string | null>('')
-  
-  // Sidebar accordion states for different views
+  // General accordion state for sidebar views (shared across modes)
   const sidebarAccordionState = shallowRef({
     lookup: [] as string[],
     wordlist: [] as string[],
     'word-of-the-day': [] as string[],
-    stage: [] as string[],
+    stage: [] as string[]
   })
   
   // ==========================================================================
@@ -95,6 +92,21 @@ export const useContentStore = defineStore('content', () => {
     return null
   })
   
+  // Progressive sidebar state (mode-specific, currently only lookup mode)
+  const sidebarActiveCluster = computed(() => {
+    if (searchBarStore.searchMode === 'lookup') {
+      return lookupContent.sidebarActiveCluster.value
+    }
+    return null
+  })
+  
+  const sidebarActivePartOfSpeech = computed(() => {
+    if (searchBarStore.searchMode === 'lookup') {
+      return lookupContent.sidebarActivePartOfSpeech.value
+    }
+    return null
+  })
+  
   // ==========================================================================
   // DELEGATED ACTIONS
   // ==========================================================================
@@ -106,6 +118,9 @@ export const useContentStore = defineStore('content', () => {
     if (entry) {
       currentWord.value = entry.word
       definitionError.value = null
+      // Add to lookup history when a new entry is set
+      const historyStore = useHistoryStore()
+      historyStore.addToLookupHistory(entry.word, entry)
     }
   }
   
@@ -205,18 +220,9 @@ export const useContentStore = defineStore('content', () => {
   }
   
   // ==========================================================================
-  // SIDEBAR NAVIGATION
+  // SIDEBAR ACCORDION MANAGEMENT
   // ==========================================================================
   
-  const setSidebarActiveCluster = (cluster: string | null) => {
-    sidebarActiveCluster.value = cluster
-  }
-  
-  const setSidebarActivePartOfSpeech = (partOfSpeech: string | null) => {
-    sidebarActivePartOfSpeech.value = partOfSpeech
-  }
-  
-  // Accordion state management
   const setSidebarAccordionState = (
     view: 'lookup' | 'wordlist' | 'word-of-the-day' | 'stage',
     state: string[]
@@ -233,12 +239,28 @@ export const useContentStore = defineStore('content', () => {
   ) => {
     const currentState = sidebarAccordionState.value[view]
     const newState = currentState.includes(item)
-      ? currentState.filter(i => i !== item)
+      ? currentState.filter((i: string) => i !== item)
       : [...currentState, item]
     
     sidebarAccordionState.value = {
       ...sidebarAccordionState.value,
       [view]: newState
+    }
+  }
+  
+  // ==========================================================================
+  // PROGRESSIVE SIDEBAR MANAGEMENT (Mode-specific)
+  // ==========================================================================
+  
+  const setSidebarActiveCluster = (cluster: string | null) => {
+    if (searchBarStore.searchMode === 'lookup') {
+      lookupContent.setSidebarActiveCluster(cluster)
+    }
+  }
+  
+  const setSidebarActivePartOfSpeech = (partOfSpeech: string | null) => {
+    if (searchBarStore.searchMode === 'lookup') {
+      lookupContent.setSidebarActivePartOfSpeech(partOfSpeech)
     }
   }
   
@@ -254,15 +276,14 @@ export const useContentStore = defineStore('content', () => {
     partialEntry,
     isStreamingData,
     regeneratingDefinitionIndex,
+    sidebarActiveCluster,
+    sidebarActivePartOfSpeech,
     
     // Shared state
     currentWord: readonly(currentWord),
     definitionError: readonly(definitionError),
-    
-    // Sidebar navigation state
-    sidebarActiveCluster: readonly(sidebarActiveCluster),
-    sidebarActivePartOfSpeech: readonly(sidebarActivePartOfSpeech),
     sidebarAccordionState: readonly(sidebarAccordionState),
+    
     
     // Delegated actions
     setCurrentEntry,
@@ -284,11 +305,14 @@ export const useContentStore = defineStore('content', () => {
     clearWordSuggestions,
     clearError,
     
-    // Sidebar navigation
-    setSidebarActiveCluster,
-    setSidebarActivePartOfSpeech,
+    // Sidebar accordion
     setSidebarAccordionState,
     toggleAccordionItem,
+    
+    // Progressive sidebar
+    setSidebarActiveCluster,
+    setSidebarActivePartOfSpeech
+    
   }
 }, {
   persist: {
@@ -298,8 +322,6 @@ export const useContentStore = defineStore('content', () => {
       'currentThesaurus',
       'wordSuggestions',
       'currentWord',
-      'sidebarActiveCluster',
-      'sidebarActivePartOfSpeech',
       'sidebarAccordionState'
     ]
   }
