@@ -39,25 +39,36 @@ class SemanticSearchManager:
         corpus_name: str,
         vocab_hash: str | None = None,
         vocabulary: list[str] | None = None,
+        model_name: str | None = None,
     ) -> SemanticSearch | None:
         """
         Get existing semantic search instance from cache.
+        
+        Enhanced for BGE-M3 integration - includes model name in cache key
+        to prevent conflicts between different embedding models.
 
         Args:
             corpus_name: Unique name for the corpus
             vocab_hash: Pre-computed vocabulary hash (preferred)
             vocabulary: Vocabulary to hash if vocab_hash not provided
+            model_name: Embedding model name for cache isolation
 
         Returns:
             Cached SemanticSearch instance or None if not found
         """
+        from .constants import DEFAULT_SENTENCE_MODEL
+        
+        # Use default model name if not provided
+        if model_name is None:
+            model_name = DEFAULT_SENTENCE_MODEL
+            
         if vocab_hash is None:
             if vocabulary is None:
                 raise ValueError("Must provide either vocab_hash or vocabulary")
-            vocab_hash = get_vocabulary_hash(vocabulary)
+            vocab_hash = get_vocabulary_hash(vocabulary, model_name)
 
         cache = await get_unified()
-        cache_key = f"semantic:{corpus_name}:{vocab_hash}"
+        cache_key = f"semantic:{corpus_name}:{model_name.replace('/', '_')}:{vocab_hash}"
         cached_data: dict[str, Any] | None = await cache.get(CacheNamespace.SEMANTIC, cache_key)
         if cached_data:
             try:
@@ -86,27 +97,39 @@ class SemanticSearchManager:
         self,
         corpus: Corpus,
         force_rebuild: bool = False,
+        model_name: str | None = None,
     ) -> SemanticSearch:
         """
         Create new semantic search instance with caching.
+        
+        Enhanced for BGE-M3 integration - includes model name in cache key
+        and passes it to SemanticSearch constructor.
 
         Args:
             corpus: Corpus instance containing vocabulary data
             force_rebuild: Force rebuild even if cached
+            model_name: Embedding model name (defaults to BGE-M3)
 
         Returns:
             Initialized SemanticSearch instance
         """
+        from .constants import DEFAULT_SENTENCE_MODEL
+        
+        # Use default model name if not provided (BGE-M3)
+        if model_name is None:
+            model_name = DEFAULT_SENTENCE_MODEL
+            
         corpus_name = corpus.corpus_name
         logger.info(
-            f"Creating semantic search for corpus '{corpus_name}' with {len(corpus.lemmatized_vocabulary)} lemmatized items"
+            f"Creating semantic search for corpus '{corpus_name}' with {len(corpus.lemmatized_vocabulary)} lemmatized items using {model_name}"
         )
         start_time = time.perf_counter()
         vocab_hash = corpus.vocabulary_hash
-        cache_key = f"semantic:{corpus_name}:{vocab_hash}"
+        cache_key = f"semantic:{corpus_name}:{model_name.replace('/', '_')}:{vocab_hash}"
 
         semantic_search = SemanticSearch(
             corpus=corpus,
+            model_name=model_name,
             force_rebuild=force_rebuild,
         )
 

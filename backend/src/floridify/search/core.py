@@ -7,10 +7,9 @@ Performance-optimized for 100k-1M word searches with KISS principles.
 from __future__ import annotations
 
 import itertools
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from ..text import normalize_comprehensive
+from ..text import normalize
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod, SearchMode
 from .corpus.core import Corpus
@@ -74,12 +73,22 @@ class SearchEngine:
         )
 
     async def initialize(self) -> None:
-        """Initialize expensive components lazily."""
-        if self._initialized:
-            logger.debug(f"SearchEngine for '{self.corpus_name}' already initialized")
+        """Initialize expensive components lazily with vocab hash-based caching."""
+        # Quick vocab hash check - if unchanged, skip re-initialization
+        current_vocab_hash = await self._get_current_vocab_hash()
+        if (
+            self._initialized
+            and self._vocabulary_hash == current_vocab_hash
+            and self.corpus is not None
+        ):
+            logger.debug(
+                f"SearchEngine for '{self.corpus_name}' already initialized with hash {current_vocab_hash[:8]}"
+            )
             return
 
-        logger.info(f"Initializing SearchEngine for corpus '{self.corpus_name}'")
+        logger.info(
+            f"Initializing SearchEngine for corpus '{self.corpus_name}' (hash: {current_vocab_hash[:8] if current_vocab_hash else 'unknown'})"
+        )
 
         # Fetch Corpus from corpus manager
         manager = get_corpus_manager()
@@ -89,17 +98,21 @@ class SearchEngine:
         metadata = await manager.get_corpus_metadata(self.corpus_name)
 
         if metadata is not None:
-            logger.info(
-                f"Found metadata for '{self.corpus_name}', fetching corpus with metadata hash: {metadata.vocabulary_hash}"
+            logger.debug(
+                f"Found metadata for '{self.corpus_name}', vocab hash: {metadata.vocabulary_hash[:8]}"
             )
             # Get corpus from cache using the vocab_hash
             self.corpus = await manager.get_corpus(
                 self.corpus_name, vocab_hash=metadata.vocabulary_hash
             )
             if self.corpus:
-                logger.info(f"Successfully loaded corpus '{self.corpus_name}' from cache")
+                logger.debug(
+                    f"Successfully loaded corpus '{self.corpus_name}' from cache"
+                )
             else:
-                logger.warning("Could not load corpus from cache despite metadata existing")
+                logger.warning(
+                    "Could not load corpus from cache despite metadata existing"
+                )
         else:
             logger.warning(f"No metadata found for corpus '{self.corpus_name}'")
 
@@ -113,20 +126,31 @@ class SearchEngine:
 
         self._vocabulary_hash = self.corpus.vocabulary_hash
         combined_vocab = self.corpus.vocabulary
-        logger.info(
-            f"Corpus loaded with {len(combined_vocab)} vocabulary items, corpus hash: {self._vocabulary_hash}"
-        )
+        logger.debug(f"Corpus loaded with {len(combined_vocab)} vocabulary items")
 
-        # High-performance search components
-        logger.debug("Building Trie index")
-        self.trie_search = TrieSearch()
-        await self.trie_search.build_index(combined_vocab)
-        logger.debug("Building Fuzzy search")
-        self.fuzzy_search = FuzzySearch(min_score=self.min_score)
+        # High-performance search components - only initialize if needed
+        if (
+            not self.trie_search
+            or self.trie_search._vocabulary_hash != self._vocabulary_hash
+        ):
+            logger.debug("Building/updating Trie index")
+            self.trie_search = TrieSearch()
+            await self.trie_search.build_index(combined_vocab)
+
+        if not self.fuzzy_search:
+            logger.debug("Initializing Fuzzy search")
+            self.fuzzy_search = FuzzySearch(min_score=self.min_score)
 
         # Initialize semantic search if enabled
-        if self.semantic:
-            logger.debug("Initializing semantic search")
+        if (
+            self.semantic
+            and (
+                not self.semantic_search
+                or getattr(self.semantic_search, '_vocabulary_hash', None)
+                != self._vocabulary_hash
+            )
+        ):
+            logger.debug("Initializing/updating semantic search")
             # Get or create semantic search from manager
             semantic_manager = get_semantic_search_manager()
             self.semantic_search = await semantic_manager.get_semantic_search(
@@ -134,7 +158,9 @@ class SearchEngine:
             )
             if not self.semantic_search:
                 # Create semantic search if not found in cache
-                logger.info(f"Creating new semantic search for corpus '{self.corpus_name}'")
+                logger.debug(
+                    f"Creating new semantic search for corpus '{self.corpus_name}'"
+                )
                 self.semantic_search = await semantic_manager.create_semantic_search(
                     corpus=self.corpus,
                     force_rebuild=self.force_rebuild,
@@ -145,56 +171,65 @@ class SearchEngine:
         self._initialized = True
 
         logger.info(
-            f"✅ SearchEngine fully initialized for corpus '{self.corpus_name}' with hash {self._vocabulary_hash} (semantic={'enabled' if self.semantic else 'disabled'})"
+            f"✅ SearchEngine initialized for corpus '{self.corpus_name}' (hash: {self._vocabulary_hash[:8]})"
         )
 
+    async def _get_current_vocab_hash(self) -> str | None:
+        """Get current vocabulary hash from corpus manager."""
+        try:
+            manager = get_corpus_manager()
+            metadata = await manager.get_corpus_metadata(self.corpus_name)
+            return metadata.vocabulary_hash if metadata else None
+        except Exception:
+            return None
+
     async def update_corpus(self) -> None:
-        """Check if corpus has changed and update components if needed."""
+        """Check if corpus has changed and update components if needed. Optimized with hash check."""
         if not self.corpus:
             return
 
-        # Get latest corpus metadata
-        manager = get_corpus_manager()
-        corpus_metadata = await manager.get_corpus_metadata(self.corpus_name)
-
-        if not corpus_metadata:
-            logger.debug(f"Corpus metadata not found for '{self.corpus_name}' during update check")
+        # Quick vocabulary hash check - if unchanged, skip expensive updates
+        current_vocab_hash = await self._get_current_vocab_hash()
+        if current_vocab_hash == self._vocabulary_hash:
+            logger.debug(
+                f"Corpus unchanged for '{self.corpus_name}' (hash: {current_vocab_hash[:8] if current_vocab_hash else 'none'})"
+            )
             return
 
-        # Check if vocabulary has changed
-        if corpus_metadata.vocabulary_hash != self._vocabulary_hash:
-            logger.info(
-                f"Corpus vocabulary changed for '{self.corpus_name}': {self._vocabulary_hash} -> {corpus_metadata.vocabulary_hash}, updating components"
-            )
+        logger.info(
+            f"Corpus vocabulary changed for '{self.corpus_name}': {self._vocabulary_hash[:8] if self._vocabulary_hash else 'none'} -> {current_vocab_hash[:8] if current_vocab_hash else 'none'}"
+        )
 
-            # Get updated corpus
-            updated_corpus = await manager.get_corpus(
-                self.corpus_name, vocab_hash=corpus_metadata.vocabulary_hash
-            )
+        # Get updated corpus
+        manager = get_corpus_manager()
+        updated_corpus = await manager.get_corpus(
+            self.corpus_name, vocab_hash=current_vocab_hash
+        )
 
-            if not updated_corpus:
-                logger.error(f"Failed to get updated corpus '{self.corpus_name}'")
-                return
+        if not updated_corpus:
+            logger.error(f"Failed to get updated corpus '{self.corpus_name}'")
+            return
 
-            # Update corpus and hash
-            self.corpus = updated_corpus
-            self._vocabulary_hash = updated_corpus.vocabulary_hash
+        # Update corpus and hash
+        self.corpus = updated_corpus
+        self._vocabulary_hash = updated_corpus.vocabulary_hash
+        combined_vocab = updated_corpus.vocabulary
 
-            # Update search components
-            combined_vocab = updated_corpus.vocabulary
+        # Update search components only if needed
+        if (
+            self.trie_search
+            and self.trie_search._vocabulary_hash != self._vocabulary_hash
+        ):
+            await self.trie_search.build_index(combined_vocab)
 
-            if self.trie_search:
-                await self.trie_search.build_index(combined_vocab)
-            
-            # Update fuzzy search if it exists
-            if self.fuzzy_search:
-                # Note: FuzzySearch doesn't store vocabulary internally, it uses corpus on demand
-                # So we don't need to rebuild it, but we should ensure it's available
-                pass
-
-            # Update semantic search if enabled
-            if self.semantic_search and updated_corpus:
-                await self.semantic_search.update_corpus(updated_corpus)
+        # Note: FuzzySearch uses corpus on-demand, no rebuild needed
+        # Update semantic search if enabled and hash changed
+        if (
+            self.semantic_search
+            and getattr(self.semantic_search, '_vocabulary_hash', None)
+            != self._vocabulary_hash
+        ):
+            await self.semantic_search.update_corpus(updated_corpus)
 
     async def search(
         self,
@@ -242,8 +277,8 @@ class SearchEngine:
         # Check if corpus has changed and update if needed
         await self.update_corpus()
 
-        # Normalize query - use comprehensive to match corpus normalization
-        normalized_query = normalize_comprehensive(query)
+        # Normalize query using global normalize function
+        normalized_query = normalize(query)
         if not normalized_query:
             return []
 
@@ -260,7 +295,9 @@ class SearchEngine:
             results = self.search_fuzzy(normalized_query, max_results, min_score)
         elif mode == SearchMode.SEMANTIC:
             if not self.semantic_search:
-                raise ValueError("Semantic search is not enabled for this SearchEngine instance")
+                raise ValueError(
+                    "Semantic search is not enabled for this SearchEngine instance"
+                )
 
             results = self.search_semantic(normalized_query, max_results, min_score)
         else:
@@ -289,7 +326,9 @@ class SearchEngine:
 
         return [
             SearchResult(
-                word=self._get_original_word(match),  # Return original word with diacritics
+                word=self._get_original_word(
+                    match
+                ),  # Return original word with diacritics
                 lemmatized_word=None,
                 score=1.0,
                 method=SearchMethod.EXACT,
@@ -359,39 +398,29 @@ class SearchEngine:
         min_score: float,
         semantic: bool,
     ) -> list[SearchResult]:
-        """Parallel search cascade using ThreadPoolExecutor for CPU-bound operations."""
+        """Sequential search cascade with smart early termination for optimal performance."""
 
-        # Execute CPU-bound searches in parallel using ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            # Submit exact and fuzzy searches to thread pool
-            exact_future = executor.submit(self.search_exact, query)
-            fuzzy_future = executor.submit(self.search_fuzzy, query, max_results)
-            semantic_future = (
-                executor.submit(self.search_semantic, query, max_results, min_score)
-                if semantic and self.semantic_search
-                else None
+        # 1. Exact search first (fastest) - perfect match early termination
+        exact_results = self.search_exact(query)
+        if exact_results:
+            logger.debug(f"Early exit: {len(exact_results)} exact matches found")
+            return exact_results
+
+        # 2. Fuzzy search (most comprehensive for misspellings)
+        fuzzy_results = self.search_fuzzy(query, max_results, min_score)
+
+        # 3. Semantic search - adaptive threshold based on fuzzy quality
+        semantic_results = []
+        if semantic and self.semantic_search:
+            # If fuzzy found good results, be more selective with semantic
+            semantic_limit = (
+                max_results // 2
+                if len(fuzzy_results) >= max_results // 2
+                else max_results
             )
+            semantic_results = self.search_semantic(query, semantic_limit, min_score)
 
-            # Get exact results first for early termination check
-            exact_results = exact_future.result(timeout=0.05)  # 50ms timeout for exact
-
-            # Early termination for perfect exact matches
-            if len(exact_results):
-                logger.debug(f"Early exit: {len(exact_results)} perfect exact matches found")
-                # Cancel the other futures if they are still running
-                fuzzy_future.cancel()
-                if semantic_future:
-                    semantic_future.cancel()
-
-                return exact_results
-
-            # Get fuzzy results
-            fuzzy_results = fuzzy_future.result(timeout=0.5)  # 500ms timeout for fuzzy
-            semantic_results = (
-                semantic_future.result(timeout=0.5) if semantic_future else []
-            )  # 500ms timeout for semantic
-
-        # Use generators with itertools.chain for memory efficiency
+        # 4. Merge and deduplicate with memory-efficient generators
         fuzzy_gen = (r for r in fuzzy_results if r.score >= min_score)
         semantic_gen = (r for r in semantic_results if r.score >= min_score)
 
@@ -434,7 +463,8 @@ class SearchEngine:
                 existing_priority = self.METHOD_PRIORITY.get(existing.method, 0)
 
                 if (result_priority > existing_priority) or (
-                    result_priority == existing_priority and result.score > existing.score
+                    result_priority == existing_priority
+                    and result.score > existing.score
                 ):
                     word_to_result[result.word] = result
 

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from ...models.definition import Language, Word
 from ...search.corpus.manager import CorpusManager, get_corpus_manager
-from ...text import normalize_comprehensive
+from ...text import normalize
 from ...utils.logging import get_logger
 from ...wordlist.constants import MasteryLevel, Temperature
 from ...wordlist.models import WordList, WordListItem
@@ -224,7 +224,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         for text in word_texts:
             # Keep original text for display, normalize for lookup
             original = text.strip()
-            normalized = normalize_comprehensive(original)
+            normalized = normalize(original)
             normalized_map[normalized] = original
             normalized_list.append(normalized)
 
@@ -268,7 +268,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         for text in word_texts:
             # Use the same normalization as above
             original = text.strip()
-            normalized = normalize_comprehensive(original)
+            normalized = normalize(original)
             word_id = existing_map.get(normalized)
             if word_id is None:
                 raise ValueError(f"Word ID not found for '{text}' after processing")

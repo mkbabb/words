@@ -9,7 +9,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ...caching.core import CacheNamespace
-from ...caching.decorators import cached_api_call
 from ...caching.unified import get_unified
 from ...core.search_pipeline import get_search_engine, reset_search_engine
 from ...models.definition import CorpusType, Language
@@ -290,7 +289,7 @@ async def get_search_suggestions(
         raise HTTPException(status_code=500, detail=f"Internal error during suggestions: {str(e)}")
 
 
-@router.post("/search/rebuild-index", response_model=RebuildIndexResponse)
+@router.post("/search/rebuild", response_model=RebuildIndexResponse)
 async def rebuild_search_index(
     request: RebuildIndexRequest = RebuildIndexRequest(),
 ) -> RebuildIndexResponse:

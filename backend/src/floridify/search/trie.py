@@ -16,7 +16,7 @@ import marisa_trie
 import numpy as np
 
 from ..caching.unified import get_unified
-from ..text import batch_normalize, normalize_comprehensive
+from ..text import batch_normalize, normalize
 from ..utils.logging import get_logger
 from .utils import calculate_default_frequency, get_vocabulary_hash
 
@@ -135,8 +135,8 @@ class TrieSearch:
         if not query or not self._trie:
             return None
 
-        # Normalize query using comprehensive normalization
-        normalized_query = normalize_comprehensive(query)
+        # Normalize query using global normalize function
+        normalized_query = normalize(query)
         if not normalized_query:
             return None
 
@@ -160,8 +160,8 @@ class TrieSearch:
         if not prefix or not self._trie:
             return []
 
-        # Normalize prefix using comprehensive normalization
-        normalized_prefix = normalize_comprehensive(prefix)
+        # Normalize prefix using global normalize function
+        normalized_prefix = normalize(prefix)
         if not normalized_prefix:
             return []
 

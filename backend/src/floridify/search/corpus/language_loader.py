@@ -22,7 +22,8 @@ from pydantic import BaseModel, Field
 from ...caching.core import CacheNamespace, CacheTTL, CompressionType
 from ...caching.unified import get_unified
 from ...models.definition import Language
-from ...text.normalize import normalize_comprehensive
+
+from ...text.normalize import normalize_vocabulary
 from ...utils.logging import get_logger
 from .constants import LexiconFormat
 from .sources import LEXICON_SOURCES, LexiconSourceConfig
@@ -164,16 +165,17 @@ class CorpusLanguageLoader:
             logger.debug(f"Source {source.name} provided {len(result)} items")
             vocabulary.extend(result)
 
-        # Deduplicate and normalize - use comprehensive for compile-time corpus building
-        logger.debug(f"Normalizing {len(vocabulary)} raw items")
-        normalized_set = set()
+        # Normalize and deduplicate vocabulary
+        logger.debug(f"Normalizing and deduplicating {len(vocabulary)} raw items")
+        normalized_vocabulary = []
+        seen = set()
         for item in vocabulary:
-            normalized = normalize_comprehensive(item)
-            if normalized:
-                normalized_set.add(normalized)
-
-        # Sort for consistency
-        vocabulary = sorted(normalized_set)
+            normalized = normalize_vocabulary(item)
+            if normalized and normalized not in seen:
+                normalized_vocabulary.append(normalized)
+                seen.add(normalized)
+        
+        vocabulary = sorted(normalized_vocabulary)
         logger.debug(f"After normalization and deduplication: {len(vocabulary)} unique items")
 
         return LexiconData(
@@ -239,8 +241,8 @@ class CorpusLanguageLoader:
             if not line or line.startswith("#"):
                 continue
 
-            # Normalize the entry
-            normalized = normalize_comprehensive(line)
+            # Normalize the vocabulary item
+            normalized = normalize_vocabulary(line)
             if normalized:
                 vocabulary.append(normalized)
 
@@ -275,9 +277,7 @@ class CorpusLanguageLoader:
                 continue
 
             if phrase_text:
-                normalized = normalize_comprehensive(phrase_text)
-                if normalized:
-                    vocabulary.append(normalized)
+                vocabulary.append(phrase_text)
 
         return vocabulary
 
@@ -294,9 +294,7 @@ class CorpusLanguageLoader:
             parts = line.split()
             if parts:
                 word = parts[0]
-                normalized = normalize_comprehensive(word)
-                if normalized:
-                    vocabulary.append(normalized)
+                vocabulary.append(word)
 
         return vocabulary
 
@@ -311,9 +309,7 @@ class CorpusLanguageLoader:
 
         if isinstance(data, dict):
             for key in data.keys():
-                normalized = normalize_comprehensive(key)
-                if normalized:
-                    vocabulary.append(normalized)
+                vocabulary.append(key)
 
         return vocabulary
 
@@ -329,9 +325,7 @@ class CorpusLanguageLoader:
         if isinstance(data, list):
             for item in data:
                 if isinstance(item, str):
-                    normalized = normalize_comprehensive(item)
-                    if normalized:
-                        vocabulary.append(normalized)
+                    vocabulary.append(item)
 
         return vocabulary
 
@@ -376,10 +370,7 @@ class CorpusLanguageLoader:
                     row.get("def") or row.get("definition") or row.get("meaning") or ""
                 ).strip()
 
-                # Normalize the idiom
-                normalized = normalize_comprehensive(idiom_text)
-                if normalized:
-                    vocabulary.append(normalized)
+                vocabulary.append(idiom_text)
 
         except Exception as e:
             logger.warning(f"Failed to parse CSV idioms: {e}")
@@ -411,10 +402,7 @@ class CorpusLanguageLoader:
                         # Clean up verb text (remove asterisks and plus signs)
                         verb_text = verb_text.replace("*", "").replace("+", "").strip()
 
-                        # Normalize the phrasal verb
-                        normalized = normalize_comprehensive(verb_text)
-                        if normalized:
-                            vocabulary.append(normalized)
+                        vocabulary.append(verb_text)
 
         except Exception as e:
             logger.warning(f"Failed to parse JSON phrasal verbs: {e}")
@@ -437,10 +425,7 @@ class CorpusLanguageLoader:
                 if not expression:
                     continue
 
-                # Normalize the expression
-                normalized = normalize_comprehensive(expression)
-                if normalized:
-                    vocabulary.append(normalized)
+                vocabulary.append(expression)
 
         return vocabulary
 

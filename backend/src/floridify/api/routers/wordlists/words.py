@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ....models import Word
-from ....text import normalize_comprehensive
+from ....text import normalize
 from ....wordlist.constants import Temperature
 from ...core import ListResponse, ResourceResponse
 from ...repositories import WordAddRequest, WordListRepository
@@ -138,7 +138,7 @@ async def apply_wordlist_filters_and_sort(
         word_ids = [w.word_id for w in filtered_items if w.word_id]
         words = await Word.find({"_id": {"$in": word_ids}}).to_list()
         # Create map with normalized text for proper sorting of diacritics and phrases
-        word_normalized_map = {str(word.id): normalize_comprehensive(word.text) for word in words}
+        word_normalized_map = {str(word.id): normalize(word.text) for word in words}
 
         # Update the word sort key to use normalized text
         sort_key_map["word"] = lambda w: word_normalized_map.get(str(w.word_id), "")

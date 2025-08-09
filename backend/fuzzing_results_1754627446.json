@@ -1,0 +1,817 @@
+{
+  "results": [
+    {
+      "query": "mise en place",
+      "expected": "mise en place",
+      "category": "exact",
+      "should_find": true,
+      "found": true,
+      "score": 1.0,
+      "position": 1,
+      "fuzzy_time_ms": 232.54733299836516,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "mise en place"
+      ]
+    },
+    {
+      "query": "raison d'\u00eatre",
+      "expected": "raison d'etre",
+      "category": "exact",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 196.00879191420972,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "joie de vivre",
+      "expected": "joie de vivre",
+      "category": "exact",
+      "should_find": true,
+      "found": true,
+      "score": 1.0,
+      "position": 1,
+      "fuzzy_time_ms": 186.88425002619624,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "joie de vivre"
+      ]
+    },
+    {
+      "query": "a fond",
+      "expected": "a fond",
+      "category": "exact",
+      "should_find": true,
+      "found": true,
+      "score": 1.0,
+      "position": 1,
+      "fuzzy_time_ms": 170.07412505336106,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "a fond",
+        "add on",
+        "act on",
+        "a la"
+      ]
+    },
+    {
+      "query": "en coulisse",
+      "expected": "en coulisse",
+      "category": "exact",
+      "should_find": true,
+      "found": true,
+      "score": 1.0,
+      "position": 1,
+      "fuzzy_time_ms": 207.44529203511775,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "en coulisse"
+      ]
+    },
+    {
+      "query": "recueillement",
+      "expected": "recueillement",
+      "category": "exact",
+      "should_find": true,
+      "found": true,
+      "score": 1.0,
+      "position": 1,
+      "fuzzy_time_ms": 196.94929104298353,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "recueillement",
+        "encirclement",
+        "recruitment",
+        "accouplements"
+      ]
+    },
+    {
+      "query": "mise en plase",
+      "expected": "mise en place",
+      "category": "minimal",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 171.0019581951201,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "mize en place",
+      "expected": "mise en place",
+      "category": "minimal",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 181.90208286978304,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "raison detre",
+      "expected": "raison d'etre",
+      "category": "minimal",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 192.85225006751716,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "razon detre",
+      "expected": "raison d'etre",
+      "category": "minimal",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 184.58925001323223,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "joi de vivre",
+      "expected": "joie de vivre",
+      "category": "minimal",
+      "should_find": true,
+      "found": true,
+      "score": 0.9747692307692308,
+      "position": 1,
+      "fuzzy_time_ms": 185.55700010620058,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "joie de vivre"
+      ]
+    },
+    {
+      "query": "a fon",
+      "expected": "a fond",
+      "category": "minimal",
+      "should_find": true,
+      "found": true,
+      "score": 1.0,
+      "position": 1,
+      "fuzzy_time_ms": 160.90845805592835,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "a fond"
+      ]
+    },
+    {
+      "query": "en couliss",
+      "expected": "en coulisse",
+      "category": "minimal",
+      "should_find": true,
+      "found": true,
+      "score": 1.0,
+      "position": 1,
+      "fuzzy_time_ms": 202.82320794649422,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "en coulisse"
+      ]
+    },
+    {
+      "query": "recueilment",
+      "expected": "recueillement",
+      "category": "minimal",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 200.58091590180993,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "recruitment",
+        "recueillement",
+        "curtailment",
+        "encirclement",
+        "accruements"
+      ]
+    },
+    {
+      "query": "mize en plase",
+      "expected": "mise en place",
+      "category": "moderate",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 173.1182080693543,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "razon detere",
+      "expected": "raison d'etre",
+      "category": "moderate",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 178.18541591987014,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "joye de vivr",
+      "expected": "joie de vivre",
+      "category": "moderate",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 173.0183339677751,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "en couliss",
+      "expected": "en coulisse",
+      "category": "moderate",
+      "should_find": true,
+      "found": true,
+      "score": 1.0,
+      "position": 1,
+      "fuzzy_time_ms": 189.84158313833177,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "en coulisse"
+      ]
+    },
+    {
+      "query": "recueilmnt",
+      "expected": "recueillement",
+      "category": "moderate",
+      "should_find": true,
+      "found": true,
+      "score": 0.6688963210702341,
+      "position": 2,
+      "fuzzy_time_ms": 194.85395890660584,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "recruitment",
+        "recueillement",
+        "curtailment",
+        "accrescent",
+        "accruement"
+      ]
+    },
+    {
+      "query": "mizz en plase",
+      "expected": "mise en place",
+      "category": "high",
+      "should_find": false,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 190.3006660286337,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "razoon deteer",
+      "expected": "raison d'etre",
+      "category": "high",
+      "should_find": false,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 199.8584580142051,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "joyyy de vivvr",
+      "expected": "joie de vivre",
+      "category": "high",
+      "should_find": false,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 187.45020893402398,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "en coulissee",
+      "expected": "en coulisse",
+      "category": "high",
+      "should_find": true,
+      "found": true,
+      "score": 0.9644927536231885,
+      "position": 1,
+      "fuzzy_time_ms": 175.19041686318815,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "en coulisse"
+      ]
+    },
+    {
+      "query": "definatly",
+      "expected": "definitely",
+      "category": "minimal",
+      "should_find": true,
+      "found": true,
+      "score": 0.7578947368421053,
+      "position": 3,
+      "fuzzy_time_ms": 186.48908287286758,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "defiantly",
+        "definably",
+        "definitely",
+        "dentality",
+        "defoliant"
+      ]
+    },
+    {
+      "query": "seperate",
+      "expected": "separate",
+      "category": "minimal",
+      "should_find": true,
+      "found": true,
+      "score": 0.875,
+      "position": 3,
+      "fuzzy_time_ms": 198.3438329771161,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "superate",
+        "asperate",
+        "separate",
+        "separata",
+        "aspirate"
+      ]
+    },
+    {
+      "query": "necesary",
+      "expected": "necessary",
+      "category": "minimal",
+      "should_find": true,
+      "found": true,
+      "score": 0.8366013071895423,
+      "position": 1,
+      "fuzzy_time_ms": 183.92254202626646,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "necessary",
+        "decenary",
+        "ancestry",
+        "accessary",
+        "cesarean"
+      ]
+    },
+    {
+      "query": "occured",
+      "expected": "occurred",
+      "category": "minimal",
+      "should_find": true,
+      "found": true,
+      "score": 0.8166666666666665,
+      "position": 1,
+      "fuzzy_time_ms": 182.24516604095697,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "occurred",
+        "sourced",
+        "reoccur",
+        "cloured",
+        "occlude"
+      ]
+    },
+    {
+      "query": "recieve",
+      "expected": "receive",
+      "category": "minimal",
+      "should_find": true,
+      "found": true,
+      "score": 0.8571428571428572,
+      "position": 1,
+      "fuzzy_time_ms": 178.08008403517306,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "receive",
+        "relieve",
+        "screeve",
+        "scrieve",
+        "deceive"
+      ]
+    },
+    {
+      "query": "embarass",
+      "expected": "embarrass",
+      "category": "minimal",
+      "should_find": true,
+      "found": true,
+      "score": 0.8366013071895423,
+      "position": 1,
+      "fuzzy_time_ms": 193.84666602127254,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "embarrass",
+        "embraves",
+        "embreads",
+        "madrases",
+        "embraces"
+      ]
+    },
+    {
+      "query": "definatley",
+      "expected": "definitely",
+      "category": "moderate",
+      "should_find": true,
+      "found": true,
+      "score": 0.8,
+      "position": 1,
+      "fuzzy_time_ms": 199.40458401106298,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "definitely",
+        "defiantly",
+        "definability",
+        "indefinitely",
+        "diffidently"
+      ]
+    },
+    {
+      "query": "sepparate",
+      "expected": "separate",
+      "category": "moderate",
+      "should_find": true,
+      "found": true,
+      "score": 0.8366013071895423,
+      "position": 3,
+      "fuzzy_time_ms": 167.1424580272287,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "separated",
+        "separates",
+        "separate",
+        "aspartate",
+        "separator"
+      ]
+    },
+    {
+      "query": "necesssary",
+      "expected": "necessary",
+      "category": "moderate",
+      "should_find": true,
+      "found": true,
+      "score": 0.8526315789473685,
+      "position": 1,
+      "fuzzy_time_ms": 181.6999160218984,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "necessary",
+        "unnecessary",
+        "accessary",
+        "ancestress"
+      ]
+    },
+    {
+      "query": "recieveing",
+      "expected": "receiving",
+      "category": "moderate",
+      "should_find": true,
+      "found": true,
+      "score": 0.7578947368421053,
+      "position": 3,
+      "fuzzy_time_ms": 185.72224979288876,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "receivings",
+        "recovering",
+        "receiving",
+        "screevings",
+        "scrivening"
+      ]
+    },
+    {
+      "query": "embarrasing",
+      "expected": "embarrassing",
+      "category": "moderate",
+      "should_find": true,
+      "found": true,
+      "score": 0.8768115942028986,
+      "position": 1,
+      "fuzzy_time_ms": 193.7929589767009,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "embarrassing",
+        "embarrings",
+        "embarring",
+        "germanising",
+        "marbelising"
+      ]
+    },
+    {
+      "query": "xqzwerty",
+      "expected": "definitely",
+      "category": "extreme",
+      "should_find": false,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 186.42754200845957,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "qwerty"
+      ]
+    },
+    {
+      "query": "abcdefgh",
+      "expected": "mise en place",
+      "category": "extreme",
+      "should_find": false,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 177.7510829269886,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "zzzzz",
+      "expected": "necessary",
+      "category": "extreme",
+      "should_find": false,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 200.4857079591602,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "mise place en",
+      "expected": "mise en place",
+      "category": "extreme",
+      "should_find": false,
+      "found": true,
+      "score": 1.0,
+      "position": 1,
+      "fuzzy_time_ms": 223.84966700337827,
+      "semantic_time_ms": 0.0,
+      "top_results": [
+        "mise en place"
+      ]
+    },
+    {
+      "query": "setup",
+      "expected": "mise en place",
+      "category": "semantic",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 159.74608319811523,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "reason for being",
+      "expected": "raison d'etre",
+      "category": "semantic",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 186.611375072971,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "joy of living",
+      "expected": "joie de vivre",
+      "category": "semantic",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 176.6369161196053,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "backstage",
+      "expected": "en coulisse",
+      "category": "semantic",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 178.09354211203754,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    },
+    {
+      "query": "contemplation",
+      "expected": "recueillement",
+      "category": "semantic",
+      "should_find": true,
+      "found": false,
+      "score": 0,
+      "position": -1,
+      "fuzzy_time_ms": 201.7559588421136,
+      "semantic_time_ms": 0.0,
+      "top_results": []
+    }
+  ],
+  "analysis": {
+    "overall": {
+      "total_tests": 43,
+      "passed": 28,
+      "failed": 15,
+      "accuracy": 0.6511627906976745,
+      "avg_fuzzy_time_ms": 187.76718307243183,
+      "avg_semantic_time_ms": 0
+    },
+    "by_category": {
+      "exact": {
+        "total": 6,
+        "passed": 5,
+        "accuracy": 0.8333333333333334,
+        "avg_score": 1.0,
+        "avg_position": 1.0
+      },
+      "minimal": {
+        "total": 14,
+        "passed": 9,
+        "accuracy": 0.6428571428571429,
+        "avg_score": 0.8838529006444381,
+        "avg_position": 1.4444444444444444
+      },
+      "moderate": {
+        "total": 10,
+        "passed": 7,
+        "accuracy": 0.7,
+        "avg_score": 0.8275479340360212,
+        "avg_position": 1.7142857142857142
+      },
+      "high": {
+        "total": 4,
+        "passed": 4,
+        "accuracy": 1.0,
+        "avg_score": 0.9644927536231885,
+        "avg_position": 1.0
+      },
+      "extreme": {
+        "total": 4,
+        "passed": 3,
+        "accuracy": 0.75,
+        "avg_score": 1.0,
+        "avg_position": 1.0
+      },
+      "semantic": {
+        "total": 5,
+        "passed": 0,
+        "accuracy": 0.0,
+        "avg_score": 0,
+        "avg_position": 0
+      }
+    },
+    "failures": [
+      {
+        "query": "raison d'\u00eatre",
+        "expected": "raison d'etre",
+        "category": "exact",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": []
+      },
+      {
+        "query": "mise en plase",
+        "expected": "mise en place",
+        "category": "minimal",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": []
+      },
+      {
+        "query": "mize en place",
+        "expected": "mise en place",
+        "category": "minimal",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": []
+      },
+      {
+        "query": "raison detre",
+        "expected": "raison d'etre",
+        "category": "minimal",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": []
+      },
+      {
+        "query": "razon detre",
+        "expected": "raison d'etre",
+        "category": "minimal",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": []
+      },
+      {
+        "query": "recueilment",
+        "expected": "recueillement",
+        "category": "minimal",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": [
+          "recruitment",
+          "recueillement",
+          "curtailment"
+        ]
+      },
+      {
+        "query": "mize en plase",
+        "expected": "mise en place",
+        "category": "moderate",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": []
+      },
+      {
+        "query": "razon detere",
+        "expected": "raison d'etre",
+        "category": "moderate",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": []
+      },
+      {
+        "query": "joye de vivr",
+        "expected": "joie de vivre",
+        "category": "moderate",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": []
+      },
+      {
+        "query": "mise place en",
+        "expected": "mise en place",
+        "category": "extreme",
+        "should_find": false,
+        "actually_found": true,
+        "top_results": [
+          "mise en place"
+        ]
+      },
+      {
+        "query": "setup",
+        "expected": "mise en place",
+        "category": "semantic",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": []
+      },
+      {
+        "query": "reason for being",
+        "expected": "raison d'etre",
+        "category": "semantic",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": []
+      },
+      {
+        "query": "joy of living",
+        "expected": "joie de vivre",
+        "category": "semantic",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": []
+      },
+      {
+        "query": "backstage",
+        "expected": "en coulisse",
+        "category": "semantic",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": []
+      },
+      {
+        "query": "contemplation",
+        "expected": "recueillement",
+        "category": "semantic",
+        "should_find": true,
+        "actually_found": false,
+        "top_results": []
+      }
+    ],
+    "edge_cases": [
+      {
+        "query": "recueilmnt",
+        "expected": "recueillement",
+        "score": 0.6688963210702341,
+        "position": 2
+      }
+    ]
+  }
+}

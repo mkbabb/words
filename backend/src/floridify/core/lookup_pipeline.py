@@ -43,7 +43,7 @@ async def lookup_word_pipeline(
     word: str,
     providers: list[DictionaryProvider] | None = None,
     languages: list[Language] | None = None,
-    semantic: bool = False,
+    semantic: bool = True,
     no_ai: bool = False,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
@@ -355,8 +355,6 @@ async def _synthesize_with_ai(
 
         return result
     except Exception as e:
-        import traceback
-
         logger.error(f"❌ AI synthesis failed for '{word}': {e}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")
         return None

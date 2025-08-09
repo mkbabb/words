@@ -19,8 +19,10 @@ from .normalize import (
     # Lemmatization
     lemmatize_word,
     # Core normalization
+    normalize,
     normalize_comprehensive,
     normalize_fast,
+    normalize_simple,
     # Diacritics
     remove_diacritics,
 )
@@ -31,22 +33,21 @@ from .phrase import is_phrase
 # Tokenization functions removed - module no longer exists
 
 __all__ = [
-    # Core
+    # Core normalization
+    "normalize",
     "normalize_comprehensive",
-    "normalize_fast",
+    "normalize_fast", 
+    "normalize_simple",
     "batch_normalize",
-    "clean_word",
     "is_valid_word",
     "remove_diacritics",
+    # Lemmatization
     "lemmatize_word",
     "batch_lemmatize",
     "clear_lemma_cache",
     "get_lemma_cache_stats",
-    "basic_lemmatize",
     # Phrase
     "is_phrase",
-    # Search functions moved to search/utils.py
-    # Tokenization functions removed - module no longer exists
     # Patterns
     "WHITESPACE_PATTERN",
     "PUNCTUATION_PATTERN",

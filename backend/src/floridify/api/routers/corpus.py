@@ -31,7 +31,7 @@ class CorpusSearchQueryParams(BaseModel):
     query: str = Field(..., min_length=1, description="Search query")
     max_results: int = Field(default=20, ge=1, le=100, description="Maximum results to return")
     min_score: float = Field(default=0.6, ge=0.0, le=1.0, description="Minimum relevance score")
-    semantic: bool = Field(default=False, description="Enable semantic search")
+    semantic: bool = Field(default=True, description="Enable semantic search")
     semantic_weight: float = Field(
         default=0.7, ge=0.0, le=1.0, description="Weight for semantic results"
     )

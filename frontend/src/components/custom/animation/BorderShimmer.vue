@@ -4,16 +4,47 @@
     class="pointer-events-none absolute inset-0 z-[25]"
     :style="{ borderRadius: radius }"
     aria-hidden="true"
+    ref="rootEl"
   >
-    <div
-      class="border-shimmer-overlay"
-      :style="overlayStyle"
-    />
+    <svg
+      class="absolute inset-0 w-full h-full"
+      :style="{ borderRadius: radius }"
+      xmlns="http://www.w3.org/2000/svg"
+      :viewBox="`0 0 ${vbWidth} ${vbHeight}`"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <defs>
+        <filter :id="filterId" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceGraphic" :stdDeviation="glowBlur" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      <rect
+        :x="ringView/2"
+        :y="ringView/2"
+        :width="vbWidth - ringView"
+        :height="vbHeight - ringView"
+        :rx="corner"
+        :ry="corner"
+        fill="none"
+        :stroke="props.color"
+        :stroke-width="ringView"
+        stroke-linecap="round"
+        :pathLength="pathLength"
+        :stroke-dasharray="`${bead} ${gap}`"
+        :style="rectStyle"
+        :filter="`url(#${filterId})`"
+      />
+    </svg>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 
 interface Props {
   active?: boolean
@@ -29,6 +60,8 @@ interface Props {
   intensity?: number
   /** Match the host element's border width in px to draw on the border itself */
   borderWidth?: number
+  /** Optional numeric corner radius for the path; otherwise auto-measured */
+  cornerRadius?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -39,55 +72,77 @@ const props = withDefaults(defineProps<Props>(), {
   duration: 2600,
   intensity: 0.9,
   borderWidth: 2,
+  cornerRadius: undefined,
 })
 
-const overlayStyle = computed(() => ({
-  '--shimmer-color': props.color,
-  '--shimmer-thickness': `${props.thickness}px`,
-  '--shimmer-speed': `${props.duration}ms`,
-  '--shimmer-opacity': String(props.intensity),
-  '--ring-width': `${props.borderWidth}px`,
+const filterId = `border-glow-${Math.random().toString(36).slice(2)}`
+
+// Fixed viewBox to normalize path length and animation
+const vbWidth = 1000
+const vbHeight = 600
+
+const pathLength = 1000
+const bead = 22
+const gap = pathLength - bead
+
+// Dynamic mapping from px to viewBox units via ResizeObserver
+const ringView = ref(2)
+const corner = ref(16)
+
+const rootEl = ref<HTMLElement | null>(null)
+let ro: ResizeObserver | null = null
+
+const recalc = () => {
+  const el = rootEl.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const width = Math.max(1, rect.width)
+  const scaleX = vbWidth / width
+  // Border width to viewBox units (slightly thicker than exact for visibility)
+  ringView.value = Math.max(1, (props.borderWidth || 2) * scaleX * 1.0)
+  // Corner radius from computed style (fallback to prop or 16)
+  const cs = getComputedStyle(el)
+  const br = cs.borderTopLeftRadius || cs.borderRadius || '16px'
+  const px = parseFloat(br)
+  const sourceCorner = props.cornerRadius ?? (Number.isFinite(px) ? px : 16)
+  corner.value = Math.max(2, sourceCorner * scaleX)
+}
+
+onMounted(() => {
+  const wrapper = rootEl.value
+  if (!wrapper) return
+  recalc()
+  if ('ResizeObserver' in window) {
+    ro = new ResizeObserver(() => recalc())
+    ro.observe(wrapper)
+  } else {
+    // Fallback: recalc once more after a paint
+    requestAnimationFrame(recalc)
+  }
+})
+
+onBeforeUnmount(() => { if (ro) { ro.disconnect(); ro = null } })
+
+const speedMs = computed(() => Math.max(1200, props.duration))
+const glowBlur = 0.9
+const rectStyle = computed(() => ({
+  animation: `border-sweep ${speedMs.value}ms cubic-bezier(0.55,0.12,0.18,1) infinite`,
+  opacity: String(props.intensity ?? 0.8),
 }))
 </script>
 
 <style scoped>
-.border-shimmer-overlay {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  /* Draw gradient in the border ring via background-clip */
-  border: var(--ring-width) solid transparent;
-  background:
-    linear-gradient(#0000, #0000) padding-box,
-    conic-gradient(
-      from 0deg at 50% 50%,
-      transparent 0deg,
-      transparent 334deg,
-      color-mix(in srgb, var(--shimmer-color), white 25%) 342deg,
-      color-mix(in srgb, var(--shimmer-color), white 55%) 350deg,
-      color-mix(in srgb, var(--shimmer-color), transparent 35%) 356deg,
-      transparent 360deg
-    ) border-box;
-  background-clip: padding-box, border-box;
-  /* Slight softening to remove harsh edges and imply bulge */
-  filter: blur(0.35px)
-          drop-shadow(0 0 5px color-mix(in srgb, var(--shimmer-color), white 20%))
-          drop-shadow(0 0 1px color-mix(in srgb, var(--shimmer-color), white 10%));
-  animation: shimmer-rotate var(--shimmer-speed) linear infinite, shimmer-pulse 2000ms ease-in-out infinite;
-  opacity: var(--shimmer-opacity);
+@keyframes border-sweep {
+  0%   { stroke-dashoffset: 0; opacity: 0.0; }
+  30%  { stroke-dashoffset: -120; opacity: 0.08; }
+  70%  { stroke-dashoffset: -820; opacity: 1.0; }
+  100% { stroke-dashoffset: -1000; opacity: 0.0; }
 }
 
-@keyframes shimmer-rotate {
-  from { transform: rotate(0turn); }
-  to { transform: rotate(1turn); }
-}
-
-@keyframes shimmer-pulse {
+@keyframes border-pulse {
   0%, 100% { opacity: calc(var(--shimmer-opacity) * 0.85); }
   50% { opacity: calc(var(--shimmer-opacity) * 1); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .border-shimmer-overlay { animation: none; opacity: 0.6; }
-}
+@media (prefers-reduced-motion: reduce) { rect { animation: none !important; opacity: 0.6; } }
 </style>

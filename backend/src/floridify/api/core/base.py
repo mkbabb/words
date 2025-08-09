@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import builtins
+import hashlib
+import json
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, TypeVar
@@ -247,9 +249,6 @@ class BaseRepository[T: Document, CreateSchema: BaseModel, UpdateSchema: BaseMod
 
 def get_etag(data: Any) -> str:
     """Generate ETag for response data."""
-    import hashlib
-    import json
-
     content = json.dumps(data, sort_keys=True, default=str)
     return hashlib.md5(content.encode()).hexdigest()
 

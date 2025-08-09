@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from ....utils.logging import get_logger
 
@@ -38,7 +38,7 @@ async def scrape_french_expressions(url: str = "", **kwargs: Any) -> dict[str, A
 
     # Find all dt/dd pairs in the main content
     content = soup.find("div", {"class": "mw-content-ltr"})
-    if not content or not hasattr(content, "find_all"):
+    if not content or not isinstance(content, Tag):
         logger.warning("Could not find main content")
         return {"data": []}
 

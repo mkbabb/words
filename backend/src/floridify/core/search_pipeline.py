@@ -58,7 +58,7 @@ async def reset_search_engine() -> None:
 async def search_word_pipeline(
     word: str,
     languages: list[Language] | None = None,
-    semantic: bool = False,
+    semantic: bool = True,
     max_results: int = 10,
 ) -> list[SearchResult]:
     """Generalized word search pipeline.
@@ -132,7 +132,7 @@ async def search_word_pipeline(
 async def find_best_match(
     word: str,
     languages: list[Language] | None = None,
-    semantic: bool = False,
+    semantic: bool = True,
 ) -> SearchResult | None:
     """Find the single best match for a word.
 

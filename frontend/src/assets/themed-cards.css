@@ -119,15 +119,7 @@
                 color-mix(in srgb, var(--theme-gradient-mid), transparent 88%) 120px,
                 transparent 180px
             ),
-            /* Gentle conic highlight for depth */
-            conic-gradient(
-                from 200deg at 50% 50%,
-                transparent 0deg,
-                color-mix(in srgb, var(--theme-gradient-mid), white 14%) 24deg,
-                transparent 48deg,
-                color-mix(in srgb, var(--theme-gradient-end), white 12%) 160deg,
-                transparent 360deg
-            ),
+            /* Removed conic highlight for simpler, non-conical look */
             /* Base metallic gradient */
             linear-gradient(
                 135deg,
@@ -737,15 +729,7 @@
             color-mix(in srgb, var(--theme-gradient-mid), transparent 88%) 96px,
             transparent 144px
         ),
-        /* Subtle conic hint */
-        conic-gradient(
-            from 180deg at 50% 50%,
-            transparent 0deg,
-            color-mix(in srgb, var(--theme-gradient-mid), white 12%) 24deg,
-            transparent 48deg,
-            color-mix(in srgb, var(--theme-gradient-end), white 10%) 200deg,
-            transparent 360deg
-        ),
+        /* Removed conic hint for hover */
         linear-gradient(
             135deg,
             var(--theme-gradient-start) 0%,
