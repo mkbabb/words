@@ -1,0 +1,62 @@
+# WOTD ML Training Container - SageMaker Compatible
+FROM python:3.11-slim
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PyTorch with CUDA support for training
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Install ML training dependencies
+RUN pip install \
+    transformers[torch] \
+    sentence-transformers \
+    peft \
+    openai \
+    boto3 \
+    sagemaker \
+    accelerate \
+    datasets \
+    numpy \
+    scipy \
+    scikit-learn \
+    pydantic \
+    asyncio \
+    aiofiles \
+    motor \
+    beanie
+
+# Install monitoring and optimization
+RUN pip install \
+    tensorboard \
+    psutil \
+    gpustat
+
+# SageMaker directories
+RUN mkdir -p /opt/ml/code /opt/ml/input /opt/ml/output /opt/ml/model
+
+# Copy WOTD system
+COPY src/floridify/wotd /opt/ml/code/wotd
+COPY src/floridify/ai /opt/ml/code/ai
+COPY src/floridify/utils /opt/ml/code/utils
+COPY src/floridify/caching /opt/ml/code/caching
+COPY src/floridify/storage /opt/ml/code/storage
+COPY src/floridify/search/semantic /opt/ml/code/search/semantic
+
+# Copy training script
+COPY src/floridify/wotd/deployment/train.py /opt/ml/code/
+
+# Set working directory and Python path
+WORKDIR /opt/ml/code
+ENV PYTHONPATH=/opt/ml/code
+
+# SageMaker environment variables
+ENV SAGEMAKER_PROGRAM=train.py
+ENV SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/code
+
+# Entry point for SageMaker training
+ENTRYPOINT ["python", "train.py"]

@@ -8,8 +8,10 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from ...core.search_pipeline import get_search_engine, search_word_pipeline
+from ...core.search_pipeline import search_word_pipeline
 from ...models.definition import Language
+from ...search.constants import SearchMode
+from ...search.language import get_language_search
 from ...utils.logging import get_logger
 from ..utils.formatting import format_error, format_warning
 
@@ -33,9 +35,20 @@ def search_group() -> None:
     help="Lexicon languages to search",
 )
 @click.option(
-    "--semantic",
+    "--mode",
+    type=click.Choice([mode.value for mode in SearchMode], case_sensitive=False),
+    default=SearchMode.SMART.value,
+    help="Search mode: smart (default), exact, fuzzy, semantic",
+)
+@click.option(
+    "--min-score",
+    type=float,
+    help="Minimum relevance score (0.0-1.0)",
+)
+@click.option(
+    "--force-rebuild",
     is_flag=True,
-    help="Use semantic search for contextual matches",
+    help="Force rebuild of search indices",
 )
 @click.option(
     "--max-results",
@@ -43,12 +56,12 @@ def search_group() -> None:
     default=20,
     help="Maximum number of results to show",
 )
-def search_word(query: str, language: tuple[str, ...], semantic: bool, max_results: int) -> None:
+def search_word(query: str, language: tuple[str, ...], mode: str, max_results: int, min_score: float | None, force_rebuild: bool) -> None:
     """Search for words in lexicons.
 
     QUERY: The word or phrase to search for
     """
-    asyncio.run(_search_word_async(query, language, semantic, max_results))
+    asyncio.run(_search_word_async(query, language, mode, max_results, min_score, force_rebuild))
 
 
 @search_group.command("similar")
@@ -88,21 +101,25 @@ def search_stats(language: tuple[str, ...]) -> None:
 
 
 async def _search_word_async(
-    query: str, language: tuple[str, ...], semantic: bool, max_results: int
+    query: str, language: tuple[str, ...], mode: str, max_results: int, min_score: float | None, force_rebuild: bool
 ) -> None:
     """Async implementation of word search."""
-    logger.info(f"Searching for: '{query}' (semantic: {semantic})")
+    logger.info(f"Searching for: '{query}' (mode: {mode})")
 
     try:
         # Convert to enums
         languages = [Language(lang) for lang in language]
 
         # Perform search using the pipeline
+        search_mode = SearchMode(mode)
+        
         results = await search_word_pipeline(
             word=query,
             languages=languages,
-            semantic=semantic,
+            mode=search_mode,
             max_results=max_results,
+            min_score=min_score,
+            force_rebuild=force_rebuild,
         )
 
         if results:
@@ -121,8 +138,8 @@ async def _search_word_async(
             console.print(f"\n✅ Found {len(results)} result(s)")
         else:
             console.print(format_warning(f"No results found for '{query}'"))
-            if not semantic:
-                console.print("💡 Try using --semantic for broader matches")
+            if search_mode != SearchMode.SEMANTIC:
+                console.print("💡 Try using --mode=semantic for broader matches")
 
     except Exception as e:
         logger.error(f"Search failed: {e}")
@@ -141,8 +158,9 @@ async def _search_similar_async(word: str, language: tuple[str, ...], max_result
         results = await search_word_pipeline(
             word=word,
             languages=languages,
-            semantic=True,
+            mode=SearchMode.SEMANTIC,  # Use semantic mode for similar words
             max_results=max_results + 1,  # +1 to account for the original word
+            min_score=0.6,  # Default minimum score for similar words
         )
 
         # Filter out the original word
@@ -179,8 +197,8 @@ async def _search_stats_async(language: tuple[str, ...]) -> None:
         # Convert to enums
         languages = [Language(lang) for lang in language]
 
-        # Get search engine instance
-        search_engine = await get_search_engine(languages=languages)
+        # Get language search instance
+        search_engine = await get_language_search(languages=languages)
 
         # Get stats from the search engine
         stats = search_engine.get_stats()

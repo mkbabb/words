@@ -281,3 +281,23 @@ class PromptTemplateManager:
             part_of_speech=part_of_speech,
             enumerate=enumerate,
         )
+
+    def get_synthetic_corpus_prompt(
+        self,
+        style: str,
+        complexity: str,
+        era: str,
+        num_words: int,
+        theme: str | None = None,
+        avoid_words: list[str] | None = None,
+    ) -> str:
+        """Generate prompt for synthetic training corpus generation."""
+        return self.render_template(
+            "wotd/synthetic_corpus",
+            style=style,
+            complexity=complexity,
+            era=era,
+            num_words=num_words,
+            theme=theme,
+            avoid_words=avoid_words or [],
+        )

@@ -81,9 +81,9 @@ async def get_current_word_of_the_day(
             "next_send_time": batch.next_send_time,
         },
         links={
-            "batch": f"/word-of-the-day/batches/{batch.id}",
-            "config": "/word-of-the-day/config",
-            "history": "/word-of-the-day/history",
+            "batch": f"/wotd/batches/{batch.id}",
+            "config": "/wotd/config",
+            "history": "/wotd/history",
         },
     )
 

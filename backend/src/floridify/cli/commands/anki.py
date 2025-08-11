@@ -12,9 +12,9 @@ from ...ai.factory import get_openai_connector
 from ...anki.constants import CardType
 from ...anki.generator import AnkiCardGenerator
 from ...core.lookup_pipeline import lookup_word_pipeline
-from ...core.search_pipeline import get_search_engine
 from ...models import Word
 from ...models.definition import DictionaryProvider, Language
+from ...search.language import get_language_search
 from ...storage.mongodb import _ensure_initialized
 from ...text import normalize
 from ...utils.logging import get_logger
@@ -150,7 +150,7 @@ async def _export_async(
         # First pass: normalize words and build frequency map
         console.print("🔍 Normalizing words and building frequency map...")
 
-        search_engine = await get_search_engine(languages=[Language.ENGLISH])
+        search_engine = await get_language_search(languages=[Language.ENGLISH])
 
         word_frequency_map: dict[str, int] = {}
         original_word_map: dict[str, str] = {}  # normalized -> first original word seen

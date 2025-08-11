@@ -5,8 +5,8 @@ from .api.free_dictionary import FreeDictionaryConnector
 from .api.merriam_webster import MerriamWebsterConnector
 from .api.oxford import OxfordConnector
 from .base import BatchConnector, BulkDownloadConnector, DictionaryConnector
-from .batch.bulk_downloader import BulkDownloader, WiktionaryBulkDownloader
-from .batch.corpus_walker import CorpusWalker, MultiProviderWalker
+# Batch processing moved to scrape.py
+from .scrape import BulkScraper, BulkScrapingConfig
 from .local.apple_dictionary import AppleDictionaryConnector
 from .scraper.dictionary_com import DictionaryComConnector
 from .scraper.wiktionary import WiktionaryConnector
@@ -38,11 +38,9 @@ __all__ = [
     "WordHippoConnector",
     # Local connectors
     "AppleDictionaryConnector",
-    # Batch processing
-    "CorpusWalker",
-    "MultiProviderWalker",
-    "BulkDownloader",
-    "WiktionaryBulkDownloader",
+    # Bulk scraping
+    "BulkScraper",
+    "BulkScrapingConfig",
     # Union type
     "Connector",
 ]

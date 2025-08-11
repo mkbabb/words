@@ -1,0 +1,53 @@
+# WOTD ML Inference Container - SageMaker Compatible
+FROM python:3.11-slim
+
+# System dependencies for inference
+RUN apt-get update && apt-get install -y \
+    curl \
+    nginx \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PyTorch CPU for efficient inference
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Install inference dependencies
+RUN pip install \
+    transformers \
+    sentence-transformers \
+    peft \
+    openai \
+    boto3 \
+    sagemaker-inference \
+    flask \
+    gunicorn \
+    pydantic \
+    numpy \
+    redis \
+    motor \
+    beanie
+
+# SageMaker inference directories
+RUN mkdir -p /opt/ml/model /opt/ml/code
+
+# Copy WOTD system (inference-only components)
+COPY src/floridify/wotd /opt/ml/code/wotd
+COPY src/floridify/ai /opt/ml/code/ai
+COPY src/floridify/utils /opt/ml/code/utils
+COPY src/floridify/caching /opt/ml/code/caching
+COPY src/floridify/storage /opt/ml/code/storage
+COPY src/floridify/search/semantic /opt/ml/code/search/semantic
+
+# Copy inference script and nginx config
+COPY src/floridify/wotd/deployment/inference.py /opt/ml/code/
+COPY src/floridify/wotd/deployment/nginx.conf /etc/nginx/nginx.conf
+
+# Set working directory and Python path
+WORKDIR /opt/ml/code
+ENV PYTHONPATH=/opt/ml/code
+ENV MODEL_PATH=/opt/ml/model
+
+# Expose port for SageMaker
+EXPOSE 8080
+
+# Entry point for SageMaker inference
+ENTRYPOINT ["python", "inference.py"]

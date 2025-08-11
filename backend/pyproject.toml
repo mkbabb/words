@@ -5,9 +5,6 @@ description = "AI-Enhanced Dictionary and Learning Tool"
 authors = [{ name = "Mike Babb", email = "mike7400@gmail.com" }]
 requires-python = ">=3.12"
 
-[project.scripts]
-floridify = "floridify.cli:cli"
-
 dependencies = [
     "httpx>=0.28.0",
     "motor>=3.6.0",
@@ -64,8 +61,12 @@ dependencies = [
     "optimum[onnxruntime]>=1.16.0",
     "python-levenshtein>=0.27.1",
     "pyobjc-framework-coreservices>=11.1",
-    "cached-property>=2.0.1",
+    "boto3>=1.40.7",
+    "botocore>=1.40.7",
 ]
+
+[project.scripts]
+floridify = "floridify.cli:cli"
 
 
 [build-system]

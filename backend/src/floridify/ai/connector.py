@@ -34,6 +34,7 @@ from .models import (
     RegisterClassificationResponse,
     SuggestionsResponse,
     SynonymGenerationResponse,
+    SyntheticCorpusResponse,
     SynthesisResponse,
     UsageNoteResponse,
     WordFormResponse,
@@ -989,4 +990,58 @@ class OpenAIConnector:
             return result
         except Exception as e:
             logger.error(f"❌ Word of the Day generation failed: {e}")
+            raise
+
+    async def generate_synthetic_corpus(
+        self,
+        style: str,
+        complexity: str,
+        era: str,
+        num_words: int,
+        theme: str | None = None,
+        avoid_words: list[str] | None = None,
+    ) -> SyntheticCorpusResponse:
+        """Generate a synthetic corpus for WOTD training.
+
+        Args:
+            style: Target style category (classical, modern, romantic, neutral)
+            complexity: Target complexity level (beautiful, simple, complex, plain)
+            era: Target era (shakespearean, victorian, modernist, contemporary)
+            num_words: Number of words to generate
+            theme: Optional thematic focus
+            avoid_words: Words to avoid in generation
+
+        Returns:
+            SyntheticCorpusResponse with generated corpus
+        """
+        logger.info(
+            f"🧬 Generating synthetic corpus: {style}/{complexity}/{era} "
+            f"({num_words} words)"
+            f"{f' themed: {theme}' if theme else ''}"
+        )
+
+        prompt = self.template_manager.get_synthetic_corpus_prompt(
+            style=style,
+            complexity=complexity,
+            era=era,
+            num_words=num_words,
+            theme=theme,
+            avoid_words=avoid_words,
+        )
+
+        try:
+            result = await self._make_structured_request(
+                prompt, 
+                SyntheticCorpusResponse, 
+                task_name="generate_synthetic_corpus",
+                tier=ModelTier.HIGH  # Use GPT-5 or best available model
+            )
+
+            logger.success(
+                f"✨ Generated {result.total_generated} words for {style}/{complexity}/{era} corpus "
+                f"(quality: {result.quality_score:.1%})"
+            )
+            return result
+        except Exception as e:
+            logger.error(f"❌ Synthetic corpus generation failed: {e}")
             raise

@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 
 from ..models.definition import Language
+from ..search.constants import SearchMode
 from ..search.core import SearchResult
 from ..search.language import LanguageSearch, get_language_search
 from ..utils.logging import (

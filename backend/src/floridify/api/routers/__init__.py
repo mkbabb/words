@@ -17,8 +17,10 @@ from .words import (
     definitions_router as definitions,
     examples_router as examples,
     main_router as words,
-    ml_word_of_the_day_router as ml_word_of_the_day,
-    word_of_the_day_router as word_of_the_day,
+)
+from .wotd import (
+    main_router as wotd_main,
+    ml_router as wotd_ml,
 )
 
 __all__ = [
@@ -30,13 +32,13 @@ __all__ = [
     "health",
     "images",
     "lookup",
-    "ml_word_of_the_day",
     "search",
     "suggestions",
-    "word_of_the_day",
     "wordlist_reviews",
     "wordlist_search",
     "wordlist_words",
     "wordlists",
     "words",
+    "wotd_main",
+    "wotd_ml",
 ]

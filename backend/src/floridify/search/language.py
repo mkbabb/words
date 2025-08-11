@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..models.definition import CorpusType, Language
+from ..models.definition import Language
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMode
 from .core import SearchEngine, SearchResult
@@ -66,49 +66,24 @@ class LanguageSearch:
             f"Initializing language search for {[lang.value for lang in self.languages]} (semantic={'enabled' if self.semantic else 'disabled'})"
         )
 
-        # Generate deterministic corpus ID and name - inline simple logic
-        lang_codes = "-".join(sorted(lang.value for lang in self.languages))
-        corpus_name = f"{CorpusType.LANGUAGE_SEARCH.value}_{lang_codes}"
-        logger.info(f"Corpus name: '{corpus_name}'")
-
-        # Load vocabulary from language sources
+        # Load vocabulary and create corpus using unified language loader
         logger.debug(f"Creating language loader (force_rebuild={self.force_rebuild})")
         loader = CorpusLanguageLoader(force_rebuild=self.force_rebuild)
-        await loader.load_languages(self.languages)
-
-        # Get vocabulary
-        vocabulary = loader.get_vocabulary()
-        logger.info(f"Language loader provided {len(vocabulary)} vocabulary items")
-
-        if not vocabulary:
-            logger.error(f"No vocabulary loaded for languages {self.languages}")
-            raise ValueError(f"No vocabulary loaded for languages {self.languages}")
-
-        # Normalize vocabulary using batch processing
-        from ..text.normalize import batch_normalize, normalize_vocabulary_fast
-
-        logger.info(f"Normalizing {len(vocabulary)} vocabulary items...")
-        vocabulary = batch_normalize(vocabulary, normalize_vocabulary_fast)
-
-        # Deduplicate after normalization
-        vocabulary = sorted(set(vocabulary))
-        logger.info(f"Normalized and deduplicated vocabulary: {len(vocabulary)} items")
-
-        # Get or create corpus through manager (uses cache if available)
-        logger.info(f"Getting or creating corpus '{corpus_name}'")
-        corpus = await self._corpus_manager.get_or_create_corpus(
-            corpus_name=corpus_name,
-            vocabulary=vocabulary,
-            force_rebuild=self.force_rebuild,
+        
+        # Get or create corpus (handles vocabulary loading, normalization, and corpus creation)
+        corpus = await loader.get_or_create_corpus(
+            languages=self.languages,
+            force_rebuild=self.force_rebuild
         )
+        
         logger.info(
             f"Corpus ready: '{corpus.corpus_name}' (full hash: {corpus.vocabulary_hash}, {len(corpus.vocabulary)} items)"
         )
 
         # Initialize search engine with corpus name
-        logger.info(f"Creating SearchEngine for corpus '{corpus_name}' with {self.semantic_model if self.semantic else 'no semantic'}")
+        logger.info(f"Creating SearchEngine for corpus '{corpus.corpus_name}' with {self.semantic_model if self.semantic else 'no semantic'}")
         self.search_engine = SearchEngine(
-            corpus_name=corpus_name,
+            corpus_name=corpus.corpus_name,
             min_score=self.min_score,
             semantic=self.semantic,
             semantic_model=self.semantic_model,

@@ -29,10 +29,16 @@ from rich.progress import (
 from rich.table import Table
 from rich.text import Text
 
-from ...connectors.batch.bulk_scraper import (
+from ...connectors.scrape import (
     BulkScraper,
     BulkScrapingConfig,
-    bulk_scrape_wiktionary_wholesale,
+    cleanup_old_sessions,
+    create_session,
+    delete_session,
+    get_session,
+    list_sessions,
+    resume_session,
+    scrape_wiktionary_wholesale,
 )
 from ...models.definition import DictionaryProvider, Language
 from ...utils.logging import get_logger
@@ -263,7 +269,8 @@ def scrape_group():
               help="Language to scrape")
 @click.option("--batch-size", "-b", default=100, help="Words per batch")
 @click.option("--max-concurrent", "-c", default=5, help="Maximum concurrent operations")
-@click.option("--resume-from", "-r", help="Word to resume scraping from")
+@click.option("--resume-session", "-r", help="Resume from existing session ID")
+@click.option("--session-name", "-n", help="Name for this scraping session")
 @click.option("--force-refresh", is_flag=True, help="Force refresh existing data")
 @click.option("--skip-existing/--include-existing", default=True, 
               help="Skip words that already have data")
@@ -271,7 +278,8 @@ def scrape_wordhippo(
     language: str,
     batch_size: int,
     max_concurrent: int,
-    resume_from: str | None,
+    resume_session: str | None,
+    session_name: str | None,
     force_refresh: bool,
     skip_existing: bool,
 ):
@@ -282,22 +290,35 @@ def scrape_wordhippo(
         console.print(f"\n[bold green]Starting WordHippo bulk scraping for {language_enum.value.title()}[/bold green]")
         console.print(f"[dim]Batch size: {batch_size}, Max concurrent: {max_concurrent}[/dim]")
         
-        if resume_from:
-            console.print(f"[yellow]Resuming from word: {resume_from}[/yellow]")
-        
-        config = BulkScrapingConfig(
-            provider=DictionaryProvider.WORDHIPPO,
-            language=language_enum,
-            batch_size=batch_size,
-            max_concurrent=max_concurrent,
-            resume_from_word=resume_from,
-            force_refresh=force_refresh,
-            skip_existing=skip_existing,
-        )
-        
-        from ...connectors.scraper.wordhippo import WordHippoConnector
-        connector = WordHippoConnector()
-        scraper = BulkScraper(connector, config)
+        # Handle session resumption
+        if resume_session:
+            console.print(f"[yellow]Resuming WordHippo scraping session: {resume_session}[/yellow]")
+            result = await resume_session(resume_session)
+            if not result:
+                console.print(f"[red]Error:[/red] Could not resume session {resume_session}")
+                return
+            scraper, session = result
+            console.print(f"[green]Resumed session:[/green] {session.get_progress_percentage():.1f}% complete")
+        else:
+            # Create new session
+            config = BulkScrapingConfig(
+                provider=DictionaryProvider.WORDHIPPO,
+                language=language_enum,
+                batch_size=batch_size,
+                max_concurrent=max_concurrent,
+                force_refresh=force_refresh,
+                skip_existing=skip_existing,
+            )
+            
+            scraper = BulkScraper(DictionaryProvider.WORDHIPPO, config)
+            
+            # Set session name if provided
+            if session_name:
+                scraper.session.session_name = session_name
+                await scraper.session.save()
+                console.print(f"[blue]Session name:[/blue] {session_name}")
+            
+            console.print(f"[blue]Session ID:[/blue] {scraper.session.session_id[:8]}")
         
         interface = BulkScrapingInterface()
         
@@ -312,8 +333,6 @@ def scrape_wordhippo(
             
         except Exception as e:
             console.print(f"\n[bold red]❌ Scraping failed: {e}[/bold red]")
-        finally:
-            await connector.close()
     
     asyncio.run(_run())
 
@@ -353,9 +372,7 @@ def scrape_dictionary_com(
             skip_existing=skip_existing,
         )
         
-        from ...connectors.scraper.dictionary_com import DictionaryComConnector
-        connector = DictionaryComConnector()
-        scraper = BulkScraper(connector, config)
+        scraper = BulkScraper(DictionaryProvider.DICTIONARY_COM, config)
         
         interface = BulkScrapingInterface()
         
@@ -368,8 +385,6 @@ def scrape_dictionary_com(
             
         except Exception as e:
             console.print(f"\n[bold red]❌ Scraping failed: {e}[/bold red]")
-        finally:
-            await connector.close()
     
     asyncio.run(_run())
 
@@ -393,7 +408,7 @@ def scrape_wiktionary_wholesale(language: str, download_all: bool):
             if not click.confirm("Continue with wholesale download?"):
                 return
             
-            progress = await bulk_scrape_wiktionary_wholesale(
+            progress = await scrape_wiktionary_wholesale(
                 language=language_enum,
                 download_all=True
             )
@@ -410,9 +425,7 @@ def scrape_wiktionary_wholesale(language: str, download_all: bool):
                 max_concurrent=3,  # Lower concurrency for respectful API usage
             )
             
-            from ...connectors.wholesale.wiktionary_wholesale import WiktionaryWholesaleConnector
-            connector = WiktionaryWholesaleConnector(language=language_enum)
-            scraper = BulkScraper(connector, config)
+            scraper = BulkScraper(DictionaryProvider.WIKTIONARY, config)
             
             interface = BulkScrapingInterface()
             progress = await interface.run_with_monitoring(scraper)
@@ -423,9 +436,166 @@ def scrape_wiktionary_wholesale(language: str, download_all: bool):
     asyncio.run(_run())
 
 
+@scrape_group.command(name="sessions")
+def list_sessions_cmd():
+    """List all scraping sessions."""
+    async def _run():
+        sessions = await list_sessions()
+        
+        if not sessions:
+            console.print("[yellow]No scraping sessions found.[/yellow]")
+            return
+        
+        table = Table(title="Scraping Sessions")
+        table.add_column("Session ID", style="cyan")
+        table.add_column("Name", style="blue")
+        table.add_column("Provider", style="green")
+        table.add_column("Language", style="magenta")
+        table.add_column("Status", style="yellow")
+        table.add_column("Progress", justify="right")
+        table.add_column("Success Rate", justify="right")
+        table.add_column("Created", style="dim")
+        
+        for session in sessions:
+            session_id = session['session_id'][:8]
+            name = session['session_name'] or "[dim]unnamed[/dim]"
+            provider = session['provider']
+            language = session['language']
+            status = session['status']
+            progress = f"{session['progress_percentage']:.1f}%"
+            success_rate = f"{session['success_rate']:.1%}" if session['success_rate'] > 0 else "—"
+            created = session['created_at'][:10]  # Just date part
+            
+            # Color-code status
+            if status == "completed":
+                status = f"[green]{status}[/green]"
+            elif status == "running":
+                status = f"[yellow]{status}[/yellow]"
+            elif status == "failed":
+                status = f"[red]{status}[/red]"
+            
+            table.add_row(session_id, name, provider, language, status, progress, success_rate, created)
+        
+        console.print(table)
+        console.print(f"\n[dim]Total sessions: {len(sessions)}[/dim]")
+        console.print("[dim]Use 'floridify scrape resume <session_id>' to continue a session[/dim]")
+    
+    asyncio.run(_run())
+
+
+@scrape_group.command(name="resume")
+@click.argument("session_id")
+def resume_session_cmd(session_id: str):
+    """Resume a scraping session by ID."""
+    async def _run():
+        console.print(f"\\n[bold yellow]Resuming scraping session: {session_id}[/bold yellow]")
+        
+        result = await resume_session(session_id)
+        if not result:
+            console.print(f"[red]Error:[/red] Could not resume session {session_id}")
+            console.print("Use 'floridify scrape sessions' to list available sessions")
+            return
+        
+        scraper, session = result
+        console.print(f"[green]Resumed session:[/green] {session.get_progress_percentage():.1f}% complete")
+        console.print(f"[blue]Provider:[/blue] {session.provider.display_name}")
+        console.print(f"[blue]Language:[/blue] {session.language.value.title()}")
+        
+        interface = BulkScrapingInterface()
+        
+        try:
+            progress = await interface.run_with_monitoring(scraper)
+            
+            console.print("\\n[bold green]✅ Scraping session completed![/bold green]")
+            console.print(f"[green]Processed: {progress.processed_words:,} words[/green]")
+            console.print(f"[green]Success rate: {progress.success_rate:.1%}[/green]")
+            
+        except Exception as e:
+            console.print(f"\\n[bold red]❌ Scraping failed: {e}[/bold red]")
+    
+    asyncio.run(_run())
+
+
+@scrape_group.command(name="delete")
+@click.argument("session_id")
+@click.confirmation_option(prompt="Are you sure you want to delete this session?")
+def delete_session_cmd(session_id: str):
+    """Delete a scraping session."""
+    async def _run():
+        success = await delete_session(session_id)
+        if success:
+            console.print(f"[green]✅ Deleted session {session_id}[/green]")
+        else:
+            console.print(f"[red]❌ Failed to delete session {session_id}[/red]")
+    
+    asyncio.run(_run())
+
+
+@scrape_group.command(name="cleanup")
+@click.option("--days", "-d", default=30, help="Delete sessions older than N days")
+def cleanup_sessions_cmd(days: int):
+    """Clean up old scraping sessions."""
+    async def _run():
+        console.print(f"[yellow]Cleaning up sessions older than {days} days...[/yellow]")
+        
+        cleaned_count = await cleanup_old_sessions(days)
+        
+        if cleaned_count > 0:
+            console.print(f"[green]✅ Cleaned up {cleaned_count} old sessions[/green]")
+        else:
+            console.print("[blue]No old sessions to clean up[/blue]")
+    
+    asyncio.run(_run())
+
+
 @scrape_group.command(name="status")
-def show_status():
-    """Show current bulk scraping status and statistics."""
-    # This could be extended to show active sessions, database statistics, etc.
-    console.print("[bold blue]Bulk Scraping Status[/bold blue]")
-    console.print("[yellow]Feature coming soon - will show active sessions and database statistics[/yellow]")
+@click.argument("session_id", required=False)
+def show_status(session_id: str | None):
+    """Show scraping status or details for a specific session."""
+    async def _run():
+        if session_id:
+            # Show specific session details
+            session = await get_session(session_id)
+            if not session:
+                console.print(f"[red]Session {session_id} not found[/red]")
+                return
+            
+            stats = session.get_statistics()
+            
+            console.print(f"[bold blue]Session Details: {session_id}[/bold blue]")
+            console.print(f"[blue]Name:[/blue] {stats['session_name'] or 'unnamed'}")
+            console.print(f"[blue]Provider:[/blue] {stats['provider']}")
+            console.print(f"[blue]Language:[/blue] {stats['language']}")
+            console.print(f"[blue]Status:[/blue] {stats['status']}")
+            console.print(f"[blue]Progress:[/blue] {stats['progress_percentage']:.1f}%")
+            console.print(f"[blue]Total Words:[/blue] {stats['total_words']:,}")
+            console.print(f"[blue]Processed:[/blue] {stats['processed_words']:,}")
+            console.print(f"[blue]Successful:[/blue] {stats['successful_words']:,}")
+            console.print(f"[blue]Failed:[/blue] {stats['failed_words']:,}")
+            console.print(f"[blue]Success Rate:[/blue] {stats['success_rate']:.1%}")
+            if stats['words_per_second'] > 0:
+                console.print(f"[blue]Speed:[/blue] {stats['words_per_second']:.2f} words/sec")
+            console.print(f"[blue]Created:[/blue] {stats['created_at']}")
+            if stats['started_at']:
+                console.print(f"[blue]Started:[/blue] {stats['started_at']}")
+            if stats['completed_at']:
+                console.print(f"[blue]Completed:[/blue] {stats['completed_at']}")
+        else:
+            # Show general scraping status
+            sessions = await list_sessions()
+            active_sessions = [s for s in sessions if s['status'] == 'running']
+            completed_sessions = [s for s in sessions if s['status'] == 'completed']
+            failed_sessions = [s for s in sessions if s['status'] == 'failed']
+            
+            console.print("[bold blue]Bulk Scraping Status[/bold blue]")
+            console.print(f"[green]Total Sessions:[/green] {len(sessions)}")
+            console.print(f"[yellow]Active:[/yellow] {len(active_sessions)}")
+            console.print(f"[green]Completed:[/green] {len(completed_sessions)}")
+            console.print(f"[red]Failed:[/red] {len(failed_sessions)}")
+            
+            if active_sessions:
+                console.print("\\n[yellow]Active Sessions:[/yellow]")
+                for session in active_sessions:
+                    console.print(f"  • {session['session_id'][:8]} - {session['provider']} ({session['progress_percentage']:.1f}%)")
+    
+    asyncio.run(_run())

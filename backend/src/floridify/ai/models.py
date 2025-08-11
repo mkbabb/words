@@ -428,6 +428,27 @@ class WordOfTheDayResponse(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in word selection")
 
 
+class SyntheticWordEntry(BaseModel):
+    """AI-generated word entry for training data."""
+    
+    word: str = Field(description="The generated word")
+    definition: str = Field(description="Word definition")
+    part_of_speech: str = Field(description="Grammatical category")
+    etymology: str = Field(description="Word origin and development")
+    example_sentence: str = Field(description="Natural usage example")
+    semantic_justification: str = Field(description="Why this word fits the requested category")
+    difficulty_level: str = Field(description="Assessed difficulty level")
+    confidence: float = Field(ge=0.0, le=1.0, description="AI confidence in classification")
+
+
+class SyntheticCorpusResponse(BaseModel):
+    """Response from synthetic corpus generation."""
+    
+    generated_words: list[SyntheticWordEntry] = Field(description="Generated word entries")
+    total_generated: int = Field(description="Number of words successfully generated")
+    quality_score: float = Field(ge=0.0, le=1.0, description="Overall quality assessment")
+
+
 # Rebuild models with forward references
 ProviderDataResponse.model_rebuild()
 SynthesisResponse.model_rebuild()

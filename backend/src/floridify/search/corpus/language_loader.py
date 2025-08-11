@@ -503,6 +503,23 @@ class CorpusLanguageLoader:
         """Get all vocabulary from all loaded languages."""
         return self.vocabulary
 
+    def get_vocabulary_normalized(self) -> list[str]:
+        """Get normalized vocabulary from all loaded languages."""
+        if not self.vocabulary:
+            return []
+        
+        # Import normalization functions at method level
+        from ...text.normalize import batch_normalize, normalize_vocabulary_fast
+        
+        logger.debug(f"Normalizing {len(self.vocabulary)} vocabulary items...")
+        normalized = batch_normalize(self.vocabulary, normalize_vocabulary_fast)
+        
+        # Deduplicate after normalization
+        normalized = sorted(set(normalized))
+        logger.debug(f"Normalized and deduplicated: {len(normalized)} items")
+        
+        return normalized
+
     def get_vocabulary_for_language(self, language: Language) -> list[str]:
         """Get vocabulary for a specific language."""
         if language in self.lexicons:
@@ -524,6 +541,49 @@ class CorpusLanguageLoader:
             }
 
         return stats
+
+    async def get_or_create_corpus(
+        self, 
+        languages: list[Language], 
+        force_rebuild: bool = False
+    ) -> Any:
+        """
+        Get or create a corpus for the specified languages.
+        
+        Args:
+            languages: List of languages to include in corpus
+            force_rebuild: Force rebuild of corpus even if cached
+            
+        Returns:
+            Corpus object (cached or newly created)
+        """
+        # Import at method level to avoid circular imports
+        from ...models.definition import CorpusType
+        from ..corpus.manager import get_corpus_manager
+        
+        # Load languages if not already loaded
+        if not self.lexicons or force_rebuild:
+            await self.load_languages(languages)
+        
+        # Get normalized vocabulary
+        vocabulary = self.get_vocabulary_normalized()
+        
+        if not vocabulary:
+            raise ValueError(f"No vocabulary loaded for languages {languages}")
+        
+        # Generate corpus name
+        lang_codes = "-".join(sorted(lang.value for lang in languages))
+        corpus_name = f"{CorpusType.LANGUAGE_SEARCH.value}_{lang_codes}"
+        
+        # Get or create corpus through manager
+        corpus_manager = get_corpus_manager()
+        corpus = await corpus_manager.get_or_create_corpus(
+            corpus_name=corpus_name,
+            vocabulary=vocabulary,
+            force_rebuild=force_rebuild,
+        )
+        
+        return corpus
 
     async def close(self) -> None:
         """Clean up resources."""

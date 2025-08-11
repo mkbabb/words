@@ -53,7 +53,7 @@ async def _database_status_async() -> None:
         word_count = await Word.count()
         synthesis_count = await SynthesizedDictionaryEntry.count()
         
-        console.print(f"[bold]Collections:[/bold]")
+        console.print("[bold]Collections:[/bold]")
         console.print(f"  • Words: {word_count:,}")
         console.print(f"  • AI Syntheses: {synthesis_count:,}")
         
@@ -231,10 +231,11 @@ def backup_database(output: str | None, backup_format: str, compress: bool) -> N
 
 async def _backup_database_async(output: str | None, backup_format: str, compress: bool) -> None:
     """Async implementation of database backup."""
-    import json
     import gzip
-    from pathlib import Path
+    import json
     from datetime import datetime
+    from pathlib import Path
+
     from rich.progress import Progress, SpinnerColumn, TextColumn
     
     if output is None:
@@ -292,7 +293,7 @@ async def _backup_database_async(output: str | None, backup_format: str, compres
                 f.write(backup_json)
         
         file_size = output_path.stat().st_size / 1024 / 1024  # MB
-        console.print(f"\n[green]✓ Backup created successfully[/green]")
+        console.print("\n[green]✓ Backup created successfully[/green]")
         console.print(f"File: {output_path.absolute()}")
         console.print(f"Size: {file_size:.1f} MB")
         
@@ -332,6 +333,7 @@ def cleanup_database(dry_run: bool, older_than: int, confirm: bool) -> None:
 async def _cleanup_database_async(dry_run: bool, older_than: int, confirm: bool) -> None:
     """Async implementation of database cleanup."""
     from datetime import datetime, timedelta
+
     from ...models import ProviderData
     
     console.print(f"[bold blue]Database cleanup (dry run: {dry_run})[/bold blue]")
@@ -489,8 +491,13 @@ async def _clear_everything_async(confirm: bool) -> None:
         console.print("[bold red]Clearing entire database...[/bold red]")
         
         from ...models import (
-            Definition, Example, Fact, Pronunciation, ProviderData,
-            SynthesizedDictionaryEntry, Word
+            Definition,
+            Example,
+            Fact,
+            Pronunciation,
+            ProviderData,
+            SynthesizedDictionaryEntry,
+            Word,
         )
         from ...wordlist import WordList
         
@@ -553,8 +560,13 @@ async def _clear_words_async(confirm: bool) -> None:
         console.print("[bold blue]Clearing all words and related data...[/bold blue]")
         
         from ...models import (
-            Definition, Example, Fact, Pronunciation, ProviderData,
-            SynthesizedDictionaryEntry, Word
+            Definition,
+            Example,
+            Fact,
+            Pronunciation,
+            ProviderData,
+            SynthesizedDictionaryEntry,
+            Word,
         )
         
         # Delete in dependency order

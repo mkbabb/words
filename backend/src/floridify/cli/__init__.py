@@ -5,13 +5,14 @@ from __future__ import annotations
 import click
 from rich.console import Console
 
-from .commands.anki import anki_command
-from .commands.scrape import scrape_group
+# from .commands.anki import anki_command
 from .commands.config import config_group
 from .commands.database import database_group
-from .commands.wordlist import wordlist_command
 from .commands.lookup import lookup_group
+from .commands.scrape import scrape_group
 from .commands.search import search_group
+from .commands.wordlist import wordlist_command
+from .commands.wotd import wotd
 
 console = Console()
 
@@ -43,7 +44,8 @@ semantic search, and Anki flashcard generation.[/dim]
 [bold]Available Commands:[/bold]
   [green]lookup[/green]      🔍 Look up words and definitions
   [green]search[/green]      🔎 Fuzzy and semantic word search
-  [green]anki[/green]        🎴 Create and manage Anki flashcard decks
+  [green]wotd[/green]        📖 Word of the Day ML training and generation
+  [dim]anki[/dim]        🎴 Create and manage Anki flashcard decks (temporarily disabled)
   [green]wordlist[/green]    📄 Manage word lists with dictionary lookup
   [green]scrape[/green]      🚀 Scraping for systematic provider data collection
   [green]config[/green]      ⚙️  Manage configuration and API keys
@@ -56,7 +58,8 @@ semantic search, and Anki flashcard generation.[/dim]
 # Register command groups
 cli.add_command(lookup_group, name="lookup")
 cli.add_command(search_group, name="search")
-cli.add_command(anki_command, name="anki")
+cli.add_command(wotd, name="wotd")
+# cli.add_command(anki_command, name="anki")
 cli.add_command(wordlist_command, name="wordlist")
 cli.add_command(scrape_group, name="scrape")
 cli.add_command(config_group, name="config")

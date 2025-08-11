@@ -23,17 +23,16 @@ from .routers import (
     health,
     images,
     lookup,
-    ml_word_of_the_day,
     search,
     suggestions,
-    word_of_the_day,
-    wordlist_reviews,
-    wordlist_search,
-    wordlist_words,
-    wordlists,
+    # wordlist_reviews,
+    # wordlist_search,
+    # wordlist_words,
+    # wordlists,
     words,
+    wotd_main,
+    wotd_ml,
 )
-from .routers.words import entries_router
 
 # Configure logging for the application
 setup_logging("DEBUG")
@@ -108,12 +107,12 @@ app.include_router(ai, prefix=API_V1_PREFIX, tags=["ai"])
 app.include_router(definitions, prefix=f"{API_V1_PREFIX}/definitions", tags=["definitions"])
 app.include_router(examples, prefix=API_V1_PREFIX, tags=["examples"])
 app.include_router(words, prefix=f"{API_V1_PREFIX}/words", tags=["words"])
-app.include_router(wordlists, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
-app.include_router(wordlist_words, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-words"])
-app.include_router(wordlist_reviews, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-reviews"])
-app.include_router(wordlist_search, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-search"])
-app.include_router(word_of_the_day, prefix=f"{API_V1_PREFIX}/word-of-day", tags=["word-of-day"])
-app.include_router(ml_word_of_the_day, prefix=f"{API_V1_PREFIX}/word-of-day", tags=["ml-word-of-day"])
+# app.include_router(wordlists, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
+# app.include_router(wordlist_words, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-words"])
+# app.include_router(wordlist_reviews, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-reviews"])
+# app.include_router(wordlist_search, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-search"])
+app.include_router(wotd_main, prefix=f"{API_V1_PREFIX}/wotd", tags=["wotd"])
+app.include_router(wotd_ml, prefix=f"{API_V1_PREFIX}/wotd", tags=["wotd-ml"])
 app.include_router(audio, prefix=API_V1_PREFIX, tags=["audio"])
 app.include_router(images, prefix=f"{API_V1_PREFIX}/images", tags=["images"])
 
