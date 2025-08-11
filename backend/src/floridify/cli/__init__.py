@@ -6,12 +6,12 @@ import click
 from rich.console import Console
 
 from .commands.anki import anki_command
+from .commands.scrape import scrape_group
 from .commands.config import config_group
 from .commands.database import database_group
-from .commands.list import list_command
+from .commands.wordlist import wordlist_command
 from .commands.lookup import lookup_group
 from .commands.search import search_group
-from .commands.similar import similar_command
 
 console = Console()
 
@@ -34,19 +34,20 @@ def cli(ctx: click.Context) -> None:
 semantic search, and Anki flashcard generation.[/dim]
 
 [bold]Quick Start:[/bold]
-  [cyan]floridify search init[/cyan]           Initialize search index (first time)
-  [cyan]floridify lookup serendipity[/cyan]     Look up a word with AI synthesis
-  [cyan]floridify search word seren[/cyan]      Search for words and phrases
-  [cyan]floridify list create vocab.txt[/cyan]     Process word list with lookup
+  [cyan]floridify search init[/cyan]               Initialize search index (first time)
+  [cyan]floridify lookup serendipity[/cyan]         Look up a word with AI synthesis
+  [cyan]floridify search word seren[/cyan]          Search for words and phrases
+  [cyan]floridify scrape wordhippo[/cyan]           Scrape WordHippo for corpus
+  [cyan]floridify wordlist create vocab.txt[/cyan]  Process word list with lookup
 
 [bold]Available Commands:[/bold]
-  [green]lookup[/green]    🔍 Look up words and definitions
-  [green]similar[/green]   🔗 Find beautiful synonyms with efflorescence ranking
-  [green]search[/green]    🔎 Fuzzy and semantic word search
-  [green]anki[/green]      🎴 Create and manage Anki flashcard decks
-  [green]list[/green]      📄 Manage word lists with dictionary lookup
-  [green]config[/green]    ⚙️  Manage configuration and API keys
-  [green]database[/green]  💾 Database operations and statistics
+  [green]lookup[/green]      🔍 Look up words and definitions
+  [green]search[/green]      🔎 Fuzzy and semantic word search
+  [green]anki[/green]        🎴 Create and manage Anki flashcard decks
+  [green]wordlist[/green]    📄 Manage word lists with dictionary lookup
+  [green]scrape[/green]      🚀 Scraping for systematic provider data collection
+  [green]config[/green]      ⚙️  Manage configuration and API keys
+  [green]database[/green]    💾 Database operations and statistics
 
 [dim]Use 'floridify <command> --help' for detailed information about each command.[/dim]
         """)
@@ -54,10 +55,10 @@ semantic search, and Anki flashcard generation.[/dim]
 
 # Register command groups
 cli.add_command(lookup_group, name="lookup")
-cli.add_command(similar_command, name="similar")
 cli.add_command(search_group, name="search")
 cli.add_command(anki_command, name="anki")
-cli.add_command(list_command, name="list")
+cli.add_command(wordlist_command, name="wordlist")
+cli.add_command(scrape_group, name="scrape")
 cli.add_command(config_group, name="config")
 cli.add_command(database_group, name="database")
 

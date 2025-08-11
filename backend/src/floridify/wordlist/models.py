@@ -89,7 +89,9 @@ class WordList(Document, BaseMetadataWithAccess):
     name: str = Field(..., description="Human-readable list name")
     description: str = Field(default="", description="List description/purpose")
     hash_id: str = Field(..., description="Content-based hash identifier")
-    words: list[WordListItem] = Field(default_factory=list, description="Words with learning data")
+    words: list[WordListItem] = Field(
+        default_factory=list, description="Words with learning data"
+    )
 
     # Statistics
     total_words: int = Field(default=0, ge=0, description="Total word count")
@@ -99,10 +101,14 @@ class WordList(Document, BaseMetadataWithAccess):
     )
 
     # Metadata
-    tags: list[str] = Field(default_factory=list, description="List categorization tags")
+    tags: list[str] = Field(
+        default_factory=list, description="List categorization tags"
+    )
     is_public: bool = Field(default=False, description="Public visibility flag")
     owner_id: str | None = Field(default=None, description="Owner user ID")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
 
     class Settings:
         name = "word_lists"
@@ -196,13 +202,3 @@ class WordList(Document, BaseMetadataWithAccess):
     def get_mastery_distribution(self) -> dict[MasteryLevel, int]:
         """Get distribution of words by mastery level."""
         return self.learning_stats.get_mastery_distribution(self.words)
-
-    # Corpus naming helpers for consistent search integration
-    def get_words_corpus_name(self) -> str:
-        """Get consistent corpus name for this wordlist's words."""
-        return f"Words in wordlist {self.id}"
-
-    @staticmethod
-    def get_names_corpus_name() -> str:
-        """Get consistent corpus name for wordlist names."""
-        return "Wordlist Names"

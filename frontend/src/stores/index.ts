@@ -1,42 +1,44 @@
-// Export all modular stores for direct usage
-export { useSearchBarStore } from './search/search-bar'
+// Core stores
 export { useContentStore } from './content/content'
-export { useUIStore } from './ui/ui-state'
-export { useLoadingStore } from './ui/loading'
-export { useNotificationStore } from './utils/notifications'
 export { useHistoryStore } from './content/history'
+export { useSearchBarStore } from './search/search-bar'
 
-// Export mode stores
-export { useLookupMode } from './search/modes/lookup'
-export { useWordlistMode } from './search/modes/wordlist'
+// Composables
+export { useNotifications } from './composables/useNotifications'
+export { useUIState } from './composables/useUIState'
+export { usePersistedState } from './composables/usePersistedState'
 
-// Export composables
-export { useRouterSync } from './composables/useRouterSync'
-
-// For components that need the orchestrator pattern, provide a unified composable
-import { useSearchBarStore } from './search/search-bar'
+// Import for useStores function
 import { useContentStore } from './content/content'
-import { useUIStore } from './ui/ui-state'
-import { useLoadingStore } from './ui/loading'
-import { useNotificationStore } from './utils/notifications'
 import { useHistoryStore } from './content/history'
-import { useLookupMode } from './search/modes/lookup'
-import { useWordlistMode } from './search/modes/wordlist'
+import { useSearchBarStore } from './search/search-bar'
+import { useNotifications } from './composables/useNotifications'
+import { useUIState } from './composables/useUIState'
 
-/**
- * Unified stores composable for components that need multiple stores
- * This provides all stores in one import while encouraging direct store usage
- */
+// Event bus
+export { eventBus, useEventBus, StoreEvents } from './EventBus'
+export type { StoreEventType } from './EventBus'
+
+// State providers
+export { localStorageProvider } from './providers/LocalStorageProvider'
+export { migrationHelper } from './providers/MigrationHelper'
+export type { StateProvider, PersistedState, StateProviderOptions } from './providers/StateProvider'
+export type { Migration, MigrationFunction } from './providers/MigrationHelper'
+
+// Types
+export type { Theme } from './composables/useUIState'
+export type { Notification } from './composables/useNotifications'
+
+// Store aggregator for components
 export function useStores() {
-  const searchBar = useSearchBarStore()
   return {
-    searchBar,
     content: useContentStore(),
-    ui: useUIStore(),
-    loading: useLoadingStore(),
-    notifications: useNotificationStore(),
     history: useHistoryStore(),
-    lookupMode: useLookupMode(),
-    wordlistMode: useWordlistMode(),
+    searchBar: useSearchBarStore(),
+    notifications: useNotifications(),
+    ui: useUIState()
   }
 }
+
+// Alias for backward compatibility
+export { useNotifications as useNotificationStore } from './composables/useNotifications'

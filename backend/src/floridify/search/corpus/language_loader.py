@@ -22,8 +22,6 @@ from pydantic import BaseModel, Field
 from ...caching.core import CacheNamespace, CacheTTL, CompressionType
 from ...caching.unified import get_unified
 from ...models.definition import Language
-
-from ...text.normalize import normalize_vocabulary
 from ...utils.logging import get_logger
 from .constants import LexiconFormat
 from .sources import LEXICON_SOURCES, LexiconSourceConfig
@@ -165,18 +163,12 @@ class CorpusLanguageLoader:
             logger.debug(f"Source {source.name} provided {len(result)} items")
             vocabulary.extend(result)
 
-        # Normalize and deduplicate vocabulary
-        logger.debug(f"Normalizing and deduplicating {len(vocabulary)} raw items")
-        normalized_vocabulary = []
-        seen = set()
-        for item in vocabulary:
-            normalized = normalize_vocabulary(item)
-            if normalized and normalized not in seen:
-                normalized_vocabulary.append(normalized)
-                seen.add(normalized)
-        
-        vocabulary = sorted(normalized_vocabulary)
-        logger.debug(f"After normalization and deduplication: {len(vocabulary)} unique items")
+        # Just deduplicate raw vocabulary - normalization happens in language.py
+        logger.debug(f"Deduplicating {len(vocabulary)} raw items")
+        unique_vocabulary = sorted(set(vocabulary))
+        logger.debug(f"After deduplication: {len(unique_vocabulary)} unique raw items")
+
+        vocabulary = unique_vocabulary
 
         return LexiconData(
             vocabulary=vocabulary,
@@ -241,10 +233,7 @@ class CorpusLanguageLoader:
             if not line or line.startswith("#"):
                 continue
 
-            # Normalize the vocabulary item
-            normalized = normalize_vocabulary(line)
-            if normalized:
-                vocabulary.append(normalized)
+            vocabulary.append(line)
 
         return vocabulary
 

@@ -15,6 +15,7 @@ from .core import SearchEngine, SearchResult
 from .corpus import Corpus
 from .corpus.language_loader import CorpusLanguageLoader
 from .corpus.manager import CorpusManager, get_corpus_manager
+from .semantic.constants import DEFAULT_SENTENCE_MODEL, SemanticModel
 
 logger = get_logger(__name__)
 
@@ -32,6 +33,7 @@ class LanguageSearch:
         min_score: float = DEFAULT_MIN_SCORE,
         force_rebuild: bool = False,
         semantic: bool = True,
+        semantic_model: SemanticModel = DEFAULT_SENTENCE_MODEL,
     ) -> None:
         """Initialize language search with configuration.
 
@@ -40,6 +42,7 @@ class LanguageSearch:
             min_score: Minimum score threshold
             force_rebuild: Force rebuild of indices
             semantic: Enable semantic search capabilities
+            semantic_model: Model for semantic search (BGE-M3 or MiniLM)
         """
         self.languages = sorted(
             languages or [Language.ENGLISH], key=lambda x: x.value
@@ -47,6 +50,7 @@ class LanguageSearch:
         self.min_score = min_score
         self.force_rebuild = force_rebuild
         self.semantic = semantic
+        self.semantic_model = semantic_model
 
         self.search_engine: SearchEngine | None = None
         self._corpus_manager: CorpusManager = get_corpus_manager()
@@ -80,6 +84,16 @@ class LanguageSearch:
             logger.error(f"No vocabulary loaded for languages {self.languages}")
             raise ValueError(f"No vocabulary loaded for languages {self.languages}")
 
+        # Normalize vocabulary using batch processing
+        from ..text.normalize import batch_normalize, normalize_vocabulary_fast
+
+        logger.info(f"Normalizing {len(vocabulary)} vocabulary items...")
+        vocabulary = batch_normalize(vocabulary, normalize_vocabulary_fast)
+
+        # Deduplicate after normalization
+        vocabulary = sorted(set(vocabulary))
+        logger.info(f"Normalized and deduplicated vocabulary: {len(vocabulary)} items")
+
         # Get or create corpus through manager (uses cache if available)
         logger.info(f"Getting or creating corpus '{corpus_name}'")
         corpus = await self._corpus_manager.get_or_create_corpus(
@@ -92,11 +106,12 @@ class LanguageSearch:
         )
 
         # Initialize search engine with corpus name
-        logger.info(f"Creating SearchEngine for corpus '{corpus_name}'")
+        logger.info(f"Creating SearchEngine for corpus '{corpus_name}' with {self.semantic_model if self.semantic else 'no semantic'}")
         self.search_engine = SearchEngine(
             corpus_name=corpus_name,
             min_score=self.min_score,
             semantic=self.semantic,
+            semantic_model=self.semantic_model,
             force_rebuild=self.force_rebuild,
         )
 
@@ -135,6 +150,7 @@ class LanguageSearch:
             "languages": [lang.value for lang in self.languages],
             "min_score": self.min_score,
             "semantic": self.semantic,
+            "semantic_model": self.semantic_model if self.semantic else None,
             "initialized": self._initialized,
         }
 
@@ -148,6 +164,7 @@ class LanguageSearch:
         self.languages = [Language(lang) for lang in data.get("languages", ["en"])]
         self.min_score = data.get("min_score", DEFAULT_MIN_SCORE)
         self.semantic = data.get("semantic", True)
+        self.semantic_model = data.get("semantic_model", DEFAULT_SENTENCE_MODEL)
         self._initialized = data.get("initialized", False)
 
     async def search(
@@ -221,6 +238,7 @@ async def get_language_search(
     languages: list[Language] | None = None,
     force_rebuild: bool = False,
     semantic: bool = True,
+    semantic_model: SemanticModel = DEFAULT_SENTENCE_MODEL,
 ) -> LanguageSearch:
     """Get or create global language search instance.
 
@@ -228,6 +246,7 @@ async def get_language_search(
         languages: Languages to support (defaults to English)
         force_rebuild: Force rebuild of search indices and re-download lexicons
         semantic: Enable semantic search capabilities
+        semantic_model: Model for semantic search (BGE-M3 or MiniLM)
 
     Returns:
         Initialized LanguageSearch instance
@@ -243,7 +262,10 @@ async def get_language_search(
     if needs_recreate:
         # Create with semantic support as specified
         _language_search = LanguageSearch(
-            languages=target_languages, force_rebuild=force_rebuild, semantic=semantic
+            languages=target_languages, 
+            force_rebuild=force_rebuild, 
+            semantic=semantic,
+            semantic_model=semantic_model
         )
         await _language_search.initialize()
 

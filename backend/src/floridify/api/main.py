@@ -17,14 +17,13 @@ from .middleware import CacheHeadersMiddleware, LoggingMiddleware
 from .routers import (
     ai,
     audio,
-    batch,
-    # corpus disabled
+    corpus,
     definitions,
     examples,
-    facts,
     health,
     images,
     lookup,
+    ml_word_of_the_day,
     search,
     suggestions,
     word_of_the_day,
@@ -105,17 +104,16 @@ app.include_router(search, prefix=API_V1_PREFIX, tags=["search"])
 # Old synonyms endpoint removed - now handled by /ai/synthesize/synonyms
 app.include_router(suggestions, prefix=API_V1_PREFIX, tags=["suggestions"])
 app.include_router(ai, prefix=API_V1_PREFIX, tags=["ai"])
-app.include_router(facts, prefix=API_V1_PREFIX, tags=["facts"])
+# app.include_router(corpus, prefix=API_V1_PREFIX, tags=["corpus"])  # disabled
 app.include_router(definitions, prefix=f"{API_V1_PREFIX}/definitions", tags=["definitions"])
 app.include_router(examples, prefix=API_V1_PREFIX, tags=["examples"])
-app.include_router(batch, prefix=f"{API_V1_PREFIX}/batch", tags=["batch"])
 app.include_router(words, prefix=f"{API_V1_PREFIX}/words", tags=["words"])
-app.include_router(entries_router, prefix=f"{API_V1_PREFIX}/words/entries", tags=["entries"])
 app.include_router(wordlists, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
 app.include_router(wordlist_words, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-words"])
 app.include_router(wordlist_reviews, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-reviews"])
 app.include_router(wordlist_search, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-search"])
 app.include_router(word_of_the_day, prefix=f"{API_V1_PREFIX}/word-of-day", tags=["word-of-day"])
+app.include_router(ml_word_of_the_day, prefix=f"{API_V1_PREFIX}/word-of-day", tags=["ml-word-of-day"])
 app.include_router(audio, prefix=API_V1_PREFIX, tags=["audio"])
 app.include_router(images, prefix=f"{API_V1_PREFIX}/images", tags=["images"])
 

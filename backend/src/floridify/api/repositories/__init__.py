@@ -18,7 +18,6 @@ from .example_repository import (
 from .fact_repository import FactCreate, FactFilter, FactRepository, FactUpdate
 from .image_repository import ImageCreate, ImageFilter, ImageRepository, ImageUpdate
 from .synthesis_repository import (
-    ComponentStatus,
     SynthesisCreate,
     SynthesisFilter,
     SynthesisRepository,
@@ -56,7 +55,6 @@ __all__ = [
     "SynthesisCreate",
     "SynthesisUpdate",
     "SynthesisFilter",
-    "ComponentStatus",
     "WordListRepository",
     "WordListCreate",
     "WordListUpdate",

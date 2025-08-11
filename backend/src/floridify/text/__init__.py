@@ -36,7 +36,7 @@ __all__ = [
     # Core normalization
     "normalize",
     "normalize_comprehensive",
-    "normalize_fast", 
+    "normalize_fast",
     "normalize_simple",
     "batch_normalize",
     "is_valid_word",

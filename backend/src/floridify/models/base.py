@@ -11,6 +11,9 @@ from uuid import UUID
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, ConfigDict, Field
 
+# Explicitly export PydanticObjectId for use in other modules
+__all__ = ["BaseMetadata", "PydanticObjectId"]
+
 
 class BaseMetadata(BaseModel):
     """Standard metadata for entities requiring CRUD tracking."""
@@ -44,7 +47,9 @@ class AccessTrackingMixin(BaseModel):
     """Mixin for entities that need access tracking functionality."""
 
     # Access tracking
-    last_accessed: datetime | None = Field(default=None, description="Last time accessed")
+    last_accessed: datetime | None = Field(
+        default=None, description="Last time accessed"
+    )
     access_count: int = Field(default=0, ge=0, description="Number of times accessed")
 
     def mark_accessed(self) -> None:

@@ -16,6 +16,7 @@ from ...utils.logging import get_logger
 from ..corpus.core import Corpus
 from ..models import CorpusMetadata, SemanticMetadata
 from ..utils import get_vocabulary_hash
+from .constants import DEFAULT_SENTENCE_MODEL, SemanticModel
 from .core import SemanticSearch
 
 logger = get_logger(__name__)
@@ -39,29 +40,27 @@ class SemanticSearchManager:
         corpus_name: str,
         vocab_hash: str | None = None,
         vocabulary: list[str] | None = None,
-        model_name: str | None = None,
+        model_name: SemanticModel | None = None,
     ) -> SemanticSearch | None:
         """
         Get existing semantic search instance from cache.
-        
-        Enhanced for BGE-M3 integration - includes model name in cache key
-        to prevent conflicts between different embedding models.
+
+        Supports both BGE-M3 (multilingual) and MiniLM (English) models.
+        Cache keys include model name to isolate different embeddings.
 
         Args:
             corpus_name: Unique name for the corpus
             vocab_hash: Pre-computed vocabulary hash (preferred)
             vocabulary: Vocabulary to hash if vocab_hash not provided
-            model_name: Embedding model name for cache isolation
+            model_name: Embedding model (BGE-M3 or MiniLM)
 
         Returns:
             Cached SemanticSearch instance or None if not found
         """
-        from .constants import DEFAULT_SENTENCE_MODEL
-        
         # Use default model name if not provided
         if model_name is None:
             model_name = DEFAULT_SENTENCE_MODEL
-            
+
         if vocab_hash is None:
             if vocabulary is None:
                 raise ValueError("Must provide either vocab_hash or vocabulary")
@@ -97,28 +96,26 @@ class SemanticSearchManager:
         self,
         corpus: Corpus,
         force_rebuild: bool = False,
-        model_name: str | None = None,
+        model_name: SemanticModel | None = None,
     ) -> SemanticSearch:
         """
         Create new semantic search instance with caching.
-        
-        Enhanced for BGE-M3 integration - includes model name in cache key
-        and passes it to SemanticSearch constructor.
+
+        Supports both BGE-M3 (1024D multilingual) and MiniLM (384D English).
+        Model choice affects memory usage and performance.
 
         Args:
             corpus: Corpus instance containing vocabulary data
             force_rebuild: Force rebuild even if cached
-            model_name: Embedding model name (defaults to BGE-M3)
+            model_name: Embedding model (defaults to BGE-M3)
 
         Returns:
             Initialized SemanticSearch instance
         """
-        from .constants import DEFAULT_SENTENCE_MODEL
-        
-        # Use default model name if not provided (BGE-M3)
+        # Use default model name if not provided
         if model_name is None:
             model_name = DEFAULT_SENTENCE_MODEL
-            
+
         corpus_name = corpus.corpus_name
         logger.info(
             f"Creating semantic search for corpus '{corpus_name}' with {len(corpus.lemmatized_vocabulary)} lemmatized items using {model_name}"

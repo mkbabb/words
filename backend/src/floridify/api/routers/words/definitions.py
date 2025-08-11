@@ -133,24 +133,15 @@ async def list_definitions(
         sort=sort,
     )
 
-    # Apply field selection and expansions
-    expand_examples = fields.expand and "examples" in fields.expand
-    expand_images = fields.expand and "images" in fields.expand
-
-    if expand_examples and expand_images:
-        items = await repo.get_many_with_examples_and_images(definitions)
-    elif expand_examples:
-        items = await repo.get_many_with_examples(definitions)
-    elif expand_images:
-        items = await repo.get_many_with_images(definitions)
-    else:
-        items = []
-        for definition in definitions:
-            item = definition.model_dump()
-            if fields.include or fields.exclude:
-                # Apply field filtering if needed
-                pass
-            items.append(item)
+    # Apply field selection and expansions using unified method
+    items = await repo.get_expanded(
+        definitions=definitions,
+        expand=fields.expand
+    )
+    
+    # Apply field selection if needed
+    if fields.include or fields.exclude:
+        items = [fields.apply_to_dict(item) for item in items]
 
     # Build response
     return ListResponse(
@@ -203,20 +194,11 @@ async def get_definition(
     Returns:
         Definition with completeness score and ETag.
     """
-    # Get definition with optional expansions
-    expand_examples = fields.expand and "examples" in fields.expand
-    expand_images = fields.expand and "images" in fields.expand
-
-    if expand_examples and expand_images:
-        definition_data = await repo.get_with_examples_and_images(definition_id)
-    elif expand_examples:
-        definition_data = await repo.get_with_examples(definition_id)
-    elif expand_images:
-        definition_data = await repo.get_with_images(definition_id)
-    else:
-        definition = await repo.get(definition_id, raise_on_missing=True)
-        assert definition is not None
-        definition_data = definition.model_dump()
+    # Get definition with optional expansions using unified method
+    definition_data = await repo.get_expanded(
+        definition_id=definition_id,
+        expand=fields.expand
+    )
 
     # Apply field selection
     definition_data = fields.apply_to_dict(definition_data)
@@ -418,14 +400,13 @@ async def regenerate_components(
                 definition=definition.text,
                 count=3,
             )
-            # Save examples
-            example_docs = []
-            for example_text in examples_response.example_sentences:
-                assert definition.id is not None  # Definition from database should have ID
-                example = Example(definition_id=definition.id, text=example_text, type="generated")
-                await example.save()
-                example_docs.append(example)
-            definition.example_ids = [ex.id for ex in example_docs if ex.id is not None]
+            # Save examples using repository method
+            assert definition.id is not None  # Definition from database should have ID
+            example_docs = await repo.batch_add_examples(
+                definition.id,
+                examples_response.example_sentences,
+                example_type="generated"
+            )
             updates["examples"] = [ex.model_dump() for ex in example_docs]
         else:
             # Generate component

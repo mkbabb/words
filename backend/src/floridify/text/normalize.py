@@ -7,7 +7,10 @@ Provides comprehensive and fast normalization for different use cases.
 from __future__ import annotations
 
 import functools
+import os
 import unicodedata
+from collections.abc import Callable
+from concurrent.futures import ProcessPoolExecutor
 
 import contractions
 import ftfy
@@ -117,7 +120,7 @@ def normalize_comprehensive(
     # Fast punctuation normalization for fuzzy search consistency
     # Remove apostrophes and normalize hyphens to spaces for signature matching
     text = text.replace("'", "").replace("-", " ")
-    
+
     # Single regex for punctuation removal and whitespace normalization
     text = COMBINED_CLEANUP_PATTERN.sub(" ", text).strip()
 
@@ -480,37 +483,37 @@ def get_lemma_cache_stats() -> dict[str, int]:
 def normalize_simple(text: str) -> str:
     """
     Simple normalization: lowercase, diacritic removal, basic cleanup.
-    
+
     Fast alternative to comprehensive normalization for performance-critical paths.
-    
+
     Args:
         text: Input text to normalize
-        
+
     Returns:
         Simply normalized text
     """
     if not text:
         return ""
-    
+
     # Quick lowercase
     text = text.lower().strip()
-    
+
     # Remove diacritics using Unicode decomposition
     text = unicodedata.normalize("NFD", text)
     text = "".join(char for char in text if unicodedata.category(char) != "Mn")
     text = unicodedata.normalize("NFC", text)
-    
+
     # Basic punctuation cleanup - preserve apostrophes and hyphens in words
     text = FAST_PUNCTUATION_PATTERN.sub(" ", text)
     text = MULTIPLE_SPACE_PATTERN.sub(" ", text).strip()
-    
+
     return text
 
 
 def normalize_vocabulary(text: str) -> str:
     """
     Vocabulary normalization that preserves important features.
-    
+
     This normalization is designed for language loader vocabulary:
     - Preserves diacritics (café stays café, not cafe)
     - Preserves internal spaces (for phrases)
@@ -518,42 +521,79 @@ def normalize_vocabulary(text: str) -> str:
     - Fixes unicode encoding issues
     - Normalizes whitespace
     - Converts to lowercase
-    
+
     Args:
         text: Input vocabulary item
-        
+
     Returns:
         Normalized vocabulary item
     """
     if not text:
         return ""
-    
+
     # Fix encoding issues
     text = ftfy.fix_text(text)
-    
+
     # Unicode normalization to composed form (preserves diacritics)
     text = unicodedata.normalize("NFC", text)
-    
+
     # Trim and normalize whitespace
     text = text.strip()
     text = MULTIPLE_SPACE_PATTERN.sub(" ", text)
-    
+
     # Convert to lowercase
     text = text.lower()
-    
+
+    return text
+
+
+@functools.lru_cache(maxsize=50000)
+def normalize_vocabulary_fast(text: str) -> str:
+    """
+    Fast vocabulary normalization with caching.
+
+    Similar to normalize_comprehensive but preserves linguistic features:
+    - Fixes unicode encoding issues
+    - Normalizes whitespace (leading/trailing/multiple)
+    - Converts to lowercase
+    - Preserves diacritics and special characters
+    - Preserves internal punctuation (hyphens, apostrophes)
+
+    Args:
+        text: Input vocabulary item
+
+    Returns:
+        Normalized vocabulary item
+    """
+    if not text:
+        return ""
+
+    # Fix encoding issues
+    text = ftfy.fix_text(text)
+
+    # Unicode normalization to composed form (preserves diacritics)
+    text = unicodedata.normalize("NFC", text)
+
+    # Normalize whitespace
+    text = text.strip()
+    text = MULTIPLE_SPACE_PATTERN.sub(" ", text)
+
+    # Convert to lowercase
+    text = text.lower()
+
     return text
 
 
 def normalize(text: str) -> str:
     """
     Global normalization function - switch between simple and comprehensive.
-    
-    This is the main normalization entry point. Swap the implementation 
+
+    This is the main normalization entry point. Swap the implementation
     to quickly test performance vs quality tradeoffs.
-    
+
     Args:
         text: Input text to normalize
-        
+
     Returns:
         Normalized text
     """
@@ -561,39 +601,53 @@ def normalize(text: str) -> str:
     return normalize_simple(text)
 
 
-def _normalize_chunk(words: list[str]) -> list[str]:
-    """Helper function for batch_normalize - must be at module level for multiprocessing."""
-    return [normalize(word) for word in words if word]
+def _normalize_chunk(args: tuple[list[str], Callable[[str], str]]) -> list[str]:
+    """Helper function for batch_normalize - must be at module level for multiprocessing.
 
-
-def batch_normalize(vocabulary: list[str]) -> list[str]:
+    Args:
+        args: Tuple of (words, normalizer_func) for multiprocessing
     """
-    Parallel normalization using global normalize function.
+    words, normalizer = args
+    return [normalizer(word) for word in words if word]
+
+
+def batch_normalize(
+    vocabulary: list[str],
+    normalizer: Callable[[str], str] | None = None,
+    min_parallel_size: int = 5000,
+) -> list[str]:
+    """
+    Batch normalization with optional custom normalizer function.
 
     Args:
         vocabulary: List of words to normalize
+        normalizer: Function to normalize each word (defaults to normalize_comprehensive)
+        min_parallel_size: Minimum size to use parallel processing
 
     Returns:
         List of normalized words
     """
-    import os
-    from concurrent.futures import ProcessPoolExecutor
-
+    # Default to normalize_comprehensive if no normalizer provided
+    if normalizer is None:
+        normalizer = normalize_comprehensive
     # Filter empty words first
     valid_words = [word for word in vocabulary if word]
 
-    if len(valid_words) < 5000:
+    if len(valid_words) < min_parallel_size:
         # Fall back to serial for small datasets
-        return [normalize(word) for word in valid_words]
+        return [normalizer(word) for word in valid_words]
 
     # Split into chunks for parallel processing
-    chunk_size = max(1000, len(valid_words) // (os.cpu_count() or 4))
+    cpu_count = os.cpu_count() or 4
+    chunk_size = max(1000, len(valid_words) // cpu_count)
     chunks = [valid_words[i : i + chunk_size] for i in range(0, len(valid_words), chunk_size)]
 
-    # Process chunks in parallel using global normalize function
+    # Process chunks in parallel - pass normalizer with each chunk
     normalized_words = []
-    with ProcessPoolExecutor(max_workers=min(8, os.cpu_count() or 4)) as executor:
-        futures = [executor.submit(_normalize_chunk, chunk) for chunk in chunks]
+    with ProcessPoolExecutor(max_workers=min(8, cpu_count)) as executor:
+        # Create args tuples for each chunk
+        chunk_args = [(chunk, normalizer) for chunk in chunks]
+        futures = [executor.submit(_normalize_chunk, args) for args in chunk_args]
         for future in futures:
             normalized_words.extend(future.result())
 

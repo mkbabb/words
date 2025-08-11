@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, readonly, computed } from 'vue'
 import { generateId } from '@/utils'
-import { dictionaryApi } from '@/api'
+import { suggestionsApi } from '@/api'
 import type {
   SearchHistory,
   LookupHistory,
@@ -248,7 +248,7 @@ export const useHistoryStore = defineStore('history', () => {
       const recentWords = recentLookupWords.value.slice(0, 10)
       console.log('📜 [History Store] Fetching vocabulary suggestions with recent words:', recentWords)
       
-      const response = await dictionaryApi.getVocabularySuggestions(recentWords)
+      const response = await suggestionsApi.getVocabulary(recentWords)
       console.log('📜 [History Store] API response:', response)
 
       const newSuggestions = response.words.map((word) => ({
@@ -280,7 +280,7 @@ export const useHistoryStore = defineStore('history', () => {
   const getHistoryBasedSuggestions = async (): Promise<string[]> => {
     try {
       const recentWords = recentLookupWords.value.slice(0, 10)
-      const response = await dictionaryApi.getVocabularySuggestions(recentWords)
+      const response = await suggestionsApi.getVocabulary(recentWords)
       return response.words
     } catch (error) {
       console.error('Failed to get history-based suggestions:', error)

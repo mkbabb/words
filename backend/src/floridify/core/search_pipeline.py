@@ -58,10 +58,12 @@ async def reset_search_engine() -> None:
 async def search_word_pipeline(
     word: str,
     languages: list[Language] | None = None,
-    semantic: bool = True,
-    max_results: int = 10,
+    mode: SearchMode = SearchMode.SMART,
+    max_results: int = 20,
+    min_score: float | None = None,
+    force_rebuild: bool = False,
 ) -> list[SearchResult]:
-    """Generalized word search pipeline.
+    """Generalized word search pipeline - isomorphic with backend API.
 
     This pipeline can be used by any component that needs to search for words,
     including lookup, synonyms, suggestions, and other features.
@@ -69,8 +71,10 @@ async def search_word_pipeline(
     Args:
         word: Word to search for
         languages: Languages to search in (defaults to English)
-        semantic: Enable semantic search
+        mode: Search mode (SMART, EXACT, FUZZY, SEMANTIC)
         max_results: Maximum number of results
+        min_score: Minimum score threshold
+        force_rebuild: Force rebuild of search indices
 
     Returns:
         List of search results ranked by relevance
@@ -85,13 +89,19 @@ async def search_word_pipeline(
     try:
         # Query processing
 
-        # Get singleton search engine
-        search_engine = await get_search_engine(
+        # Get language search (replace get_search_engine)
+        language_search = await get_language_search(
             languages=languages,
+            force_rebuild=force_rebuild,
         )
 
-        # Perform search
-        results = await search_engine.search(word, max_results=max_results)
+        # Perform search with specified mode
+        results = await language_search.search_with_mode(
+            query=word,
+            mode=mode,
+            max_results=max_results,
+            min_score=min_score,
+        )
 
         # Search completed
 

@@ -16,6 +16,7 @@ from ..corpus.core import Corpus
 from ..corpus.manager import get_corpus_manager
 from ..models import SearchResult, SemanticMetadata
 from .constants import (
+    BGE_M3_MODEL,
     DEFAULT_BATCH_SIZE,
     DEFAULT_SENTENCE_MODEL,
     ENABLE_GPU_ACCELERATION,
@@ -23,6 +24,10 @@ from .constants import (
     LARGE_CORPUS_THRESHOLD,
     MASSIVE_CORPUS_THRESHOLD,
     MEDIUM_CORPUS_THRESHOLD,
+    MINI_LM_MODEL,
+    MODEL_BATCH_SIZES,
+    MODEL_DIMENSIONS,
+    SemanticModel,
     SMALL_CORPUS_THRESHOLD,
     USE_MIXED_PRECISION,
     USE_ONNX_BACKEND,
@@ -37,23 +42,24 @@ class SemanticSearch:
     def __init__(
         self,
         corpus: Corpus,
-        model_name: str = DEFAULT_SENTENCE_MODEL,
+        model_name: SemanticModel = DEFAULT_SENTENCE_MODEL,
         force_rebuild: bool = False,
-        batch_size: int = DEFAULT_BATCH_SIZE,
+        batch_size: int | None = None,
     ):
         """
         Initialize semantic search with sentence transformers.
 
         Args:
             corpus: Corpus instance containing vocabulary data
-            model_name: Sentence transformer model to use
+            model_name: Sentence transformer model to use (BGE-M3 or MiniLM)
             force_rebuild: Force rebuilding embeddings even if cached
-            batch_size: Batch size for embedding generation
+            batch_size: Batch size for embedding generation (auto-selected if None)
         """
         self.corpus = corpus
         self.model_name = model_name
         self.force_rebuild = force_rebuild
-        self.batch_size = batch_size
+        # Auto-select batch size based on model if not provided
+        self.batch_size = batch_size or MODEL_BATCH_SIZES.get(model_name, DEFAULT_BATCH_SIZE)
 
         # Initialize optimized sentence model
         self.device = self._detect_optimal_device()
@@ -97,9 +103,7 @@ class SemanticSearch:
                 model = SentenceTransformer(self.model_name, backend="onnx")
                 logger.info("✅ ONNX backend enabled with automatic model selection")
             except Exception as e:
-                logger.warning(
-                    f"Failed to load ONNX model: {e}. Falling back to PyTorch"
-                )
+                logger.warning(f"Failed to load ONNX model: {e}. Falling back to PyTorch")
                 model = SentenceTransformer(self.model_name)
         else:
             model = SentenceTransformer(self.model_name)
@@ -195,9 +199,7 @@ class SemanticSearch:
         try:
             await self._create_semantic_metadata(build_time_ms)
         except Exception as e:
-            logger.warning(
-                f"Failed to create semantic metadata (continuing without database): {e}"
-            )
+            logger.warning(f"Failed to create semantic metadata (continuing without database): {e}")
 
     def _build_embeddings(self) -> None:
         """Build streamlined semantic embeddings - sentence transformers only."""
@@ -206,15 +208,11 @@ class SemanticSearch:
 
         # Check if lemmatized vocabulary is available
         if not self.corpus.lemmatized_vocabulary:
-            raise ValueError(
-                f"Corpus '{self.corpus.corpus_name}' has empty lemmatized vocabulary"
-            )
+            raise ValueError(f"Corpus '{self.corpus.corpus_name}' has empty lemmatized vocabulary")
 
         # Process entire vocabulary at once for better performance
         vocab_count = len(self.corpus.lemmatized_vocabulary)
-        logger.info(
-            f"🔄 Starting embedding generation: {vocab_count:,} lemmas (full batch)"
-        )
+        logger.info(f"🔄 Starting embedding generation: {vocab_count:,} lemmas (full batch)")
 
         embedding_start = time.time()
 
@@ -253,8 +251,8 @@ class SemanticSearch:
             f"🔄 Building FAISS index (dimension: {dimension}, vocab_size: {vocab_size:,})..."
         )
 
-        # BGE-M3 Optimized Quantization Strategy
-        self._build_optimized_index_bge_m3(dimension, vocab_size)
+        # Model-aware optimized quantization strategy
+        self._build_optimized_index(dimension, vocab_size)
 
         # Mark serialization cache as dirty when index is rebuilt
         self._index_cache_dirty = True
@@ -300,9 +298,7 @@ class SemanticSearch:
             vocabulary_hash=self.corpus.vocabulary_hash,
             model_name=self.model_name,
             embedding_dimension=(
-                self.sentence_embeddings.shape[1]
-                if self.sentence_embeddings is not None
-                else 0
+                self.sentence_embeddings.shape[1] if self.sentence_embeddings is not None else 0
             ),
             vocabulary_size=len(self.corpus.lemmatized_vocabulary),
             build_time_ms=build_time_ms,
@@ -318,24 +314,52 @@ class SemanticSearch:
             f"Created SemanticMetadata for corpus '{self.corpus.corpus_name}' (vocabulary_hash: {self.corpus.vocabulary_hash})"
         )
 
-    def _build_optimized_index_bge_m3(self, dimension: int, vocab_size: int) -> None:
-        """BGE-M3 optimized FAISS index building with advanced quantization strategies."""
-
-        # Memory baseline calculation for logging
+    def _build_optimized_index(self, dimension: int, vocab_size: int) -> None:
+        """
+        Build optimized FAISS index with model-aware quantization strategies.
+        
+        Quantization strategies by corpus size:
+        
+        SMALL (<10k): Exact search - no compression
+          • 10k @ BGE-M3: 40MB  |  10k @ MiniLM: 15MB
+          
+        MEDIUM (10-25k): FP16 - 50% compression, <0.5% quality loss
+          • 25k @ BGE-M3: 100MB→50MB  |  25k @ MiniLM: 38MB→19MB
+          
+        LARGE (25-50k): INT8 - 75% compression, ~1-2% quality loss
+          • 50k @ BGE-M3: 200MB→50MB  |  50k @ MiniLM: 75MB→19MB
+          
+        MASSIVE (50-250k): IVF-PQ - 90% compression, ~5-10% quality loss
+          • 100k @ BGE-M3: 400MB→40MB  |  100k @ MiniLM: 150MB→15MB
+          • 250k @ BGE-M3: 1GB→100MB  |  250k @ MiniLM: 375MB→38MB
+          
+        EXTREME (>250k): OPQ+IVF-PQ - 97% compression, ~10-15% quality loss
+          • 500k @ BGE-M3: 2GB→60MB  |  500k @ MiniLM: 750MB→23MB
+          • 1M @ BGE-M3: 4GB→120MB  |  1M @ MiniLM: 1.5GB→45MB
+        
+        FAISS parameters:
+        - nlist: Number of IVF clusters (sqrt(N) to 4*sqrt(N))
+        - nprobe: Clusters searched at query time (nlist/16 to nlist/32)
+        - m: PQ subquantizers dividing vector into subspaces
+        - nbits: Bits per subquantizer (8 for quality/size balance)
+        """
+        # Memory baseline: FP32 vectors
         base_memory_mb = (vocab_size * dimension * 4) / (1024 * 1024)
-
+        model_type = "BGE-M3" if dimension == 1024 else "MiniLM" if dimension == 384 else "Custom"
+        
         logger.info(
-            f"🔄 Building BGE-M3 optimized FAISS index (dim: {dimension}, vocab: {vocab_size:,}, baseline memory: {base_memory_mb:.1f}MB)"
+            f"🔄 Building {model_type} optimized index (dim: {dimension}, vocab: {vocab_size:,}, baseline: {base_memory_mb:.1f}MB)"
         )
 
-        if vocab_size <= SMALL_CORPUS_THRESHOLD:  # ≤10k vectors - exact search
+        if vocab_size <= SMALL_CORPUS_THRESHOLD:  
+            # Exact L2 search - no compression
             self.sentence_index = faiss.IndexFlatL2(dimension)
             self.sentence_index.add(self.sentence_embeddings)
-            logger.info("✅ IndexFlatL2 for small corpus (no compression)")
+            actual_memory_mb = base_memory_mb
+            logger.info(f"✅ IndexFlatL2: exact search, {actual_memory_mb:.1f}MB (100% of baseline)")
 
-        elif (
-            vocab_size <= MEDIUM_CORPUS_THRESHOLD
-        ):  # 10k-25k vectors - FP16 scalar quantization
+        elif vocab_size <= MEDIUM_CORPUS_THRESHOLD:  
+            # FP16 quantization - 2x compression, minimal quality loss
             self.sentence_index = faiss.IndexScalarQuantizer(
                 dimension, faiss.ScalarQuantizer.QT_fp16
             )
@@ -343,12 +367,11 @@ class SemanticSearch:
             self.sentence_index.add(self.sentence_embeddings)
             expected_memory_mb = base_memory_mb * 0.5
             logger.info(
-                f"✅ FP16 Scalar Quantization (2x compression, ~{expected_memory_mb:.1f}MB)"
+                f"✅ FP16 Quantization: {expected_memory_mb:.1f}MB (50% of {base_memory_mb:.1f}MB), <0.5% quality loss"
             )
 
-        elif (
-            vocab_size <= LARGE_CORPUS_THRESHOLD
-        ):  # 25k-50k vectors - INT8 scalar quantization
+        elif vocab_size <= LARGE_CORPUS_THRESHOLD:  
+            # INT8 quantization - 4x compression, small quality loss
             self.sentence_index = faiss.IndexScalarQuantizer(
                 dimension, faiss.ScalarQuantizer.QT_8bit
             )
@@ -356,67 +379,71 @@ class SemanticSearch:
             self.sentence_index.add(self.sentence_embeddings)
             expected_memory_mb = base_memory_mb * 0.25
             logger.info(
-                f"✅ INT8 Scalar Quantization (4x compression, ~{expected_memory_mb:.1f}MB)"
+                f"✅ INT8 Quantization: {expected_memory_mb:.1f}MB (25% of {base_memory_mb:.1f}MB), ~1-2% quality loss"
             )
 
-        elif (
-            vocab_size <= MASSIVE_CORPUS_THRESHOLD
-        ):  # 50k-200k vectors - Product quantization
+        elif vocab_size <= MASSIVE_CORPUS_THRESHOLD:  
+            # IVF with Product Quantization - high compression
             nlist = self._calculate_optimal_nlist(vocab_size)
-            m = 32 if dimension == 1024 else 16  # Optimize for BGE-M3 1024d
-            nbits = 8
+            # Adjust m based on dimension: more subquantizers for higher dims
+            m = 64 if dimension >= 1024 else 32 if dimension >= 512 else 16
+            nbits = 8  # 8 bits per subquantizer for quality
 
             quantizer = faiss.IndexFlatL2(dimension)
-            self.sentence_index = faiss.IndexIVFPQ(
-                quantizer, dimension, nlist, m, nbits
-            )
+            self.sentence_index = faiss.IndexIVFPQ(quantizer, dimension, nlist, m, nbits)
 
-            logger.info(
-                f"🔄 Training IVF-PQ index (nlist={nlist}, m={m}, nbits={nbits})..."
-            )
+            logger.info(f"🔄 Training IVF-PQ (nlist={nlist} clusters, m={m} subquantizers)...")
             self.sentence_index.train(self.sentence_embeddings)
             self.sentence_index.add(self.sentence_embeddings)
 
-            # Optimized nprobe for BGE-M3 1024d vectors
+            # nprobe: search top k% of clusters
             self.sentence_index.nprobe = min(nlist // 16, 128)
-            expected_memory_mb = (
-                base_memory_mb * (m * nbits) / (dimension * 32)
-            )  # Compression ratio
+            compression_ratio = (m * nbits) / (dimension * 32)
+            expected_memory_mb = base_memory_mb * compression_ratio
             logger.info(
-                f"✅ IVF-PQ index (nprobe={self.sentence_index.nprobe}, ~{expected_memory_mb:.1f}MB)"
+                f"✅ IVF-PQ: {expected_memory_mb:.1f}MB ({compression_ratio*100:.0f}% of {base_memory_mb:.1f}MB), ~5-10% quality loss"
             )
 
-        else:  # >200k vectors - OPQ + IVF-PQ for maximum compression
+        else:  
+            # OPQ + IVF-PQ - maximum compression for huge corpora
             nlist = min(8192, vocab_size // 25)
-            m = 64 if vocab_size > 500000 else 32
+            m = 64 if dimension >= 768 else 32
             nbits = 8
 
-            # Use OPQ for better quantization quality
+            # OPQ: Optimized Product Quantization - rotates space for better quantization
             quantizer = faiss.IndexFlatL2(dimension)
             opq_transform = faiss.OPQMatrix(dimension, m)
             pq_index = faiss.IndexIVFPQ(quantizer, dimension, nlist, m, nbits)
             self.sentence_index = faiss.IndexPreTransform(opq_transform, pq_index)
 
-            logger.info(f"🔄 Training OPQ+IVF-PQ index (nlist={nlist}, m={m})...")
+            logger.info(f"🔄 Training OPQ+IVF-PQ (nlist={nlist}, m={m})...")
             self.sentence_index.train(self.sentence_embeddings)
             self.sentence_index.add(self.sentence_embeddings)
 
             # More aggressive nprobe for large indices
             base_index = faiss.downcast_index(self.sentence_index.index)
             base_index.nprobe = min(nlist // 32, 256)
-            expected_memory_mb = base_memory_mb * 0.03  # ~97% compression
+            compression_ratio = 0.03  # ~3% of original size
+            expected_memory_mb = base_memory_mb * compression_ratio
             logger.info(
-                f"✅ OPQ+IVF-PQ index (nprobe={base_index.nprobe}, ~{expected_memory_mb:.1f}MB)"
+                f"✅ OPQ+IVF-PQ: {expected_memory_mb:.1f}MB ({compression_ratio*100:.0f}% of {base_memory_mb:.1f}MB), ~10-15% quality loss"
             )
 
     def _calculate_optimal_nlist(self, vocab_size: int) -> int:
-        """Calculate optimal nlist based on corpus size and BGE-M3 research findings."""
+        """
+        Calculate optimal number of IVF clusters.
+        
+        Rule of thumb: sqrt(N) to 4*sqrt(N) clusters
+        More clusters = faster search but slower indexing
+        """
+        import math
+        sqrt_n = int(math.sqrt(vocab_size))
         if vocab_size <= 100000:
-            return min(1024, vocab_size // 50)
-        elif vocab_size <= 200000:
-            return min(2048, vocab_size // 50)
+            return min(1024, max(sqrt_n, vocab_size // 50))
+        elif vocab_size <= 250000:
+            return min(2048, max(sqrt_n, vocab_size // 50))
         else:
-            return min(4096, vocab_size // 50)
+            return min(4096, max(sqrt_n * 2, vocab_size // 50))
 
     def search(
         self, query: str, max_results: int = 20, min_score: float = 0.0
@@ -479,9 +506,7 @@ class SemanticSearch:
             results = []
             lemma_to_word_indices = self.corpus.lemma_to_word_indices
 
-            for embedding_idx, similarity in zip(
-                valid_embedding_indices, valid_similarities
-            ):
+            for embedding_idx, similarity in zip(valid_embedding_indices, valid_similarities):
                 # Direct mapping: embedding_idx = lemma_idx (no variants)
                 lemma_idx = embedding_idx
 
@@ -526,9 +551,7 @@ class SemanticSearch:
             "batch_size": self.batch_size,
             "device": self.device,
             "sentence_embeddings": (
-                self.sentence_embeddings.tolist()
-                if self.sentence_embeddings is not None
-                else None
+                self.sentence_embeddings.tolist() if self.sentence_embeddings is not None else None
             ),
             "sentence_index_data": self._serialize_faiss_index(),
             "vocabulary_hash": self._vocabulary_hash,
@@ -559,14 +582,10 @@ class SemanticSearch:
 
         # Restore embeddings
         if data.get("sentence_embeddings"):
-            instance.sentence_embeddings = np.array(
-                data["sentence_embeddings"], dtype=np.float32
-            )
+            instance.sentence_embeddings = np.array(data["sentence_embeddings"], dtype=np.float32)
             # Ensure C-contiguous layout
             if not instance.sentence_embeddings.flags.c_contiguous:
-                instance.sentence_embeddings = np.ascontiguousarray(
-                    instance.sentence_embeddings
-                )
+                instance.sentence_embeddings = np.ascontiguousarray(instance.sentence_embeddings)
 
         # Restore FAISS index
         if data.get("sentence_index_data") and instance.sentence_embeddings is not None:
@@ -640,18 +659,12 @@ class SemanticSearch:
         """Get statistics about the semantic search index."""
         return {
             "initialized": bool(self.sentence_index),
-            "vocabulary_size": (
-                len(self.corpus.lemmatized_vocabulary) if self.corpus else 0
-            ),
+            "vocabulary_size": (len(self.corpus.lemmatized_vocabulary) if self.corpus else 0),
             "embedding_dim": (
-                self.sentence_embeddings.shape[1]
-                if self.sentence_embeddings is not None
-                else 0
+                self.sentence_embeddings.shape[1] if self.sentence_embeddings is not None else 0
             ),
             "model_name": self.model_name,
             "corpus_name": self.corpus.corpus_name if self.corpus else "",
-            "semantic_metadata_id": (
-                self.semantic_metadata.id if self.semantic_metadata else None
-            ),
+            "semantic_metadata_id": (self.semantic_metadata.id if self.semantic_metadata else None),
             "batch_size": self.batch_size,
         }

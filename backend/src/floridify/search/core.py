@@ -6,6 +6,7 @@ Performance-optimized for 100k-1M word searches with KISS principles.
 
 from __future__ import annotations
 
+import asyncio
 import itertools
 from typing import Any
 
@@ -16,6 +17,7 @@ from .corpus.core import Corpus
 from .corpus.manager import get_corpus_manager
 from .fuzzy import FuzzySearch  # Using RapidFuzz implementation
 from .models import SearchResult
+from .semantic.constants import DEFAULT_SENTENCE_MODEL, SemanticModel
 from .semantic.core import SemanticSearch
 from .semantic.manager import get_semantic_search_manager
 from .trie import TrieSearch
@@ -42,6 +44,7 @@ class SearchEngine:
         corpus_name: str,
         min_score: float = DEFAULT_MIN_SCORE,
         semantic: bool = True,
+        semantic_model: SemanticModel = DEFAULT_SENTENCE_MODEL,
         force_rebuild: bool = False,
     ) -> None:
         """Initialize with corpus name and configuration.
@@ -50,11 +53,13 @@ class SearchEngine:
             corpus_name: Name of corpus to fetch from corpus manager
             min_score: Minimum score threshold for results
             semantic: Enable semantic search (requires ML dependencies)
+            semantic_model: Model to use for semantic search (BGE-M3 or MiniLM)
             force_rebuild: Force rebuild of indices and semantic search
         """
         self.corpus_name = corpus_name
         self.min_score = min_score
         self.semantic = semantic
+        self.semantic_model = semantic_model
         self.force_rebuild = force_rebuild
 
         # Corpus will be fetched lazily
@@ -65,6 +70,10 @@ class SearchEngine:
         self.trie_search: TrieSearch | None = None
         self.fuzzy_search: FuzzySearch | None = None
         self.semantic_search: SemanticSearch | None = None
+
+        # Track semantic initialization separately
+        self._semantic_ready = False
+        self._semantic_init_task: asyncio.Task[None] | None = None
 
         self._initialized = False
 
@@ -106,13 +115,9 @@ class SearchEngine:
                 self.corpus_name, vocab_hash=metadata.vocabulary_hash
             )
             if self.corpus:
-                logger.debug(
-                    f"Successfully loaded corpus '{self.corpus_name}' from cache"
-                )
+                logger.debug(f"Successfully loaded corpus '{self.corpus_name}' from cache")
             else:
-                logger.warning(
-                    "Could not load corpus from cache despite metadata existing"
-                )
+                logger.warning("Could not load corpus from cache despite metadata existing")
         else:
             logger.warning(f"No metadata found for corpus '{self.corpus_name}'")
 
@@ -129,10 +134,7 @@ class SearchEngine:
         logger.debug(f"Corpus loaded with {len(combined_vocab)} vocabulary items")
 
         # High-performance search components - only initialize if needed
-        if (
-            not self.trie_search
-            or self.trie_search._vocabulary_hash != self._vocabulary_hash
-        ):
+        if not self.trie_search or self.trie_search._vocabulary_hash != self._vocabulary_hash:
             logger.debug("Building/updating Trie index")
             self.trie_search = TrieSearch()
             await self.trie_search.build_index(combined_vocab)
@@ -141,38 +143,54 @@ class SearchEngine:
             logger.debug("Initializing Fuzzy search")
             self.fuzzy_search = FuzzySearch(min_score=self.min_score)
 
-        # Initialize semantic search if enabled
-        if (
-            self.semantic
-            and (
-                not self.semantic_search
-                or getattr(self.semantic_search, '_vocabulary_hash', None)
-                != self._vocabulary_hash
-            )
-        ):
-            logger.debug("Initializing/updating semantic search")
-            # Get or create semantic search from manager
-            semantic_manager = get_semantic_search_manager()
-            self.semantic_search = await semantic_manager.get_semantic_search(
-                corpus_name=self.corpus_name, vocab_hash=self.corpus.vocabulary_hash
-            )
-            if not self.semantic_search:
-                # Create semantic search if not found in cache
-                logger.debug(
-                    f"Creating new semantic search for corpus '{self.corpus_name}'"
-                )
-                self.semantic_search = await semantic_manager.create_semantic_search(
-                    corpus=self.corpus,
-                    force_rebuild=self.force_rebuild,
-                )
-            else:
-                logger.debug(f"Using cached semantic search for '{self.corpus_name}'")
+        # Initialize semantic search if enabled - non-blocking background task
+        if self.semantic and not self._semantic_ready:
+            logger.debug("Semantic search enabled - initializing in background")
+            # Fire and forget - semantic search initializes in background
+            self._semantic_init_task = asyncio.create_task(self._initialize_semantic_background())
 
         self._initialized = True
 
         logger.info(
             f"✅ SearchEngine initialized for corpus '{self.corpus_name}' (hash: {self._vocabulary_hash[:8]})"
         )
+
+    async def _initialize_semantic_background(self) -> None:
+        """Initialize semantic search in background without blocking."""
+        try:
+            if not self.corpus:
+                logger.warning("Cannot initialize semantic search without corpus")
+                return
+
+            logger.info(f"Starting background semantic initialization for '{self.corpus_name}'")
+
+            # Get or create semantic search from manager
+            semantic_manager = get_semantic_search_manager()
+            self.semantic_search = await semantic_manager.get_semantic_search(
+                corpus_name=self.corpus_name, 
+                vocab_hash=self.corpus.vocabulary_hash,
+                model_name=self.semantic_model
+            )
+
+            if not self.semantic_search:
+                # Create semantic search if not found in cache
+                logger.info(
+                    f"Creating new semantic search for corpus '{self.corpus_name}' with {self.semantic_model} (background)"
+                )
+                self.semantic_search = await semantic_manager.create_semantic_search(
+                    corpus=self.corpus,
+                    force_rebuild=self.force_rebuild,
+                    model_name=self.semantic_model,
+                )
+            else:
+                logger.info(f"Using cached semantic search for '{self.corpus_name}'")
+
+            self._semantic_ready = True
+            logger.info(f"✅ Semantic search ready for '{self.corpus_name}'")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize semantic search: {e}")
+            self._semantic_ready = False
 
     async def _get_current_vocab_hash(self) -> str | None:
         """Get current vocabulary hash from corpus manager."""
@@ -202,9 +220,7 @@ class SearchEngine:
 
         # Get updated corpus
         manager = get_corpus_manager()
-        updated_corpus = await manager.get_corpus(
-            self.corpus_name, vocab_hash=current_vocab_hash
-        )
+        updated_corpus = await manager.get_corpus(self.corpus_name, vocab_hash=current_vocab_hash)
 
         if not updated_corpus:
             logger.error(f"Failed to get updated corpus '{self.corpus_name}'")
@@ -216,18 +232,14 @@ class SearchEngine:
         combined_vocab = updated_corpus.vocabulary
 
         # Update search components only if needed
-        if (
-            self.trie_search
-            and self.trie_search._vocabulary_hash != self._vocabulary_hash
-        ):
+        if self.trie_search and self.trie_search._vocabulary_hash != self._vocabulary_hash:
             await self.trie_search.build_index(combined_vocab)
 
         # Note: FuzzySearch uses corpus on-demand, no rebuild needed
         # Update semantic search if enabled and hash changed
         if (
             self.semantic_search
-            and getattr(self.semantic_search, '_vocabulary_hash', None)
-            != self._vocabulary_hash
+            and getattr(self.semantic_search, "_vocabulary_hash", None) != self._vocabulary_hash
         ):
             await self.semantic_search.update_corpus(updated_corpus)
 
@@ -295,9 +307,7 @@ class SearchEngine:
             results = self.search_fuzzy(normalized_query, max_results, min_score)
         elif mode == SearchMode.SEMANTIC:
             if not self.semantic_search:
-                raise ValueError(
-                    "Semantic search is not enabled for this SearchEngine instance"
-                )
+                raise ValueError("Semantic search is not enabled for this SearchEngine instance")
 
             results = self.search_semantic(normalized_query, max_results, min_score)
         else:
@@ -326,9 +336,7 @@ class SearchEngine:
 
         return [
             SearchResult(
-                word=self._get_original_word(
-                    match
-                ),  # Return original word with diacritics
+                word=self._get_original_word(match),  # Return original word with diacritics
                 lemmatized_word=None,
                 score=1.0,
                 method=SearchMethod.EXACT,
@@ -380,8 +388,9 @@ class SearchEngine:
             max_results: Maximum results to return
             min_score: Minimum score threshold
         """
-        if not self.semantic_search:
-            logger.debug("Semantic search not available")
+        # Check if semantic search is ready
+        if not self._semantic_ready or not self.semantic_search:
+            logger.debug("Semantic search not ready yet - returning empty results")
             return []
 
         # Perform semantic search
@@ -414,9 +423,7 @@ class SearchEngine:
         if semantic and self.semantic_search:
             # If fuzzy found good results, be more selective with semantic
             semantic_limit = (
-                max_results // 2
-                if len(fuzzy_results) >= max_results // 2
-                else max_results
+                max_results // 2 if len(fuzzy_results) >= max_results // 2 else max_results
             )
             semantic_results = self.search_semantic(query, semantic_limit, min_score)
 
@@ -463,8 +470,7 @@ class SearchEngine:
                 existing_priority = self.METHOD_PRIORITY.get(existing.method, 0)
 
                 if (result_priority > existing_priority) or (
-                    result_priority == existing_priority
-                    and result.score > existing.score
+                    result_priority == existing_priority and result.score > existing.score
                 ):
                     word_to_result[result.word] = result
 
@@ -477,7 +483,8 @@ class SearchEngine:
                 "vocabulary_size": len(self.corpus.vocabulary),
                 "min_score": self.min_score,
                 "semantic_enabled": self.semantic,
-                "semantic_available": True,
+                "semantic_ready": self._semantic_ready,
+                "semantic_model": self.semantic_model if self.semantic else None,
                 "corpus_name": self.corpus_name,
             }
         else:
@@ -487,7 +494,7 @@ class SearchEngine:
                 "phrases": 0,
                 "min_score": self.min_score,
                 "semantic_enabled": self.semantic,
-                "semantic_available": True,
+                "semantic_ready": False,
                 "corpus_name": self.corpus_name,
             }
 

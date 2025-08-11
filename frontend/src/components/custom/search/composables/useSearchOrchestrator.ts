@@ -2,7 +2,7 @@ import { ref, Ref, computed } from 'vue';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
-import { dictionaryApi, aiApi } from '@/api';
+import { lookupApi, aiApi } from '@/api';
 import type { SearchResult, WordListItem, WordSuggestionResponse, SynthesizedDictionaryEntry } from '@/types';
 
 interface UseSearchOrchestratorOptions {
@@ -145,19 +145,16 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
 
     if (options?.onProgress) {
       // Use lookupStream for streaming
-      return dictionaryApi.getDefinitionStream(
-        word,
-        apiOptions.forceRefresh,
-        apiOptions.providers,
-        apiOptions.languages,
-        options.onProgress,
-        undefined, // onConfig
-        undefined, // onPartialResult
-        apiOptions.noAI
-      );
+      return lookupApi.lookupStream(word, {
+        forceRefresh: apiOptions.forceRefresh,
+        providers: apiOptions.providers,
+        languages: apiOptions.languages,
+        noAI: apiOptions.noAI,
+        onProgress: (event) => options.onProgress?.(event.stage || 'processing', event.progress || 0)
+      });
     }
     
-    return dictionaryApi.getDefinition(word, apiOptions);
+    return lookupApi.lookup(word, apiOptions);
   };
 
   /**
@@ -177,17 +174,17 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
       onProgress?: (stage: string, progress: number, message?: string, details?: any) => void;
     }
   ): Promise<WordSuggestionResponse> => {
+    // Use aiApi.suggestWords for AI-powered word suggestions
     if (options?.onProgress) {
       // Use stream version with onProgress callback
-      return dictionaryApi.getAISuggestionsStream(
+      return aiApi.suggestWordsStream(
         query,
         count,
-        options.onProgress, // onProgress
-        undefined // onConfig
+        options.onProgress // onProgress
       );
     }
     
-    return dictionaryApi.getAISuggestions(query, count);
+    return aiApi.suggestWords(query, count);
   };
 
   // ============================================================================

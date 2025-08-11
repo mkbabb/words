@@ -1,5 +1,5 @@
 import { ref, readonly, shallowRef } from 'vue'
-import { dictionaryApi } from '@/api'
+import { definitionsApi, examplesApi, entriesApi } from '@/api'
 import type { LookupContentState, ModeHandler } from '@/stores/types/mode-types'
 import type { SearchMode, SynthesizedDictionaryEntry, ThesaurusEntry, WordSuggestionResponse, Definition } from '@/types'
 
@@ -98,7 +98,7 @@ export function useLookupContentState() {
   // ==========================================================================
   
   const updateDefinition = async (definitionId: string, updates: Partial<Definition>) => {
-    const response = await dictionaryApi.updateDefinition(definitionId, updates)
+    const response = await definitionsApi.updateDefinition(definitionId, updates)
     
     if (currentEntry.value?.definitions?.some(def => def.id === definitionId)) {
       const updatedEntry = {
@@ -114,7 +114,7 @@ export function useLookupContentState() {
   }
 
   const updateExample = async (_definitionId: string, exampleId: string, newText: string) => {
-    const response = await dictionaryApi.updateExample(exampleId, { text: newText })
+    const response = await examplesApi.updateExample(exampleId, { text: newText })
     
     if (currentEntry.value) {
       // For now, just trigger a refresh since nested updates are complex
@@ -126,7 +126,7 @@ export function useLookupContentState() {
   }
 
   const regenerateDefinitionComponent = async (definitionId: string, component: 'definition' | 'examples' | 'usage_notes') => {
-    const response = await dictionaryApi.regenerateDefinitionComponent(definitionId, component)
+    const response = await definitionsApi.regenerateComponents(definitionId, component)
     
     if (currentEntry.value) {
       const updatedEntry = {
@@ -153,10 +153,9 @@ export function useLookupContentState() {
     regeneratingDefinitionIndex.value = definitionIndex
     
     try {
-      const response = await dictionaryApi.regenerateExamples(
-        currentEntry.value.word,
-        definitionIndex
-      )
+      // For now, regenerate the entire definition component for examples
+      const definitionId = currentEntry.value.definitions[definitionIndex].id
+      const response = await definitionsApi.regenerateComponents(definitionId, 'examples')
       
       const updatedEntry = { ...currentEntry.value }
       if (updatedEntry.definitions) {
@@ -176,7 +175,9 @@ export function useLookupContentState() {
   const refreshEntryImages = async () => {
     if (!currentEntry.value) return
     
-    const response = await dictionaryApi.refreshSynthEntry(currentEntry.value.word)
+    // Assuming the entry has an ID field
+    const entryId = (currentEntry.value as any).id || currentEntry.value.word
+    const response = await entriesApi.refreshEntryImages(entryId)
     
     const updatedEntry: SynthesizedDictionaryEntry = {
       ...currentEntry.value,

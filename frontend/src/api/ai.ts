@@ -7,6 +7,9 @@ import type {
   WordSuggestionResponse,
 } from '@/types';
 import { api, transformError, API_BASE_URL } from './core';
+import { SSEClient, type SSEOptions, type SSEHandlers } from './sse/SSEClient';
+
+const sseClient = new SSEClient(api);
 
 export const aiApi = {
   // Synthesis operations - POST /ai/synthesize/*
@@ -365,160 +368,36 @@ export const aiApi = {
     onProgress?: (stage: string, progress: number, message?: string, details?: any) => void,
     onConfig?: (category: string, stages: Array<{progress: number, label: string, description: string}>) => void
   ): Promise<WordSuggestionResponse> {
-    return new Promise(async (resolve, reject) => {
-      // Cap count at 25 (backend limit)
-      const cappedCount = Math.min(Math.max(count, 1), 25);
-      const params = new URLSearchParams({
-        query: query,
-        count: cappedCount.toString()
-      });
-      
-      const url = `${API_BASE_URL}/ai/suggest-words/stream?${params.toString()}`;
-      console.log(`Opening fetch-based SSE connection for AI suggestions to: ${url}`);
-
-      let hasReceivedData = false;
-      let connectionTimeout: NodeJS.Timeout;
-      let abortController = new AbortController();
-      
-      // Set connection timeout (AI suggestions are usually faster)
-      connectionTimeout = setTimeout(() => {
-        if (!hasReceivedData) {
-          console.error('AI suggestions SSE connection timeout');
-          abortController.abort();
-          reject(new Error('Connection timeout'));
-        }
-      }, 30000); // 30 seconds for AI suggestions
-
-      try {
-        // Use fetch with streaming instead of EventSource
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Accept': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-          },
-          signal: abortController.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        if (!response.body) {
-          throw new Error('No response body received');
-        }
-
-        console.log('AI suggestions fetch-based SSE connection established successfully');
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        // Process the stream
-        let currentEvent = '';
-        
-        while (true) {
-          const { done, value } = await reader.read();
-          
-          if (done) {
-            console.log('AI suggestions stream completed');
-            break;
-          }
-
-          hasReceivedData = true;
-          clearTimeout(connectionTimeout);
-
-          // Decode the chunk and add to buffer
-          buffer += decoder.decode(value, { stream: true });
-          
-          // Process complete lines
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep incomplete line in buffer
-          
-          for (const line of lines) {
-            if (line.trim() === '') {
-              // Empty line ends an event in SSE format
-              currentEvent = '';
-              continue;
-            }
-            
-            // Parse SSE format: "event: eventname" or "data: {...}"
-            if (line.startsWith('event: ')) {
-              currentEvent = line.slice(7); // Remove "event: " prefix
-              console.log('AI Suggestions SSE Event:', currentEvent);
-              continue;
-            } else if (line.startsWith('data: ')) {
-              const eventData = line.slice(6); // Remove "data: " prefix
-              
-              try {
-                const data = JSON.parse(eventData);
-                
-                // Handle completion event specially
-                if (currentEvent === 'complete') {
-                  console.log('AI suggestions fetch-based SSE connection completed successfully');
-                  clearTimeout(connectionTimeout);
-                  
-                  // Extract result from new structured format
-                  const result = data.result || data;
-                  resolve(result as WordSuggestionResponse);
-                  return;
-                } else {
-                  // Handle different event types based on data.type
-                  if (data.type === 'config') {
-                    if (onConfig) {
-                      onConfig(data.category, data.stages);
-                    }
-                  } else if (data.type === 'progress') {
-                    if (onProgress) {
-                      onProgress(data.stage, data.progress, data.message, data.details);
-                    }
-                  }
-                }
-              } catch (parseError) {
-                console.error('Error parsing AI suggestions SSE data:', parseError, 'Raw data:', eventData);
-              }
-            }
-          }
-        }
-
-        // Handle any remaining completion data in buffer
-        if (buffer.trim()) {
-          const lines = buffer.split('\n');
-          let lastEvent = '';
-          
-          for (const line of lines) {
-            if (line.startsWith('event: ')) {
-              lastEvent = line.slice(7);
-            } else if (line.startsWith('data: ') && lastEvent === 'complete') {
-              try {
-                const data = JSON.parse(line.slice(6));
-                console.log('AI suggestions final completion from buffer');
-                
-                // Extract result from new structured format
-                const result = data.result || data;
-                resolve(result as WordSuggestionResponse);
-                return;
-              } catch (parseError) {
-                console.error('Error parsing AI suggestions final completion data:', parseError);
-              }
-            }
-          }
-        }
-
-        // If we get here without resolving, something went wrong
-        reject(new Error('AI suggestions stream ended without completion event'));
-
-      } catch (error) {
-        clearTimeout(connectionTimeout);
-        console.error('AI suggestions fetch-based SSE connection error:', error);
-        
-        // If we haven't received any data, it might be a connection issue
-        if (!hasReceivedData) {
-          reject(new Error(`Failed to establish AI suggestions SSE connection: ${error instanceof Error ? error.message : String(error)}`));
-        } else {
-          reject(new Error('AI suggestions stream connection lost'));
-        }
-      }
+    // Cap count at 25 (backend limit)
+    const cappedCount = Math.min(Math.max(count, 1), 25);
+    const params = new URLSearchParams({
+      query: query,
+      count: cappedCount.toString()
     });
+    
+    const url = `${API_BASE_URL}/ai/suggest-words/stream?${params.toString()}`;
+
+    const sseOptions: SSEOptions = {
+      timeout: 30000, // 30 seconds for AI suggestions
+      onProgress: onProgress ? (event) => onProgress(event.stage, event.progress, event.message, event.details) : undefined,
+      onConfig: onConfig ? (event) => onConfig(event.category, event.stages) : undefined
+    };
+
+    const handlers: SSEHandlers<WordSuggestionResponse> = {
+      onEvent: (event: string, data: any) => {
+        if (event === 'completion' || event === 'complete') {
+          return data.result || data;
+        }
+        return null;
+      },
+      onComplete: (result: WordSuggestionResponse) => {
+        console.log('AI suggestions completed:', result);
+      },
+      onError: (error: Error) => {
+        console.error('AI suggestions stream error:', error);
+      }
+    };
+
+    return sseClient.stream(url, sseOptions, handlers);
   },
 };

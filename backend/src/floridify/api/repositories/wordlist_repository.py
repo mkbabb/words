@@ -170,9 +170,9 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         # Check for existing list with same hash
         # Temporarily disabled to avoid loading old data format
-        # existing = await self.find_by_hash(hash_id)
-        # if existing:
-        #     return existing
+        existing = await self.find_by_hash(hash_id)
+        if existing:
+            return existing
 
         # Create new word list
         wordlist = WordList(

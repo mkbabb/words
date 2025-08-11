@@ -204,7 +204,7 @@ class TrieSearch:
         for word in self._trie:
             try:
                 # Ensure word is valid UTF-8 and can be JSON serialized
-                word.encode('utf-8').decode('utf-8')
+                word.encode("utf-8").decode("utf-8")
                 trie_words.append(word)
             except (UnicodeError, UnicodeDecodeError, UnicodeEncodeError):
                 logger.warning(f"Skipping non-UTF-8 word during trie serialization: {repr(word)}")
@@ -212,7 +212,7 @@ class TrieSearch:
 
         # Sort for deterministic output and integrity
         trie_words_sorted = sorted(trie_words)
-        
+
         # Create data payload
         data_payload = {
             "trie_data": trie_words_sorted,
@@ -222,12 +222,12 @@ class TrieSearch:
             "vocabulary_hash": self._vocabulary_hash,
             "format_version": "2.0",
         }
-        
+
         # Calculate integrity hash for corruption detection
-        data_str = json.dumps(data_payload, sort_keys=True, separators=(',', ':'))
+        data_str = json.dumps(data_payload, sort_keys=True, separators=(",", ":"))
         integrity_hash = hashlib.sha256(data_str.encode()).hexdigest()
         data_payload["integrity_hash"] = integrity_hash
-        
+
         return data_payload
 
     def model_load(self, data: dict[str, Any]) -> None:
@@ -242,18 +242,20 @@ class TrieSearch:
         """
         # Check format version for backwards compatibility
         format_version = data.get("format_version", "1.0")
-        
+
         if format_version == "2.0":
             # Verify integrity for v2.0 format
             stored_hash = data.get("integrity_hash")
             if stored_hash:
                 # Recreate hash without integrity_hash field
                 check_data = {k: v for k, v in data.items() if k != "integrity_hash"}
-                data_str = json.dumps(check_data, sort_keys=True, separators=(',', ':'))
+                data_str = json.dumps(check_data, sort_keys=True, separators=(",", ":"))
                 computed_hash = hashlib.sha256(data_str.encode()).hexdigest()
-                
+
                 if computed_hash != stored_hash:
-                    raise ValueError(f"Trie cache integrity check failed: {computed_hash[:8]} != {stored_hash[:8]}")
+                    raise ValueError(
+                        f"Trie cache integrity check failed: {computed_hash[:8]} != {stored_hash[:8]}"
+                    )
 
         words = data.get("trie_data", [])
         self._word_frequencies = data.get("frequencies", {})
@@ -266,7 +268,7 @@ class TrieSearch:
             valid_words = [w for w in words if isinstance(w, str) and w.strip()]
             if not valid_words:
                 raise ValueError("No valid words found in trie cache data")
-            
+
             # Deduplicate and sort for consistent construction
             sorted_words = sorted(set(valid_words))
             self._trie = marisa_trie.Trie(sorted_words)
@@ -303,17 +305,19 @@ class TrieSearch:
                     stored_hash = cached_data.get("integrity_hash")
                     if stored_hash:
                         check_data = {k: v for k, v in cached_data.items() if k != "integrity_hash"}
-                        data_str = json.dumps(check_data, sort_keys=True, separators=(',', ':'))
+                        data_str = json.dumps(check_data, sort_keys=True, separators=(",", ":"))
                         computed_hash = hashlib.sha256(data_str.encode()).hexdigest()
-                        
+
                         if computed_hash != stored_hash:
-                            logger.warning(f"Cache integrity check failed for {vocab_hash[:8]}, discarding")
+                            logger.warning(
+                                f"Cache integrity check failed for {vocab_hash[:8]}, discarding"
+                            )
                             await self._cache.delete("trie", vocab_hash)
                             return None
-                
+
                 logger.debug(f"Loaded verified trie from cache: {vocab_hash[:8]}")
                 return cached_data  # type: ignore[no-any-return]
         except Exception as e:
             logger.warning(f"Cache load failed for {vocab_hash[:8]}: {e}")
-            
+
         return None

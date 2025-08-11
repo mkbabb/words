@@ -124,17 +124,31 @@ class CorpusManager:
 
         # Save lightweight metadata to MongoDB (optional - continue without database if it fails)
         try:
-            corpus_data = CorpusMetadata(
-                corpus_name=corpus.corpus_name,
-                vocabulary_hash=corpus.vocabulary_hash,
-                vocabulary_stats=corpus.vocabulary_stats,
-                metadata=corpus.metadata,
-                semantic_data_id=None,
-            )
-            await corpus_data.save()
-            logger.info(
-                f"Stored corpus metadata in MongoDB for '{corpus_name}' (full hash: {corpus.vocabulary_hash})"
-            )
+            # Check if metadata already exists
+            existing_metadata = await CorpusMetadata.find_one({"corpus_name": corpus.corpus_name})
+
+            if existing_metadata:
+                # Update existing metadata
+                existing_metadata.vocabulary_hash = corpus.vocabulary_hash
+                existing_metadata.vocabulary_stats = corpus.vocabulary_stats
+                existing_metadata.metadata = corpus.metadata
+                await existing_metadata.save()
+                logger.info(
+                    f"Updated corpus metadata in MongoDB for '{corpus_name}' (full hash: {corpus.vocabulary_hash})"
+                )
+            else:
+                # Create new metadata
+                corpus_data = CorpusMetadata(
+                    corpus_name=corpus.corpus_name,
+                    vocabulary_hash=corpus.vocabulary_hash,
+                    vocabulary_stats=corpus.vocabulary_stats,
+                    metadata=corpus.metadata,
+                    semantic_data_id=None,
+                )
+                await corpus_data.save()
+                logger.info(
+                    f"Stored corpus metadata in MongoDB for '{corpus_name}' (full hash: {corpus.vocabulary_hash})"
+                )
         except Exception as e:
             logger.warning(
                 f"Failed to store corpus metadata in MongoDB (continuing without database): {e}"

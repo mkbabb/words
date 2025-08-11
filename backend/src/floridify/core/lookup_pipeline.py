@@ -9,10 +9,10 @@ import traceback
 
 from ..ai import get_definition_synthesizer
 from ..ai.synthesis_functions import cluster_definitions
-from ..connectors.apple_dictionary import AppleDictionaryConnector
+from ..connectors.api.oxford import OxfordConnector
 from ..connectors.base import DictionaryConnector
-from ..connectors.oxford import OxfordConnector
-from ..connectors.wiktionary import WiktionaryConnector
+from ..connectors.local.apple_dictionary import AppleDictionaryConnector
+from ..connectors.scraper.wiktionary import WiktionaryConnector
 from ..models.base import Etymology
 from ..models.definition import (
     Definition,

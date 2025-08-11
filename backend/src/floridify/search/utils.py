@@ -10,11 +10,14 @@ import hashlib
 
 
 def get_vocabulary_hash(
-    vocabulary: list[str], model_name: str | None = None, max_length: int = 16, is_sorted: bool = False
+    vocabulary: list[str],
+    model_name: str | None = None,
+    max_length: int = 16,
+    is_sorted: bool = False,
 ) -> str:
     """
     Generate a stable hash for vocabulary content using deterministic sampling.
-    
+
     Enhanced for BGE-M3 integration - includes model name to prevent cache collisions
     between different embedding models (all-MiniLM-L6-v2 vs BAAI/bge-m3).
 

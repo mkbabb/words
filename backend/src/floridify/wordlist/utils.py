@@ -1,11 +1,27 @@
 """Utility functions for wordlist operations."""
 
 import hashlib
+import re
 
 from ..utils.logging import get_logger
-from ..utils.utils import generate_slug
 
 logger = get_logger(__name__)
+
+
+def generate_slug(text: str) -> str:
+    """Generate a URL-safe slug from text.
+    
+    Args:
+        text: Text to convert to slug
+        
+    Returns:
+        URL-safe slug
+    """
+    # Convert to lowercase and replace spaces with hyphens
+    slug = text.lower().strip()
+    slug = re.sub(r'[^\w\s-]', '', slug)
+    slug = re.sub(r'[-\s]+', '-', slug)
+    return slug
 
 
 def generate_wordlist_hash(words: list[str]) -> str:

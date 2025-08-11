@@ -35,6 +35,10 @@ class DictionaryProvider(Enum):
     WIKTIONARY = "wiktionary"
     OXFORD = "oxford"
     APPLE_DICTIONARY = "apple_dictionary"
+    MERRIAM_WEBSTER = "merriam_webster"
+    FREE_DICTIONARY = "free_dictionary"
+    DICTIONARY_COM = "dictionary_com"
+    WORDHIPPO = "wordhippo"
     AI_FALLBACK = "ai_fallback"
     SYNTHESIS = "synthesis"
 
@@ -45,6 +49,10 @@ class DictionaryProvider(Enum):
             DictionaryProvider.WIKTIONARY: "Wiktionary",
             DictionaryProvider.OXFORD: "Oxford Dictionary",
             DictionaryProvider.APPLE_DICTIONARY: "Apple Dictionary",
+            DictionaryProvider.MERRIAM_WEBSTER: "Merriam-Webster",
+            DictionaryProvider.FREE_DICTIONARY: "Free Dictionary",
+            DictionaryProvider.DICTIONARY_COM: "Dictionary.com",
+            DictionaryProvider.WORDHIPPO: "WordHippo",
             DictionaryProvider.AI_FALLBACK: "AI Fallback",
             DictionaryProvider.SYNTHESIS: "Synthesis",
         }
@@ -77,15 +85,38 @@ class LiteratureSourceType(Enum):
     DOCUMENT = "document"
 
 
+class Word(Document, BaseMetadata):
+    """Core word entity."""
+
+    text: str
+    normalized: str  # Lowercase, no accents
+    language: Language = Language.ENGLISH
+
+    # Word forms and variations
+    homograph_number: int | None = None  # For identical spellings
+
+    # Metadata
+    offensive_flag: bool = False
+    first_known_use: str | None = None  # Historical dating
+
+    class Settings:
+        name = "words"
+        indexes = [
+            [("text", 1), ("language", 1)],
+            "normalized",
+            [("text", 1), ("homograph_number", 1)],
+        ]
+
+
 class Pronunciation(Document, BaseMetadata):
     """Pronunciation with multi-format support."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     phonetic: str  # e.g., "on koo-LEES"
     ipa: str = ""  # American IPA - default to empty string for backwards compatibility
-    audio_file_ids: list[
-        PydanticObjectId
-    ] = []  # FK to AudioMedia documents - optimized with ObjectIds
+    audio_file_ids: list[PydanticObjectId] = (
+        []
+    )  # FK to AudioMedia documents - optimized with ObjectIds
     syllables: list[str] = []
     stress_pattern: str | None = None  # Primary/secondary stress
 
@@ -144,12 +175,16 @@ class Definition(Document, BaseMetadata):
     word_forms: list[WordForm] = []  # List of WordForm objects
 
     # Examples and relationships
-    example_ids: list[PydanticObjectId] = []  # FK to Example documents - optimized with ObjectIds
+    example_ids: list[PydanticObjectId] = (
+        []
+    )  # FK to Example documents - optimized with ObjectIds
     synonyms: list[str] = []
     antonyms: list[str] = []
 
     # Usage and context
-    language_register: Literal["formal", "informal", "neutral", "slang", "technical"] | None = None
+    language_register: (
+        Literal["formal", "informal", "neutral", "slang", "technical"] | None
+    ) = None
     domain: str | None = None  # medical, legal, computing
     region: str | None = None  # US, UK, AU
     usage_notes: list[UsageNote] = []
@@ -161,10 +196,14 @@ class Definition(Document, BaseMetadata):
 
     # Educational metadata
     cefr_level: Literal["A1", "A2", "B1", "B2", "C1", "C2"] | None = None
-    frequency_band: int | None = Field(default=None, ge=1, le=5)  # 1-5, Oxford 3000/5000 style
+    frequency_band: int | None = Field(
+        default=None, ge=1, le=5
+    )  # 1-5, Oxford 3000/5000 style
 
     # Media and provenance
-    image_ids: list[PydanticObjectId] = []  # FK to ImageMedia documents - optimized with ObjectIds
+    image_ids: list[PydanticObjectId] = (
+        []
+    )  # FK to ImageMedia documents - optimized with ObjectIds
     provider_data_id: PydanticObjectId | None = (
         None  # FK to ProviderData if from provider - optimized with ObjectId
     )
@@ -178,10 +217,11 @@ class ProviderData(Document, BaseMetadata):
     """Raw data from a dictionary provider."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
+
     provider: DictionaryProvider
-    definition_ids: list[
-        PydanticObjectId
-    ] = []  # FK to Definition documents - optimized with ObjectIds
+    definition_ids: list[PydanticObjectId] = (
+        []
+    )  # FK to Definition documents - optimized with ObjectIds
     pronunciation_id: PydanticObjectId | None = (
         None  # FK to Pronunciation - optimized with ObjectId
     )
@@ -193,29 +233,6 @@ class ProviderData(Document, BaseMetadata):
         indexes = ["word_id", "provider", [("word_id", 1), ("provider", 1)]]
 
 
-class Word(Document, BaseMetadata):
-    """Core word entity."""
-
-    text: str
-    normalized: str  # Lowercase, no accents
-    language: Language = Language.ENGLISH
-
-    # Word forms and variations
-    homograph_number: int | None = None  # For identical spellings
-
-    # Metadata
-    offensive_flag: bool = False
-    first_known_use: str | None = None  # Historical dating
-
-    class Settings:
-        name = "words"
-        indexes = [
-            [("text", 1), ("language", 1)],
-            "normalized",
-            [("text", 1), ("homograph_number", 1)],
-        ]
-
-
 class SynthesizedDictionaryEntry(Document, BaseMetadata):
     """AI-synthesized entry with full provenance."""
 
@@ -225,18 +242,22 @@ class SynthesizedDictionaryEntry(Document, BaseMetadata):
     pronunciation_id: PydanticObjectId | None = (
         None  # FK to Pronunciation - optimized with ObjectId
     )
-    definition_ids: list[
-        PydanticObjectId
-    ] = []  # FK to Definition documents - optimized with ObjectIds
+    definition_ids: list[PydanticObjectId] = (
+        []
+    )  # FK to Definition documents - optimized with ObjectIds
     etymology: Etymology | None = None  # Embedded as it's lightweight
-    fact_ids: list[PydanticObjectId] = []  # FK to Fact documents - optimized with ObjectIds
-    image_ids: list[PydanticObjectId] = []  # FK to ImageMedia documents - optimized with ObjectIds
+    fact_ids: list[PydanticObjectId] = (
+        []
+    )  # FK to Fact documents - optimized with ObjectIds
+    image_ids: list[PydanticObjectId] = (
+        []
+    )  # FK to ImageMedia documents - optimized with ObjectIds
 
     # Synthesis metadata
     model_info: ModelInfo | None = None  # Optional for non-AI synthesized entries
-    source_provider_data_ids: list[
-        PydanticObjectId
-    ] = []  # FK to ProviderData documents - optimized with ObjectIds
+    source_provider_data_ids: list[PydanticObjectId] = (
+        []
+    )  # FK to ProviderData documents - optimized with ObjectIds
 
     # Access tracking
     accessed_at: datetime | None = None
