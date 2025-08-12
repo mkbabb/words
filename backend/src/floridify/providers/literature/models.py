@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from ...models.base import BaseMetadata
 from ...models.definition import Language
-from ..versioned import ContentLocation
+from ..models import ContentLocation
 
 
 class LiteratureSource(str, Enum):
@@ -372,3 +372,12 @@ class LiteraryWord(BaseModel):
     def to_search_word(self) -> str:
         """Convert to format suitable for search corpus."""
         return self.word.lower().strip()
+
+
+class VersionedLiteratureData(BaseMetadata):
+    """Versioned literature data with work reference.
+    
+    Import from providers.models instead of defining here.
+    This is just a placeholder for backward compatibility.
+    """
+    pass

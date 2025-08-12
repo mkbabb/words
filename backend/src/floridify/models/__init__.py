@@ -22,6 +22,7 @@ from .definition import (
     CorpusType,
     Definition,
     DictionaryProvider,
+    DictionaryProviderData,
     Example,
     Fact,
     Language,
@@ -29,7 +30,7 @@ from .definition import (
     LiteratureSourceType,
     OutputFormat,
     Pronunciation,
-    ProviderData,
+    ProviderData,  # Backward compatibility alias
     SynthesizedDictionaryEntry,
     Word,
 )
@@ -57,7 +58,8 @@ __all__ = [
     "Example",
     "Fact",
     "Pronunciation",
-    "ProviderData",
+    "DictionaryProviderData",
+    "ProviderData",  # Backward compatibility
     "SynthesizedDictionaryEntry",
     "LiteratureSource",
     # Relationships

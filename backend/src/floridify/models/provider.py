@@ -4,9 +4,8 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
-from beanie import Document, Indexed, before_event, Insert, Replace
+from beanie import Document, Insert, Replace, before_event
 from pydantic import BaseModel, Field
-from pydantic_core import PydanticCustomError
 
 from .base import BaseMetadata, PydanticObjectId
 from .definition import DictionaryProvider, Language

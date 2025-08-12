@@ -8,7 +8,8 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from floridify.providers.base import DictionaryConnector, VersionConfig
+from floridify.providers.dictionary.base import DictionaryConnector
+from floridify.providers.connector import ConnectorConfig
 from floridify.providers.dictionary.api.free_dictionary import FreeDictionaryConnector
 from floridify.providers.dictionary.api.oxford import OxfordConnector
 from floridify.providers.dictionary.local.apple_dictionary import AppleDictionaryConnector
@@ -39,9 +40,8 @@ async def test_provider(connector: DictionaryConnector, name: str) -> dict:
         try:
             print(f"  Testing '{word}'...", end=" ")
             result = await connector.fetch_definition(
-                word=word,
-                language=Language.ENGLISH,
-                config=VersionConfig(force_api=True, save_versioned=False),
+                word,
+                Language.ENGLISH,
             )
             
             if result and result.definitions:
@@ -52,7 +52,7 @@ async def test_provider(connector: DictionaryConnector, name: str) -> dict:
                 print("✗ (no definitions)")
                 results["failed"] += 1
         except Exception as e:
-            print(f"✗ ({e.__class__.__name__})")
+            print(f"✗ ({e.__class__.__name__}: {e})")
             results["failed"] += 1
     
     return results

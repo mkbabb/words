@@ -9,8 +9,12 @@ import re
 from collections import Counter, defaultdict
 from typing import Any
 
-import spacy
 from rich.console import Console
+
+try:
+    import spacy
+except ImportError:
+    spacy = None
 
 from ...utils.logging import get_logger
 from .api.gutenberg import GutenbergConnector
@@ -35,7 +39,7 @@ class LiteratureCorpusBuilder:
         
     def _load_nlp(self):
         """Lazy load spaCy model."""
-        if self.nlp is None:
+        if self.nlp is None and spacy is not None:
             try:
                 self.nlp = spacy.load("en_core_web_sm")
             except OSError:

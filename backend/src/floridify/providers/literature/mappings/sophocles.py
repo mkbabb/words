@@ -3,6 +3,7 @@
 Comprehensive mapping of Sophocles' works available on Project Gutenberg.
 """
 
+from ....models.definition import Language
 from ..models import AuthorInfo, Genre, LiteraryWork, Period
 
 AUTHOR = AuthorInfo(

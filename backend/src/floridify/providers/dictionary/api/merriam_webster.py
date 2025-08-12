@@ -13,14 +13,14 @@ from beanie import PydanticObjectId
 from ....models.definition import DictionaryProvider
 from ....utils.logging import get_logger
 from ...base import DictionaryConnector
-from ...caching.decorators import cached_api_call
-from ...core.state_tracker import Stages, StateTracker
-from ...models import (
+from ....caching.decorators import cached_api_call
+from ....core.state_tracker import Stages, StateTracker
+from ....models.definition import (
     Definition,
     Etymology,
     Example,
     Pronunciation,
-    ProviderData,
+    DictionaryProviderData,
     Word,
 )
 

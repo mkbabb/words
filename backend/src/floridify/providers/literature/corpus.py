@@ -201,19 +201,6 @@ class LiteratureCorpusLoader:
         
         # Create corpus
         unique_words = list(set(all_vocabulary))
-        corpus_data = LiteratureCorpusData(
-            vocabulary=unique_words,
-            metadata={
-                "period": period.value,
-                "authors_count": len(all_authors),
-                "works_count": len(all_works),
-            },
-            authors=all_authors,
-            works=all_works,
-            total_words=len(all_vocabulary),
-            unique_words=len(unique_words),
-            last_updated=datetime.now(UTC).isoformat(),
-        )
         
         corpus_name = f"literature_{period.value}"
         return await Corpus.create(

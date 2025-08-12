@@ -213,7 +213,7 @@ class Definition(Document, BaseMetadata):
         indexes = ["word_id", "part_of_speech", [("word_id", 1), ("part_of_speech", 1)]]
 
 
-class ProviderData(Document, BaseMetadata):
+class DictionaryProviderData(Document, BaseMetadata):
     """Raw data from a dictionary provider."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
@@ -229,7 +229,7 @@ class ProviderData(Document, BaseMetadata):
     raw_data: dict[str, Any] | None = None  # Original API response
 
     class Settings:
-        name = "provider_data"
+        name = "dictionary_provider_data"
         indexes = ["word_id", "provider", [("word_id", 1), ("provider", 1)]]
 
 
@@ -271,3 +271,7 @@ class SynthesizedDictionaryEntry(Document, BaseMetadata):
             [("word_id", 1), ("model_info.generation_count", -1)],
             [("word_id", 1), ("accessed_at", -1)],
         ]
+
+
+# Backward compatibility alias
+ProviderData = DictionaryProviderData
