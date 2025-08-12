@@ -29,7 +29,7 @@ from rich.progress import (
 from rich.table import Table
 from rich.text import Text
 
-from ...connectors.scrape import (
+from ...providers.scrape import (
     BulkScraper,
     BulkScrapingConfig,
     cleanup_old_sessions,

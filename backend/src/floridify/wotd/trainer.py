@@ -49,12 +49,11 @@ import numpy as np
 import torch
 
 from ..ai import get_openai_connector
-from ..literature import LiteratureSourceManager, LiteratureCorpusBuilder
+from ..literature import LiteratureCorpusBuilder, LiteratureSourceManager
 from ..utils.logging import get_logger
 from ..utils.paths import get_cache_directory
 from .constants import (
     DEFAULT_EMBEDDING_MODEL,
-    MODEL_DIMENSIONS,
     QWEN_25_7B,
     USE_BINARY_EMBEDDINGS,
     USE_FSQ,
@@ -71,7 +70,7 @@ from .core import (
 from .embeddings import EmbeddingMode, get_embedder
 from .encoders import get_semantic_encoder
 from .generator import generate_training_data
-from .literature import LiteratureCorpusBuilder, build_literature_training_set
+from .literature import LiteratureCorpusBuilder
 from .storage import get_wotd_storage
 
 logger = get_logger(__name__)
@@ -742,7 +741,7 @@ class WOTDTrainer:
             TrainingResults with literature-based training metrics
         """
         start_time = time.time()
-        logger.info(f"🎭 Starting literature-based WOTD training")
+        logger.info("🎭 Starting literature-based WOTD training")
         logger.info(f"📚 Authors: {', '.join(author.value for author in authors)}")
         
         # Use lightweight model if requested
@@ -779,7 +778,7 @@ class WOTDTrainer:
             
             if works:
                 # Create Author object for corpus building
-                from ..literature.models import Author as LitAuthor, Period, Genre
+                from ..literature.models import Author as LitAuthor, Genre, Period
                 lit_author = LitAuthor(
                     name=author_name,
                     period=Period.CONTEMPORARY,  # Will be updated based on detection
@@ -818,7 +817,6 @@ class WOTDTrainer:
             corpora_list.append(training_corpus)
             
             # Extract semantic ID from string values 
-            from .core import Style, Complexity, Era, Variation
             
             # Map string values back to enum indices
             style_map = {"classical": 0, "modern": 1, "romantic": 2, "neutral": 3}
@@ -1115,9 +1113,8 @@ class WOTDTrainer:
         Returns:
             TrainingResults with training metrics
         """
-        from .core import WOTDCorpus, WOTDWord, Style, Complexity, Era
-        import json
-        from pathlib import Path
+
+        from .core import Complexity, Era, Style, WOTDCorpus, WOTDWord
         
         logger.info("🎲 Training from synthetic data...")
         
@@ -1190,7 +1187,7 @@ class WOTDTrainer:
         logger.info("🔬 Stage 1: Generating embeddings...")
         
         # Create a dummy corpus with all words for embedding
-        from .core import WOTDCorpus, WOTDWord, Style, Complexity, Era
+        from .core import Complexity, Era, Style, WOTDCorpus, WOTDWord
         
         words_objs = [
             WOTDWord(word=word, definition="temp", pos="noun", 

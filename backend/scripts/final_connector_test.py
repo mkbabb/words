@@ -48,7 +48,7 @@ async def test_connector_comprehensive(connector_class, name, test_word, **init_
     """Test a connector comprehensively."""
     from src.floridify.models import Word
     from src.floridify.models.definition import Language
-    from src.floridify.connectors.config import VersionConfig
+    from src.floridify.providers.base import VersionConfig
     from src.floridify.models.provider import VersionedProviderData
     
     print(f"\n{'=' * 60}")
@@ -181,7 +181,7 @@ async def run_all_tests():
     try:
         import platform
         if platform.system() == "Darwin":
-            from src.floridify.connectors.local.apple_dictionary import AppleDictionaryConnector
+            from src.floridify.providers.dictionary.local.apple_dictionary import AppleDictionaryConnector
             result = await test_connector_comprehensive(
                 AppleDictionaryConnector,
                 "Apple Dictionary",
@@ -196,7 +196,7 @@ async def run_all_tests():
     
     # Test 2: WordHippo Scraper
     try:
-        from src.floridify.connectors.scraper.wordhippo import WordHippoConnector
+        from src.floridify.providers.dictionary.scraper.wordhippo import WordHippoConnector
         result = await test_connector_comprehensive(
             WordHippoConnector,
             "WordHippo Scraper",
@@ -209,7 +209,7 @@ async def run_all_tests():
     
     # Test 3: Free Dictionary API
     try:
-        from src.floridify.connectors.api.free_dictionary import FreeDictionaryConnector
+        from src.floridify.providers.dictionary.api.free_dictionary import FreeDictionaryConnector
         result = await test_connector_comprehensive(
             FreeDictionaryConnector,
             "Free Dictionary API", 
@@ -222,7 +222,7 @@ async def run_all_tests():
     
     # Test 4: Wiktionary Scraper  
     try:
-        from src.floridify.connectors.scraper.wiktionary import WiktionaryConnector
+        from src.floridify.providers.dictionary.scraper.wiktionary import WiktionaryConnector
         result = await test_connector_comprehensive(
             WiktionaryConnector,
             "Wiktionary Scraper",
