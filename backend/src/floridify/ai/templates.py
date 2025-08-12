@@ -301,3 +301,21 @@ class PromptTemplateManager:
             theme=theme,
             avoid_words=avoid_words or [],
         )
+
+    def get_literature_analysis_prompt(
+        self,
+        author: str,
+        words: list[str],
+        period: str | None = None,
+        genre: str | None = None,
+        word_frequencies: dict[str, int] | None = None,
+    ) -> str:
+        """Generate prompt for literature corpus analysis and semantic ID determination."""
+        return self.render_template(
+            "wotd/literature_analysis",
+            author=author,
+            words=words,
+            period=period,
+            genre=genre,
+            word_frequencies=word_frequencies or {},
+        )

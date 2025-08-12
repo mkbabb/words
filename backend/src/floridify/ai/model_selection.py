@@ -14,13 +14,23 @@ class ModelComplexity(Enum):
 class ModelTier(Enum):
     """Available OpenAI models with their capabilities."""
 
+    # GPT-5 series (latest generation)
+    GPT_5 = "gpt-5"
+    GPT_5_MINI = "gpt-5-mini"
+    GPT_5_NANO = "gpt-5-nano"
+    
     # Reasoning models (o-series)
     O3_MINI = "o3-mini"
     O1_MINI = "o1-mini"
 
-    # GPT-4 series
+    # GPT-4 series (legacy)
     GPT_4O = "gpt-4o"
     GPT_4O_MINI = "gpt-4o-mini"
+    
+    # Special tier aliases for capability levels
+    HIGH = "gpt-5"
+    MEDIUM = "gpt-5-mini"
+    LOW = "gpt-5-nano"
 
     @property
     def supports_vision(self) -> bool:
@@ -29,16 +39,23 @@ class ModelTier(Enum):
 
     @property
     def is_reasoning_model(self) -> bool:
-        """Check if this is a reasoning model (o-series)."""
-        return self.value.startswith(("o1", "o3"))
+        """Check if this is a reasoning model (o-series, all GPT-5 variants)."""
+        return self.value.startswith(("o1", "o3", "gpt-5"))
+    
+    @property
+    def uses_completion_tokens(self) -> bool:
+        """Check if model uses max_completion_tokens instead of max_tokens."""
+        return self.is_reasoning_model
 
 
 # Task-to-complexity mapping based on prompt analysis
 TASK_COMPLEXITY_MAP: dict[str, ModelComplexity] = {
-    # High complexity - reasoning, synthesis, clustering
+    # High complexity - reasoning, synthesis, clustering, synthetic data generation
     "synthesize_definitions": ModelComplexity.HIGH,
     "suggest_words": ModelComplexity.HIGH,
     "extract_cluster_mapping": ModelComplexity.HIGH,
+    "generate_synthetic_corpus": ModelComplexity.HIGH,  # Use GPT-5 for synthetic training data
+    "literature_analysis": ModelComplexity.HIGH,       # Use GPT-5 for literature analysis
     # Medium complexity - creative generation, pedagogical tasks
     "generate_synonyms": ModelComplexity.MEDIUM,
     "generate_facts": ModelComplexity.MEDIUM,
@@ -52,6 +69,8 @@ TASK_COMPLEXITY_MAP: dict[str, ModelComplexity] = {
     "generate_suggestions": ModelComplexity.MEDIUM,
     "lookup_word": ModelComplexity.MEDIUM,
     "deduplicate_definitions": ModelComplexity.MEDIUM,
+    "literature_augmentation": ModelComplexity.MEDIUM, # Use GPT-5 Mini for augmentation
+    "text_generation": ModelComplexity.MEDIUM,
     # Low complexity - simple classification, basic generation
     "assess_frequency": ModelComplexity.LOW,
     "assess_cefr_level": ModelComplexity.LOW,
@@ -67,9 +86,9 @@ TASK_COMPLEXITY_MAP: dict[str, ModelComplexity] = {
 
 # Default model selection based on complexity
 COMPLEXITY_TO_MODEL: dict[ModelComplexity, ModelTier] = {
-    ModelComplexity.HIGH: ModelTier.O3_MINI,
-    ModelComplexity.MEDIUM: ModelTier.GPT_4O,
-    ModelComplexity.LOW: ModelTier.GPT_4O_MINI,
+    ModelComplexity.HIGH: ModelTier.HIGH,     # GPT-5
+    ModelComplexity.MEDIUM: ModelTier.MEDIUM, # GPT-5 Mini
+    ModelComplexity.LOW: ModelTier.LOW,       # GPT-5 Nano
 }
 
 

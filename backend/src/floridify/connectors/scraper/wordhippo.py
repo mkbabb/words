@@ -19,7 +19,7 @@ from ...models import (
 from ...models.definition import DictionaryProvider
 from ...utils.logging import get_logger
 from ..base import DictionaryConnector
-from ..utils import RespectfulHttpClient
+from ...utils.scraping import respectful_scraper, RateLimitConfig
 
 logger = get_logger(__name__)
 
@@ -35,10 +35,10 @@ class WordHippoConnector(DictionaryConnector):
         """
         super().__init__(rate_limit=rate_limit)
         self.base_url = "https://www.wordhippo.com"
-        self.http_client = RespectfulHttpClient(
-            base_url=self.base_url,
-            rate_limit=rate_limit,
-            timeout=30.0,
+        self.rate_config = RateLimitConfig(
+            base_requests_per_second=rate_limit,
+            min_delay=1.0 / rate_limit,
+            max_delay=10.0,
         )
 
     @property
@@ -65,19 +65,16 @@ class WordHippoConnector(DictionaryConnector):
         Returns:
             ProviderData if successful, None if not found or error
         """
-        await self._enforce_rate_limit()
-
         try:
             # WordHippo URLs follow pattern: /what-is/the-meaning-of-the-word/WORD.html
-            url = f"what-is/the-meaning-of-the-word/{word_obj.text.lower()}.html"
+            url = f"{self.base_url}/what-is/the-meaning-of-the-word/{word_obj.text.lower()}.html"
             
-            response = await self.http_client.get(url)
+            async with respectful_scraper("wordhippo", self.rate_config) as client:
+                response = await client.get(url)
             
-            if response.status_code == 404:
-                logger.debug(f"Word '{word_obj.text}' not found on WordHippo")
-                return None
-            
-            response.raise_for_status()
+                if response.status_code == 404:
+                    logger.debug(f"Word '{word_obj.text}' not found on WordHippo")
+                    return None
             
             # Parse HTML
             soup = BeautifulSoup(response.text, "html.parser")
@@ -172,7 +169,7 @@ class WordHippoConnector(DictionaryConnector):
                     continue
                     
                 # Look for definition divs within the parent container
-                def_divs = parent.find_all("div", class_="defv2wordtype")
+                def_divs = parent.find_all("div", class_="defv2relatedwords")
                 
                 for idx, def_div in enumerate(def_divs):
                     def_text = def_div.text.strip()
@@ -205,7 +202,7 @@ class WordHippoConnector(DictionaryConnector):
             # Fallback: if no structured definitions found, try simpler extraction
             if not definitions:
                 # Look for any definition-like content
-                meaning_divs = soup.find_all("div", class_=["defv2wordtype", "wordDefinition"])
+                meaning_divs = soup.find_all("div", class_=["defv2relatedwords", "wordDefinition"])
                 for idx, div in enumerate(meaning_divs):
                     text = div.text.strip()
                     if text and len(text) > 10:  # Filter out very short text

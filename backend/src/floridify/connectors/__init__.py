@@ -8,7 +8,7 @@ from .base import BatchConnector, BulkDownloadConnector, DictionaryConnector
 # Batch processing moved to scrape.py
 from .scrape import BulkScraper, BulkScrapingConfig
 from .local.apple_dictionary import AppleDictionaryConnector
-from .scraper.dictionary_com import DictionaryComConnector
+# Dictionary.com connector removed - JavaScript-heavy site
 from .scraper.wiktionary import WiktionaryConnector
 from .scraper.wordhippo import WordHippoConnector
 
@@ -19,7 +19,6 @@ Connector = (
     | AppleDictionaryConnector
     | MerriamWebsterConnector
     | FreeDictionaryConnector
-    | DictionaryComConnector
     | WordHippoConnector
 )
 
@@ -34,7 +33,6 @@ __all__ = [
     "FreeDictionaryConnector",
     # Scraper connectors
     "WiktionaryConnector",
-    "DictionaryComConnector",
     "WordHippoConnector",
     # Local connectors
     "AppleDictionaryConnector",

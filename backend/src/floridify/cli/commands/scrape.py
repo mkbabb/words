@@ -50,7 +50,7 @@ console = Console()
 class BulkScrapingInterface:
     """Rich interface for bulk scraping operations."""
     
-    def __init__(self, scraper: BulkScraper | None = None):
+    def __init__(self, scraper: Any | None = None):
         """Initialize the interface.
         
         Args:
@@ -90,12 +90,12 @@ class BulkScrapingInterface:
     
     def _signal_handler(self, signum: int, frame: Any) -> None:
         """Handle shutdown signals gracefully."""
-        console.print(f"\n[yellow]Received signal {signum}, stopping gracefully...[/yellow]")
+        console.print(f"\\n[yellow]Received signal {signum}, stopping gracefully...[/yellow]")
         self.should_stop = True
         if self.scraper:
             self.scraper.stop()
     
-    def create_header_panel(self, config: BulkScrapingConfig) -> Panel:
+    def create_header_panel(self, config: Any) -> Panel:
         """Create header panel with session information."""
         header_text = Text()
         header_text.append("Floridify Bulk Scraper", style="bold magenta")
@@ -166,7 +166,7 @@ class BulkScrapingInterface:
         footer_lines.append("")
         footer_lines.append(f"[dim]Session ID: {progress_data.session_id}[/dim]")
         
-        footer_text = "\n".join(footer_lines) if footer_lines else "[dim]No recent activity[/dim]"
+        footer_text = "\\n".join(footer_lines) if footer_lines else "[dim]No recent activity[/dim]"
         
         return Panel(
             footer_text,
@@ -174,7 +174,7 @@ class BulkScrapingInterface:
             border_style="yellow",
         )
     
-    async def run_with_monitoring(self, scraper: BulkScraper) -> Any:
+    async def run_with_monitoring(self, scraper: Any) -> Any:
         """Run scraper with rich monitoring interface."""
         self.scraper = scraper
         config = scraper.config
@@ -225,7 +225,7 @@ class BulkScrapingInterface:
             try:
                 final_progress = await scraping_task
             except asyncio.CancelledError:
-                console.print("\n[yellow]Scraping cancelled by user[/yellow]")
+                console.print("\\n[yellow]Scraping cancelled by user[/yellow]")
                 final_progress = scraper.get_progress()
             
             # Final update
@@ -254,7 +254,87 @@ class BulkScrapingInterface:
         return final_progress
 
 
-# CLI Commands
+# Generic scraping function - DRY principle
+async def run_scraping_session(
+    provider: DictionaryProvider,
+    language: str,
+    batch_size: int,
+    max_concurrent: int,
+    resume_session_id: str | None,
+    session_name: str | None,
+    force_refresh: bool,
+    skip_existing: bool,
+) -> None:
+    """Generic scraping function used by all provider commands."""
+    language_enum = Language(language)
+    
+    console.print(f"\\n[bold green]Starting {provider.display_name} bulk scraping for {language_enum.value.title()}[/bold green]")
+    console.print(f"[dim]Batch size: {batch_size}, Max concurrent: {max_concurrent}[/dim]")
+    
+    # Handle session resumption
+    if resume_session_id:
+        console.print(f"[yellow]Resuming {provider.display_name} scraping session: {resume_session_id}[/yellow]")
+        result = await resume_session(resume_session_id)
+        if not result:
+            console.print(f"[red]Error:[/red] Could not resume session {resume_session_id}")
+            return
+        scraper, session = result
+        console.print(f"[green]Resumed session:[/green] {session.get_progress_percentage():.1f}% complete")
+    else:
+        # Create new session
+        config = BulkScrapingConfig(
+            provider=provider,
+            language=language_enum,
+            batch_size=batch_size,
+            max_concurrent=max_concurrent,
+            force_refresh=force_refresh,
+            skip_existing=skip_existing,
+        )
+        
+        scraper = BulkScraper(provider, config)
+        
+        # Set session name if provided
+        if session_name:
+            scraper.session.session_name = session_name
+            await scraper.session.save()
+            console.print(f"[blue]Session name:[/blue] {session_name}")
+        
+        console.print(f"[blue]Session ID:[/blue] {scraper.session.session_id[:8]}")
+    
+    interface = BulkScrapingInterface()
+    
+    try:
+        progress = await interface.run_with_monitoring(scraper)
+        
+        console.print(f"\\n[bold green]✅ {provider.display_name} bulk scraping completed![/bold green]")
+        console.print(f"[green]Processed: {progress.processed_words:,} words[/green]")
+        console.print(f"[green]Success rate: {progress.success_rate:.1%}[/green]")
+        console.print(f"[green]Average speed: {progress.words_per_second:.2f} words/sec[/green]")
+        
+    except Exception as e:
+        console.print(f"\\n[bold red]❌ Scraping failed: {e}[/bold red]")
+
+
+# Generic click options decorator - DRY principle  
+def scraper_options(default_concurrent: int = 5):
+    """Decorator with common scraper options."""
+    def decorator(func):
+        func = click.option("--language", "-l", 
+                          type=click.Choice([lang.value for lang in Language]), 
+                          default=Language.ENGLISH.value,
+                          help="Language to scrape")(func)
+        func = click.option("--batch-size", "-b", default=100, help="Words per batch")(func)
+        func = click.option("--max-concurrent", "-c", default=default_concurrent, help="Maximum concurrent operations")(func)
+        func = click.option("--resume-session", "-r", help="Resume from existing session ID")(func)
+        func = click.option("--session-name", "-n", help="Name for this scraping session")(func)
+        func = click.option("--force-refresh", is_flag=True, help="Force refresh existing data")(func)
+        func = click.option("--skip-existing/--include-existing", default=True, 
+                          help="Skip words that already have data")(func)
+        return func
+    return decorator
+
+
+# CLI Commands - DRY with minimal duplication
 
 @click.group(name="scrape")
 def scrape_group():
@@ -263,130 +343,63 @@ def scrape_group():
 
 
 @scrape_group.command(name="wordhippo")
-@click.option("--language", "-l", 
-              type=click.Choice([lang.value for lang in Language]), 
-              default=Language.ENGLISH.value,
-              help="Language to scrape")
-@click.option("--batch-size", "-b", default=100, help="Words per batch")
-@click.option("--max-concurrent", "-c", default=5, help="Maximum concurrent operations")
-@click.option("--resume-session", "-r", help="Resume from existing session ID")
-@click.option("--session-name", "-n", help="Name for this scraping session")
-@click.option("--force-refresh", is_flag=True, help="Force refresh existing data")
-@click.option("--skip-existing/--include-existing", default=True, 
-              help="Skip words that already have data")
-def scrape_wordhippo(
-    language: str,
-    batch_size: int,
-    max_concurrent: int,
-    resume_session: str | None,
-    session_name: str | None,
-    force_refresh: bool,
-    skip_existing: bool,
-):
+@scraper_options(default_concurrent=5)
+def scrape_wordhippo(language, batch_size, max_concurrent, resume_session, session_name, force_refresh, skip_existing):
     """Bulk scrape WordHippo for comprehensive synonym/antonym/example data."""
-    async def _run():
-        language_enum = Language(language)
-        
-        console.print(f"\n[bold green]Starting WordHippo bulk scraping for {language_enum.value.title()}[/bold green]")
-        console.print(f"[dim]Batch size: {batch_size}, Max concurrent: {max_concurrent}[/dim]")
-        
-        # Handle session resumption
-        if resume_session:
-            console.print(f"[yellow]Resuming WordHippo scraping session: {resume_session}[/yellow]")
-            result = await resume_session(resume_session)
-            if not result:
-                console.print(f"[red]Error:[/red] Could not resume session {resume_session}")
-                return
-            scraper, session = result
-            console.print(f"[green]Resumed session:[/green] {session.get_progress_percentage():.1f}% complete")
-        else:
-            # Create new session
-            config = BulkScrapingConfig(
-                provider=DictionaryProvider.WORDHIPPO,
-                language=language_enum,
-                batch_size=batch_size,
-                max_concurrent=max_concurrent,
-                force_refresh=force_refresh,
-                skip_existing=skip_existing,
-            )
-            
-            scraper = BulkScraper(DictionaryProvider.WORDHIPPO, config)
-            
-            # Set session name if provided
-            if session_name:
-                scraper.session.session_name = session_name
-                await scraper.session.save()
-                console.print(f"[blue]Session name:[/blue] {session_name}")
-            
-            console.print(f"[blue]Session ID:[/blue] {scraper.session.session_id[:8]}")
-        
-        interface = BulkScrapingInterface()
-        
-        try:
-            progress = await interface.run_with_monitoring(scraper)
-            
-            # Show final results
-            console.print("\n[bold green]✅ WordHippo bulk scraping completed![/bold green]")
-            console.print(f"[green]Processed: {progress.processed_words:,} words[/green]")
-            console.print(f"[green]Success rate: {progress.success_rate:.1%}[/green]")
-            console.print(f"[green]Average speed: {progress.words_per_second:.2f} words/sec[/green]")
-            
-        except Exception as e:
-            console.print(f"\n[bold red]❌ Scraping failed: {e}[/bold red]")
-    
-    asyncio.run(_run())
+    asyncio.run(run_scraping_session(
+        DictionaryProvider.WORDHIPPO, language, batch_size, max_concurrent, 
+        resume_session, session_name, force_refresh, skip_existing
+    ))
 
 
 @scrape_group.command(name="dictionary-com")
-@click.option("--language", "-l", 
-              type=click.Choice([lang.value for lang in Language]), 
-              default=Language.ENGLISH.value,
-              help="Language to scrape")
-@click.option("--batch-size", "-b", default=100, help="Words per batch")
-@click.option("--max-concurrent", "-c", default=5, help="Maximum concurrent operations")
-@click.option("--resume-from", "-r", help="Word to resume scraping from")
-@click.option("--force-refresh", is_flag=True, help="Force refresh existing data")
-@click.option("--skip-existing/--include-existing", default=True, 
-              help="Skip words that already have data")
-def scrape_dictionary_com(
-    language: str,
-    batch_size: int,
-    max_concurrent: int,
-    resume_from: str | None,
-    force_refresh: bool,
-    skip_existing: bool,
-):
+@scraper_options(default_concurrent=3)
+def scrape_dictionary_com(language, batch_size, max_concurrent, resume_session, session_name, force_refresh, skip_existing):
     """Bulk scrape Dictionary.com with thesaurus.com integration."""
-    async def _run():
-        language_enum = Language(language)
-        
-        console.print(f"\n[bold green]Starting Dictionary.com + Thesaurus.com bulk scraping for {language_enum.value.title()}[/bold green]")
-        
-        config = BulkScrapingConfig(
-            provider=DictionaryProvider.DICTIONARY_COM,
-            language=language_enum,
-            batch_size=batch_size,
-            max_concurrent=max_concurrent,
-            resume_from_word=resume_from,
-            force_refresh=force_refresh,
-            skip_existing=skip_existing,
-        )
-        
-        scraper = BulkScraper(DictionaryProvider.DICTIONARY_COM, config)
-        
-        interface = BulkScrapingInterface()
-        
-        try:
-            progress = await interface.run_with_monitoring(scraper)
-            
-            console.print("\n[bold green]✅ Dictionary.com bulk scraping completed![/bold green]")
-            console.print(f"[green]Processed: {progress.processed_words:,} words[/green]")
-            console.print(f"[green]Success rate: {progress.success_rate:.1%}[/green]")
-            
-        except Exception as e:
-            console.print(f"\n[bold red]❌ Scraping failed: {e}[/bold red]")
-    
-    asyncio.run(_run())
+    asyncio.run(run_scraping_session(
+        DictionaryProvider.DICTIONARY_COM, language, batch_size, max_concurrent, 
+        resume_session, session_name, force_refresh, skip_existing
+    ))
+
+
+@scrape_group.command(name="oxford")
+@scraper_options(default_concurrent=3)
+def scrape_oxford(language, batch_size, max_concurrent, resume_session, session_name, force_refresh, skip_existing):
+    """Bulk scrape Oxford Dictionary API for comprehensive definitions."""
+    asyncio.run(run_scraping_session(
+        DictionaryProvider.OXFORD, language, batch_size, max_concurrent, 
+        resume_session, session_name, force_refresh, skip_existing
+    ))
+
+
+@scrape_group.command(name="merriam-webster")
+@scraper_options(default_concurrent=3)
+def scrape_merriam_webster(language, batch_size, max_concurrent, resume_session, session_name, force_refresh, skip_existing):
+    """Bulk scrape Merriam-Webster Dictionary API."""
+    asyncio.run(run_scraping_session(
+        DictionaryProvider.MERRIAM_WEBSTER, language, batch_size, max_concurrent, 
+        resume_session, session_name, force_refresh, skip_existing
+    ))
+
+
+@scrape_group.command(name="free-dictionary")
+@scraper_options(default_concurrent=5)
+def scrape_free_dictionary(language, batch_size, max_concurrent, resume_session, session_name, force_refresh, skip_existing):
+    """Bulk scrape FreeDictionary API for comprehensive definitions."""
+    asyncio.run(run_scraping_session(
+        DictionaryProvider.FREE_DICTIONARY, language, batch_size, max_concurrent, 
+        resume_session, session_name, force_refresh, skip_existing
+    ))
+
+
+@scrape_group.command(name="apple-dictionary")
+@scraper_options(default_concurrent=5)
+def scrape_apple_dictionary(language, batch_size, max_concurrent, resume_session, session_name, force_refresh, skip_existing):
+    """Bulk scrape Apple Dictionary (macOS) for local definitions."""
+    asyncio.run(run_scraping_session(
+        DictionaryProvider.APPLE_DICTIONARY, language, batch_size, max_concurrent, 
+        resume_session, session_name, force_refresh, skip_existing
+    ))
 
 
 @scrape_group.command(name="wiktionary-wholesale")
@@ -402,7 +415,7 @@ def scrape_wiktionary_wholesale(language: str, download_all: bool):
         language_enum = Language(language)
         
         if download_all:
-            console.print(f"\n[bold green]Starting Wiktionary wholesale download for {language_enum.value.title()}[/bold green]")
+            console.print(f"\\n[bold green]Starting Wiktionary wholesale download for {language_enum.value.title()}[/bold green]")
             console.print("[yellow]This will download the complete Wiktionary dump (several GB)[/yellow]")
             
             if not click.confirm("Continue with wholesale download?"):
@@ -413,28 +426,20 @@ def scrape_wiktionary_wholesale(language: str, download_all: bool):
                 download_all=True
             )
             
-            console.print("\n[bold green]✅ Wiktionary wholesale download completed![/bold green]")
+            console.print("\\n[bold green]✅ Wiktionary wholesale download completed![/bold green]")
             console.print(f"[green]Processed: {progress.processed_words:,} entries[/green]")
         else:
-            console.print(f"\n[bold green]Starting Wiktionary vocabulary-based scraping for {language_enum.value.title()}[/bold green]")
+            console.print(f"\\n[bold green]Starting Wiktionary vocabulary-based scraping for {language_enum.value.title()}[/bold green]")
             
-            config = BulkScrapingConfig(
-                provider=DictionaryProvider.WIKTIONARY,
-                language=language_enum,
-                batch_size=50,  # Smaller batches for API-based scraping
-                max_concurrent=3,  # Lower concurrency for respectful API usage
+            await run_scraping_session(
+                DictionaryProvider.WIKTIONARY, language, 50, 3, 
+                None, None, False, True
             )
-            
-            scraper = BulkScraper(DictionaryProvider.WIKTIONARY, config)
-            
-            interface = BulkScrapingInterface()
-            progress = await interface.run_with_monitoring(scraper)
-            
-            console.print("\n[bold green]✅ Wiktionary scraping completed![/bold green]")
-            console.print(f"[green]Processed: {progress.processed_words:,} words[/green]")
     
     asyncio.run(_run())
 
+
+# Session Management Commands
 
 @scrape_group.command(name="sessions")
 def list_sessions_cmd():
@@ -477,7 +482,7 @@ def list_sessions_cmd():
             table.add_row(session_id, name, provider, language, status, progress, success_rate, created)
         
         console.print(table)
-        console.print(f"\n[dim]Total sessions: {len(sessions)}[/dim]")
+        console.print(f"\\n[dim]Total sessions: {len(sessions)}[/dim]")
         console.print("[dim]Use 'floridify scrape resume <session_id>' to continue a session[/dim]")
     
     asyncio.run(_run())

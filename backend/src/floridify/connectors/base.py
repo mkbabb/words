@@ -108,31 +108,39 @@ class DictionaryConnector(ABC):
                 version_config = VersionConfig()
         # If specific version requested, fetch from versioned storage
         if version_config.version and not version_config.force_api:
-            versioned = await VersionedProviderData.find_one(
-                {
-                    "word_id": word_obj.id,
-                    "provider": self.provider_name,
-                    "version_info.provider_version": version_config.version,
-                }
-            )
-            if versioned:
-                # Convert versioned data back to ProviderData
-                return self._versioned_to_provider_data(versioned)
-            logger.warning(f"Version {version_config.version} not found for {word_obj.text}")
-            return None
+            try:
+                versioned = await VersionedProviderData.find_one(
+                    {
+                        "word_id": word_obj.id,
+                        "provider": self.provider_name,
+                        "version_info.provider_version": version_config.version,
+                    }
+                )
+                if versioned:
+                    # Convert versioned data back to ProviderData
+                    return self._versioned_to_provider_data(versioned)
+                logger.warning(f"Version {version_config.version} not found for {word_obj.text}")
+                return None
+            except Exception as e:
+                logger.debug(f"Database not available for version lookup: {e}")
+                # Continue to fresh API call
         
         # Check for existing versioned data unless forcing API call
         if not version_config.force_api and version_config.save_versioned:
-            existing = await VersionedProviderData.find_one(
-                {
-                    "word_id": word_obj.id,
-                    "provider": self.provider_name,
-                    "version_info.is_latest": True,
-                }
-            )
-            if existing:
-                logger.debug(f"Using existing versioned data for {word_obj.text} from {self.provider_name}")
-                return self._versioned_to_provider_data(existing)
+            try:
+                existing = await VersionedProviderData.find_one(
+                    {
+                        "word_id": word_obj.id,
+                        "provider": self.provider_name,
+                        "version_info.is_latest": True,
+                    }
+                )
+                if existing:
+                    logger.debug(f"Using existing versioned data for {word_obj.text} from {self.provider_name}")
+                    return self._versioned_to_provider_data(existing)
+            except Exception as e:
+                logger.debug(f"Database not available for versioned data lookup: {e}")
+                # Continue to fresh API call
         
         # Fetch from provider API
         start_time = datetime.now(UTC)
@@ -145,12 +153,16 @@ class DictionaryConnector(ABC):
             
             # Save to versioned storage if enabled
             if version_config.save_versioned:
-                await self._save_versioned(
-                    word_obj,
-                    provider_data,
-                    version_config.increment_version,
-                    start_time,
-                )
+                try:
+                    await self._save_versioned(
+                        word_obj,
+                        provider_data,
+                        version_config.increment_version,
+                        start_time,
+                    )
+                except Exception as e:
+                    logger.debug(f"Could not save versioned data (database unavailable): {e}")
+                    # Continue without saving - data is still returned
             
             return provider_data
             
@@ -159,7 +171,10 @@ class DictionaryConnector(ABC):
             
             # Store error in versioned data if enabled
             if version_config.save_versioned:
-                await self._save_error_versioned(word_obj, e)
+                try:
+                    await self._save_error_versioned(word_obj, e)
+                except Exception as save_error:
+                    logger.debug(f"Could not save error data (database unavailable): {save_error}")
             
             return None
     

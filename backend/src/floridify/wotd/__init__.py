@@ -21,7 +21,7 @@ __all__ = [
     # Core types
     "Author",
     "Style",
-    "Complexity", 
+    "Complexity",
     "Era",
     "WOTDWord",
     "WOTDCorpus",
@@ -29,13 +29,11 @@ __all__ = [
     "TrainingResults",
     "GenerateRequest",
     "GenerateResponse",
-    
     # Main components
     "WOTDTrainer",
-    "SyntheticGenerator", 
+    "SyntheticGenerator",
     "WOTDStorage",
     "SageMakerDeployer",
-    
     # Convenience functions
     "train_wotd_pipeline",
     "generate_training_data",

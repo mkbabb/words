@@ -296,8 +296,10 @@ class AppleDictionaryConnector(DictionaryConnector):
             return provider_data
 
         except Exception as e:
+            import traceback
             error_msg = f"Apple Dictionary lookup failed for '{word_obj.text}': {str(e)}"
             logger.error(error_msg)
+            logger.debug(f"Full traceback: {traceback.format_exc()}")
             if state_tracker:
                 await state_tracker.update_error(error_msg)
             return None

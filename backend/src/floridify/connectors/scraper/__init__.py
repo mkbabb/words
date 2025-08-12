@@ -1,9 +1,8 @@
 """Web scraper dictionary connectors."""
 
-from .dictionary_com import DictionaryComConnector
+# Dictionary.com connector removed - JavaScript-heavy site
 from .wiktionary import WiktionaryConnector
 
 __all__ = [
-    "DictionaryComConnector",
     "WiktionaryConnector",
 ]

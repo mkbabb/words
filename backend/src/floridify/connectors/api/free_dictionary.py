@@ -210,7 +210,10 @@ class FreeDictionaryConnector(DictionaryConnector):
                         definitions.append(definition)
             
         except Exception as e:
+            import traceback
             logger.error(f"Error parsing definitions: {e}")
+            logger.debug(f"Full traceback: {traceback.format_exc()}")
+            logger.debug(f"Entries data: {entries}")
         
         return definitions
 

@@ -45,6 +45,7 @@ class DatabaseConfig:
     production_url: str = ""
     development_url: str = ""
     local_mongodb_url: str = ""
+    native_local_url: str = ""
     name: str = "floridify"
     timeout: int = 120
     max_pool_size: int = 100
@@ -59,12 +60,12 @@ class DatabaseConfig:
         # Get the appropriate URL
         if is_production:
             url = self.production_url
+        elif is_docker:
+            # Running in Docker - use Docker-specific URLs
+            url = self.local_mongodb_url or self.development_url
         else:
-            # For development, prefer local MongoDB if available, fall back to SSH tunnel
-            if self.local_mongodb_url:
-                url = self.local_mongodb_url
-            else:
-                url = self.development_url
+            # Running natively outside Docker - use native local MongoDB
+            url = self.native_local_url or self.development_url
 
         if not url:
             raise ValueError(
@@ -169,6 +170,7 @@ class Config:
             production_url=db_data.get("production_url", ""),
             development_url=db_data.get("development_url", ""),
             local_mongodb_url=db_data.get("local_mongodb_url", ""),
+            native_local_url=db_data.get("native_local_url", ""),
             name=db_data.get("name", "floridify"),
             timeout=db_data.get("timeout", 120),
             max_pool_size=db_data.get("max_pool_size", 100),

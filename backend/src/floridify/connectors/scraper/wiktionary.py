@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 import httpx
+from ...utils.scraping import respectful_scraper, RateLimitConfig
 import wikitextparser as wtp
 from beanie import PydanticObjectId
 

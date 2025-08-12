@@ -28,6 +28,9 @@ from .models import (
     FactGenerationResponse,
     FrequencyBandResponse,
     GrammarPatternResponse,
+    LiteratureAnalysisResponse,
+    LiteratureAugmentationRequest,
+    LiteratureAugmentationResponse,
     PronunciationResponse,
     QueryValidationResponse,
     RegionalVariantResponse,
@@ -36,6 +39,8 @@ from .models import (
     SynonymGenerationResponse,
     SyntheticCorpusResponse,
     SynthesisResponse,
+    TextGenerationRequest,
+    TextGenerationResponse,
     UsageNoteResponse,
     WordFormResponse,
     WordOfTheDayResponse,
@@ -116,6 +121,9 @@ class OpenAIConnector:
             get_temperature_for_model(model_tier, task_name) if model_tier else self.temperature
         )
 
+        # Handle max_tokens parameter from kwargs before adding to request_params
+        max_tokens_value = kwargs.pop("max_tokens", None) or self.max_tokens
+
         # Prepare request parameters
         request_params: dict[str, Any] = {
             "model": active_model,
@@ -123,15 +131,25 @@ class OpenAIConnector:
             **kwargs,
         }
 
-        # Use correct token parameter based on model
-        if model_tier and model_tier.is_reasoning_model:
-            # Reasoning models need more tokens for their thinking process
-            request_params["max_completion_tokens"] = max(8000, self.max_tokens * 8)
+        # Use correct token parameter based on model capabilities
+        if model_tier and model_tier.uses_completion_tokens:
+            if model_tier.is_reasoning_model:
+                # Reasoning models need massive token allocation for internal thinking
+                # For small outputs like 30-50 tokens, we need 10-20x more for reasoning
+                reasoning_multiplier = 30 if max_tokens_value <= 50 else 15
+                request_params["max_completion_tokens"] = max(4000, max_tokens_value * reasoning_multiplier)
+            else:
+                # Non-reasoning models with completion tokens use standard allocation  
+                request_params["max_completion_tokens"] = max_tokens_value
         else:
-            request_params["max_tokens"] = self.max_tokens
+            # Legacy models use max_tokens
+            request_params["max_tokens"] = max_tokens_value
 
-        # Add temperature if supported
-        if temperature is not None:
+        # Add temperature if model supports it (reasoning/thinking models don't)
+        if temperature is not None and model_tier and not model_tier.is_reasoning_model:
+            request_params["temperature"] = temperature
+        elif temperature is not None and not model_tier:
+            # Fallback for unknown models
             request_params["temperature"] = temperature
 
         while retry_count < max_retries:
@@ -1031,10 +1049,10 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, 
-                SyntheticCorpusResponse, 
+                prompt,
+                SyntheticCorpusResponse,
                 task_name="generate_synthetic_corpus",
-                tier=ModelTier.HIGH  # Use GPT-5 or best available model
+                tier=ModelTier.HIGH,  # Use GPT-5 or best available model
             )
 
             logger.success(
@@ -1044,4 +1062,123 @@ class OpenAIConnector:
             return result
         except Exception as e:
             logger.error(f"❌ Synthetic corpus generation failed: {e}")
+            raise
+
+    async def generate_text(
+        self,
+        request: TextGenerationRequest,
+    ) -> TextGenerationResponse:
+        """Generate text from a prompt.
+
+        Args:
+            request: Text generation request with prompt and parameters
+
+        Returns:
+            TextGenerationResponse with generated text
+        """
+        logger.info(
+            f"📝 Generating text (max_tokens: {request.max_tokens}, temp: {request.temperature})"
+        )
+
+        try:
+            result = await self._make_structured_request(
+                request.prompt,
+                TextGenerationResponse,
+                task_name="text_generation",
+                max_tokens=request.max_tokens,
+                temperature=request.temperature,
+            )
+
+            logger.success(f"✨ Generated {len(result.text)} characters of text")
+            return result
+        except Exception as e:
+            logger.error(f"❌ Text generation failed: {e}")
+            raise
+
+    async def augment_literature_vocabulary(
+        self,
+        request: LiteratureAugmentationRequest,
+    ) -> LiteratureAugmentationResponse:
+        """Generate augmented vocabulary based on literary samples.
+
+        Args:
+            request: Literature augmentation request
+
+        Returns:
+            LiteratureAugmentationResponse with augmented words
+        """
+        logger.info(
+            f"📚 Augmenting {request.author}'s vocabulary: {len(request.sample_words)} samples → "
+            f"{request.target_count} variants"
+        )
+
+        # Ultra-lean prompt - minimal tokens, maximum efficiency
+        words = ", ".join(request.sample_words[:10])  # Use only 10 words max
+        prompt = f"{request.transformation_prompt}: {words}\n{request.target_count} words:"
+
+        try:
+            result = await self._make_structured_request(
+                prompt,
+                LiteratureAugmentationResponse,
+                task_name="literature_augmentation",
+                max_tokens=50,  # Ultra-lean output
+                # Temperature handled automatically for GPT-5 series models
+            )
+
+            logger.success(
+                f"✨ Generated {len(result.words)} augmented words for {request.author} "
+                f"(confidence: {result.confidence:.1%})"
+            )
+            return result
+        except Exception as e:
+            logger.error(f"❌ Literature augmentation failed for {request.author}: {e}")
+            raise
+
+    async def analyze_literature_corpus(
+        self,
+        author: str,
+        words: list[str],
+        period: str | None = None,
+        genre: str | None = None,
+        word_frequencies: dict[str, int] | None = None,
+    ) -> LiteratureAnalysisResponse:
+        """Analyze literature corpus and generate semantic ID using template system.
+        
+        This method uses the literature_analysis.md prompt template to perform
+        comprehensive analysis of a literary corpus and generate semantic IDs.
+        
+        Args:
+            author: Author name
+            words: List of words to analyze
+            period: Literary period (optional)
+            genre: Primary genre (optional)
+            word_frequencies: Word frequency data (optional)
+            
+        Returns:
+            LiteratureAnalysisResponse with complete analysis and semantic ID
+        """
+        logger.info(f"📚 Analyzing literature corpus for {author}: {len(words)} words")
+        
+        # Use the literature analysis prompt template
+        # Ultra-lean analysis prompt
+        sample = ", ".join(words[:8])  # Only 8 words
+        prompt = f"{author}: {sample}\nSemantic ID [style,complexity,era,variant]:"
+        
+        try:
+            result = await self._make_structured_request(
+                prompt,
+                LiteratureAnalysisResponse,
+                task_name="literature_analysis",
+                max_tokens=30,  # Ultra-lean semantic ID output
+                # Temperature handled automatically based on model type (reasoning models don't use temperature)
+            )
+            
+            logger.success(
+                f"✨ Analyzed {author} corpus: semantic ID [{result.semantic_id.style},"
+                f"{result.semantic_id.complexity},{result.semantic_id.era},"
+                f"{result.semantic_id.variation}] (quality: {result.quality_score:.1%})"
+            )
+            return result
+        except Exception as e:
+            logger.error(f"❌ Literature corpus analysis failed for {author}: {e}")
             raise

@@ -24,6 +24,10 @@ from ..models import (
     Word,
     WordRelationship,
 )
+from ..models.provider import (
+    BatchOperation,
+    VersionedProviderData,
+)
 from ..utils.config import Config
 from ..utils.logging import get_logger
 from ..wordlist.models import WordList
@@ -58,22 +62,32 @@ class MongoDBStorage:
 
     async def connect(self) -> None:
         """Connect to MongoDB and initialize Beanie with optimized connection pool."""
+        # Detect if connecting to localhost (no TLS needed)
+        is_localhost = "localhost:27017" in self.connection_string
+        
+        # Build connection kwargs
+        connection_kwargs = {
+            # Connection Pool Settings
+            "maxPoolSize": 50,  # Increase max connections for concurrent load
+            "minPoolSize": 10,  # Maintain warm connections
+            "maxIdleTimeMS": 30000,  # Close idle connections after 30s
+            # Performance Settings
+            "serverSelectionTimeoutMS": 3000,  # Fast server selection (3s)
+            "socketTimeoutMS": 20000,  # Socket timeout (20s)
+            "connectTimeoutMS": 10000,  # Connection timeout (10s)
+            # Reliability Settings
+            "retryWrites": False,  # Disable retry writes for Docker MongoDB compatibility
+            "waitQueueTimeoutMS": 5000,  # Queue timeout for connection pool
+        }
+        
+        # Only add TLS settings for non-localhost connections
+        if not is_localhost and self.cert_path:
+            connection_kwargs["tlsCAFile"] = str(self.cert_path)
+        
         # Optimized connection pool configuration for production performance
         self.client = AsyncIOMotorClient(
             self.connection_string,
-            # TLS Certificate
-            tlsCAFile=str(self.cert_path) if self.cert_path else None,
-            # Connection Pool Settings
-            maxPoolSize=50,  # Increase max connections for concurrent load
-            minPoolSize=10,  # Maintain warm connections
-            maxIdleTimeMS=30000,  # Close idle connections after 30s
-            # Performance Settings
-            serverSelectionTimeoutMS=3000,  # Fast server selection (3s)
-            socketTimeoutMS=20000,  # Socket timeout (20s)
-            connectTimeoutMS=10000,  # Connection timeout (10s)
-            # Reliability Settings
-            retryWrites=False,  # Disable retry writes for Docker MongoDB compatibility
-            waitQueueTimeoutMS=5000,  # Queue timeout for connection pool
+            **connection_kwargs
         )
         database: Any = self.client[self.database_name]
 
@@ -93,6 +107,9 @@ class MongoDBStorage:
                 SynthesizedDictionaryEntry,
                 WordRelationship,
                 WordList,
+                # Versioning models
+                VersionedProviderData,
+                BatchOperation,
                 # Cache models
                 # CorpusCacheEntry removed - using unified caching
                 CorpusMetadata,

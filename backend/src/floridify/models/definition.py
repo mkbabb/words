@@ -37,7 +37,7 @@ class DictionaryProvider(Enum):
     APPLE_DICTIONARY = "apple_dictionary"
     MERRIAM_WEBSTER = "merriam_webster"
     FREE_DICTIONARY = "free_dictionary"
-    DICTIONARY_COM = "dictionary_com"
+    # DICTIONARY_COM removed - JavaScript-heavy site
     WORDHIPPO = "wordhippo"
     AI_FALLBACK = "ai_fallback"
     SYNTHESIS = "synthesis"
@@ -51,7 +51,7 @@ class DictionaryProvider(Enum):
             DictionaryProvider.APPLE_DICTIONARY: "Apple Dictionary",
             DictionaryProvider.MERRIAM_WEBSTER: "Merriam-Webster",
             DictionaryProvider.FREE_DICTIONARY: "Free Dictionary",
-            DictionaryProvider.DICTIONARY_COM: "Dictionary.com",
+            # DictionaryProvider.DICTIONARY_COM removed
             DictionaryProvider.WORDHIPPO: "WordHippo",
             DictionaryProvider.AI_FALLBACK: "AI Fallback",
             DictionaryProvider.SYNTHESIS: "Synthesis",

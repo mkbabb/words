@@ -285,6 +285,18 @@ class BulkScraper:
         elif self.provider == DictionaryProvider.WIKTIONARY:
             from .scraper.wiktionary import WiktionaryConnector
             self._connector = WiktionaryConnector()
+        elif self.provider == DictionaryProvider.OXFORD:
+            from .api.oxford import OxfordConnector
+            self._connector = OxfordConnector()
+        elif self.provider == DictionaryProvider.MERRIAM_WEBSTER:
+            from .api.merriam_webster import MerriamWebsterConnector
+            self._connector = MerriamWebsterConnector()
+        elif self.provider == DictionaryProvider.FREE_DICTIONARY:
+            from .api.free_dictionary import FreeDictionaryConnector
+            self._connector = FreeDictionaryConnector()
+        elif self.provider == DictionaryProvider.APPLE_DICTIONARY:
+            from .local.apple_dictionary import AppleDictionaryConnector
+            self._connector = AppleDictionaryConnector()
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
             
@@ -423,11 +435,23 @@ class BulkScraper:
                     # This could check MongoDB for existing entries
                     pass
                 
-                # Fetch definition using the connector
-                result = await connector.fetch_definition(
-                    word=word,
-                    language=self.config.language
-                )
+                # Fetch definition using the connector  
+                # Create Word object for the connector interface
+                from ..models import Word
+                word_obj = Word(text=word, language=self.config.language, normalized=word.lower())
+                
+                # Save Word object to get an ID (required by connectors)
+                try:
+                    await word_obj.save()
+                    logger.debug(f"Saved Word object for '{word}' with id: {word_obj.id}")
+                except Exception as save_error:
+                    logger.debug(f"Could not save Word object (database unavailable): {save_error}")
+                    # For testing without database, create a fake ID
+                    from bson import ObjectId
+                    word_obj.id = ObjectId()
+                    logger.debug(f"Using temporary ID for '{word}': {word_obj.id}")
+                
+                result = await connector.fetch_definition(word_obj)
                 
                 if result and hasattr(result, 'definitions') and result.definitions:
                     success = True
@@ -438,7 +462,10 @@ class BulkScraper:
                     self.progress.consecutive_errors += 1
                     
             except Exception as e:
-                logger.debug(f"Error processing word '{word}': {e}")
+                import traceback
+                error_msg = f"Error processing word '{word}': {e}"
+                logger.error(error_msg)
+                logger.debug(f"Full traceback: {traceback.format_exc()}")
                 self.progress.failed_words += 1
                 self.progress.consecutive_errors += 1
                 self.progress.add_error(f"{word}: {str(e)}")
