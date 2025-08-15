@@ -1,5 +1,4 @@
-"""
-Compression utilities for caching system.
+"""Compression utilities for caching system.
 
 Provides transparent compression/decompression with multiple algorithms.
 """
@@ -18,10 +17,10 @@ from .core import CacheMetadata, CompressionType, QuantizationType
 
 
 def compress_data(
-    data: bytes, compression_type: CompressionType = CompressionType.ZLIB
+    data: bytes,
+    compression_type: CompressionType = CompressionType.ZLIB,
 ) -> tuple[bytes, CacheMetadata]:
-    """
-    Compress data using the specified algorithm.
+    """Compress data using the specified algorithm.
 
     Args:
         data: Raw data to compress
@@ -29,6 +28,7 @@ def compress_data(
 
     Returns:
         Tuple of (compressed_data, metadata)
+
     """
     original_size = len(data)
 
@@ -55,8 +55,7 @@ def compress_data(
 
 
 def decompress_data(compressed_data: bytes, metadata: CacheMetadata) -> bytes:
-    """
-    Decompress data using metadata information.
+    """Decompress data using metadata information.
 
     Args:
         compressed_data: Compressed data
@@ -64,22 +63,22 @@ def decompress_data(compressed_data: bytes, metadata: CacheMetadata) -> bytes:
 
     Returns:
         Decompressed data
+
     """
     if metadata.compression_type == CompressionType.NONE:
         return compressed_data
-    elif metadata.compression_type == CompressionType.ZLIB:
+    if metadata.compression_type == CompressionType.ZLIB:
         return zlib.decompress(compressed_data)
-    elif metadata.compression_type == CompressionType.GZIP:
+    if metadata.compression_type == CompressionType.GZIP:
         return gzip.decompress(compressed_data)
-    else:
-        raise ValueError(f"Unsupported compression type: {metadata.compression_type}")
+    raise ValueError(f"Unsupported compression type: {metadata.compression_type}")
 
 
 def quantize_embeddings(
-    embeddings: np.ndarray, quantization_type: QuantizationType = QuantizationType.FLOAT32
+    embeddings: np.ndarray,
+    quantization_type: QuantizationType = QuantizationType.FLOAT32,
 ) -> tuple[bytes, CacheMetadata]:
-    """
-    Quantize embeddings to reduce memory usage.
+    """Quantize embeddings to reduce memory usage.
 
     Args:
         embeddings: NumPy array of embeddings
@@ -87,6 +86,7 @@ def quantize_embeddings(
 
     Returns:
         Tuple of (quantized_data, metadata)
+
     """
     original_size = embeddings.nbytes
 
@@ -107,7 +107,7 @@ def quantize_embeddings(
         min_val, max_val = embeddings.min(), embeddings.max()
         if max_val > min_val:
             quantized_embeddings = ((embeddings - min_val) / (max_val - min_val) * 255).astype(
-                np.uint8
+                np.uint8,
             )
         else:
             quantized_embeddings = embeddings.astype(np.uint8)
@@ -123,7 +123,7 @@ def quantize_embeddings(
             "original_range": (embeddings.min(), embeddings.max())
             if quantization_type in (QuantizationType.INT8, QuantizationType.UINT8)
             else None,
-        }
+        },
     )
 
     quantized_size = len(quantized_data)
@@ -140,8 +140,7 @@ def quantize_embeddings(
 
 
 def dequantize_embeddings(quantized_data: bytes, metadata: CacheMetadata) -> np.ndarray:
-    """
-    Dequantize embeddings back to usable form.
+    """Dequantize embeddings back to usable form.
 
     Args:
         quantized_data: Quantized embedding data
@@ -149,6 +148,7 @@ def dequantize_embeddings(quantized_data: bytes, metadata: CacheMetadata) -> np.
 
     Returns:
         Dequantized embeddings as numpy array
+
     """
     data_dict = pickle.loads(quantized_data)
     quantized_embeddings = data_dict["data"]
@@ -157,11 +157,12 @@ def dequantize_embeddings(quantized_data: bytes, metadata: CacheMetadata) -> np.
 
     if quantization_type == QuantizationType.FLOAT32:
         return np.array(quantized_embeddings, dtype=np.float32)
-    elif quantization_type == QuantizationType.FLOAT16:
+    if quantization_type == QuantizationType.FLOAT16:
         return np.array(
-            quantized_embeddings, dtype=np.float32
+            quantized_embeddings,
+            dtype=np.float32,
         )  # Convert back to float32 for processing
-    elif quantization_type == QuantizationType.INT8:
+    if quantization_type == QuantizationType.INT8:
         # Restore original scale
         if original_range:
             min_val, max_val = original_range
@@ -171,7 +172,7 @@ def dequantize_embeddings(quantized_data: bytes, metadata: CacheMetadata) -> np.
             )
             return int8_result
         return np.array(quantized_embeddings, dtype=np.float32)
-    elif quantization_type == QuantizationType.UINT8:
+    if quantization_type == QuantizationType.UINT8:
         # Restore original range
         if original_range:
             min_val, max_val = original_range
@@ -180,15 +181,14 @@ def dequantize_embeddings(quantized_data: bytes, metadata: CacheMetadata) -> np.
             ) + min_val
             return uint8_result
         return np.array(quantized_embeddings, dtype=np.float32)
-    else:
-        raise ValueError(f"Unsupported quantization type: {quantization_type}")
+    raise ValueError(f"Unsupported quantization type: {quantization_type}")
 
 
 def serialize_with_compression(
-    obj: Any, compression_type: CompressionType = CompressionType.ZLIB
+    obj: Any,
+    compression_type: CompressionType = CompressionType.ZLIB,
 ) -> tuple[bytes, CacheMetadata]:
-    """
-    Serialize and compress an object.
+    """Serialize and compress an object.
 
     Args:
         obj: Object to serialize
@@ -196,6 +196,7 @@ def serialize_with_compression(
 
     Returns:
         Tuple of (compressed_data, metadata)
+
     """
     # Serialize object
     if isinstance(obj, dict | list | str | int | float | bool) or obj is None:
@@ -209,10 +210,11 @@ def serialize_with_compression(
 
 
 def deserialize_with_decompression(
-    compressed_data: bytes, metadata: CacheMetadata, use_json: bool = True
+    compressed_data: bytes,
+    metadata: CacheMetadata,
+    use_json: bool = True,
 ) -> Any:
-    """
-    Decompress and deserialize an object.
+    """Decompress and deserialize an object.
 
     Args:
         compressed_data: Compressed serialized data
@@ -221,6 +223,7 @@ def deserialize_with_decompression(
 
     Returns:
         Deserialized object
+
     """
     decompressed = decompress_data(compressed_data, metadata)
 

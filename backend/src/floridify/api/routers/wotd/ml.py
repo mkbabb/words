@@ -24,7 +24,7 @@ class WOTDGenerationRequest(BaseModel):
     """Request model for WOTD word generation."""
 
     prompt: str = Field(
-        description="Natural language or DSL prompt like 'Generate [0,0,*,*] words'"
+        description="Natural language or DSL prompt like 'Generate [0,0,*,*] words'",
     )
     num_words: int = Field(default=10, ge=1, le=50, description="Number of words to generate")
     temperature: float = Field(default=0.8, ge=0.1, le=2.0, description="Sampling temperature")
@@ -73,6 +73,7 @@ async def generate_words(request: WOTDGenerationRequest) -> WOTDGenerationRespon
     Errors:
         503: ML models not available
         500: Generation failed
+
     """
     try:
         result = generate_words_from_prompt(request.prompt, request.num_words, request.temperature)
@@ -117,10 +118,15 @@ async def interpolate_generate(request: WOTDInterpolationRequest) -> WOTDGenerat
         400: Invalid corpus names
         503: ML models not available
         500: Interpolation failed
+
     """
     try:
         result = interpolate_corpus_preferences(
-            request.corpus1, request.corpus2, request.alpha, request.context, request.num_words
+            request.corpus1,
+            request.corpus2,
+            request.alpha,
+            request.context,
+            request.num_words,
         )
 
         return WOTDGenerationResponse(
@@ -135,7 +141,7 @@ async def interpolate_generate(request: WOTDInterpolationRequest) -> WOTDGenerat
     except RuntimeError as e:
         if "Invalid corpus" in str(e):
             raise HTTPException(400, str(e))
-        elif "not found" in str(e).lower() or "run training" in str(e).lower():
+        if "not found" in str(e).lower() or "run training" in str(e).lower():
             raise HTTPException(503, str(e))
         raise HTTPException(500, str(e))
     except Exception as e:
@@ -155,6 +161,7 @@ async def list_semantic_ids() -> ListResponse[dict[str, Any]]:
     Errors:
         503: ML models not available
         500: Failed to retrieve semantic IDs
+
     """
     try:
         semantic_ids = get_semantic_vocabulary()
@@ -168,7 +175,7 @@ async def list_semantic_ids() -> ListResponse[dict[str, Any]]:
                     "semantic_id": semantic_id,
                     "description": description,
                     "dsl_syntax": f"[{','.join(map(str, semantic_id))}]",
-                }
+                },
             )
 
         return ListResponse(items=items, total=len(items), offset=0, limit=len(items))
@@ -199,6 +206,7 @@ async def find_similar_semantic_ids(name: str, threshold: float = 0.5) -> Resour
         404: Semantic ID not found
         503: ML models not available
         500: Similarity computation failed
+
     """
     try:
         semantic_ids = get_semantic_vocabulary()
@@ -222,7 +230,7 @@ async def find_similar_semantic_ids(name: str, threshold: float = 0.5) -> Resour
                         "similarity": similarity,
                         "description": describe_semantic_id(other_id),
                         "dsl_syntax": f"[{','.join(map(str, other_id))}]",
-                    }
+                    },
                 )
 
         # Sort by similarity descending
@@ -263,12 +271,14 @@ async def get_models_status() -> ResourceResponse:
 
     Returns:
         Model status and system information.
+
     """
     try:
         health_info = get_pipeline_health()
 
         return ResourceResponse(
-            data=health_info, metadata={"checked_at": datetime.now(), "health_check_version": "1.0"}
+            data=health_info,
+            metadata={"checked_at": datetime.now(), "health_check_version": "1.0"},
         )
 
     except Exception as e:
@@ -296,6 +306,7 @@ async def reload_models() -> ResourceResponse:
     Errors:
         503: Models not available
         500: Reload failed
+
     """
     try:
         # Force reload pipeline

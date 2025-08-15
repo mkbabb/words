@@ -17,7 +17,7 @@ from ...caching.unified import get_unified
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, StateTracker
 from ...core.streaming import create_streaming_response
-from ...models.definition import DictionaryProvider, Language
+from ...models.dictionary import DictionaryProvider, Language
 from ...storage.mongodb import get_synthesized_entry
 from ...utils.logging import get_logger
 from ...utils.sanitization import validate_word_input
@@ -39,7 +39,8 @@ class DictionaryEntryResponse(BaseModel):
     id: str | None = Field(None, description="ID of the synthesized dictionary entry")
     last_updated: datetime = Field(..., description="When this entry was last updated")
     model_info: dict[str, Any] | None = Field(
-        None, description="AI model information (null for non-AI entries)"
+        None,
+        description="AI model information (null for non-AI entries)",
     )
 
     # Pronunciation
@@ -50,12 +51,14 @@ class DictionaryEntryResponse(BaseModel):
 
     # Images attached to the entry
     images: list[dict[str, Any]] = Field(
-        default_factory=list, description="Images attached to the synthesized entry"
+        default_factory=list,
+        description="Images attached to the synthesized entry",
     )
 
     # Definitions with all resolved data
     definitions: list[dict[str, Any]] = Field(
-        default_factory=list, description="Word definitions with all resolved data"
+        default_factory=list,
+        description="Word definitions with all resolved data",
     )
 
 
@@ -171,6 +174,7 @@ async def lookup_word(
 
         Returns detailed entry with pronunciation, multiple meanings,
         examples, and AI-synthesized coherent definitions.
+
     """
     # Sanitize and validate word input
     try:
@@ -197,7 +201,7 @@ async def lookup_word(
         raise
     except Exception as e:
         logger.error(f"Lookup failed for {word}: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal error during lookup: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error during lookup: {e!s}")
 
 
 async def _report_cached_progress(
@@ -217,7 +221,9 @@ async def _report_cached_progress(
 
 
 async def _lookup_with_tracking(
-    word: str, params: LookupParams, state_tracker: StateTracker
+    word: str,
+    params: LookupParams,
+    state_tracker: StateTracker,
 ) -> DictionaryEntryResponse | None:
     """Perform lookup with state tracking and unified caching."""
     try:
@@ -241,7 +247,10 @@ async def _lookup_with_tracking(
             if cached_result is not None:
                 logger.info(f"🎯 Memory cache hit for '{word}'")
                 await _report_cached_progress(
-                    state_tracker, word, "cache", len(cached_result.definitions)
+                    state_tracker,
+                    word,
+                    "cache",
+                    len(cached_result.definitions),
                 )
                 return cached_result
 
@@ -250,7 +259,7 @@ async def _lookup_with_tracking(
             if existing:
                 logger.info(f"📋 DB cache hit for '{word}'")
                 response_dict = await SynthesizedDictionaryEntryLoader.load_as_lookup_response(
-                    entry=existing
+                    entry=existing,
                 )
                 result = DictionaryEntryResponse(**response_dict)
 
@@ -258,7 +267,10 @@ async def _lookup_with_tracking(
                 await cache.set("api", cache_key, result, ttl=timedelta(hours=1.0))
 
                 await _report_cached_progress(
-                    state_tracker, word, "database cache", len(result.definitions)
+                    state_tracker,
+                    word,
+                    "database cache",
+                    len(result.definitions),
                 )
                 return result
 
@@ -284,7 +296,9 @@ async def _lookup_with_tracking(
 
         # Load the entry using the centralized loader
         await state_tracker.update(
-            stage=Stages.COMPLETE, progress=90, message="Loading definition details..."
+            stage=Stages.COMPLETE,
+            progress=90,
+            message="Loading definition details...",
         )
 
         # Use the centralized loader to convert to LookupResponse
@@ -297,7 +311,7 @@ async def _lookup_with_tracking(
         return result
 
     except Exception as e:
-        await state_tracker.update_error(f"Lookup failed: {str(e)}")
+        await state_tracker.update_error(f"Lookup failed: {e!s}")
         raise
 
 
@@ -327,6 +341,7 @@ async def lookup_word_stream(
         Server-Sent Events stream with progress updates, partial provider results,
         and final synthesized result. Includes timing metrics for performance monitoring.
         Content-Type: text/event-stream
+
     """
     logger.info(f"Starting streaming lookup for word: {word}")
 

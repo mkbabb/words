@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ...core.search_pipeline import search_word_pipeline
-from ...models.definition import Language
+from ...models.dictionary import Language
 from ...search.constants import SearchMode
 from ...search.language import get_language_search
 from ...utils.logging import get_logger
@@ -22,7 +22,6 @@ logger = get_logger(__name__)
 @click.group()
 def search_group() -> None:
     """🔎 Search functionality - find words across lexicons."""
-    pass
 
 
 @search_group.command("word")
@@ -56,7 +55,14 @@ def search_group() -> None:
     default=20,
     help="Maximum number of results to show",
 )
-def search_word(query: str, language: tuple[str, ...], mode: str, max_results: int, min_score: float | None, force_rebuild: bool) -> None:
+def search_word(
+    query: str,
+    language: tuple[str, ...],
+    mode: str,
+    max_results: int,
+    min_score: float | None,
+    force_rebuild: bool,
+) -> None:
     """Search for words in lexicons.
 
     QUERY: The word or phrase to search for
@@ -101,7 +107,12 @@ def search_stats(language: tuple[str, ...]) -> None:
 
 
 async def _search_word_async(
-    query: str, language: tuple[str, ...], mode: str, max_results: int, min_score: float | None, force_rebuild: bool
+    query: str,
+    language: tuple[str, ...],
+    mode: str,
+    max_results: int,
+    min_score: float | None,
+    force_rebuild: bool,
 ) -> None:
     """Async implementation of word search."""
     logger.info(f"Searching for: '{query}' (mode: {mode})")
@@ -112,7 +123,7 @@ async def _search_word_async(
 
         # Perform search using the pipeline
         search_mode = SearchMode(mode)
-        
+
         results = await search_word_pipeline(
             word=query,
             languages=languages,

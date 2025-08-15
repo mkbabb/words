@@ -16,8 +16,6 @@ logger = get_logger(__name__)
 class AnkiConnectError(Exception):
     """Exception raised when AnkiConnect operations fail."""
 
-    pass
-
 
 class AnkiConnectInterface:
     """Interface for communicating with Anki via AnkiConnect add-on."""
@@ -27,6 +25,7 @@ class AnkiConnectInterface:
 
         Args:
             url: AnkiConnect server URL (default: localhost:8765)
+
         """
         self.url = url
         self._is_available: bool | None = None
@@ -59,6 +58,7 @@ class AnkiConnectInterface:
 
         Raises:
             AnkiConnectError: If the request fails or returns an error
+
         """
         import time
 
@@ -101,6 +101,7 @@ class AnkiConnectInterface:
 
         Returns:
             True if successful
+
         """
         try:
             self.invoke("createDeck", deck=deck_name)
@@ -111,7 +112,11 @@ class AnkiConnectInterface:
             return False
 
     def add_note(
-        self, deck_name: str, model_name: str, fields: dict[str, str], tags: list[str] | None = None
+        self,
+        deck_name: str,
+        model_name: str,
+        fields: dict[str, str],
+        tags: list[str] | None = None,
     ) -> int | None:
         """Add a note to Anki.
 
@@ -123,6 +128,7 @@ class AnkiConnectInterface:
 
         Returns:
             Note ID if successful, None otherwise
+
         """
         note_data = {
             "deckName": deck_name,
@@ -140,12 +146,15 @@ class AnkiConnectInterface:
             if "duplicate" in str(e).lower():
                 logger.debug(f"🔄 Attempting to update duplicate note in '{deck_name}'")
                 return self._handle_duplicate_note(deck_name, model_name, fields, tags)
-            else:
-                logger.warning(f"Failed to add note to '{deck_name}': {e}")
-                return None
+            logger.warning(f"Failed to add note to '{deck_name}': {e}")
+            return None
 
     def _handle_duplicate_note(
-        self, deck_name: str, model_name: str, fields: dict[str, str], tags: list[str] | None = None
+        self,
+        deck_name: str,
+        model_name: str,
+        fields: dict[str, str],
+        tags: list[str] | None = None,
     ) -> int | None:
         """Handle duplicate notes by finding and updating existing ones."""
         try:
@@ -168,9 +177,8 @@ class AnkiConnectInterface:
 
                 logger.debug(f"🔄 Updated existing note {note_id} in deck '{deck_name}'")
                 return note_id  # type: ignore[no-any-return]
-            else:
-                logger.warning(f"Could not find duplicate note to update in '{deck_name}'")
-                return None
+            logger.warning(f"Could not find duplicate note to update in '{deck_name}'")
+            return None
 
         except AnkiConnectError as e:
             logger.warning(f"Failed to handle duplicate note in '{deck_name}': {e}")
@@ -184,6 +192,7 @@ class AnkiConnectInterface:
 
         Returns:
             True if import successful
+
         """
         apkg_path = Path(apkg_path)
         if not apkg_path.exists():
@@ -220,7 +229,12 @@ class AnkiConnectInterface:
         return self.invoke("modelNames")  # type: ignore[no-any-return]
 
     def create_model(
-        self, model_name: str, fields: list[str], css: str, front_template: str, back_template: str
+        self,
+        model_name: str,
+        fields: list[str],
+        css: str,
+        front_template: str,
+        back_template: str,
     ) -> bool:
         """Create a custom note model in Anki.
 
@@ -233,6 +247,7 @@ class AnkiConnectInterface:
 
         Returns:
             True if successful
+
         """
         model_data = {
             "modelName": model_name,
@@ -280,6 +295,7 @@ class AnkiDirectIntegration:
 
         Returns:
             True if all cards were added successfully
+
         """
         if not self.is_available():
             return False
@@ -349,14 +365,13 @@ class AnkiDirectIntegration:
 
             if failed_cards == 0:
                 logger.success(
-                    f"✅ Successfully added all {successful_cards} cards to Anki in {total_time:.2f}s"
+                    f"✅ Successfully added all {successful_cards} cards to Anki in {total_time:.2f}s",
                 )
                 return True
-            else:
-                logger.warning(
-                    f"⚠️ Added {successful_cards} cards, {failed_cards} failed in {total_time:.2f}s"
-                )
-                return successful_cards > 0
+            logger.warning(
+                f"⚠️ Added {successful_cards} cards, {failed_cards} failed in {total_time:.2f}s",
+            )
+            return successful_cards > 0
 
         except Exception as e:
             logger.error(f"💥 Direct export failed: {e}")
@@ -395,6 +410,7 @@ class AnkiDirectIntegration:
 
         Returns:
             True if import successful
+
         """
         if not self.is_available():
             return False

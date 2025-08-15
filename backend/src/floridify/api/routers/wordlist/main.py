@@ -73,6 +73,7 @@ async def list_wordlists(
 
     Returns:
         Paginated list of wordlists.
+
     """
     # Build filter
     filter_params = WordListFilter(
@@ -124,6 +125,7 @@ async def create_wordlist(
 
     Returns:
         Created wordlist with resource links.
+
     """
     wordlist = await repo.create(data)
 
@@ -145,6 +147,7 @@ async def generate_wordlist_slug() -> dict[str, str]:
 
     Returns:
         Dictionary with 'name' key containing the generated slug.
+
     """
     try:
         # Generate slug using existing utility (empty list for words since name is independent)
@@ -167,6 +170,7 @@ async def get_wordlist(
 
     Returns:
         Wordlist with metadata and statistics.
+
     """
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
     assert wordlist is not None
@@ -189,7 +193,7 @@ async def get_wordlist(
                 "mastery_distribution": mastery_distribution,
                 "study_sessions": wordlist.learning_stats.total_reviews,
                 "total_study_time": wordlist.learning_stats.study_time_minutes,
-            }
+            },
         },
         links={
             "self": f"/wordlists/{wordlist_id}",
@@ -209,6 +213,7 @@ async def get_wordlist_statistics(
 
     Returns:
         Comprehensive statistics about the wordlist.
+
     """
     stats = await repo.get_statistics(wordlist_id)
 
@@ -236,6 +241,7 @@ async def update_wordlist(
 
     Returns:
         Updated wordlist.
+
     """
     wordlist = await repo.update(wordlist_id, data)
 
@@ -280,6 +286,7 @@ async def upload_wordlist(
 
     Returns:
         Created wordlist.
+
     """
     try:
         # Read file content
@@ -331,7 +338,7 @@ async def upload_wordlist(
             tmp_path.unlink(missing_ok=True)
 
     except Exception as e:
-        raise HTTPException(400, detail=f"Failed to parse file: {str(e)}")
+        raise HTTPException(400, detail=f"Failed to parse file: {e!s}")
 
 
 @router.post("/upload/stream", status_code=201)
@@ -375,7 +382,8 @@ async def upload_wordlist_stream(
             # File already read - move to parsing
             await state_tracker.update_stage(Stages.UPLOAD_READING)
             await state_tracker.update(
-                stage=Stages.UPLOAD_READING, message="File read successfully"
+                stage=Stages.UPLOAD_READING,
+                message="File read successfully",
             )
 
             # Create temporary file for parser
@@ -387,13 +395,16 @@ async def upload_wordlist_stream(
                 # Parse file
                 await state_tracker.update_stage(Stages.UPLOAD_PARSING)
                 await state_tracker.update(
-                    stage=Stages.UPLOAD_PARSING, message="Parsing words from file..."
+                    stage=Stages.UPLOAD_PARSING,
+                    message="Parsing words from file...",
                 )
                 parsed = parse_file(tmp_path)
                 total_words = len(parsed.words)
 
                 await state_tracker.update(
-                    stage=Stages.UPLOAD_PARSING, progress=35, message=f"Found {total_words} words"
+                    stage=Stages.UPLOAD_PARSING,
+                    progress=35,
+                    message=f"Found {total_words} words",
                 )
 
                 # Generate name if not provided
@@ -404,7 +415,8 @@ async def upload_wordlist_stream(
                 # Create wordlist data
                 await state_tracker.update_stage(Stages.UPLOAD_PROCESSING)
                 await state_tracker.update(
-                    stage=Stages.UPLOAD_PROCESSING, message="Creating word entries..."
+                    stage=Stages.UPLOAD_PROCESSING,
+                    message="Creating word entries...",
                 )
 
                 data = WordListCreate(
@@ -418,13 +430,15 @@ async def upload_wordlist_stream(
                 # Create wordlist with progress updates
                 await state_tracker.update_stage(Stages.UPLOAD_CREATING)
                 await state_tracker.update(
-                    stage=Stages.UPLOAD_CREATING, message="Finalizing wordlist creation..."
+                    stage=Stages.UPLOAD_CREATING,
+                    message="Finalizing wordlist creation...",
                 )
                 wordlist = await repo.create(data)
 
                 await state_tracker.update_stage(Stages.UPLOAD_FINALIZING)
                 await state_tracker.update(
-                    stage=Stages.UPLOAD_FINALIZING, message="Completing upload..."
+                    stage=Stages.UPLOAD_FINALIZING,
+                    message="Completing upload...",
                 )
 
                 # Complete successfully
@@ -438,7 +452,7 @@ async def upload_wordlist_stream(
                 tmp_path.unlink(missing_ok=True)
 
         except Exception as e:
-            await state_tracker.update_error(f"Failed to upload wordlist: {str(e)}")
+            await state_tracker.update_error(f"Failed to upload wordlist: {e!s}")
             raise
 
     # Use the generalized streaming system

@@ -25,7 +25,7 @@ class LazyGroup(click.Group):
             # Get the command group from the module
             if hasattr(module, f"{cmd_name}_command"):
                 return getattr(module, f"{cmd_name}_command")
-            elif hasattr(module, f"{cmd_name}_group"):
+            if hasattr(module, f"{cmd_name}_group"):
                 return getattr(module, f"{cmd_name}_group")
             return None
         except ImportError:
@@ -35,12 +35,12 @@ class LazyGroup(click.Group):
         # Return a static list of commands without importing modules
         return [
             "lookup",
-            "search", 
+            "search",
             "scrape",
             "wordlist",
             "config",
             "database",
-            "wotd-ml"
+            "wotd-ml",
         ]
 
 
@@ -84,16 +84,30 @@ semantic search, and Anki flashcard generation.[/dim]
 # Define lazy-loaded commands
 @cli.command()
 @click.argument("word")
-@click.option("--provider", type=click.Choice([
-    "wiktionary", "oxford", "apple_dictionary", "merriam_webster", 
-    "free_dictionary", "wordhippo", "ai_fallback", "synthesis"
-]), multiple=True, help="Dictionary providers to use")
+@click.option(
+    "--provider",
+    type=click.Choice(
+        [
+            "wiktionary",
+            "oxford",
+            "apple_dictionary",
+            "merriam_webster",
+            "free_dictionary",
+            "wordhippo",
+            "ai_fallback",
+            "synthesis",
+        ]
+    ),
+    multiple=True,
+    help="Dictionary providers to use",
+)
 @click.option("--language", "-l", default="en", help="Language code")
 @click.option("--no-ai", is_flag=True, help="Disable AI synthesis")
 @click.option("--force-refresh", is_flag=True, help="Force refresh from providers")
 def lookup(word: str, **kwargs: Any) -> None:
     """Look up word definitions with AI enhancement."""
     from .commands.lookup import lookup_word_command
+
     lookup_word_command(word, **kwargs)
 
 
@@ -120,90 +134,139 @@ def scrape(ctx: click.Context) -> None:
 
 # Define individual scrape subcommands with lazy loading
 @scrape.command()
-@click.option('--skip-existing/--include-existing', default=True, help='Skip words that already have data')
-@click.option('--force-refresh', is_flag=True, help='Force refresh existing data')
-@click.option('-n', '--session-name', help='Name for this scraping session')
-@click.option('-r', '--resume-session', help='Resume from existing session ID')
-@click.option('-c', '--max-concurrent', type=int, help='Maximum concurrent operations')
-@click.option('-b', '--batch-size', type=int, help='Words per batch')
-@click.option('-l', '--language', type=click.Choice(['en', 'fr', 'es', 'de', 'it']), default='en', help='Language to scrape')
+@click.option(
+    "--skip-existing/--include-existing", default=True, help="Skip words that already have data"
+)
+@click.option("--force-refresh", is_flag=True, help="Force refresh existing data")
+@click.option("-n", "--session-name", help="Name for this scraping session")
+@click.option("-r", "--resume-session", help="Resume from existing session ID")
+@click.option("-c", "--max-concurrent", type=int, help="Maximum concurrent operations")
+@click.option("-b", "--batch-size", type=int, help="Words per batch")
+@click.option(
+    "-l",
+    "--language",
+    type=click.Choice(["en", "fr", "es", "de", "it"]),
+    default="en",
+    help="Language to scrape",
+)
 def apple_dictionary(**kwargs: Any) -> None:
     """Bulk scrape Apple Dictionary (macOS) for local definitions."""
     from .commands.scrape import scrape_apple_dictionary
+
     scrape_apple_dictionary(**kwargs)
 
+
 @scrape.command()
-@click.option('--skip-existing/--include-existing', default=True, help='Skip words that already have data')
-@click.option('--force-refresh', is_flag=True, help='Force refresh existing data')
-@click.option('-n', '--session-name', help='Name for this scraping session')
-@click.option('-r', '--resume-session', help='Resume from existing session ID')
-@click.option('-c', '--max-concurrent', type=int, help='Maximum concurrent operations')
-@click.option('-b', '--batch-size', type=int, help='Words per batch')
-@click.option('-l', '--language', type=click.Choice(['en', 'fr', 'es', 'de', 'it']), default='en', help='Language to scrape')
+@click.option(
+    "--skip-existing/--include-existing", default=True, help="Skip words that already have data"
+)
+@click.option("--force-refresh", is_flag=True, help="Force refresh existing data")
+@click.option("-n", "--session-name", help="Name for this scraping session")
+@click.option("-r", "--resume-session", help="Resume from existing session ID")
+@click.option("-c", "--max-concurrent", type=int, help="Maximum concurrent operations")
+@click.option("-b", "--batch-size", type=int, help="Words per batch")
+@click.option(
+    "-l",
+    "--language",
+    type=click.Choice(["en", "fr", "es", "de", "it"]),
+    default="en",
+    help="Language to scrape",
+)
 def wordhippo(**kwargs: Any) -> None:
     """Bulk scrape WordHippo for comprehensive synonym/antonym/example data."""
     from .commands.scrape import scrape_wordhippo
+
     scrape_wordhippo(**kwargs)
 
+
 @scrape.command()
-@click.option('--skip-existing/--include-existing', default=True, help='Skip words that already have data')
-@click.option('--force-refresh', is_flag=True, help='Force refresh existing data')
-@click.option('-n', '--session-name', help='Name for this scraping session')
-@click.option('-r', '--resume-session', help='Resume from existing session ID')
-@click.option('-c', '--max-concurrent', type=int, help='Maximum concurrent operations')
-@click.option('-b', '--batch-size', type=int, help='Words per batch')
-@click.option('-l', '--language', type=click.Choice(['en', 'fr', 'es', 'de', 'it']), default='en', help='Language to scrape')
+@click.option(
+    "--skip-existing/--include-existing", default=True, help="Skip words that already have data"
+)
+@click.option("--force-refresh", is_flag=True, help="Force refresh existing data")
+@click.option("-n", "--session-name", help="Name for this scraping session")
+@click.option("-r", "--resume-session", help="Resume from existing session ID")
+@click.option("-c", "--max-concurrent", type=int, help="Maximum concurrent operations")
+@click.option("-b", "--batch-size", type=int, help="Words per batch")
+@click.option(
+    "-l",
+    "--language",
+    type=click.Choice(["en", "fr", "es", "de", "it"]),
+    default="en",
+    help="Language to scrape",
+)
 def free_dictionary(**kwargs: Any) -> None:
     """Bulk scrape FreeDictionary API for comprehensive coverage."""
     from .commands.scrape import scrape_free_dictionary
+
     scrape_free_dictionary(**kwargs)
 
+
 @scrape.command()
-@click.option('--skip-existing/--include-existing', default=True, help='Skip words that already have data')
-@click.option('--force-refresh', is_flag=True, help='Force refresh existing data')
-@click.option('-n', '--session-name', help='Name for this scraping session')
-@click.option('-r', '--resume-session', help='Resume from existing session ID')
-@click.option('-c', '--max-concurrent', type=int, help='Maximum concurrent operations')
-@click.option('-b', '--batch-size', type=int, help='Words per batch')
-@click.option('-l', '--language', type=click.Choice(['en', 'fr', 'es', 'de', 'it']), default='en', help='Language to scrape')
+@click.option(
+    "--skip-existing/--include-existing", default=True, help="Skip words that already have data"
+)
+@click.option("--force-refresh", is_flag=True, help="Force refresh existing data")
+@click.option("-n", "--session-name", help="Name for this scraping session")
+@click.option("-r", "--resume-session", help="Resume from existing session ID")
+@click.option("-c", "--max-concurrent", type=int, help="Maximum concurrent operations")
+@click.option("-b", "--batch-size", type=int, help="Words per batch")
+@click.option(
+    "-l",
+    "--language",
+    type=click.Choice(["en", "fr", "es", "de", "it"]),
+    default="en",
+    help="Language to scrape",
+)
 def wiktionary_wholesale(**kwargs: Any) -> None:
     """Download and process complete Wiktionary dumps."""
     from .commands.scrape import scrape_wiktionary_wholesale
+
     scrape_wiktionary_wholesale(**kwargs)
+
 
 @scrape.command()
 def sessions() -> None:
     """List all scraping sessions."""
     from .commands.scrape import list_sessions
+
     list_sessions()
 
+
 @scrape.command()
-@click.argument('session_id', required=False)
+@click.argument("session_id", required=False)
 def status(session_id: str | None = None) -> None:
     """Show scraping status or details for a specific session."""
     from .commands.scrape import show_status
+
     show_status(session_id)
 
+
 @scrape.command()
-@click.argument('session_id')
+@click.argument("session_id")
 def resume(session_id: str) -> None:
     """Resume a scraping session by ID."""
     from .commands.scrape import resume_session
+
     resume_session(session_id)
 
+
 @scrape.command()
-@click.argument('session_id')
-@click.confirmation_option(prompt='Are you sure you want to delete this session?')
+@click.argument("session_id")
+@click.confirmation_option(prompt="Are you sure you want to delete this session?")
 def delete(session_id: str) -> None:
     """Delete a scraping session."""
     from .commands.scrape import delete_session
+
     delete_session(session_id)
 
+
 @scrape.command()
-@click.confirmation_option(prompt='Are you sure you want to clean up old sessions?')
+@click.confirmation_option(prompt="Are you sure you want to clean up old sessions?")
 def cleanup() -> None:
     """Clean up old scraping sessions."""
-    from .commands.scrape import cleanup_sessions  
+    from .commands.scrape import cleanup_sessions
+
     cleanup_sessions()
 
 
@@ -212,14 +275,16 @@ def cleanup() -> None:
 def search(query: str) -> None:
     """🔎 Search functionality - find words across lexicons."""
     from .commands.search import search_command
+
     search_command(query)
 
 
-@cli.command() 
+@cli.command()
 @click.argument("file_path")
 def wordlist(file_path: str) -> None:
     """Manage word lists with dictionary lookup and storage."""
     from .commands.wordlist import wordlist_command
+
     wordlist_command(file_path)
 
 
@@ -229,40 +294,49 @@ def config(ctx: click.Context) -> None:
     """⚙️ Manage configuration and API keys."""
     if ctx.invoked_subcommand is None:
         from .commands.config import config_group
+
         ctx.invoke(config_group)
 
 
 @cli.group(invoke_without_command=True)
-@click.pass_context  
+@click.pass_context
 def database(ctx: click.Context) -> None:
     """💾 Database operations and statistics."""
     if ctx.invoked_subcommand is None:
         from .commands.database import database_group
+
         ctx.invoke(database_group)
-
-
 
 
 @cli.command()
 def wotd_ml() -> None:
     """🚀 WOTD ML with multi-model support."""
     from .commands.wotd_ml import wotd_ml_command
+
     wotd_ml_command()
 
 
 @cli.command()
-@click.option('--shell', type=click.Choice(['zsh', 'bash']), default='zsh', 
-              help='Shell to generate completion for')
+@click.option(
+    "--shell",
+    type=click.Choice(["zsh", "bash"]),
+    default="zsh",
+    help="Shell to generate completion for",
+)
 def completion(shell: str) -> None:
     """Generate shell completion script for floridify."""
     from .completion import generate_zsh_completion
-    if shell == 'zsh':
+
+    if shell == "zsh":
         completion_script = generate_zsh_completion()
         click.echo(completion_script)
         click.echo("\n# To install, run:", err=True)
-        click.echo("# floridify completion --shell zsh > ~/.local/share/zsh/site-functions/_floridify", err=True)
+        click.echo(
+            "# floridify completion --shell zsh > ~/.local/share/zsh/site-functions/_floridify",
+            err=True,
+        )
         click.echo("# Or add to your ~/.zshrc:", err=True)
-        click.echo("# eval \"$(floridify completion --shell zsh)\"", err=True)
+        click.echo('# eval "$(floridify completion --shell zsh)"', err=True)
     else:
         click.echo("Bash completion not yet implemented", err=True)
 

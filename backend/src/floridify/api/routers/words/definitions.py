@@ -24,7 +24,7 @@ from ....ai.synthesis_functions import (
     synthesize_synonyms,
     usage_note_generation,
 )
-from ....models import Definition, Example, Word
+from ....models import Definition, Word
 from ...core import (
     ErrorDetail,
     ErrorResponse,
@@ -60,7 +60,8 @@ class DefinitionQueryParams(BaseModel):
     word_id: str | None = Field(None, description="Filter by word ID")
     part_of_speech: str | None = Field(None, description="Filter by part of speech")
     language_register: str | None = Field(
-        None, description="Filter by register (formal/informal/neutral/slang/technical)"
+        None,
+        description="Filter by register (formal/informal/neutral/slang/technical)",
     )
     domain: str | None = Field(None, description="Filter by domain")
     cefr_level: str | None = Field(None, description="Filter by CEFR level")
@@ -114,6 +115,7 @@ async def list_definitions(
 
     Returns:
         Paginated definition list.
+
     """
     # Build filter
     filter_params = DefinitionFilter(
@@ -136,9 +138,9 @@ async def list_definitions(
     # Apply field selection and expansions using unified method
     items = await repo.get_expanded(
         definitions=definitions,
-        expand=fields.expand
+        expand=fields.expand,
     )
-    
+
     # Apply field selection if needed
     if fields.include or fields.exclude:
         items = [fields.apply_to_dict(item) for item in items]
@@ -164,6 +166,7 @@ async def create_definition(
 
     Returns:
         Created definition with resource links.
+
     """
     definition = await repo.create(data)
 
@@ -193,11 +196,12 @@ async def get_definition(
 
     Returns:
         Definition with completeness score and ETag.
+
     """
     # Get definition with optional expansions using unified method
     definition_data = await repo.get_expanded(
         definition_id=definition_id,
-        expand=fields.expand
+        expand=fields.expand,
     )
 
     # Apply field selection
@@ -324,6 +328,7 @@ async def regenerate_components(
     Errors:
         400: Invalid component names
         404: Definition or word not found
+
     """
     # Get definition
     definition = await repo.get(definition_id)
@@ -361,7 +366,7 @@ async def regenerate_components(
                         field="components",
                         message=f"Invalid components: {invalid_components}",
                         code="invalid_components",
-                    )
+                    ),
                 ],
             ).model_dump(),
         )
@@ -379,7 +384,7 @@ async def regenerate_components(
                         field="word_id",
                         message=f"Word with ID {definition.word_id} not found",
                         code="word_not_found",
-                    )
+                    ),
                 ],
             ).model_dump(),
         )
@@ -405,7 +410,7 @@ async def regenerate_components(
             example_docs = await repo.batch_add_examples(
                 definition.id,
                 examples_response.example_sentences,
-                example_type="generated"
+                example_type="generated",
             )
             updates["examples"] = [ex.model_dump() for ex in example_docs]
         else:
@@ -463,6 +468,7 @@ async def batch_regenerate_components(
 
     Returns:
         Processing summary and results by word.
+
     """
     # Get definitions
     definition_oids: list[PydanticObjectId | str] = [

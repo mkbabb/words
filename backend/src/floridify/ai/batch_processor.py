@@ -1,5 +1,4 @@
-"""
-Batch processing for OpenAI API calls with 50% cost reduction.
+"""Batch processing for OpenAI API calls with 50% cost reduction.
 
 This module provides a context manager approach to batch multiple OpenAI API calls
 into a single batch request, maintaining compatibility with existing code.
@@ -46,7 +45,10 @@ class BatchCollector:
         self._id_counter = 0
 
     def add_request(
-        self, prompt: str, response_model: type[BaseModel], **kwargs: Any
+        self,
+        prompt: str,
+        response_model: type[BaseModel],
+        **kwargs: Any,
     ) -> asyncio.Future[Any]:
         """Add a request to the batch and return a future for the result."""
         self._id_counter += 1
@@ -142,9 +144,8 @@ class BatchExecutor:
             if completed_job.output_file_id:
                 results = await self._download_results(completed_job.output_file_id)
                 return self._map_results_by_id(results)
-            else:
-                logger.error(f"Batch job {batch_job.id} completed without output file")
-                return {}
+            logger.error(f"Batch job {batch_job.id} completed without output file")
+            return {}
 
         finally:
             # Clean up temp file
@@ -161,12 +162,12 @@ class BatchExecutor:
             batch_job = await self.client.batches.retrieve(batch_id)
             elapsed = time.time() - start_time
             logger.info(
-                f"🔄 Check #{check_count} - Batch {batch_id} status: {batch_job.status} (elapsed: {elapsed:.1f}s)"
+                f"🔄 Check #{check_count} - Batch {batch_id} status: {batch_job.status} (elapsed: {elapsed:.1f}s)",
             )
 
             if batch_job.status == "completed":
                 return batch_job
-            elif batch_job.status in ["failed", "expired", "cancelled"]:
+            if batch_job.status in ["failed", "expired", "cancelled"]:
                 raise Exception(f"Batch job failed: {batch_job.status}")
 
             await asyncio.sleep(check_interval)
@@ -216,13 +217,13 @@ class BatchContext:
             # Add to batch and return future
             future = batch_context.collector.add_request(prompt, response_model, **kwargs)
             logger.debug(
-                f"📥 Collected request #{len(batch_context.collector.requests)}: {response_model.__name__}"
+                f"📥 Collected request #{len(batch_context.collector.requests)}: {response_model.__name__}",
             )
             # Return a task that will be resolved when batch executes
             return asyncio.create_task(batch_context._await_future(future))
 
         # Patch the method
-        setattr(self.connector, "_make_structured_request", batch_wrapper)
+        self.connector._make_structured_request = batch_wrapper
         logger.info("✅ Batch mode activated - collecting API requests")
         return self
 
@@ -236,7 +237,7 @@ class BatchContext:
 
         # Restore original method
         if self._original_method:
-            setattr(self.connector, "_make_structured_request", self._original_method)
+            self.connector._make_structured_request = self._original_method
             logger.debug("🔄 Restored original API method")
 
         # Execute batch if no exception
@@ -313,8 +314,7 @@ class BatchContext:
 
 @asynccontextmanager
 async def batch_synthesis(connector: OpenAIConnector) -> AsyncIterator[BatchContext]:
-    """
-    Context manager for batch synthesis operations.
+    """Context manager for batch synthesis operations.
 
     Usage:
         async with batch_synthesis(ai_connector) as batch:

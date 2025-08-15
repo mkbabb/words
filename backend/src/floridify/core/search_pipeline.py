@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from ..models.definition import Language
+from ..models.dictionary import Language
 from ..search.constants import SearchMode
 from ..search.core import SearchResult
 from ..search.language import LanguageSearch, get_language_search
@@ -34,6 +34,7 @@ async def get_search_engine(
 
     Returns:
         Initialized LanguageSearch instance
+
     """
     global _search_engine
 
@@ -79,6 +80,7 @@ async def search_word_pipeline(
 
     Returns:
         List of search results ranked by relevance
+
     """
     # Set defaults
     if languages is None:
@@ -109,7 +111,7 @@ async def search_word_pipeline(
         # Log search metrics
         pipeline_time = time.perf_counter() - pipeline_start
         logger.info(
-            f"✅ Search completed: {len(results)} results for '{word}' in {pipeline_time:.2f}s"
+            f"✅ Search completed: {len(results)} results for '{word}' in {pipeline_time:.2f}s",
         )
 
         # Log detailed metrics
@@ -157,6 +159,7 @@ async def find_best_match(
 
     Returns:
         Best matching search result or None
+
     """
     results = await search_word_pipeline(
         word=word,
@@ -168,12 +171,11 @@ async def find_best_match(
     if results:
         best = results[0]
         logger.debug(
-            f"✅ Best match for '{word}': '{best.word}' (score: {best.score:.3f}, method: {best.method})"
+            f"✅ Best match for '{word}': '{best.word}' (score: {best.score:.3f}, method: {best.method})",
         )
         return best
-    else:
-        logger.debug(f"❌ No match found for '{word}'")
-        return None
+    logger.debug(f"❌ No match found for '{word}'")
+    return None
 
 
 async def search_similar_words(
@@ -195,6 +197,7 @@ async def search_similar_words(
 
     Returns:
         List of similar words ranked by semantic similarity
+
     """
     # Always use semantic search for similarity
     results = await search_word_pipeline(

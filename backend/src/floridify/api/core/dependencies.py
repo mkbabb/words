@@ -23,6 +23,7 @@ def get_pagination(
 
     Returns:
         PaginationParams object with offset and limit
+
     """
     return PaginationParams(offset=offset, limit=limit)
 
@@ -41,6 +42,7 @@ def get_sort(
 
     Returns:
         SortParams object with sort field and direction
+
     """
     return SortParams(sort_by=sort_by, sort_order=sort_order)
 
@@ -65,6 +67,7 @@ def get_fields(
     Note:
         - include and exclude are mutually exclusive - if both are provided, include takes precedence
         - expand allows loading related resources in a single request
+
     """
     return FieldSelection(
         include=set(include.split(",")) if include else None,

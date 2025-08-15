@@ -94,7 +94,6 @@ class Stages:
     @classmethod
     def get_stage_definitions(cls, category: str = "lookup") -> list[ProcessStage]:
         """Get predefined stage definitions for a process category."""
-
         if category == "lookup":
             return [
                 ProcessStage(
@@ -162,7 +161,7 @@ class Stages:
                 ),
             ]
 
-        elif category == "upload":
+        if category == "upload":
             return [
                 ProcessStage(
                     name=cls.UPLOAD_START,
@@ -215,7 +214,7 @@ class Stages:
                 ),
             ]
 
-        elif category == "image":
+        if category == "image":
             return [
                 ProcessStage(
                     name=cls.IMAGE_UPLOAD_START,
@@ -254,31 +253,30 @@ class Stages:
                 ),
             ]
 
-        else:
-            # Generic stages for unknown categories
-            return [
-                ProcessStage(
-                    name=cls.START,
-                    progress=10,
-                    label="Start",
-                    description="Starting process",
-                    category=category,
-                ),
-                ProcessStage(
-                    name="PROCESSING",
-                    progress=50,
-                    label="Processing",
-                    description="Processing data",
-                    category=category,
-                ),
-                ProcessStage(
-                    name=cls.COMPLETE,
-                    progress=100,
-                    label="Complete",
-                    description="Process complete!",
-                    category=category,
-                ),
-            ]
+        # Generic stages for unknown categories
+        return [
+            ProcessStage(
+                name=cls.START,
+                progress=10,
+                label="Start",
+                description="Starting process",
+                category=category,
+            ),
+            ProcessStage(
+                name="PROCESSING",
+                progress=50,
+                label="Processing",
+                description="Processing data",
+                category=category,
+            ),
+            ProcessStage(
+                name=cls.COMPLETE,
+                progress=100,
+                label="Complete",
+                description="Process complete!",
+                category=category,
+            ),
+        ]
 
 
 class PipelineState(BaseModel):
@@ -288,10 +286,12 @@ class PipelineState(BaseModel):
     progress: int = Field(0, ge=0, le=100, description="Progress from 0 to 100")
     message: str = Field("", description="Human-readable status message")
     details: dict[str, Any] | None = Field(
-        default=None, description="Optional stage-specific details (for debugging)"
+        default=None,
+        description="Optional stage-specific details (for debugging)",
     )
     timestamp: datetime = Field(
-        default_factory=datetime.now, description="When this state was recorded"
+        default_factory=datetime.now,
+        description="When this state was recorded",
     )
     is_complete: bool = Field(default=False, description="Whether the pipeline has completed")
     error: str | None = Field(default=None, description="Error message if pipeline failed")
@@ -324,13 +324,16 @@ class StateTracker:
     """Tracks pipeline state and provides async event streaming."""
 
     def __init__(
-        self, category: str = "general", custom_stages: list[ProcessStage] | None = None
+        self,
+        category: str = "general",
+        custom_stages: list[ProcessStage] | None = None,
     ) -> None:
         """Initialize the state tracker.
 
         Args:
             category: Process category (lookup, upload, image, etc.)
             custom_stages: Optional custom stage definitions
+
         """
         self._queue: asyncio.Queue[PipelineState] = asyncio.Queue()
         self._current_state: PipelineState | None = None
@@ -405,7 +408,9 @@ class StateTracker:
             )
 
     async def update_complete(
-        self, stage: str = "COMPLETE", message: str = "Pipeline completed"
+        self,
+        stage: str = "COMPLETE",
+        message: str = "Pipeline completed",
     ) -> None:
         """Optimized update for completion."""
         await self.update(stage=stage, progress=100, message=message, is_complete=True)

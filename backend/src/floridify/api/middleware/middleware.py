@@ -19,7 +19,9 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     """Middleware for request/response logging."""
 
     async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Log requests and responses with timing."""
         # Generate request ID
@@ -86,7 +88,9 @@ class CacheHeadersMiddleware(BaseHTTPMiddleware):
     """Middleware to add HTTP cache headers for improved performance."""
 
     async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Add appropriate cache headers based on endpoint."""
         response = await call_next(request)

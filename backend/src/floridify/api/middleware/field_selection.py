@@ -7,7 +7,9 @@ from pydantic import BaseModel
 
 
 def select_fields[T: BaseModel](
-    obj: T, include: set[str] | None = None, exclude: set[str] | None = None
+    obj: T,
+    include: set[str] | None = None,
+    exclude: set[str] | None = None,
 ) -> dict[str, Any]:
     """Select specific fields from a Pydantic model.
 
@@ -18,6 +20,7 @@ def select_fields[T: BaseModel](
 
     Returns:
         Dictionary with selected fields
+
     """
     data = obj.model_dump()
 
@@ -40,6 +43,7 @@ def parse_field_param(field_str: str | None) -> set[str] | None:
 
     Returns:
         Set of field names or None
+
     """
     if not field_str:
         return None
@@ -73,6 +77,7 @@ async def load_related_fields(obj: Document, fields: set[str], depth: int = 1) -
 
     Returns:
         Dictionary with loaded fields
+
     """
     data: dict[str, Any] = obj.model_dump()
 
@@ -103,7 +108,9 @@ async def load_related_fields(obj: Document, fields: set[str], depth: int = 1) -
                     related_obj = await related_model.get(fk_value)  # type: ignore[attr-defined]
                     if related_obj:
                         data[related_field] = await load_related_fields(
-                            related_obj, fields, depth - 1
+                            related_obj,
+                            fields,
+                            depth - 1,
                         )
 
     return data

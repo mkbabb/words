@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..ai import get_definition_synthesizer, get_openai_connector
-from ..models.definition import Language
+from ..models.dictionary import Language
 from ..search.language import get_language_search
 from ..storage.mongodb import get_storage
 from ..utils.logging import setup_logging
@@ -17,7 +17,6 @@ from .middleware import CacheHeadersMiddleware, LoggingMiddleware
 from .routers import (
     ai,
     audio,
-    corpus,
     definitions,
     examples,
     health,
@@ -131,6 +130,6 @@ async def api_info() -> dict[str, Any]:
                 "status": "stable",
                 "base_url": "/api/v1",
                 "docs_url": "/api/v1/docs",
-            }
+            },
         },
     }

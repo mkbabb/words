@@ -76,7 +76,9 @@ class ExampleRepository(BaseRepository[Example, ExampleCreate, ExampleUpdate]):
         super().__init__(Example)
 
     async def find_by_definition(
-        self, definition_id: str, limit: int | None = None
+        self,
+        definition_id: str,
+        limit: int | None = None,
     ) -> list[Example]:
         """Find examples for a definition."""
         query = Example.find({"definition_id": definition_id})
@@ -112,4 +114,3 @@ class ExampleRepository(BaseRepository[Example, ExampleCreate, ExampleUpdate]):
 
     async def _cascade_delete(self, example: Example) -> None:
         """No cascade needed for examples."""
-        pass

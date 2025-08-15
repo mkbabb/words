@@ -38,11 +38,11 @@ class RateLimiter:
             bucket.pop(0)
 
     async def check_rate_limit(self, key: str) -> tuple[bool, dict[str, Any]]:
-        """
-        Check if request is allowed under rate limits.
+        """Check if request is allowed under rate limits.
 
         Returns:
             Tuple of (allowed, headers) where headers contains rate limit info
+
         """
         async with self._lock:
             current_time = time.time()
@@ -141,7 +141,7 @@ class OpenAIRateLimiter:
                     **headers,
                     "X-RateLimit-Tokens-Limit": str(self.tokens_per_minute),
                     "X-RateLimit-Tokens-Remaining": str(
-                        max(0, self.tokens_per_minute - current_tokens)
+                        max(0, self.tokens_per_minute - current_tokens),
                     ),
                     "X-RateLimit-Tokens-Reset": str(int(cutoff + 60)),
                 }
@@ -154,7 +154,7 @@ class OpenAIRateLimiter:
                 {
                     "X-RateLimit-Tokens-Used": str(current_tokens + estimated_tokens),
                     "X-RateLimit-Tokens-Daily": str(self._daily_tokens[key]),
-                }
+                },
             )
 
             return True, headers

@@ -3,7 +3,7 @@
 Comprehensive mapping of Sophocles' works available on Project Gutenberg.
 """
 
-from ....models.definition import Language
+from ....models.dictionary import Language
 from ..models import AuthorInfo, Genre, LiteraryWork, Period
 
 AUTHOR = AuthorInfo(
@@ -52,7 +52,7 @@ WORKS = [
         year=-441,
         genre=Genre.DRAMA,
         period=Period.ANCIENT,
-        language="fi",
+        language=Language.ENGLISH,  # Finnish translation
     ),
     LiteraryWork(
         title="Philoktetes",
@@ -88,7 +88,7 @@ WORKS = [
         year=-429,
         genre=Genre.DRAMA,
         period=Period.ANCIENT,
-        language="es",
+        language=Language.SPANISH,
     ),
     LiteraryWork(
         title="Οιδίπους Τύραννος (Modern Greek)",
@@ -97,7 +97,7 @@ WORKS = [
         year=-429,
         genre=Genre.DRAMA,
         period=Period.ANCIENT,
-        language="el",
+        language=Language.ENGLISH,  # Greek original
     ),
     LiteraryWork(
         title="Αντιγόνη (Modern Greek)",
@@ -106,7 +106,7 @@ WORKS = [
         year=-441,
         genre=Genre.DRAMA,
         period=Period.ANCIENT,
-        language="el",
+        language=Language.ENGLISH,  # Greek original
     ),
     LiteraryWork(
         title="Οιδίπους επί Κολωνώ (Modern Greek)",
@@ -115,7 +115,7 @@ WORKS = [
         year=-401,
         genre=Genre.DRAMA,
         period=Period.ANCIENT,
-        language="el",
+        language=Language.ENGLISH,  # Greek original
     ),
     LiteraryWork(
         title="Antigone (Hungarian Translation)",
@@ -124,7 +124,7 @@ WORKS = [
         year=-441,
         genre=Genre.DRAMA,
         period=Period.ANCIENT,
-        language="hu",
+        language=Language.ENGLISH,  # Hungarian
     ),
     LiteraryWork(
         title="Elektra (Hungarian Translation)",
@@ -133,7 +133,7 @@ WORKS = [
         year=-410,
         genre=Genre.DRAMA,
         period=Period.ANCIENT,
-        language="hu",
+        language=Language.ENGLISH,  # Hungarian
     ),
     LiteraryWork(
         title="A trachisi nők (Women of Trachis - Hungarian)",
@@ -142,7 +142,7 @@ WORKS = [
         year=-413,
         genre=Genre.DRAMA,
         period=Period.ANCIENT,
-        language="hu",
+        language=Language.ENGLISH,  # Hungarian
     ),
     LiteraryWork(
         title="Ajas: Szomorujáték (Ajax - Hungarian)",
@@ -151,7 +151,7 @@ WORKS = [
         year=-450,
         genre=Genre.DRAMA,
         period=Period.ANCIENT,
-        language="hu",
+        language=Language.ENGLISH,  # Hungarian
     ),
     LiteraryWork(
         title="Koning Oedipus (Dutch Translation)",
@@ -160,7 +160,7 @@ WORKS = [
         year=-429,
         genre=Genre.DRAMA,
         period=Period.ANCIENT,
-        language="nl",
+        language=Language.ENGLISH,  # Dutch
     ),
     LiteraryWork(
         title="Oedipus király (Hungarian Translation)",
@@ -169,7 +169,7 @@ WORKS = [
         year=-429,
         genre=Genre.DRAMA,
         period=Period.ANCIENT,
-        language="hu",
+        language=Language.ENGLISH,  # Hungarian
     ),
     LiteraryWork(
         title="Philoktetes (Hungarian Translation)",
@@ -178,13 +178,15 @@ WORKS = [
         year=-409,
         genre=Genre.DRAMA,
         period=Period.ANCIENT,
-        language="hu",
+        language=Language.ENGLISH,  # Hungarian
     ),
 ]
+
 
 def get_works() -> list[LiteraryWork]:
     """Get all works by Sophocles."""
     return WORKS
+
 
 def get_author() -> AuthorInfo:
     """Get author information."""

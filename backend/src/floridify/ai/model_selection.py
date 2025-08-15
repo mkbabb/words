@@ -18,7 +18,7 @@ class ModelTier(Enum):
     GPT_5 = "gpt-5"
     GPT_5_MINI = "gpt-5-mini"
     GPT_5_NANO = "gpt-5-nano"
-    
+
     # Reasoning models (o-series)
     O3_MINI = "o3-mini"
     O1_MINI = "o1-mini"
@@ -26,7 +26,7 @@ class ModelTier(Enum):
     # GPT-4 series (legacy)
     GPT_4O = "gpt-4o"
     GPT_4O_MINI = "gpt-4o-mini"
-    
+
     # Special tier aliases for capability levels
     HIGH = "gpt-5"
     MEDIUM = "gpt-5-mini"
@@ -41,7 +41,7 @@ class ModelTier(Enum):
     def is_reasoning_model(self) -> bool:
         """Check if this is a reasoning model (o-series, all GPT-5 variants)."""
         return self.value.startswith(("o1", "o3", "gpt-5"))
-    
+
     @property
     def uses_completion_tokens(self) -> bool:
         """Check if model uses max_completion_tokens instead of max_tokens."""
@@ -55,7 +55,7 @@ TASK_COMPLEXITY_MAP: dict[str, ModelComplexity] = {
     "suggest_words": ModelComplexity.HIGH,
     "extract_cluster_mapping": ModelComplexity.HIGH,
     "generate_synthetic_corpus": ModelComplexity.HIGH,  # Use GPT-5 for synthetic training data
-    "literature_analysis": ModelComplexity.HIGH,       # Use GPT-5 for literature analysis
+    "literature_analysis": ModelComplexity.HIGH,  # Use GPT-5 for literature analysis
     # Medium complexity - creative generation, pedagogical tasks
     "generate_synonyms": ModelComplexity.MEDIUM,
     "generate_facts": ModelComplexity.MEDIUM,
@@ -69,7 +69,7 @@ TASK_COMPLEXITY_MAP: dict[str, ModelComplexity] = {
     "generate_suggestions": ModelComplexity.MEDIUM,
     "lookup_word": ModelComplexity.MEDIUM,
     "deduplicate_definitions": ModelComplexity.MEDIUM,
-    "literature_augmentation": ModelComplexity.MEDIUM, # Use GPT-5 Mini for augmentation
+    "literature_augmentation": ModelComplexity.MEDIUM,  # Use GPT-5 Mini for augmentation
     "text_generation": ModelComplexity.MEDIUM,
     # Low complexity - simple classification, basic generation
     "assess_frequency": ModelComplexity.LOW,
@@ -86,15 +86,14 @@ TASK_COMPLEXITY_MAP: dict[str, ModelComplexity] = {
 
 # Default model selection based on complexity
 COMPLEXITY_TO_MODEL: dict[ModelComplexity, ModelTier] = {
-    ModelComplexity.HIGH: ModelTier.HIGH,     # GPT-5
-    ModelComplexity.MEDIUM: ModelTier.MEDIUM, # GPT-5 Mini
-    ModelComplexity.LOW: ModelTier.LOW,       # GPT-5 Nano
+    ModelComplexity.HIGH: ModelTier.HIGH,  # GPT-5
+    ModelComplexity.MEDIUM: ModelTier.MEDIUM,  # GPT-5 Mini
+    ModelComplexity.LOW: ModelTier.LOW,  # GPT-5 Nano
 }
 
 
 def get_model_for_task(task_name: str, override: ModelTier | None = None) -> ModelTier:
-    """
-    Get the appropriate model for a given task.
+    """Get the appropriate model for a given task.
 
     Args:
         task_name: Name of the task/method being called
@@ -102,6 +101,7 @@ def get_model_for_task(task_name: str, override: ModelTier | None = None) -> Mod
 
     Returns:
         The selected model tier
+
     """
     if override:
         return override
@@ -112,8 +112,7 @@ def get_model_for_task(task_name: str, override: ModelTier | None = None) -> Mod
 
 
 def get_temperature_for_model(model: ModelTier, task_name: str | None = None) -> float | None:
-    """
-    Get appropriate temperature for a model and task.
+    """Get appropriate temperature for a model and task.
 
     Args:
         model: The model tier
@@ -121,6 +120,7 @@ def get_temperature_for_model(model: ModelTier, task_name: str | None = None) ->
 
     Returns:
         Temperature value or None for reasoning models
+
     """
     # Reasoning models don't use temperature
     if model.is_reasoning_model:

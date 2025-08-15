@@ -23,24 +23,30 @@ class WordListItem(BaseModel):
     # Learning metadata
     frequency: int = Field(default=1, ge=1, description="Number of occurrences in list")
     selected_definition_ids: list[PydanticObjectId] = Field(
-        default_factory=list, description="FK to selected Definition documents"
+        default_factory=list,
+        description="FK to selected Definition documents",
     )
     mastery_level: MasteryLevel = Field(
-        default=MasteryLevel.DEFAULT, description="Current mastery level"
+        default=MasteryLevel.DEFAULT,
+        description="Current mastery level",
     )
     temperature: Temperature = Field(
-        default=Temperature.COLD, description="Learning temperature state"
+        default=Temperature.COLD,
+        description="Learning temperature state",
     )
     review_data: ReviewData = Field(
-        default_factory=ReviewData, description="Spaced repetition data"
+        default_factory=ReviewData,
+        description="Spaced repetition data",
     )
 
     # Timestamps
     last_visited: datetime | None = Field(
-        default=None, description="Last time word was viewed/studied"
+        default=None,
+        description="Last time word was viewed/studied",
     )
     added_date: datetime = Field(
-        default_factory=lambda: datetime.now(UTC), description="When added to list"
+        default_factory=lambda: datetime.now(UTC),
+        description="When added to list",
     )
 
     # User metadata
@@ -90,24 +96,28 @@ class WordList(Document, BaseMetadataWithAccess):
     description: str = Field(default="", description="List description/purpose")
     hash_id: str = Field(..., description="Content-based hash identifier")
     words: list[WordListItem] = Field(
-        default_factory=list, description="Words with learning data"
+        default_factory=list,
+        description="Words with learning data",
     )
 
     # Statistics
     total_words: int = Field(default=0, ge=0, description="Total word count")
     unique_words: int = Field(default=0, ge=0, description="Unique word count")
     learning_stats: LearningStats = Field(
-        default_factory=LearningStats, description="Aggregated learning statistics"
+        default_factory=LearningStats,
+        description="Aggregated learning statistics",
     )
 
     # Metadata
     tags: list[str] = Field(
-        default_factory=list, description="List categorization tags"
+        default_factory=list,
+        description="List categorization tags",
     )
     is_public: bool = Field(default=False, description="Public visibility flag")
     owner_id: str | None = Field(default=None, description="Owner user ID")
     metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
+        default_factory=dict,
+        description="Additional metadata",
     )
 
     class Settings:
@@ -127,6 +137,7 @@ class WordList(Document, BaseMetadataWithAccess):
 
         Args:
             word_ids: List of word ObjectIds to add
+
         """
         # Create a map of existing word_ids for quick lookup
         word_map = {w.word_id: w for w in self.words}
@@ -182,7 +193,7 @@ class WordList(Document, BaseMetadataWithAccess):
 
     async def get_word_item(self, word_text: str) -> WordListItem | None:
         """Get WordListItem by word text."""
-        from ..models.definition import Word
+        from ..models.dictionary import Word
 
         # Find the word document by text
         word_doc = await Word.find_one({"text": word_text})

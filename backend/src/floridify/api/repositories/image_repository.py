@@ -177,4 +177,3 @@ class ImageRepository(BaseRepository[ImageMedia, ImageCreate, ImageUpdate]):
         """Handle cascade deletion - implemented via CleanupService in delete method."""
         # This method is required by BaseRepository but we handle cascading
         # in the delete method using CleanupService for better separation of concerns
-        pass

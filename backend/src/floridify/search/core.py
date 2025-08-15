@@ -1,5 +1,4 @@
-"""
-Core search engine for arbitrary lexicons.
+"""Core search engine for arbitrary lexicons.
 
 Performance-optimized for 100k-1M word searches with KISS principles.
 """
@@ -10,11 +9,11 @@ import asyncio
 import itertools
 from typing import Any
 
+from ..corpus.core import Corpus
+from ..corpus.manager import get_corpus_manager
 from ..text import normalize
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod, SearchMode
-from .corpus.core import Corpus
-from .corpus.manager import get_corpus_manager
 from .fuzzy import FuzzySearch  # Using RapidFuzz implementation
 from .models import SearchResult
 from .semantic.constants import DEFAULT_SENTENCE_MODEL, SemanticModel
@@ -26,8 +25,7 @@ logger = get_logger(__name__)
 
 
 class SearchEngine:
-    """
-    High-performance search engine using corpus-based vocabulary.
+    """High-performance search engine using corpus-based vocabulary.
 
     Optimized for 100k-1M word searches with minimal overhead.
     """
@@ -55,6 +53,7 @@ class SearchEngine:
             semantic: Enable semantic search (requires ML dependencies)
             semantic_model: Model to use for semantic search (BGE-M3 or MiniLM)
             force_rebuild: Force rebuild of indices and semantic search
+
         """
         self.corpus_name = corpus_name
         self.min_score = min_score
@@ -78,7 +77,7 @@ class SearchEngine:
         self._initialized = False
 
         logger.debug(
-            f"SearchEngine created for corpus '{corpus_name}', semantic={'enabled' if self.semantic else 'disabled'}"
+            f"SearchEngine created for corpus '{corpus_name}', semantic={'enabled' if self.semantic else 'disabled'}",
         )
 
     async def initialize(self) -> None:
@@ -91,12 +90,12 @@ class SearchEngine:
             and self.corpus is not None
         ):
             logger.debug(
-                f"SearchEngine for '{self.corpus_name}' already initialized with hash {current_vocab_hash[:8]}"
+                f"SearchEngine for '{self.corpus_name}' already initialized with hash {current_vocab_hash[:8]}",
             )
             return
 
         logger.info(
-            f"Initializing SearchEngine for corpus '{self.corpus_name}' (hash: {current_vocab_hash[:8] if current_vocab_hash else 'unknown'})"
+            f"Initializing SearchEngine for corpus '{self.corpus_name}' (hash: {current_vocab_hash[:8] if current_vocab_hash else 'unknown'})",
         )
 
         # Fetch Corpus from corpus manager
@@ -108,11 +107,12 @@ class SearchEngine:
 
         if metadata is not None:
             logger.debug(
-                f"Found metadata for '{self.corpus_name}', vocab hash: {metadata.vocabulary_hash[:8]}"
+                f"Found metadata for '{self.corpus_name}', vocab hash: {metadata.vocabulary_hash[:8]}",
             )
             # Get corpus from cache using the vocab_hash
             self.corpus = await manager.get_corpus(
-                self.corpus_name, vocab_hash=metadata.vocabulary_hash
+                self.corpus_name,
+                vocab_hash=metadata.vocabulary_hash,
             )
             if self.corpus:
                 logger.debug(f"Successfully loaded corpus '{self.corpus_name}' from cache")
@@ -123,10 +123,10 @@ class SearchEngine:
 
         if self.corpus is None:
             logger.error(
-                f"Failed to load corpus '{self.corpus_name}' - not found in cache or metadata"
+                f"Failed to load corpus '{self.corpus_name}' - not found in cache or metadata",
             )
             raise ValueError(
-                f"Corpus '{self.corpus_name}' not found. It should have been created by LanguageSearch.initialize() or via get_or_create_corpus()."
+                f"Corpus '{self.corpus_name}' not found. It should have been created by LanguageSearch.initialize() or via get_or_create_corpus().",
             )
 
         self._vocabulary_hash = self.corpus.vocabulary_hash
@@ -152,7 +152,7 @@ class SearchEngine:
         self._initialized = True
 
         logger.info(
-            f"✅ SearchEngine initialized for corpus '{self.corpus_name}' (hash: {self._vocabulary_hash[:8]})"
+            f"✅ SearchEngine initialized for corpus '{self.corpus_name}' (hash: {self._vocabulary_hash[:8]})",
         )
 
     async def _initialize_semantic_background(self) -> None:
@@ -167,15 +167,15 @@ class SearchEngine:
             # Get or create semantic search from manager
             semantic_manager = get_semantic_search_manager()
             self.semantic_search = await semantic_manager.get_semantic_search(
-                corpus_name=self.corpus_name, 
+                corpus_name=self.corpus_name,
                 vocab_hash=self.corpus.vocabulary_hash,
-                model_name=self.semantic_model
+                model_name=self.semantic_model,
             )
 
             if not self.semantic_search:
                 # Create semantic search if not found in cache
                 logger.info(
-                    f"Creating new semantic search for corpus '{self.corpus_name}' with {self.semantic_model} (background)"
+                    f"Creating new semantic search for corpus '{self.corpus_name}' with {self.semantic_model} (background)",
                 )
                 self.semantic_search = await semantic_manager.create_semantic_search(
                     corpus=self.corpus,
@@ -210,12 +210,12 @@ class SearchEngine:
         current_vocab_hash = await self._get_current_vocab_hash()
         if current_vocab_hash == self._vocabulary_hash:
             logger.debug(
-                f"Corpus unchanged for '{self.corpus_name}' (hash: {current_vocab_hash[:8] if current_vocab_hash else 'none'})"
+                f"Corpus unchanged for '{self.corpus_name}' (hash: {current_vocab_hash[:8] if current_vocab_hash else 'none'})",
             )
             return
 
         logger.info(
-            f"Corpus vocabulary changed for '{self.corpus_name}': {self._vocabulary_hash[:8] if self._vocabulary_hash else 'none'} -> {current_vocab_hash[:8] if current_vocab_hash else 'none'}"
+            f"Corpus vocabulary changed for '{self.corpus_name}': {self._vocabulary_hash[:8] if self._vocabulary_hash else 'none'} -> {current_vocab_hash[:8] if current_vocab_hash else 'none'}",
         )
 
         # Get updated corpus
@@ -249,8 +249,7 @@ class SearchEngine:
         max_results: int = 20,
         min_score: float | None = None,
     ) -> list[SearchResult]:
-        """
-        Smart cascading search with early termination optimization and caching.
+        """Smart cascading search with early termination optimization and caching.
 
         Automatically selects optimal search methods based on query.
 
@@ -258,6 +257,7 @@ class SearchEngine:
             query: Search query
             max_results: Maximum results to return
             min_score: Minimum score threshold
+
         """
         # Use the new search_with_mode method with SMART mode
         return await self.search_with_mode(
@@ -274,14 +274,14 @@ class SearchEngine:
         max_results: int = 20,
         min_score: float | None = None,
     ) -> list[SearchResult]:
-        """
-        Search with explicit mode selection.
+        """Search with explicit mode selection.
 
         Args:
             query: Search query
             mode: Search mode (SMART, EXACT, FUZZY, SEMANTIC)
             max_results: Maximum results to return
             min_score: Minimum score threshold
+
         """
         # Ensure initialization
         await self.initialize()
@@ -299,7 +299,10 @@ class SearchEngine:
         # Perform search based on mode
         if mode == SearchMode.SMART:
             results = await self._smart_search_cascade(
-                normalized_query, max_results, min_score, self.semantic
+                normalized_query,
+                max_results,
+                min_score,
+                self.semantic,
             )
         elif mode == SearchMode.EXACT:
             results = self.search_exact(normalized_query)
@@ -319,12 +322,12 @@ class SearchEngine:
         self,
         query: str,
     ) -> list[SearchResult]:
-        """
-        Search using only exact matching.
+        """Search using only exact matching.
 
         Args:
             query: Normalized search query
             max_results: Maximum results to return
+
         """
         if self.trie_search is None:
             return []
@@ -342,19 +345,22 @@ class SearchEngine:
                 method=SearchMethod.EXACT,
                 language=None,
                 metadata=None,
-            )
+            ),
         ]
 
     def search_fuzzy(
-        self, query: str, max_results: int = 20, min_score: float = DEFAULT_MIN_SCORE
+        self,
+        query: str,
+        max_results: int = 20,
+        min_score: float = DEFAULT_MIN_SCORE,
     ) -> list[SearchResult]:
-        """
-        Search using only fuzzy matching.
+        """Search using only fuzzy matching.
 
         Args:
             query: Normalized search query
             max_results: Maximum results to return
             min_score: Minimum score threshold
+
         """
         if self.fuzzy_search is None or self.corpus is None:
             return []
@@ -378,15 +384,18 @@ class SearchEngine:
             return []
 
     def search_semantic(
-        self, query: str, max_results: int = 20, min_score: float = DEFAULT_MIN_SCORE
+        self,
+        query: str,
+        max_results: int = 20,
+        min_score: float = DEFAULT_MIN_SCORE,
     ) -> list[SearchResult]:
-        """
-        Search using only semantic matching.
+        """Search using only semantic matching.
 
         Args:
             query: Normalized search query
             max_results: Maximum results to return
             min_score: Minimum score threshold
+
         """
         # Check if semantic search is ready
         if not self._semantic_ready or not self.semantic_search:
@@ -408,7 +417,6 @@ class SearchEngine:
         semantic: bool,
     ) -> list[SearchResult]:
         """Sequential search cascade with smart early termination for optimal performance."""
-
         # 1. Exact search first (fastest) - perfect match early termination
         exact_results = self.search_exact(query)
         if exact_results:
@@ -487,16 +495,15 @@ class SearchEngine:
                 "semantic_model": self.semantic_model if self.semantic else None,
                 "corpus_name": self.corpus_name,
             }
-        else:
-            return {
-                "vocabulary_size": 0,
-                "words": 0,
-                "phrases": 0,
-                "min_score": self.min_score,
-                "semantic_enabled": self.semantic,
-                "semantic_ready": False,
-                "corpus_name": self.corpus_name,
-            }
+        return {
+            "vocabulary_size": 0,
+            "words": 0,
+            "phrases": 0,
+            "min_score": self.min_score,
+            "semantic_enabled": self.semantic,
+            "semantic_ready": False,
+            "corpus_name": self.corpus_name,
+        }
 
 
-__all__ = ["SearchEngine", "SearchResult", "SearchMode"]
+__all__ = ["SearchEngine", "SearchMode", "SearchResult"]

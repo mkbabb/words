@@ -22,7 +22,9 @@ logger = get_logger(__name__)
 
 
 def _efficient_cache_key_parts(
-    func: Any, args: tuple[Any, ...], kwargs: dict[str, Any]
+    func: Any,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
 ) -> tuple[Any, ...]:
     """Generate efficient cache key parts avoiding expensive operations."""
     key_parts: list[Any] = [func.__module__, func.__name__, args]
@@ -70,8 +72,7 @@ def cached_api_call(
     ignore_params: list[str] | None = None,
     include_headers: bool = False,
 ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
-    """
-    Cache decorator for API calls with proper async handling.
+    """Cache decorator for API calls with proper async handling.
 
     Args:
         ttl_hours: Cache TTL in hours (default: 24 hours)
@@ -81,6 +82,7 @@ def cached_api_call(
 
     Returns:
         Decorated async function with preserved parameter types
+
     """
 
     def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
@@ -119,9 +121,9 @@ def cached_api_call(
             cached_result = await cache.get(key_prefix, cache_key)
             if cached_result is not None:
                 logger.debug(
-                    f"💨 Cache hit for {func.__name__} (took {(time.time() - start_time) * 1000:.2f}ms)"
+                    f"💨 Cache hit for {func.__name__} (took {(time.time() - start_time) * 1000:.2f}ms)",
                 )
-                return cast(R, cached_result)
+                return cast("R", cached_result)
 
             # Call the actual function
             try:
@@ -150,8 +152,7 @@ def cached_computation_async(
     ttl_hours: float = 168.0,  # 7 days default
     key_prefix: str = "compute",
 ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
-    """
-    Cache decorator for async computational functions.
+    """Cache decorator for async computational functions.
 
     Optimized for async-only functions with proper type preservation.
 
@@ -161,6 +162,7 @@ def cached_computation_async(
 
     Returns:
         Decorated async function with preserved parameter types
+
     """
 
     def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
@@ -177,7 +179,7 @@ def cached_computation_async(
             cached_result = await cache.get(key_prefix, cache_key)
             if cached_result is not None:
                 logger.debug(f"💨 Cache hit for async computation {func.__name__}")
-                return cast(R, cached_result)
+                return cast("R", cached_result)
 
             # Execute the computation
             result = await func(*args, **kwargs)
@@ -197,8 +199,7 @@ def cached_computation_sync(
     ttl_hours: float = 168.0,  # 7 days default
     key_prefix: str = "compute",
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
-    """
-    Cache decorator for sync computational functions.
+    """Cache decorator for sync computational functions.
 
     Optimized for sync-only functions with proper type preservation.
 
@@ -208,6 +209,7 @@ def cached_computation_sync(
 
     Returns:
         Decorated sync function with preserved parameter types
+
     """
 
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
@@ -225,7 +227,7 @@ def cached_computation_sync(
                 cached_result = await cache.get(key_prefix, cache_key)
                 if cached_result is not None:
                     logger.debug(f"💨 Cache hit for sync computation {func.__name__}")
-                    return cast(R, cached_result)
+                    return cast("R", cached_result)
 
                 # Execute the computation
                 result = func(*args, **kwargs)
@@ -252,8 +254,7 @@ def cached_computation(
     ttl_hours: float = 168.0,  # 7 days default
     key_prefix: str = "compute",
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """
-    Universal cache decorator for computational functions.
+    """Universal cache decorator for computational functions.
 
     Auto-detects sync vs async and applies appropriate decorator.
     For better type safety, prefer cached_computation_async or cached_computation_sync.
@@ -264,20 +265,19 @@ def cached_computation(
 
     Returns:
         Decorated function
+
     """
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         if inspect.iscoroutinefunction(func):
             return cached_computation_async(ttl_hours, key_prefix)(func)
-        else:
-            return cached_computation_sync(ttl_hours, key_prefix)(func)
+        return cached_computation_sync(ttl_hours, key_prefix)(func)
 
     return decorator
 
 
 def deduplicated[**P, R](func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
-    """
-    Decorator to prevent duplicate concurrent calls to the same function.
+    """Decorator to prevent duplicate concurrent calls to the same function.
 
     If multiple calls are made with the same arguments while one is in progress,
     they will wait for the first call to complete and share the result.
@@ -287,6 +287,7 @@ def deduplicated[**P, R](func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitab
 
     Returns:
         Decorated async function with preserved types
+
     """
 
     @functools.wraps(func)
@@ -299,7 +300,7 @@ def deduplicated[**P, R](func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitab
         if cache_key in _active_calls:
             logger.debug(f"🔄 Deduplicating call to {func.__name__} - waiting for existing call")
             # Wait for the existing call to complete
-            return cast(R, await _active_calls[cache_key])
+            return cast("R", await _active_calls[cache_key])
 
         # Create a future for this call
         future: asyncio.Future[R] = asyncio.Future()
@@ -331,8 +332,7 @@ def cached_api_call_with_dedup(
     ignore_params: list[str] | None = None,
     include_headers: bool = False,
 ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
-    """
-    Combine caching and deduplication for API calls.
+    """Combine caching and deduplication for API calls.
 
     This decorator first checks the cache, then prevents duplicate concurrent
     calls if the cache misses.
@@ -345,6 +345,7 @@ def cached_api_call_with_dedup(
 
     Returns:
         Decorated async function with preserved types
+
     """
 
     def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
@@ -378,9 +379,9 @@ def cached_api_call_with_dedup(
             # Check for existing calls first (deduplication)
             if cache_key in _active_calls:
                 logger.debug(
-                    f"🔄 Deduplicating API call to {func.__name__} - waiting for existing call"
+                    f"🔄 Deduplicating API call to {func.__name__} - waiting for existing call",
                 )
-                return cast(R, await _active_calls[cache_key])
+                return cast("R", await _active_calls[cache_key])
 
             # Create future for deduplication
             future: asyncio.Future[R] = asyncio.Future()
@@ -394,10 +395,10 @@ def cached_api_call_with_dedup(
                 cached_result = await cache.get(key_prefix, cache_key)
                 if cached_result is not None:
                     logger.debug(
-                        f"💨 Cache hit for {func.__name__} (took {(time.time() - start_time) * 1000:.2f}ms)"
+                        f"💨 Cache hit for {func.__name__} (took {(time.time() - start_time) * 1000:.2f}ms)",
                     )
                     future.set_result(cached_result)
-                    return cast(R, cached_result)
+                    return cast("R", cached_result)
 
                 # Call the actual function
                 result = await func(*args, **kwargs)

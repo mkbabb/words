@@ -61,7 +61,7 @@ class FieldSelection(BaseModel):
         """Apply field selection to a dictionary."""
         if self.include:
             return {k: v for k, v in data.items() if k in self.include}
-        elif self.exclude:
+        if self.exclude:
             return {k: v for k, v in data.items() if k not in self.exclude}
         return data
 
@@ -132,7 +132,10 @@ class BaseRepository[T: Document, CreateSchema: BaseModel, UpdateSchema: BaseMod
         return doc
 
     async def update(
-        self, id: PydanticObjectId, data: UpdateSchema, version: int | None = None
+        self,
+        id: PydanticObjectId,
+        data: UpdateSchema,
+        version: int | None = None,
     ) -> T:
         """Update a document with optional optimistic locking."""
         doc = await self.get(id, raise_on_missing=True)
@@ -199,7 +202,8 @@ class BaseRepository[T: Document, CreateSchema: BaseModel, UpdateSchema: BaseMod
         return docs
 
     async def batch_update(
-        self, updates: builtins.list[tuple[PydanticObjectId, UpdateSchema]]
+        self,
+        updates: builtins.list[tuple[PydanticObjectId, UpdateSchema]],
     ) -> builtins.list[T]:
         """Update multiple documents."""
         results = []
@@ -244,7 +248,6 @@ class BaseRepository[T: Document, CreateSchema: BaseModel, UpdateSchema: BaseMod
     @abstractmethod
     async def _cascade_delete(self, doc: T) -> None:
         """Handle cascade deletion of related documents."""
-        pass
 
 
 def get_etag(data: Any) -> str:
@@ -347,6 +350,7 @@ class ResponseBuilder:
         Returns:
             True if the client has the latest version (304 Not Modified should be sent)
             False if the response should be sent normally
+
         """
         etag = get_etag(data)
         response.headers["ETag"] = etag

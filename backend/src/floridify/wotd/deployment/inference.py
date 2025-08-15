@@ -163,7 +163,7 @@ def invoke() -> Response:
 def not_found(error: Any) -> Response:
     """Handle 404 errors."""
     return jsonify(
-        {"error": "Endpoint not found", "available_endpoints": ["/ping", "/invocations"]}
+        {"error": "Endpoint not found", "available_endpoints": ["/ping", "/invocations"]},
     ), 404
 
 

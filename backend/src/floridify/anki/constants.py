@@ -1,5 +1,4 @@
-"""
-Anki-related constants and enums.
+"""Anki-related constants and enums.
 
 Contains enums for flashcard types and Anki-specific configurations.
 """

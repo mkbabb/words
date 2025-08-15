@@ -10,14 +10,14 @@ from pydantic import BaseModel, Field
 
 from ...models import (
     Definition,
+    DictionaryProviderData,
     Example,
     Fact,
     Pronunciation,
-    ProviderData,
     SynthesizedDictionaryEntry,
     Word,
 )
-from ...models.definition import Language
+from ...models.dictionary import Language
 from ..core.base import BaseRepository
 
 
@@ -88,13 +88,18 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
         return await Word.find_one({"text": text, "language": language})
 
     async def find_by_normalized(
-        self, normalized: str, language: Language = Language.ENGLISH
+        self,
+        normalized: str,
+        language: Language = Language.ENGLISH,
     ) -> list[Word]:
         """Find words by normalized form."""
         return await Word.find({"normalized": normalized, "language": language.value}).to_list()
 
     async def search(
-        self, query: str, language: Language | None = None, limit: int = 10
+        self,
+        query: str,
+        language: Language | None = None,
+        limit: int = 10,
     ) -> list[Word]:
         """Search words by text pattern."""
         filter_dict: dict[str, Any] = {"text": RegEx(f"^{query}", "i")}
@@ -105,7 +110,6 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
 
     async def _cascade_delete(self, word: Word) -> None:
         """Delete related documents when deleting a word."""
-
         # Delete all related documents in parallel for better performance
         word_id_str = str(word.id)
         await asyncio.gather(
@@ -113,13 +117,12 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
             Example.find({"word_id": word_id_str}).delete(),
             Fact.find({"word_id": word_id_str}).delete(),
             Pronunciation.find({"word_id": word_id_str}).delete(),
-            ProviderData.find({"word_id": word_id_str}).delete(),
+            DictionaryProviderData.find({"word_id": word_id_str}).delete(),
             SynthesizedDictionaryEntry.find({"word_id": word_id_str}).delete(),
         )
 
     async def get_with_counts(self, id: PydanticObjectId) -> dict[str, Any]:
         """Get word with related document counts."""
-
         word = await self.get(id, raise_on_missing=True)
         if word is None:
             raise ValueError(f"Word with id {id} not found")
@@ -132,7 +135,9 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
         facts_count_task = Fact.find({"word_id": word_id_str}).count()
 
         definitions_count, examples_count, facts_count = await asyncio.gather(
-            definitions_count_task, examples_count_task, facts_count_task
+            definitions_count_task,
+            examples_count_task,
+            facts_count_task,
         )
 
         word_dict["counts"] = {

@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..models import ProviderData
+from ..models import DictionaryProviderData
 
 
 class ExampleGenerationResponse(BaseModel):
@@ -66,11 +66,11 @@ class ClusterMapping(BaseModel):
     """A single cluster mapping entry."""
 
     cluster_id: str = Field(
-        description="Pithy unique cluster identifier (e.g., 'bank_financial') - always in the form {word}_{meaning_cluster}."
+        description="Pithy unique cluster identifier (e.g., 'bank_financial') - always in the form {word}_{meaning_cluster}.",
     )
     cluster_description: str = Field(description="Human-readable description of this cluster")
     definition_indices: list[int] = Field(
-        description="List of definition indices (0-based) in this cluster"
+        description="List of definition indices (0-based) in this cluster",
     )
     confidence: float = Field(
         default=1.0,
@@ -100,7 +100,7 @@ class ClusterMappingResponse(BaseModel):
 
 class TextGenerationRequest(BaseModel):
     """Request for text generation."""
-    
+
     prompt: str = Field(description="The prompt for text generation")
     max_tokens: int = Field(default=500, description="Maximum tokens to generate")
     temperature: float = Field(default=0.7, description="Temperature for generation")
@@ -108,14 +108,14 @@ class TextGenerationRequest(BaseModel):
 
 class TextGenerationResponse(BaseModel):
     """Response from text generation."""
-    
+
     text: str = Field(description="Generated text content")
     confidence: float = Field(default=1.0, description="Confidence in generation quality")
 
 
 class LiteratureAugmentationRequest(BaseModel):
     """Request for literature augmentation."""
-    
+
     author: str = Field(description="Author name for context")
     sample_words: list[str] = Field(description="Sample words from the author")
     transformation_prompt: str = Field(description="How to transform the words")
@@ -124,7 +124,7 @@ class LiteratureAugmentationRequest(BaseModel):
 
 class LiteratureAugmentationResponse(BaseModel):
     """Response from literature augmentation."""
-    
+
     words: list[str] = Field(description="Generated augmented words")
     transformation_applied: str = Field(description="Description of transformation applied")
     confidence: float = Field(default=0.9, description="Confidence in augmentation quality")
@@ -132,7 +132,7 @@ class LiteratureAugmentationResponse(BaseModel):
 
 class SemanticID(BaseModel):
     """4D semantic identifier for literature analysis."""
-    
+
     style: int = Field(ge=0, le=7, description="Style dimension (0-7)")
     complexity: int = Field(ge=0, le=7, description="Complexity dimension (0-7)")
     era: int = Field(ge=0, le=7, description="Era dimension (0-7)")
@@ -141,7 +141,7 @@ class SemanticID(BaseModel):
 
 class LiteratureAnalysis(BaseModel):
     """Detailed analysis of literature characteristics."""
-    
+
     style_description: str = Field(description="Detailed explanation of style classification")
     complexity_description: str = Field(description="Explanation of complexity assessment")
     era_description: str = Field(description="Historical/temporal context")
@@ -150,7 +150,7 @@ class LiteratureAnalysis(BaseModel):
 
 class LiteratureCharacteristics(BaseModel):
     """Characteristic features of the literature corpus."""
-    
+
     dominant_themes: list[str] = Field(description="Main thematic elements")
     linguistic_features: list[str] = Field(description="Key linguistic features")
     stylistic_markers: list[str] = Field(description="Stylistic markers")
@@ -159,17 +159,21 @@ class LiteratureCharacteristics(BaseModel):
 
 class LiteratureAugmentation(BaseModel):
     """Augmentation suggestions for literature corpus."""
-    
+
     suggested_additions: list[str] = Field(description="Words to add")
     suggested_removals: list[str] = Field(description="Words to remove")
-    thematic_clusters: dict[str, list[str]] = Field(default_factory=dict, description="Thematic word clusters")
+    thematic_clusters: dict[str, list[str]] = Field(
+        default_factory=dict, description="Thematic word clusters"
+    )
 
 
 class LiteratureQualityMetrics(BaseModel):
     """Quality assessment metrics for literature corpus."""
-    
+
     coverage_score: float = Field(ge=0.0, le=1.0, description="Coverage of author's vocabulary")
-    distinctiveness_score: float = Field(ge=0.0, le=1.0, description="Uniqueness compared to general English")
+    distinctiveness_score: float = Field(
+        ge=0.0, le=1.0, description="Uniqueness compared to general English"
+    )
     coherence_score: float = Field(ge=0.0, le=1.0, description="Internal consistency")
     balance_score: float = Field(ge=0.0, le=1.0, description="Distribution across categories")
     overall_quality: float = Field(ge=0.0, le=1.0, description="Overall quality assessment")
@@ -177,7 +181,7 @@ class LiteratureQualityMetrics(BaseModel):
 
 class LiteratureMetadata(BaseModel):
     """Metadata about the analyzed literature."""
-    
+
     author: str = Field(description="Author name")
     period: str = Field(description="Literary period")
     genre: str = Field(description="Primary genre")
@@ -187,7 +191,7 @@ class LiteratureMetadata(BaseModel):
 
 class LiteratureAnalysisResponse(BaseModel):
     """Complete response from literature corpus analysis."""
-    
+
     semantic_id: SemanticID = Field(description="4D semantic identifier")
     style_description: str = Field(description="Detailed explanation of style classification")
     complexity_description: str = Field(description="Explanation of complexity assessment")
@@ -216,7 +220,7 @@ class SynonymCandidate(BaseModel):
     relevance: float = Field(description="Relevance score (0.0 to 1.0)")
     efflorescence: float = Field(description="Beauty and expressive power score (0.0 to 1.0)")
     explanation: str = Field(
-        description="Brief explanation of the relationship and why it's beautiful"
+        description="Brief explanation of the relationship and why it's beautiful",
     )
 
 
@@ -224,7 +228,7 @@ class SynonymGenerationResponse(BaseModel):
     """Response for synonym generation with efflorescence ranking."""
 
     synonyms: list[SynonymCandidate] = Field(
-        description="List of synonyms ordered by relevance and efflorescence"
+        description="List of synonyms ordered by relevance and efflorescence",
     )
     confidence: float = Field(description="Overall confidence in the synonym generation")
 
@@ -235,7 +239,9 @@ class Suggestion(BaseModel):
     word: str = Field(description="The suggested word")
     reasoning: str = Field(description="Brief explanation of why this word is a good suggestion")
     difficulty_level: int = Field(
-        ge=1, le=5, description="Difficulty level from 1 (basic) to 5 (advanced)"
+        ge=1,
+        le=5,
+        description="Difficulty level from 1 (basic) to 5 (advanced)",
     )
     semantic_category: str = Field(description="Semantic category or theme")
 
@@ -245,7 +251,7 @@ class SuggestionsResponse(BaseModel):
 
     suggestions: list[Suggestion] = Field(description="List of word suggestions with explanations")
     input_analysis: str = Field(
-        description="Brief analysis of the input words and suggestion rationale"
+        description="Brief analysis of the input words and suggestion rationale",
     )
     confidence: float = Field(ge=0.0, le=1.0, description="Overall confidence in suggestions")
 
@@ -255,7 +261,9 @@ class FactGenerationResponse(BaseModel):
 
     facts: list[str] = Field(description="List of interesting, educational facts about the word")
     confidence: float = Field(
-        ge=0.0, le=1.0, description="Overall confidence in fact accuracy and quality"
+        ge=0.0,
+        le=1.0,
+        description="Overall confidence in fact accuracy and quality",
     )
     categories: list[str] = Field(
         description="Categories of facts generated (etymology, usage, cultural, etc.)",
@@ -274,7 +282,7 @@ class CollocationResponse(BaseModel):
     """Response for collocation generation."""
 
     collocations: list[Collocation] = Field(
-        description="Common word combinations with type and frequency"
+        description="Common word combinations with type and frequency",
     )
     confidence: float = Field(ge=0.0, le=1.0)
 
@@ -293,10 +301,10 @@ class WordSuggestionResponse(BaseModel):
     """Response for AI word suggestions from descriptive queries."""
 
     suggestions: list[WordSuggestion] = Field(
-        description="Words matching the description, ranked by confidence then efflorescence"
+        description="Words matching the description, ranked by confidence then efflorescence",
     )
     query_type: str = Field(
-        description="Type of query (descriptive, fill-in-blank, characteristic-based)"
+        description="Type of query (descriptive, fill-in-blank, characteristic-based)",
     )
     original_query: str = Field(description="The original user query")
 
@@ -338,7 +346,7 @@ class UsageNoteResponse(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
 
 
-class AIGeneratedProviderData(ProviderData):
+class AIGeneratedProviderData(DictionaryProviderData):
     """AI fallback provider data with quality indicators."""
 
     confidence_score: float
@@ -454,7 +462,7 @@ class DefinitionSynthesisResponse(BaseModel):
     """Response for definition text synthesis from clusters."""
 
     definition_text: str = Field(
-        description="Synthesized definition text combining clustered meanings"
+        description="Synthesized definition text combining clustered meanings",
     )
     part_of_speech: str = Field(description="Part of speech for this definition cluster")
     confidence: float = Field(ge=0.0, le=1.0)
@@ -507,7 +515,7 @@ class DeduplicationResponse(BaseModel):
     """Response from definition deduplication."""
 
     deduplicated_definitions: list[DeduplicatedDefinition] = Field(
-        description="Deduplicated definitions preserving highest quality"
+        description="Deduplicated definitions preserving highest quality",
     )
     removed_count: int = Field(description="Number of duplicate definitions removed")
     confidence: float = Field(description="Confidence in deduplication (0.0-1.0)")
@@ -521,7 +529,7 @@ class WordOfTheDayResponse(BaseModel):
     etymology: str = Field(description="Brief origin and historical development")
     example_usage: str = Field(description="Natural sentence demonstrating proper usage")
     fascinating_fact: str = Field(
-        description="Interesting linguistic, cultural, or historical insight"
+        description="Interesting linguistic, cultural, or historical insight",
     )
     difficulty_level: str = Field(description="Difficulty level: intermediate or advanced")
     memorable_aspect: str = Field(description="What makes this word particularly worth learning")
@@ -530,7 +538,7 @@ class WordOfTheDayResponse(BaseModel):
 
 class SyntheticWordEntry(BaseModel):
     """AI-generated word entry for training data."""
-    
+
     word: str = Field(description="The generated word")
     definition: str = Field(description="Word definition")
     part_of_speech: str = Field(description="Grammatical category")
@@ -543,7 +551,7 @@ class SyntheticWordEntry(BaseModel):
 
 class SyntheticCorpusResponse(BaseModel):
     """Response from synthetic corpus generation."""
-    
+
     generated_words: list[SyntheticWordEntry] = Field(description="Generated word entries")
     total_generated: int = Field(description="Number of words successfully generated")
     quality_score: float = Field(ge=0.0, le=1.0, description="Overall quality assessment")

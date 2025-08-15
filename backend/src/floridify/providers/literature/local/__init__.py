@@ -3,4 +3,4 @@
 # Local literature providers would go here
 # For example: local file system, local databases, etc.
 
-__all__ = []
+__all__: list[str] = []

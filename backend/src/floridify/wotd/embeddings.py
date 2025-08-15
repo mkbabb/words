@@ -9,14 +9,14 @@ Key Concepts:
     1. **Matryoshka Embeddings**: Hierarchical representations where prefix
        dimensions contain the most important information. Enables dynamic
        dimension reduction with minimal performance loss.
-    
+
     2. **Quantization**: Reduces embedding precision for memory efficiency:
        - Binary: 1 bit per dimension (32x compression)
        - INT8: 8 bits per dimension (4x compression)
-    
+
     3. **L2 Normalization**: Projects embeddings onto unit hypersphere,
        making cosine similarity equivalent to dot product.
-    
+
     4. **Hierarchical Encoding**: Maps different dimension ranges to
        semantic attributes (style, complexity, era, variation).
 
@@ -43,6 +43,7 @@ if platform.machine() == "arm64" and platform.system() == "Darwin":
 else:
     # Intel/AMD: Standard multi-threading
     import multiprocessing
+
     num_cores = multiprocessing.cpu_count()
     os.environ["OMP_NUM_THREADS"] = str(min(4, num_cores))  # Cap at 4 for stability
     os.environ["MKL_NUM_THREADS"] = str(min(4, num_cores))
@@ -64,7 +65,7 @@ try:
 except ImportError as e:
     raise ImportError(
         "sentence-transformers is required for embedding computation. "
-        "Install with: pip install sentence-transformers"
+        "Install with: pip install sentence-transformers",
     ) from e
 
 from ..utils.logging import get_logger
@@ -80,9 +81,9 @@ logger = get_logger(__name__)
 
 class EmbeddingMode(str, Enum):
     """Embedding computation modes.
-    
+
     Different modes provide trade-offs between quality and efficiency:
-    
+
     - FULL: Maximum fidelity, highest memory usage
     - ELASTIC: Reduced dimensions via Matryoshka, good quality/speed balance
     - BINARY: Extreme compression for fast similarity, ~90% quality retention
@@ -97,20 +98,20 @@ class EmbeddingMode(str, Enum):
 
 class Embedder:
     """Multi-model embedder with Matryoshka and quantization support.
-    
+
     This class provides a unified interface for computing embeddings from text
     using various transformer models. It supports multiple optimization techniques
     including Matryoshka truncation and quantization.
-    
+
     Architecture:
         Text → Tokenization → Transformer → Pooling → Post-processing
-    
+
     The transformer models use bi-encoder architecture:
         1. Encode text to token embeddings
         2. Apply self-attention layers
         3. Pool token embeddings (mean pooling)
         4. Optionally normalize to unit sphere
-    
+
     Matryoshka Support:
         Models trained with Matryoshka loss organize information hierarchically.
         Early dimensions capture coarse semantics, later dimensions add details.
@@ -124,20 +125,25 @@ class Embedder:
             model_name: Model to use (defaults to DEFAULT_EMBEDDING_MODEL)
             device: Device for computation (cpu/cuda/mps)
             use_fp16: Use half precision for efficiency (disabled by default for stability)
+
         """
         self.model_name = model_name or DEFAULT_EMBEDDING_MODEL
-        
+
         # Smart device selection
         if device == "cpu" or not torch.cuda.is_available():
             # On Apple Silicon, check for MPS availability
-            if platform.machine() == "arm64" and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            if (
+                platform.machine() == "arm64"
+                and hasattr(torch.backends, "mps")
+                and torch.backends.mps.is_available()
+            ):
                 self.device = "mps"  # Use Metal Performance Shaders on Apple Silicon
                 logger.info("🍎 Using Apple Silicon MPS acceleration")
             else:
                 self.device = "cpu"
         else:
             self.device = device
-            
+
         # Disable fp16 on CPU and MPS for numerical stability
         self.use_fp16 = use_fp16 and self.device not in ["cpu", "mps"]
 
@@ -157,11 +163,11 @@ class Embedder:
         # Load model with careful device and precision handling
         try:
             self.model = SentenceTransformer(self.model_name, device=self.device)
-            
+
             # Only use fp16 on CUDA devices
             if self.use_fp16 and hasattr(self.model, "half"):
                 self.model = self.model.half()
-                
+
             logger.info(f"✅ Loaded {self.model_name} ({self.full_dim}D) on {self.device}")
         except Exception as e:
             logger.error(f"❌ Failed to load model {self.model_name} on {self.device}: {e}")
@@ -179,8 +185,8 @@ class Embedder:
     def current_dim(self) -> int:
         """Get the current effective embedding dimension based on the last operation."""
         # This will be updated dynamically based on the mode/target_dim used
-        return getattr(self, '_current_dim', self.full_dim)
-    
+        return getattr(self, "_current_dim", self.full_dim)
+
     def _update_current_dim(self, mode: EmbeddingMode, target_dim: int | None = None) -> int:
         """Update and return the current dimension based on mode and target."""
         if mode == EmbeddingMode.ELASTIC and target_dim:
@@ -202,7 +208,7 @@ class Embedder:
         batch_size: int = 32,
     ) -> np.ndarray | torch.Tensor:
         """Compute embeddings with specified mode and dimension.
-        
+
         The embedding pipeline:
         1. Tokenize text into subword tokens
         2. Pass through transformer encoder
@@ -223,16 +229,17 @@ class Embedder:
         Returns:
             Embeddings as numpy array or torch tensor
             Shape: [num_texts, embedding_dim]
+
         """
         if isinstance(texts, str):
             texts = [texts]
-        
+
         # Update current dimension tracking
-        actual_dim = self._update_current_dim(mode, target_dim)
+        self._update_current_dim(mode, target_dim)
 
         # Compute base embeddings using sentence transformers
         # The model handles tokenization, encoding, and pooling internally
-        
+
         # Determine optimal batch size based on device and number of texts
         if self.device == "mps":
             # Apple Silicon MPS: small batches work best
@@ -243,7 +250,7 @@ class Embedder:
         else:
             # CPU: moderate batch size
             optimal_batch_size = min(batch_size, 16, len(texts))
-        
+
         try:
             embeddings = self.model.encode(
                 texts,
@@ -255,7 +262,9 @@ class Embedder:
                 convert_to_numpy=False,  # Keep as tensor
             )
         except Exception as e:
-            logger.warning(f"⚠️ Embedding computation failed with batch_size={optimal_batch_size}: {e}")
+            logger.warning(
+                f"⚠️ Embedding computation failed with batch_size={optimal_batch_size}: {e}"
+            )
             logger.info("🔄 Retrying with batch_size=1")
             # Fallback to single-item processing
             embeddings = self.model.encode(
@@ -272,19 +281,19 @@ class Embedder:
         if not isinstance(embeddings, torch.Tensor):
             # Convert to tensor if needed
             embeddings = torch.tensor(embeddings, dtype=torch.float32)
-        
+
         # Ensure consistent data type
         if embeddings.dtype != torch.float32:
             embeddings = embeddings.to(torch.float32)
-        
+
         # Move to CPU for consistent processing (other operations expect CPU tensors)
         if embeddings.device.type != "cpu":
             embeddings = embeddings.cpu()
-        
+
         # Ensure tensor is contiguous in memory
         if not embeddings.is_contiguous():
             embeddings = embeddings.contiguous()
-        
+
         # Detach from computation graph to prevent gradient tracking issues
         embeddings = embeddings.detach()
 
@@ -305,28 +314,31 @@ class Embedder:
         return embeddings
 
     def _apply_matryoshka(
-        self, embeddings: torch.Tensor, target_dim: int | None = None
+        self,
+        embeddings: torch.Tensor,
+        target_dim: int | None = None,
     ) -> torch.Tensor:
         """Apply Matryoshka truncation to embeddings.
-        
+
         Matryoshka embeddings are trained such that prefix dimensions
         form valid representations at multiple scales. This is achieved
         through a special training loss that optimizes similarity at
         multiple truncation points simultaneously.
-        
+
         Mathematical property:
             For Matryoshka-trained model M and dimensions d1 < d2:
             sim(M(x)[:d1], M(y)[:d1]) ≈ sim(M(x)[:d2], M(y)[:d2])
-        
+
         This means we can truncate without significant quality loss,
         enabling dynamic compute/accuracy trade-offs at inference time.
 
         Args:
             embeddings: Full embeddings to truncate
             target_dim: Target dimension (must be ≤ full dimension)
-        
+
         Returns:
             Truncated and renormalized embeddings
+
         """
         if target_dim is None:
             # Use middle dimension as default
@@ -347,19 +359,19 @@ class Embedder:
 
     def _binarize(self, embeddings: torch.Tensor) -> torch.Tensor:
         """Convert embeddings to binary (1-bit per dimension).
-        
+
         Binary quantization uses the sign function:
             b_i = sign(e_i) = {+1 if e_i > 0, -1 if e_i ≤ 0}
-        
+
         Similarity computation becomes Hamming distance:
             sim_binary(x, y) = (d - hamming_dist(x, y)) / d
-        
+
         Where d is the dimension. This can be computed with XOR and popcount,
         making it extremely fast on modern hardware.
-        
+
         Trade-offs:
             - 32x memory reduction (float32 → 1 bit)
-            - 100x+ faster similarity computation  
+            - 100x+ faster similarity computation
             - ~90% quality retention for many tasks
             - Best for large-scale approximate search
 
@@ -371,18 +383,18 @@ class Embedder:
 
     def _quantize_int8(self, embeddings: torch.Tensor) -> torch.Tensor:
         """Quantize embeddings to int8.
-        
+
         INT8 quantization linearly maps floating point to 8-bit integers:
             1. Find scale: s = 127 / max(|embeddings|)
             2. Quantize: q = round(embeddings * s)
             3. Clip: q = clip(q, -128, 127)
-        
+
         To dequantize: embeddings ≈ q / s
-        
+
         This preserves relative magnitudes while reducing precision.
         Modern CPUs/GPUs have optimized INT8 operations, providing
         both memory and compute benefits.
-        
+
         Trade-offs:
             - 4x memory reduction (float32 → int8)
             - 2-4x faster operations on compatible hardware
@@ -399,7 +411,9 @@ class Embedder:
         return quantized  # type: ignore
 
     async def encode_hierarchical(
-        self, texts: list[str], hierarchy_dims: list[int] | None = None
+        self,
+        texts: list[str],
+        hierarchy_dims: list[int] | None = None,
     ) -> dict[int, torch.Tensor]:
         """Encode texts at multiple dimensional resolutions.
 
@@ -411,6 +425,7 @@ class Embedder:
 
         Returns:
             Dict mapping dimension to embeddings
+
         """
         if hierarchy_dims is None:
             hierarchy_dims = self.elastic_dims if self.supports_matryoshka else [self.full_dim]
@@ -429,7 +444,7 @@ class Embedder:
                 # Model doesn't support this dimension
                 raise ValueError(
                     f"Model {self.model_name} doesn't support dimension {dim}. "
-                    f"Available dimensions: {self.elastic_dims}"
+                    f"Available dimensions: {self.elastic_dims}",
                 )
 
         return hierarchy
@@ -464,18 +479,19 @@ class Embedder:
             # Move to CPU and ensure contiguous memory for safe serialization
             cpu_embeddings = embeddings.cpu().contiguous()
             await storage.cache_embeddings(
-                cache_key, cpu_embeddings.numpy().tolist(), ttl_hours=48
+                cache_key,
+                cpu_embeddings.numpy().tolist(),
+                ttl_hours=48,
             )
             # Return the original embeddings, not the CPU copy
             return embeddings.contiguous() if not embeddings.is_contiguous() else embeddings
-        else:
-            await storage.cache_embeddings(
-                cache_key,
-                embeddings.tolist() if hasattr(embeddings, "tolist") else list(embeddings),
-                ttl_hours=48,
-            )
-            # Convert to properly aligned tensor
-            return torch.tensor(embeddings, dtype=torch.float32).contiguous()
+        await storage.cache_embeddings(
+            cache_key,
+            embeddings.tolist() if hasattr(embeddings, "tolist") else list(embeddings),
+            ttl_hours=48,
+        )
+        # Convert to properly aligned tensor
+        return torch.tensor(embeddings, dtype=torch.float32).contiguous()
 
 
 class SemanticHierarchyEncoder:
@@ -502,6 +518,7 @@ class SemanticHierarchyEncoder:
 
         Returns:
             Dict mapping semantic attribute to embedding segment
+
         """
         components = {}
 
@@ -527,6 +544,7 @@ class SemanticHierarchyEncoder:
 
         Returns:
             Weighted similarity score
+
         """
         if weights is None:
             weights = {"style": 0.3, "complexity": 0.2, "era": 0.2, "variation": 0.3}

@@ -4,4 +4,4 @@ from .constants import CardType
 from .generator import AnkiCardGenerator
 from .templates import AnkiCardTemplate
 
-__all__ = ["AnkiCardTemplate", "CardType", "AnkiCardGenerator"]
+__all__ = ["AnkiCardGenerator", "AnkiCardTemplate", "CardType"]

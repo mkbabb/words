@@ -11,9 +11,9 @@ from pydantic import BaseModel, Field
 from ...caching.core import CacheNamespace
 from ...caching.unified import get_unified
 from ...core.search_pipeline import get_search_engine, reset_search_engine
-from ...models.definition import CorpusType, Language
+from ...corpus.manager import get_corpus_manager
+from ...models.dictionary import CorpusType, Language
 from ...search.constants import SearchMode
-from ...search.corpus.manager import get_corpus_manager
 from ...search.language import get_language_search
 from ...search.models import SearchResult
 from ...text import clear_lemma_cache, get_lemma_cache_stats
@@ -30,7 +30,8 @@ class SearchParams(BaseModel):
     max_results: int = Field(default=20, ge=1, le=100, description="Maximum results")
     min_score: float = Field(default=0.6, ge=0.0, le=1.0, description="Minimum score")
     mode: SearchMode = Field(
-        default=SearchMode.SMART, description="Search mode: smart, exact, fuzzy, semantic"
+        default=SearchMode.SMART,
+        description="Search mode: smart, exact, fuzzy, semantic",
     )
 
 
@@ -56,7 +57,7 @@ class SearchResponse(BaseModel):
                 "total_found": 1,
                 "language": "en",
                 "metadata": {"search_time_ms": 15},
-            }
+            },
         }
 
 
@@ -65,7 +66,8 @@ class RebuildIndexRequest(BaseModel):
 
     # Language and source options
     languages: list[Language] = Field(
-        default=[Language.ENGLISH], description="Languages to rebuild (defaults to English)"
+        default=[Language.ENGLISH],
+        description="Languages to rebuild (defaults to English)",
     )
     force_download: bool = Field(default=True, description="Force re-download of lexicon sources")
 
@@ -79,25 +81,30 @@ class RebuildIndexRequest(BaseModel):
     # Semantic search options
     rebuild_semantic: bool = Field(default=True, description="Rebuild semantic search indices")
     semantic_force_rebuild: bool = Field(
-        default=False, description="Force rebuild semantic even if cached"
+        default=False,
+        description="Force rebuild semantic even if cached",
     )
     quantization_type: str = Field(
-        default="binary", description="Quantization method: 'binary', 'scalar', 'none'"
+        default="binary",
+        description="Quantization method: 'binary', 'scalar', 'none'",
     )
     auto_semantic_small_corpora: bool = Field(
-        default=True, description="Auto-enable semantic for small corpora (<10k words)"
+        default=True,
+        description="Auto-enable semantic for small corpora (<10k words)",
     )
 
     # Cache management options
     clear_existing_cache: bool = Field(
-        default=False, description="Clear all existing caches before rebuild"
+        default=False,
+        description="Clear all existing caches before rebuild",
     )
     clear_semantic_cache: bool = Field(default=False, description="Clear only semantic caches")
     clear_lexicon_cache: bool = Field(default=False, description="Clear only lexicon caches")
 
     # Performance options
     enable_lemmatization_cache: bool = Field(
-        default=True, description="Enable lemmatization memoization"
+        default=True,
+        description="Enable lemmatization memoization",
     )
     batch_size: int = Field(default=1000, ge=100, le=5000, description="Batch size for processing")
 
@@ -119,31 +126,38 @@ class RebuildIndexResponse(BaseModel):
     total_time_seconds: float = Field(..., description="Total rebuild time in seconds")
     semantic_build_time_seconds: float = Field(default=0.0, description="Semantic index build time")
     vocabulary_optimization_ratio: float = Field(
-        default=1.0, description="Vocabulary reduction ratio"
+        default=1.0,
+        description="Vocabulary reduction ratio",
     )
 
     # Unified corpus management results
     corpus_results: dict[str, Any] = Field(
-        default_factory=dict, description="Corpus rebuild results by type"
+        default_factory=dict,
+        description="Corpus rebuild results by type",
     )
     corpus_manager_stats: dict[str, Any] = Field(
-        default_factory=dict, description="Corpus manager statistics"
+        default_factory=dict,
+        description="Corpus manager statistics",
     )
 
     # Cache management results
     caches_cleared: dict[str, int] = Field(
-        default_factory=dict, description="Caches cleared counts"
+        default_factory=dict,
+        description="Caches cleared counts",
     )
     compression_stats: dict[str, float] = Field(
-        default_factory=dict, description="Compression statistics"
+        default_factory=dict,
+        description="Compression statistics",
     )
 
     # Quality metrics
     vocabulary_quality: dict[str, Any] = Field(
-        default_factory=dict, description="Vocabulary validation results"
+        default_factory=dict,
+        description="Vocabulary validation results",
     )
     lemmatization_stats: dict[str, int] = Field(
-        default_factory=dict, description="Lemmatization cache statistics"
+        default_factory=dict,
+        description="Lemmatization cache statistics",
     )
 
 
@@ -228,7 +242,7 @@ async def search_words_query(
         raise
     except Exception as e:
         logger.error(f"Search failed for '{q}': {e}")
-        raise HTTPException(status_code=500, detail=f"Internal error during search: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error during search: {e!s}")
 
 
 @router.get("/search/{query}", response_model=SearchResponse)
@@ -245,7 +259,7 @@ async def search_words_path(
         # Log performance
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
         logger.info(
-            f"Search completed: '{query}' -> {len(result.results)} results in {elapsed_ms}ms"
+            f"Search completed: '{query}' -> {len(result.results)} results in {elapsed_ms}ms",
         )
 
         return result
@@ -254,7 +268,7 @@ async def search_words_path(
         raise
     except Exception as e:
         logger.error(f"Search failed for '{query}': {e}")
-        raise HTTPException(status_code=500, detail=f"Internal error during search: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error during search: {e!s}")
 
 
 @router.get("/search/{query}/suggestions", response_model=SearchResponse)
@@ -279,22 +293,21 @@ async def get_search_suggestions(
         # Log performance
         elapsed_ms = int((time.perf_counter() - start_time) * 1000)
         logger.info(
-            f"Suggestions completed: '{query}' -> {len(result.results)} results in {elapsed_ms}ms"
+            f"Suggestions completed: '{query}' -> {len(result.results)} results in {elapsed_ms}ms",
         )
 
         return result
 
     except Exception as e:
         logger.error(f"Suggestions failed for '{query}': {e}")
-        raise HTTPException(status_code=500, detail=f"Internal error during suggestions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error during suggestions: {e!s}")
 
 
 @router.post("/search/rebuild", response_model=RebuildIndexResponse)
 async def rebuild_search_index(
     request: RebuildIndexRequest = RebuildIndexRequest(),
 ) -> RebuildIndexResponse:
-    """
-    Streamlined rebuild of search index with unified corpus management.
+    """Streamlined rebuild of search index with unified corpus management.
 
     This endpoint provides unified control over:
     1. All corpus types (language_search, wordlist, wordlist_names, custom)
@@ -305,7 +318,7 @@ async def rebuild_search_index(
     logger.info(
         f"Rebuilding search index with unified corpus management: "
         f"languages={[lang.value for lang in request.languages]}, "
-        f"corpus_types={request.corpus_types}, semantic={request.rebuild_semantic}"
+        f"corpus_types={request.corpus_types}, semantic={request.rebuild_semantic}",
     )
     start_time = time.perf_counter()
 
@@ -425,7 +438,7 @@ async def rebuild_search_index(
                 "cache_hits": cache_stats["hits"],
                 "cache_misses": cache_stats["misses"],
                 "cache_enabled": 1 if request.enable_lemmatization_cache else 0,
-            }
+            },
         )
 
         logger.info(f"Unified corpus rebuild completed in {total_elapsed:.2f}s")
@@ -448,4 +461,4 @@ async def rebuild_search_index(
 
     except Exception as e:
         logger.error(f"Failed to rebuild search index with unified corpus management: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to rebuild search index: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to rebuild search index: {e!s}")

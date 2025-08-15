@@ -1,243 +1,256 @@
-"""
-Semantic Search Manager - Centralized management of semantic search instances.
+"""Semantic Search Manager - Centralized management of semantic search instances.
 
-Provides singleton pattern for managing semantic search instances across the application
-with proper caching, initialization, and lifecycle management.
+Provides unified API for managing semantic search instances with proper
+versioning, caching, and lifecycle management.
 """
 
 from __future__ import annotations
 
 import time
-from typing import Any
+from datetime import timedelta
 
-from ...caching.core import CacheNamespace, CacheTTL
-from ...caching.unified import get_unified
-from ...utils.logging import get_logger
-from ..corpus.core import Corpus
-from ..models import CorpusMetadata, SemanticMetadata
-from ..utils import get_vocabulary_hash
-from .constants import DEFAULT_SENTENCE_MODEL, SemanticModel
+from ...caching.models import CacheTTL
+from ...caching.manager import BaseManager
+from ...core.constants import ResourceType
+from ...caching.versioned import VersionConfig, VersionedDataManager, get_semantic_version_manager
+from ...corpus.core import Corpus
+from ...models.versioned import SemanticVersionedData
+from ..models import SemanticMetadata
+from .constants import DEFAULT_SENTENCE_MODEL
 from .core import SemanticSearch
 
-logger = get_logger(__name__)
 
+class SemanticSearchManager(BaseManager[SemanticSearch, SemanticMetadata]):
+    """Centralized manager for semantic search instances.
 
-class SemanticSearchManager:
-    """
-    Centralized manager for semantic search instances.
-
-    Handles creation, caching, and lifecycle of semantic search instances
-    to avoid duplication and ensure efficient resource usage.
+    Uses unified versioning API for creation, caching, and lifecycle management.
     """
 
     def __init__(self) -> None:
         """Initialize semantic search manager."""
-        # Cache managed by unified cache - no separate TTL cache needed
-        pass
+        super().__init__()
 
-    async def get_semantic_search(
+    @property
+    def resource_type(self) -> ResourceType:
+        """Get the resource type this manager handles."""
+        return ResourceType.SEMANTIC
+
+    @property
+    def default_cache_ttl(self) -> timedelta | None:
+        """Get default cache TTL for semantic operations."""
+        return CacheTTL.SEMANTIC
+
+    def _get_version_manager(self) -> VersionedDataManager[SemanticVersionedData]:
+        """Get the version manager for semantic search."""
+        return get_semantic_version_manager()
+
+    async def _reconstruct_resource(
+        self, versioned_data: SemanticVersionedData
+    ) -> SemanticSearch | None:
+        """Reconstruct semantic search from versioned data."""
+        try:
+            if versioned_data.content_inline:
+                from .core import SemanticSearch as SemanticSearchClass
+
+                return SemanticSearchClass.model_load(versioned_data.content_inline)
+            if versioned_data.content_location:
+                # Load content from storage
+                version_manager = self._get_version_manager()
+                content = await version_manager.load_content(versioned_data.content_location)
+                if content:
+                    from .core import SemanticSearch as SemanticSearchClass
+
+                    return SemanticSearchClass.model_load(content)
+            return None
+        except Exception:
+            return None
+
+    async def create_semantic_index(
         self,
         corpus_name: str,
-        vocab_hash: str | None = None,
-        vocabulary: list[str] | None = None,
-        model_name: SemanticModel | None = None,
-    ) -> SemanticSearch | None:
-        """
-        Get existing semantic search instance from cache.
-
-        Supports both BGE-M3 (multilingual) and MiniLM (English) models.
-        Cache keys include model name to isolate different embeddings.
+        corpus: Corpus,
+        model_name: str | None = None,
+        use_ttl: bool = True,
+    ) -> SemanticMetadata:
+        """Create a new semantic index from corpus.
 
         Args:
             corpus_name: Unique name for the corpus
-            vocab_hash: Pre-computed vocabulary hash (preferred)
-            vocabulary: Vocabulary to hash if vocab_hash not provided
-            model_name: Embedding model (BGE-M3 or MiniLM)
+            corpus: Corpus with vocabulary to index
+            model_name: Embedding model (defaults to BGE-M3)
+            use_ttl: Whether to use TTL for caching
 
         Returns:
-            Cached SemanticSearch instance or None if not found
+            Semantic metadata
+
         """
-        # Use default model name if not provided
+        # Use default model if not provided
         if model_name is None:
             model_name = DEFAULT_SENTENCE_MODEL
 
-        if vocab_hash is None:
-            if vocabulary is None:
-                raise ValueError("Must provide either vocab_hash or vocabulary")
-            vocab_hash = get_vocabulary_hash(vocabulary, model_name)
+        # Create semantic search instance
+        start_time = time.time()
+        semantic_search = SemanticSearch(corpus, model_name)  # type: ignore[arg-type]
+        build_time_ms = (time.time() - start_time) * 1000
 
-        cache = await get_unified()
-        cache_key = f"semantic:{corpus_name}:{model_name.replace('/', '_')}:{vocab_hash}"
-        cached_data: dict[str, Any] | None = await cache.get(CacheNamespace.SEMANTIC, cache_key)
-        if cached_data:
-            try:
-                # Ensure cached_data is a dictionary, not a SemanticSearch object
-                if isinstance(cached_data, dict):
-                    semantic_search = SemanticSearch.model_load(cached_data)
-                    logger.debug(f"Cache hit for semantic search '{corpus_name}'")
-                    return semantic_search
-                else:
-                    logger.warning(
-                        f"Invalid cached data type for semantic search '{corpus_name}': {type(cached_data)}. Invalidating cache."
-                    )
-                    await cache.delete(CacheNamespace.SEMANTIC, cache_key)
-            except Exception as e:
-                logger.warning(
-                    f"Failed to load semantic search from cache for '{corpus_name}': {e}. Invalidating cache."
-                )
-                await cache.delete(CacheNamespace.SEMANTIC, cache_key)
+        # Create metadata
+        vocab_hash = corpus.vocabulary_hash
 
-        logger.error(
-            f"🚨 SEMANTIC CACHE MISS: corpus='{corpus_name}', vocab_hash='{vocab_hash[:8]}...', cache_key='{cache_key}'"
+        # Get dimension from embeddings if available
+        embedding_dimension = 0
+        if semantic_search.sentence_embeddings is not None:
+            embedding_dimension = semantic_search.sentence_embeddings.shape[1]
+
+        metadata = SemanticMetadata(
+            corpus_data_id=None,  # Will be set if linked to corpus
+            vocabulary_hash=vocab_hash,
+            model_name=model_name,
+            embedding_dimension=embedding_dimension,
+            vocabulary_size=len(corpus.vocabulary),
+            build_time_ms=build_time_ms,
         )
-        return None
 
-    async def create_semantic_search(
+        # Configure versioning
+        config = VersionConfig(
+            force_rebuild=False,
+            check_cache=True,
+            save_versions=True,
+            ttl=CacheTTL.SEMANTIC if use_ttl else None,
+        )
+
+        # Save to versioned storage
+        index_name = f"{corpus_name}_{model_name.replace('/', '_')}"
+        version_manager = self._get_version_manager()
+        await version_manager.save(
+            resource_id=index_name,
+            content=semantic_search.model_dump(),
+            resource_type=self.resource_type.value,
+            metadata=metadata.model_dump(),
+            tags=["semantic", corpus_name],
+            config=config,
+            index_name=index_name,
+            corpus_id=corpus_name,
+            embedding_model=model_name,
+            dimension=embedding_dimension,
+            total_vectors=len(corpus.vocabulary),
+        )
+
+        # Cache the instance
+        self._cache[index_name] = semantic_search
+
+        # Save metadata to MongoDB
+        await metadata.save()
+
+        return metadata
+
+    async def get_semantic_index(
         self,
-        corpus: Corpus,
-        force_rebuild: bool = False,
-        model_name: SemanticModel | None = None,
-    ) -> SemanticSearch:
-        """
-        Create new semantic search instance with caching.
-
-        Supports both BGE-M3 (1024D multilingual) and MiniLM (384D English).
-        Model choice affects memory usage and performance.
+        corpus_name: str,
+        model_name: str | None = None,
+        use_ttl: bool = True,
+    ) -> SemanticSearch | None:
+        """Get existing semantic search instance.
 
         Args:
-            corpus: Corpus instance containing vocabulary data
-            force_rebuild: Force rebuild even if cached
+            corpus_name: Unique name for the corpus
             model_name: Embedding model (defaults to BGE-M3)
+            use_ttl: Whether to use TTL for caching
 
         Returns:
-            Initialized SemanticSearch instance
+            SemanticSearch instance or None if not found
+
         """
-        # Use default model name if not provided
+        # Use default model if not provided
         if model_name is None:
             model_name = DEFAULT_SENTENCE_MODEL
 
-        corpus_name = corpus.corpus_name
-        logger.info(
-            f"Creating semantic search for corpus '{corpus_name}' with {len(corpus.lemmatized_vocabulary)} lemmatized items using {model_name}"
-        )
-        start_time = time.perf_counter()
-        vocab_hash = corpus.vocabulary_hash
-        cache_key = f"semantic:{corpus_name}:{model_name.replace('/', '_')}:{vocab_hash}"
+        index_name = f"{corpus_name}_{model_name.replace('/', '_')}"
+        return await self.get(index_name, use_ttl)
 
-        semantic_search = SemanticSearch(
+    async def get_or_create_semantic_index(
+        self,
+        corpus_name: str,
+        corpus: Corpus | None = None,
+        model_name: str | None = None,
+        use_ttl: bool = True,
+    ) -> tuple[SemanticSearch, SemanticMetadata]:
+        """Get existing semantic index or create new one.
+
+        Args:
+            corpus_name: Unique name for the corpus
+            corpus: Corpus with vocabulary (required for creation)
+            model_name: Embedding model (defaults to BGE-M3)
+            use_ttl: Whether to use TTL for caching
+
+        Returns:
+            Tuple of (semantic_search, metadata)
+
+        """
+        # Try to get existing index
+        semantic_search = await self.get_semantic_index(corpus_name, model_name, use_ttl)
+        if semantic_search:
+            index_name = f"{corpus_name}_{(model_name or DEFAULT_SENTENCE_MODEL).replace('/', '_')}"
+            metadata = await SemanticMetadata.find_one({"index_name": index_name})
+            if metadata:
+                return semantic_search, metadata
+
+        # Create new index if corpus provided
+        if corpus is None:
+            raise ValueError(f"Corpus required to create semantic index for '{corpus_name}'")
+
+        metadata = await self.create_semantic_index(
+            corpus_name=corpus_name,
             corpus=corpus,
             model_name=model_name,
-            force_rebuild=force_rebuild,
+            use_ttl=use_ttl,
         )
+        index_name = f"{corpus_name}_{(model_name or DEFAULT_SENTENCE_MODEL).replace('/', '_')}"
+        semantic_search = self._cache[index_name]
+        return semantic_search, metadata
 
-        # Initialize with corpus instance directly
-        await semantic_search.initialize()
-
-        # Cache in unified cache (L1 + L2)
-        cache = await get_unified()
-        await cache.set(
-            namespace=CacheNamespace.SEMANTIC,
-            key=cache_key,
-            value=semantic_search.model_dump(),
-            ttl=CacheTTL.SEMANTIC,
-            tags=[
-                f"{CacheNamespace.CORPUS}:{corpus_name}",
-                f"{CacheNamespace.SEMANTIC}:{corpus_name}",
-            ],
-        )
-
-        elapsed_ms = int((time.perf_counter() - start_time) * 1000)
-        logger.info(f"Semantic search created for '{corpus_name}' in {elapsed_ms}ms")
-
-        return semantic_search
-
-    async def invalidate_semantic_search(self, corpus_name: str) -> bool:
-        """
-        Invalidate and remove semantic search instance ONLY (not corpus).
-        Updates corpus to remove semantic reference.
+    async def cleanup_versions(  # type: ignore[override]
+        self,
+        corpus_name: str | None = None,
+        model_name: str | None = None,
+        keep_count: int = 3,
+    ) -> int:
+        """Clean up old versions of semantic indices.
 
         Args:
-            corpus_name: Corpus name to invalidate semantic search for
+            corpus_name: Optional corpus name to clean up
+            model_name: Optional model name to clean up
+            keep_count: Number of versions to keep
 
         Returns:
-            True if instance was removed, False if not found
+            Total number of versions deleted
+
         """
-        # Invalidate ONLY semantic data in unified cache
-        cache = await get_unified()
-        cache_removed = await cache.invalidate_by_tags([f"{CacheNamespace.SEMANTIC}:{corpus_name}"])
-
-        # Update CorpusMetadata to remove semantic reference
-        corpus_updated = 0
-        async for corpus_metadata in CorpusMetadata.find({"corpus_name": corpus_name}):
-            corpus_metadata.semantic_data_id = None
-            await corpus_metadata.save()
-            corpus_updated += 1
-
-        # Cascading deletion: Remove SemanticMetadata from MongoDB
-        deleted_count = 0
-        async for semantic_metadata in SemanticMetadata.find({"corpus_name": corpus_name}):
-            await semantic_metadata.delete()
-            deleted_count += 1
-
-        removed = cache_removed > 0 or deleted_count > 0
-        if removed:
-            logger.info(
-                f"Invalidated semantic search for '{corpus_name}' (cache: {cache_removed}, db: {deleted_count}, corpus_updated: {corpus_updated})"
-            )
-
-        return removed
-
-    async def invalidate_all(self) -> int:
-        """
-        Invalidate all semantic search instances with full cleanup.
-
-        Returns:
-            Number of instances invalidated
-        """
-        # Clear semantic data from unified cache
-        cache = await get_unified()
-        cache_removed = await cache.invalidate_namespace(CacheNamespace.SEMANTIC)
-
-        # Cascading deletion: Remove all SemanticMetadata from MongoDB
-        deleted_result = await SemanticMetadata.delete_all()
-        deleted_count = deleted_result.deleted_count if deleted_result else 0
-
-        total_count = cache_removed + deleted_count
-        logger.info(
-            f"Invalidated all semantic search instances (cache: {cache_removed}, db: {deleted_count})"
-        )
-
-        return total_count
-
-    async def get_stats(self) -> dict[str, Any]:
-        """Get statistics about managed semantic search instances."""
-        cache = await get_unified()
-        cache_stats = await cache.get_stats(CacheNamespace.SEMANTIC)
-
-        return {
-            "architecture": "Unified Cache (Memory TTL + Filesystem)",
-            "cache_stats": cache_stats,
-            "description": "Semantic search data cached in unified L1+L2 cache",
-        }
+        if corpus_name and model_name:
+            index_name = f"{corpus_name}_{model_name.replace('/', '_')}"
+            return await super().cleanup_versions(index_name, keep_count)
+        if corpus_name:
+            # Clean up all models for a corpus
+            total_deleted = 0
+            for model in [DEFAULT_SENTENCE_MODEL, "sentence-transformers/all-MiniLM-L6-v2"]:
+                index_name = f"{corpus_name}_{model.replace('/', '_')}"
+                deleted = await super().cleanup_versions(index_name, keep_count)
+                total_deleted += deleted
+            return total_deleted
+        # Clean up all indices
+        total_deleted = 0
+        for index_name in self._cache.keys():
+            deleted = await super().cleanup_versions(index_name, keep_count)
+            total_deleted += deleted
+        return total_deleted
 
 
-# Global singleton instance
+# Global instance for singleton pattern
 _semantic_search_manager: SemanticSearchManager | None = None
 
 
 def get_semantic_search_manager() -> SemanticSearchManager:
-    """Get or create global semantic search manager singleton."""
+    """Get the global semantic search manager instance."""
     global _semantic_search_manager
     if _semantic_search_manager is None:
         _semantic_search_manager = SemanticSearchManager()
-        logger.info("Initialized semantic search manager")
     return _semantic_search_manager
-
-
-async def shutdown_semantic_search_manager() -> None:
-    """Shutdown global semantic search manager."""
-    global _semantic_search_manager
-    if _semantic_search_manager:
-        await _semantic_search_manager.invalidate_all()
-        _semantic_search_manager = None
-        logger.info("Shutdown semantic search manager")

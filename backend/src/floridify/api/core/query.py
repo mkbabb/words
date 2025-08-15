@@ -49,7 +49,7 @@ class QueryOptimizer:
                 [
                     {"$indexStats": {}},
                     {"$match": {"name": index["name"]}},
-                ]
+                ],
             ).to_list(None)
 
             stats.append(
@@ -57,7 +57,7 @@ class QueryOptimizer:
                     "name": index["name"],
                     "keys": index["key"],
                     "usage": index_stats[0] if index_stats else None,
-                }
+                },
             )
 
         return {
@@ -159,7 +159,11 @@ class AggregationBuilder:
         return self
 
     def lookup(
-        self, from_collection: str, local_field: str, foreign_field: str, as_field: str
+        self,
+        from_collection: str,
+        local_field: str,
+        foreign_field: str,
+        as_field: str,
     ) -> "AggregationBuilder":
         """Add lookup stage."""
         self.pipeline.append(
@@ -169,8 +173,8 @@ class AggregationBuilder:
                     "localField": local_field,
                     "foreignField": foreign_field,
                     "as": as_field,
-                }
-            }
+                },
+            },
         )
         return self
 
@@ -181,8 +185,8 @@ class AggregationBuilder:
                 "$unwind": {
                     "path": f"${path}",
                     "preserveNullAndEmptyArrays": preserve_empty,
-                }
-            }
+                },
+            },
         )
         return self
 
@@ -243,7 +247,10 @@ class BulkOperationBuilder:
         return self
 
     def update_one(
-        self, filter: dict[str, Any], update: dict[str, Any], upsert: bool = False
+        self,
+        filter: dict[str, Any],
+        update: dict[str, Any],
+        upsert: bool = False,
     ) -> "BulkOperationBuilder":
         """Add update one operation."""
         self.operations.append(UpdateOne(filter, update, upsert=upsert))

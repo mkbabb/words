@@ -1,5 +1,4 @@
-"""
-High-performance fuzzy search implementation.
+"""High-performance fuzzy search implementation.
 
 Streamlined fuzzy search using TheFuzz backend with direct corpus vocabulary access.
 """
@@ -8,9 +7,9 @@ from __future__ import annotations
 
 from rapidfuzz import fuzz, process
 
+from ..corpus.core import Corpus
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod
-from .corpus.core import Corpus
 from .models import SearchResult
 from .utils import apply_length_correction
 
@@ -18,18 +17,17 @@ logger = get_logger(__name__)
 
 
 class FuzzySearch:
-    """
-    Streamlined fuzzy search using RapidFuzz backend.
+    """Streamlined fuzzy search using RapidFuzz backend.
 
     Optimized with candidate pre-selection for better performance.
     """
 
     def __init__(self, min_score: float = DEFAULT_MIN_SCORE) -> None:
-        """
-        Initialize fuzzy search engine.
+        """Initialize fuzzy search engine.
 
         Args:
             min_score: Minimum similarity score to include in results
+
         """
         self.min_score = min_score
 
@@ -110,7 +108,7 @@ class FuzzySearch:
                         lemmatized_word=None,
                         language=None,
                         metadata={"scoring_method": method} if method == "secondary" else None,
-                    )
+                    ),
                 )
 
         final_matches.sort(key=lambda x: x.score, reverse=True)

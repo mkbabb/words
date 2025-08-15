@@ -175,7 +175,7 @@ class TestLexiconCaching:
         """Test CorpusCacheEntry model validation."""
         from datetime import UTC, datetime, timedelta
 
-        from src.floridify.models.definition import Language
+        from floridify.models.dictionary import Language
         
         # Valid entry
         entry_data = {

@@ -69,7 +69,7 @@ class LearningStats(BaseModel):
 
     def get_mastery_distribution(self, words: list["WordListItem"]) -> dict[MasteryLevel, int]:
         """Get distribution of words by mastery level."""
-        distribution = {level: 0 for level in MasteryLevel}
+        distribution = dict.fromkeys(MasteryLevel, 0)
         for word in words:
             distribution[word.mastery_level] += 1
         return distribution

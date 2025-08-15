@@ -9,7 +9,7 @@ from rich.console import Console
 
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...models import Definition
-from ...models.definition import DictionaryProvider, Language
+from ...models.dictionary import DictionaryProvider, Language
 from ...utils.logging import get_logger
 from ..utils.formatting import (
     format_error,
@@ -105,7 +105,7 @@ async def _lookup_async(
 
             # Display the synthesized entry
             console.print(
-                format_meaning_based_definition(result, languages, providers, meaning_groups)
+                format_meaning_based_definition(result, languages, providers, meaning_groups),
             )
         else:
             console.print(format_warning(f"No definition found for '{word}'"))

@@ -54,7 +54,9 @@ def generate_cache_key(request: Request, config: APICacheConfig, prefix: str = "
 
 
 def cached_endpoint(
-    ttl: int = 3600, prefix: str = "api", config: APICacheConfig | None = None
+    ttl: int = 3600,
+    prefix: str = "api",
+    config: APICacheConfig | None = None,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator for caching API endpoints."""
     if config is None:
@@ -190,7 +192,9 @@ class CacheInvalidator:
 
 
 def get_cache_headers(
-    max_age: int = 3600, private: bool = False, must_revalidate: bool = True
+    max_age: int = 3600,
+    private: bool = False,
+    must_revalidate: bool = True,
 ) -> dict[str, str]:
     """Generate standard cache headers."""
     directives = []
@@ -215,7 +219,11 @@ class ResponseCache:
     """Context manager for response caching."""
 
     def __init__(
-        self, request: Request, response: Response, ttl: int = 3600, key_prefix: str = "response"
+        self,
+        request: Request,
+        response: Response,
+        ttl: int = 3600,
+        key_prefix: str = "response",
     ):
         self.request = request
         self.response = response

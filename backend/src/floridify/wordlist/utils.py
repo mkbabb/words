@@ -10,17 +10,18 @@ logger = get_logger(__name__)
 
 def generate_slug(text: str) -> str:
     """Generate a URL-safe slug from text.
-    
+
     Args:
         text: Text to convert to slug
-        
+
     Returns:
         URL-safe slug
+
     """
     # Convert to lowercase and replace spaces with hyphens
     slug = text.lower().strip()
-    slug = re.sub(r'[^\w\s-]', '', slug)
-    slug = re.sub(r'[-\s]+', '-', slug)
+    slug = re.sub(r"[^\w\s-]", "", slug)
+    slug = re.sub(r"[-\s]+", "-", slug)
     return slug
 
 
@@ -32,6 +33,7 @@ def generate_wordlist_hash(words: list[str]) -> str:
 
     Returns:
         16-character hash string
+
     """
     # Sort words to ensure consistent hash regardless of order
     sorted_words = sorted(set(w.lower().strip() for w in words if w.strip()))
@@ -46,15 +48,9 @@ def generate_wordlist_name(words: list[str]) -> str:
         words: List of words (used for fallback hash)
 
     Returns:
-        Generated name like 'myrtle-goldfish-swim' or fallback 'wordlist-{hash}'
+        Generated name like 'wordlist-{hash}'
+
     """
-    # Use the unified slug generator from utils
-    slug = generate_slug(3)  # 3 words: adjective-animal-verb
-
-    # If slug generation somehow returns a UUID fallback, prepend 'wordlist-'
-    if len(slug) == 8 and all(c in "0123456789abcdef-" for c in slug):
-        # Looks like a UUID fragment, use hash-based name instead
-        hash_id = generate_wordlist_hash(words)
-        return f"wordlist-{hash_id}"
-
-    return slug
+    # Generate a hash-based name
+    hash_id = generate_wordlist_hash(words)
+    return f"wordlist-{hash_id[:8]}"

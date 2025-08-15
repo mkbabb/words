@@ -31,7 +31,6 @@ BATCH_SIZE = 10
 @click.group(name="wordlist")
 def wordlist_command() -> None:
     """Manage word lists with dictionary lookup and storage."""
-    pass
 
 
 @wordlist_command.command()
@@ -46,7 +45,7 @@ def create(
         _create_async(
             Path(input_file),
             name,
-        )
+        ),
     )
 
 
@@ -97,7 +96,7 @@ async def _create_async(
     await word_list.save()
 
     console.print(
-        f"Word list '[green]{name}[/green]' saved with {word_list.unique_words} unique words"
+        f"Word list '[green]{name}[/green]' saved with {word_list.unique_words} unique words",
     )
     console.print(f"Total occurrences: {word_list.total_words}")
     console.print("Starting batch dictionary lookup...")
@@ -259,7 +258,7 @@ async def _update_async(name: str, input_file: Path) -> None:
     new_words = word_list.unique_words - old_count
     console.print(f"Added {new_words} new words to '[green]{name}[/green]'")
     console.print(
-        f"Total: {word_list.unique_words} unique words, {word_list.total_words} occurrences"
+        f"Total: {word_list.unique_words} unique words, {word_list.total_words} occurrences",
     )
 
 
@@ -317,7 +316,7 @@ async def _process_words_batch(
 
                 # Track success/failure
                 successful = 0
-                for word, result in zip(batch, results):
+                for word, result in zip(batch, results, strict=False):
                     if isinstance(result, Exception):
                         logger.warning(f"Failed to process '{word}': {result}")
                     elif result:
@@ -346,9 +345,8 @@ async def _lookup_word(word: str) -> bool:
         if result:
             logger.debug(f"Successfully looked up '{word}'")
             return True
-        else:
-            logger.debug(f"No definition found for '{word}'")
-            return False
+        logger.debug(f"No definition found for '{word}'")
+        return False
 
     except Exception as e:
         logger.warning(f"Error looking up '{word}': {e}")

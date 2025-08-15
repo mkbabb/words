@@ -3,7 +3,7 @@
 Comprehensive mapping of Dante's works available on Project Gutenberg.
 """
 
-from ....models.definition import Language
+from ....models.dictionary import Language
 from ..models import AuthorInfo, Genre, LiteraryWork, Period
 
 AUTHOR = AuthorInfo(
@@ -46,7 +46,6 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    
     # Inferno
     LiteraryWork(
         title="Divine Comedy, Longfellow's Translation, Hell",
@@ -84,7 +83,6 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    
     # Purgatorio
     LiteraryWork(
         title="Divine Comedy, Longfellow's Translation, Purgatory",
@@ -113,7 +111,6 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    
     # Paradiso
     LiteraryWork(
         title="Divine Comedy, Longfellow's Translation, Paradise",
@@ -142,7 +139,6 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    
     # Italian editions
     LiteraryWork(
         title="La Divina Commedia di Dante (Italian)",
@@ -189,7 +185,6 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ITALIAN,
     ),
-    
     # Other languages
     LiteraryWork(
         title="La Divina Comedia (Spanish)",
@@ -218,7 +213,6 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.FRENCH,
     ),
-    
     # Other works
     LiteraryWork(
         title="The New Life (La Vita Nuova)",
@@ -258,9 +252,11 @@ WORKS = [
     ),
 ]
 
+
 def get_works() -> list[LiteraryWork]:
     """Get all works by Dante."""
     return WORKS
+
 
 def get_author() -> AuthorInfo:
     """Get author information."""

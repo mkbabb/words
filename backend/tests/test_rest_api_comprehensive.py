@@ -9,7 +9,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from src.floridify.api.main import app
-from src.floridify.models.definition import Language
+from floridify.models.dictionary import Language
 
 
 class TestSearchAPIImprovements:

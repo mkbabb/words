@@ -52,7 +52,6 @@ class DatabaseConfig:
 
     def get_url(self) -> str:
         """Get appropriate database URL based on environment."""
-
         is_docker = os.path.exists("/.dockerenv")
         is_ec2 = os.path.exists("/var/lib/cloud")
         is_production = is_ec2 or os.getenv("ENVIRONMENT") == "production"
@@ -71,7 +70,7 @@ class DatabaseConfig:
             raise ValueError(
                 f"No database URL configured for environment "
                 f"(production={is_production}, docker={is_docker}). "
-                f"Please check auth/config.toml"
+                f"Please check auth/config.toml",
             )
 
         return url
@@ -125,6 +124,7 @@ class Config:
 
         Returns:
             Loaded configuration
+
         """
         if config_path is None:
             # Get config path with environment override
@@ -147,7 +147,7 @@ class Config:
         if not config_path.exists():
             raise FileNotFoundError(
                 f"Configuration file not found: {config_path}\n"
-                f"Please create {config_path} with your API keys and database configuration."
+                f"Please create {config_path} with your API keys and database configuration.",
             )
 
         data = toml.load(config_path)
@@ -180,7 +180,8 @@ class Config:
             oxford_rps=data.get("rate_limits", {}).get("oxford_rps", 10.0),
             wiktionary_rps=data.get("rate_limits", {}).get("wiktionary_rps", 50.0),
             openai_bulk_max_concurrent=data.get("rate_limits", {}).get(
-                "openai_bulk_max_concurrent", 5
+                "openai_bulk_max_concurrent",
+                5,
             ),
         )
 
@@ -202,7 +203,8 @@ class Config:
                 tts_american_voice=gc_data.get("tts_american_voice", "en-US-Wavenet-D"),
                 tts_british_voice=gc_data.get("tts_british_voice", "en-GB-Wavenet-B"),
                 tts_american_voice_female=gc_data.get(
-                    "tts_american_voice_female", "en-US-Wavenet-F"
+                    "tts_american_voice_female",
+                    "en-US-Wavenet-F",
                 ),
                 tts_british_voice_female=gc_data.get("tts_british_voice_female", "en-GB-Wavenet-A"),
             )
@@ -220,7 +222,7 @@ class Config:
         if not config.openai.api_key:
             raise ValueError(
                 f"OpenAI API key missing in {config_path}\n"
-                f"Please update the 'api_key' field in the [openai] section."
+                f"Please update the 'api_key' field in the [openai] section.",
             )
 
         return config

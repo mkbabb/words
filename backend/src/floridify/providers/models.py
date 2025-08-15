@@ -13,12 +13,12 @@ from beanie import Document
 from pydantic import Field
 
 from ..models.base import BaseMetadata
-from ..models.definition import Language
+from ..models.dictionary import Language
 
 
 class StorageType(str, Enum):
     """Storage types for content."""
-    
+
     CACHE = "cache"
     DISK = "disk"
     MEMORY = "memory"
@@ -26,7 +26,7 @@ class StorageType(str, Enum):
 
 class ContentLocation(BaseMetadata):
     """Location of content storage."""
-    
+
     storage_type: StorageType = StorageType.CACHE
     cache_namespace: str | None = None
     cache_key: str | None = None
@@ -38,31 +38,31 @@ class ContentLocation(BaseMetadata):
 
 class VersionedData(Document, BaseMetadata):
     """Base class for versioned data storage."""
-    
+
     # Core identification
     resource_id: str = Field(description="Unique identifier for the resource")
     resource_type: str = Field(description="Type: word, literary_work, etc.")
     language: Language = Field(default=Language.ENGLISH)
-    
+
     # Provider information
     provider_type: str  # 'dictionary' or 'literature'
     provider_name: str
     provider_version: str = "1.0.0"
-    
+
     # Versioning (simplified)
     data_hash: str = Field(description="Content hash for deduplication")
     is_latest: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.now)
-    
+
     # Content storage
     content_location: ContentLocation
-    
+
     # Unified metadata
     metadata: dict[str, Any] = Field(default_factory=dict)
-    
+
     # Status
     error: str | None = None
-    
+
     class Settings:
         name = "versioned_data"
         indexes = [
@@ -74,7 +74,7 @@ class VersionedData(Document, BaseMetadata):
             "is_latest",
             [("resource_id", 1), ("provider_name", 1), ("is_latest", -1)],
         ]
-        
+
     async def mark_as_old(self) -> None:
         """Mark this version as not latest."""
         self.is_latest = False

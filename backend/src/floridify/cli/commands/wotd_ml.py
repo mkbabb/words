@@ -10,7 +10,6 @@ Commands for training and using the WOTD ML system with:
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
 
 import click
 from rich.console import Console
@@ -31,7 +30,7 @@ from ...wotd.constants import (
 )
 from ...wotd.core import TrainingConfig
 from ...wotd.generator import SyntheticGenerator
-from ...wotd.trainer import train_wotd_pipeline, train_from_literature
+from ...wotd.trainer import train_from_literature, train_wotd_pipeline
 
 console = Console()
 logger = get_logger(__name__)
@@ -40,7 +39,6 @@ logger = get_logger(__name__)
 @click.group()
 def wotd_ml():
     """WOTD ML System - Word generation with semantic learning."""
-    pass
 
 
 @wotd_ml.command()
@@ -57,7 +55,10 @@ def wotd_ml():
     help="Language model for generation",
 )
 @click.option(
-    "--encoder", type=click.Choice(["fsq", "hvq"]), default="fsq", help="Semantic encoder type"
+    "--encoder",
+    type=click.Choice(["fsq", "hvq"]),
+    default="fsq",
+    help="Semantic encoder type",
 )
 @click.option("--words-per-corpus", default=100, help="Words per semantic corpus")
 @click.option("--num-corpora", default=12, help="Number of corpora to generate")
@@ -73,7 +74,6 @@ def train(
     use_cache: bool,
 ):
     """Train WOTD system."""
-
     # Map model choices
     embedding_map = {
         "gte-qwen2-7b": GTE_QWEN2_7B,
@@ -107,20 +107,20 @@ def train(
             f"[yellow]Corpora:[/yellow] {num_corpora} × {words_per_corpus} words\n"
             f"[yellow]Output:[/yellow] {output_dir}",
             title="Training",
-        )
+        ),
     )
 
     async def run_training():
         with Progress(
-            SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
         ) as progress:
             task = progress.add_task("Training WOTD pipeline...", total=None)
 
             # Update config for encoder type
             if encoder == "fsq":
-                from ...wotd.constants import USE_FSQ
-
-                USE_FSQ = True
+                pass
 
             results = await train_wotd_pipeline(config, output_dir)
 
@@ -147,26 +147,28 @@ def train(
 @click.option("--save/--no-save", default=True, help="Save to storage")
 def generate(words: int, save: bool):
     """Generate synthetic training corpora."""
-
     console.print(
         Panel.fit(
             f"[bold cyan]Generating Synthetic Corpora[/bold cyan]\n\n"
             f"[yellow]Words per corpus:[/yellow] {words}\n"
             f"[yellow]Save to storage:[/yellow] {'Yes' if save else 'No'}",
             title="Generation",
-        )
+        ),
     )
 
     async def run_generation():
         generator = SyntheticGenerator()
 
         with Progress(
-            SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
         ) as progress:
             task = progress.add_task("Generating corpora...", total=None)
 
             corpora = await generator.generate_complete_training_set(
-                words_per_corpus=words, save=save
+                words_per_corpus=words,
+                save=save,
             )
 
             progress.update(task, completed=True)
@@ -196,21 +198,23 @@ def generate(words: int, save: bool):
 
 @wotd_ml.command()
 @click.option(
-    "--corpus-id", default="classical_beautiful_shakespearean", help="Corpus to benchmark"
+    "--corpus-id",
+    default="classical_beautiful_shakespearean",
+    help="Corpus to benchmark",
 )
 def benchmark(corpus_id: str):
     """Benchmark embedding and encoding performance."""
-
     console.print(
         Panel.fit(
             f"[bold cyan]Performance Benchmark[/bold cyan]\n\n[yellow]Corpus:[/yellow] {corpus_id}",
             title="Benchmark",
-        )
+        ),
     )
 
     async def run_benchmark():
         import time
-        from ...wotd.embeddings import get_embedder, EmbeddingMode
+
+        from ...wotd.embeddings import EmbeddingMode, get_embedder
         from ...wotd.encoders import get_semantic_encoder
         from ...wotd.storage import get_wotd_storage
 
@@ -241,7 +245,7 @@ def benchmark(corpus_id: str):
 
             # Binary embeddings
             start = time.time()
-            binary_emb = embedder.embed(words, mode=EmbeddingMode.BINARY)
+            embedder.embed(words, mode=EmbeddingMode.BINARY)
             binary_time = time.time() - start
 
             results.append(
@@ -251,7 +255,7 @@ def benchmark(corpus_id: str):
                     "binary_time": binary_time,
                     "full_dim": full_emb.shape[-1],
                     "speedup": full_time / binary_time,
-                }
+                },
             )
 
         # Display results
@@ -287,7 +291,7 @@ def benchmark(corpus_id: str):
             encode_time = time.time() - start
 
             encoder_results.append(
-                {"type": encoder_type.upper(), "time": encode_time, "semantic_id": semantic_id}
+                {"type": encoder_type.upper(), "time": encode_time, "semantic_id": semantic_id},
             )
 
         # Display encoder results
@@ -335,27 +339,28 @@ def literature(
     authors: tuple[str, ...],
     lightweight: bool,
     augment: bool,
-    output_dir: Optional[str],
+    output_dir: str | None,
     max_words: int,
 ):
     """Train WOTD from literary texts with AI augmentation.
-    
+
     This command extracts vocabulary from real literature (Shakespeare, Woolf, etc.),
     augments it with AI-generated synthetic variations, and trains the semantic
     encoding pipeline using these real-world examples.
-    
+
     Examples:
         # Train on default authors (Shakespeare and Woolf)
         floridify wotd-ml literature
-        
+
         # Train on specific author with lightweight model
         floridify wotd-ml literature --authors Shakespeare --lightweight
-        
+
         # Train without AI augmentation
         floridify wotd-ml literature --no-augment
+
     """
     authors_list = list(authors) if authors else ["Shakespeare", "Woolf"]
-    
+
     console.print(
         Panel.fit(
             f"[bold cyan]Literature-Based WOTD Training[/bold cyan]\n\n"
@@ -365,60 +370,88 @@ def literature(
             f"[yellow]Max Words/Author:[/yellow] {max_words}\n"
             f"[yellow]Output:[/yellow] {output_dir or 'auto-generated'}",
             title="Literature Training",
-        )
+        ),
     )
-    
+
     async def run_literature_training():
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
-            console=console
+            console=console,
         ) as progress:
             # Add main task
             task = progress.add_task(
-                f"Training on {', '.join(authors_list)}...", total=None
+                f"Training on {', '.join(authors_list)}...",
+                total=None,
             )
-            
+
             # Run training
             results = await train_from_literature(
                 authors=authors_list,
                 config=None,  # Use defaults
                 output_dir=output_dir,
                 use_lightweight_model=lightweight,
-                augment_with_ai=augment
+                augment_with_ai=augment,
             )
-            
+
             progress.update(task, completed=True)
-        
+
         # Display results
         table = Table(title="Literature Training Results")
         table.add_column("Metric", style="cyan")
         table.add_column("Value", style="green")
-        
+
         table.add_row("Duration", f"{results.duration_seconds:.2f}s")
         table.add_row("Authors", ", ".join(authors_list))
         table.add_row("Corpora", str(results.num_corpora))
         table.add_row("Total Words", str(results.total_words))
         table.add_row("Semantic IDs", str(len(results.semantic_ids)))
-        
+
         # Show options used
         table.add_row("Model Type", "Lightweight" if lightweight else "Full")
         table.add_row("AI Augmented", "Yes" if augment else "No")
-        
+
         console.print(table)
-        
+
         # Show sample semantic IDs
         if results.semantic_ids:
             id_table = Table(title="Sample Semantic IDs")
             id_table.add_column("Corpus", style="cyan")
             id_table.add_column("Semantic ID", style="yellow")
             id_table.add_column("Interpretation", style="green")
-            
+
             # Interpretation maps
-            style_map = ["formal", "casual", "poetic", "dramatic", "archaic", "regional", "technical", "experimental"]
-            complexity_map = ["simple", "basic", "intermediate", "advanced", "erudite", "ornate", "dense", "esoteric"]
-            era_map = ["ancient", "medieval", "renaissance", "early_modern", "enlightenment", "romantic", "modernist", "contemporary"]
-            
+            style_map = [
+                "formal",
+                "casual",
+                "poetic",
+                "dramatic",
+                "archaic",
+                "regional",
+                "technical",
+                "experimental",
+            ]
+            complexity_map = [
+                "simple",
+                "basic",
+                "intermediate",
+                "advanced",
+                "erudite",
+                "ornate",
+                "dense",
+                "esoteric",
+            ]
+            era_map = [
+                "ancient",
+                "medieval",
+                "renaissance",
+                "early_modern",
+                "enlightenment",
+                "romantic",
+                "modernist",
+                "contemporary",
+            ]
+
             for corpus_id, sem_id in list(results.semantic_ids.items())[:5]:
                 interpretation = (
                     f"{style_map[sem_id[0]] if sem_id[0] < len(style_map) else 'unknown'}, "
@@ -428,30 +461,31 @@ def literature(
                 id_table.add_row(
                     corpus_id[:30],
                     str(sem_id),
-                    interpretation
+                    interpretation,
                 )
-            
+
             console.print(id_table)
-        
+
         console.print("[bold green]✅ Literature training completed successfully![/bold green]")
-        
+
         if results.model_paths:
-            console.print(f"\n[yellow]Models saved to:[/yellow] {results.model_paths.get('models_directory')}")
-    
+            console.print(
+                f"\n[yellow]Models saved to:[/yellow] {results.model_paths.get('models_directory')}"
+            )
+
     asyncio.run(run_literature_training())
 
 
 @wotd_ml.command()
 def info():
     """Display system information and configuration."""
-
     from ...wotd.constants import (
         DEFAULT_EMBEDDING_MODEL,
         DEFAULT_LANGUAGE_MODEL,
-        USE_FSQ,
-        USE_BINARY_EMBEDDINGS,
-        USE_INT8_EMBEDDINGS,
         MATRYOSHKA_TRAINING,
+        USE_BINARY_EMBEDDINGS,
+        USE_FSQ,
+        USE_INT8_EMBEDDINGS,
     )
 
     # Create info table
@@ -478,11 +512,17 @@ def info():
 
     capabilities.add_row("GTE-Qwen2-7B", "Embedding", "4096", "SOTA, Matryoshka, Multilingual")
     capabilities.add_row(
-        "GTE-Qwen2-1.5B", "Embedding", "4096", "Efficient, Matryoshka, Multilingual"
+        "GTE-Qwen2-1.5B",
+        "Embedding",
+        "4096",
+        "Efficient, Matryoshka, Multilingual",
     )
     capabilities.add_row("E5-Multilingual", "Embedding", "1024", "Fast, 100+ languages")
     capabilities.add_row(
-        "Qwen-2.5-7B", "Language", "32K context", "SOTA generation, instruction-tuned"
+        "Qwen-2.5-7B",
+        "Language",
+        "32K context",
+        "SOTA generation, instruction-tuned",
     )
     capabilities.add_row("Phi-4", "Language", "128K context", "Reasoning-focused, efficient")
 

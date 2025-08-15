@@ -159,4 +159,3 @@ class AudioRepository(BaseRepository[AudioMedia, AudioCreate, AudioUpdate]):
         """Handle cascade deletion of related documents."""
         # For audio files, no cascade deletion is needed
         # But we could clean up references in other documents if needed
-        pass

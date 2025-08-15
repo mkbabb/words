@@ -9,10 +9,10 @@ from beanie import Document
 from ...models import (
     AudioMedia,
     Definition,
+    DictionaryProviderData,
     Example,
     ImageMedia,
     Pronunciation,
-    ProviderData,
     SynthesizedDictionaryEntry,
     Word,
 )
@@ -62,7 +62,7 @@ class PronunciationLoader(DataLoader):
                     audio_dict = audio.model_dump(mode="json", exclude={"id"})
                     # Convert file path to API URL
                     if audio_dict.get("url", "").startswith("/"):
-                        audio_dict["url"] = f"/api/v1/audio/files/{str(audio_id)}"
+                        audio_dict["url"] = f"/api/v1/audio/files/{audio_id!s}"
                     audio_files.append(audio_dict)
 
         pron_dict["audio_files"] = audio_files
@@ -91,6 +91,7 @@ class DefinitionLoader(DataLoader):
 
         Returns:
             Dictionary with fully resolved definition data
+
         """
         # Start with base definition data
         def_dict = {
@@ -146,7 +147,7 @@ class DefinitionLoader(DataLoader):
         if include_provider_data and provider_data_ids:
             providers_data = []
             for provider_id in provider_data_ids:
-                provider_data = await ProviderData.get(provider_id)
+                provider_data = await DictionaryProviderData.get(provider_id)
                 if provider_data:
                     providers_data.append(provider_data.model_dump(mode="json", exclude={"id"}))
             def_dict["providers_data"] = providers_data
@@ -171,7 +172,7 @@ class DefinitionLoader(DataLoader):
             # Pre-load all provider data
             provider_data_cache = {}
             for provider_id in provider_data_ids:
-                provider_data = await ProviderData.get(provider_id)
+                provider_data = await DictionaryProviderData.get(provider_id)
                 if provider_data:
                     provider_data_cache[provider_id] = provider_data
 
@@ -203,6 +204,7 @@ class SynthesizedDictionaryEntryLoader(DataLoader):
 
         Returns:
             Dictionary ready to be used as LookupResponse
+
         """
         # Load word
         word_obj = await Word.get(entry.word_id)

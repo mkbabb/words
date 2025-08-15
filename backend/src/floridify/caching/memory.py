@@ -1,5 +1,4 @@
-"""
-In-memory TTL cache utilities for efficient instance management.
+"""In-memory TTL cache utilities for efficient instance management.
 
 Provides robust TTL-based caching with automatic cleanup, instance limits,
 and proper type safety for managing corpus and semantic search instances.
@@ -38,8 +37,7 @@ class CacheEntry[T]:
 
 
 class InMemoryTTLCache[T]:
-    """
-    High-performance in-memory TTL cache with automatic cleanup.
+    """High-performance in-memory TTL cache with automatic cleanup.
 
     Features:
     - Automatic TTL-based expiration
@@ -56,14 +54,14 @@ class InMemoryTTLCache[T]:
         cleanup_interval_seconds: float = 300.0,  # 5 minutes
         name: str = "cache",
     ) -> None:
-        """
-        Initialize TTL cache.
+        """Initialize TTL cache.
 
         Args:
             max_instances: Maximum number of instances to keep in cache
             default_ttl_seconds: Default TTL for entries
             cleanup_interval_seconds: How often to run cleanup
             name: Name for logging and metrics
+
         """
         self.max_instances = max_instances
         self.default_ttl_seconds = default_ttl_seconds
@@ -81,18 +79,18 @@ class InMemoryTTLCache[T]:
         self._cleanups = 0
 
         logger.info(
-            f"Initialized {name} TTL cache (max_instances={max_instances}, ttl={default_ttl_seconds}s)"
+            f"Initialized {name} TTL cache (max_instances={max_instances}, ttl={default_ttl_seconds}s)",
         )
 
     async def get(self, key: str) -> T | None:
-        """
-        Get value from cache, returning None if expired or not found.
+        """Get value from cache, returning None if expired or not found.
 
         Args:
             key: Cache key
 
         Returns:
             Cached value or None if not found/expired
+
         """
         async with self._lock:
             entry = self._cache.get(key)
@@ -116,13 +114,13 @@ class InMemoryTTLCache[T]:
             return entry.value
 
     async def set(self, key: str, value: T, ttl_seconds: float | None = None) -> None:
-        """
-        Set value in cache with TTL.
+        """Set value in cache with TTL.
 
         Args:
             key: Cache key
             value: Value to cache
             ttl_seconds: TTL in seconds, uses default if None
+
         """
         ttl = ttl_seconds if ttl_seconds is not None else self.default_ttl_seconds
 
@@ -143,14 +141,14 @@ class InMemoryTTLCache[T]:
             logger.debug(f"{self.name} cached: {key} (ttl={ttl}s)")
 
     async def delete(self, key: str) -> bool:
-        """
-        Delete entry from cache.
+        """Delete entry from cache.
 
         Args:
             key: Cache key to delete
 
         Returns:
             True if entry was deleted, False if not found
+
         """
         async with self._lock:
             if key in self._cache:
@@ -160,11 +158,11 @@ class InMemoryTTLCache[T]:
             return False
 
     async def clear(self) -> int:
-        """
-        Clear all entries from cache.
+        """Clear all entries from cache.
 
         Returns:
             Number of entries cleared
+
         """
         async with self._lock:
             count = len(self._cache)
@@ -173,11 +171,11 @@ class InMemoryTTLCache[T]:
             return count
 
     async def cleanup_expired(self) -> int:
-        """
-        Remove expired entries from cache.
+        """Remove expired entries from cache.
 
         Returns:
             Number of entries removed
+
         """
         async with self._lock:
             expired_keys = [key for key, entry in self._cache.items() if entry.is_expired()]
@@ -187,7 +185,9 @@ class InMemoryTTLCache[T]:
 
             self._cleanups += 1
             if expired_keys:
-                logger.debug(f"{self.name} cleaned up {len(expired_keys)} expired entries")
+                logger.debug(
+                    f"{self.name} cleaned up {len(expired_keys)} expired entries",
+                )
 
             return len(expired_keys)
 
@@ -237,7 +237,9 @@ class InMemoryTTLCache[T]:
                     logger.error(f"{self.name} cleanup error: {e}")
 
         self._cleanup_task = asyncio.create_task(cleanup_loop())
-        logger.info(f"{self.name} cleanup task started (interval={self.cleanup_interval_seconds}s)")
+        logger.info(
+            f"{self.name} cleanup task started (interval={self.cleanup_interval_seconds}s)",
+        )
 
     async def stop_cleanup_task(self) -> None:
         """Stop background cleanup task."""
@@ -251,52 +253,7 @@ class InMemoryTTLCache[T]:
             logger.info(f"{self.name} cleanup task stopped")
 
 
-# Singleton instances for different cache types
-_corpus_cache: InMemoryTTLCache[Any] | None = None
-_semantic_cache: InMemoryTTLCache[Any] | None = None
-
-
-def get_corpus_ttl_cache() -> InMemoryTTLCache[Any]:
-    """Get global corpus TTL cache instance."""
-    global _corpus_cache
-    if _corpus_cache is None:
-        _corpus_cache = InMemoryTTLCache[Any](
-            max_instances=25,
-            default_ttl_seconds=3600.0,
-            name="corpus",  # 1 hour
-        )
-    return _corpus_cache
-
-
-def get_semantic_ttl_cache() -> InMemoryTTLCache[Any]:
-    """Get global semantic search TTL cache instance."""
-    global _semantic_cache
-    if _semantic_cache is None:
-        _semantic_cache = InMemoryTTLCache[Any](
-            max_instances=25,
-            default_ttl_seconds=7200.0,
-            name="semantic",  # 2 hours
-        )
-    return _semantic_cache
-
-
-async def start_all_cleanup_tasks() -> None:
-    """Start cleanup tasks for all caches."""
-    await get_corpus_ttl_cache().start_cleanup_task()
-    await get_semantic_ttl_cache().start_cleanup_task()
-
-
-async def stop_all_cleanup_tasks() -> None:
-    """Stop cleanup tasks for all caches."""
-    await get_corpus_ttl_cache().stop_cleanup_task()
-    await get_semantic_ttl_cache().stop_cleanup_task()
-
-
 __all__ = [
-    "InMemoryTTLCache",
     "CacheEntry",
-    "get_corpus_ttl_cache",
-    "get_semantic_ttl_cache",
-    "start_all_cleanup_tasks",
-    "stop_all_cleanup_tasks",
+    "InMemoryTTLCache",
 ]

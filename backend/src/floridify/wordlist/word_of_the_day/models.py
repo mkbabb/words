@@ -50,15 +50,18 @@ class WordOfTheDayEntry(BaseModel):
     etymology: str = Field(..., description="Brief origin and historical development")
     example_usage: str = Field(..., description="Natural sentence demonstrating proper usage")
     fascinating_fact: str = Field(
-        ..., description="Interesting linguistic, cultural, or historical insight"
+        ...,
+        description="Interesting linguistic, cultural, or historical insight",
     )
     difficulty_level: str = Field(..., description="Difficulty level: intermediate or advanced")
     memorable_aspect: str = Field(
-        ..., description="What makes this word particularly worth learning"
+        ...,
+        description="What makes this word particularly worth learning",
     )
     confidence: float = Field(..., ge=0.0, le=1.0, description="AI confidence in word selection")
     generated_at: datetime = Field(
-        default_factory=datetime.now, description="When this entry was generated"
+        default_factory=datetime.now,
+        description="When this entry was generated",
     )
     sent_at: datetime | None = Field(default=None, description="When this entry was sent to users")
 
@@ -68,14 +71,16 @@ class WordOfTheDayBatch(Document, BaseMetadata):
 
     context: str = Field(default="", description="Context steering for word generation")
     frequency: NotificationFrequency = Field(
-        default=NotificationFrequency.DAILY, description="Notification frequency"
+        default=NotificationFrequency.DAILY,
+        description="Notification frequency",
     )
     max_seen_words: int = Field(default=500, description="Maximum number of seen words to track")
     active: bool = Field(default=True, description="Whether this batch is active")
 
     # Word pools
     current_batch: list[WordOfTheDayEntry] = Field(
-        default_factory=list, description="Current batch of unsent words"
+        default_factory=list,
+        description="Current batch of unsent words",
     )
     sent_words: list[str] = Field(default_factory=list, description="Words that have been sent")
 
@@ -159,16 +164,26 @@ class WordOfTheDayConfig(Document, BaseMetadata):
     """Global configuration for Word of the Day system."""
 
     default_batch_size: int = Field(
-        default=20, ge=5, le=100, description="Default batch size for generation"
+        default=20,
+        ge=5,
+        le=100,
+        description="Default batch size for generation",
     )
     min_batch_threshold: int = Field(
-        default=5, ge=1, le=20, description="Generate new batch when below this threshold"
+        default=5,
+        ge=1,
+        le=20,
+        description="Generate new batch when below this threshold",
     )
     max_previous_words: int = Field(
-        default=100, ge=10, le=1000, description="Max previous words to send to AI"
+        default=100,
+        ge=10,
+        le=1000,
+        description="Max previous words to send to AI",
     )
     generation_enabled: bool = Field(
-        default=True, description="Whether to generate new batches automatically"
+        default=True,
+        description="Whether to generate new batches automatically",
     )
 
     # Singleton pattern - there should only be one config

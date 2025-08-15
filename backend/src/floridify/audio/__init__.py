@@ -2,4 +2,4 @@
 
 from .synthesizer import AudioSynthesisConfig, AudioSynthesizer
 
-__all__ = ["AudioSynthesizer", "AudioSynthesisConfig"]
+__all__ = ["AudioSynthesisConfig", "AudioSynthesizer"]

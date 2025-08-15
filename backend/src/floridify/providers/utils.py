@@ -31,19 +31,13 @@ logger = get_logger(__name__)
 class ScrapingError(Exception):
     """Base exception for scraping-related errors."""
 
-    pass
-
 
 class RateLimitError(ScrapingError):
     """Raised when rate limiting is encountered."""
 
-    pass
-
 
 class ContentError(ScrapingError):
     """Raised when content cannot be parsed or is invalid."""
-
-    pass
 
 
 class UserAgent(str, Enum):
@@ -220,7 +214,10 @@ class RespectfulHttpClient:
         }
 
         self._session = httpx.AsyncClient(
-            timeout=self.timeout, limits=limits, headers=headers, follow_redirects=True
+            timeout=self.timeout,
+            limits=limits,
+            headers=headers,
+            follow_redirects=True,
         )
         return self
 
@@ -246,17 +243,16 @@ class RespectfulHttpClient:
                 retry_delay = float(retry_after) if retry_after else None
                 self.rate_limiter.record_error(retry_delay)
                 raise RateLimitError(f"Rate limited: {response.status_code}")
-            elif response.status_code >= 500:
+            if response.status_code >= 500:
                 # Server error
                 self.rate_limiter.record_error()
                 raise ScrapingError(f"Server error: {response.status_code}")
-            elif response.status_code >= 400:
+            if response.status_code >= 400:
                 # Client error
                 raise ScrapingError(f"Client error: {response.status_code}")
-            else:
-                # Success
-                self.rate_limiter.record_success()
-                return response
+            # Success
+            self.rate_limiter.record_success()
+            return response
 
         except httpx.RequestError as e:
             self.rate_limiter.record_error()
@@ -322,7 +318,7 @@ class SessionManager:
             )
 
             logger.info(
-                f"📋 Loaded session {session_id} ({session.processed_items}/{session.total_items})"
+                f"📋 Loaded session {session_id} ({session.processed_items}/{session.total_items})",
             )
             return session
 
@@ -340,10 +336,11 @@ class SessionManager:
 
 @asynccontextmanager
 async def respectful_scraper(
-    source: str, rate_config: RateLimitConfig | None = None, **client_kwargs
+    source: str,
+    rate_config: RateLimitConfig | None = None,
+    **client_kwargs,
 ) -> AsyncGenerator[RespectfulHttpClient, None]:
     """Context manager for respectful scraping sessions."""
-
     rate_config = rate_config or RateLimitConfig(base_requests_per_second=2.0)
     rate_limiter = AdaptiveRateLimiter(rate_config)
 
@@ -356,8 +353,6 @@ async def respectful_scraper(
         except Exception as e:
             logger.error(f"❌ Scraping session failed for {source}: {e}")
             raise
-
-
 
 
 class ContentProcessor:
@@ -415,10 +410,11 @@ class ContentProcessor:
 
 # Convenience functions for common patterns
 async def download_with_retry(
-    url: str, max_retries: int = 3, rate_config: RateLimitConfig | None = None
+    url: str,
+    max_retries: int = 3,
+    rate_config: RateLimitConfig | None = None,
 ) -> str:
     """Download content with automatic retry on failure."""
-
     rate_config = rate_config or RateLimitConfig()
 
     for attempt in range(max_retries + 1):

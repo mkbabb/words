@@ -18,7 +18,6 @@ console = Console()
 @click.group()
 def config_group() -> None:
     """⚙️ Manage configuration and API keys."""
-    pass
 
 
 @config_group.command("show")
@@ -32,7 +31,7 @@ def show_config(show_keys: bool) -> None:
                 format_warning(
                     "Configuration file not found",
                     f"Create {config_file} to store settings and API keys.",
-                )
+                ),
             )
             return
 
@@ -68,7 +67,7 @@ def show_config(show_keys: bool) -> None:
                 console.print()
 
     except Exception as e:
-        console.print(format_error(f"Failed to read configuration: {str(e)}"))
+        console.print(format_error(f"Failed to read configuration: {e!s}"))
 
 
 @config_group.command("set")
@@ -107,7 +106,7 @@ def set_config(key: str, value: str, section: str) -> None:
         console.print(format_success(f"Set {section}.{key} = {parsed_value}"))
 
     except Exception as e:
-        console.print(format_error(f"Failed to set configuration: {str(e)}"))
+        console.print(format_error(f"Failed to set configuration: {e!s}"))
 
 
 @config_group.command("get")
@@ -138,13 +137,12 @@ def get_config(key: str, section: str) -> None:
         console.print(f"{section}.{key} = {value}")
 
     except Exception as e:
-        console.print(format_error(f"Failed to get configuration: {str(e)}"))
+        console.print(format_error(f"Failed to get configuration: {e!s}"))
 
 
 @config_group.group("keys")
 def keys_group() -> None:
     """Manage API keys."""
-    pass
 
 
 @keys_group.command("list")
@@ -177,7 +175,7 @@ def list_keys() -> None:
         console.print(table)
 
     except Exception as e:
-        console.print(format_error(f"Failed to list API keys: {str(e)}"))
+        console.print(format_error(f"Failed to list API keys: {e!s}"))
 
 
 @keys_group.command("set")
@@ -214,7 +212,7 @@ def set_key(service: str, api_key: str) -> None:
         console.print(format_success(f"Set API key for {service}"))
 
     except Exception as e:
-        console.print(format_error(f"Failed to set API key: {str(e)}"))
+        console.print(format_error(f"Failed to set API key: {e!s}"))
 
 
 @keys_group.command("test")
@@ -282,7 +280,7 @@ def edit_config() -> None:
         os.system(f"{editor} {config_file}")
 
     except Exception as e:
-        console.print(format_error(f"Failed to edit configuration: {str(e)}"))
+        console.print(format_error(f"Failed to edit configuration: {e!s}"))
 
 
 @config_group.command("reset")
@@ -303,7 +301,7 @@ def reset_config(confirm: bool) -> None:
         console.print("[dim]Run 'floridify config edit' to customize settings.[/dim]")
 
     except Exception as e:
-        console.print(format_error(f"Failed to reset configuration: {str(e)}"))
+        console.print(format_error(f"Failed to reset configuration: {e!s}"))
 
 
 def _parse_config_value(value: str) -> str | int | float | bool:
@@ -311,7 +309,7 @@ def _parse_config_value(value: str) -> str | int | float | bool:
     # Try boolean
     if value.lower() in ["true", "yes", "on"]:
         return True
-    elif value.lower() in ["false", "no", "off"]:
+    if value.lower() in ["false", "no", "off"]:
         return False
 
     # Try integer

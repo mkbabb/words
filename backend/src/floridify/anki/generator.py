@@ -120,6 +120,7 @@ class AnkiCard:
             card_type: Type of flashcard
             fields: Dictionary of field names to values
             template: Card template with styling
+
         """
         self.card_type = card_type
         self.fields = fields
@@ -147,6 +148,7 @@ class AnkiCardGenerator:
         Args:
             openai_connector: OpenAI connector for generating card content
             prompt_loader: Optional prompt loader (creates default if None)
+
         """
         self.openai_connector = openai_connector
         self.prompt_loader = prompt_loader or PromptLoader()
@@ -161,6 +163,7 @@ class AnkiCardGenerator:
 
         Returns:
             List of example texts
+
         """
         if not definition.example_ids:
             return []
@@ -192,6 +195,7 @@ class AnkiCardGenerator:
 
         Returns:
             List of generated Anki cards
+
         """
         start_time = time.time()
 
@@ -219,7 +223,7 @@ class AnkiCardGenerator:
 
         total_elapsed = time.time() - start_time
         logger.info(
-            f"🏁 Generated {len(cards)} total cards for '{entry.word}' in {total_elapsed:.2f}s"
+            f"🏁 Generated {len(cards)} total cards for '{entry.word}' in {total_elapsed:.2f}s",
         )
         return cards
 
@@ -234,11 +238,10 @@ class AnkiCardGenerator:
         try:
             if card_type == CardType.BEST_DESCRIBES:
                 return await self._generate_best_describes_card(entry, definition, frequency)
-            elif card_type == CardType.FILL_IN_BLANK:
+            if card_type == CardType.FILL_IN_BLANK:
                 return await self._generate_fill_blank_card(entry, definition, frequency)
-            else:
-                logger.warning(f"⚠️ Unsupported card type: {card_type.value}")
-                return None
+            logger.warning(f"⚠️ Unsupported card type: {card_type.value}")
+            return None
         except Exception as e:
             logger.error(f"💥 Error generating {card_type.value} card for {entry.word}: {e}")
             return None
@@ -289,7 +292,7 @@ class AnkiCardGenerator:
                         examples_list.extend(example_response.example_sentences[:needed_count])
                 except Exception as e:
                     logger.warning(
-                        f"Failed to generate additional examples for '{entry.word}': {e}"
+                        f"Failed to generate additional examples for '{entry.word}': {e}",
                     )
 
             examples_text = "<br><br>".join(examples_list)
@@ -323,7 +326,7 @@ class AnkiCardGenerator:
 
             total_elapsed = time.time() - start_time
             logger.debug(
-                f"📋 Best describes card creation completed in {total_elapsed:.2f}s (template: {template_elapsed:.3f}s)"
+                f"📋 Best describes card creation completed in {total_elapsed:.2f}s (template: {template_elapsed:.3f}s)",
             )
 
             return AnkiCard(CardType.BEST_DESCRIBES, fields, card_template)
@@ -378,7 +381,7 @@ class AnkiCardGenerator:
                         examples_list.extend(example_response.example_sentences[:needed_count])
                 except Exception as e:
                     logger.warning(
-                        f"Failed to generate additional examples for '{entry.word}': {e}"
+                        f"Failed to generate additional examples for '{entry.word}': {e}",
                     )
 
             examples_text = "<br><br>".join(examples_list)
@@ -414,7 +417,7 @@ class AnkiCardGenerator:
 
             total_elapsed = time.time() - start_time
             logger.debug(
-                f"📋 Fill-in-blank card creation completed in {total_elapsed:.2f}s (template: {template_elapsed:.3f}s)"
+                f"📋 Fill-in-blank card creation completed in {total_elapsed:.2f}s (template: {template_elapsed:.3f}s)",
             )
 
             return AnkiCard(CardType.FILL_IN_BLANK, fields, card_template)
@@ -424,7 +427,10 @@ class AnkiCardGenerator:
             return None
 
     def export_to_apkg(
-        self, cards: list[AnkiCard], deck_name: str, output_path: str | Path
+        self,
+        cards: list[AnkiCard],
+        deck_name: str,
+        output_path: str | Path,
     ) -> Path | None:
         """Export cards to Anki .apkg file format.
 
@@ -435,6 +441,7 @@ class AnkiCardGenerator:
 
         Returns:
             Path to exported .apkg file if successful, None otherwise
+
         """
         try:
             start_time = time.time()
@@ -494,7 +501,7 @@ class AnkiCardGenerator:
 
             total_elapsed = time.time() - start_time
             logger.success(
-                f"✅ Exported {len(cards)} cards to {output_path.with_suffix('.apkg')} in {total_elapsed:.2f}s"
+                f"✅ Exported {len(cards)} cards to {output_path.with_suffix('.apkg')} in {total_elapsed:.2f}s",
             )
             logger.info(f"📄 HTML preview available at {output_path.with_suffix('.html')}")
             return output_path.with_suffix(".apkg")
@@ -521,6 +528,7 @@ class AnkiCardGenerator:
         Returns:
             Tuple of (success, apkg_path). Success is True if cards were added to Anki
             directly, apkg_path is provided if .apkg was created as fallback.
+
         """
         start_time = time.time()
 
@@ -534,8 +542,7 @@ class AnkiCardGenerator:
                 total_time = time.time() - start_time
                 logger.success(f"✅ Cards exported directly to Anki in {total_time:.2f}s")
                 return True, None
-            else:
-                logger.warning("⚠️ Direct export failed, falling back to .apkg")
+            logger.warning("⚠️ Direct export failed, falling back to .apkg")
         else:
             logger.info("📦 AnkiConnect not available, using .apkg export")
 
@@ -559,8 +566,7 @@ class AnkiCardGenerator:
                     total_time = time.time() - start_time
                     logger.success(f"✅ .apkg imported directly to Anki in {total_time:.2f}s")
                     return True, apkg_path
-                else:
-                    logger.warning("⚠️ Direct .apkg import failed")
+                logger.warning("⚠️ Direct .apkg import failed")
 
             total_time = time.time() - start_time
             logger.info(f"📦 Created .apkg file in {total_time:.2f}s: {apkg_path}")
@@ -601,7 +607,7 @@ class AnkiCardGenerator:
                     card.render_back(),
                     "</div>",
                     "</div>",
-                ]
+                ],
             )
 
         html_parts.extend(["</body></html>"])
@@ -616,7 +622,9 @@ class AnkiCardGenerator:
         return int.from_bytes(hash_obj.digest()[:8], "big", signed=False) % (2**31 - 1)
 
     def _create_genanki_model(
-        self, card_type: CardType, template: AnkiCardTemplate
+        self,
+        card_type: CardType,
+        template: AnkiCardTemplate,
     ) -> genanki.Model:
         """Create a genanki model for the given card type."""
         model_id = self._generate_model_id(card_type)
@@ -630,7 +638,7 @@ class AnkiCardGenerator:
                 "name": f"{card_type.value.title()} Card",
                 "qfmt": template.front_template,
                 "afmt": template.back_template,
-            }
+            },
         ]
 
         # Add CSS and JavaScript

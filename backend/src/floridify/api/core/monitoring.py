@@ -40,7 +40,7 @@ class PerformanceMetrics:
                 "duration": duration,
                 "status_code": status_code,
                 "timestamp": datetime.now(UTC),
-            }
+            },
         )
 
         # Keep only last 1000 entries per endpoint
@@ -62,7 +62,7 @@ class PerformanceMetrics:
             {
                 "duration": duration,
                 "timestamp": datetime.now(UTC),
-            }
+            },
         )
 
         # Keep only last 500 entries per query type
@@ -157,7 +157,8 @@ async def track_request_performance(request: Request, response: Response) -> Any
 
 
 def track_db_operation(
-    collection: str, operation: str
+    collection: str,
+    operation: str,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator for tracking database operation performance."""
 

@@ -160,6 +160,7 @@ async def generate_pronunciation(
         Pronunciation data with phonetic spelling and IPA.
 
     Rate Limited: ~100 tokens
+
     """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=100)
@@ -200,6 +201,7 @@ async def generate_suggestions(
         Suggested words with themes and difficulty levels.
 
     Rate Limited: ~200 tokens
+
     """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=200)
@@ -226,6 +228,7 @@ async def generate_word_forms(
         Inflected forms (plurals, tenses, etc.).
 
     Rate Limited: ~150 tokens
+
     """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=150)
@@ -255,6 +258,7 @@ async def assess_frequency(
         Frequency band (1=most common, 5=rare).
 
     Rate Limited: ~100 tokens
+
     """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=100)
@@ -284,6 +288,7 @@ async def assess_cefr(
         CEFR level (A1-C2) with reasoning.
 
     Rate Limited: ~100 tokens
+
     """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=100)
@@ -319,6 +324,7 @@ async def generate_synonyms(
         Synonyms with relevance scores.
 
     Rate Limited: ~300 tokens
+
     """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=300)
@@ -361,6 +367,7 @@ async def generate_antonyms(
         Antonyms with confidence scores.
 
     Rate Limited: ~250 tokens
+
     """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=250)
@@ -402,6 +409,7 @@ async def generate_examples(
         Natural example sentences demonstrating usage.
 
     Rate Limited: ~400 tokens
+
     """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=400)
@@ -442,6 +450,7 @@ async def generate_facts(
         Categorized facts (etymology, usage, cultural).
 
     Rate Limited: ~500 tokens
+
     """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=500)
@@ -480,6 +489,7 @@ async def classify_register(
         Register: formal/informal/neutral/slang/technical.
 
     Rate Limited: ~100 tokens
+
     """
     client_key = get_client_key(api_request)
     allowed, headers = await ai_limiter.check_request_allowed(client_key, estimated_tokens=100)
@@ -695,7 +705,8 @@ async def suggest_words_stream(
         try:
             await state_tracker.update_stage("START")
             await state_tracker.update(
-                stage="START", message=f"Starting word suggestions for '{query}'..."
+                stage="START",
+                message=f"Starting word suggestions for '{query}'...",
             )
 
             # Validate query
@@ -709,13 +720,16 @@ async def suggest_words_stream(
                 raise ValueError(f"Invalid query: {validation.reason}")
 
             await state_tracker.update(
-                stage="QUERY_VALIDATION", progress=30, message="Query validated successfully"
+                stage="QUERY_VALIDATION",
+                progress=30,
+                message="Query validated successfully",
             )
 
             # Generate words
             await state_tracker.update_stage("WORD_GENERATION")
             await state_tracker.update(
-                stage="WORD_GENERATION", message="Generating word suggestions..."
+                stage="WORD_GENERATION",
+                message="Generating word suggestions...",
             )
 
             result = await connector.suggest_words(query, count)
@@ -729,7 +743,8 @@ async def suggest_words_stream(
             # Score and rank
             await state_tracker.update_stage("SCORING")
             await state_tracker.update(
-                stage="SCORING", message="Scoring and ranking suggestions..."
+                stage="SCORING",
+                message="Scoring and ranking suggestions...",
             )
 
             # Complete successfully
@@ -739,7 +754,7 @@ async def suggest_words_stream(
             return result.model_dump()
 
         except Exception as e:
-            await state_tracker.update_error(f"Failed to generate suggestions: {str(e)}")
+            await state_tracker.update_error(f"Failed to generate suggestions: {e!s}")
             raise
 
     # Use the generalized streaming system

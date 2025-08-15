@@ -2,12 +2,6 @@
 
 # Base models and metadata
 
-# Cache models
-from ..search.models import (
-    CorpusMetadata,
-    SemanticMetadata,
-)
-
 # Word of the Day models
 from ..wordlist.word_of_the_day import (
     NotificationFrequency,
@@ -18,7 +12,7 @@ from ..wordlist.word_of_the_day import (
 from .base import AudioMedia, BaseMetadata, Etymology, ImageMedia, ModelInfo
 
 # Core models from definition.py (includes constants)
-from .definition import (
+from .dictionary import (
     CorpusType,
     Definition,
     DictionaryProvider,
@@ -30,7 +24,6 @@ from .definition import (
     LiteratureSourceType,
     OutputFormat,
     Pronunciation,
-    ProviderData,  # Backward compatibility alias
     SynthesizedDictionaryEntry,
     Word,
 )
@@ -59,7 +52,6 @@ __all__ = [
     "Fact",
     "Pronunciation",
     "DictionaryProviderData",
-    "ProviderData",  # Backward compatibility
     "SynthesizedDictionaryEntry",
     "LiteratureSource",
     # Relationships
@@ -74,9 +66,6 @@ __all__ = [
     "WordOfTheDayBatch",
     "WordOfTheDayConfig",
     "WordOfTheDayEntry",
-    # Cache models
-    "CorpusMetadata",
-    "SemanticMetadata",
     # Constants
     "Language",
     "DictionaryProvider",

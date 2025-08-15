@@ -48,7 +48,8 @@ class AccessTrackingMixin(BaseModel):
 
     # Access tracking
     last_accessed: datetime | None = Field(
-        default=None, description="Last time accessed"
+        default=None,
+        description="Last time accessed",
     )
     access_count: int = Field(default=0, ge=0, description="Number of times accessed")
 
@@ -63,8 +64,6 @@ class AccessTrackingMixin(BaseModel):
 
 class BaseMetadataWithAccess(BaseMetadata, AccessTrackingMixin):
     """Base metadata with access tracking for entities that need both."""
-
-    pass
 
 
 class ModelInfo(BaseModel):

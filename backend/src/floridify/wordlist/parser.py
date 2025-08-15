@@ -148,7 +148,6 @@ def _looks_like_phrase(text: str) -> bool:
         "et",
         "en",  # Common French
         "el",
-        "la",
         "los",
         "las",
         "y",
@@ -249,12 +248,11 @@ def parse_text_file(path: Path) -> ParsedWordList:
                         words.append(word)
                     else:
                         skipped += 1
+            # Single word
+            elif is_valid_word(result):
+                words.append(result)
             else:
-                # Single word
-                if is_valid_word(result):
-                    words.append(result)
-                else:
-                    skipped += 1
+                skipped += 1
         elif line.strip():  # Non-empty line was skipped
             skipped += 1
 
@@ -358,7 +356,7 @@ def parse_markdown_file(path: Path) -> ParsedWordList:
                 if is_valid_word(word):
                     words.append(word)
             continue
-        elif in_table:
+        if in_table:
             in_table = False
 
         # Handle lists
@@ -368,9 +366,8 @@ def parse_markdown_file(path: Path) -> ParsedWordList:
                 for word in result:
                     if is_valid_word(word):
                         words.append(word)
-            else:
-                if is_valid_word(result):
-                    words.append(result)
+            elif is_valid_word(result):
+                words.append(result)
 
     metadata = {
         "format": "markdown",

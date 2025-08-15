@@ -13,7 +13,7 @@ from ...anki.constants import CardType
 from ...anki.generator import AnkiCardGenerator
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...models import Word
-from ...models.definition import DictionaryProvider, Language
+from ...models.dictionary import DictionaryProvider, Language
 from ...search.language import get_language_search
 from ...storage.mongodb import _ensure_initialized
 from ...text import normalize
@@ -27,7 +27,6 @@ logger = get_logger(__name__)
 @click.group(name="anki")
 def anki_command() -> None:
     """Create and manage Anki flashcard decks from word lists."""
-    pass
 
 
 @anki_command.command()
@@ -85,6 +84,7 @@ def export(
         floridify anki export vocabulary-list
         floridify anki export gre-words --output ~/decks/gre.apkg
         floridify anki export test-words --card-types best_describes
+
     """
     asyncio.run(
         _export_async(
@@ -96,7 +96,7 @@ def export(
             direct,
             apkg_fallback,
             force,
-        )
+        ),
     )
 
 
@@ -176,7 +176,7 @@ async def _export_async(
 
         unique_words = list(word_frequency_map.keys())
         console.print(
-            f"📊 Found {len(unique_words)} unique words after normalization (from {word_list.unique_words} original)"
+            f"📊 Found {len(unique_words)} unique words after normalization (from {word_list.unique_words} original)",
         )
 
         all_cards = []
@@ -192,7 +192,8 @@ async def _export_async(
             for canonical_word in unique_words:
                 frequency = word_frequency_map[canonical_word]
                 progress.update(
-                    task, description=f"Processing '{canonical_word}' (freq: {frequency})"
+                    task,
+                    description=f"Processing '{canonical_word}' (freq: {frequency})",
                 )
 
                 # Look up word to get dictionary entry using lookup pipeline
@@ -218,11 +219,11 @@ async def _export_async(
 
                         freq_indicator = f" (×{frequency})" if frequency > 1 else ""
                         console.print(
-                            f"  Generated {len(cards)} cards for '{canonical_word}'{freq_indicator}"
+                            f"  Generated {len(cards)} cards for '{canonical_word}'{freq_indicator}",
                         )
                     else:
                         console.print(
-                            f"  [yellow]Warning:[/yellow] Could not find definition for '{canonical_word}'"
+                            f"  [yellow]Warning:[/yellow] Could not find definition for '{canonical_word}'",
                         )
 
                 except Exception as e:
@@ -233,7 +234,7 @@ async def _export_async(
 
         if not all_cards:
             console.print(
-                "[red]Error:[/red] No flashcards generated. Check that words have definitions."
+                "[red]Error:[/red] No flashcards generated. Check that words have definitions.",
             )
             return
 
@@ -252,14 +253,14 @@ async def _export_async(
             if success and apkg_path is None:
                 # Direct export succeeded, no .apkg file created
                 console.print(
-                    f"[green]Success![/green] Exported {len(all_cards)} flashcards directly to Anki"
+                    f"[green]Success![/green] Exported {len(all_cards)} flashcards directly to Anki",
                 )
                 console.print(f"Deck: [blue]{deck_name}[/blue] (available in Anki now)")
                 console.print("\\n[dim]💡 Cards are now available in your Anki app![/dim]")
             elif success and apkg_path:
                 # .apkg file was imported directly into Anki
                 console.print(
-                    f"[green]Success![/green] Imported {len(all_cards)} flashcards into Anki"
+                    f"[green]Success![/green] Imported {len(all_cards)} flashcards into Anki",
                 )
                 console.print(f"Deck: [blue]{deck_name}[/blue] (available in Anki now)")
                 console.print(f"Backup file: {apkg_path}")
@@ -329,7 +330,7 @@ def status() -> None:
         console.print("3. On macOS, disable App Nap for Anki:")
         console.print("   defaults write net.ichi2.anki NSAppSleepDisabled -bool true")
         console.print(
-            "\\n[dim]Without AnkiConnect, .apkg files will be created for manual import.[/dim]"
+            "\\n[dim]Without AnkiConnect, .apkg files will be created for manual import.[/dim]",
         )
 
 
@@ -362,7 +363,7 @@ def info() -> None:
   3. Import .apkg file into Anki desktop or mobile app
 
 [dim]Cards test semantic understanding rather than rote memorization.[/dim]
-    """
+    """,
     )
 
 

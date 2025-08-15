@@ -33,8 +33,7 @@ def _format_path(record: dict[str, Any]) -> str:
     """Format file path to be relative to project root."""
     file_path = record["file"].path
     # Remove container path prefix if present
-    if file_path.startswith("/app/"):
-        file_path = file_path[5:]  # Remove /app/
+    file_path = file_path.removeprefix("/app/")  # Remove /app/
     # Make path relative to backend directory
     if file_path.startswith("src/"):
         file_path = "backend/" + file_path
@@ -215,7 +214,9 @@ def log_timing[T](func: Callable[..., T]) -> Callable[..., T]:
         except Exception as e:
             elapsed = time.perf_counter() - start_time
             func_logger.error(
-                f"❌ {func_name} failed after {elapsed:.2f}s: {e}", duration=elapsed, error=str(e)
+                f"❌ {func_name} failed after {elapsed:.2f}s: {e}",
+                duration=elapsed,
+                error=str(e),
             )
             raise
 
@@ -236,14 +237,15 @@ def log_timing[T](func: Callable[..., T]) -> Callable[..., T]:
         except Exception as e:
             elapsed = time.perf_counter() - start_time
             func_logger.error(
-                f"❌ {func_name} failed after {elapsed:.2f}s: {e}", duration=elapsed, error=str(e)
+                f"❌ {func_name} failed after {elapsed:.2f}s: {e}",
+                duration=elapsed,
+                error=str(e),
             )
             raise
 
     if asyncio.iscoroutinefunction(func):
-        return cast(Callable[..., T], async_wrapper)
-    else:
-        return cast(Callable[..., T], sync_wrapper)
+        return cast("Callable[..., T]", async_wrapper)
+    return cast("Callable[..., T]", sync_wrapper)
 
 
 def log_stage(stage_name: str, emoji: str = "🔄") -> Callable[[Callable[..., T]], Callable[..., T]]:
@@ -254,7 +256,9 @@ def log_stage(stage_name: str, emoji: str = "🔄") -> Callable[[Callable[..., T
         async def async_wrapper(*args: Any, **kwargs: Any) -> T:
             # Use loguru with stage context
             stage_logger = loguru_logger.bind(
-                stage=stage_name, stage_emoji=emoji, execution_type="async"
+                stage=stage_name,
+                stage_emoji=emoji,
+                execution_type="async",
             )
 
             stage_logger.info(f"{emoji} Entering stage: {stage_name}")
@@ -264,7 +268,7 @@ def log_stage(stage_name: str, emoji: str = "🔄") -> Callable[[Callable[..., T
                     Text(f"Stage: {stage_name}", style="bold cyan"),
                     title="Pipeline Stage",
                     border_style="cyan",
-                )
+                ),
             )
 
             try:
@@ -279,7 +283,9 @@ def log_stage(stage_name: str, emoji: str = "🔄") -> Callable[[Callable[..., T
         def sync_wrapper(*args: Any, **kwargs: Any) -> T:
             # Use loguru with stage context
             stage_logger = loguru_logger.bind(
-                stage=stage_name, stage_emoji=emoji, execution_type="sync"
+                stage=stage_name,
+                stage_emoji=emoji,
+                execution_type="sync",
             )
 
             stage_logger.info(f"{emoji} Entering stage: {stage_name}")
@@ -289,7 +295,7 @@ def log_stage(stage_name: str, emoji: str = "🔄") -> Callable[[Callable[..., T
                     Text(f"Stage: {stage_name}", style="bold cyan"),
                     title="Pipeline Stage",
                     border_style="cyan",
-                )
+                ),
             )
 
             try:
@@ -301,9 +307,8 @@ def log_stage(stage_name: str, emoji: str = "🔄") -> Callable[[Callable[..., T
                 raise
 
         if asyncio.iscoroutinefunction(func):
-            return cast(Callable[..., T], async_wrapper)
-        else:
-            return cast(Callable[..., T], sync_wrapper)
+            return cast("Callable[..., T]", async_wrapper)
+        return cast("Callable[..., T]", sync_wrapper)
 
     return decorator
 
@@ -315,7 +320,11 @@ def log_metrics(**metrics: Any) -> None:
 
 
 def log_provider_fetch(
-    provider_name: str, word: str, success: bool, response_size: int = 0, duration: float = 0.0
+    provider_name: str,
+    word: str,
+    success: bool,
+    response_size: int = 0,
+    duration: float = 0.0,
 ) -> None:
     """Log provider fetch attempt details with structured context."""
     status = "✅" if success else "❌"
@@ -327,7 +336,7 @@ def log_provider_fetch(
         duration=duration,
     ).debug(
         f"{status} Provider '{provider_name}' for '{word}': "
-        f"size={response_size} bytes, duration={duration:.2f}s"
+        f"size={response_size} bytes, duration={duration:.2f}s",
     )
 
 
@@ -354,12 +363,15 @@ def log_search_method(
         scores=scores[:5] if scores else None,  # Log first 5 scores for context
     ).info(
         f"🔍 Search '{method}' for '{query}': "
-        f"results={result_count}, duration={duration:.2f}s{score_info}"
+        f"results={result_count}, duration={duration:.2f}s{score_info}",
     )
 
 
 def log_ai_synthesis(
-    word: str, token_usage: dict[str, int], cluster_count: int, duration: float = 0.0
+    word: str,
+    token_usage: dict[str, int],
+    cluster_count: int,
+    duration: float = 0.0,
 ) -> None:
     """Log AI synthesis details with structured context."""
     loguru_logger.bind(
@@ -370,7 +382,7 @@ def log_ai_synthesis(
     ).info(
         f"🤖 AI synthesis for '{word}': "
         f"clusters={cluster_count}, tokens={token_usage.get('total_tokens', 0)}, "
-        f"duration={duration:.2f}s"
+        f"duration={duration:.2f}s",
     )
 
 
@@ -382,6 +394,7 @@ def set_request_context(**context: Any) -> None:
 
     Example:
         set_request_context(request_id="req-123", user_id="user-456")
+
     """
     request_context.set(context)
 
@@ -397,6 +410,7 @@ def get_correlation_logger(correlation_id: str) -> LoggerWrapper:
     Example:
         logger = get_correlation_logger("req-123")
         logger.info("Processing request")  # Includes correlation_id in logs
+
     """
     wrapper = LoggerWrapper("correlation")
     wrapper._logger = loguru_logger.bind(correlation_id=correlation_id)
@@ -408,9 +422,11 @@ def log_performance(operation: str, **metrics: Any) -> None:
 
     Example:
         log_performance("search", duration=0.123, result_count=42, cache_hit=True)
+
     """
     loguru_logger.bind(operation=operation, **metrics).info(
-        f"⚡ Performance: {operation}", **metrics
+        f"⚡ Performance: {operation}",
+        **metrics,
     )
 
 

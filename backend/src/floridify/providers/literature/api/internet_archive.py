@@ -35,7 +35,6 @@ class InternetArchiveConnector(LiteratureConnector):
         limit: int = 50,
     ) -> list[dict[str, Any]]:
         """Search Internet Archive for texts."""
-
         # Build query for books
         query_parts = ["mediatype:texts"]
 
@@ -81,10 +80,12 @@ class InternetArchiveConnector(LiteratureConnector):
         return works
 
     async def _fetch_work_metadata(
-        self, source_id: str, title: str | None = None, author_name: str | None = None
+        self,
+        source_id: str,
+        title: str | None = None,
+        author_name: str | None = None,
     ) -> dict[str, Any]:
         """Fetch metadata from Internet Archive."""
-
         metadata_url = f"{self.api_base}/metadata/{source_id}"
 
         async with respectful_scraper("archive_org", self.rate_config) as client:
@@ -98,7 +99,6 @@ class InternetArchiveConnector(LiteratureConnector):
 
     async def _fetch_work_content(self, source_id: str, metadata: dict[str, Any]) -> str | None:
         """Download text content from Internet Archive."""
-
         files_url = f"{self.api_base}/download/{source_id}"
 
         async with respectful_scraper("archive_org", self.rate_config) as client:
@@ -129,10 +129,13 @@ class InternetArchiveConnector(LiteratureConnector):
         return None
 
     def _parse_archive_metadata(
-        self, metadata: dict, source_id: str, title: str | None, author_name: str | None
+        self,
+        metadata: dict,
+        source_id: str,
+        title: str | None,
+        author_name: str | None,
     ) -> dict[str, Any]:
         """Parse Internet Archive metadata."""
-
         item_metadata = metadata.get("metadata", {})
 
         # Extract title and author
@@ -164,7 +167,10 @@ class InternetArchiveConnector(LiteratureConnector):
         return result
 
     def _create_minimal_metadata(
-        self, source_id: str, title: str | None, author_name: str | None
+        self,
+        source_id: str,
+        title: str | None,
+        author_name: str | None,
     ) -> dict[str, Any]:
         """Create minimal metadata for Archive.org."""
         return {
@@ -173,5 +179,3 @@ class InternetArchiveConnector(LiteratureConnector):
             "source_url": f"{self.api_base}/details/{source_id}",
             "external_ids": {"archive_id": source_id},
         }
-
-

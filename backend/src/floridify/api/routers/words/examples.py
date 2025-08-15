@@ -44,7 +44,8 @@ class ExampleQueryParams(BaseModel):
     is_ai_generated: bool | None = Field(None, description="Filter by AI generation status")
     can_regenerate: bool | None = Field(None, description="Filter by regeneration capability")
     has_literature_source: bool | None = Field(
-        None, description="Filter by literature source presence"
+        None,
+        description="Filter by literature source presence",
     )
     quality_score_min: float | None = Field(None, ge=0, le=1, description="Minimum quality score")
 
@@ -246,7 +247,7 @@ async def generate_examples_for_definition(
                     "word": f"/words/{example.word_id}",
                     "definition": f"/definitions/{example.definition_id}",
                 },
-            )
+            ),
         )
 
     # Update definition with new example IDs

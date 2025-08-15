@@ -4,10 +4,12 @@
 # Direct file import to avoid circular dependencies
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import just the constants module directly
 import importlib.util
+
 spec = importlib.util.spec_from_file_location(
     "constants", 
     Path(__file__).parent.parent / "src/floridify/search/semantic/constants.py"

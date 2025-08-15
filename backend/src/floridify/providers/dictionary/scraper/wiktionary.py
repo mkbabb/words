@@ -19,13 +19,12 @@ from ....models import (
     Etymology,
     Example,
     Pronunciation,
-    ProviderData,
     UsageNote,
     Word,
 )
-from ....models.definition import DictionaryProvider
+from ....models.dictionary import DictionaryProvider, DictionaryProviderData
 from ....utils.logging import get_logger
-from ...base import DictionaryConnector
+from ..base import DictionaryConnector
 
 logger = get_logger(__name__)
 
@@ -85,30 +84,29 @@ class WikitextCleaner:
                     else:
                         template.string = ""
 
-                else:
-                    # For other templates, try to extract meaningful content from arguments
-                    # This handles templates like {{synonym of|en|word}}, {{form of|...}}, etc.
-                    if template.arguments:
-                        # Skip language codes and template metadata, look for actual content
-                        content_args = []
-                        for arg in template.arguments:
-                            arg_val = str(arg.value).strip()
-                            # Skip language codes and common metadata
-                            if (
-                                arg_val
-                                and len(arg_val) > 1
-                                and arg_val not in ["en", "eng", "1", "2", "3"]
-                                and not arg_val.startswith("http")
-                            ):
-                                content_args.append(arg_val)
+                # For other templates, try to extract meaningful content from arguments
+                # This handles templates like {{synonym of|en|word}}, {{form of|...}}, etc.
+                elif template.arguments:
+                    # Skip language codes and template metadata, look for actual content
+                    content_args = []
+                    for arg in template.arguments:
+                        arg_val = str(arg.value).strip()
+                        # Skip language codes and common metadata
+                        if (
+                            arg_val
+                            and len(arg_val) > 1
+                            and arg_val not in ["en", "eng", "1", "2", "3"]
+                            and not arg_val.startswith("http")
+                        ):
+                            content_args.append(arg_val)
 
-                        if content_args:
-                            # Use the first meaningful content argument
-                            template.string = content_args[0]
-                        else:
-                            template.string = ""
+                    if content_args:
+                        # Use the first meaningful content argument
+                        template.string = content_args[0]
                     else:
                         template.string = ""
+                else:
+                    template.string = ""
 
             # Convert wikilinks to plain text
             for wikilink in parsed.wikilinks:
@@ -167,7 +165,7 @@ class WiktionaryConnector(DictionaryConnector):
 
     def __init__(self, rate_limit: float = 30.0) -> None:
         """Initialize enhanced Wiktionary connector."""
-        super().__init__(rate_limit)
+        super().__init__(DictionaryProvider.WIKTIONARY)
         self.base_url = "https://en.wiktionary.org/w/api.php"
         self.cleaner = WikitextCleaner()
 
@@ -186,15 +184,11 @@ class WiktionaryConnector(DictionaryConnector):
             response.raise_for_status()
             return response.text
 
-    @property
-    def provider_name(self) -> DictionaryProvider:
-        return DictionaryProvider.WIKTIONARY
-
     async def _fetch_from_provider(
         self,
         word_obj: Word,
         state_tracker: StateTracker | None = None,
-    ) -> ProviderData | None:
+    ) -> DictionaryProviderData | None:
         """Fetch comprehensive definition data from Wiktionary."""
         await self._enforce_rate_limit()
 
@@ -225,7 +219,7 @@ class WiktionaryConnector(DictionaryConnector):
                             stage="PROVIDER_FETCH_HTTP_CONNECTING",
                             message=f"Connecting to {self.provider_name}",
                             details={"word": word_obj.text, **metadata},
-                        )
+                        ),
                     )
                 elif stage == "downloaded":
                     if state_tracker:
@@ -235,7 +229,7 @@ class WiktionaryConnector(DictionaryConnector):
                                 stage="PROVIDER_FETCH_HTTP_DOWNLOADING",
                                 message=f"Downloading from {self.provider_name}",
                                 details={"word": word_obj.text, **metadata},
-                            )
+                            ),
                         )
 
             response_text = await self._cached_get(self.base_url, params)
@@ -259,7 +253,7 @@ class WiktionaryConnector(DictionaryConnector):
 
         except Exception as e:
             if state_tracker:
-                await state_tracker.update_error(f"Provider error: {str(e)}")
+                await state_tracker.update_error(f"Provider error: {e!s}")
 
             logger.error(f"Error fetching {word_obj.text} from Wiktionary: {e}")
             return None
@@ -268,7 +262,7 @@ class WiktionaryConnector(DictionaryConnector):
         self,
         word_obj: Word,
         data: dict[str, Any],
-    ) -> ProviderData | None:
+    ) -> DictionaryProviderData | None:
         """Parse Wiktionary response comprehensively."""
         try:
             pages = data.get("query", {}).get("pages", [])
@@ -285,8 +279,10 @@ class WiktionaryConnector(DictionaryConnector):
             return None
 
     async def _extract_comprehensive_data(
-        self, wikitext: str, word_obj: Word
-    ) -> ProviderData | None:
+        self,
+        wikitext: str,
+        word_obj: Word,
+    ) -> DictionaryProviderData | None:
         """Extract all available data from wikitext using systematic parsing."""
         try:
             parsed = wtp.parse(wikitext)
@@ -326,7 +322,7 @@ class WiktionaryConnector(DictionaryConnector):
 
                 await definition.save()  # Update the definition
 
-            return ProviderData(
+            return DictionaryProviderData(
                 word_id=word_obj.id,
                 provider=self.provider_name,
                 definition_ids=[d.id for d in definitions],  # type:ignore
@@ -350,7 +346,9 @@ class WiktionaryConnector(DictionaryConnector):
         return None
 
     async def _extract_definitions(
-        self, section: wtp.Section, word_id: PydanticObjectId
+        self,
+        section: wtp.Section,
+        word_id: PydanticObjectId,
     ) -> list[Definition]:
         """Extract definitions using new model structure."""
         definitions = []
@@ -465,8 +463,7 @@ class WiktionaryConnector(DictionaryConnector):
                             # Take only the part before the quote template
                             definition_text += " " + next_line[: quote_match.start()].strip()
                             break
-                        else:
-                            definition_text += " " + next_line
+                        definition_text += " " + next_line
                     i += 1
 
                 # Clean and validate the definition text
@@ -481,7 +478,9 @@ class WiktionaryConnector(DictionaryConnector):
         return items
 
     async def _extract_examples(
-        self, definition_text: str, definition_id: PydanticObjectId
+        self,
+        definition_text: str,
+        definition_id: PydanticObjectId,
     ) -> list[Example]:
         """Extract and save examples using new model structure."""
         examples = []
@@ -498,7 +497,8 @@ class WiktionaryConnector(DictionaryConnector):
                     if len(template.arguments) >= 2:
                         example_text = str(template.arguments[1].value).strip()
                         clean_example = self.cleaner.clean_text(
-                            example_text, preserve_structure=True
+                            example_text,
+                            preserve_structure=True,
                         )
                         if clean_example and len(clean_example) > 10:
                             example = Example(
@@ -749,7 +749,7 @@ class WiktionaryConnector(DictionaryConnector):
                         ]:
                             gloss_text = str(arg.value).strip()
                             break
-                        elif not arg.name and len(str(arg.value).strip()) > 3:
+                        if not arg.name and len(str(arg.value).strip()) > 3:
                             # Sometimes the gloss is a positional argument
                             gloss_text = str(arg.value).strip()
 
@@ -816,7 +816,9 @@ class WiktionaryConnector(DictionaryConnector):
         return cleaned
 
     def _extract_pronunciation(
-        self, section: wtp.Section, word_id: PydanticObjectId
+        self,
+        section: wtp.Section,
+        word_id: PydanticObjectId,
     ) -> Pronunciation | None:
         """Extract pronunciation comprehensively."""
         ipa_american = None
@@ -1109,7 +1111,7 @@ class WiktionaryConnector(DictionaryConnector):
                             quotation_data["source"] = arg_value
 
                     # Only add if we have at least the text
-                    if "text" in quotation_data and quotation_data["text"]:
+                    if quotation_data.get("text"):
                         quotations.append(quotation_data)
 
         except Exception as e:
@@ -1177,4 +1179,4 @@ class WiktionaryConnector(DictionaryConnector):
 
     async def close(self) -> None:
         """Close HTTP client."""
-        pass  # No HTTP client to close - using cached decorator
+        # No HTTP client to close - using cached decorator

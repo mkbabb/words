@@ -54,7 +54,6 @@ class DefinitionSynthesizer:
         state_tracker: StateTracker | None = None,
     ) -> SynthesizedDictionaryEntry | None:
         """Synthesize a complete dictionary entry from provider data."""
-
         # Get or create Word document
         storage = await get_storage()
         word_obj = await storage.get_word(word)
@@ -65,7 +64,7 @@ class DefinitionSynthesizer:
         # Check for existing synthesized entry
         if not force_refresh:
             existing = await SynthesizedDictionaryEntry.find_one(
-                SynthesizedDictionaryEntry.word_id == word_obj.id
+                SynthesizedDictionaryEntry.word_id == word_obj.id,
             )
             if existing:
                 logger.info(f"Using existing synthesized entry for '{word}'")
@@ -79,7 +78,7 @@ class DefinitionSynthesizer:
 
         # Batch load all definitions in a single query
         all_definitions: list[Definition] = await Definition.find(
-            {"_id": {"$in": all_def_ids}}
+            {"_id": {"$in": all_def_ids}},
         ).to_list()
 
         if not all_definitions:
@@ -115,12 +114,12 @@ class DefinitionSynthesizer:
                 merged_indices = dedup_def.source_indices[1:]
                 logger.debug(
                     f"Merged definitions at indices {merged_indices} into index {primary_idx}: "
-                    f"{dedup_def.reasoning}"
+                    f"{dedup_def.reasoning}",
                 )
 
         logger.success(
             f"Deduplicated {len(all_definitions)} → {len(unique_definitions)} definitions "
-            f"(removed {dedup_response.removed_count} duplicates)"
+            f"(removed {dedup_response.removed_count} duplicates)",
         )
 
         # Cluster unique definitions
@@ -128,7 +127,10 @@ class DefinitionSynthesizer:
             await state_tracker.update_stage(Stages.AI_CLUSTERING)
 
         clustered_definitions = await cluster_definitions(
-            word_obj, unique_definitions, self.ai, state_tracker
+            word_obj,
+            unique_definitions,
+            self.ai,
+            state_tracker,
         )
 
         # Synthesize core components in parallel
@@ -166,7 +168,7 @@ class DefinitionSynthesizer:
 
         await entry.save()
         logger.success(
-            f"Created synthesized entry for '{word}' with {len(synthesized_definitions)} definitions"
+            f"Created synthesized entry for '{word}' with {len(synthesized_definitions)} definitions",
         )
 
         # Enhance and synthesize definitions
@@ -195,7 +197,6 @@ class DefinitionSynthesizer:
         This method is optimized for bulk processing with 50% cost reduction
         through OpenAI's Batch API. Use this when processing multiple words.
         """
-
         # Get or create Word document
         storage = await get_storage()
         word_obj = await storage.get_word(word)
@@ -206,7 +207,7 @@ class DefinitionSynthesizer:
         # Check for existing synthesized entry
         if not force_refresh:
             existing = await SynthesizedDictionaryEntry.find_one(
-                SynthesizedDictionaryEntry.word_id == word_obj.id
+                SynthesizedDictionaryEntry.word_id == word_obj.id,
             )
             if existing:
                 logger.info(f"Using existing synthesized entry for '{word}'")
@@ -220,7 +221,7 @@ class DefinitionSynthesizer:
 
         # Batch load all definitions in a single query
         all_definitions: list[Definition] = await Definition.find(
-            {"_id": {"$in": all_def_ids}}
+            {"_id": {"$in": all_def_ids}},
         ).to_list()
 
         if not all_definitions:
@@ -242,7 +243,7 @@ class DefinitionSynthesizer:
                 logger.debug(f"Skipping duplicate definition: {definition.text[:50]}...")
 
         logger.info(
-            f"Deduplicated {len(all_definitions)} definitions to {len(unique_definitions)} unique definitions for '{word}'"
+            f"Deduplicated {len(all_definitions)} definitions to {len(unique_definitions)} unique definitions for '{word}'",
         )
 
         # Batch all synthesis operations together
@@ -253,7 +254,10 @@ class DefinitionSynthesizer:
                 await state_tracker.update_stage(Stages.AI_CLUSTERING)
 
             clustered_definitions = await cluster_definitions(
-                word_obj, unique_definitions, self.ai, state_tracker
+                word_obj,
+                unique_definitions,
+                self.ai,
+                state_tracker,
             )
 
             # Synthesize core components
@@ -262,12 +266,17 @@ class DefinitionSynthesizer:
 
             # Synthesize definitions for each cluster
             synthesized_definitions = await self._synthesize_definitions(
-                word_obj, clustered_definitions, state_tracker
+                word_obj,
+                clustered_definitions,
+                state_tracker,
             )
 
             # Synthesize pronunciation
             pronunciation = await synthesize_pronunciation(
-                word_obj.text, providers_data, self.ai, state_tracker
+                word_obj.text,
+                providers_data,
+                self.ai,
+                state_tracker,
             )
 
             # Synthesize etymology
@@ -275,7 +284,10 @@ class DefinitionSynthesizer:
 
             # Generate facts
             facts = await generate_facts(
-                word_obj, synthesized_definitions, self.ai, self.facts_count
+                word_obj,
+                synthesized_definitions,
+                self.ai,
+                self.facts_count,
             )
 
         # Create synthesized entry
@@ -300,7 +312,7 @@ class DefinitionSynthesizer:
 
         await entry.save()
         logger.success(
-            f"Created synthesized entry for '{word}' with {len(synthesized_definitions)} definitions (batch mode)"
+            f"Created synthesized entry for '{word}' with {len(synthesized_definitions)} definitions (batch mode)",
         )
 
         # Enhance and synthesize definitions
@@ -322,7 +334,6 @@ class DefinitionSynthesizer:
         state_tracker: StateTracker | None = None,
     ) -> list[Definition]:
         """Synthesize definitions by cluster using modular functions."""
-
         # Group by cluster
         clusters: dict[str, list[Definition]] = {}
         for definition in clustered_definitions:
@@ -387,7 +398,6 @@ class DefinitionSynthesizer:
         state_tracker: StateTracker | None = None,
     ) -> SynthesizedDictionaryEntry | None:
         """Generate a complete fallback entry using AI."""
-
         logger.info(f"Generating AI fallback for '{word}'")
 
         # Get or create Word
@@ -464,6 +474,7 @@ class DefinitionSynthesizer:
 
         Returns:
             Updated synthesized dictionary entry or None if not found
+
         """
         from .constants import SynthesisComponent
 

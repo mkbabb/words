@@ -51,7 +51,8 @@ class WOTDStorage:
 
         # Try cache first
         cached = await cache.get(
-            namespace=CacheKeys.NAMESPACE, key=f"{CacheKeys.SYNTHETIC_CORPUS}:{corpus_id}"
+            namespace=CacheKeys.NAMESPACE,
+            key=f"{CacheKeys.SYNTHETIC_CORPUS}:{corpus_id}",
         )
         if cached:
             return WOTDCorpus.model_validate(cached)
@@ -98,7 +99,8 @@ class WOTDStorage:
 
         # Delete from cache
         await cache.delete(
-            namespace=CacheKeys.NAMESPACE, key=f"{CacheKeys.SYNTHETIC_CORPUS}:{corpus_id}"
+            namespace=CacheKeys.NAMESPACE,
+            key=f"{CacheKeys.SYNTHETIC_CORPUS}:{corpus_id}",
         )
 
         # Delete from MongoDB
@@ -110,7 +112,10 @@ class WOTDStorage:
 
     # Embeddings Cache
     async def cache_embeddings(
-        self, corpus_id: str, embeddings: list[float], ttl_hours: int = 48
+        self,
+        corpus_id: str,
+        embeddings: list[float],
+        ttl_hours: int = 48,
     ) -> None:
         """Cache embeddings with compression."""
         cache = await get_unified()
@@ -125,7 +130,8 @@ class WOTDStorage:
         """Get cached embeddings."""
         cache = await get_unified()
         return await cache.get_compressed(
-            namespace=CacheKeys.NAMESPACE, key=f"{CacheKeys.EMBEDDINGS}:{corpus_id}"
+            namespace=CacheKeys.NAMESPACE,
+            key=f"{CacheKeys.EMBEDDINGS}:{corpus_id}",
         )
 
     # Semantic IDs

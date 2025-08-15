@@ -48,6 +48,7 @@ class APIException(HTTPException):
             details: List of error details with field information
             request_id: Optional request tracking ID
             headers: Optional HTTP headers
+
         """
         response = ErrorResponse(
             error=error,
@@ -78,6 +79,7 @@ class NotFoundException(APIException):
             identifier: Resource identifier that was not found
             field: Field name used for lookup (default: "id")
             request_id: Optional request tracking ID
+
         """
         if identifier:
             message = f"{resource} '{identifier}' not found"
@@ -92,7 +94,7 @@ class NotFoundException(APIException):
                     field=field,
                     message=message,
                     code=f"{resource.upper()}_NOT_FOUND",
-                )
+                ),
             ],
             request_id=request_id,
         )
@@ -115,6 +117,7 @@ class ValidationException(APIException):
             message: Validation error message
             code: Error code (default: VALIDATION_ERROR)
             request_id: Optional request tracking ID
+
         """
         super().__init__(
             status_code=400,
@@ -124,7 +127,7 @@ class ValidationException(APIException):
                     field=field,
                     message=message,
                     code=code,
-                )
+                ),
             ],
             request_id=request_id,
         )
@@ -147,6 +150,7 @@ class ConflictException(APIException):
             field: Optional field that caused conflict
             code: Error code (default: CONFLICT)
             request_id: Optional request tracking ID
+
         """
         super().__init__(
             status_code=409,
@@ -156,7 +160,7 @@ class ConflictException(APIException):
                     field=field,
                     message=message,
                     code=code,
-                )
+                ),
             ],
             request_id=request_id,
         )
@@ -179,6 +183,7 @@ class VersionConflictException(ConflictException):
             actual: Actual version number
             resource: Optional resource type
             request_id: Optional request tracking ID
+
         """
         message = f"Version mismatch: expected {expected}, got {actual}"
         if resource:
@@ -209,7 +214,7 @@ class UnauthorizedException(APIException):
                 ErrorDetail(
                     message=message,
                     code=code,
-                )
+                ),
             ],
             request_id=request_id,
         )
@@ -238,7 +243,7 @@ class ForbiddenException(APIException):
                 ErrorDetail(
                     message=message,
                     code="ACCESS_DENIED",
-                )
+                ),
             ],
             request_id=request_id,
         )
@@ -265,7 +270,7 @@ class RateLimitException(APIException):
                 ErrorDetail(
                     message=message,
                     code="RATE_LIMIT_EXCEEDED",
-                )
+                ),
             ],
             request_id=request_id,
             headers=headers,
@@ -298,7 +303,7 @@ class ServiceUnavailableException(APIException):
                     field="service",
                     message=message,
                     code="SERVICE_UNAVAILABLE",
-                )
+                ),
             ],
             request_id=request_id,
             headers=headers,
@@ -329,7 +334,7 @@ class PayloadTooLargeException(APIException):
                     field=field,
                     message=message,
                     code="FILE_TOO_LARGE",
-                )
+                ),
             ],
             request_id=request_id,
         )

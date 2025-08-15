@@ -6,6 +6,6 @@ from .wiktionary_wholesale import (
 )
 
 __all__ = [
-    "WiktionaryWholesaleConnector",
     "WiktionaryTitleListDownloader",
+    "WiktionaryWholesaleConnector",
 ]

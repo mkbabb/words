@@ -3,4 +3,4 @@
 # Web scraping literature providers would go here
 # For example: custom site scrapers, document extractors, etc.
 
-__all__ = []
+__all__: list[str] = []

@@ -58,8 +58,7 @@ CACHE_DIR = PROJECT_ROOT / "backend" / ".cache"
 
 
 def get_cache_directory(cache_type: str = "") -> Path:
-    """
-    Get unified cache directory for different cache types.
+    """Get unified cache directory for different cache types.
 
     Handles Docker, production, and development environments consistently.
 
@@ -68,6 +67,7 @@ def get_cache_directory(cache_type: str = "") -> Path:
 
     Returns:
         Path to cache directory, created if it doesn't exist
+
     """
     # Check for environment variable override first (12-factor)
     env_cache_dir = os.getenv("FLORIDIFY_CACHE_DIR")

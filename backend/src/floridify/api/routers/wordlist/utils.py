@@ -5,15 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 from beanie import PydanticObjectId
-from pydantic import BaseModel, Field
-from src.floridify.api.routers.search import SearchResponse
 
-from ....search import SearchEngine
-from ....search.corpus.manager import get_corpus_manager
 from ....api.repositories import WordListRepository
+from ....corpus.manager import get_corpus_manager
 from ....models import Word
-from ....wordlist.models import WordList
-from .words import WordListSearchQueryParams, WordListQueryParams
+from ....search import SearchEngine
+from ..search import SearchResponse
 
 
 async def search_wordlist_names(
@@ -23,10 +20,7 @@ async def search_wordlist_names(
     min_score: float = 0.6,
 ) -> None:
     """Search wordlist names using generalized SearchEngine."""
-
     raise NotImplementedError("search_wordlist_names is not implemented")
-
-    return None
 
 
 async def search_words_in_wordlist(
@@ -37,7 +31,6 @@ async def search_words_in_wordlist(
     repo: Any | None = None,
 ) -> SearchResponse:
     """Search words in a wordlist using generalized SearchEngine."""
-
     # Get repository if not provided
     if repo is None:
         repo = WordListRepository()
@@ -59,7 +52,9 @@ async def search_words_in_wordlist(
     corpus_name = f"wordlist_{wordlist_id}"
     corpus_manager = get_corpus_manager()
     await corpus_manager.get_or_create_corpus(
-        corpus_name=corpus_name, vocabulary=word_texts, force_rebuild=False
+        corpus_name=corpus_name,
+        vocabulary=word_texts,
+        force_rebuild=False,
     )
 
     # Create search engine and perform search
@@ -71,7 +66,9 @@ async def search_words_in_wordlist(
     await search_engine.initialize()
 
     results = await search_engine.search(
-        query=query, max_results=max_results, min_score=min_score
+        query=query,
+        max_results=max_results,
+        min_score=min_score,
     )
 
     # Convert results to expected format
@@ -81,6 +78,3 @@ async def search_words_in_wordlist(
         total_found=len(results),
         language=None,
     )
-
-
-

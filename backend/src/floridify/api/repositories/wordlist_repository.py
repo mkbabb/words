@@ -8,8 +8,8 @@ from beanie.odm.enums import SortDirection
 from beanie.operators import RegEx
 from pydantic import BaseModel, Field
 
-from ...models.definition import Language, Word
-from ...search.corpus.manager import CorpusManager, get_corpus_manager
+from ...corpus.manager import CorpusManager, get_corpus_manager
+from ...models.dictionary import Language, Word
 from ...text import normalize
 from ...utils.logging import get_logger
 from ...wordlist.constants import MasteryLevel, Temperature
@@ -238,7 +238,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         # Bulk lookup existing words
         existing_words = await Word.find(
-            {"normalized": {"$in": unique_normalized}, "language": Language.ENGLISH}
+            {"normalized": {"$in": unique_normalized}, "language": Language.ENGLISH},
         ).to_list()
 
         # Create a map of normalized text to word ObjectId
@@ -297,7 +297,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             vocabulary=word_texts,
         )
         logger.debug(
-            f"Created unified corpus {corpus.vocabulary_hash[:8]} for wordlist {wordlist.id} with {len(word_texts)} vocabulary items"
+            f"Created unified corpus {corpus.vocabulary_hash[:8]} for wordlist {wordlist.id} with {len(word_texts)} vocabulary items",
         )
 
     async def add_word(self, wordlist_id: PydanticObjectId, request: WordAddRequest) -> WordList:
@@ -321,7 +321,9 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         return wordlist
 
     async def remove_word(
-        self, wordlist_id: PydanticObjectId, word_id: PydanticObjectId
+        self,
+        wordlist_id: PydanticObjectId,
+        word_id: PydanticObjectId,
     ) -> WordList:
         """Remove a word from a word list by word ID."""
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
@@ -342,7 +344,10 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         return wordlist
 
     async def update(
-        self, id: PydanticObjectId, data: WordListUpdate, version: int | None = None
+        self,
+        id: PydanticObjectId,
+        data: WordListUpdate,
+        version: int | None = None,
     ) -> WordList:
         """Update a wordlist and invalidate name corpus cache if name changed."""
         # Get the original wordlist to check if name changed
@@ -374,7 +379,9 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         return result
 
     async def review_word(
-        self, wordlist_id: PydanticObjectId, request: WordReviewRequest
+        self,
+        wordlist_id: PydanticObjectId,
+        request: WordReviewRequest,
     ) -> WordList:
         """Process a word review session."""
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
@@ -406,7 +413,9 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         return wordlist
 
     async def record_study_session(
-        self, wordlist_id: PydanticObjectId, request: StudySessionRequest
+        self,
+        wordlist_id: PydanticObjectId,
+        request: StudySessionRequest,
     ) -> WordList:
         """Record a study session."""
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
@@ -418,7 +427,9 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         return wordlist
 
     async def get_due_words(
-        self, wordlist_id: PydanticObjectId, limit: int | None = None
+        self,
+        wordlist_id: PydanticObjectId,
+        limit: int | None = None,
     ) -> list[WordListItem]:
         """Get words due for review from a word list."""
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
@@ -428,7 +439,9 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         return wordlist.get_due_for_review(limit)
 
     async def get_by_mastery(
-        self, wordlist_id: PydanticObjectId, level: MasteryLevel
+        self,
+        wordlist_id: PydanticObjectId,
+        level: MasteryLevel,
     ) -> list[WordListItem]:
         """Get words at a specific mastery level."""
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
@@ -513,7 +526,6 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
     async def _cascade_delete(self, wordlist: WordList) -> None:
         """Handle cascade deletion - WordList is self-contained."""
         # WordList contains all data internally, no cascade needed
-        pass
 
     async def populate_words(self, wordlist: WordList) -> dict[str, Any]:
         """Populate wordlist with actual word text instead of just IDs.

@@ -14,10 +14,10 @@ MONGODB_URL = "mongodb://localhost:27017/floridify_test"
 
 async def init_database():
     """Initialize database connection directly."""
-    from motor.motor_asyncio import AsyncIOMotorClient
     from beanie import init_beanie
-    
-    from src.floridify.models import Word, Definition, Example, Pronunciation, ProviderData
+    from motor.motor_asyncio import AsyncIOMotorClient
+
+    from src.floridify.models import Definition, Example, Pronunciation, ProviderData, Word
     from src.floridify.models.provider import VersionedProviderData
     
     # Connect directly to local MongoDB
@@ -47,9 +47,9 @@ async def init_database():
 async def test_connector_comprehensive(connector_class, name, test_word, **init_kwargs):
     """Test a connector comprehensively."""
     from src.floridify.models import Word
-    from src.floridify.models.definition import Language
-    from src.floridify.providers.base import VersionConfig
+    from floridify.models.dictionary import Language
     from src.floridify.models.provider import VersionedProviderData
+    from src.floridify.providers.base import VersionConfig
     
     print(f"\n{'=' * 60}")
     print(f"COMPREHENSIVE TEST: {name}")
@@ -72,12 +72,12 @@ async def test_connector_comprehensive(connector_class, name, test_word, **init_
         print(f"✓ Test word '{test_word}' created")
         
         # Test 1: Initial fetch with versioning
-        print(f"\n1. Initial fetch with versioning:")
+        print("\n1. Initial fetch with versioning:")
         config1 = VersionConfig(save_versioned=True, force_api=True)
         result1 = await connector.fetch_definition(word, version_config=config1)
         
         if result1:
-            print(f"  ✓ Successfully fetched definition")
+            print("  ✓ Successfully fetched definition")
             print(f"    Provider: {result1.provider}")
             print(f"    Definitions: {len(result1.definition_ids)}")
             print(f"    Has pronunciation: {result1.pronunciation_id is not None}")
@@ -91,34 +91,34 @@ async def test_connector_comprehensive(connector_class, name, test_word, **init_
                 print(f"    ✓ Saved to versioned storage v{versioned1.version_info.provider_version}")
                 initial_hash = versioned1.version_info.data_hash
             else:
-                print(f"    ✗ Not saved to versioned storage")
+                print("    ✗ Not saved to versioned storage")
                 initial_hash = None
         else:
             print(f"  ℹ No definition found for '{test_word}'")
             return False
         
         # Test 2: Fetch again (should use cache)
-        print(f"\n2. Test caching behavior:")
+        print("\n2. Test caching behavior:")
         config2 = VersionConfig(save_versioned=True, force_api=False)
         result2 = await connector.fetch_definition(word, version_config=config2)
         
         if result2:
-            print(f"  ✓ Second fetch successful (used cache)")
+            print("  ✓ Second fetch successful (used cache)")
             versioned2 = await VersionedProviderData.find_one(
                 {"word_id": word.id, "provider": connector.provider_name, "version_info.is_latest": True}
             )
             if versioned2 and initial_hash and versioned2.version_info.data_hash == initial_hash:
-                print(f"  ✓ Same data hash (no duplicate save)")
+                print("  ✓ Same data hash (no duplicate save)")
             else:
-                print(f"  ℹ Data hash changed or missing")
+                print("  ℹ Data hash changed or missing")
         
         # Test 3: Force refresh
-        print(f"\n3. Test force refresh:")
+        print("\n3. Test force refresh:")
         config3 = VersionConfig(save_versioned=True, force_api=True, increment_version=True)
         result3 = await connector.fetch_definition(word, version_config=config3)
         
         if result3:
-            print(f"  ✓ Force refresh successful")
+            print("  ✓ Force refresh successful")
             versioned3 = await VersionedProviderData.find_one(
                 {"word_id": word.id, "provider": connector.provider_name, "version_info.is_latest": True}
             )
@@ -129,26 +129,26 @@ async def test_connector_comprehensive(connector_class, name, test_word, **init_
                     print(f"  ℹ Same data, version: v{versioned3.version_info.provider_version}")
         
         # Test 4: Version-specific fetch
-        print(f"\n4. Test version-specific fetch:")
+        print("\n4. Test version-specific fetch:")
         if versioned1:
             config4 = VersionConfig(version=versioned1.version_info.provider_version)
             result4 = await connector.fetch_definition(word, version_config=config4)
             if result4:
                 print(f"  ✓ Fetched specific version v{versioned1.version_info.provider_version}")
             else:
-                print(f"  ✗ Could not fetch specific version")
+                print("  ✗ Could not fetch specific version")
         
         # Test 5: Backward compatibility
-        print(f"\n5. Test backward compatibility:")
+        print("\n5. Test backward compatibility:")
         result5 = await connector.fetch_definition(
             word,
             force_api=False,
             save_versioned=True,
         )
         if result5:
-            print(f"  ✓ Backward compatible API works")
+            print("  ✓ Backward compatible API works")
         else:
-            print(f"  ✗ Backward compatibility failed")
+            print("  ✗ Backward compatibility failed")
         
         print(f"\n✅ {name} - All tests passed!")
         return True
@@ -181,7 +181,9 @@ async def run_all_tests():
     try:
         import platform
         if platform.system() == "Darwin":
-            from src.floridify.providers.dictionary.local.apple_dictionary import AppleDictionaryConnector
+            from src.floridify.providers.dictionary.local.apple_dictionary import (
+                AppleDictionaryConnector,
+            )
             result = await test_connector_comprehensive(
                 AppleDictionaryConnector,
                 "Apple Dictionary",
@@ -189,7 +191,7 @@ async def run_all_tests():
             )
             results.append(("Apple Dictionary", result))
         else:
-            print(f"\n⚠️ Skipping Apple Dictionary (not on macOS)")
+            print("\n⚠️ Skipping Apple Dictionary (not on macOS)")
     except Exception as e:
         print(f"\n❌ Apple Dictionary test setup failed: {e}")
         results.append(("Apple Dictionary", False))

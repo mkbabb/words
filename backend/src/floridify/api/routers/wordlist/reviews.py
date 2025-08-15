@@ -25,7 +25,8 @@ class ReviewSessionParams(BaseModel):
 
     limit: int = Field(20, ge=1, le=50, description="Maximum words to review")
     mastery_threshold: MasteryLevel = Field(
-        MasteryLevel.SILVER, description="Maximum mastery level to include"
+        MasteryLevel.SILVER,
+        description="Maximum mastery level to include",
     )
 
 
@@ -48,6 +49,7 @@ async def get_due_words(
 
     Returns:
         List of words that need review.
+
     """
     due_words = await repo.get_due_words(wordlist_id, limit)
 
@@ -68,7 +70,7 @@ async def get_due_words(
                 else None,
                 "review_count": word_item.review_data.repetitions,
                 "due_priority": word_item.get_overdue_days(),
-            }
+            },
         )
 
     return ListResponse(
@@ -93,6 +95,7 @@ async def get_review_session(
 
     Returns:
         Review session with selected words.
+
     """
     # Get wordlist
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
@@ -131,7 +134,7 @@ async def get_review_session(
                 if word_item.review_data.last_review_date
                 else None,
                 "notes": word_item.notes,
-            }
+            },
         )
 
     return ResourceResponse(
@@ -168,6 +171,7 @@ async def submit_review(
 
     Returns:
         Updated word metadata.
+
     """
     updated_list = await repo.review_word(wordlist_id, request)
 
@@ -214,6 +218,7 @@ async def submit_bulk_reviews(
 
     Returns:
         Summary of review results.
+
     """
     # Process each review
     success_count = 0
@@ -255,6 +260,7 @@ async def record_study_session(
 
     Returns:
         Updated statistics.
+
     """
     updated_list = await repo.record_study_session(wordlist_id, request)
 
@@ -271,7 +277,7 @@ async def record_study_session(
                 "duration_minutes": request.duration_minutes,
                 "words_studied": request.words_studied,
                 "words_mastered": request.words_mastered,
-            }
+            },
         },
         links={
             "wordlist": f"/wordlists/{wordlist_id}",

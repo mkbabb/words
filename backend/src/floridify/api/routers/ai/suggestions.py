@@ -132,6 +132,7 @@ async def _handle_suggestions_request(params: SuggestionsParams) -> SuggestionsA
 
         Returns sophisticated vocabulary suggestions like "perspicacious",
         "efflorescence", "mellifluous" with detailed explanations.
+
     """
     start_time = time.perf_counter()
 
@@ -144,7 +145,7 @@ async def _handle_suggestions_request(params: SuggestionsParams) -> SuggestionsA
         logger.info(
             f"Suggestions completed: {word_count} words -> "
             f"{len(result.words)} suggestions in {elapsed_ms}ms "
-            f"(confidence: {result.confidence:.1%})"
+            f"(confidence: {result.confidence:.1%})",
         )
 
         return result
@@ -152,5 +153,6 @@ async def _handle_suggestions_request(params: SuggestionsParams) -> SuggestionsA
     except Exception as e:
         logger.error(f"Suggestions failed: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Internal error generating suggestions: {str(e)}"
+            status_code=500,
+            detail=f"Internal error generating suggestions: {e!s}",
         )

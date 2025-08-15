@@ -28,6 +28,7 @@ def get_ml_pipeline() -> WOTDPipeline:
 
     Raises:
         RuntimeError: If models are not available or failed to load.
+
     """
     global _pipeline_cache
 
@@ -41,19 +42,19 @@ def get_ml_pipeline() -> WOTDPipeline:
         if not encoder_path.exists():
             raise RuntimeError(
                 f"Semantic encoder model not found at {encoder_path}. "
-                "Run training pipeline first: python -m floridify.wotd.train"
+                "Run training pipeline first: python -m floridify.wotd.train",
             )
 
         if not dsl_model_path.exists() or not dsl_model_path.is_dir():
             raise RuntimeError(
                 f"DSL model not found at {dsl_model_path}. "
-                "Run training pipeline first: python -m floridify.wotd.train"
+                "Run training pipeline first: python -m floridify.wotd.train",
             )
 
         if not semantic_ids_path.exists():
             raise RuntimeError(
                 f"Semantic IDs vocabulary not found at {semantic_ids_path}. "
-                "Run training pipeline first: python -m floridify.wotd.train"
+                "Run training pipeline first: python -m floridify.wotd.train",
             )
 
         try:
@@ -81,6 +82,7 @@ def reload_ml_pipeline() -> WOTDPipeline:
 
     Raises:
         RuntimeError: If models are not available or failed to load.
+
     """
     global _pipeline_cache
     _pipeline_cache = None
@@ -95,6 +97,7 @@ def get_wotd_training_config() -> dict[str, Any]:
 
     Returns:
         Dictionary with training configuration paths and settings.
+
     """
     models_dir = get_wotd_models_directory()
 
@@ -119,6 +122,7 @@ def check_wotd_models_status() -> dict[str, Any]:
 
     Returns:
         Dictionary with comprehensive model status information.
+
     """
     models_dir = get_wotd_models_directory()
     encoder_path = models_dir / "semantic_encoder.pt"
@@ -136,7 +140,7 @@ def check_wotd_models_status() -> dict[str, Any]:
 
     # Overall pipeline availability
     pipeline_available = all(
-        [model_status["semantic_encoder"], model_status["dsl_model"], model_status["semantic_ids"]]
+        [model_status["semantic_encoder"], model_status["dsl_model"], model_status["semantic_ids"]],
     )
 
     # Load metadata if available
@@ -175,6 +179,7 @@ def prepare_wotd_training_environment() -> dict[str, str]:
 
     Returns:
         Dictionary with prepared training paths.
+
     """
     models_dir = get_wotd_models_directory()
     training_data_dir = models_dir / "training_data"
@@ -204,13 +209,16 @@ def get_semantic_vocabulary() -> dict[str, list[int]]:
 
     Raises:
         RuntimeError: If pipeline is not available.
+
     """
     pipeline = get_ml_pipeline()
     return pipeline.get_semantic_ids()
 
 
 def generate_words_from_prompt(
-    prompt: str, num_words: int = 10, temperature: float = 0.8
+    prompt: str,
+    num_words: int = 10,
+    temperature: float = 0.8,
 ) -> dict[str, Any]:
     """Generate words using the ML pipeline.
 
@@ -226,6 +234,7 @@ def generate_words_from_prompt(
 
     Raises:
         RuntimeError: If generation fails or pipeline unavailable.
+
     """
     try:
         pipeline = get_ml_pipeline()
@@ -245,7 +254,11 @@ def generate_words_from_prompt(
 
 
 def interpolate_corpus_preferences(
-    corpus1: str, corpus2: str, alpha: float = 0.5, context: str | None = None, num_words: int = 10
+    corpus1: str,
+    corpus2: str,
+    alpha: float = 0.5,
+    context: str | None = None,
+    num_words: int = 10,
 ) -> dict[str, Any]:
     """Interpolate between two corpus preferences.
 
@@ -263,6 +276,7 @@ def interpolate_corpus_preferences(
 
     Raises:
         RuntimeError: If interpolation fails or corpus names invalid.
+
     """
     try:
         pipeline = get_ml_pipeline()
@@ -291,6 +305,7 @@ def get_pipeline_health() -> dict[str, Any]:
 
     Returns:
         Complete health check including models, memory usage, and capabilities.
+
     """
     try:
         status = check_wotd_models_status()

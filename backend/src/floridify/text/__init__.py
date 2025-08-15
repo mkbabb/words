@@ -1,5 +1,4 @@
-"""
-Unified text normalization and processing utilities.
+"""Unified text normalization and processing utilities.
 
 Provides comprehensive and fast normalization functions for text processing,
 search operations, and linguistic analysis.

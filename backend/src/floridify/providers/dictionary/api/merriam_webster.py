@@ -10,19 +10,19 @@ from typing import Any
 import httpx
 from beanie import PydanticObjectId
 
-from ....models.definition import DictionaryProvider
-from ....utils.logging import get_logger
-from ...base import DictionaryConnector
 from ....caching.decorators import cached_api_call
 from ....core.state_tracker import Stages, StateTracker
-from ....models.definition import (
+from ....models.dictionary import (
     Definition,
+    DictionaryProvider,
+    DictionaryProviderData,
     Etymology,
     Example,
     Pronunciation,
-    DictionaryProviderData,
     Word,
 )
+from ....utils.logging import get_logger
+from ..base import DictionaryConnector
 
 logger = get_logger(__name__)
 
@@ -45,6 +45,7 @@ class MerriamWebsterConnector(DictionaryConnector):
         Args:
             api_key: API key for Merriam-Webster (optional, will read from config)
             rate_limit: Maximum requests per second (default: 10)
+
         """
         super().__init__(rate_limit)
 
@@ -73,7 +74,7 @@ class MerriamWebsterConnector(DictionaryConnector):
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, *args: Any) -> None:
+    async def __aexit__(self, *args: object) -> None:
         """Async context manager exit."""
         await self.session.aclose()
 
@@ -86,6 +87,7 @@ class MerriamWebsterConnector(DictionaryConnector):
 
         Returns:
             API response data or None if not found
+
         """
         await self._enforce_rate_limit()
 
@@ -101,9 +103,8 @@ class MerriamWebsterConnector(DictionaryConnector):
             # API returns list of suggestions if word not found
             if isinstance(data, list) and data and isinstance(data[0], dict):
                 return data[0]  # Return first matching entry
-            else:
-                logger.warning(f"No definition found for '{word}' in Merriam-Webster")
-                return None
+            logger.warning(f"No definition found for '{word}' in Merriam-Webster")
+            return None
 
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP error from Merriam-Webster API: {e}")
@@ -113,7 +114,9 @@ class MerriamWebsterConnector(DictionaryConnector):
             return None
 
     def _parse_pronunciation(
-        self, data: dict[str, Any], word_id: PydanticObjectId
+        self,
+        data: dict[str, Any],
+        word_id: PydanticObjectId,
     ) -> Pronunciation | None:
         """Parse pronunciation data from API response.
 
@@ -122,6 +125,7 @@ class MerriamWebsterConnector(DictionaryConnector):
 
         Returns:
             Pronunciation object or None
+
         """
         try:
             # Merriam-Webster provides multiple pronunciation formats
@@ -158,6 +162,7 @@ class MerriamWebsterConnector(DictionaryConnector):
 
         Returns:
             Etymology object or None
+
         """
         try:
             # Merriam-Webster includes etymology in "et" field
@@ -194,7 +199,9 @@ class MerriamWebsterConnector(DictionaryConnector):
             return None
 
     async def _parse_definitions(
-        self, data: dict[str, Any], word_id: PydanticObjectId
+        self,
+        data: dict[str, Any],
+        word_id: PydanticObjectId,
     ) -> list[Definition]:
         """Parse definitions from API response.
 
@@ -204,6 +211,7 @@ class MerriamWebsterConnector(DictionaryConnector):
 
         Returns:
             List of Definition objects
+
         """
         definitions: list[Definition] = []
 
@@ -280,6 +288,7 @@ class MerriamWebsterConnector(DictionaryConnector):
 
         Returns:
             Cleaned definition text
+
         """
         text_parts: list[str] = []
 
@@ -304,6 +313,7 @@ class MerriamWebsterConnector(DictionaryConnector):
 
         Returns:
             List of Example objects
+
         """
         examples: list[str] = []
 
@@ -329,7 +339,7 @@ class MerriamWebsterConnector(DictionaryConnector):
         self,
         word_obj: Word,
         state_tracker: StateTracker | None = None,
-    ) -> ProviderData | None:
+    ) -> DictionaryProviderData | None:
         """Fetch definition from Merriam-Webster.
 
         Args:
@@ -338,6 +348,7 @@ class MerriamWebsterConnector(DictionaryConnector):
 
         Returns:
             ProviderData with definitions, pronunciation, and etymology
+
         """
         try:
             if state_tracker:
@@ -373,7 +384,7 @@ class MerriamWebsterConnector(DictionaryConnector):
                 pronunciation_id = pronunciation.id
 
             # Create provider data
-            provider_data = ProviderData(
+            provider_data = DictionaryProviderData(
                 word_id=word_obj.id,
                 provider=self.provider_name,
                 definition_ids=definition_ids,

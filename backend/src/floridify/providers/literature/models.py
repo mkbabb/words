@@ -7,15 +7,13 @@ with the versioned data system while keeping large text content on disk.
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime
 from enum import Enum
-from typing import Any
 
 from beanie import Document
 from pydantic import BaseModel, Field
 
 from ...models.base import BaseMetadata
-from ...models.definition import Language
+from ...models.dictionary import Language
 from ..models import ContentLocation
 
 
@@ -113,11 +111,6 @@ class AuthorInfo(BaseModel):
         return genre_to_style.get(self.primary_genre, 2)
 
 
-# Alias for backward compatibility and clarity
-Author = AuthorInfo
-AuthorMetadata = AuthorInfo
-
-
 class TextQualityMetrics(BaseModel):
     """Quality metrics for literary text content."""
 
@@ -156,10 +149,6 @@ class LiteratureMetadata(Document, BaseMetadata):
     # Content location
     content_location: ContentLocation
 
-    # Processing information
-    processing_version: str = "1.0.0"
-    last_processed: datetime = Field(default_factory=datetime.now)
-
     # Classification
     genre: Genre | None = None
     period: Period | None = None
@@ -180,13 +169,12 @@ class LiteratureMetadata(Document, BaseMetadata):
             [("title", 1)],
             [("source", 1)],
             [("language", 1)],
-            [("processing_version", 1)],
         ]
 
     @property
     def cache_key(self) -> str:
         """Generate cache key for content retrieval."""
-        return f"{self.source.value}_{self.source_id}_{self.processing_version}"
+        return f"{self.source.value}_{self.source_id}"
 
     async def get_text_content(self) -> str | None:
         """Retrieve the full text content from storage."""
@@ -204,7 +192,6 @@ class LiteratureMetadata(Document, BaseMetadata):
         # Update quality metrics
         self.quality_metrics = self._calculate_quality_metrics(text)
         self.text_hash = new_hash
-        self.last_processed = datetime.now()
 
         # Save new content
         self.content_location = await versioned_manager.save_content(
@@ -268,66 +255,12 @@ class LiteratureMetadata(Document, BaseMetadata):
         return await cls.find_one({"text_hash": text_hash})
 
 
-class LiteratureCorpusMetadata(Document, BaseMetadata):
-    """Metadata for literature-based corpora."""
-
-    corpus_id: str = Field(unique=True)
-    name: str
-    description: str | None = None
-
-    # Literature-specific metadata
-    authors: list[AuthorInfo] = Field(default_factory=list)
-    periods: list[Period] = Field(default_factory=list)
-    genres: list[Genre] = Field(default_factory=list)
-    languages: list[Language] = Field(default_factory=list)
-
-    # Source information
-    works: list[str] = Field(default_factory=list)  # LiteratureMetadata IDs
-    total_works: int = 0
-    total_unique_words: int = 0
-    total_word_occurrences: int = 0
-
-    # Processing metadata
-    processing_config: dict[str, Any] = Field(default_factory=dict)
-    ai_analysis: dict[str, Any] | None = None
-    semantic_classification: dict[str, Any] | None = None
-
-    # Quality metrics
-    vocabulary_diversity: float | None = None
-    average_word_length: float | None = None
-    readability_score: float | None = None
-
-    class Settings:
-        name = "literature_corpus_metadata"
-        indexes = [
-            [("corpus_id", 1)],
-            [("name", 1)],
-        ]
-
-    def add_work(self, work_metadata: LiteratureMetadata) -> None:
-        """Add a literary work to this corpus."""
-        work_id = str(work_metadata.id)
-        if work_id not in self.works:
-            self.works.append(work_id)
-            self.total_works += 1
-
-            # Update aggregate metadata
-            if work_metadata.author not in self.authors:
-                self.authors.append(work_metadata.author)
-            if work_metadata.period and work_metadata.period not in self.periods:
-                self.periods.append(work_metadata.period)
-            if work_metadata.genre and work_metadata.genre not in self.genres:
-                self.genres.append(work_metadata.genre)
-            if work_metadata.language not in self.languages:
-                self.languages.append(work_metadata.language)
-
-
 class LiteraryWork(BaseModel):
     """Represents a single literary work with metadata.
-    
+
     Migrated from wotd/literature/models.py.
     """
-    
+
     title: str
     author: AuthorInfo
     gutenberg_id: str
@@ -336,7 +269,7 @@ class LiteraryWork(BaseModel):
     period: Period | None = None
     language: Language = Language.ENGLISH
     url: str | None = None
-    
+
     def __post_init__(self):
         """Generate Gutenberg URL if not provided."""
         if not self.url and self.gutenberg_id:
@@ -344,7 +277,9 @@ class LiteraryWork(BaseModel):
             if self.gutenberg_id.startswith("http"):
                 self.url = self.gutenberg_id
             else:
-                self.url = f"https://www.gutenberg.org/files/{self.gutenberg_id}/{self.gutenberg_id}-0.txt"
+                self.url = (
+                    f"https://www.gutenberg.org/files/{self.gutenberg_id}/{self.gutenberg_id}-0.txt"
+                )
 
 
 class LiteraryWord(BaseModel):
@@ -372,12 +307,3 @@ class LiteraryWord(BaseModel):
     def to_search_word(self) -> str:
         """Convert to format suitable for search corpus."""
         return self.word.lower().strip()
-
-
-class VersionedLiteratureData(BaseMetadata):
-    """Versioned literature data with work reference.
-    
-    Import from providers.models instead of defining here.
-    This is just a placeholder for backward compatibility.
-    """
-    pass

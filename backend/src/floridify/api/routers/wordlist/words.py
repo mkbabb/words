@@ -1,6 +1,5 @@
 """WordList words management endpoints."""
 
-from datetime import UTC, datetime
 from typing import Any
 
 from beanie import PydanticObjectId
@@ -8,8 +7,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ....models import Word
-from ....text import normalize
-from ....wordlist.constants import Temperature
 from ...core import ListResponse, ResourceResponse
 from ...repositories import WordAddRequest, WordListRepository
 
@@ -21,7 +18,8 @@ class WordListQueryParams(BaseModel):
 
     # Filters
     mastery_levels: list[str] | None = Field(
-        None, description="Filter by mastery levels (bronze, silver, gold)"
+        None,
+        description="Filter by mastery levels (bronze, silver, gold)",
     )
     hot_only: bool | None = Field(None, description="Show only hot items")
     due_only: bool | None = Field(None, description="Show only items due for review")
@@ -44,13 +42,68 @@ class WordListQueryParams(BaseModel):
     limit: int = Field(20, ge=1, le=100, description="Maximum results")
 
 
+async def apply_wordlist_filters_and_sort(
+    words: list[Any],
+    params: WordListQueryParams,
+) -> list[Any]:
+    """Apply filtering and sorting to wordlist items."""
+    filtered = words
+
+    # Apply filters
+    if params.mastery_levels:
+        filtered = [w for w in filtered if w.get("mastery_level") in params.mastery_levels]
+    if params.hot_only:
+        filtered = [w for w in filtered if w.get("is_hot")]
+    if params.due_only:
+        filtered = [w for w in filtered if w.get("is_due")]
+    if params.min_views is not None:
+        filtered = [w for w in filtered if w.get("view_count", 0) >= params.min_views]
+    if params.max_views is not None:
+        filtered = [w for w in filtered if w.get("view_count", 0) <= params.max_views]
+    if params.reviewed is not None:
+        filtered = [w for w in filtered if w.get("reviewed") == params.reviewed]
+
+    # Apply sorting
+    sort_fields = params.sort_by.split(",")
+    sort_orders = params.sort_order.split(",")
+
+    # Ensure we have matching sort orders for each field
+    while len(sort_orders) < len(sort_fields):
+        sort_orders.append(sort_orders[-1] if sort_orders else "asc")
+
+    # Sort by multiple fields
+    for field, order in reversed(list(zip(sort_fields, sort_orders, strict=False))):
+        reverse = order.lower() == "desc"
+        filtered = sorted(filtered, key=lambda x: x.get(field.strip(), ""), reverse=reverse)
+
+    return filtered
+
+
+async def convert_wordlist_items_to_response(
+    items: list[Any],
+    paginated: bool = True,
+    offset: int = 0,
+    limit: int = 20,
+) -> tuple[list[Any], int]:
+    """Convert wordlist items to response format with optional pagination."""
+    total = len(items)
+
+    if paginated:
+        items = items[offset : offset + limit]
+
+    return items, total
+
+
 class WordListSearchQueryParams(WordListQueryParams):
     """Query parameters for searching within a wordlist."""
 
     # Search-specific parameters
     query: str = Field(..., description="Search query")
     max_results: int = Field(
-        100, ge=1, le=500, description="Maximum search results before filtering"
+        100,
+        ge=1,
+        le=500,
+        description="Maximum search results before filtering",
     )
     min_score: float = Field(0.4, ge=0.0, le=1.0, description="Minimum match score")
 
@@ -94,6 +147,7 @@ async def list_words(
 
     Returns:
         Paginated list of words with metadata.
+
     """
     # Get wordlist
     wordlist = await repo.get(wordlist_id, raise_on_missing=True)
@@ -104,7 +158,10 @@ async def list_words(
 
     # Convert to response format with pagination
     items, total = await convert_wordlist_items_to_response(
-        filtered_words, paginated=True, offset=params.offset, limit=params.limit
+        filtered_words,
+        paginated=True,
+        offset=params.offset,
+        limit=params.limit,
     )
 
     return ListResponse(
@@ -132,6 +189,7 @@ async def add_word(
 
     Errors:
         409: Word already in list
+
     """
     updated_list = await repo.add_word(wordlist_id, request)
 

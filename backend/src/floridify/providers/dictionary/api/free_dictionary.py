@@ -12,13 +12,10 @@ import httpx
 
 from ....caching.decorators import cached_api_call
 from ....core.state_tracker import Stages, StateTracker
-from ....models import (
-    ProviderData,
-    Word,
-)
-from ....models.definition import DictionaryProvider
+from ....models import Word
+from ....models.dictionary import DictionaryProvider, DictionaryProviderData
 from ....utils.logging import get_logger
-from ...base import DictionaryConnector
+from ..base import DictionaryConnector
 
 logger = get_logger(__name__)
 
@@ -40,6 +37,7 @@ class FreeDictionaryConnector(DictionaryConnector):
 
         Args:
             rate_limit: Maximum requests per second (default: 60, very generous)
+
         """
         super().__init__()
         self.base_url = "https://api.dictionaryapi.dev/api/v2/entries/en"
@@ -59,7 +57,7 @@ class FreeDictionaryConnector(DictionaryConnector):
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, *args: Any) -> None:
+    async def __aexit__(self, *args: object) -> None:
         """Async context manager exit."""
         await self.session.aclose()
 
@@ -72,6 +70,7 @@ class FreeDictionaryConnector(DictionaryConnector):
 
         Returns:
             API response data or None if not found
+
         """
         await self._enforce_rate_limit()
 
@@ -104,7 +103,7 @@ class FreeDictionaryConnector(DictionaryConnector):
         self,
         word_obj: Word,
         state_tracker: StateTracker | None = None,
-    ) -> ProviderData | None:
+    ) -> DictionaryProviderData | None:
         """Fetch definition from Free Dictionary.
 
         Args:
@@ -113,6 +112,7 @@ class FreeDictionaryConnector(DictionaryConnector):
 
         Returns:
             ProviderData with definitions, pronunciation, and etymology
+
         """
         try:
             if state_tracker:
@@ -128,7 +128,7 @@ class FreeDictionaryConnector(DictionaryConnector):
                 raise ValueError(f"Word {word_obj.text} must be saved before processing")
 
             # Parse and create provider data
-            provider_data = ProviderData(
+            provider_data = DictionaryProviderData(
                 word_id=word_obj.id,
                 provider=self.provider_name,
                 definition_ids=[],
@@ -145,4 +145,3 @@ class FreeDictionaryConnector(DictionaryConnector):
             if state_tracker:
                 await state_tracker.update_error(str(e), Stages.PROVIDER_FETCH_ERROR)
             return None
-

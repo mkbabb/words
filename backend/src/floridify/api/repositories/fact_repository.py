@@ -77,4 +77,3 @@ class FactRepository(BaseRepository[Fact, FactCreate, FactUpdate]):
 
     async def _cascade_delete(self, fact: Fact) -> None:
         """No cascade needed for facts."""
-        pass

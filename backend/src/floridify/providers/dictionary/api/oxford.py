@@ -14,12 +14,11 @@ from ....models import (
     Etymology,
     Example,
     Pronunciation,
-    ProviderData,
     Word,
 )
-from ....models.definition import DictionaryProvider
+from ....models.dictionary import DictionaryProvider, DictionaryProviderData
 from ....utils.logging import get_logger
-from ...base import DictionaryConnector
+from ..base import DictionaryConnector
 
 logger = get_logger(__name__)
 
@@ -34,6 +33,7 @@ class OxfordConnector(DictionaryConnector):
             app_id: Oxford API application ID
             api_key: Oxford API key
             rate_limit: Requests per second (max varies by plan)
+
         """
         super().__init__(rate_limit)
         self.app_id = app_id
@@ -57,7 +57,7 @@ class OxfordConnector(DictionaryConnector):
         self,
         word_obj: Word,
         state_tracker: StateTracker | None = None,
-    ) -> ProviderData | None:
+    ) -> DictionaryProviderData | None:
         """Fetch definition data for a word from Oxford API.
 
         Args:
@@ -66,6 +66,7 @@ class OxfordConnector(DictionaryConnector):
 
         Returns:
             ProviderData if successful, None if not found or error
+
         """
         await self._enforce_rate_limit()
 
@@ -77,7 +78,7 @@ class OxfordConnector(DictionaryConnector):
 
             if response.status_code == 404:
                 return None  # Word not found
-            elif response.status_code == 429:
+            if response.status_code == 429:
                 # Rate limited - wait and retry once
                 await asyncio.sleep(1)
                 response = await self.session.get(url)
@@ -92,8 +93,11 @@ class OxfordConnector(DictionaryConnector):
             return None
 
     async def _parse_oxford_response(
-        self, word: str, data: dict[str, Any], word_obj: Word
-    ) -> ProviderData:
+        self,
+        word: str,
+        data: dict[str, Any],
+        word_obj: Word,
+    ) -> DictionaryProviderData:
         """Parse Oxford API response using new models.
 
         Args:
@@ -103,6 +107,7 @@ class OxfordConnector(DictionaryConnector):
 
         Returns:
             Parsed ProviderData
+
         """
         # Extract all components using the new API pattern
         assert word_obj.id is not None  # After save(), id is guaranteed to be not None
@@ -119,7 +124,7 @@ class OxfordConnector(DictionaryConnector):
         etymology = await self.extract_etymology(data)
 
         # Create and return ProviderData
-        return ProviderData(
+        return DictionaryProviderData(
             word_id=word_obj.id,
             provider=self.provider_name,
             definition_ids=[d.id for d in definitions if d.id is not None],
@@ -133,7 +138,9 @@ class OxfordConnector(DictionaryConnector):
         await self.session.aclose()
 
     async def extract_pronunciation(
-        self, raw_data: dict[str, Any], word_id: PydanticObjectId
+        self,
+        raw_data: dict[str, Any],
+        word_id: PydanticObjectId,
     ) -> Pronunciation | None:
         """Extract pronunciation from Oxford data.
 
@@ -142,6 +149,7 @@ class OxfordConnector(DictionaryConnector):
 
         Returns:
             Pronunciation if found, None otherwise
+
         """
         try:
             results = raw_data.get("results", [])
@@ -184,7 +192,9 @@ class OxfordConnector(DictionaryConnector):
         return None
 
     async def extract_definitions(
-        self, raw_data: dict[str, Any], word_id: PydanticObjectId
+        self,
+        raw_data: dict[str, Any],
+        word_id: PydanticObjectId,
     ) -> list[Definition]:
         """Extract definitions from Oxford data.
 
@@ -194,6 +204,7 @@ class OxfordConnector(DictionaryConnector):
 
         Returns:
             List of Definition objects
+
         """
         definitions: list[Definition] = []
 
@@ -296,6 +307,7 @@ class OxfordConnector(DictionaryConnector):
 
         Returns:
             Etymology if found, None otherwise
+
         """
         try:
             results = raw_data.get("results", [])

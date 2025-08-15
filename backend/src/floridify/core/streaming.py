@@ -113,6 +113,7 @@ class StreamingProgressHandler:
 
         Yields:
             SSE-formatted strings for streaming to client
+
         """
         try:
             # Send initial configuration if requested
@@ -173,7 +174,8 @@ class StreamingProgressHandler:
         except Exception as e:
             self.logger.error(f"Streaming error: {e}")
             error_event = SSEEvent(
-                event_type="error", data={"type": "error", "message": f"Streaming error: {str(e)}"}
+                event_type="error",
+                data={"type": "error", "message": f"Streaming error: {e!s}"},
             )
             yield error_event.format()
 
@@ -223,6 +225,7 @@ async def create_streaming_response(
 
     Returns:
         StreamingResponse with SSE content
+
     """
 
     async def event_generator() -> AsyncGenerator[str, None]:
@@ -253,7 +256,8 @@ async def create_streaming_response(
                             state = await asyncio.wait_for(queue.get(), timeout=0.1)
 
                             progress_event = SSEEvent(
-                                event_type="progress", data=state.model_dump_optimized()
+                                event_type="progress",
+                                data=state.model_dump_optimized(),
                             )
                             yield progress_event.format()
 
@@ -316,7 +320,8 @@ async def create_streaming_response(
         except Exception as e:
             logger.error(f"Streaming generator error: {e}")
             error_event = SSEEvent(
-                event_type="error", data={"type": "error", "message": f"Streaming error: {str(e)}"}
+                event_type="error",
+                data={"type": "error", "message": f"Streaming error: {e!s}"},
             )
             yield error_event.format()
 
@@ -376,7 +381,7 @@ async def create_streaming_response(
                                         await asyncio.wait_for(process_task, timeout=1.0)
                                     except TimeoutError:
                                         logger.warning(
-                                            "Process task did not complete after state marked complete"
+                                            "Process task did not complete after state marked complete",
                                         )
 
                                 if process_task.done():
@@ -401,7 +406,8 @@ async def create_streaming_response(
                                                 "result": result_data,
                                             }
                                             completion_event = SSEEvent(
-                                                event_type="complete", data=completion_data
+                                                event_type="complete",
+                                                data=completion_data,
                                             )
                                             yield completion_event.format()
                                     else:
@@ -410,7 +416,8 @@ async def create_streaming_response(
                                             "message": "Process completed successfully",
                                         }
                                         completion_event = SSEEvent(
-                                            event_type="complete", data=completion_data
+                                            event_type="complete",
+                                            data=completion_data,
                                         )
                                         yield completion_event.format()
                                 break
@@ -431,7 +438,7 @@ async def create_streaming_response(
 
         except Exception as e:
             logger.error(f"Streaming error: {e}")
-            error_data = {"message": f"Streaming error: {str(e)}"}
+            error_data = {"message": f"Streaming error: {e!s}"}
             error_event = SSEEvent(event_type="error", data=error_data)
             yield error_event.format()
 

@@ -9,12 +9,8 @@ import traceback
 
 from ..ai import get_definition_synthesizer
 from ..ai.synthesis_functions import cluster_definitions
-from ..providers.dictionary.api.oxford import OxfordConnector
-from ..providers.base import DictionaryConnector
-from ..providers.dictionary.local.apple_dictionary import AppleDictionaryConnector
-from ..providers.dictionary.scraper.wiktionary import WiktionaryConnector
 from ..models.base import Etymology
-from ..models.definition import (
+from ..models.dictionary import (
     Definition,
     DictionaryProvider,
     Language,
@@ -22,6 +18,10 @@ from ..models.definition import (
     SynthesizedDictionaryEntry,
     Word,
 )
+from ..providers.base import DictionaryConnector
+from ..providers.dictionary.api.oxford import OxfordConnector
+from ..providers.dictionary.local.apple_dictionary import AppleDictionaryConnector
+from ..providers.dictionary.scraper.wiktionary import WiktionaryConnector
 from ..storage.mongodb import get_storage, get_synthesized_entry
 from ..utils.config import Config
 from ..utils.logging import (
@@ -62,6 +62,7 @@ async def lookup_word_pipeline(
 
     Returns:
         Synthesized dictionary entry or None if not found
+
     """
     # Set defaults
     if providers is None:
@@ -107,7 +108,7 @@ async def lookup_word_pipeline(
         logger.info(
             f"✅ Found best match: '{best_match}' "
             f"(score: {best_match_result.score:.3f}, method: {best_match_result.method}, "
-            f"search_time: {search_duration:.2f}s)"
+            f"search_time: {search_duration:.2f}s)",
         )
 
         # Handle force_refresh by deleting existing entry
@@ -115,7 +116,7 @@ async def lookup_word_pipeline(
             existing = await get_synthesized_entry(word)
             if existing:
                 logger.info(
-                    f"🗑️  Deleting existing synthesized entry for '{best_match}' due to force_refresh"
+                    f"🗑️  Deleting existing synthesized entry for '{best_match}' due to force_refresh",
                 )
                 await existing.delete()
         else:
@@ -130,7 +131,7 @@ async def lookup_word_pipeline(
             await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
 
         logger.info(
-            f"🔄 Fetching from {len(providers)} providers in parallel: {[p.value for p in providers]}"
+            f"🔄 Fetching from {len(providers)} providers in parallel: {[p.value for p in providers]}",
         )
         provider_fetch_start = time.perf_counter()
 
@@ -161,7 +162,7 @@ async def lookup_word_pipeline(
 
         total_provider_time = time.perf_counter() - provider_fetch_start
         logger.info(
-            f"✅ Fetched from {len(providers_data)}/{len(providers)} providers in {total_provider_time:.2f}s"
+            f"✅ Fetched from {len(providers_data)}/{len(providers)} providers in {total_provider_time:.2f}s",
         )
 
         if state_tracker:
@@ -176,7 +177,7 @@ async def lookup_word_pipeline(
         if not no_ai and providers_data:
             try:
                 logger.info(
-                    f"🤖 Starting AI synthesis for '{best_match}' with {len(providers_data)} providers"
+                    f"🤖 Starting AI synthesis for '{best_match}' with {len(providers_data)} providers",
                 )
                 ai_start = time.perf_counter()
 
@@ -196,7 +197,7 @@ async def lookup_word_pipeline(
                 if synthesized_entry:
                     logger.info(
                         f"✅ Successfully synthesized entry for '{best_match}' "
-                        f"in {ai_duration:.2f}s"
+                        f"in {ai_duration:.2f}s",
                     )
 
                     # Log synthesis metrics
@@ -208,12 +209,11 @@ async def lookup_word_pipeline(
                         provider_count=len(providers_data),
                     )
                     return synthesized_entry
-                else:
-                    logger.error(
-                        f"❌ AI synthesis returned empty result for '{best_match}' "
-                        f"after {ai_duration:.2f}s"
-                    )
-                    return None
+                logger.error(
+                    f"❌ AI synthesis returned empty result for '{best_match}' "
+                    f"after {ai_duration:.2f}s",
+                )
+                return None
             except Exception as e:
                 logger.error(f"❌ AI synthesis failed for '{best_match}': {e}")
                 return None
@@ -228,9 +228,8 @@ async def lookup_word_pipeline(
                     provider_data=providers_data[0],  # Use first provider only
                     state_tracker=state_tracker,
                 )
-            else:
-                logger.warning("No provider data available for non-AI synthesis")
-                return None
+            logger.warning("No provider data available for non-AI synthesis")
+            return None
 
     except Exception as e:
         logger.error(f"❌ Lookup pipeline failed for '{word}': {e}")
@@ -249,6 +248,7 @@ async def _get_provider_definition(
 
     Returns:
         Tuple of (provider_data, provider_metrics)
+
     """
     logger.debug(f"📖 Fetching definition from {provider.value} for '{word}'")
 
@@ -262,7 +262,7 @@ async def _get_provider_definition(
             if not config.oxford.app_id or not config.oxford.api_key:
                 raise ValueError(
                     "Oxford Dictionary API credentials not configured. "
-                    "Please update auth/config.toml with your Oxford app_id and api_key."
+                    "Please update auth/config.toml with your Oxford app_id and api_key.",
                 )
             connector = OxfordConnector(app_id=config.oxford.app_id, api_key=config.oxford.api_key)
         elif provider == DictionaryProvider.APPLE_DICTIONARY:
@@ -348,7 +348,7 @@ async def _synthesize_with_ai(
         if result:
             logger.debug(
                 f"✅ AI synthesis complete: {len(result.definition_ids) if result.definition_ids else 0} "
-                f"synthesized definitions"
+                f"synthesized definitions",
             )
         else:
             logger.warning(f"⚠️  AI synthesis returned empty result for '{word}'")
@@ -416,7 +416,7 @@ async def _create_provider_mapped_entry(
             processed_indices.update(dedup_def.source_indices)
 
         logger.info(
-            f"✅ Deduplicated {len(all_definitions)} → {len(unique_definitions)} definitions"
+            f"✅ Deduplicated {len(all_definitions)} → {len(unique_definitions)} definitions",
         )
 
         # Use AI for clustering only
@@ -426,7 +426,10 @@ async def _create_provider_mapped_entry(
         logger.info("📊 Clustering definitions (AI-assisted)")
 
         clustered_definitions = await cluster_definitions(
-            word_obj, unique_definitions, synthesizer.ai, state_tracker
+            word_obj,
+            unique_definitions,
+            synthesizer.ai,
+            state_tracker,
         )
 
         # Save the clustered definitions to persist meaning_cluster assignments
@@ -440,7 +443,7 @@ async def _create_provider_mapped_entry(
         etymology = None
         if hasattr(provider_data, "raw_data") and provider_data.raw_data:
             raw_data = provider_data.raw_data
-            if "etymology" in raw_data and raw_data["etymology"]:
+            if raw_data.get("etymology"):
                 etymology = Etymology(text=raw_data["etymology"])
 
         # Create the synthesized entry without AI content generation
@@ -459,7 +462,7 @@ async def _create_provider_mapped_entry(
 
         logger.info(
             f"✅ Created provider-mapped entry for '{word}' with "
-            f"{len(synthesized_entry.definition_ids)} clustered definitions"
+            f"{len(synthesized_entry.definition_ids)} clustered definitions",
         )
 
         if state_tracker:
@@ -475,7 +478,9 @@ async def _create_provider_mapped_entry(
 @log_timing
 @log_stage("AI Fallback", "🔮")
 async def _ai_fallback_lookup(
-    word: str, force_refresh: bool = False, state_tracker: StateTracker | None = None
+    word: str,
+    force_refresh: bool = False,
+    state_tracker: StateTracker | None = None,
 ) -> SynthesizedDictionaryEntry | None:
     """AI fallback when no provider definitions are found."""
     logger.info(f"🔮 Attempting AI fallback generation for '{word}'")
@@ -485,14 +490,17 @@ async def _ai_fallback_lookup(
         start_time = time.perf_counter()
 
         ai_entry = await synthesizer.generate_fallback_entry(
-            word, Language.ENGLISH, force_refresh, state_tracker
+            word,
+            Language.ENGLISH,
+            force_refresh,
+            state_tracker,
         )
         duration = time.perf_counter() - start_time
 
         if ai_entry and ai_entry.definition_ids:
             logger.info(
                 f"✅ AI fallback successful for '{word}': "
-                f"{len(ai_entry.definition_ids)} definitions generated in {duration:.2f}s"
+                f"{len(ai_entry.definition_ids)} definitions generated in {duration:.2f}s",
             )
 
             log_metrics(
@@ -503,11 +511,10 @@ async def _ai_fallback_lookup(
             )
 
             return ai_entry
-        else:
-            logger.warning(
-                f"⚠️  AI fallback returned no definitions for '{word}' after {duration:.2f}s"
-            )
-            return None
+        logger.warning(
+            f"⚠️  AI fallback returned no definitions for '{word}' after {duration:.2f}s",
+        )
+        return None
 
     except Exception as e:
         logger.error(f"❌ AI fallback failed for '{word}': {e}")

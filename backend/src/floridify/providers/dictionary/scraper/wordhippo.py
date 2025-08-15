@@ -7,19 +7,17 @@ from typing import Any
 from beanie import PydanticObjectId
 from bs4 import BeautifulSoup
 
-from ....core.state_tracker import StateTracker
 from ....models import (
     Definition,
     Etymology,
     Example,
     Pronunciation,
-    ProviderData,
     Word,
 )
-from ....models.definition import DictionaryProvider
+from ....models.dictionary import DictionaryProvider, DictionaryProviderData, Language
 from ....utils.logging import get_logger
-from ...base import DictionaryConnector
 from ...utils import RateLimitConfig, respectful_scraper
+from ..base import DictionaryConnector
 
 logger = get_logger(__name__)
 
@@ -32,8 +30,11 @@ class WordHippoConnector(DictionaryConnector):
 
         Args:
             rate_limit: Maximum requests per second (default 1.5 for respectful scraping)
+
         """
-        super().__init__(rate_limit)
+        from ....models.dictionary import DictionaryProvider
+
+        super().__init__(DictionaryProvider.WORDHIPPO)
         self.base_url = "https://www.wordhippo.com"
         self.rate_config = RateLimitConfig(
             base_requests_per_second=rate_limit,
@@ -41,47 +42,44 @@ class WordHippoConnector(DictionaryConnector):
             max_delay=10.0,
         )
 
-    @property
-    def provider_name(self) -> DictionaryProvider:
-        """Name of the dictionary provider."""
-        return DictionaryProvider.WORDHIPPO
+    provider_name: str = DictionaryProvider.WORDHIPPO.value
 
-    @property
-    def provider_version(self) -> str:
-        """Version of the provider implementation."""
-        return "1.0.0"
+    provider_version: str = "1.0.0"
 
     async def _fetch_from_provider(
         self,
-        word_obj: Word,
-        state_tracker: StateTracker | None = None,
-    ) -> ProviderData | None:
+        word: str,
+        language: Language,
+    ) -> DictionaryProviderData | None:
         """Fetch definition data for a word from WordHippo.
 
         Args:
-            word_obj: The word to look up
-            state_tracker: Optional state tracker for progress updates
+            word: The word text to look up
+            language: Language for the word
 
         Returns:
-            ProviderData if successful, None if not found or error
+            DictionaryProviderData if successful, None if not found or error
+
         """
         try:
             # WordHippo URLs follow pattern: /what-is/the-meaning-of-the-word/WORD.html
-            url = f"{self.base_url}/what-is/the-meaning-of-the-word/{word_obj.text.lower()}.html"
+            url = f"{self.base_url}/what-is/the-meaning-of-the-word/{word.lower()}.html"
 
             async with respectful_scraper("wordhippo", self.rate_config) as client:
                 response = await client.get(url)
 
                 if response.status_code == 404:
-                    logger.debug(f"Word '{word_obj.text}' not found on WordHippo")
+                    logger.debug(f"Word '{word}' not found on WordHippo")
                     return None
 
             # Parse HTML
             soup = BeautifulSoup(response.text, "html.parser")
 
-            # Check that word_obj has been saved and has an ID
-            if not word_obj.id:
-                raise ValueError(f"Word {word_obj.text} must be saved before processing")
+            # Get or create word object to get ID
+            word_obj = await Word.find_one({"text": word, "language": language})
+            if not word_obj:
+                word_obj = Word(text=word, language=language)
+                await word_obj.save()
 
             # Extract all components
             definitions = await self._extract_definitions(soup, word_obj.id)
@@ -89,9 +87,9 @@ class WordHippoConnector(DictionaryConnector):
             etymology = await self._extract_etymology(soup)
 
             # Fetch enhanced data from additional URLs (delays handled by RespectfulHttpClient)
-            synonyms = await self._fetch_synonyms(word_obj.text)
-            antonyms = await self._fetch_antonyms(word_obj.text)
-            sentences = await self._fetch_sentences(word_obj.text)
+            synonyms = await self._fetch_synonyms(word)
+            antonyms = await self._fetch_antonyms(word)
+            sentences = await self._fetch_sentences(word)
 
             # Enhance definitions with synonyms, antonyms, and additional examples
             await self._enhance_definitions_with_data(definitions, synonyms, antonyms, sentences)
@@ -110,9 +108,9 @@ class WordHippoConnector(DictionaryConnector):
                 "sentences_count": len(sentences),
             }
 
-            return ProviderData(
+            return DictionaryProviderData(
                 word_id=word_obj.id,
-                provider=self.provider_name,
+                provider=DictionaryProvider.WORDHIPPO,
                 definition_ids=[d.id for d in definitions if d.id is not None],
                 pronunciation_id=pronunciation.id if pronunciation else None,
                 etymology=etymology,
@@ -120,11 +118,13 @@ class WordHippoConnector(DictionaryConnector):
             )
 
         except Exception as e:
-            logger.error(f"Error fetching {word_obj.text} from WordHippo: {e}")
+            logger.error(f"Error fetching {word} from WordHippo: {e}")
             return None
 
     async def _extract_definitions(
-        self, soup: BeautifulSoup, word_id: PydanticObjectId
+        self,
+        soup: BeautifulSoup,
+        word_id: PydanticObjectId,
     ) -> list[Definition]:
         """Extract definitions from WordHippo HTML.
 
@@ -134,6 +134,7 @@ class WordHippoConnector(DictionaryConnector):
 
         Returns:
             List of Definition objects
+
         """
         definitions = []
 
@@ -193,7 +194,8 @@ class WordHippoConnector(DictionaryConnector):
                     # Look for examples in nearby elements
                     if definition.id is not None:
                         examples = await self._extract_examples_for_definition(
-                            parent, definition.id
+                            parent,
+                            definition.id,
                         )
                         if examples:
                             definition.example_ids = [ex.id for ex in examples if ex.id]
@@ -226,7 +228,9 @@ class WordHippoConnector(DictionaryConnector):
         return definitions
 
     async def _extract_examples_for_definition(
-        self, parent_elem: Any, definition_id: PydanticObjectId
+        self,
+        parent_elem: Any,
+        definition_id: PydanticObjectId,
     ) -> list[Example]:
         """Extract examples for a specific definition.
 
@@ -236,6 +240,7 @@ class WordHippoConnector(DictionaryConnector):
 
         Returns:
             List of Example objects
+
         """
         examples = []
 
@@ -260,7 +265,9 @@ class WordHippoConnector(DictionaryConnector):
         return examples
 
     async def _extract_pronunciation(
-        self, soup: BeautifulSoup, word_id: PydanticObjectId
+        self,
+        soup: BeautifulSoup,
+        word_id: PydanticObjectId,
     ) -> Pronunciation | None:
         """Extract pronunciation from WordHippo HTML.
 
@@ -270,6 +277,7 @@ class WordHippoConnector(DictionaryConnector):
 
         Returns:
             Pronunciation if found, None otherwise
+
         """
         try:
             # WordHippo may have pronunciation in various formats
@@ -306,6 +314,7 @@ class WordHippoConnector(DictionaryConnector):
 
         Returns:
             Etymology if found, None otherwise
+
         """
         try:
             # WordHippo may include etymology in various sections
@@ -343,12 +352,14 @@ class WordHippoConnector(DictionaryConnector):
 
         Returns:
             List of synonym strings
+
         """
-        synonyms = []
+        synonyms: list[str] = []
 
         try:
-            url = f"what-is/another-word-for/{word.lower()}.html"
-            response = await self.http_client.get(url)
+            url = f"{self.base_url}/what-is/another-word-for/{word.lower()}.html"
+            async with respectful_scraper("wordhippo", self.rate_config) as client:
+                response = await client.get(url)
 
             if response.status_code == 404:
                 logger.debug(f"No synonyms page found for '{word}'")
@@ -388,12 +399,14 @@ class WordHippoConnector(DictionaryConnector):
 
         Returns:
             List of antonym strings
+
         """
-        antonyms = []
+        antonyms: list[str] = []
 
         try:
-            url = f"what-is/the-opposite-of/{word.lower()}.html"
-            response = await self.http_client.get(url)
+            url = f"{self.base_url}/what-is/the-opposite-of/{word.lower()}.html"
+            async with respectful_scraper("wordhippo", self.rate_config) as client:
+                response = await client.get(url)
 
             if response.status_code == 404:
                 logger.debug(f"No antonyms page found for '{word}'")
@@ -433,12 +446,14 @@ class WordHippoConnector(DictionaryConnector):
 
         Returns:
             List of example sentence strings
+
         """
-        sentences = []
+        sentences: list[str] = []
 
         try:
-            url = f"what-is/sentences-with-the-word/{word.lower()}.html"
-            response = await self.http_client.get(url)
+            url = f"{self.base_url}/what-is/sentences-with-the-word/{word.lower()}.html"
+            async with respectful_scraper("wordhippo", self.rate_config) as client:
+                response = await client.get(url)
 
             if response.status_code == 404:
                 logger.debug(f"No sentences page found for '{word}'")
@@ -449,7 +464,8 @@ class WordHippoConnector(DictionaryConnector):
 
             # Look for sentence examples - WordHippo typically uses specific classes
             sentence_elements = soup.find_all(
-                ["div", "span"], class_=["sentence", "example", "examplesentence"]
+                ["div", "span"],
+                class_=["sentence", "example", "examplesentence"],
             )
 
             # Also look for quote-like structures or list items
@@ -496,6 +512,7 @@ class WordHippoConnector(DictionaryConnector):
             synonyms: List of synonyms to add
             antonyms: List of antonyms to add
             sentences: List of sentences to add as examples
+
         """
         try:
             # Distribute synonyms and antonyms across definitions
@@ -541,4 +558,4 @@ class WordHippoConnector(DictionaryConnector):
 
     async def close(self) -> None:
         """Close the HTTP session."""
-        await self.http_client.close()
+        pass  # No persistent client to close

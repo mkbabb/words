@@ -3,7 +3,7 @@
 Comprehensive mapping of Cervantes' works available on Project Gutenberg.
 """
 
-from ....models.definition import Language
+from ....models.dictionary import Language
 from ..models import AuthorInfo, Genre, LiteraryWork, Period
 
 AUTHOR = AuthorInfo(
@@ -146,9 +146,11 @@ WORKS = [
     ),
 ]
 
+
 def get_works() -> list[LiteraryWork]:
     """Get all works by Cervantes."""
     return WORKS
+
 
 def get_author() -> AuthorInfo:
     """Get author information."""

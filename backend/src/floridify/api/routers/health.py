@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from ...caching.unified import get_unified
 from ...core.search_pipeline import get_search_engine
-from ...models.definition import Language
+from ...models.dictionary import Language
 from ...storage.mongodb import _ensure_initialized, get_storage
 from ...utils.logging import get_logger
 
@@ -48,7 +48,8 @@ class HealthResponse(HealthCheckResponse):
     cache_hit_rate: float = Field(..., ge=0.0, le=1.0, description="Cache hit rate")
     uptime_seconds: int = Field(..., ge=0, description="Service uptime in seconds")
     connection_pool: dict[str, Any] = Field(
-        default_factory=dict, description="MongoDB connection pool stats"
+        default_factory=dict,
+        description="MongoDB connection pool stats",
     )
 
 

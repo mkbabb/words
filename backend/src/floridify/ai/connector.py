@@ -37,8 +37,8 @@ from .models import (
     RegisterClassificationResponse,
     SuggestionsResponse,
     SynonymGenerationResponse,
-    SyntheticCorpusResponse,
     SynthesisResponse,
+    SyntheticCorpusResponse,
     TextGenerationRequest,
     TextGenerationResponse,
     UsageNoteResponse,
@@ -97,6 +97,7 @@ class OpenAIConnector:
             response_model: The Pydantic model for response parsing
             task_name: Optional task name for model selection
             **kwargs: Additional parameters for the API call
+
         """
         start_time = time.perf_counter()
         retry_count = 0
@@ -137,9 +138,11 @@ class OpenAIConnector:
                 # Reasoning models need massive token allocation for internal thinking
                 # For small outputs like 30-50 tokens, we need 10-20x more for reasoning
                 reasoning_multiplier = 30 if max_tokens_value <= 50 else 15
-                request_params["max_completion_tokens"] = max(4000, max_tokens_value * reasoning_multiplier)
+                request_params["max_completion_tokens"] = max(
+                    4000, max_tokens_value * reasoning_multiplier
+                )
             else:
-                # Non-reasoning models with completion tokens use standard allocation  
+                # Non-reasoning models with completion tokens use standard allocation
                 request_params["max_completion_tokens"] = max_tokens_value
         else:
             # Legacy models use max_tokens
@@ -159,13 +162,14 @@ class OpenAIConnector:
                     f"🤖 OpenAI API call: model={active_model}, "
                     f"task={task_name or 'default'}, "
                     f"response_type={response_model.__name__}, "
-                    f"prompt_length={len(prompt)}, retry={retry_count}"
+                    f"prompt_length={len(prompt)}, retry={retry_count}",
                 )
 
                 # Make the API call with structured output
                 api_start = time.perf_counter()
                 response = await self.client.beta.chat.completions.parse(
-                    response_format=response_model, **request_params
+                    response_format=response_model,
+                    **request_params,
                 )
                 api_duration = time.perf_counter() - api_start
 
@@ -211,7 +215,7 @@ class OpenAIConnector:
                 total_duration = time.perf_counter() - start_time
                 logger.info(
                     f"✅ OpenAI API success: {response_model.__name__} "
-                    f"in {total_duration:.2f}s (tokens: {token_usage.get('total_tokens', 'N/A')})"
+                    f"in {total_duration:.2f}s (tokens: {token_usage.get('total_tokens', 'N/A')})",
                 )
 
                 return result
@@ -224,13 +228,13 @@ class OpenAIConnector:
                     wait_time = retry_count * 2  # Exponential backoff
                     logger.warning(
                         f"⚠️  OpenAI API error (attempt {retry_count}/{max_retries}): {e}. "
-                        f"Retrying in {wait_time}s..."
+                        f"Retrying in {wait_time}s...",
                     )
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(
                         f"❌ OpenAI API failed after {max_retries} attempts "
-                        f"({duration:.2f}s total): {e}"
+                        f"({duration:.2f}s total): {e}",
                     )
                     log_metrics(
                         api_call="openai_error",
@@ -258,8 +262,8 @@ class OpenAIConnector:
             word: The word to synthesize definitions for.
             definitions: List of Definition objects serialized as dictionaries.
             meaning_cluster: The meaning cluster this definition belongs to.
-        """
 
+        """
         prompt = self.template_manager.get_synthesis_prompt(
             word=word,
             definitions=definitions,
@@ -268,7 +272,9 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, SynthesisResponse, task_name="synthesize_definitions"
+                prompt,
+                SynthesisResponse,
+                task_name="synthesize_definitions",
             )
             # Success logging handled by synthesizer context
             return result
@@ -287,12 +293,17 @@ class OpenAIConnector:
         logger.debug(f"📝 Generating {count} example sentence(s) for '{word}' ({part_of_speech})")
 
         prompt = self.template_manager.get_generate_examples_prompt(
-            word, definition, part_of_speech, count
+            word,
+            definition,
+            part_of_speech,
+            count,
         )
 
         try:
             result = await self._make_structured_request(
-                prompt, ExampleGenerationResponse, task_name="generate_examples"
+                prompt,
+                ExampleGenerationResponse,
+                task_name="generate_examples",
             )
             if result.example_sentences:
                 first_example = result.example_sentences[0]
@@ -308,7 +319,9 @@ class OpenAIConnector:
         prompt = self.template_manager.get_pronunciation_prompt(word)
 
         return await self._make_structured_request(
-            prompt, PronunciationResponse, task_name="generate_pronunciation"
+            prompt,
+            PronunciationResponse,
+            task_name="generate_pronunciation",
         )
 
     async def lookup_fallback(self, word: str) -> DictionaryEntryResponse | None:
@@ -319,17 +332,19 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, DictionaryEntryResponse, task_name="lookup_word"
+                prompt,
+                DictionaryEntryResponse,
+                task_name="lookup_word",
             )
 
             if result.provider_data is None:
                 logger.info(f"🚫 AI identified '{word}' as nonsense/invalid")
                 return None
-            elif result.provider_data:
+            if result.provider_data:
                 def_count = len(result.provider_data.definitions)
                 logger.success(
                     f"✨ Generated {def_count} definitions for '{word}' "
-                    f"(confidence: {result.confidence:.1%})"
+                    f"(confidence: {result.confidence:.1%})",
                 )
             else:
                 logger.warning(f"⚠️  AI generated empty response for '{word}'")
@@ -340,13 +355,16 @@ class OpenAIConnector:
             raise
 
     async def extract_cluster_mapping(
-        self, word: str, definitions: list[tuple[str, str, str]]
+        self,
+        word: str,
+        definitions: list[tuple[str, str, str]],
     ) -> ClusterMappingResponse:
         """Extract numerical mapping of clusters to definition IDs.
 
         Args:
             word: The word to extract mappings for.
             definitions: list of: (provider, part_of_speech, definition) tuples from providers.
+
         """
         start_time = time.perf_counter()
         def_count = len(definitions)
@@ -357,7 +375,9 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, ClusterMappingResponse, task_name="extract_cluster_mapping"
+                prompt,
+                ClusterMappingResponse,
+                task_name="extract_cluster_mapping",
             )
             duration = time.perf_counter() - start_time
 
@@ -365,14 +385,14 @@ class OpenAIConnector:
             total_defs_mapped = sum(len(cm.definition_indices) for cm in result.cluster_mappings)
             logger.success(
                 f"🧮 Extracted {len(result.cluster_mappings)} meaning clusters for '{word}' "
-                f"in {duration:.2f}s (mapped {total_defs_mapped}/{def_count} definitions)"
+                f"in {duration:.2f}s (mapped {total_defs_mapped}/{def_count} definitions)",
             )
 
             # Log each cluster for debugging
             for cluster in result.cluster_mappings:
                 logger.debug(
                     f"  • Cluster '{cluster.cluster_id}': {cluster.cluster_description} "
-                    f"({len(cluster.definition_indices)} definitions)"
+                    f"({len(cluster.definition_indices)} definitions)",
                 )
 
             log_metrics(
@@ -406,7 +426,9 @@ class OpenAIConnector:
         )
         try:
             result = await self._make_structured_request(
-                prompt, AnkiFillBlankResponse, task_name="generate_anki_fill_blank"
+                prompt,
+                AnkiFillBlankResponse,
+                task_name="generate_anki_fill_blank",
             )
             logger.debug(f"Generated fill-blank card for '{word}'")
             return result
@@ -462,12 +484,14 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, SynonymGenerationResponse, task_name="generate_synonyms"
+                prompt,
+                SynonymGenerationResponse,
+                task_name="generate_synonyms",
             )
 
             synonym_count = len(result.synonyms)
             logger.success(
-                f"✨ Generated {synonym_count} synonyms for '{word}' (confidence: {result.confidence:.1%})"
+                f"✨ Generated {synonym_count} synonyms for '{word}' (confidence: {result.confidence:.1%})",
             )
             return result
         except Exception as e:
@@ -475,7 +499,9 @@ class OpenAIConnector:
             raise
 
     async def suggestions(
-        self, input_words: list[str] | None, count: int = 10
+        self,
+        input_words: list[str] | None,
+        count: int = 10,
     ) -> SuggestionsResponse:
         """Generate word suggestions based on input words.
 
@@ -485,12 +511,13 @@ class OpenAIConnector:
 
         Returns:
             SuggestionsResponse with suggestions and analysis
+
         """
         limited_words = input_words[:10] if input_words else None
         suggestion_count = max(8, min(12, count))
 
         logger.info(
-            f"🌸 Generating {suggestion_count} suggestions from {len(limited_words) if limited_words else 0} words"
+            f"🌸 Generating {suggestion_count} suggestions from {len(limited_words) if limited_words else 0} words",
         )
 
         prompt = self.template_manager.get_suggestions_prompt(
@@ -500,12 +527,14 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, SuggestionsResponse, task_name="generate_suggestions"
+                prompt,
+                SuggestionsResponse,
+                task_name="generate_suggestions",
             )
 
             suggestions_count = len(result.suggestions)
             logger.success(
-                f"✨ Generated {suggestions_count} suggestions (confidence: {result.confidence:.1%})"
+                f"✨ Generated {suggestions_count} suggestions (confidence: {result.confidence:.1%})",
             )
             return result
         except Exception as e:
@@ -529,12 +558,13 @@ class OpenAIConnector:
 
         Returns:
             FactGenerationResponse with facts and metadata
+
         """
         fact_count = max(3, min(8, count))
         limited_previous = previous_words[:20] if previous_words else []
 
         logger.info(
-            f"📚 Generating {fact_count} facts for '{word}' with {len(limited_previous)} previous words"
+            f"📚 Generating {fact_count} facts for '{word}' with {len(limited_previous)} previous words",
         )
 
         prompt = self.template_manager.get_fact_generation_prompt(
@@ -546,14 +576,16 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, FactGenerationResponse, task_name="generate_facts"
+                prompt,
+                FactGenerationResponse,
+                task_name="generate_facts",
             )
 
             facts_count = len(result.facts)
             categories_str = ", ".join(result.categories) if result.categories else "general"
             logger.success(
                 f"✨ Generated {facts_count} facts for '{word}' "
-                f"({categories_str}, confidence: {result.confidence:.1%})"
+                f"({categories_str}, confidence: {result.confidence:.1%})",
             )
             return result
         except Exception as e:
@@ -577,6 +609,7 @@ class OpenAIConnector:
 
         Returns:
             AntonymResponse with list of antonyms
+
         """
         prompt = self.template_manager.get_synthesize_antonyms_prompt(
             word=word,
@@ -588,7 +621,9 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, AntonymResponse, task_name="generate_antonyms"
+                prompt,
+                AntonymResponse,
+                task_name="generate_antonyms",
             )
             logger.info(f"Generated {len(result.antonyms)} antonyms for '{word}'")
             return result
@@ -609,6 +644,7 @@ class OpenAIConnector:
 
         Returns:
             EtymologyResponse with etymology information
+
         """
         prompt = self.template_manager.get_etymology_prompt(
             word=word,
@@ -617,7 +653,9 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, EtymologyResponse, task_name="synthesize_etymology"
+                prompt,
+                EtymologyResponse,
+                task_name="synthesize_etymology",
             )
             logger.info(f"Extracted etymology for '{word}' (origin: {result.origin_language})")
             return result
@@ -638,6 +676,7 @@ class OpenAIConnector:
 
         Returns:
             WordFormResponse with word forms
+
         """
         prompt = self.template_manager.get_word_forms_prompt(
             word=word,
@@ -646,7 +685,9 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, WordFormResponse, task_name="generate_word_forms"
+                prompt,
+                WordFormResponse,
+                task_name="generate_word_forms",
             )
             logger.info(f"Identified {len(result.forms)} word forms for '{word}'")
             return result
@@ -667,6 +708,7 @@ class OpenAIConnector:
 
         Returns:
             FrequencyBandResponse with band assessment
+
         """
         prompt = self.template_manager.get_frequency_prompt(
             word=word,
@@ -675,7 +717,9 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, FrequencyBandResponse, task_name="assess_frequency"
+                prompt,
+                FrequencyBandResponse,
+                task_name="assess_frequency",
             )
             logger.info(f"Assessed frequency band {result.band} for '{word}'")
             return result
@@ -694,12 +738,15 @@ class OpenAIConnector:
 
         Returns:
             RegisterClassificationResponse with classification
+
         """
         prompt = self.template_manager.get_register_prompt(definition=definition)
 
         try:
             result = await self._make_structured_request(
-                prompt, RegisterClassificationResponse, task_name="classify_register"
+                prompt,
+                RegisterClassificationResponse,
+                task_name="classify_register",
             )
             logger.info(f"Classified register as '{result.language_register}'")
             return result
@@ -718,12 +765,15 @@ class OpenAIConnector:
 
         Returns:
             DomainIdentificationResponse with domain
+
         """
         prompt = self.template_manager.get_domain_prompt(definition=definition)
 
         try:
             result = await self._make_structured_request(
-                prompt, DomainIdentificationResponse, task_name="classify_domain"
+                prompt,
+                DomainIdentificationResponse,
+                task_name="classify_domain",
             )
             logger.info(f"Identified domain as '{result.domain}'")
             return result
@@ -744,6 +794,7 @@ class OpenAIConnector:
 
         Returns:
             CEFRLevelResponse with level assessment
+
         """
         prompt = self.template_manager.get_cefr_prompt(
             word=word,
@@ -752,7 +803,9 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, CEFRLevelResponse, task_name="assess_cefr_level"
+                prompt,
+                CEFRLevelResponse,
+                task_name="assess_cefr_level",
             )
             logger.info(f"Assessed CEFR level {result.level} for '{word}'")
             return result
@@ -773,6 +826,7 @@ class OpenAIConnector:
 
         Returns:
             GrammarPatternResponse with patterns
+
         """
         prompt = self.template_manager.get_grammar_patterns_prompt(
             definition=definition,
@@ -781,7 +835,9 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, GrammarPatternResponse, task_name="identify_grammar_patterns"
+                prompt,
+                GrammarPatternResponse,
+                task_name="identify_grammar_patterns",
             )
             logger.info(f"Extracted {len(result.patterns)} grammar patterns")
             return result
@@ -804,6 +860,7 @@ class OpenAIConnector:
 
         Returns:
             CollocationResponse with collocations
+
         """
         prompt = self.template_manager.get_collocations_prompt(
             word=word,
@@ -813,7 +870,9 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, CollocationResponse, task_name="generate_collocations"
+                prompt,
+                CollocationResponse,
+                task_name="generate_collocations",
             )
             logger.info(f"Identified {len(result.collocations)} collocations for '{word}'")
             return result
@@ -834,6 +893,7 @@ class OpenAIConnector:
 
         Returns:
             UsageNoteResponse with usage guidance
+
         """
         prompt = self.template_manager.get_usage_notes_prompt(
             word=word,
@@ -842,7 +902,9 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, UsageNoteResponse, task_name="generate_usage_notes"
+                prompt,
+                UsageNoteResponse,
+                task_name="generate_usage_notes",
             )
             logger.info(f"Generated {len(result.notes)} usage notes for '{word}'")
             return result
@@ -861,12 +923,15 @@ class OpenAIConnector:
 
         Returns:
             RegionalVariantResponse with regions
+
         """
         prompt = self.template_manager.get_regional_variants_prompt(definition=definition)
 
         try:
             result = await self._make_structured_request(
-                prompt, RegionalVariantResponse, task_name="identify_regional_variants"
+                prompt,
+                RegionalVariantResponse,
+                task_name="identify_regional_variants",
             )
             logger.info(f"Detected regional variants: {', '.join(result.regions)}")
             return result
@@ -885,12 +950,15 @@ class OpenAIConnector:
 
         Returns:
             QueryValidationResponse with validation result
+
         """
         prompt = self.template_manager.get_query_validation_prompt(query=query)
 
         try:
             result = await self._make_structured_request(
-                prompt, QueryValidationResponse, task_name="validate_query"
+                prompt,
+                QueryValidationResponse,
+                task_name="validate_query",
             )
             logger.info(f"Query validation: {result.is_valid} - {result.reason}")
             return result
@@ -911,6 +979,7 @@ class OpenAIConnector:
 
         Returns:
             WordSuggestionResponse with ranked suggestions
+
         """
         prompt = self.template_manager.get_word_suggestion_prompt(
             query=query,
@@ -944,10 +1013,11 @@ class OpenAIConnector:
 
         Returns:
             DeduplicationResponse with deduplicated definitions
+
         """
         logger.info(
             f"🔍 Deduplicating {len(definitions)} definitions for '{word}'"
-            f"{f' ({part_of_speech})' if part_of_speech else ''}"
+            f"{f' ({part_of_speech})' if part_of_speech else ''}",
         )
 
         prompt = self.template_manager.get_deduplicate_prompt(
@@ -958,12 +1028,14 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, DeduplicationResponse, task_name="deduplicate_definitions"
+                prompt,
+                DeduplicationResponse,
+                task_name="deduplicate_definitions",
             )
 
             logger.success(
                 f"✨ Deduplicated {len(definitions)} → {len(result.deduplicated_definitions)} "
-                f"definitions (removed {result.removed_count}, confidence: {result.confidence:.1%})"
+                f"definitions (removed {result.removed_count}, confidence: {result.confidence:.1%})",
             )
             return result
         except Exception as e:
@@ -983,11 +1055,12 @@ class OpenAIConnector:
 
         Returns:
             WordOfTheDayResponse with educational word content
+
         """
         logger.info(
             f"📖 Generating Word of the Day"
             f"{f' with context: {context}' if context else ''}"
-            f"{f' avoiding {len(previous_words)} previous words' if previous_words else ''}"
+            f"{f' avoiding {len(previous_words)} previous words' if previous_words else ''}",
         )
 
         prompt = self.template_manager.render_template(
@@ -998,12 +1071,14 @@ class OpenAIConnector:
 
         try:
             result = await self._make_structured_request(
-                prompt, WordOfTheDayResponse, task_name="generate_word_of_the_day"
+                prompt,
+                WordOfTheDayResponse,
+                task_name="generate_word_of_the_day",
             )
 
             logger.success(
                 f"✨ Generated Word of the Day: '{result.word}' "
-                f"({result.difficulty_level}, confidence: {result.confidence:.1%})"
+                f"({result.difficulty_level}, confidence: {result.confidence:.1%})",
             )
             return result
         except Exception as e:
@@ -1031,11 +1106,12 @@ class OpenAIConnector:
 
         Returns:
             SyntheticCorpusResponse with generated corpus
+
         """
         logger.info(
             f"🧬 Generating synthetic corpus: {style}/{complexity}/{era} "
             f"({num_words} words)"
-            f"{f' themed: {theme}' if theme else ''}"
+            f"{f' themed: {theme}' if theme else ''}",
         )
 
         prompt = self.template_manager.get_synthetic_corpus_prompt(
@@ -1057,7 +1133,7 @@ class OpenAIConnector:
 
             logger.success(
                 f"✨ Generated {result.total_generated} words for {style}/{complexity}/{era} corpus "
-                f"(quality: {result.quality_score:.1%})"
+                f"(quality: {result.quality_score:.1%})",
             )
             return result
         except Exception as e:
@@ -1075,9 +1151,10 @@ class OpenAIConnector:
 
         Returns:
             TextGenerationResponse with generated text
+
         """
         logger.info(
-            f"📝 Generating text (max_tokens: {request.max_tokens}, temp: {request.temperature})"
+            f"📝 Generating text (max_tokens: {request.max_tokens}, temp: {request.temperature})",
         )
 
         try:
@@ -1106,10 +1183,11 @@ class OpenAIConnector:
 
         Returns:
             LiteratureAugmentationResponse with augmented words
+
         """
         logger.info(
             f"📚 Augmenting {request.author}'s vocabulary: {len(request.sample_words)} samples → "
-            f"{request.target_count} variants"
+            f"{request.target_count} variants",
         )
 
         # Ultra-lean prompt - minimal tokens, maximum efficiency
@@ -1127,7 +1205,7 @@ class OpenAIConnector:
 
             logger.success(
                 f"✨ Generated {len(result.words)} augmented words for {request.author} "
-                f"(confidence: {result.confidence:.1%})"
+                f"(confidence: {result.confidence:.1%})",
             )
             return result
         except Exception as e:
@@ -1143,27 +1221,28 @@ class OpenAIConnector:
         word_frequencies: dict[str, int] | None = None,
     ) -> LiteratureAnalysisResponse:
         """Analyze literature corpus and generate semantic ID using template system.
-        
+
         This method uses the literature_analysis.md prompt template to perform
         comprehensive analysis of a literary corpus and generate semantic IDs.
-        
+
         Args:
             author: Author name
             words: List of words to analyze
             period: Literary period (optional)
             genre: Primary genre (optional)
             word_frequencies: Word frequency data (optional)
-            
+
         Returns:
             LiteratureAnalysisResponse with complete analysis and semantic ID
+
         """
         logger.info(f"📚 Analyzing literature corpus for {author}: {len(words)} words")
-        
+
         # Use the literature analysis prompt template
         # Ultra-lean analysis prompt
         sample = ", ".join(words[:8])  # Only 8 words
         prompt = f"{author}: {sample}\nSemantic ID [style,complexity,era,variant]:"
-        
+
         try:
             result = await self._make_structured_request(
                 prompt,
@@ -1172,11 +1251,11 @@ class OpenAIConnector:
                 max_tokens=30,  # Ultra-lean semantic ID output
                 # Temperature handled automatically based on model type (reasoning models don't use temperature)
             )
-            
+
             logger.success(
                 f"✨ Analyzed {author} corpus: semantic ID [{result.semantic_id.style},"
                 f"{result.semantic_id.complexity},{result.semantic_id.era},"
-                f"{result.semantic_id.variation}] (quality: {result.quality_score:.1%})"
+                f"{result.semantic_id.variation}] (quality: {result.quality_score:.1%})",
             )
             return result
         except Exception as e:

@@ -7,8 +7,7 @@ from typing import Any
 
 
 def sanitize_mongodb_input(value: str) -> str:
-    """
-    Sanitize user input to prevent MongoDB injection attacks.
+    """Sanitize user input to prevent MongoDB injection attacks.
 
     Removes MongoDB operators and special characters that could be used
     for injection attacks.
@@ -18,6 +17,7 @@ def sanitize_mongodb_input(value: str) -> str:
 
     Returns:
         Sanitized string safe for MongoDB queries
+
     """
     if not isinstance(value, str):
         return str(value)
@@ -40,8 +40,7 @@ def sanitize_mongodb_input(value: str) -> str:
 
 
 def validate_word_input(word: str) -> str:
-    """
-    Validate and sanitize word input for dictionary lookups.
+    """Validate and sanitize word input for dictionary lookups.
 
     Args:
         word: Raw word input
@@ -51,6 +50,7 @@ def validate_word_input(word: str) -> str:
 
     Raises:
         ValueError: If word is invalid
+
     """
     # Basic sanitization
     word = sanitize_mongodb_input(word)
@@ -71,8 +71,7 @@ def validate_word_input(word: str) -> str:
 
 
 def sanitize_field_name(field: str) -> str:
-    """
-    Sanitize field names to prevent injection attacks.
+    """Sanitize field names to prevent injection attacks.
 
     Args:
         field: Raw field name
@@ -82,6 +81,7 @@ def sanitize_field_name(field: str) -> str:
 
     Raises:
         ValueError: If field name is invalid
+
     """
     # Only allow alphanumeric and underscore
     if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", field):
@@ -95,14 +95,14 @@ def sanitize_field_name(field: str) -> str:
 
 
 def sanitize_query_params(params: dict[str, Any]) -> dict[str, Any]:
-    """
-    Sanitize a dictionary of query parameters.
+    """Sanitize a dictionary of query parameters.
 
     Args:
         params: Raw query parameters
 
     Returns:
         Sanitized parameters
+
     """
     sanitized: dict[str, Any] = {}
 

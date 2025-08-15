@@ -49,7 +49,8 @@ class AudioQueryParams(BaseModel):
     format: str | None = Field(None, description="Filter by format (mp3, wav, ogg)")
     accent: str | None = Field(None, description="Filter by accent (us, uk, au)")
     quality: Literal["low", "standard", "high"] | None = Field(
-        None, description="Filter by quality"
+        None,
+        description="Filter by quality",
     )
     min_duration_ms: int | None = Field(None, description="Minimum duration in milliseconds")
     max_duration_ms: int | None = Field(None, description="Maximum duration in milliseconds")
@@ -75,6 +76,7 @@ async def list_audio_files(
 
     Returns:
         Paginated list of audio metadata.
+
     """
     # Build filter
     filter_params = AudioFilter(
@@ -108,7 +110,7 @@ async def list_audio_files(
                 "quality": audio.quality,
                 "content_url": f"/api/v1/audio/{audio.id}/content",
                 "created_at": audio.created_at.isoformat() if audio.created_at else None,
-            }
+            },
         )
 
     return ListResponse(
@@ -141,6 +143,7 @@ async def upload_audio(
     Errors:
         400: Invalid audio file
         413: File too large (max 50MB)
+
     """
     # Validate file type
     if not file.content_type or not file.content_type.startswith("audio/"):
@@ -225,6 +228,7 @@ async def get_audio_metadata(
 
     Errors:
         404: Audio not found
+
     """
     audio = await repo.get(audio_id, raise_on_missing=True)
     assert audio is not None
@@ -264,6 +268,7 @@ async def get_audio_content(audio_id: str) -> FileResponse:
 
     Raises:
         404: Audio file not found
+
     """
     # Get the audio media document
     audio = await AudioMedia.get(audio_id)
@@ -314,6 +319,7 @@ async def update_audio(
     Errors:
         404: Audio not found
         409: Version conflict
+
     """
     try:
         audio = await repo.update(audio_id, update, version)
@@ -395,6 +401,7 @@ async def get_cached_audio(subdir: str, filename: str) -> FileResponse:
 
     Raises:
         404: Audio file not found
+
     """
     # Construct the file path
     cache_dir = get_project_root() / "data" / "audio_cache"

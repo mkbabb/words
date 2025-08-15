@@ -1,5 +1,4 @@
-"""
-Simplified corpus REST API with TTL cache.
+"""Simplified corpus REST API with TTL cache.
 
 Provides streamlined corpus creation and search with automatic cleanup.
 """
@@ -11,7 +10,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from ...search.corpus.manager import get_corpus_manager
+from ...corpus.manager import get_corpus_manager
 from ...utils.logging import get_logger
 from ..core import ListResponse, PaginationParams, get_pagination
 from ..repositories.corpus_repository import CorpusCreate, CorpusRepository, CorpusSearchParams
@@ -33,7 +32,10 @@ class CorpusSearchQueryParams(BaseModel):
     min_score: float = Field(default=0.6, ge=0.0, le=1.0, description="Minimum relevance score")
     semantic: bool = Field(default=True, description="Enable semantic search")
     semantic_weight: float = Field(
-        default=0.7, ge=0.0, le=1.0, description="Weight for semantic results"
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Weight for semantic results",
     )
 
 
@@ -89,8 +91,7 @@ async def create_corpus(
     request: CreateCorpusRequest,
     repo: CorpusRepository = Depends(get_corpus_repo),
 ) -> CreateCorpusResponse:
-    """
-    Create a new searchable corpus.
+    """Create a new searchable corpus.
 
     Creates an in-memory corpus with TTL-based auto-cleanup.
     Returns a unique ID for subsequent search operations.
@@ -120,8 +121,7 @@ async def create_corpus(
 async def get_cache_stats(
     repo: CorpusRepository = Depends(get_corpus_repo),
 ) -> CacheStatsResponse:
-    """
-    Get cache statistics.
+    """Get cache statistics.
 
     Returns overall cache usage and performance metrics.
     """
@@ -129,7 +129,9 @@ async def get_cache_stats(
         stats = await repo.get_stats()
 
         return CacheStatsResponse(
-            status="active", cache=stats, message="Simplified corpus cache is active"
+            status="active",
+            cache=stats,
+            message="Simplified corpus cache is active",
         )
 
     except Exception as e:
@@ -142,8 +144,7 @@ async def list_corpora(
     repo: CorpusRepository = Depends(get_corpus_repo),
     pagination: PaginationParams = Depends(get_pagination),
 ) -> ListResponse[CorpusInfoResponse]:
-    """
-    List all active corpora with pagination.
+    """List all active corpora with pagination.
 
     Returns summary of all non-expired corpora with basic metadata.
     """
@@ -174,8 +175,7 @@ async def search_corpus(
     params: CorpusSearchQueryParams = Depends(),
     repo: CorpusRepository = Depends(get_corpus_repo),
 ) -> SearchCorpusResponse:
-    """
-    Search within a corpus.
+    """Search within a corpus.
 
     Performs multi-method search (exact, prefix, fuzzy, and optionally semantic) within the specified corpus.
     Returns error if corpus doesn't exist or has expired.
@@ -205,8 +205,7 @@ async def get_corpus_info(
     corpus_id: str,
     repo: CorpusRepository = Depends(get_corpus_repo),
 ) -> CorpusInfoResponse:
-    """
-    Get corpus metadata and statistics.
+    """Get corpus metadata and statistics.
 
     Returns corpus information including creation time, expiration, and usage stats.
     """
@@ -242,16 +241,16 @@ class InvalidateCorpusResponse(BaseModel):
 @router.post("/corpus/invalidate", response_model=InvalidateCorpusResponse)
 async def invalidate_corpus(
     request: InvalidateCorpusRequest = InvalidateCorpusRequest(
-        specific_corpus_id=None, invalidate_all=False
+        specific_corpus_id=None,
+        invalidate_all=False,
     ),
 ) -> InvalidateCorpusResponse:
-    """
-    Invalidate corpus caches.
+    """Invalidate corpus caches.
 
     Allows invalidating a specific corpus by ID or all corpus caches.
     """
     logger.info(
-        f"Corpus invalidation: specific={request.specific_corpus_id}, all={request.invalidate_all}"
+        f"Corpus invalidation: specific={request.specific_corpus_id}, all={request.invalidate_all}",
     )
 
     try:
@@ -283,4 +282,4 @@ async def invalidate_corpus(
 
     except Exception as e:
         logger.error(f"Failed to invalidate corpus caches: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to invalidate corpus caches: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to invalidate corpus caches: {e!s}")

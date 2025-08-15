@@ -7,15 +7,11 @@ literary texts from various sources.
 from .api.gutenberg import GutenbergConnector
 from .api.internet_archive import InternetArchiveConnector
 from .base import LiteratureConnector
-from .corpus_builder import LiteratureCorpusBuilder
-from .mappings import get_author_metadata, get_author_works
 from .models import (
-    Author,
-    AuthorMetadata,
+    AuthorInfo,
     Genre,
     LiteraryWord,
     LiteraryWork,
-    LiteratureCorpusMetadata,
     LiteratureMetadata,
     LiteratureSource,
     Period,
@@ -28,18 +24,11 @@ __all__ = [
     # Connectors
     "GutenbergConnector",
     "InternetArchiveConnector",
-    # Corpus building
-    "LiteratureCorpusBuilder",
-    # Mappings
-    "get_author_works",
-    "get_author_metadata",
     # Models
-    "Author",
-    "AuthorMetadata",
+    "AuthorInfo",
     "Genre",
     "LiteraryWord",
     "LiteraryWork",
-    "LiteratureCorpusMetadata",
     "LiteratureMetadata",
     "LiteratureSource",
     "Period",

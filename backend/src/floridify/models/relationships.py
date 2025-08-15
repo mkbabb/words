@@ -63,7 +63,12 @@ class WordRelationship(Document, BaseMetadata):
     from_word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     to_word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     relationship_type: Literal[
-        "synonym", "antonym", "related", "compare", "see_also", "derived_from"
+        "synonym",
+        "antonym",
+        "related",
+        "compare",
+        "see_also",
+        "derived_from",
     ]
     strength: float = Field(ge=0.0, le=1.0, default=1.0)
     context: str | None = None

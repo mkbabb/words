@@ -4,17 +4,13 @@ from typing import Any
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends
-from src.floridify.search.corpus.manager import get_corpus_manager
 
-from ....models import Word
+from ....corpus.manager import get_corpus_manager
 from ...core import ListResponse
 from ...repositories import WordListRepository
 from .utils import search_wordlist_names, search_words_in_wordlist
 from .words import (
     WordListSearchQueryParams,
-    apply_wordlist_filters_and_sort,
-    convert_wordlist_items_to_response,
-    passes_wordlist_filters,
 )
 
 router = APIRouter()
@@ -59,6 +55,10 @@ async def search_wordlist_words(
     if not search_response.results:
         return ListResponse(items=[], total=0, offset=0, limit=params.limit)
 
+    # Extract items and total from search response
+    items = search_response.results[params.offset : params.offset + params.limit]
+    total = len(search_response.results)
+
     return ListResponse(
         items=items,
         total=total,
@@ -83,6 +83,7 @@ async def search_wordlists(
 
     Returns:
         Matching wordlists with search scores.
+
     """
     # Use corpus-based fuzzy search (no TTL expiration)
     search_results = await search_wordlist_names(

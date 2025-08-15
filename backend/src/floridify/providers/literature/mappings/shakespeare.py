@@ -3,7 +3,7 @@
 Comprehensive mapping of Shakespeare's works available on Project Gutenberg.
 """
 
-from ....models.definition import Language
+from ....models.dictionary import Language
 from ..models import AuthorInfo, Genre, LiteraryWork, Period
 
 AUTHOR = AuthorInfo(
@@ -46,7 +46,6 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    
     # Major Tragedies
     LiteraryWork(
         title="Hamlet, Prince of Denmark",
@@ -138,7 +137,6 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    
     # Major Comedies
     LiteraryWork(
         title="A Midsummer Night's Dream",
@@ -221,7 +219,6 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    
     # History Plays
     LiteraryWork(
         title="King Richard III",
@@ -297,9 +294,11 @@ WORKS = [
     ),
 ]
 
+
 def get_works() -> list[LiteraryWork]:
     """Get all works by Shakespeare."""
     return WORKS
+
 
 def get_author() -> AuthorInfo:
     """Get author information."""

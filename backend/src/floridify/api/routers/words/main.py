@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from ....models import Word
-from ....models.definition import Language
+from ....models.dictionary import Language
 from ...core import (
     ErrorDetail,
     ErrorResponse,
@@ -74,6 +74,7 @@ async def list_words(
 
     Example:
         GET /api/v1/words?language=en&limit=10&sort_by=text
+
     """
     # Build filter
     filter_params = WordFilter(
@@ -130,6 +131,7 @@ async def create_word(
     Errors:
         409: Word already exists in specified language
         422: Invalid input data
+
     """
     # Check if word already exists
     existing = await repo.find_by_text(data.text, data.language)
@@ -143,7 +145,7 @@ async def create_word(
                         field="text",
                         message=f"Word '{data.text}' already exists in {data.language}",
                         code="duplicate_word",
-                    )
+                    ),
                 ],
             ).model_dump(),
         )
@@ -186,6 +188,7 @@ async def get_word(
     Headers:
         - ETag: Entity tag for caching
         - Returns 304 if If-None-Match matches current ETag
+
     """
     # Get word with counts
     word_data = await repo.get_with_counts(word_id)
@@ -245,6 +248,7 @@ async def update_word(
     Errors:
         409: Version conflict (concurrent modification)
         404: Word not found
+
     """
     word = await repo.update(word_id, data, version)
 
@@ -275,5 +279,6 @@ async def delete_word(
 
     Errors:
         404: Word not found
+
     """
     await repo.delete(word_id, cascade=cascade)

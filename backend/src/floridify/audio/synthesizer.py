@@ -52,6 +52,7 @@ class AudioSynthesizer:
 
         Args:
             config: Audio synthesis configuration. If None, will load from main config.
+
         """
         self.config = config or self._load_config()
         self._client: texttospeech.TextToSpeechClient | None = None
@@ -91,26 +92,25 @@ class AudioSynthesizer:
                 american_voice_female=gc_config.tts_american_voice_female,
                 british_voice_female=gc_config.tts_british_voice_female,
             )
-        else:
-            # Fallback to environment-based config
-            auth_dir = get_project_root() / "auth"
-            credentials_path = None
+        # Fallback to environment-based config
+        auth_dir = get_project_root() / "auth"
+        credentials_path = None
 
-            # Check for common credential file names
-            for filename in [
-                "google-cloud-credentials.json",
-                "gcp-credentials.json",
-                "tts-credentials.json",
-            ]:
-                path = auth_dir / filename
-                if path.exists():
-                    credentials_path = path
-                    break
+        # Check for common credential file names
+        for filename in [
+            "google-cloud-credentials.json",
+            "gcp-credentials.json",
+            "tts-credentials.json",
+        ]:
+            path = auth_dir / filename
+            if path.exists():
+                credentials_path = path
+                break
 
-            return AudioSynthesisConfig(
-                credentials_path=credentials_path,
-                project_id=os.getenv("GOOGLE_CLOUD_PROJECT"),
-            )
+        return AudioSynthesisConfig(
+            credentials_path=credentials_path,
+            project_id=os.getenv("GOOGLE_CLOUD_PROJECT"),
+        )
 
     @property
     def client(self) -> texttospeech.TextToSpeechClient:
@@ -118,7 +118,7 @@ class AudioSynthesizer:
         if self._client is None:
             if self.config.credentials_path and self.config.credentials_path.exists():
                 credentials = service_account.Credentials.from_service_account_file(
-                    str(self.config.credentials_path)
+                    str(self.config.credentials_path),
                 )
                 self._client = texttospeech.TextToSpeechClient(credentials=credentials)
             else:
@@ -152,6 +152,7 @@ class AudioSynthesizer:
 
         Returns:
             AudioMedia object with file information, or None if synthesis fails
+
         """
         try:
             # Select appropriate voice
@@ -258,6 +259,7 @@ class AudioSynthesizer:
 
         Returns:
             AudioMedia object with file information, or None if synthesis fails
+
         """
         try:
             # Select appropriate voice
@@ -364,6 +366,7 @@ class AudioSynthesizer:
 
         Returns:
             List of AudioMedia objects for generated audio files
+
         """
         audio_files: list[AudioMedia] = []
 
@@ -378,7 +381,9 @@ class AudioSynthesizer:
         if not audio_files and pronunciation.phonetic:
             # Try American accent
             audio = await self.synthesize_phonetic(
-                word_text, pronunciation.phonetic, accent="american"
+                word_text,
+                pronunciation.phonetic,
+                accent="american",
             )
             if audio:
                 await audio.save()

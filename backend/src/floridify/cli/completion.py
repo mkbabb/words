@@ -1,13 +1,11 @@
 """ZSH completion generation for floridify CLI."""
 
 import click
-from .fast_cli import cli
 
 
 def generate_zsh_completion() -> str:
     """Generate ZSH completion script for floridify."""
-    
-    completion_script = '''#compdef floridify
+    completion_script = """#compdef floridify
 
 _floridify() {
     local context state line
@@ -131,23 +129,30 @@ _floridify_database() {
 }
 
 compdef _floridify floridify
-'''
-    
+"""
+
     return completion_script
 
 
 @click.command()
-@click.option('--shell', type=click.Choice(['zsh', 'bash']), default='zsh', 
-              help='Shell to generate completion for')
+@click.option(
+    "--shell",
+    type=click.Choice(["zsh", "bash"]),
+    default="zsh",
+    help="Shell to generate completion for",
+)
 def completion_command(shell: str) -> None:
     """Generate shell completion script for floridify."""
-    if shell == 'zsh':
+    if shell == "zsh":
         completion = generate_zsh_completion()
         click.echo(completion)
         click.echo("\n# To install, run:", err=True)
-        click.echo("# floridify completion --shell zsh > ~/.local/share/zsh/site-functions/_floridify", err=True)
+        click.echo(
+            "# floridify completion --shell zsh > ~/.local/share/zsh/site-functions/_floridify",
+            err=True,
+        )
         click.echo("# Or add to your ~/.zshrc:", err=True)
-        click.echo("# eval \"$(floridify completion --shell zsh)\"", err=True)
+        click.echo('# eval "$(floridify completion --shell zsh)"', err=True)
     else:
         click.echo("Bash completion not yet implemented", err=True)
 

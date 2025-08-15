@@ -1,5 +1,4 @@
-"""
-High-performance trie-based exact and prefix search implementation.
+"""High-performance trie-based exact and prefix search implementation.
 
 Uses marisa-trie for C++ optimized performance with minimal memory footprint.
 Provides exact matching and autocomplete functionality with frequency-based ranking.
@@ -16,16 +15,16 @@ import marisa_trie
 import numpy as np
 
 from ..caching.unified import get_unified
+from ..corpus.utils import get_vocabulary_hash
 from ..text import batch_normalize, normalize
 from ..utils.logging import get_logger
-from .utils import calculate_default_frequency, get_vocabulary_hash
+from .utils import calculate_default_frequency
 
 logger = get_logger(__name__)
 
 
 class TrieSearch:
-    """
-    High-performance trie-based search using marisa-trie (C++ backend).
+    """High-performance trie-based search using marisa-trie (C++ backend).
 
     Performance characteristics:
     - Search: O(m) where m = query length
@@ -45,26 +44,27 @@ class TrieSearch:
 
     async def initialize(self) -> None:
         """Initialize the trie search (no-op for compatibility)."""
-        pass
 
     async def update_corpus(self, corpus: Any) -> None:
-        """
-        Update the trie with a new corpus.
+        """Update the trie with a new corpus.
 
         Args:
             corpus: Corpus object containing vocabulary
+
         """
         await self.build_index(corpus.vocabulary, corpus.word_frequencies)
 
     async def build_index(
-        self, words: list[str], frequencies: dict[str, int] | None = None
+        self,
+        words: list[str],
+        frequencies: dict[str, int] | None = None,
     ) -> None:
-        """
-        Build the optimized trie index with content-hash based caching.
+        """Build the optimized trie index with content-hash based caching.
 
         Args:
             words: List of words and phrases to index
             frequencies: Optional frequency data for ranking
+
         """
         # Generate vocabulary hash for caching
         vocab_hash = get_vocabulary_hash(words)
@@ -123,14 +123,14 @@ class TrieSearch:
         self._vocabulary_hash = vocab_hash
 
     def search_exact(self, query: str) -> str | None:
-        """
-        Find exact matches for the query using optimized marisa-trie.
+        """Find exact matches for the query using optimized marisa-trie.
 
         Args:
             query: Exact string to search for
 
         Returns:
             List of exact matches (typically 0 or 1 items)
+
         """
         if not query or not self._trie:
             return None
@@ -147,8 +147,7 @@ class TrieSearch:
         return None
 
     def search_prefix(self, prefix: str, max_results: int = 20) -> list[str]:
-        """
-        Find all words that start with the given prefix using optimized marisa-trie.
+        """Find all words that start with the given prefix using optimized marisa-trie.
 
         Args:
             prefix: Prefix to search for
@@ -156,6 +155,7 @@ class TrieSearch:
 
         Returns:
             List of words starting with prefix, ranked by frequency
+
         """
         if not prefix or not self._trie:
             return []
@@ -174,19 +174,18 @@ class TrieSearch:
             frequency_pairs = [(word, self._word_frequencies.get(word, 0)) for word in matches]
             frequency_pairs.sort(key=lambda x: x[1], reverse=True)
             return [word for word, _ in frequency_pairs]
-        else:
-            # For many matches, use numpy argsort for better performance
-            frequencies = np.array([self._word_frequencies.get(word, 0) for word in matches])
-            # Get indices of top frequencies
-            top_indices = np.argsort(-frequencies)[:max_results]
-            return [matches[i] for i in top_indices]
+        # For many matches, use numpy argsort for better performance
+        frequencies = np.array([self._word_frequencies.get(word, 0) for word in matches])
+        # Get indices of top frequencies
+        top_indices = np.argsort(-frequencies)[:max_results]
+        return [matches[i] for i in top_indices]
 
     def model_dump(self) -> dict[str, Any]:
-        """
-        Export trie state with integrity checks and robust serialization.
+        """Export trie state with integrity checks and robust serialization.
 
         Returns:
             Dictionary containing trie state with integrity verification
+
         """
         if not self._trie:
             return {
@@ -207,7 +206,7 @@ class TrieSearch:
                 word.encode("utf-8").decode("utf-8")
                 trie_words.append(word)
             except (UnicodeError, UnicodeDecodeError, UnicodeEncodeError):
-                logger.warning(f"Skipping non-UTF-8 word during trie serialization: {repr(word)}")
+                logger.warning(f"Skipping non-UTF-8 word during trie serialization: {word!r}")
                 continue
 
         # Sort for deterministic output and integrity
@@ -231,14 +230,14 @@ class TrieSearch:
         return data_payload
 
     def model_load(self, data: dict[str, Any]) -> None:
-        """
-        Load trie state with integrity verification and corruption detection.
+        """Load trie state with integrity verification and corruption detection.
 
         Args:
             data: Dictionary containing trie state
 
         Raises:
             ValueError: If cache is corrupted or integrity check fails
+
         """
         # Check format version for backwards compatibility
         format_version = data.get("format_version", "1.0")
@@ -254,7 +253,7 @@ class TrieSearch:
 
                 if computed_hash != stored_hash:
                     raise ValueError(
-                        f"Trie cache integrity check failed: {computed_hash[:8]} != {stored_hash[:8]}"
+                        f"Trie cache integrity check failed: {computed_hash[:8]} != {stored_hash[:8]}",
                     )
 
         words = data.get("trie_data", [])
@@ -310,7 +309,7 @@ class TrieSearch:
 
                         if computed_hash != stored_hash:
                             logger.warning(
-                                f"Cache integrity check failed for {vocab_hash[:8]}, discarding"
+                                f"Cache integrity check failed for {vocab_hash[:8]}, discarding",
                             )
                             await self._cache.delete("trie", vocab_hash)
                             return None

@@ -89,7 +89,8 @@ class SyntheticGenerator:
                 Author.PROUST: "with Proustian memory-laden introspection and temporal depth",
             }
             authorial_flavor = author_influences.get(
-                author, f"with {author.value}'s distinctive style"
+                author,
+                f"with {author.value}'s distinctive style",
             )
             context = f"{base_context} {authorial_flavor}"
         else:
@@ -130,10 +131,11 @@ class SyntheticGenerator:
         return corpus
 
     async def generate_complete_training_set(
-        self, words_per_corpus: int = 100, save: bool = True
+        self,
+        words_per_corpus: int = 100,
+        save: bool = True,
     ) -> dict[str, WOTDCorpus]:
         """Generate complete training set with balanced semantic coverage and authorial influence."""
-
         logger.info(f"🚀 Generating complete WOTD training set ({words_per_corpus} words/corpus)")
 
         # Define semantic combinations with strategic authorial influences
@@ -179,7 +181,7 @@ class SyntheticGenerator:
                     style, complexity, era, author = batch[j]
                     author_info = f" ({author.value})" if author else ""
                     logger.error(
-                        f"❌ Failed to generate {style}/{complexity}/{era}{author_info}: {result}"
+                        f"❌ Failed to generate {style}/{complexity}/{era}{author_info}: {result}",
                     )
                 elif isinstance(result, WOTDCorpus):
                     corpora[result.id] = result
@@ -188,7 +190,7 @@ class SyntheticGenerator:
         total_words = sum(len(corpus.words) for corpus in corpora.values())
 
         logger.success(
-            f"🎯 Generated {len(corpora)} corpora with {total_words} words in {duration:.2f}s"
+            f"🎯 Generated {len(corpora)} corpora with {total_words} words in {duration:.2f}s",
         )
 
         # Save to storage
@@ -201,7 +203,10 @@ class SyntheticGenerator:
         return corpora
 
     async def regenerate_corpus(
-        self, corpus_id: str, num_words: int = 100, theme: str | None = None
+        self,
+        corpus_id: str,
+        num_words: int = 100,
+        theme: str | None = None,
     ) -> WOTDCorpus:
         """Regenerate specific corpus."""
         # Parse corpus ID
@@ -224,7 +229,8 @@ class SyntheticGenerator:
 
 # Convenience functions
 async def generate_training_data(
-    words_per_corpus: int = 100, use_cached: bool = True
+    words_per_corpus: int = 100,
+    use_cached: bool = True,
 ) -> dict[str, WOTDCorpus]:
     """Generate or load training data."""
     storage = await get_wotd_storage()
@@ -240,7 +246,8 @@ async def generate_training_data(
     # Generate fresh data
     logger.info("🔄 Generating fresh training data")
     return await generator.generate_complete_training_set(
-        words_per_corpus=words_per_corpus, save=True
+        words_per_corpus=words_per_corpus,
+        save=True,
     )
 
 

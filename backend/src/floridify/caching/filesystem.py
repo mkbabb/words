@@ -17,6 +17,7 @@ logger = get_logger(__name__)
 T = TypeVar("T")
 
 
+
 class FilesystemCacheBackend(CacheBackend[T]):
     """High-performance filesystem cache using diskcache."""
 
@@ -61,8 +62,7 @@ class FilesystemCacheBackend(CacheBackend[T]):
                     cache.delete(test_key)
                     logger.info(f"Initialized filesystem cache at: {self.cache_dir}")
                     return cache
-                else:
-                    raise RuntimeError("Cache test failed - get/set not working")
+                raise RuntimeError("Cache test failed - get/set not working")
 
             except Exception as e:
                 logger.warning(f"Cache initialization attempt {attempt + 1} failed: {e}")
@@ -76,7 +76,7 @@ class FilesystemCacheBackend(CacheBackend[T]):
                         logger.warning(f"Failed to cleanup cache directory: {cleanup_error}")
                 else:
                     raise RuntimeError(
-                        f"Failed to initialize cache after {max_attempts} attempts: {e}"
+                        f"Failed to initialize cache after {max_attempts} attempts: {e}",
                     )
 
         raise RuntimeError("Unreachable code")
@@ -88,7 +88,7 @@ class FilesystemCacheBackend(CacheBackend[T]):
 
         try:
             value = await loop.run_in_executor(None, self.cache.get, cache_key, default)
-            return cast(T, value)
+            return cast("T", value)
         except Exception as e:
             logger.warning(f"Cache get failed for {cache_key}: {e}")
             # Try to reinitialize cache if SQLite error
@@ -98,10 +98,10 @@ class FilesystemCacheBackend(CacheBackend[T]):
                     self.cache.close()
                     self.cache = self._initialize_cache()
                     value = await loop.run_in_executor(None, self.cache.get, cache_key, default)
-                    return cast(T, value)
+                    return cast("T", value)
                 except Exception as reinit_error:
                     logger.error(f"Cache reinitialization failed: {reinit_error}")
-            return cast(T, default)
+            return cast("T", default)
 
     async def set(
         self,
@@ -134,7 +134,13 @@ class FilesystemCacheBackend(CacheBackend[T]):
                     self.cache.close()
                     self.cache = self._initialize_cache()
                     await loop.run_in_executor(
-                        None, self.cache.set, cache_key, value, expire, False, tag
+                        None,
+                        self.cache.set,
+                        cache_key,
+                        value,
+                        expire,
+                        False,
+                        tag,
                     )
                 except Exception as reinit_error:
                     logger.error(f"Cache reinitialization failed: {reinit_error}")
@@ -197,15 +203,14 @@ class FilesystemCacheBackend(CacheBackend[T]):
                 "count": count,
                 "size_bytes": total_size,
             }
-        else:
-            # Get overall stats
-            stats = await loop.run_in_executor(None, lambda: self.cache.stats())
-            return {
-                "size": len(self.cache),
-                "size_limit": self.cache.size_limit,
-                "eviction_policy": self.cache.eviction_policy,
-                "stats": stats,
-            }
+        # Get overall stats
+        stats = await loop.run_in_executor(None, lambda: self.cache.stats())
+        return {
+            "size": len(self.cache),
+            "size_limit": self.cache.size_limit,
+            "eviction_policy": self.cache.eviction_policy,
+            "stats": stats,
+        }
 
     async def invalidate_by_tags(self, tags: list[str]) -> int:
         """Invalidate entries by tags (required abstract method)."""

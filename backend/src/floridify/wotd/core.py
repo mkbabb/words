@@ -99,7 +99,10 @@ class Author(str, Enum):
 
 # Core Data Types - Semantic Preference System
 SemanticID = tuple[
-    int, int, int, int
+    int,
+    int,
+    int,
+    int,
 ]  # [style, complexity, era, variation] - 4D discrete preference space
 
 

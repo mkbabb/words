@@ -1,5 +1,4 @@
-"""
-Consolidated constants and patterns for text processing.
+"""Consolidated constants and patterns for text processing.
 
 Contains regex patterns, lemmatization rules, and other constants
 used throughout the text processing system.
@@ -16,7 +15,8 @@ MULTIPLE_SPACE_PATTERN = re.compile(r"\s{2,}")
 
 # Article patterns for normalization
 ARTICLE_PATTERN = re.compile(
-    r"^(the|a|an|le|la|les|der|die|das|el|la|los|las|il|lo|gli)\s+", re.IGNORECASE
+    r"^(the|a|an|le|la|les|der|die|das|el|la|los|las|il|lo|gli)\s+",
+    re.IGNORECASE,
 )
 
 # ======================================================================
@@ -60,7 +60,7 @@ UNICODE_TO_ASCII = str.maketrans(
         "\xa0": " ",  # non-breaking space
         "\u2009": " ",  # thin space
         "\u200a": " ",  # hair space
-    }
+    },
 )
 
 # Lemmatization suffix rules

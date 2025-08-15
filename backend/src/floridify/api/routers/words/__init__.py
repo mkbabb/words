@@ -5,7 +5,7 @@ from .examples import router as examples_router
 from .main import router as main_router
 
 __all__ = [
-    "main_router",
-    "definitions_router", 
+    "definitions_router",
     "examples_router",
+    "main_router",
 ]

@@ -18,15 +18,14 @@ from rich.table import Table
 from rich.text import Text
 
 from ...models import Definition, SynthesizedDictionaryEntry
-from ...models.definition import DictionaryProvider, Language
+from ...models.dictionary import DictionaryProvider, Language
 from ...search import SearchResult
 from ...search.constants import SearchMethod
 
 
 # CLI-specific text formatting functions
 def clean_markdown(text: str) -> str:
-    """
-    Remove markdown formatting from text.
+    """Remove markdown formatting from text.
 
     Used for CLI display purposes.
 
@@ -35,6 +34,7 @@ def clean_markdown(text: str) -> str:
 
     Returns:
         Plain text without formatting
+
     """
     if not text:
         return ""
@@ -65,8 +65,7 @@ def clean_markdown(text: str) -> str:
 
 
 def ensure_sentence_case(text: str) -> str:
-    """
-    Ensure text has proper sentence case.
+    """Ensure text has proper sentence case.
 
     Used for CLI display purposes.
 
@@ -75,6 +74,7 @@ def ensure_sentence_case(text: str) -> str:
 
     Returns:
         Text with proper sentence case
+
     """
     if not text:
         return ""
@@ -93,8 +93,7 @@ def ensure_sentence_case(text: str) -> str:
 
 
 def bold_word_in_text(text: str, word: str) -> list[tuple[str, str]]:
-    """
-    Return formatted parts for displaying text with a bold word.
+    """Return formatted parts for displaying text with a bold word.
 
     Used for highlighting search terms in CLI examples.
 
@@ -104,6 +103,7 @@ def bold_word_in_text(text: str, word: str) -> list[tuple[str, str]]:
 
     Returns:
         List of (text_part, style) tuples for Rich Text formatting
+
     """
     if not text or not word:
         return [(text, "")]
@@ -150,6 +150,7 @@ def format_meaning_cluster_name(meaning_id: str) -> str:
         bank_financial -> Bank Financial
         simple_uncomplicated -> Simple Uncomplicated
         word_general -> Word General
+
     """
     # Remove word prefix and convert to title case
     parts = meaning_id.split("_")
@@ -157,16 +158,17 @@ def format_meaning_cluster_name(meaning_id: str) -> str:
         # Skip the word part and format the meaning part
         meaning_parts = parts[1:]  # Skip word prefix like 'bank_'
         return " ".join(word.lower() for word in meaning_parts)
-    else:
-        # Fallback for single words
-        return meaning_id.lower()
+    # Fallback for single words
+    return meaning_id.lower()
 
 
 console = Console()
 
 
 def format_word_display(
-    entry: SynthesizedDictionaryEntry, show_examples: bool = True, show_synonyms: bool = True
+    entry: SynthesizedDictionaryEntry,
+    show_examples: bool = True,
+    show_synonyms: bool = True,
 ) -> Panel:
     """Create a beautiful display panel for a dictionary entry."""
     # TODO: Implement word display formatting
@@ -189,7 +191,8 @@ def format_search_results(results: list[tuple[float, str]], title: str = "Search
 
 
 def format_similarity_results(
-    results: list[tuple[float, str, str]], title: str = "Similar Words"
+    results: list[tuple[float, str, str]],
+    title: str = "Similar Words",
 ) -> Table:
     """Format semantic similarity results with explanations."""
     table = Table(title=title, show_header=True, header_style="bold blue")
@@ -222,7 +225,10 @@ def format_anki_progress(current: int, total: int, current_word: str) -> Progres
 
 
 def format_processing_summary(
-    processed: int, successful: int, failed: int, file_path: str
+    processed: int,
+    successful: int,
+    failed: int,
+    file_path: str,
 ) -> Panel:
     """Format a summary of word list processing."""
     success_rate = (successful / processed * 100) if processed > 0 else 0
@@ -270,7 +276,7 @@ def format_deck_summary(
             Text(f"💾 Saved to: {output_path}", style="dim"),
             Text(""),
             Text("🎯 Ready to import into Anki!", style="bold green"),
-        ]
+        ],
     )
 
     content = Text()
@@ -433,7 +439,10 @@ def _create_superscript(number: int) -> str:
 
 
 def _format_example_with_bold_word(
-    content: Text, example_text: str, word: str, base_style: str = "italic cyan"
+    content: Text,
+    example_text: str,
+    word: str,
+    base_style: str = "italic cyan",
 ) -> None:
     """Add example text to content with word bolded."""
     content.append("  ", style="cyan")  # Indent
@@ -516,7 +525,6 @@ def format_meaning_based_definition(
     meaning_groups: dict[str, list[Definition]],
 ) -> Panel:
     """Format AI-generated definition grouped by meanings with separate panels for multiple meanings."""
-
     # Header with word and pronunciation (word always lowercase)
     header = Text()
 
@@ -536,7 +544,11 @@ def format_meaning_based_definition(
         panels = []
         for meaning_counter, (meaning_id, definitions) in enumerate(meaning_groups.items(), 1):
             meaning_panel = _create_meaning_panel(
-                entry, meaning_id, definitions, meaning_counter, True
+                entry,
+                meaning_id,
+                definitions,
+                meaning_counter,
+                True,
             )
             panels.append(meaning_panel)
 

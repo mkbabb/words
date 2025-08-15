@@ -28,6 +28,7 @@ class CleanupService:
 
         Returns:
             Total number of documents modified across all collections
+
         """
         tasks = [
             collection.update_many({array_field: object_id}, {"$pull": {array_field: object_id}})
@@ -38,7 +39,7 @@ class CleanupService:
         total_modified = sum(result.modified_count for result in results)
 
         logger.warning(
-            f"Removed ObjectId {object_id} from {total_modified} documents across {len(collections)} collections"
+            f"Removed ObjectId {object_id} from {total_modified} documents across {len(collections)} collections",
         )
         return total_modified
 
@@ -51,6 +52,7 @@ class CleanupService:
 
         Returns:
             Total number of documents that had their image_ids arrays updated
+
         """
         # Import models here to avoid circular imports
         from ...models import Definition, SynthesizedDictionaryEntry
@@ -68,6 +70,6 @@ class CleanupService:
         )
 
         logger.warning(
-            f"Completed cleanup: removed image {image_id} from {total_cleaned} documents"
+            f"Completed cleanup: removed image {image_id} from {total_cleaned} documents",
         )
         return total_cleaned

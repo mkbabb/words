@@ -1,5 +1,4 @@
-"""
-Language-specific search using LexiconLanguageLoader.
+"""Language-specific search using LexiconLanguageLoader.
 
 Provides high-level interface for searching language lexicons.
 """
@@ -8,21 +7,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..models.definition import Language
+from ..corpus.core import Corpus
+from ..corpus.loaders.language import CorpusLanguageLoader
+from ..corpus.manager import CorpusManager, get_corpus_manager
+from ..models.dictionary import Language
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMode
 from .core import SearchEngine, SearchResult
-from .corpus import Corpus
-from .corpus.language_loader import CorpusLanguageLoader
-from .corpus.manager import CorpusManager, get_corpus_manager
 from .semantic.constants import DEFAULT_SENTENCE_MODEL, SemanticModel
 
 logger = get_logger(__name__)
 
 
 class LanguageSearch:
-    """
-    High-level search interface for language lexicons.
+    """High-level search interface for language lexicons.
 
     Handles lexicon loading and provides search functionality.
     """
@@ -43,9 +41,11 @@ class LanguageSearch:
             force_rebuild: Force rebuild of indices
             semantic: Enable semantic search capabilities
             semantic_model: Model for semantic search (BGE-M3 or MiniLM)
+
         """
         self.languages = sorted(
-            languages or [Language.ENGLISH], key=lambda x: x.value
+            languages or [Language.ENGLISH],
+            key=lambda x: x.value,
         )  # Sort for deterministic ID
         self.min_score = min_score
         self.force_rebuild = force_rebuild
@@ -63,25 +63,27 @@ class LanguageSearch:
             return
 
         logger.info(
-            f"Initializing language search for {[lang.value for lang in self.languages]} (semantic={'enabled' if self.semantic else 'disabled'})"
+            f"Initializing language search for {[lang.value for lang in self.languages]} (semantic={'enabled' if self.semantic else 'disabled'})",
         )
 
         # Load vocabulary and create corpus using unified language loader
         logger.debug(f"Creating language loader (force_rebuild={self.force_rebuild})")
         loader = CorpusLanguageLoader(force_rebuild=self.force_rebuild)
-        
+
         # Get or create corpus (handles vocabulary loading, normalization, and corpus creation)
         corpus = await loader.get_or_create_corpus(
             languages=self.languages,
-            force_rebuild=self.force_rebuild
+            force_rebuild=self.force_rebuild,
         )
-        
+
         logger.info(
-            f"Corpus ready: '{corpus.corpus_name}' (full hash: {corpus.vocabulary_hash}, {len(corpus.vocabulary)} items)"
+            f"Corpus ready: '{corpus.corpus_name}' (full hash: {corpus.vocabulary_hash}, {len(corpus.vocabulary)} items)",
         )
 
         # Initialize search engine with corpus name
-        logger.info(f"Creating SearchEngine for corpus '{corpus.corpus_name}' with {self.semantic_model if self.semantic else 'no semantic'}")
+        logger.info(
+            f"Creating SearchEngine for corpus '{corpus.corpus_name}' with {self.semantic_model if self.semantic else 'no semantic'}"
+        )
         self.search_engine = SearchEngine(
             corpus_name=corpus.corpus_name,
             min_score=self.min_score,
@@ -97,16 +99,16 @@ class LanguageSearch:
         # Semantic search is initialized during SearchEngine.initialize() if enabled
 
         logger.info(
-            f"✅ Language search fully initialized for {[lang.value for lang in self.languages]}"
+            f"✅ Language search fully initialized for {[lang.value for lang in self.languages]}",
         )
         self._initialized = True
 
     async def update_corpus(self, corpus: Corpus) -> None:
-        """
-        Update the language search with a new corpus.
+        """Update the language search with a new corpus.
 
         Args:
             corpus: New corpus to use
+
         """
         if self.search_engine is None:
             await self.initialize()
@@ -115,11 +117,11 @@ class LanguageSearch:
             await self.search_engine.update_corpus()
 
     def model_dump(self) -> dict[str, Any]:
-        """
-        Export language search state.
+        """Export language search state.
 
         Returns:
             Dictionary containing state
+
         """
         return {
             "languages": [lang.value for lang in self.languages],
@@ -130,11 +132,11 @@ class LanguageSearch:
         }
 
     def model_load(self, data: dict[str, Any]) -> None:
-        """
-        Load language search state.
+        """Load language search state.
 
         Args:
             data: Dictionary containing state
+
         """
         self.languages = [Language(lang) for lang in data.get("languages", ["en"])]
         self.min_score = data.get("min_score", DEFAULT_MIN_SCORE)
@@ -154,6 +156,7 @@ class LanguageSearch:
             query: Search query
             max_results: Maximum results to return
             min_score: Minimum score threshold
+
         """
         if self.search_engine is None:
             await self.initialize()
@@ -175,6 +178,7 @@ class LanguageSearch:
             mode: Search mode (SMART, EXACT, FUZZY, SEMANTIC)
             max_results: Maximum results to return
             min_score: Minimum score threshold
+
         """
         if self.search_engine is None:
             await self.initialize()
@@ -200,7 +204,7 @@ class LanguageSearch:
             {
                 "languages": [lang.value for lang in self.languages],
                 "corpus_name": self.search_engine.corpus_name if self.search_engine else None,
-            }
+            },
         )
         return stats
 
@@ -225,6 +229,7 @@ async def get_language_search(
 
     Returns:
         Initialized LanguageSearch instance
+
     """
     global _language_search
 
@@ -237,10 +242,10 @@ async def get_language_search(
     if needs_recreate:
         # Create with semantic support as specified
         _language_search = LanguageSearch(
-            languages=target_languages, 
-            force_rebuild=force_rebuild, 
+            languages=target_languages,
+            force_rebuild=force_rebuild,
             semantic=semantic,
-            semantic_model=semantic_model
+            semantic_model=semantic_model,
         )
         await _language_search.initialize()
 

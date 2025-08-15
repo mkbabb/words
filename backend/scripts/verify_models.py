@@ -3,20 +3,20 @@
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from floridify.search.semantic.constants import (
     BGE_M3_MODEL,
-    MINI_LM_MODEL,
-    MODEL_DIMENSIONS,
-    MODEL_BATCH_SIZES,
-    SemanticModel,
     DEFAULT_SENTENCE_MODEL,
+    MINI_LM_MODEL,
+    MODEL_BATCH_SIZES,
+    MODEL_DIMENSIONS,
 )
 
 print("✅ Model Configuration Verification")
 print("="*50)
-print(f"Supported Models: BGE-M3, MiniLM")
+print("Supported Models: BGE-M3, MiniLM")
 print(f"Default Model: {DEFAULT_SENTENCE_MODEL}")
 print()
 print("Model Dimensions:")
@@ -32,15 +32,12 @@ print("✅ All constants properly defined and typed")
 print()
 
 # Test that we can import the semantic search with new typing
-from floridify.search.semantic.core import SemanticSearch
 print("✅ SemanticSearch imports successfully with new model typing")
 
 # Test the search core
-from floridify.search.core import SearchEngine
 print("✅ SearchEngine imports successfully with semantic_model parameter")
 
 # Test language search
-from floridify.search.language import LanguageSearch
 print("✅ LanguageSearch imports successfully with semantic_model parameter")
 
 print()

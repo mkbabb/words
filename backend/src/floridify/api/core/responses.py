@@ -45,7 +45,9 @@ class ValidationErrorResponse(BaseModel):
 
     @classmethod
     def from_pydantic_errors(
-        cls, errors: list[dict[str, Any]], request_id: str | None = None
+        cls,
+        errors: list[dict[str, Any]],
+        request_id: str | None = None,
     ) -> "ValidationErrorResponse":
         """Create from Pydantic validation errors."""
         validation_errors = []
@@ -56,6 +58,6 @@ class ValidationErrorResponse(BaseModel):
                     "message": error.get("msg", "Invalid value"),
                     "type": error.get("type", "value_error"),
                     "input": error.get("input"),
-                }
+                },
             )
         return cls(validation_errors=validation_errors, request_id=request_id)

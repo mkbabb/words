@@ -4,8 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ...corpus.manager import get_corpus_manager
 from ...search.core import SearchEngine
-from ...search.corpus.manager import get_corpus_manager
 
 
 class CorpusCreate(BaseModel):
@@ -23,7 +23,10 @@ class CorpusSearchParams(BaseModel):
     min_score: float = Field(default=0.6, ge=0.0, le=1.0, description="Min score")
     semantic: bool = Field(default=False, description="Enable semantic search")
     semantic_weight: float = Field(
-        default=0.7, ge=0.0, le=1.0, description="Weight for semantic results"
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Weight for semantic results",
     )
 
 

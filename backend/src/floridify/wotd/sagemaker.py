@@ -31,7 +31,10 @@ class SageMakerDeployer:
     NGINX_CONFIG = "nginx.conf"
 
     def __init__(
-        self, role_arn: str, region: str = "us-east-1", ecr_repo_name: str = "wotd-ml"
+        self,
+        role_arn: str,
+        region: str = "us-east-1",
+        ecr_repo_name: str = "wotd-ml",
     ) -> None:
         self.role_arn = role_arn
         self.region = region
@@ -63,7 +66,6 @@ class SageMakerDeployer:
         instance_type: str = "ml.g5.xlarge",
     ) -> str:
         """Deploy training job to SageMaker."""
-
         if not config:
             config = TrainingConfig()
 
@@ -97,11 +99,11 @@ class SageMakerDeployer:
                             "S3DataType": "S3Prefix",
                             "S3Uri": f"s3://{s3_bucket}/wotd-training-data/",
                             "S3DataDistributionType": "FullyReplicated",
-                        }
+                        },
                     },
                     "ContentType": "application/json",
                     "CompressionType": "None",
-                }
+                },
             ],
             "OutputDataConfig": {"S3OutputPath": f"s3://{s3_bucket}/wotd-models/"},
             "ResourceConfig": {
@@ -110,7 +112,7 @@ class SageMakerDeployer:
                 "VolumeSizeInGB": 30,
             },
             "StoppingCondition": {
-                "MaxRuntimeInSeconds": 3600  # 1 hour max
+                "MaxRuntimeInSeconds": 3600,  # 1 hour max
             },
             "HyperParameters": hyperparameters,
         }
@@ -134,7 +136,6 @@ class SageMakerDeployer:
         instance_type: str = "ml.m5.xlarge",
     ) -> str:
         """Deploy inference endpoint to SageMaker."""
-
         logger.info(f"🚀 Deploying inference endpoint: {endpoint_name}")
 
         try:
@@ -166,7 +167,7 @@ class SageMakerDeployer:
                         "InitialInstanceCount": 1,
                         "InstanceType": instance_type,
                         "InitialVariantWeight": 1.0,
-                    }
+                    },
                 ],
             }
 
@@ -191,7 +192,6 @@ class SageMakerDeployer:
 
     async def monitor_training_job(self, job_name: str) -> dict[str, Any]:
         """Monitor training job progress."""
-
         logger.info(f"👀 Monitoring training job: {job_name}")
 
         while True:
@@ -202,10 +202,10 @@ class SageMakerDeployer:
                 if status == "Completed":
                     logger.success(f"✅ Training job completed: {job_name}")
                     return dict(response)
-                elif status == "Failed":
+                if status == "Failed":
                     logger.error(f"❌ Training job failed: {job_name}")
                     return dict(response)
-                elif status in ["InProgress", "Stopping"]:
+                if status in ["InProgress", "Stopping"]:
                     logger.info(f"🔄 Training job {status.lower()}: {job_name}")
                     await asyncio.sleep(30)  # Check every 30 seconds
                 else:
@@ -281,7 +281,6 @@ async def deploy_complete_wotd_pipeline(
     region: str = "us-east-1",
 ) -> dict[str, str]:
     """Deploy complete WOTD pipeline to SageMaker."""
-
     deployer = SageMakerDeployer(role_arn, region)
 
     # Generate unique job name if not provided
@@ -291,7 +290,9 @@ async def deploy_complete_wotd_pipeline(
 
     # Deploy training job
     training_arn = await deployer.deploy_training_job(
-        job_name=job_name, s3_bucket=s3_bucket, config=config
+        job_name=job_name,
+        s3_bucket=s3_bucket,
+        config=config,
     )
 
     # Monitor training job
@@ -306,7 +307,9 @@ async def deploy_complete_wotd_pipeline(
     model_s3_path = training_result["ModelArtifacts"]["S3ModelArtifacts"]
 
     endpoint_arn = await deployer.deploy_inference_endpoint(
-        model_name=model_name, endpoint_name=endpoint_name, s3_model_path=model_s3_path
+        model_name=model_name,
+        endpoint_name=endpoint_name,
+        s3_model_path=model_s3_path,
     )
 
     return {

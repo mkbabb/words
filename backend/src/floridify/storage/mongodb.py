@@ -9,25 +9,29 @@ from typing import Any
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
+from ..corpus.models import CorpusMetadata
 from ..models import (
     AudioMedia,
     # CorpusCacheEntry removed - using unified caching
-    CorpusMetadata,
     Definition,
+    DictionaryProviderData,
     Example,
     Fact,
     ImageMedia,
     Pronunciation,
-    ProviderData,
-    SemanticMetadata,
     SynthesizedDictionaryEntry,
     Word,
     WordRelationship,
 )
-from ..models.provider import (
-    BatchOperation,
-    VersionedProviderData,
+from ..models.versioned import (
+    CorpusVersionedData,
+    DictionaryVersionedData,
+    LiteratureVersionedData,
+    SemanticVersionedData,
+    VersionedData,
 )
+from ..providers.batch import BatchOperation
+from ..search.models import SemanticMetadata
 from ..utils.config import Config
 from ..utils.logging import get_logger
 from ..wordlist.models import WordList
@@ -53,6 +57,7 @@ class MongoDBStorage:
             connection_string: MongoDB connection string
             database_name: Name of the database to use
             cert_path: Path to TLS certificate file
+
         """
         self.connection_string = connection_string
         self.database_name = database_name
@@ -64,7 +69,7 @@ class MongoDBStorage:
         """Connect to MongoDB and initialize Beanie with optimized connection pool."""
         # Detect if connecting to localhost (no TLS needed)
         is_localhost = "localhost:27017" in self.connection_string
-        
+
         # Build connection kwargs
         connection_kwargs = {
             # Connection Pool Settings
@@ -79,15 +84,15 @@ class MongoDBStorage:
             "retryWrites": False,  # Disable retry writes for Docker MongoDB compatibility
             "waitQueueTimeoutMS": 5000,  # Queue timeout for connection pool
         }
-        
+
         # Only add TLS settings for non-localhost connections
         if not is_localhost and self.cert_path:
-            connection_kwargs["tlsCAFile"] = str(self.cert_path)
-        
+            connection_kwargs["tlsCAFile"] = str(self.cert_path)  # type: ignore[assignment]
+
         # Optimized connection pool configuration for production performance
         self.client = AsyncIOMotorClient(
             self.connection_string,
-            **connection_kwargs
+            **connection_kwargs,
         )
         database: Any = self.client[self.database_name]
 
@@ -103,12 +108,16 @@ class MongoDBStorage:
                 Pronunciation,
                 AudioMedia,
                 ImageMedia,
-                ProviderData,
+                DictionaryProviderData,
                 SynthesizedDictionaryEntry,
                 WordRelationship,
                 WordList,
                 # Versioning models
-                VersionedProviderData,
+                VersionedData,
+                DictionaryVersionedData,
+                CorpusVersionedData,
+                SemanticVersionedData,
+                LiteratureVersionedData,
                 BatchOperation,
                 # Cache models
                 # CorpusCacheEntry removed - using unified caching
@@ -125,6 +134,7 @@ class MongoDBStorage:
 
         Returns:
             True if connection is healthy, False otherwise
+
         """
         if not self.client:
             return False
@@ -153,6 +163,7 @@ class MongoDBStorage:
 
         Returns:
             Dictionary with connection pool statistics
+
         """
         if not self.client:
             return {"status": "disconnected"}
@@ -193,6 +204,7 @@ class MongoDBStorage:
 
         Returns:
             True if successful, False otherwise
+
         """
         if not self._initialized:
             return False
@@ -227,6 +239,7 @@ class MongoDBStorage:
 
         Returns:
             Word if found, None otherwise
+
         """
         if not self._initialized:
             return None
@@ -245,6 +258,7 @@ class MongoDBStorage:
 
         Returns:
             True if word exists, False otherwise
+
         """
         if not self._initialized:
             return False
@@ -264,6 +278,7 @@ class MongoDBStorage:
 
         Returns:
             List of definitions
+
         """
         if not self._initialized:
             return []
@@ -295,7 +310,9 @@ async def _ensure_initialized() -> None:
             logger.info(f"Initializing MongoDB: {database_name} at {mongodb_url[:50]}...")
 
             _storage = MongoDBStorage(
-                connection_string=mongodb_url, database_name=database_name, cert_path=cert_path
+                connection_string=mongodb_url,
+                database_name=database_name,
+                cert_path=cert_path,
             )
             await _storage.connect()
             logger.info("MongoDB initialized successfully")
@@ -331,7 +348,7 @@ async def get_synthesized_entry(word_text: str) -> SynthesizedDictionaryEntry | 
             return None
         # Then find the synthesized entry
         return await SynthesizedDictionaryEntry.find_one(
-            SynthesizedDictionaryEntry.word_id == word.id
+            SynthesizedDictionaryEntry.word_id == word.id,
         )
     except Exception:
         return None
@@ -342,7 +359,7 @@ async def save_synthesized_entry(entry: SynthesizedDictionaryEntry) -> None:
     try:
         await _ensure_initialized()
         existing = await SynthesizedDictionaryEntry.find_one(
-            SynthesizedDictionaryEntry.word_id == entry.word_id
+            SynthesizedDictionaryEntry.word_id == entry.word_id,
         )
 
         if existing:

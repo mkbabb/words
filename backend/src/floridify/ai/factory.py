@@ -28,6 +28,7 @@ def get_openai_connector(
 
     Returns:
         Initialized OpenAI connector instance
+
     """
     global _openai_connector
 
@@ -71,6 +72,7 @@ def get_definition_synthesizer(
 
     Returns:
         Initialized definition synthesizer instance
+
     """
     global _definition_synthesizer
 

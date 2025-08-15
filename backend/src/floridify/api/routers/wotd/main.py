@@ -46,6 +46,7 @@ async def get_current_word_of_the_day(
     Errors:
         404: No word available and generation disabled
         500: Word generation failed
+
     """
     # Get or create active batch
     batch = await WordOfTheDayBatch.find_one({"active": True})
@@ -102,6 +103,7 @@ async def send_current_word(
     Errors:
         404: No word available to send
         409: Word not due for sending yet
+
     """
     # Get active batch
     batch = await WordOfTheDayBatch.find_one({"active": True})
@@ -128,8 +130,7 @@ async def send_current_word(
                 409,
                 f"Word not due for sending yet. Next word in {time_until_due.total_seconds():.0f} seconds",
             )
-        else:
-            raise HTTPException(409, "Word not due for sending yet")
+        raise HTTPException(409, "Word not due for sending yet")
 
     # Mark as sent
     word_text = current_word.word
@@ -161,6 +162,7 @@ async def list_word_batches(
 
     Returns:
         List of batches with metadata and statistics.
+
     """
     query = {"active": True} if active_only else {}
     batches = await WordOfTheDayBatch.find(query).limit(limit).to_list()
@@ -187,6 +189,7 @@ async def get_word_batch(
 
     Errors:
         404: Batch not found
+
     """
     batch = await WordOfTheDayBatch.get(batch_id)
     if not batch:
@@ -241,6 +244,7 @@ async def update_batch_config(
 
     Errors:
         404: Batch not found
+
     """
     batch = await WordOfTheDayBatch.get(batch_id)
     if not batch:
@@ -297,6 +301,7 @@ async def generate_new_batch_words(
     Errors:
         404: Batch not found
         500: Word generation failed
+
     """
     batch = await WordOfTheDayBatch.get(batch_id)
     if not batch:
@@ -331,6 +336,7 @@ async def get_word_history(
 
     Returns:
         List of recently sent words with metadata.
+
     """
     query: dict[str, Any] = {}
     if batch_id:
@@ -362,7 +368,7 @@ async def get_word_history(
                         "estimated_sent_date": estimated_date,
                         "batch_id": str(batch.id),
                         "batch_context": batch.context,
-                    }
+                    },
                 )
 
     # Sort by date and limit
@@ -383,6 +389,7 @@ async def get_word_of_the_day_config() -> ResourceResponse:
 
     Returns:
         Global configuration settings.
+
     """
     config = await WordOfTheDayConfig.get_default()
     return ResourceResponse(
@@ -410,6 +417,7 @@ async def update_word_of_the_day_config(
 
     Returns:
         Updated configuration.
+
     """
     config = await WordOfTheDayConfig.get_default()
 
@@ -442,7 +450,9 @@ async def update_word_of_the_day_config(
 
 # Helper function for batch generation
 async def _generate_new_batch(
-    batch: WordOfTheDayBatch, ai: OpenAIConnector, count: int | None = None
+    batch: WordOfTheDayBatch,
+    ai: OpenAIConnector,
+    count: int | None = None,
 ) -> None:
     """Generate new words for a batch."""
     config = await WordOfTheDayConfig.get_default()

@@ -98,7 +98,9 @@ class PromptTemplateManager:
         return self.render_template("misc/lookup", word=word)
 
     def get_meaning_extraction_prompt(
-        self, word: str, definitions: list[tuple[str, str, str]]
+        self,
+        word: str,
+        definitions: list[tuple[str, str, str]],
     ) -> str:
         """Generate meaning extraction prompt with cluster mapping."""
         return self.render_template(
@@ -108,7 +110,10 @@ class PromptTemplateManager:
         )
 
     def get_meaning_cluster_single_prompt(
-        self, word: str, definition: str, part_of_speech: str
+        self,
+        word: str,
+        definition: str,
+        part_of_speech: str,
     ) -> str:
         """Generate meaning cluster for a single definition."""
         return self.render_template(
@@ -145,7 +150,11 @@ class PromptTemplateManager:
         )
 
     def get_fact_generation_prompt(
-        self, word: str, definition: str, count: int = 5, previous_words: list[str] | None = None
+        self,
+        word: str,
+        definition: str,
+        count: int = 5,
+        previous_words: list[str] | None = None,
     ) -> str:
         """Generate prompt for interesting facts about a word."""
         return self.render_template(

@@ -9,7 +9,7 @@ from .models import (
 
 __all__ = [
     "NotificationFrequency",
-    "WordOfTheDayEntry",
     "WordOfTheDayBatch",
     "WordOfTheDayConfig",
+    "WordOfTheDayEntry",
 ]

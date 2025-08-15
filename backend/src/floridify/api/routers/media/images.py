@@ -81,6 +81,7 @@ async def list_images(
 
     Returns:
         Paginated list of image metadata.
+
     """
     # Build filter
     filter_params = ImageFilter(
@@ -116,7 +117,7 @@ async def list_images(
                 "url": f"/api/v1/images/{image.id}",
                 "content_url": f"/api/v1/images/{image.id}/content",
                 "created_at": image.created_at.isoformat() if image.created_at else None,
-            }
+            },
         )
 
     return ListResponse(
@@ -149,6 +150,7 @@ async def upload_image(
     Errors:
         400: Invalid image file
         413: File too large (max 10MB)
+
     """
     # Validate file type
     if not file.content_type or not file.content_type.startswith("image/"):
@@ -161,7 +163,7 @@ async def upload_image(
                         field="file",
                         message=f"File must be an image, got {file.content_type}",
                         code="invalid_type",
-                    )
+                    ),
                 ],
             ).model_dump(),
         )
@@ -180,7 +182,7 @@ async def upload_image(
                         field="file",
                         message="File size must be less than 10MB",
                         code="file_too_large",
-                    )
+                    ),
                 ],
             ).model_dump(),
         )
@@ -198,9 +200,9 @@ async def upload_image(
                 details=[
                     ErrorDetail(
                         field="file",
-                        message=f"Could not parse image: {str(e)}",
+                        message=f"Could not parse image: {e!s}",
                         code="invalid_image",
-                    )
+                    ),
                 ],
             ).model_dump(),
         )
@@ -274,13 +276,15 @@ async def upload_image_stream(
             # Start upload
             await state_tracker.update_stage(Stages.IMAGE_UPLOAD_START)
             await state_tracker.update(
-                stage=Stages.IMAGE_UPLOAD_START, message="Starting image upload..."
+                stage=Stages.IMAGE_UPLOAD_START,
+                message="Starting image upload...",
             )
 
             # Validate file type
             await state_tracker.update_stage(Stages.IMAGE_UPLOAD_VALIDATING)
             await state_tracker.update(
-                stage=Stages.IMAGE_UPLOAD_VALIDATING, message="Validating file type..."
+                stage=Stages.IMAGE_UPLOAD_VALIDATING,
+                message="Validating file type...",
             )
 
             if not file.content_type or not file.content_type.startswith("image/"):
@@ -299,7 +303,8 @@ async def upload_image_stream(
             # Process image metadata
             await state_tracker.update_stage(Stages.IMAGE_UPLOAD_PROCESSING)
             await state_tracker.update(
-                stage=Stages.IMAGE_UPLOAD_PROCESSING, message="Processing image metadata..."
+                stage=Stages.IMAGE_UPLOAD_PROCESSING,
+                message="Processing image metadata...",
             )
 
             try:
@@ -307,7 +312,7 @@ async def upload_image_stream(
                 width, height = img.size
                 format = img.format.lower() if img.format else "unknown"
             except Exception as e:
-                raise ValueError(f"Could not parse image: {str(e)}")
+                raise ValueError(f"Could not parse image: {e!s}")
 
             await state_tracker.update(
                 stage=Stages.IMAGE_UPLOAD_PROCESSING,
@@ -318,7 +323,8 @@ async def upload_image_stream(
             # Store image
             await state_tracker.update_stage(Stages.IMAGE_UPLOAD_STORING)
             await state_tracker.update(
-                stage=Stages.IMAGE_UPLOAD_STORING, message="Storing image data..."
+                stage=Stages.IMAGE_UPLOAD_STORING,
+                message="Storing image data...",
             )
 
             # Create image
@@ -352,7 +358,7 @@ async def upload_image_stream(
             }
 
         except Exception as e:
-            await state_tracker.update_error(f"Failed to upload image: {str(e)}")
+            await state_tracker.update_error(f"Failed to upload image: {e!s}")
             raise
 
     # Use the generalized streaming system
@@ -377,6 +383,7 @@ async def get_image(request: Request, image_id: str) -> Response | dict[str, Any
 
     Raises:
         404: Image not found
+
     """
     image = await ImageMedia.get(image_id)
 
@@ -390,7 +397,7 @@ async def get_image(request: Request, image_id: str) -> Response | dict[str, Any
                         field="image_id",
                         message=f"Image with ID {image_id} not found",
                         code="not_found",
-                    )
+                    ),
                 ],
             ).model_dump(),
         )
@@ -411,7 +418,7 @@ async def get_image(request: Request, image_id: str) -> Response | dict[str, Any
             )
 
         # Fallback to file path if available
-        elif image.url and image.url.startswith("/"):
+        if image.url and image.url.startswith("/"):
             image_path = Path(image.url)
             if image_path.exists():
                 media_type = f"image/{image.format}"
@@ -434,7 +441,7 @@ async def get_image(request: Request, image_id: str) -> Response | dict[str, Any
                         field="data",
                         message="No image data or valid file path available",
                         code="no_data",
-                    )
+                    ),
                 ],
             ).model_dump(),
         )
@@ -467,6 +474,7 @@ async def get_image_content(image_id: str) -> Response:
 
     Raises:
         404: Image not found or no data available
+
     """
     # Get image metadata
     image = await ImageMedia.get(image_id)
@@ -481,7 +489,7 @@ async def get_image_content(image_id: str) -> Response:
                         field="image_id",
                         message=f"Image with ID {image_id} not found",
                         code="not_found",
-                    )
+                    ),
                 ],
             ).model_dump(),
         )
@@ -500,7 +508,7 @@ async def get_image_content(image_id: str) -> Response:
         )
 
     # Fallback to file path if available
-    elif image.url and image.url.startswith("/"):
+    if image.url and image.url.startswith("/"):
         image_path = Path(image.url)
         if image_path.exists():
             # Determine media type
@@ -524,7 +532,7 @@ async def get_image_content(image_id: str) -> Response:
                     field="data",
                     message="No image data or valid file path available",
                     code="no_data",
-                )
+                ),
             ],
         ).model_dump(),
     )
@@ -556,6 +564,7 @@ async def update_image(
     Errors:
         404: Image not found
         409: Version conflict
+
     """
     try:
         image = await repo.update(image_id, update, version)
@@ -593,7 +602,7 @@ async def update_image(
                             field="version",
                             message=str(e),
                             code="version_conflict",
-                        )
+                        ),
                     ],
                 ).model_dump(),
             )

@@ -53,14 +53,12 @@ async def synthesize_pronunciation(
     state_tracker: StateTracker | None = None,
 ) -> Pronunciation | None:
     """Synthesize pronunciation: enhance existing or create new."""
-
     # Find existing pronunciation
     existing_pronunciation = await _find_existing_pronunciation(providers_data)
 
     if existing_pronunciation:
         return await _enhance_pronunciation(existing_pronunciation, word, ai, state_tracker)
-    else:
-        return await _create_pronunciation(word, ai, state_tracker)
+    return await _create_pronunciation(word, ai, state_tracker)
 
 
 async def _find_existing_pronunciation(
@@ -73,9 +71,8 @@ async def _find_existing_pronunciation(
                 pronunciation = await Pronunciation.get(provider.pronunciation_id)
                 if pronunciation:
                     return pronunciation
-        else:
-            if provider.get("pronunciation"):
-                return cast(Pronunciation, provider["pronunciation"])
+        elif provider.get("pronunciation"):
+            return cast("Pronunciation", provider["pronunciation"])
     return None
 
 
@@ -112,7 +109,9 @@ async def _enhance_pronunciation(
 
 
 async def _create_pronunciation(
-    word: str, ai: OpenAIConnector, state_tracker: StateTracker | None
+    word: str,
+    ai: OpenAIConnector,
+    state_tracker: StateTracker | None,
 ) -> Pronunciation | None:
     """Create new pronunciation from scratch."""
     try:
@@ -172,7 +171,6 @@ async def synthesize_etymology(
     state_tracker: StateTracker | None = None,
 ) -> Etymology | None:
     """Extract and synthesize etymology from provider data."""
-
     # Collect etymology data from providers
     etymology_data = []
 
@@ -184,17 +182,16 @@ async def synthesize_etymology(
                     {
                         "name": provider.provider,  # Already a string due to use_enum_values=True
                         "etymology_text": provider.etymology.text,
-                    }
+                    },
                 )
-        else:
-            # Dict format
-            if provider.get("etymology"):
-                etymology_data.append(
-                    {
-                        "name": provider["name"],
-                        "etymology_text": provider["etymology"],
-                    }
-                )
+        # Dict format
+        elif provider.get("etymology"):
+            etymology_data.append(
+                {
+                    "name": provider["name"],
+                    "etymology_text": provider["etymology"],
+                },
+            )
 
     if not etymology_data:
         return None
@@ -224,7 +221,6 @@ async def synthesize_word_forms(
     state_tracker: StateTracker | None = None,
 ) -> list[WordForm]:
     """Generate word forms for a word."""
-
     # Determine primary part of speech from definitions
     try:
         if state_tracker:
@@ -301,11 +297,11 @@ async def assess_definition_cefr(
     state_tracker: StateTracker | None = None,
 ) -> str | None:
     """Assess CEFR level for a definition."""
-
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, message=f"Assessing CEFR level for {word}"
+                stage=Stages.AI_SYNTHESIS,
+                message=f"Assessing CEFR level for {word}",
             )
         response = await ai.assess_cefr_level(word, definition.text)
         return response.level
@@ -321,7 +317,6 @@ async def assess_definition_frequency(
     state_tracker: StateTracker | None = None,
 ) -> int | None:
     """Assess frequency band for a definition."""
-
     try:
         if state_tracker:
             await state_tracker.update(
@@ -341,11 +336,11 @@ async def classify_definition_register(
     state_tracker: StateTracker | None = None,
 ) -> str | None:
     """Classify register for a definition."""
-
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, message="Classifying register for definition"
+                stage=Stages.AI_SYNTHESIS,
+                message="Classifying register for definition",
             )
         response = await ai.classify_register(definition.text)
         return response.language_register
@@ -360,11 +355,11 @@ async def assess_definition_domain(
     state_tracker: StateTracker | None = None,
 ) -> str | None:
     """Identify domain for a definition."""
-
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, message="Identifying domain for definition"
+                stage=Stages.AI_SYNTHESIS,
+                message="Identifying domain for definition",
             )
         response = await ai.assess_domain(definition.text)
         return response.domain
@@ -379,11 +374,11 @@ async def assess_grammar_patterns(
     state_tracker: StateTracker | None = None,
 ) -> list[GrammarPattern]:
     """Extract grammar patterns for a definition."""
-
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, message="Extracting grammar patterns"
+                stage=Stages.AI_SYNTHESIS,
+                message="Extracting grammar patterns",
             )
         response = await ai.assess_grammar_patterns(
             definition.text,
@@ -394,7 +389,7 @@ async def assess_grammar_patterns(
                 pattern=pattern,
                 description=desc,
             )
-            for pattern, desc in zip(response.patterns, response.descriptions)
+            for pattern, desc in zip(response.patterns, response.descriptions, strict=False)
         ]
     except Exception as e:
         logger.error(f"Failed to extract grammar patterns: {e}")
@@ -408,7 +403,6 @@ async def assess_collocations(
     state_tracker: StateTracker | None = None,
 ) -> list[Collocation]:
     """Identify collocations for a definition."""
-
     try:
         if state_tracker:
             await state_tracker.update(
@@ -440,11 +434,11 @@ async def usage_note_generation(
     state_tracker: StateTracker | None = None,
 ) -> list[UsageNote]:
     """Generate usage notes for a definition."""
-
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, message=f"Generating usage notes for {word}"
+                stage=Stages.AI_SYNTHESIS,
+                message=f"Generating usage notes for {word}",
             )
         response = await ai.usage_note_generation(word, definition.text)
         return [
@@ -465,11 +459,11 @@ async def assess_regional_variants(
     state_tracker: StateTracker | None = None,
 ) -> list[str]:
     """Detect regional variants for a definition."""
-
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, message="Detecting regional variants"
+                stage=Stages.AI_SYNTHESIS,
+                message="Detecting regional variants",
             )
         response = await ai.assess_regional_variants(definition.text)
         return response.regions
@@ -486,14 +480,14 @@ async def generate_facts(
     state_tracker: StateTracker | None = None,
 ) -> list[Fact]:
     """Generate interesting facts about a word."""
-
     # Use primary definition for context
     primary_def = definitions[0].text if definitions else ""
 
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, message=f"Generating facts for {word.text}"
+                stage=Stages.AI_SYNTHESIS,
+                message=f"Generating facts for {word.text}",
             )
         response = await ai.generate_facts(
             word=word.text,
@@ -587,7 +581,7 @@ async def synthesize_synonyms(
     except Exception as e:
         logger.error(f"Failed to synthesize synonyms: {e}")
         if state_tracker:
-            await state_tracker.update_error(f"Synonym synthesis failed: {str(e)}")
+            await state_tracker.update_error(f"Synonym synthesis failed: {e!s}")
         return existing_synonyms
 
 
@@ -622,7 +616,7 @@ async def generate_examples(
     except Exception as e:
         logger.error(f"Failed to generate examples: {e}")
         if state_tracker:
-            await state_tracker.update_error(f"Example generation failed: {str(e)}")
+            await state_tracker.update_error(f"Example generation failed: {e!s}")
         return []
 
 
@@ -636,7 +630,8 @@ async def synthesize_definition_text(
     try:
         if state_tracker:
             await state_tracker.update(
-                stage=Stages.AI_SYNTHESIS, message=f"Synthesizing definition for {word.text}"
+                stage=Stages.AI_SYNTHESIS,
+                message=f"Synthesizing definition for {word.text}",
             )
 
         # Convert dict definitions to Definition objects for the AI method
@@ -666,17 +661,16 @@ async def synthesize_definition_text(
                 "part_of_speech": synth_def.part_of_speech,
                 "sources_used": [d.get("provider", "unknown") for d in clustered_definitions],
             }
-        else:
-            return {
-                "definition_text": "",
-                "part_of_speech": "",
-                "sources_used": [],
-            }
+        return {
+            "definition_text": "",
+            "part_of_speech": "",
+            "sources_used": [],
+        }
 
     except Exception as e:
         logger.error(f"Failed to synthesize definition: {e}")
         if state_tracker:
-            await state_tracker.update_error(f"Definition synthesis failed: {str(e)}")
+            await state_tracker.update_error(f"Definition synthesis failed: {e!s}")
         return {
             "definition_text": "",
             "part_of_speech": "",
@@ -700,6 +694,7 @@ async def cluster_definitions(
 
     Returns:
         The same list of definitions with meaning_cluster attributes set
+
     """
     if not definitions:
         return definitions
@@ -729,7 +724,7 @@ async def cluster_definitions(
                     provider_name,
                     definition.part_of_speech,
                     definition.text,
-                )
+                ),
             )
 
         # Extract cluster mappings
@@ -760,7 +755,7 @@ async def cluster_definitions(
         clustered_count = sum(1 for d in definitions if d.meaning_cluster)
         logger.info(
             f"Clustered {clustered_count}/{len(definitions)} definitions "
-            f"into {len(cluster_response.cluster_mappings)} clusters"
+            f"into {len(cluster_response.cluster_mappings)} clusters",
         )
 
         if state_tracker:
@@ -774,7 +769,7 @@ async def cluster_definitions(
     except Exception as e:
         logger.error(f"Failed to cluster definitions for '{word.text}': {e}")
         if state_tracker:
-            await state_tracker.update_error(f"Definition clustering failed: {str(e)}")
+            await state_tracker.update_error(f"Definition clustering failed: {e!s}")
         # Return definitions unchanged on error
         return definitions
 
@@ -823,6 +818,7 @@ async def enhance_definitions_parallel(
         force_refresh: Force regeneration even if data exists
         state_tracker: Optional state tracker
         batch_mode: Use batch processing for 50% cost reduction (for bulk operations)
+
     """
     # Default to all definition-level components
     if components is None:
@@ -842,7 +838,7 @@ async def enhance_definitions_parallel(
                     ai,
                     force_refresh=force_refresh,
                     state_tracker=state_tracker,
-                )
+                ),
             )
             task_info.append((definition, SynthesisComponent.SYNONYMS, len(tasks) - 1))
 
@@ -862,7 +858,7 @@ async def enhance_definitions_parallel(
                     ai,
                     force_refresh=force_refresh,
                     state_tracker=state_tracker,
-                )
+                ),
             )
             task_info.append((definition, SynthesisComponent.ANTONYMS, len(tasks) - 1))
 
@@ -957,12 +953,12 @@ async def enhance_definitions_parallel(
 
         # Update the definition based on component type
         if component == SynthesisComponent.SYNONYMS and isinstance(result, list):
-            definition.synonyms = cast(list[str], result)
+            definition.synonyms = cast("list[str]", result)
         elif component == SynthesisComponent.EXAMPLES and isinstance(result, list):
             # Create Example objects and save them
             example_ids: list[PydanticObjectId] = []
             assert definition.id is not None  # Definition should have been saved
-            for example_text in cast(list[str], result):
+            for example_text in cast("list[str]", result):
                 example = Example(
                     definition_id=definition.id,
                     text=example_text,
@@ -978,9 +974,9 @@ async def enhance_definitions_parallel(
                 example_ids.append(example.id)
             definition.example_ids.extend(example_ids)
         elif component == SynthesisComponent.ANTONYMS and isinstance(result, list):
-            definition.antonyms = cast(list[str], result)
+            definition.antonyms = cast("list[str]", result)
         elif component == SynthesisComponent.WORD_FORMS and isinstance(result, list):
-            definition.word_forms = cast(list[WordForm], result)
+            definition.word_forms = cast("list[WordForm]", result)
         elif component == SynthesisComponent.CEFR_LEVEL and isinstance(result, str):
             definition.cefr_level = result  # type: ignore
         elif component == SynthesisComponent.FREQUENCY_BAND and isinstance(result, int):
@@ -990,15 +986,15 @@ async def enhance_definitions_parallel(
         elif component == SynthesisComponent.DOMAIN and isinstance(result, str):
             definition.domain = result
         elif component == SynthesisComponent.GRAMMAR_PATTERNS and isinstance(result, list):
-            definition.grammar_patterns = cast(list[GrammarPattern], result)
+            definition.grammar_patterns = cast("list[GrammarPattern]", result)
         elif component == SynthesisComponent.COLLOCATIONS and isinstance(result, list):
-            definition.collocations = cast(list[Collocation], result)
+            definition.collocations = cast("list[Collocation]", result)
         elif component == SynthesisComponent.USAGE_NOTES and isinstance(result, list):
-            definition.usage_notes = cast(list[UsageNote], result)
+            definition.usage_notes = cast("list[UsageNote]", result)
         elif component == SynthesisComponent.REGIONAL_VARIANTS:
             # Regional variants returns a list, take the first
             if isinstance(result, list) and result:
-                definition.region = cast(str, result[0])
+                definition.region = cast("str", result[0])
             elif isinstance(result, str):
                 definition.region = result
 
@@ -1008,7 +1004,7 @@ async def enhance_definitions_parallel(
     await asyncio.gather(*[d.save() for d in definitions])
 
     logger.info(
-        f"Enhanced {len(definitions)} definitions: {successes} successes, {failures} failures"
+        f"Enhanced {len(definitions)} definitions: {successes} successes, {failures} failures",
     )
 
     if state_tracker:
@@ -1037,6 +1033,7 @@ async def enhance_synthesized_entry(
         force: Force regeneration even if data exists
         ai: OpenAI connector instance (required)
         state_tracker: Optional state tracker for progress updates
+
     """
     # Load entry
     entry = await SynthesizedDictionaryEntry.get(entry_id)
@@ -1104,7 +1101,7 @@ async def enhance_synthesized_entry(
         results = await asyncio.gather(*word_tasks, return_exceptions=True)
 
         # Process results based on task type
-        for task_type, result in zip(task_types, results):
+        for task_type, result in zip(task_types, results, strict=False):
             if isinstance(result, Exception):
                 logger.error(f"Failed to enhance {task_type}: {result}")
                 continue
@@ -1115,10 +1112,10 @@ async def enhance_synthesized_entry(
             elif task_type == SynthesisComponent.ETYMOLOGY and isinstance(result, Etymology):
                 entry.etymology = result
             elif task_type == SynthesisComponent.WORD_FORMS and isinstance(result, list):
-                entry.word_forms = cast(list[WordForm], result)
+                entry.word_forms = cast("list[WordForm]", result)
             elif task_type == SynthesisComponent.FACTS and isinstance(result, list):
                 entry.fact_ids = [
-                    fact.id for fact in cast(list[Fact], result) if fact.id is not None
+                    fact.id for fact in cast("list[Fact]", result) if fact.id is not None
                 ]
 
         # Save updated entry
@@ -1128,12 +1125,14 @@ async def enhance_synthesized_entry(
         successes = sum(1 for r in results if r and not isinstance(r, Exception))
         failures = sum(1 for r in results if isinstance(r, Exception))
         logger.info(
-            f"Enhanced entry {entry_id}: {successes} word-level successes, {failures} failures"
+            f"Enhanced entry {entry_id}: {successes} word-level successes, {failures} failures",
         )
 
     if state_tracker:
         await state_tracker.update(
-            stage=Stages.AI_SYNTHESIS, progress=100, message="Enhancement complete"
+            stage=Stages.AI_SYNTHESIS,
+            progress=100,
+            message="Enhancement complete",
         )
 
 

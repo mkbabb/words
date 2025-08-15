@@ -9,10 +9,10 @@ from typing import Any
 from beanie import PydanticObjectId
 
 from ....core.state_tracker import Stages, StateTracker
-from ....models import Definition, Etymology, Example, Pronunciation, ProviderData, Word
-from ....models.definition import DictionaryProvider
+from ....models import Definition, Etymology, Example, Pronunciation, Word
+from ....models.dictionary import DictionaryProvider, DictionaryProviderData
 from ....utils.logging import get_logger
-from ...base import DictionaryConnector
+from ..base import DictionaryConnector
 
 logger = get_logger(__name__)
 
@@ -20,19 +20,13 @@ logger = get_logger(__name__)
 class AppleDictionaryError(Exception):
     """Base exception for Apple Dictionary Service errors."""
 
-    pass
-
 
 class PlatformError(AppleDictionaryError):
     """Raised when platform doesn't support Dictionary Services."""
 
-    pass
-
 
 class ImportError(AppleDictionaryError):
     """Raised when required PyObjC modules cannot be imported."""
-
-    pass
 
 
 class AppleDictionaryConnector(DictionaryConnector):
@@ -43,6 +37,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         Args:
             rate_limit: Maximum requests per second (default 10.0 for local API)
+
         """
         super().__init__(rate_limit)
         self._dictionary_service = None
@@ -75,7 +70,7 @@ class AppleDictionaryConnector(DictionaryConnector):
         except ImportError as e:
             logger.warning(
                 f"Failed to import CoreServices.DictionaryServices: {e}. "
-                "Install PyObjC with: pip install pyobjc-framework-CoreServices"
+                "Install PyObjC with: pip install pyobjc-framework-CoreServices",
             )
             self._dictionary_service = None
 
@@ -91,6 +86,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         Returns:
             Definition text or None if not found
+
         """
         if not self._is_available():
             return None
@@ -117,6 +113,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         Returns:
             Cleaned definition text
+
         """
         # Remove pronunciation markers like |ˈæpəl|
         text = re.sub(r"\|[^|]+\|", "", text)
@@ -135,6 +132,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         Returns:
             Main definition text
+
         """
         # Look for text after word type indicators
         pattern = r"(?:noun|verb|adjective|adverb|preposition|conjunction|interjection|pronoun|determiner)\s+(.*?)(?:\n|$)"
@@ -153,6 +151,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         Returns:
             List of example strings
+
         """
         examples = []
 
@@ -179,6 +178,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         Returns:
             Clean definition text without examples
+
         """
         # Remove quoted examples
         text = re.sub(r'"[^"]*"', "", definition_text)
@@ -200,7 +200,7 @@ class AppleDictionaryConnector(DictionaryConnector):
         self,
         word_obj: Word,
         state_tracker: StateTracker | None = None,
-    ) -> ProviderData | None:
+    ) -> DictionaryProviderData | None:
         """Fetch definition data for a word from Apple Dictionary.
 
         Args:
@@ -209,6 +209,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         Returns:
             ProviderData if successful, None if not found or error
+
         """
         if not word_obj or not word_obj.text:
             return None
@@ -278,7 +279,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             etymology = await self.extract_etymology(raw_data)
 
             # Create ProviderData
-            provider_data = ProviderData(
+            provider_data = DictionaryProviderData(
                 word_id=word_obj.id,
                 provider=self.provider_name,
                 definition_ids=[d.id for d in definitions if d.id is not None],
@@ -291,14 +292,14 @@ class AppleDictionaryConnector(DictionaryConnector):
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
 
             logger.info(
-                f"Successfully fetched definition for '{word_obj.text}' from Apple Dictionary"
+                f"Successfully fetched definition for '{word_obj.text}' from Apple Dictionary",
             )
             return provider_data
 
         except Exception as e:
             import traceback
 
-            error_msg = f"Apple Dictionary lookup failed for '{word_obj.text}': {str(e)}"
+            error_msg = f"Apple Dictionary lookup failed for '{word_obj.text}': {e!s}"
             logger.error(error_msg)
             logger.debug(f"Full traceback: {traceback.format_exc()}")
             if state_tracker:
@@ -310,6 +311,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         Returns:
             Dictionary with service information
+
         """
         return {
             "provider_name": self.provider_name,
@@ -321,7 +323,9 @@ class AppleDictionaryConnector(DictionaryConnector):
         }
 
     async def extract_pronunciation(
-        self, raw_data: dict[str, Any], word_id: PydanticObjectId
+        self,
+        raw_data: dict[str, Any],
+        word_id: PydanticObjectId,
     ) -> Pronunciation | None:
         """Extract pronunciation from Apple Dictionary data.
 
@@ -330,6 +334,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         Returns:
             Pronunciation if found, None otherwise
+
         """
         if "raw_definition" not in raw_data:
             return None
@@ -352,7 +357,9 @@ class AppleDictionaryConnector(DictionaryConnector):
         return None
 
     async def extract_definitions(
-        self, raw_data: dict[str, Any], word_id: PydanticObjectId
+        self,
+        raw_data: dict[str, Any],
+        word_id: PydanticObjectId,
     ) -> list[Definition]:
         """Extract definitions from Apple Dictionary data.
 
@@ -362,6 +369,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         Returns:
             List of Definition objects
+
         """
         if "raw_definition" not in raw_data:
             return []
@@ -431,6 +439,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         Returns:
             Etymology if found, None otherwise
+
         """
         # Apple Dictionary sometimes includes etymology in the definition
         # Look for patterns like "ORIGIN" or "Etymology:"
@@ -441,7 +450,9 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         # Common etymology patterns
         etym_match = re.search(
-            r"(?:ORIGIN|Etymology:?|from)\s+(.+?)(?=\n|$)", text, re.IGNORECASE | re.MULTILINE
+            r"(?:ORIGIN|Etymology:?|from)\s+(.+?)(?=\n|$)",
+            text,
+            re.IGNORECASE | re.MULTILINE,
         )
 
         if etym_match:

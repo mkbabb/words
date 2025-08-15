@@ -1,5 +1,4 @@
-"""
-Core text normalization functions.
+"""Core text normalization functions.
 
 Provides comprehensive and fast normalization for different use cases.
 """
@@ -58,8 +57,7 @@ def normalize_comprehensive(
     remove_articles: bool = False,
     lowercase: bool = True,
 ) -> str:
-    """
-    Optimized single-pass text normalization with caching.
+    """Optimized single-pass text normalization with caching.
 
     Reduces Unicode passes from 3 to 2 and combines operations
     for 3-5x performance improvement while maintaining accuracy.
@@ -73,6 +71,7 @@ def normalize_comprehensive(
 
     Returns:
         Fully normalized text
+
     """
     if not text:
         return ""
@@ -128,8 +127,7 @@ def normalize_comprehensive(
 
 
 def normalize_fast(text: str, lowercase: bool = True) -> str:
-    """
-    Fast normalization for search and lookup operations.
+    """Fast normalization for search and lookup operations.
 
     Optimized for speed with minimal processing steps.
     Use this for real-time search and high-frequency operations.
@@ -140,6 +138,7 @@ def normalize_fast(text: str, lowercase: bool = True) -> str:
 
     Returns:
         Quickly normalized text
+
     """
     if not text:
         return ""
@@ -164,8 +163,7 @@ def normalize_fast(text: str, lowercase: bool = True) -> str:
 
 
 def is_valid_word(word: str, min_length: int = 2, max_length: int = 50) -> bool:
-    """
-    Check if a word is valid for dictionary operations.
+    """Check if a word is valid for dictionary operations.
 
     Args:
         word: Word to validate
@@ -174,6 +172,7 @@ def is_valid_word(word: str, min_length: int = 2, max_length: int = 50) -> bool:
 
     Returns:
         True if word is valid
+
     """
     if not word or len(word) < min_length or len(word) > max_length:
         return False
@@ -195,14 +194,14 @@ def is_valid_word(word: str, min_length: int = 2, max_length: int = 50) -> bool:
 
 
 def remove_diacritics(text: str) -> str:
-    """
-    Remove diacritics from text while preserving base characters.
+    """Remove diacritics from text while preserving base characters.
 
     Args:
         text: Input text
 
     Returns:
         Text without diacritics
+
     """
     # Normalize to NFD (decomposed form)
     nfd_text = unicodedata.normalize("NFD", text)
@@ -218,8 +217,7 @@ def remove_diacritics(text: str) -> str:
 
 
 def basic_lemmatize(word: str) -> str:
-    """
-    Basic rule-based lemmatization.
+    """Basic rule-based lemmatization.
 
     Uses suffix rules to find base form of words.
 
@@ -228,6 +226,7 @@ def basic_lemmatize(word: str) -> str:
 
     Returns:
         Lemmatized form
+
     """
     if not word or len(word) < 3:
         return word
@@ -254,22 +253,20 @@ def _get_wordnet_pos(word: str) -> str:
         # Map to WordNet POS (return string constants)
         if pos_tag.startswith("J"):
             return "a"  # wordnet.ADJ
-        elif pos_tag.startswith("V"):
+        if pos_tag.startswith("V"):
             return "v"  # wordnet.VERB
-        elif pos_tag.startswith("N"):
+        if pos_tag.startswith("N"):
             return "n"  # wordnet.NOUN
-        elif pos_tag.startswith("R"):
+        if pos_tag.startswith("R"):
             return "r"  # wordnet.ADV
-        else:
-            return "n"  # wordnet.NOUN - Default to noun
+        return "n"  # wordnet.NOUN - Default to noun
     except Exception:
         return "n"  # Safe fallback
 
 
 @functools.lru_cache(maxsize=300000)  # Cache up to 300k lemmatizations
 def lemmatize_word(word: str) -> str:
-    """
-    Lemmatize a word using modern NLTK WordNet approach with POS tagging.
+    """Lemmatize a word using modern NLTK WordNet approach with POS tagging.
 
     Uses NLTK WordNetLemmatizer with POS context for accuracy (>95%).
     Performance-optimized with caching decorator for repeated lookups.
@@ -279,6 +276,7 @@ def lemmatize_word(word: str) -> str:
 
     Returns:
         Lemmatized form, validated for quality
+
     """
     if not word or len(word) < 2:
         return word
@@ -309,8 +307,7 @@ def lemmatize_word(word: str) -> str:
 
 
 def _lemmatize_chunk(chunk: list[str]) -> list[str]:
-    """
-    Lemmatize a chunk of words for multiprocessing.
+    """Lemmatize a chunk of words for multiprocessing.
     Helper function that reinitializes NLTK in each process.
     """
     # Each process needs its own NLTK lemmatizer
@@ -391,8 +388,7 @@ def batch_lemmatize(
     n_processes: int | None = None,
     chunk_size: int = 5000,
 ) -> tuple[list[str], list[int], list[int]]:
-    """
-    Batch lemmatization with automatic parallelization for large inputs.
+    """Batch lemmatization with automatic parallelization for large inputs.
 
     Args:
         words: List of words to lemmatize
@@ -401,6 +397,7 @@ def batch_lemmatize(
 
     Returns:
         Tuple of (unique_lemmas, word_to_lemma_indices, lemma_to_word_indices)
+
     """
     if not words:
         return [], [], []
@@ -444,15 +441,14 @@ def batch_lemmatize(
     unique_lemmas, word_to_lemma_indices, lemma_to_word_indices = _build_lemma_indices(all_lemmas)
 
     logger.info(
-        f"✅ Lemmatization complete: {len(unique_lemmas)} unique lemmas from {len(words)} words"
+        f"✅ Lemmatization complete: {len(unique_lemmas)} unique lemmas from {len(words)} words",
     )
 
     return unique_lemmas, word_to_lemma_indices, lemma_to_word_indices
 
 
 def clear_lemma_cache() -> None:
-    """
-    Clear the lemmatization cache.
+    """Clear the lemmatization cache.
 
     Note: Cache is managed by decorator, clearing happens automatically via TTL.
     """
@@ -461,11 +457,11 @@ def clear_lemma_cache() -> None:
 
 
 def get_lemma_cache_stats() -> dict[str, int]:
-    """
-    Get statistics about the lemmatization cache.
+    """Get statistics about the lemmatization cache.
 
     Returns:
         Dictionary with cache statistics
+
     """
     cache_info = lemmatize_word.cache_info()
     return {
@@ -481,8 +477,7 @@ def get_lemma_cache_stats() -> dict[str, int]:
 
 @functools.lru_cache(maxsize=10000)
 def normalize_simple(text: str) -> str:
-    """
-    Simple normalization: lowercase, diacritic removal, basic cleanup.
+    """Simple normalization: lowercase, diacritic removal, basic cleanup.
 
     Fast alternative to comprehensive normalization for performance-critical paths.
 
@@ -491,6 +486,7 @@ def normalize_simple(text: str) -> str:
 
     Returns:
         Simply normalized text
+
     """
     if not text:
         return ""
@@ -511,8 +507,7 @@ def normalize_simple(text: str) -> str:
 
 
 def normalize_vocabulary(text: str) -> str:
-    """
-    Vocabulary normalization that preserves important features.
+    """Vocabulary normalization that preserves important features.
 
     This normalization is designed for language loader vocabulary:
     - Preserves diacritics (café stays café, not cafe)
@@ -527,6 +522,7 @@ def normalize_vocabulary(text: str) -> str:
 
     Returns:
         Normalized vocabulary item
+
     """
     if not text:
         return ""
@@ -549,8 +545,7 @@ def normalize_vocabulary(text: str) -> str:
 
 @functools.lru_cache(maxsize=50000)
 def normalize_vocabulary_fast(text: str) -> str:
-    """
-    Fast vocabulary normalization with caching.
+    """Fast vocabulary normalization with caching.
 
     Similar to normalize_comprehensive but preserves linguistic features:
     - Fixes unicode encoding issues
@@ -564,6 +559,7 @@ def normalize_vocabulary_fast(text: str) -> str:
 
     Returns:
         Normalized vocabulary item
+
     """
     if not text:
         return ""
@@ -585,8 +581,7 @@ def normalize_vocabulary_fast(text: str) -> str:
 
 
 def normalize(text: str) -> str:
-    """
-    Global normalization function - switch between simple and comprehensive.
+    """Global normalization function - switch between simple and comprehensive.
 
     This is the main normalization entry point. Swap the implementation
     to quickly test performance vs quality tradeoffs.
@@ -596,6 +591,7 @@ def normalize(text: str) -> str:
 
     Returns:
         Normalized text
+
     """
     # PERFORMANCE MODE: Use simple normalization for efficiency
     return normalize_simple(text)
@@ -606,6 +602,7 @@ def _normalize_chunk(args: tuple[list[str], Callable[[str], str]]) -> list[str]:
 
     Args:
         args: Tuple of (words, normalizer_func) for multiprocessing
+
     """
     words, normalizer = args
     return [normalizer(word) for word in words if word]
@@ -616,8 +613,7 @@ def batch_normalize(
     normalizer: Callable[[str], str] | None = None,
     min_parallel_size: int = 5000,
 ) -> list[str]:
-    """
-    Batch normalization with optional custom normalizer function.
+    """Batch normalization with optional custom normalizer function.
 
     Args:
         vocabulary: List of words to normalize
@@ -626,6 +622,7 @@ def batch_normalize(
 
     Returns:
         List of normalized words
+
     """
     # Default to normalize_comprehensive if no normalizer provided
     if normalizer is None:

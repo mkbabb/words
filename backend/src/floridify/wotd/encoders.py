@@ -9,14 +9,14 @@ Key Concepts:
     1. **Finite Scalar Quantization (FSQ)**: Directly quantizes each dimension
        to a fixed number of levels without using codebooks. This eliminates
        codebook collapse issues and provides interpretable indices.
-    
+
     2. **Hierarchical Vector Quantization (HVQ)**: Multi-level quantization
        where each level refines the previous, creating a hierarchy of
        increasingly fine-grained representations.
-    
+
     3. **Semantic ID**: A 4-tuple (style, complexity, era, variation) that
        uniquely identifies semantic characteristics of text.
-    
+
     4. **Straight-Through Estimator**: Enables gradient flow through discrete
        quantization by using quantized values in forward pass but continuous
        gradients in backward pass.
@@ -32,8 +32,8 @@ from __future__ import annotations
 from typing import Any
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F  # noqa: N812
+from torch import nn
 
 from ..utils.logging import get_logger
 from .constants import (
@@ -50,28 +50,28 @@ logger = get_logger(__name__)
 
 class FSQEncoder(nn.Module):
     """Finite Scalar Quantization encoder for discrete semantic IDs.
-    
+
     FSQ is a quantization method that directly maps continuous values to discrete
     levels without maintaining explicit codebooks. Each dimension is independently
     quantized to a predetermined number of levels.
-    
+
     Architecture:
         Input (4096D) → Projection Network → Latent Space (4D) → Quantization → Semantic ID
-    
+
     Semantic Dimensions:
         - Dim 0: Style (8 levels) - Literary genre/register (formal, casual, technical)
         - Dim 1: Complexity (8 levels) - Linguistic sophistication
         - Dim 2: Era (8 levels) - Temporal/cultural context
         - Dim 3: Variation (5 levels) - Fine-grained distinctions
-    
+
     Total Unique Codes: 8 × 8 × 8 × 5 = 2,560 semantic IDs
-    
+
     Mathematical Formulation:
         For each dimension i with L_i levels and bounds [a_i, b_i]:
         1. Normalize: z_norm = (z_i - a_i) / (b_i - a_i) ∈ [0, 1]
         2. Quantize: q_i = round(z_norm * (L_i - 1))
         3. Dequantize: z_q = q_i / (L_i - 1) * (b_i - a_i) + a_i
-    
+
     Advantages over Vector Quantization:
         - No codebook storage or lookup required
         - No codebook collapse (all codes always accessible)
@@ -94,6 +94,7 @@ class FSQEncoder(nn.Module):
             latent_dim: Number of latent dimensions (4 for semantic ID)
             levels: Quantization levels per dimension
             use_l2_norm: L2 normalize before quantization
+
         """
         super().__init__()
 
@@ -136,6 +137,7 @@ class FSQEncoder(nn.Module):
 
         Returns:
             Tuple of (quantized latents, semantic ID)
+
         """
         # Project to latent space
         z = self.projection(x)
@@ -175,12 +177,11 @@ class FSQEncoder(nn.Module):
         if z.shape[0] == 1:
             # Single batch - indices should be list of ints
             id_list = [int(idx) if not isinstance(idx, int) else idx for idx in indices[:4]]
+        # Multiple batch - take first item's indices
+        elif isinstance(indices[0], list):
+            id_list = [int(idx) for idx in indices[0][:4]]
         else:
-            # Multiple batch - take first item's indices
-            if isinstance(indices[0], list):
-                id_list = [int(idx) for idx in indices[0][:4]]
-            else:
-                id_list = [int(idx) for idx in indices[:4]]
+            id_list = [int(idx) for idx in indices[:4]]
 
         # Ensure exactly 4 elements
         while len(id_list) < 4:
@@ -191,11 +192,11 @@ class FSQEncoder(nn.Module):
 
     def forward(self, x: torch.Tensor) -> dict[str, Any]:
         """Forward pass with straight-through estimator.
-        
+
         The straight-through estimator allows gradients to flow through
         discrete quantization. In the forward pass, we use quantized values.
         In the backward pass, gradients flow as if no quantization occurred.
-        
+
         This is achieved by: z_q = z + (quantize(z) - z).detach()
         The detach() stops gradients from the quantization operation.
 
@@ -242,14 +243,14 @@ class FSQEncoder(nn.Module):
 
     def _quantize_straight_through(self, z: torch.Tensor) -> torch.Tensor:
         """Quantize with straight-through gradient estimator.
-        
+
         Straight-through estimator formula:
             z_quantized = z + (quantize(z) - z).detach()
-        
+
         This allows:
         - Forward pass: Uses quantized values (discrete)
         - Backward pass: Gradients flow through z (continuous)
-        
+
         The .detach() operation stops gradients from flowing through
         the quantization operation, treating it as a constant.
         """
@@ -273,16 +274,16 @@ class FSQEncoder(nn.Module):
 
     def _compute_entropy_loss(self, z: torch.Tensor) -> torch.Tensor:
         """Compute entropy loss to encourage diverse quantization.
-        
+
         Entropy maximization prevents mode collapse where the model
         only uses a subset of available quantization levels.
-        
+
         H = -Σ p(i) log p(i)
-        
+
         Where p(i) is the soft assignment probability to level i.
         We use soft assignments (continuous) rather than hard assignments
         (discrete) to maintain differentiability.
-        
+
         Returns negative entropy (to minimize for maximum entropy).
         """
         total_entropy = torch.tensor(0.0, device=z.device)
@@ -309,32 +310,32 @@ class FSQEncoder(nn.Module):
 
 class HierarchicalVQEncoder(nn.Module):
     """Hierarchical Vector Quantization for multi-level semantic encoding.
-    
+
     HVQ performs quantization at multiple scales, with each level refining
     the representation from the previous level. This creates a hierarchy
     from coarse to fine-grained features.
-    
+
     Architecture:
         Input → Level 0 (coarse) → Residual → Level 1 (medium) → ... → Level N (fine)
-    
+
     Each level:
         1. Quantizes the residual from previous levels
         2. Has its own codebook with different granularity
         3. Contributes to the final representation
-    
+
     Semantic Hierarchy:
         - Level 0: Coarse semantic category (style/era) - 32 codes
         - Level 1: Refinement (complexity) - 16 codes
-        - Level 2: Fine details (variations) - 8 codes  
+        - Level 2: Fine details (variations) - 8 codes
         - Level 3: Residual nuances - 4 codes
-    
+
     Mathematical Formulation:
         x_0 = input
         For level i:
             q_i, idx_i = quantize(residual_{i-1}, codebook_i)
             residual_i = residual_{i-1} - q_i
         reconstruction = Σ q_i
-    
+
     Inspired by neural audio codecs (SoundStream, EnCodec) but adapted
     for semantic text representations.
     """
@@ -353,6 +354,7 @@ class HierarchicalVQEncoder(nn.Module):
             num_levels: Number of hierarchy levels
             codebook_sizes: Size of codebook at each level
             hidden_dim: Hidden dimension for projections
+
         """
         super().__init__()
 
@@ -390,17 +392,18 @@ class HierarchicalVQEncoder(nn.Module):
 
     def encode_level(self, z: torch.Tensor, level: int) -> tuple[torch.Tensor, int]:
         """Encode at specific hierarchy level.
-        
+
         Vector quantization process:
         1. Project input to level-specific space
         2. Find nearest codebook entry (L2 distance)
         3. Return codebook entry and its index
-        
+
         This is similar to k-means clustering where codebook
         entries are cluster centers.
 
         Returns:
             Tuple of (quantized vector from codebook, codebook index)
+
         """
         # Project for this level
         z_proj = self.quantizers[level](z)
@@ -408,7 +411,9 @@ class HierarchicalVQEncoder(nn.Module):
         # Find nearest codebook entry using L2 distance
         # cdist computes pairwise distances between all vectors
         codebook = self.codebooks[level]
-        distances = torch.cdist(z_proj.unsqueeze(0), codebook.unsqueeze(0))  # [1, batch, codebook_size]
+        distances = torch.cdist(
+            z_proj.unsqueeze(0), codebook.unsqueeze(0)
+        )  # [1, batch, codebook_size]
         indices = distances.argmin(dim=-1).squeeze(0)  # Get index of nearest codebook entry
 
         # Get quantized vector
@@ -422,6 +427,7 @@ class HierarchicalVQEncoder(nn.Module):
 
         Returns:
             Tuple of (reconstructed embedding, semantic ID)
+
         """
         # Initial projection
         z = self.input_proj(x)
@@ -545,6 +551,7 @@ class UnifiedSemanticEncoder:
         Args:
             input_dim: Input embedding dimension
             encoding_type: Type of encoder to use
+
         """
         self.input_dim = input_dim
         self.encoding_type = encoding_type
@@ -568,6 +575,7 @@ class UnifiedSemanticEncoder:
 
         Returns:
             4-tuple semantic ID
+
         """
         _, semantic_id = self.encoder.encode(embedding)
         return semantic_id
@@ -577,13 +585,15 @@ class UnifiedSemanticEncoder:
 
         Returns:
             Dict with losses and outputs
+
         """
         return self.encoder(embedding)  # type: ignore
 
 
 # Factory function
 def get_semantic_encoder(
-    input_dim: int = 4096, use_fsq: bool | None = None
+    input_dim: int = 4096,
+    use_fsq: bool | None = None,
 ) -> UnifiedSemanticEncoder:
     """Get appropriate semantic encoder based on configuration.
 
@@ -593,6 +603,7 @@ def get_semantic_encoder(
 
     Returns:
         Unified semantic encoder instance
+
     """
     if use_fsq is None:
         use_fsq = USE_FSQ
