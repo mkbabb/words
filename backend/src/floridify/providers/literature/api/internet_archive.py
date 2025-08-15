@@ -7,10 +7,11 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from ....models.literature import LiteratureSource
 from ....utils.logging import get_logger
+from ...core import ConnectorConfig, RateLimitPresets
 from ...utils import respectful_scraper
-from ..base import LiteratureConnector
-from ..models import LiteratureSource
+from ..core import LiteratureConnector
 
 logger = get_logger(__name__)
 
@@ -18,14 +19,12 @@ logger = get_logger(__name__)
 class InternetArchiveConnector(LiteratureConnector):
     """Internet Archive literature connector."""
 
-    def __init__(self):
-        super().__init__(LiteratureSource.INTERNET_ARCHIVE)
+    def __init__(self, config: ConnectorConfig | None = None) -> None:
+        if config is None:
+            config = ConnectorConfig(rate_limit_config=RateLimitPresets.BULK_DOWNLOAD.value)
+        super().__init__(source=LiteratureSource.INTERNET_ARCHIVE, config=config)
         self.api_base = "https://archive.org"
         self.search_url = "https://archive.org/advancedsearch.php"
-
-        # More conservative rate limiting for Archive.org
-        self.rate_config.base_requests_per_second = 0.5
-        self.rate_config.min_delay = 2.0
 
     async def search_works(
         self,
@@ -55,7 +54,7 @@ class InternetArchiveConnector(LiteratureConnector):
         }
 
         works = []
-        async with respectful_scraper("archive_org", self.rate_config) as client:
+        async with respectful_scraper("archive_org", self.config.rate_limit_config) as client:
             try:
                 response = await client.get(self.search_url, params=params)
                 data = response.json()
@@ -88,7 +87,7 @@ class InternetArchiveConnector(LiteratureConnector):
         """Fetch metadata from Internet Archive."""
         metadata_url = f"{self.api_base}/metadata/{source_id}"
 
-        async with respectful_scraper("archive_org", self.rate_config) as client:
+        async with respectful_scraper("archive_org", self.config.rate_limit_config) as client:
             try:
                 response = await client.get(metadata_url)
                 metadata_json = response.json()
@@ -101,7 +100,7 @@ class InternetArchiveConnector(LiteratureConnector):
         """Download text content from Internet Archive."""
         files_url = f"{self.api_base}/download/{source_id}"
 
-        async with respectful_scraper("archive_org", self.rate_config) as client:
+        async with respectful_scraper("archive_org", self.config.rate_limit_config) as client:
             try:
                 files_response = await client.get(files_url)
                 files_soup = BeautifulSoup(files_response.text, "html.parser")
@@ -130,7 +129,7 @@ class InternetArchiveConnector(LiteratureConnector):
 
     def _parse_archive_metadata(
         self,
-        metadata: dict,
+        metadata: dict[str, Any],
         source_id: str,
         title: str | None,
         author_name: str | None,

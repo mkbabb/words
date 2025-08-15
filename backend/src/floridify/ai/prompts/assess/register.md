@@ -1,19 +1,26 @@
-# Register
-
-Classify register:
+# Register Classification: {{ word }}
 **Definition**: {{ definition }}
 
-## Levels:
-- **formal**: Academic/professional
-- **informal**: Casual/everyday
-- **neutral**: Standard
-- **slang**: Very informal
-- **technical**: Specialized jargon
+## Register Spectrum
+- **formal**: Academic/professional discourse
+- **neutral**: Standard communication
+- **informal**: Casual/conversational
+- **slang**: Vernacular/street
+- **technical**: Domain-specific jargon
+- **literary**: Poetic/artistic expression
 
-## Examples:
-- "Make something move faster" → neutral
-- "Accelerate velocity" → formal/technical
-- "Speed something up" → informal
-- "Make it go zoom" → slang
+## Examples
 
-Return level with brief reason.
+### Movement Verbs
+`accelerate` → formal/technical | Scientific precision
+`move faster` → neutral | Standard usage
+`speed up` → informal | Everyday speech
+`haul ass` → slang | Colloquial urgency
+
+### Beauty Descriptors
+`pulchritudinous` → literary | Highly formal, rare
+`beautiful` → neutral | Standard usage
+`gorgeous` → informal | Casual enthusiasm
+`hot` → slang | Contemporary informal
+
+Output: Register with brief justification.

@@ -11,13 +11,13 @@ import base64
 import csv
 import hashlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from io import StringIO
 from pathlib import Path
 from typing import Any
 
-from ...caching.core import CacheNamespace, CacheTTL, CompressionType
-from ...caching.unified import get_unified
+from ...caching.core import get_global_cache
+from ...caching.models import CacheNamespace
 from ...models.dictionary import Language
 from ...utils.logging import get_logger
 from ..constants import LexiconFormat
@@ -87,8 +87,8 @@ class CorpusLanguageLoader(BaseCorpusLoader):
 
         # Try to load from unified cache first (unless force rebuild)
         if not self.force_rebuild:
-            cache = await get_unified()
-            cached_data = await cache.get_compressed(CacheNamespace.CORPUS, cache_key)
+            cache = await get_global_cache()
+            cached_data = await cache.get(CacheNamespace.CORPUS, cache_key)
 
             if cached_data:
                 # Deserialize cached lexicon data
@@ -164,7 +164,7 @@ class CorpusLanguageLoader(BaseCorpusLoader):
             language=language,
             sources=[s.name for s in sources],
             unique_word_count=len(vocabulary),
-            last_updated=datetime.now(UTC).isoformat(),
+            last_updated=datetime.now(UTC),
         )
         return lexicon
 
@@ -562,7 +562,7 @@ class CorpusLanguageLoader(BaseCorpusLoader):
 
         # Generate corpus name
         lang_codes = "-".join(sorted(lang.value for lang in languages))
-        corpus_name = f"{CorpusType.LANGUAGE_SEARCH.value}_{lang_codes}"
+        corpus_name = f"{CorpusType.LANGUAGE.value}_{lang_codes}"
 
         # Get or create corpus through manager
         corpus_manager = get_corpus_manager()
@@ -608,14 +608,12 @@ class CorpusLanguageLoader(BaseCorpusLoader):
         }
 
         # Save to unified cache with compression
-        cache = await get_unified()
-        await cache.set_compressed(
+        cache = await get_global_cache()
+        await cache.set(
             namespace=CacheNamespace.CORPUS,
             key=cache_key,
             value=cache_data,
-            compression_type=CompressionType.ZLIB,
-            ttl=CacheTTL.CORPUS,
-            tags=[f"{CacheNamespace.CORPUS}:{language.value}"],
+            ttl_override=timedelta(days=30),  # Long TTL for corpus data
         )
 
         logger.info(
@@ -625,7 +623,7 @@ class CorpusLanguageLoader(BaseCorpusLoader):
     async def load_corpus(
         self,
         source_id: str,
-        **kwargs,
+        **kwargs: Any,
     ) -> LexiconData | None:
         """Load corpus from source.
 
@@ -639,7 +637,9 @@ class CorpusLanguageLoader(BaseCorpusLoader):
         """
         try:
             language = Language(source_id)
-            return await self.get_or_create_lexicon(language)
+            await self._load_language(language)
+            # Return the loaded lexicon data
+            return self.lexicons.get(language)
         except ValueError:
             logger.warning(f"Invalid language code: {source_id}")
             return None
@@ -647,7 +647,7 @@ class CorpusLanguageLoader(BaseCorpusLoader):
     async def get_or_create_corpus(
         self,
         corpus_name: str,
-        **kwargs,
+        **kwargs: Any,
     ) -> LexiconData | None:
         """Get existing corpus from cache or create new one.
 

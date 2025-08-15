@@ -15,7 +15,6 @@ from .core import (
     WOTDCorpus,
     WOTDWord,
 )
-from .storage import WOTDStorage, get_wotd_storage
 
 logger = get_logger(__name__)
 

@@ -250,7 +250,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         # Bulk create missing words if any
         if missing_normalized:
             new_words = [
-                Word(text=normalized_map[norm], normalized=norm, language=Language.ENGLISH)
+                Word(text=normalized_map[norm], language=Language.ENGLISH)
                 for norm in missing_normalized
             ]
 

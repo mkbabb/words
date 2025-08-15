@@ -5,8 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ...caching.core import CacheNamespace
-from ...caching.unified import UnifiedCache, get_unified
+from ...caching.core import get_global_cache
+from ...caching.models import CacheNamespace
 from ...utils.logging import get_logger
 from ..models import LexiconData
 
@@ -27,12 +27,12 @@ class BaseCorpusLoader(ABC):
 
         """
         self.force_rebuild = force_rebuild
-        self._cache: UnifiedCache | None = None
+        self._cache: Any = None  # GlobalCacheManager instance
 
-    async def get_cache(self) -> UnifiedCache:
+    async def get_cache(self) -> Any:
         """Get or create cache instance."""
         if self._cache is None:
-            self._cache = await get_unified()
+            self._cache = await get_global_cache()
         return self._cache
 
     @abstractmethod

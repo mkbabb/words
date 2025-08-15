@@ -1,119 +1,437 @@
-"""Core caching infrastructure with abstract backend and unified types."""
+"""Global cache manager with two-tier caching (L1 memory + L2 filesystem)."""
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+import asyncio
+import time
+from collections.abc import Callable
 from datetime import timedelta
 from typing import Any, TypeVar
 
-from pydantic import BaseModel, Field
+from ..utils.logging import get_logger
+from .filesystem import FilesystemBackend
+from .models import CacheNamespace, CompressionType
 
-from .models import (
-    CacheNamespace,
-    CacheTTL,
-    CompressionType,
-    QuantizationType,
-)
+logger = get_logger(__name__)
 
-T = TypeVar("T")
+# Type variable for backend
+T = TypeVar("T", bound=FilesystemBackend)
 
 
-class CacheMetadata(BaseModel):
-    """Metadata for cached items with compression and quantization info."""
-
-    compression_type: CompressionType = Field(
-        default=CompressionType.NONE,
-        description="Compression algorithm used",
-    )
-    quantization_type: QuantizationType = Field(
-        default=QuantizationType.FLOAT32,
-        description="Quantization type for embeddings",
-    )
-    original_size: int = Field(
-        default=0,
-        description="Original size in bytes",
-    )
-    compressed_size: int = Field(
-        default=0,
-        description="Compressed size in bytes",
-    )
-    compression_ratio: float = Field(
-        default=1.0,
-        description="Compression ratio achieved",
-    )
+class NamespaceConfig:
+    """Configuration for a cache namespace."""
+    
+    def __init__(
+        self,
+        name: CacheNamespace,
+        memory_limit: int = 100,
+        memory_ttl: timedelta | None = None,
+        disk_ttl: timedelta | None = None,
+        compression: CompressionType | None = None
+    ):
+        self.name = name
+        self.memory_limit = memory_limit
+        self.memory_ttl = memory_ttl
+        self.disk_ttl = disk_ttl
+        self.compression = compression
+        self.memory_cache: dict[str, dict[str, Any]] = {}
+        self.lock = asyncio.Lock()
+        self.stats = {"hits": 0, "misses": 0, "evictions": 0}
 
 
-class CacheBackend[T](ABC):
-    """Abstract base class for cache backends."""
-
-    @abstractmethod
-    async def get(self, namespace: str, key: str, default: T | None = None) -> T | None:
-        """Get value from cache."""
-
-    @abstractmethod
+class GlobalCacheManager[T: FilesystemBackend]:
+    """Two-tier cache: L1 memory + L2 filesystem.
+    
+    Optimized for minimal serialization overhead.
+    """
+    
+    def __init__(self, l2_backend: T):
+        """Initialize with filesystem backend.
+        
+        Args:
+            l2_backend: Filesystem backend for L2 storage
+        """
+        self.namespaces: dict[CacheNamespace, NamespaceConfig] = {}
+        self.l2_backend = l2_backend
+        self._init_default_namespaces()
+    
+    def _init_default_namespaces(self) -> None:
+        """Initialize namespaces with optimized configs."""
+        configs = [
+            NamespaceConfig(
+                CacheNamespace.DICTIONARY,
+                memory_limit=500,
+                memory_ttl=timedelta(hours=24),
+                disk_ttl=timedelta(days=7)
+            ),
+            NamespaceConfig(
+                CacheNamespace.CORPUS,
+                memory_limit=100,
+                memory_ttl=timedelta(days=30),
+                disk_ttl=timedelta(days=90),
+                compression=CompressionType.ZSTD
+            ),
+            NamespaceConfig(
+                CacheNamespace.SEMANTIC,
+                memory_limit=50,
+                memory_ttl=timedelta(days=7),
+                disk_ttl=timedelta(days=30)
+            ),
+            NamespaceConfig(
+                CacheNamespace.SEARCH,
+                memory_limit=300,
+                memory_ttl=timedelta(hours=1),
+                disk_ttl=timedelta(hours=6)
+            ),
+            NamespaceConfig(
+                CacheNamespace.TRIE,
+                memory_limit=50,
+                memory_ttl=timedelta(days=7),
+                disk_ttl=timedelta(days=30),
+                compression=CompressionType.LZ4
+            ),
+            NamespaceConfig(
+                CacheNamespace.LITERATURE,
+                memory_limit=50,
+                memory_ttl=timedelta(days=30),
+                disk_ttl=timedelta(days=90),
+                compression=CompressionType.GZIP
+            ),
+            NamespaceConfig(
+                CacheNamespace.SCRAPING,
+                memory_limit=100,
+                memory_ttl=timedelta(hours=1),
+                disk_ttl=timedelta(hours=24),
+                compression=CompressionType.ZSTD
+            ),
+        ]
+        
+        for config in configs:
+            self.namespaces[config.name] = config
+    
+    async def get(
+        self,
+        namespace: CacheNamespace,
+        key: str,
+        loader: Callable[[], Any] | None = None
+    ) -> Any | None:
+        """Two-tier get with optional loader."""
+        ns = self.namespaces.get(namespace)
+        if not ns:
+            return None
+        
+        # L1: Memory cache
+        async with ns.lock:
+            if key in ns.memory_cache:
+                entry = ns.memory_cache[key]
+                
+                # Check TTL
+                if ns.memory_ttl:
+                    age = time.time() - entry["timestamp"]
+                    if age > ns.memory_ttl.total_seconds():
+                        del ns.memory_cache[key]
+                        ns.stats["evictions"] += 1
+                    else:
+                        # Move to end for LRU (dict preserves order)
+                        del ns.memory_cache[key]
+                        ns.memory_cache[key] = entry
+                        ns.stats["hits"] += 1
+                        return entry["data"]
+                else:
+                    ns.stats["hits"] += 1
+                    return entry["data"]
+        
+        # L2: Filesystem cache
+        backend_key = f"{namespace.value}:{key}"
+        data = await self.l2_backend.get(backend_key)
+        
+        if data is not None:
+            # Decompress if needed
+            if ns.compression and isinstance(data, bytes):
+                data = await self._decompress_data(data, ns.compression)
+            
+            # Promote to L1
+            await self._promote_to_memory(ns, key, data)
+            return data
+        
+        ns.stats["misses"] += 1
+        
+        # Cache miss - use loader
+        if loader:
+            data = await loader()
+            if data is not None:
+                await self.set(namespace, key, data)
+            return data
+        
+        return None
+    
     async def set(
         self,
-        namespace: str,
+        namespace: CacheNamespace,
         key: str,
-        value: T,
-        ttl: timedelta | None = None,
-        tags: list[str] | None = None,
+        value: Any,
+        ttl_override: timedelta | None = None
     ) -> None:
-        """Set value in cache with optional TTL and tags."""
-
-    @abstractmethod
-    async def delete(self, namespace: str, key: str) -> bool:
-        """Delete specific cache entry."""
-
-    @abstractmethod
-    async def invalidate_namespace(self, namespace: str) -> int:
-        """Invalidate all entries in a namespace."""
-
-    @abstractmethod
-    async def invalidate_by_tags(self, tags: list[str]) -> int:
-        """Invalidate entries by tags."""
-
-    @abstractmethod
-    async def clear(self) -> None:
-        """Clear entire cache."""
-
-    @abstractmethod
-    async def exists(self, namespace: str, key: str) -> bool:
-        """Check if key exists in cache."""
-
-    @abstractmethod
-    async def get_stats(self, namespace: str | None = None) -> dict[str, Any]:
+        """Store in both tiers efficiently."""
+        ns = self.namespaces.get(namespace)
+        if not ns:
+            return
+        
+        # L1: Memory cache
+        async with ns.lock:
+            # LRU eviction
+            while len(ns.memory_cache) >= ns.memory_limit:
+                # Remove first item (oldest)
+                first_key = next(iter(ns.memory_cache))
+                del ns.memory_cache[first_key]
+                ns.stats["evictions"] += 1
+            
+            ns.memory_cache[key] = {
+                "data": value,
+                "timestamp": time.time()
+            }
+        
+        # L2: Filesystem with compression
+        backend_key = f"{namespace.value}:{key}"
+        ttl = ttl_override or ns.disk_ttl
+        
+        # Compress if configured
+        store_value = value
+        if ns.compression:
+            store_value = await self._compress_data(value, ns.compression)
+        
+        await self.l2_backend.set(backend_key, store_value, ttl)
+    
+    async def delete(self, namespace: CacheNamespace, key: str) -> bool:
+        """Delete from both tiers."""
+        ns = self.namespaces.get(namespace)
+        if not ns:
+            return False
+        
+        # Remove from L1
+        async with ns.lock:
+            if key in ns.memory_cache:
+                del ns.memory_cache[key]
+        
+        # Remove from L2
+        backend_key = f"{namespace.value}:{key}"
+        return await self.l2_backend.delete(backend_key)
+    
+    async def clear_namespace(self, namespace: CacheNamespace) -> None:
+        """Clear all entries in a namespace."""
+        ns = self.namespaces.get(namespace)
+        if not ns:
+            return
+        
+        # Clear L1
+        async with ns.lock:
+            ns.memory_cache.clear()
+        
+        # Clear L2
+        pattern = f"{namespace.value}:*"
+        await self.l2_backend.clear_pattern(pattern)
+    
+    async def _promote_to_memory(
+        self, 
+        ns: NamespaceConfig, 
+        key: str, 
+        data: Any
+    ) -> None:
+        """Promote data from L2 to L1."""
+        async with ns.lock:
+            # LRU eviction if needed
+            while len(ns.memory_cache) >= ns.memory_limit:
+                first_key = next(iter(ns.memory_cache))
+                del ns.memory_cache[first_key]
+                ns.stats["evictions"] += 1
+            
+            ns.memory_cache[key] = {
+                "data": data,
+                "timestamp": time.time()
+            }
+    
+    async def _compress_data(self, data: Any, compression: CompressionType) -> bytes:
+        """Compress data with specified algorithm."""
+        from .compression import compress_data
+        return compress_data(data, compression)
+    
+    async def _decompress_data(self, data: bytes, compression: CompressionType) -> Any:
+        """Decompress data."""
+        from .compression import decompress_data
+        return decompress_data(data, compression)
+    
+    def get_stats(self, namespace: CacheNamespace | None = None) -> dict[str, Any]:
         """Get cache statistics."""
+        if namespace:
+            ns = self.namespaces.get(namespace)
+            if ns:
+                return {
+                    "namespace": namespace.value,
+                    "memory_count": len(ns.memory_cache),
+                    "stats": ns.stats.copy()
+                }
+        
+        # Aggregate stats
+        total_stats = {"hits": 0, "misses": 0, "evictions": 0, "memory_count": 0}
+        for ns in self.namespaces.values():
+            total_stats["hits"] += ns.stats["hits"]
+            total_stats["misses"] += ns.stats["misses"]
+            total_stats["evictions"] += ns.stats["evictions"]
+            total_stats["memory_count"] += len(ns.memory_cache)
+        
+        return total_stats
 
-    async def get_or_set(
-        self,
-        namespace: str,
-        key: str,
-        factory: Any,
-        ttl: timedelta | None = None,
-        tags: list[str] | None = None,
-    ) -> Any:
-        """Get value from cache or compute and set if not found."""
-        value = await self.get(namespace, key)
-        if value is None:
-            if callable(factory):
-                value = await factory() if hasattr(factory, "__await__") else factory()
-            else:
-                value = factory
-            await self.set(namespace, key, value, ttl, tags)
-        return value
+
+# Global instance management
+_global_cache: GlobalCacheManager[FilesystemBackend] | None = None
 
 
-__all__ = [
-    "CacheBackend",
-    "CacheMetadata",
-    "CacheNamespace",
-    "CacheTTL",
-    "CompressionType",
-    "QuantizationType",
-]
+async def get_global_cache(force_new: bool = False) -> GlobalCacheManager[FilesystemBackend]:
+    """Get the global cache manager instance.
+    
+    Args:
+        force_new: Force creation of new instance
+        
+    Returns:
+        GlobalCacheManager singleton
+    """
+    global _global_cache
+    
+    if _global_cache is None or force_new:
+        # Create filesystem backend
+        l2_backend = FilesystemBackend()
+        
+        # Create global cache manager
+        _global_cache = GlobalCacheManager(l2_backend)
+        
+        logger.info("Global cache manager initialized")
+    
+    return _global_cache
 
-# Re-export for backward compatibility
-from .models import CacheableMetadata, CacheConfig, CacheStats  # noqa: E402
 
-__all__ += ["CacheConfig", "CacheStats", "CacheableMetadata"]
+async def shutdown_global_cache() -> None:
+    """Shutdown the global cache manager."""
+    global _global_cache
+    
+    if _global_cache:
+        _global_cache.l2_backend.close()
+        _global_cache = None
+        logger.info("Global cache manager shut down")
+
+
+# ============================================================================
+# EXTERNAL CONTENT STORAGE - Moved from models/storage.py
+# ============================================================================
+
+async def load_external_content(location: Any) -> Any:
+    """Load content from external storage location.
+
+    Handles decompression and deserialization efficiently.
+    
+    Args:
+        location: ContentLocation object with storage metadata
+        
+    Returns:
+        Deserialized content from external storage
+    """
+    import json
+    import pickle
+
+    from ..models.versioned import StorageType
+    
+    if location.storage_type == StorageType.CACHE:
+        # Load from cache backend
+        cache = await get_global_cache()
+        backend_key = f"{location.cache_namespace}:{location.cache_key}"
+        data = await cache.l2_backend.get(backend_key)
+
+    elif location.storage_type == StorageType.S3:
+        # Load from S3 (implement when needed)
+        raise NotImplementedError("S3 backend not yet implemented")
+
+    else:
+        raise ValueError(f"Unsupported storage type: {location.storage_type}")
+
+    # Decompress if needed
+    if location.compression and isinstance(data, bytes):
+        from .compression import decompress_data
+        data = decompress_data(data, location.compression)
+
+    # Deserialize based on content type hint
+    if isinstance(data, bytes):
+        # Check pickle magic bytes for fast path
+        if len(data) >= 2 and data[:2] in (b"\x80\x04", b"\x80\x05"):
+            return pickle.loads(data)
+        # Otherwise assume JSON
+        return json.loads(data.decode("utf-8"))
+
+    return data
+
+
+async def store_external_content(
+    content: Any,
+    namespace: CacheNamespace,
+    key: str,
+    compression: CompressionType | None = None,
+) -> Any:
+    """Store content externally with optimal serialization.
+
+    Returns ContentLocation metadata for retrieval.
+    
+    Args:
+        content: Content to store
+        namespace: Cache namespace for organization
+        key: Unique key for the content
+        compression: Optional compression type (auto-selected if None)
+        
+    Returns:
+        ContentLocation object with storage metadata
+    """
+    import hashlib
+    import json
+    import pickle
+
+    from pydantic import BaseModel
+
+    from ..models.versioned import ContentLocation, StorageType
+    
+    # Serialize efficiently based on type
+    if isinstance(content, BaseModel):
+        # Pydantic models: use model_dump for dict conversion
+        serialized = json.dumps(content.model_dump(), sort_keys=True).encode()
+    elif isinstance(content, dict | list):
+        # JSON-serializable types
+        serialized = json.dumps(content, sort_keys=True).encode()
+    else:
+        # Everything else: use pickle (fastest for complex objects)
+        serialized = pickle.dumps(content, protocol=pickle.HIGHEST_PROTOCOL)
+
+    size_bytes = len(serialized)
+
+    # Auto-select compression if not specified
+    if compression is None:
+        if size_bytes < 1024:
+            compression = None
+        elif size_bytes < 10_000_000:
+            compression = CompressionType.ZSTD
+        else:
+            compression = CompressionType.GZIP
+
+    # Compress
+    from .compression import compress_data
+    compressed = compress_data(serialized, compression) if compression else serialized
+
+    # Store in cache backend
+    cache = await get_global_cache()
+    backend_key = f"{namespace.value}:{key}"
+    await cache.l2_backend.set(backend_key, compressed)
+
+    return ContentLocation(
+        storage_type=StorageType.CACHE,
+        cache_namespace=namespace,
+        cache_key=key,
+        compression=compression,
+        size_bytes=size_bytes,
+        size_compressed=len(compressed) if compression else None,
+        checksum=hashlib.sha256(serialized).hexdigest(),
+    )

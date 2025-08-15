@@ -14,16 +14,19 @@ from typing import Any
 import marisa_trie
 import numpy as np
 
-from ..caching.unified import get_unified
+from ..caching.core import get_global_cache
+from ..caching.models import CacheNamespace
 from ..corpus.utils import get_vocabulary_hash
 from ..text import batch_normalize, normalize
 from ..utils.logging import get_logger
+from .base import BaseIndexedSearch
+from .models import TrieIndex
 from .utils import calculate_default_frequency
 
 logger = get_logger(__name__)
 
 
-class TrieSearch:
+class TrieSearch(BaseIndexedSearch):
     """High-performance trie-based search using marisa-trie (C++ backend).
 
     Performance characteristics:
@@ -35,15 +38,22 @@ class TrieSearch:
 
     def __init__(self) -> None:
         """Initialize the optimized trie search engine."""
+        super().__init__(index_type="trie", index_version="v2.0.0")
+
+        # Core trie data
         self._trie: marisa_trie.Trie | None = None
         self._word_frequencies: dict[str, int] = {}
         self._word_count = 0
         self._max_frequency = 0
         self._vocabulary_hash: str | None = None
-        self._cache: Any = None  # Will be initialized on first use
+
+        # Index data for persistence
+        self._index_data: TrieIndex | None = None
+        self._cache: Any | None = None
 
     async def initialize(self) -> None:
         """Initialize the trie search (no-op for compatibility)."""
+        pass
 
     async def update_corpus(self, corpus: Any) -> None:
         """Update the trie with a new corpus.
@@ -52,14 +62,24 @@ class TrieSearch:
             corpus: Corpus object containing vocabulary
 
         """
-        await self.build_index(corpus.vocabulary, corpus.word_frequencies)
+        await self._build_from_vocabulary(corpus.vocabulary, corpus.word_frequencies)
 
-    async def build_index(
+    async def build_index(self, corpus: Any) -> None:
+        """Build the search index from a corpus.
+
+        Args:
+            corpus: Corpus to build index from
+        """
+        await self._build_from_vocabulary(
+            corpus.vocabulary, getattr(corpus, "word_frequencies", None)
+        )
+
+    async def _build_from_vocabulary(
         self,
         words: list[str],
         frequencies: dict[str, int] | None = None,
     ) -> None:
-        """Build the optimized trie index with content-hash based caching.
+        """Build the optimized trie index from vocabulary with content-hash based caching.
 
         Args:
             words: List of words and phrases to index
@@ -180,6 +200,48 @@ class TrieSearch:
         top_indices = np.argsort(-frequencies)[:max_results]
         return [matches[i] for i in top_indices]
 
+    async def search(
+        self,
+        query: str,
+        max_results: int = 10,
+        **kwargs: Any,
+    ) -> list[Any]:
+        """Perform search on the index.
+
+        Args:
+            query: Search query
+            max_results: Maximum number of results
+            **kwargs: Additional search parameters
+
+        Returns:
+            List of search results
+        """
+        # For now, return empty list - actual implementation would use search_prefix
+        results = self.search_prefix(query, max_results)
+        return [{"word": word, "score": 1.0} for word in results]
+
+    async def serialize(self) -> bytes:
+        """Serialize the index to bytes.
+
+        Returns:
+            Serialized index data
+        """
+        import pickle
+
+        data = self.model_dump()
+        return pickle.dumps(data)
+
+    async def deserialize(self, data: bytes) -> None:
+        """Deserialize the index from bytes.
+
+        Args:
+            data: Serialized index data
+        """
+        import pickle
+
+        loaded_data = pickle.loads(data)
+        self.model_load(loaded_data)
+
     def model_dump(self) -> dict[str, Any]:
         """Export trie state with integrity checks and robust serialization.
 
@@ -282,21 +344,28 @@ class TrieSearch:
 
         # Get cache
         if self._cache is None:
-            self._cache = await get_unified()
+            self._cache = await get_global_cache()
 
         cache_data = self.model_dump()
 
         # Store with 7-day TTL
-        await self._cache.set("trie", vocab_hash, cache_data, ttl=timedelta(days=7))
+        await self._cache.set(
+            namespace=CacheNamespace.SEARCH,
+            key=f"trie_{vocab_hash}",
+            value=cache_data,
+            ttl_override=timedelta(days=7),
+        )
         logger.debug(f"Saved trie to cache: {vocab_hash[:8]}")
 
     async def _load_from_cache(self, vocab_hash: str) -> dict[str, Any] | None:
         """Load trie from cache with integrity verification."""
         if self._cache is None:
-            self._cache = await get_unified()
+            self._cache = await get_global_cache()
 
         try:
-            cached_data = await self._cache.get("trie", vocab_hash)
+            cached_data = await self._cache.get(
+                namespace=CacheNamespace.SEARCH, key=f"trie_{vocab_hash}"
+            )
             if cached_data:
                 # Verify integrity before returning
                 format_version = cached_data.get("format_version", "1.0")
@@ -311,7 +380,9 @@ class TrieSearch:
                             logger.warning(
                                 f"Cache integrity check failed for {vocab_hash[:8]}, discarding",
                             )
-                            await self._cache.delete("trie", vocab_hash)
+                            await self._cache.delete(
+                                namespace=CacheNamespace.SEARCH, key=f"trie_{vocab_hash}"
+                            )
                             return None
 
                 logger.debug(f"Loaded verified trie from cache: {vocab_hash[:8]}")

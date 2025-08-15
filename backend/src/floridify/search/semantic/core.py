@@ -10,11 +10,13 @@ import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 
+from ...caching.manager import get_tree_corpus_manager
+from ...caching.models import CacheNamespace
 from ...corpus.core import Corpus
-from ...corpus.manager import get_corpus_manager
+from ...models.versioned import ResourceType, SemanticIndexMetadata, VersionConfig
 from ...utils.logging import get_logger
 from ..constants import SearchMethod
-from ..models import SearchResult, SemanticMetadata
+from ..models import SearchResult
 from .constants import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_SENTENCE_MODEL,
@@ -33,9 +35,345 @@ from .constants import (
 logger = get_logger(__name__)
 
 
-class SemanticSearch:
-    """ULTRATHINK: Modern semantic search using state-of-the-art sentence transformers."""
+class SemanticIndex:
+    """Encapsulates semantic index data and building logic.
 
+    This class manages the FAISS index, embeddings, and related data structures
+    for semantic search. It handles index building and optimization.
+    """
+
+    def __init__(
+        self,
+        corpus: Corpus,
+        model_name: SemanticModel = DEFAULT_SENTENCE_MODEL,
+    ):
+        """Initialize semantic index.
+
+        Args:
+            corpus: Corpus containing vocabulary data
+            model_name: Sentence transformer model to use
+        """
+        self.corpus = corpus
+        self.model_name = model_name
+
+        # Embeddings and index data
+        self.sentence_embeddings: np.ndarray | None = None
+        self.sentence_index: faiss.Index | None = None
+
+        # Variant mapping for embedding index to lemma index
+        self.variant_mapping: dict[int, int] = {}
+        self.lemma_to_embeddings: dict[int, list[int]] = {}
+
+        # Metadata
+        self.embedding_dimension: int = 0
+        self.num_vectors: int = 0
+        self.build_time_seconds: float = 0.0
+        self.memory_usage_mb: float = 0.0
+
+        # Cache control
+        self.embeddings_hash: str | None = None
+        self.index_hash: str | None = None
+        self._serialized_index_cache: dict[str, Any] | None = None
+        self._index_cache_dirty: bool = True
+
+    def build_index(
+        self,
+        embeddings: np.ndarray,
+        variant_mapping: dict[int, int],
+    ) -> None:
+        """Build optimized FAISS index from embeddings.
+
+        Args:
+            embeddings: Sentence embeddings array
+            variant_mapping: Mapping from embedding index to lemma index
+        """
+        start_time = time.perf_counter()
+
+        self.sentence_embeddings = embeddings
+        self.variant_mapping = variant_mapping
+        self.embedding_dimension = embeddings.shape[1]
+        self.num_vectors = embeddings.shape[0]
+
+        # Build lemma to embeddings mapping
+        self.lemma_to_embeddings.clear()
+        for embed_idx, lemma_idx in variant_mapping.items():
+            if lemma_idx not in self.lemma_to_embeddings:
+                self.lemma_to_embeddings[lemma_idx] = []
+            self.lemma_to_embeddings[lemma_idx].append(embed_idx)
+
+        # Build optimized FAISS index
+        self._build_optimized_faiss_index(self.embedding_dimension, len(self.corpus.vocabulary))
+
+        # Add embeddings to index
+        if self.sentence_index and self.sentence_embeddings is not None:
+            self.sentence_index.add(self.sentence_embeddings)
+
+        # Calculate metrics
+        self.build_time_seconds = time.perf_counter() - start_time
+        if self.sentence_embeddings is not None:
+            self.memory_usage_mb = self.sentence_embeddings.nbytes / (1024 * 1024)
+
+        self._index_cache_dirty = True
+
+        logger.info(
+            f"Built semantic index with {self.num_vectors} vectors in {self.build_time_seconds:.2f}s"
+        )
+
+    def _build_optimized_faiss_index(self, dimension: int, vocab_size: int) -> None:
+        """Build optimized FAISS index with model-aware quantization strategies.
+
+        Implements adaptive quantization based on corpus size and embedding model.
+        Uses different strategies for different scales to balance speed vs accuracy.
+        """
+        if vocab_size < SMALL_CORPUS_THRESHOLD:
+            # Small corpus: Use flat index for exact search
+            logger.debug(f"Using flat index for small corpus ({vocab_size} words)")
+            if L2_DISTANCE_NORMALIZATION:
+                self.sentence_index = faiss.IndexFlatL2(dimension)
+            else:
+                self.sentence_index = faiss.IndexFlatIP(dimension)
+
+        elif vocab_size < MEDIUM_CORPUS_THRESHOLD:
+            # Medium corpus: IVF with moderate quantization
+            nlist = min(int(np.sqrt(vocab_size) * 2), 256)
+            quantizer = faiss.IndexFlatL2(dimension)
+            self.sentence_index = faiss.IndexIVFFlat(quantizer, dimension, nlist)
+
+            if self.sentence_embeddings is not None:
+                self.sentence_index.train(self.sentence_embeddings)
+
+            # Set search parameters
+            self.sentence_index.nprobe = max(1, nlist // 8)
+
+            logger.debug(f"Using IVF index for medium corpus ({vocab_size} words, nlist={nlist})")
+
+        elif vocab_size < LARGE_CORPUS_THRESHOLD:
+            # Large corpus: IVF with PQ quantization
+            nlist = min(int(np.sqrt(vocab_size) * 4), 1024)
+            m = min(dimension // 2, 64)  # subquantizers
+            nbits = 8  # bits per subquantizer
+
+            quantizer = faiss.IndexFlatL2(dimension)
+            self.sentence_index = faiss.IndexIVFPQ(quantizer, dimension, nlist, m, nbits)
+
+            if self.sentence_embeddings is not None:
+                self.sentence_index.train(self.sentence_embeddings)
+
+            # Optimize search parameters
+            self.sentence_index.nprobe = max(1, nlist // 16)
+
+            logger.debug(
+                f"Using IVFPQ index for large corpus ({vocab_size} words, "
+                f"nlist={nlist}, m={m}, nbits={nbits})"
+            )
+
+        else:
+            # Massive corpus: Aggressive quantization with IVFPQ
+            nlist = min(int(np.sqrt(vocab_size) * 8), 4096)
+            m = min(dimension // 4, 32)
+            nbits = 8
+
+            quantizer = faiss.IndexFlatL2(dimension)
+            if vocab_size > MASSIVE_CORPUS_THRESHOLD:
+                # For truly massive corpora, use hierarchical quantization
+                self.sentence_index = faiss.IndexShards(dimension, True, False)
+            else:
+                self.sentence_index = faiss.IndexIVFPQ(quantizer, dimension, nlist, m, nbits)
+
+            if self.sentence_embeddings is not None:
+                if hasattr(self.sentence_index, "train"):
+                    self.sentence_index.train(self.sentence_embeddings)
+
+            # Conservative search for massive index
+            if hasattr(self.sentence_index, "nprobe"):
+                self.sentence_index.nprobe = max(1, nlist // 32)
+
+            logger.debug(
+                f"Using aggressive IVFPQ for massive corpus ({vocab_size} words, nlist={nlist})"
+            )
+
+    def search(
+        self,
+        query_embeddings: np.ndarray,
+        k: int = 10,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Search index for nearest neighbors.
+
+        Args:
+            query_embeddings: Query embedding vectors
+            k: Number of neighbors to return
+
+        Returns:
+            Distances and indices of nearest neighbors
+        """
+        if self.sentence_index is None:
+            return np.array([]), np.array([])
+
+        # Ensure query embeddings are contiguous
+        query_embeddings = np.ascontiguousarray(query_embeddings, dtype=np.float32)
+
+        # Search FAISS index
+        distances, indices = self.sentence_index.search(query_embeddings, k)
+
+        return distances, indices
+
+    def get_statistics(self) -> dict[str, Any]:
+        """Get index statistics."""
+        return {
+            "model_name": self.model_name,
+            "num_vectors": self.num_vectors,
+            "embedding_dimension": self.embedding_dimension,
+            "memory_usage_mb": self.memory_usage_mb,
+            "build_time_seconds": self.build_time_seconds,
+            "index_type": type(self.sentence_index).__name__ if self.sentence_index else None,
+        }
+
+    @classmethod
+    async def get(
+        cls,
+        corpus: Corpus,
+        model_name: SemanticModel = DEFAULT_SENTENCE_MODEL,
+        config: VersionConfig | None = None,
+    ) -> SemanticIndex | None:
+        """Get semantic index from versioned storage.
+
+        Args:
+            corpus: Corpus containing vocabulary
+            model_name: Model name for embeddings
+            config: Version configuration
+
+        Returns:
+            SemanticIndex instance or None if not found
+        """
+        from ...caching.manager import get_version_manager
+
+        manager = get_version_manager()
+
+        # Create index ID based on corpus and model
+        index_id = f"{corpus.corpus_name}:{model_name}"
+
+        # Get the latest semantic index metadata
+        semantic_metadata = await manager.get_latest(
+            resource_id=index_id,
+            resource_type=ResourceType.SEMANTIC,
+            use_cache=config.use_cache if config else True,
+            config=config or VersionConfig(),
+        )
+
+        if not semantic_metadata:
+            return None
+
+        # Load content from metadata
+        content = await semantic_metadata.get_content()
+        if not content:
+            return None
+
+        # Create index instance
+        index = cls(corpus=corpus, model_name=model_name)
+
+        # Load data from content
+        if "embeddings" in content:
+            index.sentence_embeddings = np.array(content["embeddings"], dtype=np.float32)
+        if "variant_mapping" in content:
+            index.variant_mapping = content["variant_mapping"]
+        if "lemma_to_embeddings" in content:
+            index.lemma_to_embeddings = content["lemma_to_embeddings"]
+
+        # Rebuild FAISS index from embeddings
+        if index.sentence_embeddings is not None and len(index.variant_mapping) > 0:
+            index.build_index(index.sentence_embeddings, index.variant_mapping)
+
+        # Set metadata from stored values
+        index.embedding_dimension = semantic_metadata.embedding_dimension
+        index.num_vectors = semantic_metadata.num_vectors
+        index.build_time_seconds = semantic_metadata.build_time_seconds
+        index.memory_usage_mb = semantic_metadata.memory_usage_mb
+
+        return index
+
+    async def save(
+        self,
+        config: VersionConfig | None = None,
+    ) -> None:
+        """Save semantic index to versioned storage.
+
+        Args:
+            config: Version configuration
+        """
+        from ...caching.manager import get_version_manager
+
+        if self.sentence_embeddings is None:
+            raise ValueError("No embeddings to save")
+
+        manager = get_version_manager()
+
+        # Create index ID
+        index_id = f"{self.corpus.corpus_name}:{self.model_name}"
+
+        # Prepare content to save
+        content = {
+            "embeddings": self.sentence_embeddings.tolist(),
+            "variant_mapping": self.variant_mapping,
+            "lemma_to_embeddings": self.lemma_to_embeddings,
+            "corpus_name": self.corpus.corpus_name,
+            "model_name": self.model_name,
+        }
+
+        # Save using version manager
+        await manager.save(
+            resource_id=index_id,
+            resource_type=ResourceType.SEMANTIC,
+            namespace=CacheNamespace.SEMANTIC,
+            content=content,
+            config=config or VersionConfig(),
+            metadata={
+                "corpus_id": self.corpus.corpus_id,
+                "corpus_version": self.corpus.vocabulary_hash,
+                "model_name": self.model_name,
+                "embedding_dimension": self.embedding_dimension,
+                "num_vectors": self.num_vectors,
+                "build_time_seconds": self.build_time_seconds,
+                "memory_usage_mb": self.memory_usage_mb,
+            },
+        )
+
+        logger.info(f"Saved semantic index for {index_id}")
+
+    @classmethod
+    async def get_or_create(
+        cls,
+        corpus: Corpus,
+        model_name: SemanticModel = DEFAULT_SENTENCE_MODEL,
+        force_rebuild: bool = False,
+        config: VersionConfig | None = None,
+    ) -> SemanticIndex:
+        """Get existing semantic index or create new one.
+
+        Args:
+            corpus: Corpus containing vocabulary
+            model_name: Model name for embeddings
+            force_rebuild: Force rebuilding even if exists
+            config: Version configuration
+
+        Returns:
+            SemanticIndex instance
+        """
+        # Try to get existing unless forced rebuild
+        if not force_rebuild:
+            existing = await cls.get(corpus, model_name, config)
+            if existing:
+                return existing
+
+        # Create new index
+        index = cls(corpus=corpus, model_name=model_name)
+
+        # The actual embedding generation would happen in SemanticSearch
+        # This is just the data container
+
+        return index
+
+
+class SemanticSearch:
     def __init__(
         self,
         corpus: Corpus,
@@ -64,8 +402,8 @@ class SemanticSearch:
         self.sentence_embeddings: np.ndarray | None = None
         self.sentence_index: faiss.Index | None = None
 
-        # Semantic metadata reference
-        self.semantic_metadata: SemanticMetadata | None = None
+        # Semantic metadata reference for persistence
+        self.semantic_metadata: SemanticIndexMetadata | None = None
         self._vocabulary_hash: str = ""
 
         # Variant mapping for embedding index to lemma index (always present)
@@ -259,54 +597,99 @@ class SemanticSearch:
         )
 
     async def _create_semantic_metadata(self, build_time_ms: float) -> None:
-        """Create or update SemanticMetadata MongoDB document."""
+        """Create or update SemanticIndex versioned document."""
         if not self.corpus:
             raise ValueError("Corpus not loaded")
 
         # Get existing corpus metadata from MongoDB
-        manager = get_corpus_manager()
-        corpus_metadata = await manager.get_corpus_metadata(self.corpus.corpus_name)
+        manager = get_tree_corpus_manager()
+        corpus_metadata = await manager.get_corpus(self.corpus.corpus_name)
 
         if not corpus_metadata:
             raise ValueError(
                 f"Corpus metadata must be created before semantic metadata: {self.corpus.corpus_name}",
             )
 
-        # Check if SemanticMetadata already exists
-        existing = await SemanticMetadata.find_one(
-            {
-                "corpus_data_id": corpus_metadata.id,
-                "vocabulary_hash": self.corpus.vocabulary_hash,
-                "model_name": self.model_name,
-            },
+        # Check if SemanticIndexMetadata already exists
+        existing = await SemanticIndexMetadata.find_one(
+            SemanticIndexMetadata.corpus_id == corpus_metadata.id,
+            SemanticIndexMetadata.model_name == self.model_name,
+            SemanticIndexMetadata.version_info.is_latest,
         )
 
         if existing:
+            logger.debug(f"Using existing SemanticIndexMetadata for {corpus_metadata.id}")
             self.semantic_metadata = existing
-            logger.debug(f"Using existing SemanticMetadata for {corpus_metadata.id}")
+            # Load the actual index from metadata
+            await self._load_index_from_metadata(existing)
             return
 
-        # Create new SemanticMetadata with bi-directional relationship
-        self.semantic_metadata = SemanticMetadata(
-            corpus_data_id=corpus_metadata.id,
-            vocabulary_hash=self.corpus.vocabulary_hash,
+        # Create new SemanticIndex with versioned data
+        import hashlib
+
+        from ...models.versioned import ContentLocation, StorageType, VersionInfo
+
+        # Store index externally
+        content_location = ContentLocation(
+            storage_type=StorageType.CACHE,
+            cache_namespace=CacheNamespace.SEMANTIC,
+            cache_key=f"semantic:{self.corpus.vocabulary_hash}:{self.model_name}",
+            size_bytes=self.sentence_embeddings.nbytes
+            if self.sentence_embeddings is not None
+            else 0,
+            checksum=hashlib.sha256(self.corpus.vocabulary_hash.encode()).hexdigest(),
+        )
+
+        # Create metadata for persistence
+        self.semantic_metadata = SemanticIndexMetadata(
+            resource_id=f"{self.corpus.corpus_name}:{self.model_name}",
+            resource_type=ResourceType.SEMANTIC,
+            namespace=CacheNamespace.SEMANTIC,
+            version_info=VersionInfo(
+                version="1.0.0",
+                data_hash=self.corpus.vocabulary_hash,
+            ),
+            corpus_id=corpus_metadata.id,
+            corpus_version="1.0.0",
             model_name=self.model_name,
             embedding_dimension=(
                 self.sentence_embeddings.shape[1] if self.sentence_embeddings is not None else 0
             ),
-            vocabulary_size=len(self.corpus.lemmatized_vocabulary),
-            build_time_ms=build_time_ms,
+            index_type="faiss",
+            content_location=content_location,
+            build_time_seconds=build_time_ms / 1000.0,
+            memory_usage_mb=(self.sentence_embeddings.nbytes / (1024 * 1024))
+            if self.sentence_embeddings is not None
+            else 0,
+            num_vectors=len(self.corpus.lemmatized_vocabulary),
         )
 
+        # Store the index data in metadata content
+        index_data = {
+            "corpus_id": str(corpus_metadata.id),
+            "corpus_version": "1.0.0",
+            "model_name": self.model_name,
+            "embedding_dimension": (
+                self.sentence_embeddings.shape[1] if self.sentence_embeddings is not None else 0
+            ),
+            "variant_mapping": self.variant_mapping,
+            "vocabulary": self.corpus.vocabulary,
+            "lemmatized_vocabulary": self.corpus.lemmatized_vocabulary,
+            "num_vectors": len(self.corpus.lemmatized_vocabulary),
+        }
+        await self.semantic_metadata.set_content(index_data)
         await self.semantic_metadata.save()
 
-        # Update corpus metadata to reference the semantic metadata
-        corpus_metadata.semantic_data_id = self.semantic_metadata.id
-        await corpus_metadata.save()
-
         logger.info(
-            f"Created SemanticMetadata for corpus '{self.corpus.corpus_name}' (vocabulary_hash: {self.corpus.vocabulary_hash})",
+            f"Created SemanticIndexMetadata for corpus '{self.corpus.corpus_name}' (vocabulary_hash: {self.corpus.vocabulary_hash})",
         )
+
+    async def _load_index_from_metadata(self, metadata: SemanticIndexMetadata) -> None:
+        """Load index data from metadata."""
+        content = await metadata.get_content()
+        if content:
+            # Restore data from content
+            self.variant_mapping = content.get("variant_mapping", {})
 
     def _build_optimized_index(self, dimension: int, vocab_size: int) -> None:
         """Build optimized FAISS index with model-aware quantization strategies.

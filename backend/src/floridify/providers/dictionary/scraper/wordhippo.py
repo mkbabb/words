@@ -7,6 +7,7 @@ from typing import Any
 from beanie import PydanticObjectId
 from bs4 import BeautifulSoup
 
+from ....core.state_tracker import StateTracker
 from ....models import (
     Definition,
     Etymology,
@@ -14,10 +15,11 @@ from ....models import (
     Pronunciation,
     Word,
 )
-from ....models.dictionary import DictionaryProvider, DictionaryProviderData, Language
+from ....models.dictionary import DictionaryEntry, DictionaryProvider
 from ....utils.logging import get_logger
-from ...utils import RateLimitConfig, respectful_scraper
-from ..base import DictionaryConnector
+from ...core import ConnectorConfig, RateLimitPresets
+from ...utils import respectful_scraper
+from ..core import DictionaryConnector
 
 logger = get_logger(__name__)
 
@@ -25,40 +27,32 @@ logger = get_logger(__name__)
 class WordHippoConnector(DictionaryConnector):
     """WordHippo dictionary scraper connector."""
 
-    def __init__(self, rate_limit: float = 1.5) -> None:
+    def __init__(self, config: ConnectorConfig | None = None) -> None:
         """Initialize WordHippo connector.
 
         Args:
-            rate_limit: Maximum requests per second (default 1.5 for respectful scraping)
+            config: Connector configuration
 
         """
-        from ....models.dictionary import DictionaryProvider
-
-        super().__init__(DictionaryProvider.WORDHIPPO)
+        if config is None:
+            config = ConnectorConfig(rate_limit_config=RateLimitPresets.SCRAPER_RESPECTFUL.value)
+        super().__init__(provider=DictionaryProvider.WORDHIPPO, config=config)
         self.base_url = "https://www.wordhippo.com"
-        self.rate_config = RateLimitConfig(
-            base_requests_per_second=rate_limit,
-            min_delay=1.0 / rate_limit,
-            max_delay=10.0,
-        )
-
-    provider_name: str = DictionaryProvider.WORDHIPPO.value
-
-    provider_version: str = "1.0.0"
+        self.rate_config = self.config.rate_limit_config
 
     async def _fetch_from_provider(
         self,
         word: str,
-        language: Language,
-    ) -> DictionaryProviderData | None:
+        state_tracker: StateTracker | None = None,
+    ) -> DictionaryEntry | None:
         """Fetch definition data for a word from WordHippo.
 
         Args:
             word: The word text to look up
-            language: Language for the word
+            state_tracker: Optional state tracker for progress updates
 
         Returns:
-            DictionaryProviderData if successful, None if not found or error
+            DictionaryEntry if successful, None if not found or error
 
         """
         try:
@@ -76,12 +70,15 @@ class WordHippoConnector(DictionaryConnector):
             soup = BeautifulSoup(response.text, "html.parser")
 
             # Get or create word object to get ID
-            word_obj = await Word.find_one({"text": word, "language": language})
+            word_obj = await Word.find_one({"text": word})
             if not word_obj:
-                word_obj = Word(text=word, language=language)
+                word_obj = Word(text=word)  # Language defaults to ENGLISH
                 await word_obj.save()
 
             # Extract all components
+            if word_obj.id is None:
+                raise ValueError(f"Word {word} must be saved before processing")
+
             definitions = await self._extract_definitions(soup, word_obj.id)
             pronunciation = await self._extract_pronunciation(soup, word_obj.id)
             etymology = await self._extract_etymology(soup)
@@ -108,7 +105,8 @@ class WordHippoConnector(DictionaryConnector):
                 "sentences_count": len(sentences),
             }
 
-            return DictionaryProviderData(
+            # word_obj.id is guaranteed to be not None after save()
+            return DictionaryEntry(
                 word_id=word_obj.id,
                 provider=DictionaryProvider.WORDHIPPO,
                 definition_ids=[d.id for d in definitions if d.id is not None],

@@ -29,13 +29,12 @@ def get_all_document_models():
             AudioMedia,
             ImageMedia,
         )
-        from src.floridify.models.models import (
+        from src.floridify.models import (
             Definition,
+            DictionaryEntry,
             Example,
             Fact,
             Pronunciation,
-            ProviderData,
-            SynthesizedDictionaryEntry,
             Word,
         )
         from src.floridify.models.phrasal import PhrasalExpression
@@ -52,8 +51,7 @@ def get_all_document_models():
             Example,
             Pronunciation,
             Fact,
-            ProviderData,
-            SynthesizedDictionaryEntry,
+            DictionaryEntry,
             PhrasalExpression,
             WordRelationship,
             WordList,

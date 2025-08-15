@@ -10,9 +10,10 @@ from beanie import PydanticObjectId
 
 from ....core.state_tracker import Stages, StateTracker
 from ....models import Definition, Etymology, Example, Pronunciation, Word
-from ....models.dictionary import DictionaryProvider, DictionaryProviderData
+from ....models.dictionary import DictionaryEntry, DictionaryProvider
 from ....utils.logging import get_logger
-from ..base import DictionaryConnector
+from ...core import ConnectorConfig, RateLimitPresets
+from ..core import DictionaryConnector
 
 logger = get_logger(__name__)
 
@@ -32,22 +33,19 @@ class ImportError(AppleDictionaryError):
 class AppleDictionaryConnector(DictionaryConnector):
     """Apple Dictionary connector using macOS Dictionary Services."""
 
-    def __init__(self, rate_limit: float = 10.0) -> None:
+    def __init__(self, config: ConnectorConfig | None = None) -> None:
         """Initialize Apple Dictionary connector.
 
         Args:
-            rate_limit: Maximum requests per second (default 10.0 for local API)
+            config: Connector configuration
 
         """
-        super().__init__(rate_limit)
+        if config is None:
+            config = ConnectorConfig(rate_limit_config=RateLimitPresets.LOCAL.value)
+        super().__init__(provider=DictionaryProvider.APPLE_DICTIONARY, config=config)
         self._dictionary_service = None
         self._platform_compatible = self._check_platform_compatibility()
         self._initialize_service()
-
-    @property
-    def provider_name(self) -> DictionaryProvider:
-        """Name of the dictionary provider."""
-        return DictionaryProvider.APPLE_DICTIONARY
 
     def _check_platform_compatibility(self) -> bool:
         """Check if running on macOS (Darwin)."""
@@ -198,20 +196,20 @@ class AppleDictionaryConnector(DictionaryConnector):
 
     async def _fetch_from_provider(
         self,
-        word_obj: Word,
+        word: str,
         state_tracker: StateTracker | None = None,
-    ) -> DictionaryProviderData | None:
+    ) -> DictionaryEntry | None:
         """Fetch definition data for a word from Apple Dictionary.
 
         Args:
-            word_obj: The word to look up
+            word: The word to look up
             state_tracker: Optional state tracker for progress updates
 
         Returns:
             ProviderData if successful, None if not found or error
 
         """
-        if not word_obj or not word_obj.text:
+        if not word:
             return None
 
         # Update state tracker
@@ -231,27 +229,30 @@ class AppleDictionaryConnector(DictionaryConnector):
             return None
 
         try:
-            # Enforce rate limiting
-            await self._enforce_rate_limit()
+            # Rate limiting is handled by the base class fetch method
 
             # Update progress
             if state_tracker:
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_HTTP_CONNECTING)
 
             # Look up the word
-            raw_definition = self._lookup_definition(word_obj.text.strip())
+            raw_definition = self._lookup_definition(word.strip())
 
             if state_tracker:
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_HTTP_PARSING)
 
             if not raw_definition:
-                logger.debug(f"No definition found for '{word_obj.text}' in Apple Dictionary")
+                logger.debug(f"No definition found for '{word}' in Apple Dictionary")
                 if state_tracker:
                     await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
                 return None
 
             # For the lookup method, we'll return the raw data to be processed later
             # The actual parsing and Definition creation should happen in extract_definitions
+
+            # Create Word object for processing
+            word_obj = Word(text=word)
+            await word_obj.save()
 
             # Create raw data for base class processing
             raw_data = {
@@ -260,7 +261,7 @@ class AppleDictionaryConnector(DictionaryConnector):
                 if platform.system() == "Darwin"
                 else None,
                 "raw_definition": raw_definition,
-                "word_processed": word_obj.text,
+                "word_processed": word,
                 "definitions_count": 1 if raw_definition else 0,
             }
 
@@ -279,9 +280,9 @@ class AppleDictionaryConnector(DictionaryConnector):
             etymology = await self.extract_etymology(raw_data)
 
             # Create ProviderData
-            provider_data = DictionaryProviderData(
+            provider_data = DictionaryEntry(
                 word_id=word_obj.id,
-                provider=self.provider_name,
+                provider=self.provider,
                 definition_ids=[d.id for d in definitions if d.id is not None],
                 pronunciation_id=pronunciation.id if pronunciation else None,
                 etymology=etymology,
@@ -292,14 +293,14 @@ class AppleDictionaryConnector(DictionaryConnector):
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
 
             logger.info(
-                f"Successfully fetched definition for '{word_obj.text}' from Apple Dictionary",
+                f"Successfully fetched definition for '{word}' from Apple Dictionary",
             )
             return provider_data
 
         except Exception as e:
             import traceback
 
-            error_msg = f"Apple Dictionary lookup failed for '{word_obj.text}': {e!s}"
+            error_msg = f"Apple Dictionary lookup failed for '{word}': {e!s}"
             logger.error(error_msg)
             logger.debug(f"Full traceback: {traceback.format_exc()}")
             if state_tracker:
@@ -314,12 +315,12 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         """
         return {
-            "provider_name": self.provider_name,
+            "provider_name": self.provider.value,
             "platform": platform.system(),
             "platform_version": platform.mac_ver()[0] if platform.system() == "Darwin" else None,
             "is_available": self._is_available(),
             "service_initialized": self._dictionary_service is not None,
-            "rate_limit": self.rate_limit,
+            "rate_limit_config": self.config.rate_limit_config.model_dump(),
         }
 
     async def extract_pronunciation(

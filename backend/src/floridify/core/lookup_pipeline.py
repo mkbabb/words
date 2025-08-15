@@ -9,15 +9,14 @@ import traceback
 
 from ..ai import get_definition_synthesizer
 from ..ai.synthesis_functions import cluster_definitions
-from ..models.base import Etymology
-from ..models.dictionary import (
+from ..models import (
     Definition,
+    DictionaryEntry,
     DictionaryProvider,
     Language,
-    ProviderData,
-    SynthesizedDictionaryEntry,
     Word,
 )
+from ..models.base import Etymology
 from ..providers.base import DictionaryConnector
 from ..providers.dictionary.api.oxford import OxfordConnector
 from ..providers.dictionary.local.apple_dictionary import AppleDictionaryConnector
@@ -47,7 +46,7 @@ async def lookup_word_pipeline(
     no_ai: bool = False,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
-) -> SynthesizedDictionaryEntry | None:
+) -> DictionaryEntry | None:
     """Core lookup pipeline that normalizes, searches, gets provider definitions,
     and optionally synthesizes with AI.
 
@@ -243,7 +242,7 @@ async def _get_provider_definition(
     language: Language = Language.ENGLISH,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
-) -> ProviderData | None:
+) -> DictionaryEntry | None:
     """Get definition from specified provider.
 
     Returns:
@@ -323,11 +322,11 @@ async def _get_provider_definition(
 @log_stage("AI Synthesis", "🤖")
 async def _synthesize_with_ai(
     word: str,
-    providers: list[ProviderData],
+    providers: list[DictionaryEntry],
     language: Language = Language.ENGLISH,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
-) -> SynthesizedDictionaryEntry | None:
+) -> DictionaryEntry | None:
     """Synthesize definition using AI."""
     logger.debug(f"🤖 Starting AI synthesis for '{word}' with {len(providers)} providers")
 
@@ -364,9 +363,9 @@ async def _synthesize_with_ai(
 @log_stage("Provider Mapping", "🔄")
 async def _create_provider_mapped_entry(
     word: str,
-    provider_data: ProviderData,
+    provider_data: DictionaryEntry,
     state_tracker: StateTracker | None = None,
-) -> SynthesizedDictionaryEntry | None:
+) -> DictionaryEntry | None:
     """Create a synthesized entry from provider data without full AI synthesis.
 
     Uses AI only for deduplication and clustering, but not for content generation.
@@ -447,14 +446,15 @@ async def _create_provider_mapped_entry(
                 etymology = Etymology(text=raw_data["etymology"])
 
         # Create the synthesized entry without AI content generation
-        synthesized_entry = SynthesizedDictionaryEntry(
+        synthesized_entry = DictionaryEntry(
+            resource_id=f"{word}:synthesis",
+            provider=DictionaryProvider.SYNTHESIS,
             word_id=provider_data.word_id,
             pronunciation_id=provider_data.pronunciation_id,
             definition_ids=clustered_def_ids,  # Use deduplicated and clustered definitions
             etymology=provider_data.etymology or etymology,
             fact_ids=[],  # No facts in non-AI mode
             model_info=None,  # No AI model info
-            source_provider_data_ids=([provider_data.id] if provider_data.id is not None else []),
         )
 
         # Save the entry
@@ -481,7 +481,7 @@ async def _ai_fallback_lookup(
     word: str,
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
-) -> SynthesizedDictionaryEntry | None:
+) -> DictionaryEntry | None:
     """AI fallback when no provider definitions are found."""
     logger.info(f"🔮 Attempting AI fallback generation for '{word}'")
 

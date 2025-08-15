@@ -12,13 +12,25 @@ from datetime import timedelta
 from typing import Any, ParamSpec, TypeVar, cast
 
 from ..utils.logging import get_logger
-from .unified import get_unified
+from .core import get_global_cache
+from .models import CacheNamespace
 
 # Modern type parameters using ParamSpec
 P = ParamSpec("P")
 R = TypeVar("R")
 
 logger = get_logger(__name__)
+
+# Cache namespace mapping - DRY principle
+CACHE_NAMESPACE_MAP: dict[str, CacheNamespace] = {
+    "api": CacheNamespace.API,
+    "search": CacheNamespace.SEARCH,
+    "dictionary": CacheNamespace.DICTIONARY,
+    "corpus": CacheNamespace.CORPUS,
+    "semantic": CacheNamespace.SEMANTIC,
+    "scraping": CacheNamespace.SCRAPING,
+    "compute": CacheNamespace.SEARCH,  # Map compute to SEARCH for backward compatibility
+}
 
 
 def _efficient_cache_key_parts(
@@ -115,10 +127,13 @@ def cached_api_call(
             cache_key = _generate_cache_key(key_parts)
 
             # Get unified cache
-            cache = await get_unified()
+            cache = await get_global_cache()
+            
+            # Map key_prefix to namespace
+            namespace = CACHE_NAMESPACE_MAP.get(key_prefix, CacheNamespace.API)
 
             # Try to get from cache
-            cached_result = await cache.get(key_prefix, cache_key)
+            cached_result = await cache.get(namespace, cache_key)
             if cached_result is not None:
                 logger.debug(
                     f"💨 Cache hit for {func.__name__} (took {(time.time() - start_time) * 1000:.2f}ms)",
@@ -130,7 +145,7 @@ def cached_api_call(
                 result = await func(*args, **kwargs)
 
                 # Cache the result
-                await cache.set(key_prefix, cache_key, result, ttl=timedelta(hours=ttl_hours))
+                await cache.set(namespace, cache_key, result, ttl_override=timedelta(hours=ttl_hours))
 
                 elapsed = (time.time() - start_time) * 1000
                 logger.debug(f"✅ Cached result for {func.__name__} (took {elapsed:.2f}ms)")
@@ -173,10 +188,13 @@ def cached_computation_async(
             cache_key = _generate_cache_key(key_parts)
 
             # Get unified cache
-            cache = await get_unified()
+            cache = await get_global_cache()
+            
+            # Map key_prefix to namespace
+            namespace = CACHE_NAMESPACE_MAP.get(key_prefix, CacheNamespace.API)
 
             # Try to get from cache
-            cached_result = await cache.get(key_prefix, cache_key)
+            cached_result = await cache.get(namespace, cache_key)
             if cached_result is not None:
                 logger.debug(f"💨 Cache hit for async computation {func.__name__}")
                 return cast("R", cached_result)
@@ -185,7 +203,7 @@ def cached_computation_async(
             result = await func(*args, **kwargs)
 
             # Cache the result
-            await cache.set(key_prefix, cache_key, result, ttl=timedelta(hours=ttl_hours))
+            await cache.set(namespace, cache_key, result, ttl_override=timedelta(hours=ttl_hours))
 
             logger.debug(f"✅ Cached async computation result for {func.__name__}")
             return result
@@ -221,10 +239,13 @@ def cached_computation_sync(
                 cache_key = _generate_cache_key(key_parts)
 
                 # Get unified cache
-                cache = await get_unified()
+                cache = await get_global_cache()
+                
+                # Map key_prefix to namespace
+                namespace = CACHE_NAMESPACE_MAP.get(key_prefix, CacheNamespace.API)
 
                 # Try to get from cache
-                cached_result = await cache.get(key_prefix, cache_key)
+                cached_result = await cache.get(namespace, cache_key)
                 if cached_result is not None:
                     logger.debug(f"💨 Cache hit for sync computation {func.__name__}")
                     return cast("R", cached_result)
@@ -233,7 +254,7 @@ def cached_computation_sync(
                 result = func(*args, **kwargs)
 
                 # Cache the result
-                await cache.set(key_prefix, cache_key, result, ttl=timedelta(hours=ttl_hours))
+                await cache.set(namespace, cache_key, result, ttl_override=timedelta(hours=ttl_hours))
 
                 logger.debug(f"✅ Cached sync computation result for {func.__name__}")
                 return result
@@ -389,10 +410,13 @@ def cached_api_call_with_dedup(
 
             try:
                 # Get unified cache
-                cache = await get_unified()
+                cache = await get_global_cache()
+                
+                # Map key_prefix to namespace
+                namespace = CACHE_NAMESPACE_MAP.get(key_prefix, CacheNamespace.API)
 
                 # Try to get from cache
-                cached_result = await cache.get(key_prefix, cache_key)
+                cached_result = await cache.get(namespace, cache_key)
                 if cached_result is not None:
                     logger.debug(
                         f"💨 Cache hit for {func.__name__} (took {(time.time() - start_time) * 1000:.2f}ms)",
@@ -404,7 +428,7 @@ def cached_api_call_with_dedup(
                 result = await func(*args, **kwargs)
 
                 # Cache the result
-                await cache.set(key_prefix, cache_key, result, ttl=timedelta(hours=ttl_hours))
+                await cache.set(namespace, cache_key, result, ttl_override=timedelta(hours=ttl_hours))
 
                 elapsed = (time.time() - start_time) * 1000
                 logger.debug(f"✅ Cached API result for {func.__name__} (took {elapsed:.2f}ms)")

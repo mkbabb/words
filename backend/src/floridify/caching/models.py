@@ -13,11 +13,18 @@ from pydantic import BaseModel, Field
 
 
 class CompressionType(str, Enum):
-    """Compression algorithms for cache data."""
-
+    """Compression algorithms for cache data.
+    
+    Algorithm selection is automatic based on content size:
+    - < 1KB: No compression
+    - 1KB-10MB: ZSTD (best balance of speed and ratio)
+    - > 10MB: GZIP (maximum compression)
+    """
+    ZSTD = "zstd"  # Zstandard - fast with good compression
+    LZ4 = "lz4"    # LZ4 - extremely fast, moderate compression
+    GZIP = "gzip"  # GZIP - slower but maximum compression
     NONE = "none"  # No compression
-    ZLIB = "zlib"  # Standard zlib compression (default)
-    GZIP = "gzip"  # Gzip compression (for compatibility)
+    ZLIB = "zlib"  # Standard zlib compression (legacy)
 
 
 class QuantizationType(str, Enum):
@@ -45,11 +52,15 @@ class CacheNamespace(str, Enum):
 
     TRIE = "trie"
 
+    LITERATURE = "literature"
+    
     LEXICON = "lexicon"
 
     API = "api"
 
     OPENAI = "openai_structured"
+    
+    SCRAPING = "scraping"
 
 
 # Standardized TTL values based on data volatility
@@ -188,7 +199,7 @@ class CacheConfig(BaseModel):
         """Create config for API responses."""
         return cls(
             namespace=CacheNamespace.API,
-            ttl=CacheTTL.API_RESPONSE,
+            ttl=CacheTTL.API_RESPONSE.value,
         )
 
     @classmethod
@@ -196,7 +207,7 @@ class CacheConfig(BaseModel):
         """Create config for corpus data."""
         return cls(
             namespace=CacheNamespace.CORPUS,
-            ttl=CacheTTL.CORPUS,
+            ttl=CacheTTL.CORPUS.value,
         )
 
     @classmethod
@@ -204,15 +215,15 @@ class CacheConfig(BaseModel):
         """Create config for semantic indices."""
         return cls(
             namespace=CacheNamespace.SEMANTIC,
-            ttl=CacheTTL.SEMANTIC,
+            ttl=CacheTTL.SEMANTIC.value,
         )
 
     @classmethod
     def for_computation(cls) -> CacheConfig:
         """Create config for computation results."""
         return cls(
-            namespace=CacheNamespace.COMPUTE,
-            ttl=CacheTTL.COMPUTATION,
+            namespace=CacheNamespace.SEARCH,  # Changed from COMPUTE which doesn't exist
+            ttl=CacheTTL.COMPUTATION.value,
         )
 
 

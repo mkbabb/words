@@ -1,12 +1,9 @@
 """Modern generalized caching system for Floridify."""
 
 from .core import (
-    CacheBackend,
-    CacheMetadata,
-    CacheNamespace,
-    CacheTTL,
-    CompressionType,
-    QuantizationType,
+    GlobalCacheManager,
+    get_global_cache,
+    shutdown_global_cache,
 )
 from .decorators import (
     cached_api_call,
@@ -16,28 +13,25 @@ from .decorators import (
     cached_computation_sync,
     deduplicated,
 )
-from .unified import (
-    UnifiedCache,
-    clear_all_cache,
-    get_unified,
-    invalidate_cache_namespace,
+from .models import (
+    CacheNamespace,
+    CacheTTL,
+    CompressionType,
+    QuantizationType,
 )
 
 __all__ = [
-    "CacheBackend",
-    "CacheMetadata",
     "CacheNamespace",
     "CacheTTL",
     "CompressionType",
     "QuantizationType",
-    "UnifiedCache",
+    "GlobalCacheManager",
     "cached_api_call",
     "cached_api_call_with_dedup",
     "cached_computation",
     "cached_computation_async",
     "cached_computation_sync",
-    "clear_all_cache",
     "deduplicated",
-    "get_unified",
-    "invalidate_cache_namespace",
+    "get_global_cache",
+    "shutdown_global_cache",
 ]

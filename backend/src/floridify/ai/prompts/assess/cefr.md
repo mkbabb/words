@@ -18,9 +18,20 @@ Assess CEFR level for "{{ word }}":
 4. Context of use
 
 ## Examples:
-- "cat" → A1
-- "improve" → B1
-- "philosophy" → B2
-- "perspicacious" → C2
 
-Return level with brief reasoning.
+### A1-A2 Progression
+`cat` → A1 | Basic concrete noun
+`happy` → A1 | Elementary emotion
+`describe` → A2 | Simple communication verb
+
+### B1-B2 Progression  
+`improve` → B1 | Common development concept
+`philosophy` → B2 | Abstract academic discipline
+`ambiguous` → B2 | Nuanced descriptor
+
+### C1-C2 Mastery
+`perspicacious` → C2 | Rare, literary acuity
+`paradigm` → C1 | Sophisticated framework
+`ineffable` → C2 | Philosophical impossibility
+
+Output: Level with brief reasoning (max 10 words).

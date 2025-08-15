@@ -10,7 +10,7 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel
 
 from ..caching.decorators import cached_api_call
-from ..models import Definition
+from ..models import Definition, ModelInfo
 from ..utils.logging import get_logger, log_metrics
 from .model_selection import ModelTier, get_model_for_task, get_temperature_for_model
 from .models import (
@@ -59,7 +59,7 @@ class OpenAIConnector:
     def __init__(
         self,
         api_key: str,
-        model_name: str = "gpt-4o",
+        model_name: str = "gpt-5-nano",
         embedding_model: str = "text-embedding-3-small",
         temperature: float | None = None,
         max_tokens: int = 1000,
@@ -72,12 +72,17 @@ class OpenAIConnector:
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.template_manager = PromptTemplateManager()
-        self._last_model_used: str | None = None  # Track last model used
+        self._last_model_info: ModelInfo | None = None  # Track last model info
 
     @property
+    def last_model_info(self) -> ModelInfo | None:
+        """Get the last model info that was actually used for a request."""
+        return self._last_model_info
+    
+    @property
     def last_model_used(self) -> str:
-        """Get the last model that was actually used for a request."""
-        return self._last_model_used or self.model_name
+        """Get the last model that was actually used for a request (backward compat)."""
+        return self._last_model_info.name if self._last_model_info else self.model_name
 
     @cached_api_call(
         ttl_hours=24.0,  # Cache OpenAI responses for 24 hours
@@ -175,11 +180,17 @@ class OpenAIConnector:
 
                 # Extract token usage
                 token_usage = {}
+                prompt_tokens = None
+                completion_tokens = None
+                total_tokens = None
                 if hasattr(response, "usage") and response.usage:
+                    prompt_tokens = response.usage.prompt_tokens
+                    completion_tokens = response.usage.completion_tokens
+                    total_tokens = response.usage.total_tokens
                     token_usage = {
-                        "prompt_tokens": response.usage.prompt_tokens,
-                        "completion_tokens": response.usage.completion_tokens,
-                        "total_tokens": response.usage.total_tokens,
+                        "prompt_tokens": prompt_tokens,
+                        "completion_tokens": completion_tokens,
+                        "total_tokens": total_tokens,
                     }
 
                 # Log successful API call
@@ -209,8 +220,17 @@ class OpenAIConnector:
                 else:
                     raise ValueError("No content in response")
 
-                # Track the last model used
-                self._last_model_used = active_model
+                # Track the last model info
+                self._last_model_info = ModelInfo(
+                    name=active_model,
+                    confidence=0.9,  # Default high confidence for successful responses
+                    temperature=temperature or 0.7,
+                    max_tokens=max_tokens_value,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                    response_time_ms=int(api_duration * 1000)
+                )
 
                 total_duration = time.perf_counter() - start_time
                 logger.info(

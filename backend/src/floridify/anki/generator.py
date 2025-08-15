@@ -12,7 +12,7 @@ import genanki
 
 from ..ai.connector import OpenAIConnector
 from ..ai.templates import PromptTemplateManager as PromptLoader
-from ..models import Definition, SynthesizedDictionaryEntry
+from ..models import Definition, DictionaryEntry
 from ..utils.logging import get_logger
 from .ankiconnect import AnkiDirectIntegration
 from .templates import AnkiCardTemplate, CardType
@@ -92,8 +92,8 @@ def render_template(template: str, fields: dict[str, Any]) -> str:
     return result
 
 
-async def extract_definitions(entry: SynthesizedDictionaryEntry) -> list[Definition]:
-    """Extract definitions from SynthesizedDictionaryEntry."""
+async def extract_definitions(entry: DictionaryEntry) -> list[Definition]:
+    """Extract definitions from DictionaryEntry."""
     # Load definitions from IDs
     from ..models import Definition
 
@@ -180,7 +180,7 @@ class AnkiCardGenerator:
 
     async def generate_cards(
         self,
-        entry: SynthesizedDictionaryEntry,
+        entry: DictionaryEntry,
         card_types: list[CardType] | None = None,
         max_cards_per_type: int = 1,
         frequency: int = 1,
@@ -231,7 +231,7 @@ class AnkiCardGenerator:
         self,
         card_type: CardType,
         definition: Definition,
-        entry: SynthesizedDictionaryEntry,
+        entry: DictionaryEntry,
         frequency: int = 1,
     ) -> AnkiCard | None:
         """Generate a card for a specific type using appropriate method."""
@@ -248,7 +248,7 @@ class AnkiCardGenerator:
 
     async def _generate_best_describes_card(
         self,
-        entry: SynthesizedDictionaryEntry,
+        entry: DictionaryEntry,
         definition: Definition,
         frequency: int = 1,
     ) -> AnkiCard | None:
@@ -337,7 +337,7 @@ class AnkiCardGenerator:
 
     async def _generate_fill_blank_card(
         self,
-        entry: SynthesizedDictionaryEntry,
+        entry: DictionaryEntry,
         definition: Definition,
         frequency: int = 1,
     ) -> AnkiCard | None:

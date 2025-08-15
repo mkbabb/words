@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock
 import pytest
 from httpx import AsyncClient
 
-from src.floridify.models.models import Definition, SynthesizedDictionaryEntry, Word
+from src.floridify.models import Definition, DictionaryEntry, Word
 from tests.conftest import assert_response_structure, assert_valid_object_id
 
 
@@ -180,8 +180,9 @@ class TestLookupPipelineAPI:
         assert data["model_info"] is not None
         
         # Verify synthesized entry was created
-        entry = await SynthesizedDictionaryEntry.find_one(
-            SynthesizedDictionaryEntry.word_id is not None
+        entry = await DictionaryEntry.find_one(
+            DictionaryEntry.word_id is not None,
+            DictionaryEntry.provider == "synthesis"
         )
         assert entry is not None
 
@@ -303,8 +304,9 @@ class TestLookupPipelineAPI:
         assert len(definitions) > 0
         
         # Verify synthesized entry was created
-        entry = await SynthesizedDictionaryEntry.find_one(
-            SynthesizedDictionaryEntry.word_id == created_word.id
+        entry = await DictionaryEntry.find_one(
+            DictionaryEntry.word_id == created_word.id,
+            DictionaryEntry.provider == "synthesis"
         )
         assert entry is not None
 

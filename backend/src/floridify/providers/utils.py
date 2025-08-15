@@ -12,18 +12,15 @@ import hashlib
 import random
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from typing import Any
 
-import aiofiles
 import httpx
 from bs4 import BeautifulSoup
+from pydantic import BaseModel, Field
 
 from ..utils.logging import get_logger
-from ..utils.paths import get_cache_directory
 
 logger = get_logger(__name__)
 
@@ -53,32 +50,37 @@ class UserAgent(str, Enum):
     EDGE_WIN = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.2210.144"
 
 
-@dataclass
-class RateLimitConfig:
+class RateLimitConfig(BaseModel):
     """Configuration for adaptive rate limiting."""
 
-    base_requests_per_second: float = 2.0
-    min_delay: float = 0.5  # Minimum delay between requests
-    max_delay: float = 10.0  # Maximum delay for backoff
-    backoff_multiplier: float = 2.0  # Exponential backoff multiplier
-    success_speedup: float = 1.1  # Rate increase after successful requests
-    success_threshold: int = 10  # Successes needed before speedup
-    max_consecutive_errors: int = 5  # Stop after this many errors
-    respect_retry_after: bool = True  # Honor server Retry-After headers
+    base_requests_per_second: float = Field(default=2.0, ge=0.1, le=100.0, description="Base RPS")
+    min_delay: float = Field(default=0.5, ge=0.0, description="Minimum delay between requests")
+    max_delay: float = Field(default=10.0, ge=1.0, description="Maximum delay for backoff")
+    backoff_multiplier: float = Field(
+        default=2.0, ge=1.0, description="Exponential backoff multiplier"
+    )
+    success_speedup: float = Field(
+        default=1.1, ge=1.0, description="Rate increase after successful requests"
+    )
+    success_threshold: int = Field(default=10, ge=1, description="Successes needed before speedup")
+    max_consecutive_errors: int = Field(default=5, ge=1, description="Stop after this many errors")
+    respect_retry_after: bool = Field(default=True, description="Honor server Retry-After headers")
 
 
-@dataclass
-class ScrapingSession:
-    """Manages scraping session state with resume capability."""
+class ScrapingSession(BaseModel):
+    """Manages scraping session state with resume capability and caching."""
 
-    session_id: str
-    source: str  # e.g., "gutenberg", "internet_archive"
-    total_items: int
-    processed_items: int = 0
-    failed_items: int = 0
-    start_time: datetime = field(default_factory=datetime.now)
-    last_checkpoint: datetime = field(default_factory=datetime.now)
-    errors: list[str] = field(default_factory=list)
+    session_id: str = Field(..., description="Unique session identifier")
+    source: str = Field(..., description="Source name (e.g., 'gutenberg', 'internet_archive')")
+    total_items: int = Field(..., description="Total items to process")
+    processed_items: int = Field(default=0, description="Items processed successfully")
+    failed_items: int = Field(default=0, description="Items that failed processing")
+    start_time: datetime = Field(default_factory=datetime.now, description="Session start time")
+    last_checkpoint: datetime = Field(
+        default_factory=datetime.now, description="Last checkpoint time"
+    )
+    errors: list[str] = Field(default_factory=list, description="List of error messages")
+    cache_namespace: str = Field(default="scraping", description="Cache namespace for this session")
 
     @property
     def success_rate(self) -> float:
@@ -196,7 +198,7 @@ class RespectfulHttpClient:
         self.user_agent = user_agent or random.choice(list(UserAgent)).value
         self._session: httpx.AsyncClient | None = None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> RespectfulHttpClient:
         """Async context manager entry."""
         limits = httpx.Limits(
             max_connections=self.max_connections,
@@ -221,13 +223,18 @@ class RespectfulHttpClient:
         )
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any | None,
+    ) -> None:
         """Async context manager exit."""
         if self._session:
             await self._session.aclose()
             self._session = None
 
-    async def get(self, url: str, **kwargs) -> httpx.Response:
+    async def get(self, url: str, **kwargs: Any) -> httpx.Response:
         """Make a respectful GET request."""
         if not self._session:
             raise ValueError("Client must be used as async context manager")
@@ -260,62 +267,63 @@ class RespectfulHttpClient:
 
 
 class SessionManager:
-    """Manages scraping session persistence and recovery."""
+    """Manages scraping session persistence and recovery using global cache."""
 
-    def __init__(self, cache_dir: Path | None = None):
-        self.cache_dir = cache_dir or get_cache_directory("scraping_sessions")
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+    def __init__(self) -> None:
+        """Initialize session manager with global cache integration."""
+        self._cache: Any = None  # Will be initialized on first use
 
-    def get_session_path(self, session_id: str) -> Path:
-        """Get file path for session storage."""
+    async def _get_cache(self) -> Any:
+        """Get global cache instance."""
+        if self._cache is None:
+            from ..caching.core import get_global_cache
+
+            self._cache = await get_global_cache()
+        return self._cache
+
+    def _get_cache_key(self, session_id: str) -> str:
+        """Generate cache key for session."""
         safe_id = hashlib.md5(session_id.encode()).hexdigest()
-        return self.cache_dir / f"session_{safe_id}.json"
+        return f"session_{safe_id}"
 
     async def save_session(self, session: ScrapingSession) -> None:
-        """Save session state to disk."""
-        session_data = {
-            "session_id": session.session_id,
-            "source": session.source,
-            "total_items": session.total_items,
-            "processed_items": session.processed_items,
-            "failed_items": session.failed_items,
-            "start_time": session.start_time.isoformat(),
-            "last_checkpoint": session.last_checkpoint.isoformat(),
-            "errors": session.errors[-50:],  # Keep last 50 errors
-        }
+        """Save session state to global cache."""
+        from datetime import timedelta
 
-        session_path = self.get_session_path(session.session_id)
+        from ..caching.models import CacheNamespace
 
-        async with aiofiles.open(session_path, "w") as f:
-            import json
+        cache = await self._get_cache()
+        cache_key = self._get_cache_key(session.session_id)
 
-            await f.write(json.dumps(session_data, indent=2))
+        # Keep only last 50 errors for storage efficiency
+        session_data = session.model_copy(update={"errors": session.errors[-50:]})
 
-        logger.debug(f"💾 Saved session {session.session_id}")
+        # Save to cache with 24-hour TTL
+        await cache.set(
+            namespace=CacheNamespace.SCRAPING,
+            key=cache_key,
+            value=session_data.model_dump(mode="json"),
+            ttl_override=timedelta(hours=24),
+        )
+
+        logger.debug(f"💾 Saved session {session.session_id} to cache")
 
     async def load_session(self, session_id: str) -> ScrapingSession | None:
-        """Load session state from disk."""
-        session_path = self.get_session_path(session_id)
+        """Load session state from global cache."""
+        from ..caching.models import CacheNamespace
 
-        if not session_path.exists():
+        cache = await self._get_cache()
+        cache_key = self._get_cache_key(session_id)
+
+        # Try to get from cache
+        session_data = await cache.get(namespace=CacheNamespace.SCRAPING, key=cache_key)
+
+        if session_data is None:
             return None
 
         try:
-            async with aiofiles.open(session_path) as f:
-                import json
-
-                session_data = json.loads(await f.read())
-
-            session = ScrapingSession(
-                session_id=session_data["session_id"],
-                source=session_data["source"],
-                total_items=session_data["total_items"],
-                processed_items=session_data["processed_items"],
-                failed_items=session_data["failed_items"],
-                start_time=datetime.fromisoformat(session_data["start_time"]),
-                last_checkpoint=datetime.fromisoformat(session_data["last_checkpoint"]),
-                errors=session_data["errors"],
-            )
+            # Reconstruct ScrapingSession from cached data
+            session = ScrapingSession(**session_data)
 
             logger.info(
                 f"📋 Loaded session {session_id} ({session.processed_items}/{session.total_items})",
@@ -327,10 +335,14 @@ class SessionManager:
             return None
 
     async def delete_session(self, session_id: str) -> None:
-        """Delete session file."""
-        session_path = self.get_session_path(session_id)
-        if session_path.exists():
-            session_path.unlink()
+        """Delete session from cache."""
+        from ..caching.models import CacheNamespace
+
+        cache = await self._get_cache()
+        cache_key = self._get_cache_key(session_id)
+
+        deleted = await cache.delete(CacheNamespace.SCRAPING, cache_key)
+        if deleted:
             logger.debug(f"🗑️ Deleted session {session_id}")
 
 
@@ -338,7 +350,7 @@ class SessionManager:
 async def respectful_scraper(
     source: str,
     rate_config: RateLimitConfig | None = None,
-    **client_kwargs,
+    **client_kwargs: Any,
 ) -> AsyncGenerator[RespectfulHttpClient, None]:
     """Context manager for respectful scraping sessions."""
     rate_config = rate_config or RateLimitConfig(base_requests_per_second=2.0)
@@ -406,29 +418,3 @@ class ContentProcessor:
             return False
 
         return True
-
-
-# Convenience functions for common patterns
-async def download_with_retry(
-    url: str,
-    max_retries: int = 3,
-    rate_config: RateLimitConfig | None = None,
-) -> str:
-    """Download content with automatic retry on failure."""
-    rate_config = rate_config or RateLimitConfig()
-
-    for attempt in range(max_retries + 1):
-        try:
-            async with respectful_scraper("generic", rate_config) as client:
-                response = await client.get(url)
-                return response.text
-
-        except Exception as e:
-            if attempt == max_retries:
-                raise
-
-            wait_time = 2**attempt  # Exponential backoff
-            logger.warning(f"⚠️ Attempt {attempt + 1} failed, retrying in {wait_time}s: {e}")
-            await asyncio.sleep(wait_time)
-
-    raise ScrapingError("All retry attempts failed")

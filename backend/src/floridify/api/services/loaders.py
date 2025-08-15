@@ -9,11 +9,10 @@ from beanie import Document
 from ...models import (
     AudioMedia,
     Definition,
-    DictionaryProviderData,
+    DictionaryEntry,
     Example,
     ImageMedia,
     Pronunciation,
-    SynthesizedDictionaryEntry,
     Word,
 )
 
@@ -147,7 +146,7 @@ class DefinitionLoader(DataLoader):
         if include_provider_data and provider_data_ids:
             providers_data = []
             for provider_id in provider_data_ids:
-                provider_data = await DictionaryProviderData.get(provider_id)
+                provider_data = await DictionaryEntry.get(provider_id)
                 if provider_data:
                     providers_data.append(provider_data.model_dump(mode="json", exclude={"id"}))
             def_dict["providers_data"] = providers_data
@@ -172,7 +171,7 @@ class DefinitionLoader(DataLoader):
             # Pre-load all provider data
             provider_data_cache = {}
             for provider_id in provider_data_ids:
-                provider_data = await DictionaryProviderData.get(provider_id)
+                provider_data = await DictionaryEntry.get(provider_id)
                 if provider_data:
                     provider_data_cache[provider_id] = provider_data
 
@@ -190,13 +189,13 @@ class DefinitionLoader(DataLoader):
 
 
 class SynthesizedDictionaryEntryLoader(DataLoader):
-    """Service for loading SynthesizedDictionaryEntry and converting to API response."""
+    """Service for loading DictionaryEntry synthesis and converting to API response."""
 
     @staticmethod
     async def load_as_lookup_response(
-        entry: SynthesizedDictionaryEntry,
+        entry: DictionaryEntry,
     ) -> dict[str, Any]:
-        """Load a SynthesizedDictionaryEntry and convert to LookupResponse format.
+        """Load a DictionaryEntry and convert to LookupResponse format.
 
         Args:
             entry: The synthesized dictionary entry to load
@@ -214,13 +213,6 @@ class SynthesizedDictionaryEntryLoader(DataLoader):
         # Load definitions with all relations
         definitions = []
         if entry.definition_ids:
-            # Prepare provider data IDs for definition loader
-            provider_data_ids = (
-                [str(pid) for pid in entry.source_provider_data_ids]
-                if entry.source_provider_data_ids
-                else None
-            )
-
             # Load each definition with relations
             for def_id in entry.definition_ids:
                 definition = await Definition.get(def_id)
@@ -230,7 +222,7 @@ class SynthesizedDictionaryEntryLoader(DataLoader):
                         include_examples=True,
                         include_images=True,
                         include_provider_data=True,
-                        provider_data_ids=provider_data_ids,
+                        provider_data_ids=None,  # Provider tracking now in Definition.providers
                     )
                     definitions.append(def_dict)
 

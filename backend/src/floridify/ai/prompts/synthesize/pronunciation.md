@@ -1,8 +1,14 @@
 # Pronunciation: {{ word }}
 
-Generate phonetic + IPA:
+Generate American English pronunciation:
 
-**Phonetic**: hyphenated, CAPS for stress (e.g., koh-NISH-uhn)
-**IPA**: American English with stress marks (e.g., /kəˈnɪʃən/)
+**Phonetic**: Hyphenated syllables, CAPS for primary stress
+**IPA**: Standard American with /ˈ/ for stress
 
-Output both formats only. No paths/audio references.
+Include variants with "or" if multiple are standard.
+
+## Examples
+
+`either`: **Phonetic**: EE-thur or EYE-thur | **IPA**: /ˈiːðər/ or /ˈaɪðər/
+`croissant`: **Phonetic**: kruh-SAHNT | **IPA**: /krəˈsɑːnt/
+`controversy`: **Phonetic**: KAHN-truh-vur-see | **IPA**: /ˈkɑntrəvɜrsi/

@@ -587,8 +587,10 @@ class TestAISynthesisPipelineAPI:
         definition = await definition_factory(word_instance=word)
         
         # Create synthesized entry for regeneration
-        from src.floridify.models.models import SynthesizedDictionaryEntry
-        entry = await SynthesizedDictionaryEntry(
+        from src.floridify.models import DictionaryEntry, DictionaryProvider
+        entry = await DictionaryEntry(
+            resource_id=f"{word.text}:synthesis",
+            provider=DictionaryProvider.SYNTHESIS,
             word_id=word.id,
             definition_ids=[definition.id]
         ).create()

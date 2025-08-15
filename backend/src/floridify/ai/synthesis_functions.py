@@ -16,6 +16,7 @@ from ..core.state_tracker import Stages
 from ..models import (
     Collocation,
     Definition,
+    DictionaryEntry,
     Etymology,
     Example,
     Fact,
@@ -23,8 +24,6 @@ from ..models import (
     MeaningCluster,
     ModelInfo,
     Pronunciation,
-    ProviderData,
-    SynthesizedDictionaryEntry,
     UsageNote,
     Word,
     WordForm,
@@ -48,7 +47,7 @@ SynthesisFunc = Callable[..., Any]
 
 async def synthesize_pronunciation(
     word: str,
-    providers_data: list[dict[str, Any]] | list[ProviderData],
+    providers_data: list[dict[str, Any]] | list[DictionaryEntry],
     ai: OpenAIConnector,
     state_tracker: StateTracker | None = None,
 ) -> Pronunciation | None:
@@ -62,11 +61,11 @@ async def synthesize_pronunciation(
 
 
 async def _find_existing_pronunciation(
-    providers_data: list[dict[str, Any]] | list[ProviderData],
+    providers_data: list[dict[str, Any]] | list[DictionaryEntry],
 ) -> Pronunciation | None:
     """Find existing pronunciation from provider data."""
     for provider in providers_data:
-        if isinstance(provider, ProviderData):
+        if isinstance(provider, DictionaryEntry):
             if provider.pronunciation_id:
                 pronunciation = await Pronunciation.get(provider.pronunciation_id)
                 if pronunciation:
@@ -126,7 +125,7 @@ async def _create_pronunciation(
         # Create Word object if we need word_id (assuming word parameter should be Word object)
         word_obj = await Word.find_one(Word.text == word)
         if not word_obj:
-            word_obj = Word(text=word, normalized=word.lower())
+            word_obj = Word(text=word)
             await word_obj.save()
 
         assert word_obj.id is not None  # After save(), id is guaranteed to be not None
@@ -166,7 +165,7 @@ async def _generate_audio_files(pronunciation: Pronunciation, word: str) -> None
 
 async def synthesize_etymology(
     word: Word,
-    providers_data: list[dict[str, Any]] | list[ProviderData],
+    providers_data: list[dict[str, Any]] | list[DictionaryEntry],
     ai: OpenAIConnector,
     state_tracker: StateTracker | None = None,
 ) -> Etymology | None:
@@ -175,8 +174,8 @@ async def synthesize_etymology(
     etymology_data = []
 
     for provider in providers_data:
-        if isinstance(provider, ProviderData):
-            # ProviderData format
+        if isinstance(provider, DictionaryEntry):
+            # DictionaryEntry format
             if provider.etymology:
                 etymology_data.append(
                     {
@@ -208,6 +207,7 @@ async def synthesize_etymology(
             origin_language=response.origin_language,
             root_words=response.root_words,
             first_known_use=response.first_known_use,
+            model_info=ai.last_model_info,  # Set model info
         )
     except Exception as e:
         logger.error(f"Failed to synthesize etymology for {word.text}: {e}")
@@ -279,9 +279,9 @@ async def synthesize_antonyms(
 
         # Union existing and new antonyms, removing duplicates
         all_antonyms = existing_antonyms.copy()
-        for antonym in response.antonyms:
-            if antonym not in all_antonyms:
-                all_antonyms.append(antonym)
+        for candidate in response.antonyms:
+            if candidate.word not in all_antonyms:
+                all_antonyms.append(candidate.word)
 
         return all_antonyms[:count]
 
@@ -518,11 +518,7 @@ async def generate_facts(
                 word_id=word.id,
                 content=fact_text,
                 category=category,  # type: ignore[arg-type]
-                model_info=ModelInfo(
-                    name=ai.last_model_used,  # Use the actual model that was used
-                    confidence=response.confidence,
-                    generation_count=1,
-                ),
+                model_info=ai.last_model_info,  # Use full model info from AI connector
             )
             await fact.save()
             facts.append(fact)
@@ -713,7 +709,7 @@ async def cluster_definitions(
             provider_name = "unknown"
 
             if definition.provider_data_id:
-                provider_data = await ProviderData.get(definition.provider_data_id)
+                provider_data = await DictionaryEntry.get(definition.dictionary_entry_id)
 
                 if provider_data:
                     # Convert enum to string for display
@@ -1028,7 +1024,7 @@ async def enhance_synthesized_entry(
     allowing incremental updates to entries without regenerating everything.
 
     Args:
-        entry_id: ID of the SynthesizedDictionaryEntry
+        entry_id: ID of the DictionaryEntry
         components: Set of components to synthesize (None = all)
         force: Force regeneration even if data exists
         ai: OpenAI connector instance (required)
@@ -1036,7 +1032,7 @@ async def enhance_synthesized_entry(
 
     """
     # Load entry
-    entry = await SynthesizedDictionaryEntry.get(entry_id)
+    entry = await DictionaryEntry.get(entry_id)
     if not entry:
         raise ValueError(f"Entry {entry_id} not found")
 

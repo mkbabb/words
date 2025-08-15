@@ -71,7 +71,7 @@ class LanguageSearch:
         loader = CorpusLanguageLoader(force_rebuild=self.force_rebuild)
 
         # Get or create corpus (handles vocabulary loading, normalization, and corpus creation)
-        corpus = await loader.get_or_create_corpus(
+        corpus = await loader.get_or_create_corpus_for_languages(
             languages=self.languages,
             force_rebuild=self.force_rebuild,
         )

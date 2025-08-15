@@ -17,7 +17,7 @@ from rich.progress import (
 from rich.table import Table
 from rich.text import Text
 
-from ...models import Definition, SynthesizedDictionaryEntry
+from ...models import Definition, DictionaryEntry
 from ...models.dictionary import DictionaryProvider, Language
 from ...search import SearchResult
 from ...search.constants import SearchMethod
@@ -166,7 +166,7 @@ console = Console()
 
 
 def format_word_display(
-    entry: SynthesizedDictionaryEntry,
+    entry: DictionaryEntry,
     show_examples: bool = True,
     show_synonyms: bool = True,
 ) -> Panel:
@@ -487,7 +487,7 @@ def _add_definition_content(content: Text, definitions: list[Definition], word: 
 
 
 def _create_meaning_panel(
-    entry: SynthesizedDictionaryEntry,
+    entry: DictionaryEntry,
     meaning_id: str,
     definitions: list[Definition],
     counter: int,
@@ -519,7 +519,7 @@ def _create_meaning_panel(
 
 
 def format_meaning_based_definition(
-    entry: SynthesizedDictionaryEntry,
+    entry: DictionaryEntry,
     languages: list[Language],
     providers: list[DictionaryProvider],
     meaning_groups: dict[str, list[Definition]],

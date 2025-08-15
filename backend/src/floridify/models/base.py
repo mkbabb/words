@@ -72,7 +72,15 @@ class ModelInfo(BaseModel):
     name: str  # e.g., "gpt-4o", "gpt-3.5-turbo"
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     temperature: float = Field(ge=0.0, le=2.0, default=0.7)
+    max_tokens: int | None = None  # Max tokens for generation
+    top_p: float = Field(default=1.0, ge=0.0, le=1.0)  # Nucleus sampling
+    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
+    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0)
     generation_count: int = Field(default=1, ge=1)  # Times regenerated
+    prompt_tokens: int | None = None  # Tokens in prompt
+    completion_tokens: int | None = None  # Tokens in completion
+    total_tokens: int | None = None  # Total tokens used
+    response_time_ms: int | None = None  # Response time in milliseconds
     last_generated: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -113,3 +121,4 @@ class Etymology(BaseModel):
     origin_language: str | None = None  # e.g., "Latin", "Greek"
     root_words: list[str] = Field(default_factory=list)
     first_known_use: str | None = None  # e.g., "14th century"
+    model_info: ModelInfo | None = None  # If AI-generated

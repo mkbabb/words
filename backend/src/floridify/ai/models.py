@@ -7,27 +7,36 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..models import DictionaryProviderData
+from ..models import DictionaryProvider
 
 
-class ExampleGenerationResponse(BaseModel):
+class ModelInfo(BaseModel):
+    """Base class for AI response models with confidence tracking."""
+    
+    confidence: float = Field(
+        default=0.9,
+        ge=0.0,
+        le=1.0,
+        description="Model confidence in this response (0.0-1.0)"
+    )
+
+
+class ExampleGenerationResponse(ModelInfo):
     """Response from example generation."""
 
     example_sentences: list[str] = Field(
         description="List of high-quality example sentences.",
     )
-    confidence: float
 
 
-class PronunciationResponse(BaseModel):
+class PronunciationResponse(ModelInfo):
     """Response from pronunciation generation."""
 
     phonetic: str
     ipa: str
-    confidence: float
 
 
-class DefinitionResponse(BaseModel):
+class DefinitionResponse(ModelInfo):
     """Clean definition model for AI responses without numpy arrays."""
 
     part_of_speech: str = Field(
@@ -44,39 +53,30 @@ class DefinitionResponse(BaseModel):
         le=1.0,
         description="Relevancy score for this definition within its meaning cluster (0.0-1.0, where 1.0 is most commonly used).",
     )
-
-
-class ProviderDataResponse(BaseModel):
-    """Clean definition model for AI responses without numpy arrays."""
-
-    definitions: list[DefinitionResponse] = Field(
-        description="Comprehensive list of definitions for this word across all word types.",
+    
+    source_providers: list[DictionaryProvider] = Field(
+        default_factory=list,
+        description="List of providers that contributed to this definition.",
     )
 
 
-class DictionaryEntryResponse(BaseModel):
-    """Response from AI fallback provider."""
+class DictionaryEntryResponse(ModelInfo):
+    """Response from AI dictionary synthesis."""
 
-    provider_data: ProviderDataResponse | None
+    definitions: list[DefinitionResponse] = Field(
+        description="Comprehensive list of synthesized definitions with provider attribution.",
+    )
 
-    confidence: float
 
-
-class ClusterMapping(BaseModel):
+class ClusterMapping(ModelInfo):
     """A single cluster mapping entry."""
 
     cluster_id: str = Field(
-        description="Pithy unique cluster identifier (e.g., 'bank_financial') - always in the form {word}_{meaning_cluster}.",
+        description="Unique cluster identifier (e.g., 'bank_financial') - always in the form {word}_{meaning_cluster}.",
     )
     cluster_description: str = Field(description="Human-readable description of this cluster")
     definition_indices: list[int] = Field(
         description="List of definition indices (0-based) in this cluster",
-    )
-    confidence: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=1.0,
-        description="Confidence in this cluster mapping (0.0-1.0)",
     )
     relevancy: float = Field(
         default=1.0,
@@ -86,7 +86,7 @@ class ClusterMapping(BaseModel):
     )
 
 
-class ClusterMappingResponse(BaseModel):
+class ClusterMappingResponse(ModelInfo):
     """Response containing numerical mapping of clusters to definition IDs."""
 
     word: str = Field(description="The word being analyzed")
@@ -94,8 +94,6 @@ class ClusterMappingResponse(BaseModel):
     cluster_mappings: list[ClusterMapping] = Field(
         description="List of cluster mappings with their descriptions and indices",
     )
-
-    confidence: float = Field(description="Overall confidence in the clustering (0.0-1.0)")
 
 
 class TextGenerationRequest(BaseModel):
@@ -106,11 +104,10 @@ class TextGenerationRequest(BaseModel):
     temperature: float = Field(default=0.7, description="Temperature for generation")
 
 
-class TextGenerationResponse(BaseModel):
+class TextGenerationResponse(ModelInfo):
     """Response from text generation."""
 
     text: str = Field(description="Generated text content")
-    confidence: float = Field(default=1.0, description="Confidence in generation quality")
 
 
 class LiteratureAugmentationRequest(BaseModel):
@@ -122,12 +119,11 @@ class LiteratureAugmentationRequest(BaseModel):
     target_count: int = Field(default=50, description="Number of words to generate")
 
 
-class LiteratureAugmentationResponse(BaseModel):
+class LiteratureAugmentationResponse(ModelInfo):
     """Response from literature augmentation."""
 
     words: list[str] = Field(description="Generated augmented words")
     transformation_applied: str = Field(description="Description of transformation applied")
-    confidence: float = Field(default=0.9, description="Confidence in augmentation quality")
 
 
 class SemanticID(BaseModel):
@@ -189,7 +185,7 @@ class LiteratureMetadata(BaseModel):
     unique_features: list[str] = Field(description="Unique features identified")
 
 
-class LiteratureAnalysisResponse(BaseModel):
+class LiteratureAnalysisResponse(ModelInfo):
     """Complete response from literature corpus analysis."""
 
     semantic_id: SemanticID = Field(description="4D semantic identifier")
@@ -202,14 +198,15 @@ class LiteratureAnalysisResponse(BaseModel):
     word_count: int = Field(description="Number of words analyzed")
 
 
-class SynthesisResponse(BaseModel):
+class SynthesisResponse(ModelInfo):
     """Response from definition synthesis."""
 
     definitions: list[DefinitionResponse] = Field(
-        description="Comprehensive list of definitions for this word across all word types.",
+        description="Comprehensive list of definitions for this word across all word types, each with their source providers.",
     )
-    confidence: float
-    sources_used: list[str]
+    sources_used: list[str] = Field(
+        description="List of all unique provider names used in the synthesis.",
+    )
 
 
 class SynonymCandidate(BaseModel):
@@ -224,13 +221,12 @@ class SynonymCandidate(BaseModel):
     )
 
 
-class SynonymGenerationResponse(BaseModel):
+class SynonymGenerationResponse(ModelInfo):
     """Response for synonym generation with efflorescence ranking."""
 
     synonyms: list[SynonymCandidate] = Field(
         description="List of synonyms ordered by relevance and efflorescence",
     )
-    confidence: float = Field(description="Overall confidence in the synonym generation")
 
 
 class Suggestion(BaseModel):
@@ -246,25 +242,19 @@ class Suggestion(BaseModel):
     semantic_category: str = Field(description="Semantic category or theme")
 
 
-class SuggestionsResponse(BaseModel):
+class SuggestionsResponse(ModelInfo):
     """Response for word suggestions based on input words."""
 
     suggestions: list[Suggestion] = Field(description="List of word suggestions with explanations")
     input_analysis: str = Field(
         description="Brief analysis of the input words and suggestion rationale",
     )
-    confidence: float = Field(ge=0.0, le=1.0, description="Overall confidence in suggestions")
 
 
-class FactGenerationResponse(BaseModel):
+class FactGenerationResponse(ModelInfo):
     """Response from AI fact generation about a word."""
 
     facts: list[str] = Field(description="List of interesting, educational facts about the word")
-    confidence: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="Overall confidence in fact accuracy and quality",
-    )
     categories: list[str] = Field(
         description="Categories of facts generated (etymology, usage, cultural, etc.)",
     )
@@ -278,13 +268,12 @@ class Collocation(BaseModel):
     frequency: float = Field(ge=0.0, le=1.0, description="Frequency score")
 
 
-class CollocationResponse(BaseModel):
+class CollocationResponse(ModelInfo):
     """Response for collocation generation."""
 
     collocations: list[Collocation] = Field(
         description="Common word combinations with type and frequency",
     )
-    confidence: float = Field(ge=0.0, le=1.0)
 
 
 class WordSuggestion(BaseModel):
@@ -297,7 +286,7 @@ class WordSuggestion(BaseModel):
     example_usage: str | None = Field(None, description="Example sentence with word in context")
 
 
-class WordSuggestionResponse(BaseModel):
+class WordSuggestionResponse(ModelInfo):
     """Response for AI word suggestions from descriptive queries."""
 
     suggestions: list[WordSuggestion] = Field(
@@ -309,26 +298,24 @@ class WordSuggestionResponse(BaseModel):
     original_query: str = Field(description="The original user query")
 
 
-class QueryValidationResponse(BaseModel):
+class QueryValidationResponse(ModelInfo):
     """Response for query validation."""
 
     is_valid: bool = Field(description="Whether query seeks word suggestions")
     reason: str = Field(description="Explanation of validation decision")
 
 
-class GrammarPatternResponse(BaseModel):
+class GrammarPatternResponse(ModelInfo):
     """Response for grammar pattern extraction."""
 
     patterns: list[str] = Field(description="Common grammatical constructions (e.g., [Tn], sb/sth)")
     descriptions: list[str] = Field(description="Human-readable descriptions of patterns")
-    confidence: float = Field(ge=0.0, le=1.0)
 
 
-class CEFRLevelResponse(BaseModel):
+class CEFRLevelResponse(ModelInfo):
     """Response for CEFR level assessment."""
 
     level: str = Field(description="CEFR level (A1-C2)")
-    confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str = Field(description="Explanation for the level assignment")
 
 
@@ -339,36 +326,50 @@ class UsageNote(BaseModel):
     text: str = Field(description="The usage guidance text")
 
 
-class UsageNoteResponse(BaseModel):
+class UsageNoteResponse(ModelInfo):
     """Response for usage note generation."""
 
     notes: list[UsageNote] = Field(description="Usage guidance with type and text")
-    confidence: float = Field(ge=0.0, le=1.0)
 
 
-class AIGeneratedProviderData(DictionaryProviderData):
+class AIGeneratedProviderData(BaseModel):
     """AI fallback provider data with quality indicators."""
 
+    word: str
+    provider: DictionaryProvider = DictionaryProvider.AI_FALLBACK
+    definitions: list[dict[str, Any]] = Field(default_factory=list)
     confidence_score: float
-    generation_timestamp: datetime
+    generation_timestamp: datetime = Field(default_factory=datetime.now)
     model_used: str
 
 
-class AntonymResponse(BaseModel):
-    """Response for antonym generation."""
+class AntonymCandidate(BaseModel):
+    """A single antonym candidate with relevance and efflorescence rating."""
 
-    antonyms: list[str] = Field(description="List of antonyms for the definition")
-    confidence: float = Field(ge=0.0, le=1.0)
+    word: str = Field(description="The antonym word or phrase")
+    language: str = Field(description="Language of origin (e.g., English, Latin, French)")
+    relevance: float = Field(description="Relevance score (0.0 to 1.0)")
+    efflorescence: float = Field(description="Beauty and expressive power score (0.0 to 1.0)")
+    explanation: str = Field(
+        description="Brief explanation of the semantic inversion",
+    )
 
 
-class EtymologyResponse(BaseModel):
+class AntonymResponse(ModelInfo):
+    """Response for antonym generation with efflorescence ranking."""
+
+    antonyms: list[AntonymCandidate] = Field(
+        description="List of antonyms ordered by relevance and efflorescence",
+    )
+
+
+class EtymologyResponse(ModelInfo):
     """Response for etymology extraction."""
 
     text: str = Field(description="Etymology text explaining word origin")
     origin_language: str | None = Field(None, description="Language of origin")
     root_words: list[str] = Field(description="Root words or morphemes")
     first_known_use: str | None = Field(None, description="Date or period of first use")
-    confidence: float = Field(ge=0.0, le=1.0)
 
 
 class WordForm(BaseModel):
@@ -378,14 +379,13 @@ class WordForm(BaseModel):
     text: str = Field(description="The word form text")
 
 
-class WordFormResponse(BaseModel):
+class WordFormResponse(ModelInfo):
     """Response for word form generation."""
 
     forms: list[WordForm] = Field(description="List of word forms with type and text")
-    confidence: float = Field(ge=0.0, le=1.0)
 
 
-class RegisterClassificationResponse(BaseModel):
+class RegisterClassificationResponse(ModelInfo):
     """Response for register classification."""
 
     model_config = {"populate_by_name": True}  # Accept both field name and alias
@@ -394,34 +394,30 @@ class RegisterClassificationResponse(BaseModel):
         alias="register",
         description="Register level: formal, informal, neutral, slang, technical",
     )
-    confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str = Field(description="Explanation for classification")
 
 
-class DomainIdentificationResponse(BaseModel):
+class DomainIdentificationResponse(ModelInfo):
     """Response for domain identification."""
 
     domain: str | None = Field(None, description="Domain/field: medical, legal, computing, etc.")
-    confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str = Field(description="Explanation for identification")
 
 
-class FrequencyBandResponse(BaseModel):
+class FrequencyBandResponse(ModelInfo):
     """Response for frequency band assessment."""
 
     band: int = Field(ge=1, le=5, description="Frequency band: 1 (most common) to 5 (least common)")
-    confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str = Field(description="Explanation for assessment")
 
 
-class RegionalVariantResponse(BaseModel):
+class RegionalVariantResponse(ModelInfo):
     """Response for regional variant detection."""
 
     regions: list[str] = Field(description="Regions where this usage is common (US, UK, AU, etc.)")
-    confidence: float = Field(ge=0.0, le=1.0)
 
 
-class EnhancedDefinitionResponse(BaseModel):
+class EnhancedDefinitionResponse(ModelInfo):
     """Complete enhanced definition with all fields."""
 
     model_config = {"populate_by_name": True}  # Accept both field name and alias
@@ -436,10 +432,9 @@ class EnhancedDefinitionResponse(BaseModel):
     grammar_patterns: list[dict[str, str]]
     collocations: list[dict[str, str | float]]
     usage_notes: list[dict[str, str]]
-    confidence: float = Field(ge=0.0, le=1.0)
 
 
-class ComprehensiveSynthesisResponse(BaseModel):
+class ComprehensiveSynthesisResponse(ModelInfo):
     """Complete synthesis response with all components."""
 
     pronunciation: PronunciationResponse | None
@@ -451,36 +446,33 @@ class ComprehensiveSynthesisResponse(BaseModel):
     model_info: dict[str, Any]
 
 
-class ExampleSynthesisResponse(BaseModel):
+class ExampleSynthesisResponse(ModelInfo):
     """Response for example sentence synthesis."""
 
     examples: list[str] = Field(description="List of natural, contextual example sentences")
-    confidence: float = Field(ge=0.0, le=1.0)
 
 
-class DefinitionSynthesisResponse(BaseModel):
+class DefinitionSynthesisResponse(ModelInfo):
     """Response for definition text synthesis from clusters."""
 
     definition_text: str = Field(
         description="Synthesized definition text combining clustered meanings",
     )
     part_of_speech: str = Field(description="Part of speech for this definition cluster")
-    confidence: float = Field(ge=0.0, le=1.0)
     sources_used: list[str] = Field(description="Provider sources used in synthesis")
 
 
-class MeaningClusterResponse(BaseModel):
+class MeaningClusterResponse(ModelInfo):
     """Response for single definition meaning cluster generation."""
 
     cluster_id: str = Field(description="Semantic cluster identifier for this definition")
     cluster_description: str = Field(description="Human-readable cluster description")
-    confidence: float = Field(ge=0.0, le=1.0)
 
 
 # Anki Models
 
 
-class AnkiFillBlankResponse(BaseModel):
+class AnkiFillBlankResponse(ModelInfo):
     """Response for fill-in-the-blank flashcard generation."""
 
     sentence: str = Field(description="Sentence with _____ where the word belongs")
@@ -491,7 +483,7 @@ class AnkiFillBlankResponse(BaseModel):
     correct_choice: str = Field(description="Letter of correct answer (A, B, C, or D)")
 
 
-class AnkiMultipleChoiceResponse(BaseModel):
+class AnkiMultipleChoiceResponse(ModelInfo):
     """Response for multiple choice flashcard generation."""
 
     choice_a: str = Field(description="First answer choice")
@@ -511,17 +503,16 @@ class DeduplicatedDefinition(BaseModel):
     reasoning: str = Field(description="Brief explanation (max 10 words)")
 
 
-class DeduplicationResponse(BaseModel):
+class DeduplicationResponse(ModelInfo):
     """Response from definition deduplication."""
 
     deduplicated_definitions: list[DeduplicatedDefinition] = Field(
         description="Deduplicated definitions preserving highest quality",
     )
     removed_count: int = Field(description="Number of duplicate definitions removed")
-    confidence: float = Field(description="Confidence in deduplication (0.0-1.0)")
 
 
-class WordOfTheDayResponse(BaseModel):
+class WordOfTheDayResponse(ModelInfo):
     """Response for Word of the Day generation."""
 
     word: str = Field(description="The selected word")
@@ -533,7 +524,6 @@ class WordOfTheDayResponse(BaseModel):
     )
     difficulty_level: str = Field(description="Difficulty level: intermediate or advanced")
     memorable_aspect: str = Field(description="What makes this word particularly worth learning")
-    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in word selection")
 
 
 class SyntheticWordEntry(BaseModel):
@@ -546,10 +536,9 @@ class SyntheticWordEntry(BaseModel):
     example_sentence: str = Field(description="Natural usage example")
     semantic_justification: str = Field(description="Why this word fits the requested category")
     difficulty_level: str = Field(description="Assessed difficulty level")
-    confidence: float = Field(ge=0.0, le=1.0, description="AI confidence in classification")
 
 
-class SyntheticCorpusResponse(BaseModel):
+class SyntheticCorpusResponse(ModelInfo):
     """Response from synthetic corpus generation."""
 
     generated_words: list[SyntheticWordEntry] = Field(description="Generated word entries")
@@ -558,6 +547,5 @@ class SyntheticCorpusResponse(BaseModel):
 
 
 # Rebuild models with forward references
-ProviderDataResponse.model_rebuild()
 SynthesisResponse.model_rebuild()
 EnhancedDefinitionResponse.model_rebuild()

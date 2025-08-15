@@ -18,17 +18,19 @@ import httpx
 import wikitextparser as wtp
 
 from ....models import Word
-from ....models.dictionary import DictionaryProvider, Language
-from ....models.versioned import DictionaryVersionedData, VersionInfo
+from ....models.dictionary import DictionaryEntry, DictionaryProvider, Language
+from ....models.versioned import VersionInfo
 from ....utils.logging import get_logger
-from ...base import BulkDownloadConnector
 from ...batch import BatchOperation
+from ...core import ConnectorConfig
+from ...utils import RateLimitConfig
+from ..core import DictionaryConnector
 from ..scraper.wiktionary import WiktionaryConnector
 
 logger = get_logger(__name__)
 
 
-class WiktionaryWholesaleConnector(BulkDownloadConnector):
+class WiktionaryWholesaleConnector(DictionaryConnector):
     """Downloads and processes complete Wiktionary data dumps.
 
     Supports:
@@ -42,45 +44,43 @@ class WiktionaryWholesaleConnector(BulkDownloadConnector):
         self,
         language: Language = Language.ENGLISH,
         data_dir: Path | None = None,
-        rate_limit: float = 10.0,
+        config: ConnectorConfig | None = None,
     ) -> None:
         """Initialize Wiktionary wholesale connector.
 
         Args:
             language: Language enum (defaults to English)
             data_dir: Directory for storing downloads
-            rate_limit: Rate limit for API calls during processing
+            config: Connector configuration
 
         """
-        super().__init__(rate_limit=rate_limit)
+        if config is None:
+            config = ConnectorConfig(
+                rate_limit_config=RateLimitConfig(base_requests_per_second=10.0)
+            )
+        super().__init__(provider=DictionaryProvider.WIKTIONARY, config=config)
         self.language = language
         self.data_dir = data_dir or Path("/tmp/floridify/wiktionary_wholesale")
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize a regular Wiktionary connector for parsing
-        self.parser = WiktionaryConnector(rate_limit=rate_limit)
+        self.parser = WiktionaryConnector(config=config)
 
         # Wikimedia dump URLs
         self.dump_base_url = f"https://dumps.wikimedia.org/{language.value}wiktionary/latest"
-        self.session = httpx.AsyncClient(timeout=None)  # No timeout for large files
 
-    @property
-    def provider_name(self) -> DictionaryProvider:
-        """Return the provider name."""
-        return DictionaryProvider.WIKTIONARY
-
-    @property
-    def provider_version(self) -> str:
+    def get_provider_version(self) -> str:
         """Version includes language and date."""
         return f"{self.language}_wholesale_{datetime.now(UTC).strftime('%Y%m%d')}"
 
     async def __aenter__(self) -> WiktionaryWholesaleConnector:
         """Async context manager entry."""
+        await super().__aenter__()
         return self
 
     async def __aexit__(self, *args: object) -> None:
         """Async context manager exit."""
-        await self.session.aclose()
+        await super().__aexit__(*args)
 
     async def download_bulk_data(
         self,
@@ -112,7 +112,8 @@ class WiktionaryWholesaleConnector(BulkDownloadConnector):
             logger.info(f"Downloading Wiktionary dump from {url}")
 
             # Stream download with progress
-            async with self.session.stream("GET", url) as response:
+            session = await self.get_api_session()
+            async with session.stream("GET", url) as response:
                 response.raise_for_status()
 
                 total_size = int(response.headers.get("content-length", 0))
@@ -293,7 +294,7 @@ class WiktionaryWholesaleConnector(BulkDownloadConnector):
         self,
         page_data: dict[str, Any],
         batch_operation: BatchOperation | None,
-    ) -> DictionaryVersionedData | None:
+    ) -> DictionaryEntry | None:
         """Convert Wiktionary page to versioned provider data.
 
         Args:
@@ -301,7 +302,7 @@ class WiktionaryWholesaleConnector(BulkDownloadConnector):
             batch_operation: Optional batch operation
 
         Returns:
-            DictionaryVersionedData or None
+            DictionaryEntry or None
 
         """
         try:
@@ -335,21 +336,19 @@ class WiktionaryWholesaleConnector(BulkDownloadConnector):
             data_hash = hashlib.sha256(data_str.encode()).hexdigest()
 
             # Check if this exact data already exists
-            existing = await DictionaryVersionedData.find_one(
+            existing = await DictionaryEntry.find_one(
                 {"version_info.data_hash": data_hash},
             )
             if existing:
                 return None  # Skip duplicate
 
             # Create versioned data
-            versioned_data = DictionaryVersionedData(
+            versioned_data = DictionaryEntry(
                 word_id=word_obj.id,
                 word_text=title,
                 language=self.language,
-                provider=self.provider_name,
+                provider=self.provider,
                 version_info=VersionInfo(
-                    provider_version=self.provider_version,
-                    schema_version="wholesale_1.0",
                     data_hash=data_hash,
                     is_latest=True,
                 ),
@@ -421,23 +420,23 @@ class WiktionaryWholesaleConnector(BulkDownloadConnector):
 
         return data
 
-    async def _save_batch(self, items: list[DictionaryVersionedData]) -> None:
+    async def _save_batch(self, items: list[DictionaryEntry]) -> None:
         """Save a batch of versioned data.
 
         Args:
-            items: List of DictionaryVersionedData to save
+            items: List of DictionaryEntry to save
 
         """
         if items:
             try:
-                await DictionaryVersionedData.insert_many(items)
+                await DictionaryEntry.insert_many(items)
                 logger.debug(f"Saved batch of {len(items)} items")
             except Exception as e:
                 logger.error(f"Error saving batch: {e}")
 
     async def _fetch_from_provider(
         self,
-        word_obj: Word,
+        word: str,
         state_tracker: Any | None = None,
     ) -> Any | None:
         """Fetch definition from local wholesale data.
@@ -446,32 +445,38 @@ class WiktionaryWholesaleConnector(BulkDownloadConnector):
         and returns it, otherwise falls back to the regular scraper.
 
         Args:
-            word_obj: Word to look up
+            word: Word text to look up
             state_tracker: Optional state tracker
 
         Returns:
             ProviderData or None
 
         """
+        # First get or create word object
+        word_obj = await Word.find_one({"text": word})
+        if not word_obj:
+            word_obj = Word(text=word)
+            await word_obj.save()
+
         # First check if we have wholesale data
-        wholesale_data = await DictionaryVersionedData.find_one(
+        wholesale_data = await DictionaryEntry.find_one(
             {
                 "word_id": word_obj.id,
-                "provider": self.provider_name,
+                "provider": DictionaryProvider.WIKTIONARY,
                 "version_info.is_latest": True,
                 "raw_data.source": "wholesale_dump",
             },
         )
 
-        if wholesale_data:
-            logger.debug(f"Using wholesale data for {word_obj.text}")
+        if wholesale_data and wholesale_data.raw_data:
+            logger.debug(f"Using wholesale data for {word}")
             # Convert versioned data back to ProviderData format
             # This would need proper conversion logic
             return wholesale_data.raw_data.get("parsed")
 
         # Fall back to regular scraper
-        logger.debug(f"No wholesale data for {word_obj.text}, using scraper")
-        return await self.parser._fetch_from_provider(word_obj, state_tracker)
+        logger.debug(f"No wholesale data for {word}, using scraper")
+        return await self.parser._fetch_from_provider(word, state_tracker)
 
 
 class WiktionaryTitleListDownloader:

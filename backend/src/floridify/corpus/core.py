@@ -8,6 +8,13 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from beanie import PydanticObjectId
+from pydantic import BaseModel, Field
+
+from ..caching.manager import get_tree_corpus_manager
+from ..models.dictionary import CorpusType, Language
+from ..models.literature import AuthorInfo, Genre, Period
+from ..models.versioned import VersionConfig
 from ..text.normalize import batch_lemmatize, batch_normalize
 from ..utils.logging import get_logger
 from .utils import get_vocabulary_hash
@@ -15,44 +22,57 @@ from .utils import get_vocabulary_hash
 logger = get_logger(__name__)
 
 
-class Corpus:
+class Corpus(BaseModel):
     """In-memory corpus containing vocabulary data and processing logic.
 
-    This class contains all the actual vocabulary data that was previously
-    stored in CorpusData. It's designed to be passed by reference without
-    copying large datasets.
+    This class contains all vocabulary data and provides processing functionality.
+    Integrates with VersionedDataManager for persistence.
     """
 
-    def __init__(self, corpus_name: str) -> None:
-        """Initialize empty corpus with given name."""
-        self.corpus_name = corpus_name
+    # Core identification
+    corpus_name: str
+    corpus_type: CorpusType = CorpusType.LEXICON
+    language: Language = Language.ENGLISH
 
-        # Core vocabulary data - dual storage for original preservation
-        self.vocabulary: list[str] = []  # Normalized forms for search indexing
-        self.original_vocabulary: list[str] = []  # Original forms for display
+    # Core vocabulary data - dual storage for original preservation
+    vocabulary: list[str] = Field(default_factory=list)  # Normalized forms for search
+    original_vocabulary: list[str] = Field(default_factory=list)  # Original forms for display
 
-        # Mapping between normalized and original forms
-        self.normalized_to_original_indices: dict[int, int] = {}  # normalized_idx -> original_idx
+    # Mappings and indices
+    normalized_to_original_indices: dict[int, int] = Field(default_factory=dict)
+    vocabulary_to_index: dict[str, int] = Field(default_factory=dict)
 
-        # O(1) lookup dictionary for performance
-        self.vocabulary_to_index: dict[str, int] = {}  # word -> vocabulary index
+    # Lemmatization data
+    lemmatized_vocabulary: list[str] = Field(default_factory=list)
+    word_to_lemma_indices: list[int] = Field(default_factory=list)
+    lemma_to_word_indices: list[int] = Field(default_factory=list)
 
-        # Computed data
-        self.vocabulary_hash: str = ""
-        self.vocabulary_indices: dict[str, Any] = {}
-        self.vocabulary_stats: dict[str, int] = {}
+    # Search optimization structures
+    signature_buckets: dict[str, list[int]] = Field(default_factory=dict)
+    length_buckets: dict[int, list[int]] = Field(default_factory=dict)
 
-        # Lemmatization data
-        self.lemmatized_vocabulary: list[str] = []
-        self.word_to_lemma_indices: list[int] = []
-        self.lemma_to_word_indices: list[int] = []
+    # Metadata and statistics
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    vocabulary_stats: dict[str, int] = Field(default_factory=dict)
+    vocabulary_hash: str = ""
+    vocabulary_indices: dict[str, Any] = Field(default_factory=dict)
 
-        # Metadata
-        self.metadata: dict[str, Any] = {}
+    # Source information
+    sources: list[str] = Field(default_factory=list)
+    unique_word_count: int = 0
+    total_word_count: int = 0
+    last_updated: str | None = None
 
-        # Character signature-based candidate selection index
-        self.signature_buckets: dict[str, list[int]] = {}  # signature -> [word_indices]
-        self.length_buckets: dict[int, list[int]] = {}  # length -> [word_indices]
+    # Hierarchical relationships (for tree structure)
+    corpus_id: PydanticObjectId | None = None
+    parent_corpus_id: PydanticObjectId | None = None
+    child_corpus_ids: list[PydanticObjectId] = Field(default_factory=list)
+    is_master: bool = False
+
+    # Word frequencies (loaded from external storage if needed)
+    word_frequencies: dict[str, int] = Field(default_factory=dict)
+
+    model_config = {"arbitrary_types_allowed": True}
 
     @classmethod
     async def create(
@@ -61,6 +81,7 @@ class Corpus:
         vocabulary: list[str],
         semantic: bool = True,
         model_name: str | None = None,
+        language: Language = Language.ENGLISH,
     ) -> Corpus:
         """Create new corpus with full vocabulary processing.
 
@@ -80,7 +101,7 @@ class Corpus:
         logger.info(f"Creating corpus '{corpus_name}' with {len(vocabulary)} vocabulary items")
         start_time = time.perf_counter()
 
-        corpus = cls(corpus_name)
+        corpus = cls(corpus_name=corpus_name, language=language)
 
         # Store reference to original vocabulary (no copy needed - we don't modify it)
         corpus.original_vocabulary = vocabulary  # Reference, not copy
@@ -350,47 +371,181 @@ class Corpus:
             f"Built signature index: {signature_count} signatures, avg size {avg_signature_size:.1f}",
         )
 
-    def model_dump(self) -> dict[str, Any]:
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Serialize corpus to dictionary for caching."""
-        return {
-            "corpus_name": self.corpus_name,
-            "vocabulary": self.vocabulary,
-            "original_vocabulary": self.original_vocabulary,
-            "normalized_to_original_indices": self.normalized_to_original_indices,
-            "vocabulary_to_index": self.vocabulary_to_index,  # Store the index mapping
-            "vocabulary_hash": self.vocabulary_hash,
-            "vocabulary_indices": self.vocabulary_indices,
-            "vocabulary_stats": self.vocabulary_stats,
-            "lemmatized_vocabulary": self.lemmatized_vocabulary,
-            "word_to_lemma_indices": self.word_to_lemma_indices,
-            "lemma_to_word_indices": self.lemma_to_word_indices,
-            "metadata": self.metadata,
-            "signature_buckets": self.signature_buckets,
-            "length_buckets": self.length_buckets,
-        }
+        return super().model_dump(exclude_none=True, **kwargs)
 
     @classmethod
     def model_load(cls, data: dict[str, Any]) -> Corpus:
         """Deserialize corpus from cached dictionary."""
-        corpus = cls(data["corpus_name"])
-        corpus.vocabulary = data["vocabulary"]
-        corpus.original_vocabulary = data["original_vocabulary"]
-        corpus.normalized_to_original_indices = data["normalized_to_original_indices"]
-        corpus.vocabulary_hash = data["vocabulary_hash"]
-        corpus.vocabulary_indices = data["vocabulary_indices"]
-        corpus.vocabulary_stats = data["vocabulary_stats"]
-        corpus.lemmatized_vocabulary = data["lemmatized_vocabulary"]
-        corpus.word_to_lemma_indices = data["word_to_lemma_indices"]
-        corpus.lemma_to_word_indices = data["lemma_to_word_indices"]
-        corpus.metadata = data["metadata"]
-        corpus.vocabulary_to_index = data["vocabulary_to_index"]
+        corpus = cls.model_validate(data)
 
-        # Load signature buckets
-        corpus.signature_buckets = data.get("signature_buckets", {})
-        corpus.length_buckets = data.get("length_buckets", {})
-
-        # Rebuild if empty (older cached data)
+        # Rebuild indices if needed
         if not corpus.signature_buckets or not corpus.length_buckets:
             corpus._build_signature_index()
 
         return corpus
+
+    @classmethod
+    async def get(
+        cls,
+        corpus_name: str,
+        config: VersionConfig | None = None,
+    ) -> Corpus | None:
+        """Get corpus from versioned storage.
+
+        Args:
+            corpus_name: Name of the corpus
+            config: Version configuration
+
+        Returns:
+            Corpus instance or None if not found
+        """
+        manager = get_tree_corpus_manager()
+
+        # Get the latest corpus metadata
+        corpus_metadata = await manager.get_corpus(
+            corpus_name=corpus_name,
+            config=config,
+        )
+
+        if not corpus_metadata:
+            return None
+
+        # Load content from metadata
+        content = await corpus_metadata.get_content()
+        if not content:
+            return None
+
+        return cls.model_load(content)
+
+    @classmethod
+    async def get_or_create(
+        cls,
+        corpus_name: str,
+        vocabulary: list[str],
+        language: Language = Language.ENGLISH,
+        corpus_type: CorpusType = CorpusType.LEXICON,
+        semantic: bool = True,
+        model_name: str | None = None,
+        config: VersionConfig | None = None,
+    ) -> Corpus:
+        """Get existing corpus or create new one.
+
+        Args:
+            corpus_name: Name of the corpus
+            vocabulary: List of words if creating new
+            language: Language of the corpus
+            corpus_type: Type of corpus
+            semantic: Enable semantic search
+            model_name: Embedding model name
+            config: Version configuration
+
+        Returns:
+            Corpus instance
+        """
+        # Try to get existing
+        existing = await cls.get(corpus_name, config)
+        if existing:
+            return existing
+
+        # Create new corpus
+        corpus = await cls.create(
+            corpus_name=corpus_name,
+            vocabulary=vocabulary,
+            semantic=semantic,
+            model_name=model_name,
+            language=language,
+        )
+
+        # Set the corpus type
+        corpus.corpus_type = corpus_type
+
+        # Save the new corpus
+        await corpus.save(config)
+
+        return corpus
+
+    async def save(
+        self,
+        config: VersionConfig | None = None,
+    ) -> None:
+        """Save corpus to versioned storage.
+
+        Args:
+            config: Version configuration
+        """
+        manager = get_tree_corpus_manager()
+
+        # Prepare content to save
+        content = self.model_dump()
+
+        # Save using tree corpus manager
+        saved = await manager.save_corpus(
+            corpus_name=self.corpus_name,
+            content=content,
+            corpus_type=self.corpus_type,
+            language=self.language,
+            parent_id=self.parent_corpus_id,
+            config=config,
+            metadata=self.metadata,
+        )
+
+        # Update corpus_id if new
+        if saved.id and not self.corpus_id:
+            self.corpus_id = saved.id
+
+    async def delete(self) -> None:
+        """Delete corpus from storage."""
+        if self.corpus_id:
+            from ..models.versioned import CorpusMetadata
+
+            corpus_meta = await CorpusMetadata.get(self.corpus_id)
+            if corpus_meta:
+                await corpus_meta.delete()
+
+
+class LanguageCorpus(Corpus):
+    """Language-level master corpus with aggregated statistics.
+
+    Contains language-wide vocabulary and statistics aggregated
+    from all child corpora.
+    """
+
+    # Aggregated statistics
+    total_documents: int = 0
+    total_tokens: int = 0
+    unique_sources: list[str] = Field(default_factory=list)
+
+    # Language-specific data
+    common_words: list[str] = Field(default_factory=list)
+    stop_words: set[str] = Field(default_factory=set)
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize language corpus as master."""
+        data["corpus_type"] = CorpusType.LANGUAGE
+        data["is_master"] = True
+        super().__init__(**data)
+
+
+class LiteratureCorpus(Corpus):
+    """Literature-based corpus with work metadata.
+
+    Contains vocabulary extracted from specific literary works
+    with author and genre information.
+    """
+
+    # Literature metadata
+    literature_data_ids: list[PydanticObjectId] = Field(default_factory=list)
+    authors: list[AuthorInfo] = Field(default_factory=list)
+    periods: list[Period] = Field(default_factory=list)
+    genres: list[Genre] = Field(default_factory=list)
+
+    # Work-specific statistics
+    work_titles: list[str] = Field(default_factory=list)
+    publication_years: list[int] = Field(default_factory=list)
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize literature corpus."""
+        data["corpus_type"] = CorpusType.LITERATURE
+        super().__init__(**data)

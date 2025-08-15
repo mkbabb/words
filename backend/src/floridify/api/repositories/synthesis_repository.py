@@ -16,6 +16,7 @@ from ...models import (
     Pronunciation,
     SynthesizedDictionaryEntry,
 )
+from ...models.dictionary import DictionaryEntry
 from ..core.base import BaseRepository
 
 
@@ -29,7 +30,6 @@ class SynthesisCreate(BaseModel):
     fact_ids: list[PydanticObjectId] = Field(default_factory=list)
     image_ids: list[PydanticObjectId] = Field(default_factory=list)
     model_info: ModelInfo | None = None
-    source_provider_data_ids: list[PydanticObjectId] = Field(default_factory=list)
 
 
 class SynthesisUpdate(BaseModel):
@@ -102,29 +102,35 @@ class ComponentStatus(BaseModel):
 
 
 class SynthesisRepository(
-    BaseRepository[SynthesizedDictionaryEntry, SynthesisCreate, SynthesisUpdate],
+    BaseRepository[DictionaryEntry, SynthesisCreate, SynthesisUpdate],
 ):
-    """Repository for SynthesizedDictionaryEntry - simplified CRUD for definition collections."""
+    """Repository for DictionaryEntry synthesis - simplified CRUD for definition collections."""
 
     def __init__(self) -> None:
-        super().__init__(SynthesizedDictionaryEntry)
+        super().__init__(DictionaryEntry)
 
     # Core queries matching model relationships
     async def find_by_word(
         self, word_id: PydanticObjectId | str
-    ) -> SynthesizedDictionaryEntry | None:
+    ) -> DictionaryEntry | None:
         """Find synthesized entry for a word."""
         word_oid = PydanticObjectId(word_id) if isinstance(word_id, str) else word_id
-        return await SynthesizedDictionaryEntry.find_one({"word_id": word_oid})
+        return await DictionaryEntry.find_one({
+            "word_id": word_oid,
+            "provider": "synthesis"
+        })
 
-    async def find_by_model(self, model_name: str) -> list[SynthesizedDictionaryEntry]:
+    async def find_by_model(self, model_name: str) -> list[DictionaryEntry]:
         """Find entries synthesized by a specific model."""
-        return await SynthesizedDictionaryEntry.find({"model_info.name": model_name}).to_list()
+        return await DictionaryEntry.find({
+            "model_info.name": model_name,
+            "provider": "synthesis"
+        }).to_list()
 
     # CRUD for related definitions
     async def add_definition(
         self, entry_id: PydanticObjectId, definition_id: PydanticObjectId
-    ) -> SynthesizedDictionaryEntry:
+    ) -> DictionaryEntry:
         """Add a definition to the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
         assert entry is not None
@@ -138,7 +144,7 @@ class SynthesisRepository(
 
     async def remove_definition(
         self, entry_id: PydanticObjectId, definition_id: PydanticObjectId
-    ) -> SynthesizedDictionaryEntry:
+    ) -> DictionaryEntry:
         """Remove a definition from the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
         assert entry is not None
@@ -152,7 +158,7 @@ class SynthesisRepository(
 
     async def add_fact(
         self, entry_id: PydanticObjectId, fact_id: PydanticObjectId
-    ) -> SynthesizedDictionaryEntry:
+    ) -> DictionaryEntry:
         """Add a fact to the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
         assert entry is not None
@@ -166,7 +172,7 @@ class SynthesisRepository(
 
     async def set_pronunciation(
         self, entry_id: PydanticObjectId, pronunciation_id: PydanticObjectId
-    ) -> SynthesizedDictionaryEntry:
+    ) -> DictionaryEntry:
         """Set the pronunciation for the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
         assert entry is not None
@@ -178,7 +184,7 @@ class SynthesisRepository(
         return entry
 
     # Completeness and status tracking
-    async def get_completeness_score(self, entry: SynthesizedDictionaryEntry) -> float:
+    async def get_completeness_score(self, entry: DictionaryEntry) -> float:
         """Calculate completeness score for an entry."""
         components = [
             entry.pronunciation_id is not None,
@@ -189,10 +195,10 @@ class SynthesisRepository(
         ]
         return sum(components) / len(components)
 
-    async def find_incomplete(self, limit: int = 100) -> list[SynthesizedDictionaryEntry]:
+    async def find_incomplete(self, limit: int = 100) -> list[DictionaryEntry]:
         """Find entries missing components."""
         return (
-            await SynthesizedDictionaryEntry.find(
+            await DictionaryEntry.find(
                 {
                     "$or": [
                         {"pronunciation_id": None},
@@ -331,7 +337,7 @@ class SynthesisRepository(
         self,
         entry_id: PydanticObjectId,
         definition_ids: list[PydanticObjectId],
-    ) -> SynthesizedDictionaryEntry:
+    ) -> DictionaryEntry:
         """Add multiple definitions to the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
         assert entry is not None
@@ -348,7 +354,7 @@ class SynthesisRepository(
         self,
         word_id: PydanticObjectId,
         data: SynthesisCreate | SynthesisUpdate,
-    ) -> SynthesizedDictionaryEntry:
+    ) -> DictionaryEntry:
         """Create or update synthesis for a word."""
         existing = await self.find_by_word(word_id)
 

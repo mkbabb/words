@@ -5,12 +5,12 @@ with common versioning, caching, and storage capabilities.
 """
 
 from .batch import BatchOperation, BatchStatus
-from .config import ProviderConfiguration
-from .dictionary.base import DictionaryConnector
+from .core import ConnectorConfig, ProviderType
+from .dictionary.core import DictionaryConnector
 
 # Import literature providers
 from .literature import *  # noqa: F403
-from .literature.base import LiteratureConnector
+from .literature.core import LiteratureConnector
 
 __all__ = [
     # Base classes
@@ -20,5 +20,6 @@ __all__ = [
     "BatchOperation",
     "BatchStatus",
     # Configuration
-    "ProviderConfiguration",
+    "ConnectorConfig",
+    "ProviderType",
 ]

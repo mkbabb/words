@@ -6,16 +6,17 @@ as CorpusLanguageLoader but specialized for literary texts.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from rich.console import Console
 from rich.progress import track
 
-from ...caching.core import CacheNamespace, CacheTTL
-from ...caching.unified import get_unified
+from ...caching.core import get_global_cache
+from ...caching.models import CacheNamespace
 from ...models.dictionary import Language
+from ...models.literature import AuthorInfo, LiteraryWork, Period
 from ...providers.literature.api.gutenberg import GutenbergConnector
-from ...providers.literature.models import AuthorInfo, LiteraryWork, Period
 from ...text.normalize import batch_lemmatize, batch_normalize
 from ...utils.logging import get_logger
 from ..core import Corpus
@@ -64,7 +65,7 @@ class LiteratureCorpusLoader(BaseCorpusLoader):
         self.gutenberg = GutenbergConnector()
 
         # Author mappings - removed since mappings.py was deleted
-        self.author_mappings = {}
+        self.author_mappings: dict[str, Any] = {}
 
     async def load_author_corpus(
         self,
@@ -132,12 +133,13 @@ class LiteratureCorpusLoader(BaseCorpusLoader):
                 "total_word_occurrences": len(vocabulary),  # Store original count in metadata
                 "unique_word_count": len(unique_vocabulary),
             },
-            authors=[author_info],
-            works=works,
-            total_works=len(works),
             unique_word_count=len(unique_vocabulary),
-            last_updated=datetime.now(UTC).isoformat(),
+            last_updated=datetime.now(UTC),
         )
+        # Set literature-specific fields
+        corpus_data.authors = [author_info.name]
+        corpus_data.works = [work.title for work in works]
+        corpus_data.total_works = len(works)
 
         # Cache the data
         await self._save_to_cache(cache_key, corpus_data)
@@ -318,10 +320,13 @@ class LiteratureCorpusLoader(BaseCorpusLoader):
         vocabulary = data.vocabulary
 
         if normalize:
-            vocabulary = await batch_normalize(vocabulary)
+            vocabulary = batch_normalize(vocabulary)
 
         if lemmatize:
-            vocabulary = await batch_lemmatize(vocabulary)
+            lemmatized_vocab = batch_lemmatize(vocabulary)
+            vocabulary = (
+                lemmatized_vocab[0] if isinstance(lemmatized_vocab, tuple) else lemmatized_vocab
+            )
 
         # Create corpus name from metadata
         if "author" in data.metadata:
@@ -348,14 +353,14 @@ class LiteratureCorpusLoader(BaseCorpusLoader):
 
         """
         try:
-            cache = await get_unified()
+            cache = await get_global_cache()
             cached_data = await cache.get(
                 key=cache_key,
                 namespace=CacheNamespace.CORPUS,
             )
 
             if cached_data:
-                return LiteratureLexiconData.model_validate(cached_data)
+                return LiteratureLexiconData(**cached_data)
         except Exception as e:
             logger.debug(f"Cache load failed for {cache_key}: {e}")
 
@@ -370,12 +375,12 @@ class LiteratureCorpusLoader(BaseCorpusLoader):
 
         """
         try:
-            cache = await get_unified()
+            cache = await get_global_cache()
             await cache.set(
                 key=cache_key,
                 value=data.model_dump(),
                 namespace=CacheNamespace.CORPUS,
-                ttl=CacheTTL.LONG,
+                ttl_override=timedelta(days=30),  # Long TTL
             )
         except Exception as e:
             logger.warning(f"Failed to cache {cache_key}: {e}")
@@ -396,13 +401,13 @@ class LiteratureCorpusLoader(BaseCorpusLoader):
         """
         author_key = author_name.lower().replace(" ", "_")
         if author_key in self.author_mappings:
-            return self.author_mappings[author_key].get_author()
+            return self.author_mappings[author_key].get_author()  # type: ignore[no-any-return]
         return None
 
     async def load_corpus(
         self,
         source_id: str,
-        **kwargs,
+        **kwargs: Any,
     ) -> LexiconData | None:
         """Load corpus from source.
 
@@ -429,7 +434,7 @@ class LiteratureCorpusLoader(BaseCorpusLoader):
     async def get_or_create_corpus(
         self,
         corpus_name: str,
-        **kwargs,
+        **kwargs: Any,
     ) -> LexiconData | None:
         """Get existing corpus from cache or create new one.
 

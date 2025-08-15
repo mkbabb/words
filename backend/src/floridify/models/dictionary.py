@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
 
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
+from ..text.normalize import lemmatize_word, normalize_fast
 from .base import BaseMetadata, Etymology, ModelInfo
 from .relationships import (
     Collocation,
@@ -91,21 +91,30 @@ class Word(Document, BaseMetadata):
     """Core word entity."""
 
     text: str
-    normalized: str  # Lowercase, no accents
+    normalized: str = ""  # Will be auto-populated
+    lemma: str = ""  # Will be auto-populated
     language: Language = Language.ENGLISH
 
     # Word forms and variations
     homograph_number: int | None = None  # For identical spellings
 
-    # Metadata
-    offensive_flag: bool = False
-    first_known_use: str | None = None  # Historical dating
+    def __init__(self, **data: Any) -> None:
+        """Initialize Word with automatic normalization and lemmatization."""
+        # If normalized not provided, compute it
+        if "normalized" not in data or not data["normalized"]:
+            data["normalized"] = normalize_fast(data.get("text", ""))
+        # If lemma not provided, compute it
+        if "lemma" not in data or not data["lemma"]:
+            data["lemma"] = lemmatize_word(data.get("text", ""))
+
+        super().__init__(**data)
 
     class Settings:
         name = "words"
         indexes = [
             [("text", 1), ("language", 1)],
             "normalized",
+            "lemma",
             [("text", 1), ("homograph_number", 1)],
         ]
 
@@ -121,6 +130,7 @@ class Pronunciation(Document, BaseMetadata):
     )  # FK to AudioMedia documents - optimized with ObjectIds
     syllables: list[str] = []
     stress_pattern: str | None = None  # Primary/secondary stress
+    model_info: ModelInfo | None = None  # If AI-generated
 
     class Settings:
         name = "pronunciations"
@@ -209,70 +219,40 @@ class Definition(Document, BaseMetadata):
     image_ids: list[PydanticObjectId] = (
         []
     )  # FK to ImageMedia documents - optimized with ObjectIds
-    provider_data_id: PydanticObjectId | None = (
-        None  # FK to ProviderData if from provider - optimized with ObjectId
+    dictionary_entry_id: PydanticObjectId | None = (
+        None  # FK to DictionaryEntry - optimized with ObjectId
     )
+    providers: list[DictionaryProvider] = (
+        []
+    )  # List of providers this definition is sourced from
+    model_info: ModelInfo | None = None  # If AI-generated/synthesized
 
     class Settings:
         name = "definitions"
         indexes = ["word_id", "part_of_speech", [("word_id", 1), ("part_of_speech", 1)]]
 
 
-class DictionaryProviderData(Document, BaseMetadata):
-    """Raw data from a dictionary provider."""
+class DictionaryEntry(Document, BaseMetadata):
+    # Foreign keys to related entities
+    word_id: PydanticObjectId  # FK to Word document
+    definition_ids: list[PydanticObjectId] = Field(
+        default_factory=list
+    )  # FK to Definition documents
+    pronunciation_id: PydanticObjectId | None = None  # FK to Pronunciation document
+    fact_ids: list[PydanticObjectId] = Field(
+        default_factory=list
+    )  # FK to Fact documents
+    image_ids: list[PydanticObjectId] = Field(
+        default_factory=list
+    )  # FK to ImageMedia documents
 
-    word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
-
+    # Provider information
     provider: DictionaryProvider
-    definition_ids: list[PydanticObjectId] = (
-        []
-    )  # FK to Definition documents - optimized with ObjectIds
-    pronunciation_id: PydanticObjectId | None = (
-        None  # FK to Pronunciation - optimized with ObjectId
-    )
+    language: Language = Language.ENGLISH
+
+    # Etymology and raw data
     etymology: Etymology | None = None
     raw_data: dict[str, Any] | None = None  # Original API response
 
-    class Settings:
-        name = "dictionary_provider_data"
-        indexes = ["word_id", "provider", [("word_id", 1), ("provider", 1)]]
-
-
-class SynthesizedDictionaryEntry(Document, BaseMetadata):
-    """AI-synthesized entry with full provenance."""
-
-    word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
-
-    # Synthesized content references
-    pronunciation_id: PydanticObjectId | None = (
-        None  # FK to Pronunciation - optimized with ObjectId
-    )
-    definition_ids: list[PydanticObjectId] = (
-        []
-    )  # FK to Definition documents - optimized with ObjectIds
-    etymology: Etymology | None = None  # Embedded as it's lightweight
-    fact_ids: list[PydanticObjectId] = (
-        []
-    )  # FK to Fact documents - optimized with ObjectIds
-    image_ids: list[PydanticObjectId] = (
-        []
-    )  # FK to ImageMedia documents - optimized with ObjectIds
-
-    # Synthesis metadata
-    model_info: ModelInfo | None = None  # Optional for non-AI synthesized entries
-    source_provider_data_ids: list[PydanticObjectId] = (
-        []
-    )  # FK to ProviderData documents - optimized with ObjectIds
-
-    # Access tracking
-    accessed_at: datetime | None = None
-    access_count: int = 0
-
-    class Settings:
-        name = "synthesized_dictionary_entries"
-        indexes = [
-            "word_id",
-            [("word_id", 1), ("version", -1)],
-            [("word_id", 1), ("model_info.generation_count", -1)],
-            [("word_id", 1), ("accessed_at", -1)],
-        ]
+    # Synthesis metadata (populated for synthesized entries)
+    model_info: ModelInfo | None = None  # AI model info for synthesized entries

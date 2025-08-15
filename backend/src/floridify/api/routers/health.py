@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from ...caching.unified import get_unified
+from ...caching.core import get_global_cache
 from ...core.search_pipeline import get_search_engine
 from ...models.dictionary import Language
 from ...storage.mongodb import _ensure_initialized, get_storage
@@ -95,7 +95,7 @@ async def health_check() -> HealthResponse:
     # Check cache system
     cache_hit_rate = 0.0
     try:
-        cache = await get_unified()
+        cache = await get_global_cache()
         stats = await cache.get_stats()
 
         # Get cache statistics

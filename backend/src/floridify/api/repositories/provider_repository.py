@@ -13,8 +13,7 @@ from typing import Any
 from beanie import PydanticObjectId
 from pydantic import BaseModel
 
-from ...models.dictionary import DictionaryProvider, Language
-from ...models.versioned import DictionaryVersionedData
+from ...models.dictionary import DictionaryEntry, DictionaryProvider, Language
 from ...providers.batch import BatchOperation, BatchStatus
 from ...providers.config import ProviderConfiguration
 from ...utils.logging import get_logger
@@ -41,17 +40,17 @@ class ProviderDataUpdate(BaseModel):
 
 
 class ProviderDataRepository(
-    BaseRepository[DictionaryVersionedData, ProviderDataCreate, ProviderDataUpdate]
+    BaseRepository[DictionaryEntry, ProviderDataCreate, ProviderDataUpdate]
 ):
     """Repository for versioned provider data operations."""
 
-    model = DictionaryVersionedData
+    model = DictionaryEntry
 
     async def get_latest(
         self,
         word_id: PydanticObjectId,
         provider: DictionaryProvider,
-    ) -> DictionaryVersionedData | None:
+    ) -> DictionaryEntry | None:
         """Get latest version of provider data for a word.
 
         Args:
@@ -59,7 +58,7 @@ class ProviderDataRepository(
             provider: Dictionary provider
 
         Returns:
-            Latest DictionaryVersionedData or None
+            Latest DictionaryEntry or None
 
         """
         return await self.model.find_one(
@@ -75,7 +74,7 @@ class ProviderDataRepository(
         word_id: PydanticObjectId,
         provider: DictionaryProvider,
         version: str,
-    ) -> DictionaryVersionedData | None:
+    ) -> DictionaryEntry | None:
         """Get specific version of provider data.
 
         Args:
@@ -84,7 +83,7 @@ class ProviderDataRepository(
             version: Provider version string
 
         Returns:
-            DictionaryVersionedData for specific version or None
+            DictionaryEntry for specific version or None
 
         """
         return await self.model.find_one(
@@ -100,7 +99,7 @@ class ProviderDataRepository(
         word_id: PydanticObjectId,
         provider: DictionaryProvider | None = None,
         limit: int = 10,
-    ) -> list[DictionaryVersionedData]:
+    ) -> list[DictionaryEntry]:
         """Get version history for a word.
 
         Args:
@@ -123,7 +122,7 @@ class ProviderDataRepository(
         word_id: PydanticObjectId,
         provider: DictionaryProvider,
         date: datetime,
-    ) -> DictionaryVersionedData | None:
+    ) -> DictionaryEntry | None:
         """Get provider data as of a specific date.
 
         Args:
@@ -132,7 +131,7 @@ class ProviderDataRepository(
             date: Point in time to query
 
         Returns:
-            DictionaryVersionedData active at that date
+            DictionaryEntry active at that date
 
         """
         result = (
@@ -188,7 +187,7 @@ class ProviderDataRepository(
         """Mark a version as the latest for its word/provider combo.
 
         Args:
-            data_id: ID of DictionaryVersionedData to mark as latest
+            data_id: ID of DictionaryEntry to mark as latest
 
         Returns:
             True if successful

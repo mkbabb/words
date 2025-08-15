@@ -14,24 +14,18 @@ from ..models import (
     AudioMedia,
     # CorpusCacheEntry removed - using unified caching
     Definition,
-    DictionaryProviderData,
     Example,
     Fact,
     ImageMedia,
     Pronunciation,
-    SynthesizedDictionaryEntry,
     Word,
     WordRelationship,
 )
 from ..models.versioned import (
-    CorpusVersionedData,
-    DictionaryVersionedData,
-    LiteratureVersionedData,
-    SemanticVersionedData,
-    VersionedData,
+    BaseVersionedData,
+    CorpusMetadata,
 )
 from ..providers.batch import BatchOperation
-from ..search.models import SemanticMetadata
 from ..utils.config import Config
 from ..utils.logging import get_logger
 from ..wordlist.models import WordList
@@ -108,21 +102,19 @@ class MongoDBStorage:
                 Pronunciation,
                 AudioMedia,
                 ImageMedia,
-                DictionaryProviderData,
-                SynthesizedDictionaryEntry,
                 WordRelationship,
                 WordList,
                 # Versioning models
-                VersionedData,
-                DictionaryVersionedData,
-                CorpusVersionedData,
-                SemanticVersionedData,
-                LiteratureVersionedData,
+                BaseVersionedData,
+                DictionaryEntry,
+                Corpus,
+                SemanticIndex,
+                Literature,
                 BatchOperation,
                 # Cache models
                 # CorpusCacheEntry removed - using unified caching
                 CorpusMetadata,
-                SemanticMetadata,
+                SemanticIndex,
             ],
         )
 
@@ -338,7 +330,7 @@ async def get_database() -> AsyncIOMotorDatabase[Any]:
     return storage.client[storage.database_name]
 
 
-async def get_synthesized_entry(word_text: str) -> SynthesizedDictionaryEntry | None:
+async def get_synthesized_entry(word_text: str) -> DictionaryEntry | None:
     """Get synthesized dictionary entry by word text."""
     try:
         await _ensure_initialized()
@@ -347,19 +339,21 @@ async def get_synthesized_entry(word_text: str) -> SynthesizedDictionaryEntry | 
         if not word:
             return None
         # Then find the synthesized entry
-        return await SynthesizedDictionaryEntry.find_one(
-            SynthesizedDictionaryEntry.word_id == word.id,
+        return await DictionaryEntry.find_one(
+            DictionaryEntry.word_id == word.id,
+            DictionaryEntry.provider == "synthesis",
         )
     except Exception:
         return None
 
 
-async def save_synthesized_entry(entry: SynthesizedDictionaryEntry) -> None:
+async def save_synthesized_entry(entry: DictionaryEntry) -> None:
     """Save synthesized dictionary entry."""
     try:
         await _ensure_initialized()
-        existing = await SynthesizedDictionaryEntry.find_one(
-            SynthesizedDictionaryEntry.word_id == entry.word_id,
+        existing = await DictionaryEntry.find_one(
+            DictionaryEntry.word_id == entry.word_id,
+            DictionaryEntry.provider == "synthesis",
         )
 
         if existing:
@@ -369,7 +363,6 @@ async def save_synthesized_entry(entry: SynthesizedDictionaryEntry) -> None:
             existing.etymology = entry.etymology
             existing.fact_ids = entry.fact_ids
             existing.model_info = entry.model_info
-            existing.source_provider_data_ids = entry.source_provider_data_ids
             existing.updated_at = datetime.now()
             existing.version += 1
             await existing.save()

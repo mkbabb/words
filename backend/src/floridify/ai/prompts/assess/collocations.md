@@ -1,23 +1,27 @@
-# Collocations
-
-Find collocations for "{{ word }}" ({{ part_of_speech }}):
+# Collocations: {{ word }} ({{ part_of_speech }})
 **Definition**: {{ definition }}
 
-## Types:
-- **adjective**: Modifying adjectives
-- **verb**: Verbs taking as object
-- **noun**: Associated nouns
-- **adverb**: Modifying adverbs
-- **preposition**: Following prepositions
+## Categories
+- **adjective**: Modifying descriptors
+- **verb**: Verbal companions
+- **noun**: Nominal associations
+- **adverb**: Adverbial intensifiers
+- **preposition**: Prepositional bonds
 
-## Rules:
-- Strong, natural only
-- Score 0.0-1.0
-- Max 5 per type
-- This meaning only
+## Rules
+- Natural collocations only
+- Strength: 0.0-1.0 (1.0 = inseparable)
+- Maximum 5 per category
+- Semantic fidelity to definition
 
-## Example "decision":
-- adjective: "difficult" (0.9), "important" (0.8)
-- verb: "make" (0.95), "reach" (0.7)
+## Examples
 
-Return collocations with scores.
+### `decision` (noun)
+- adjective: difficult (0.9), crucial (0.85), informed (0.8)
+- verb: make (0.95), reach (0.8), overturn (0.75)
+
+### `egregious` (adjective)
+- noun: error (0.95), violation (0.9), oversight (0.85)
+- adverb: particularly (0.8), especially (0.75)
+
+Output: Collocations with strength scores (0-1).

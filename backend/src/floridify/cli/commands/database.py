@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ...models import (
-    SynthesizedDictionaryEntry,
+    DictionaryEntry,
     Word,
 )
 from ...models.dictionary import DictionaryProvider
@@ -50,7 +50,7 @@ async def _database_status_async() -> None:
 
         # Get basic counts
         word_count = await Word.count()
-        synthesis_count = await SynthesizedDictionaryEntry.count()
+        synthesis_count = await DictionaryEntry.find({"provider": "synthesis"}).count()
 
         console.print("[bold]Collections:[/bold]")
         console.print(f"  • Words: {word_count:,}")
@@ -101,7 +101,7 @@ async def _database_stats_async(detailed: bool, connection_string: str, database
 
         # Get collection counts
         total_words = await Word.count()
-        total_syntheses = await SynthesizedDictionaryEntry.count()
+        total_syntheses = await DictionaryEntry.find({"provider": "synthesis"}).count()
 
         # Overview statistics
         console.print("[bold]Overview:[/bold]")
@@ -271,7 +271,7 @@ async def _backup_database_async(output: str | None, backup_format: str, compres
 
             # Backup Synthesized Entries
             task = progress.add_task("Backing up synthesized entries...", total=None)
-            syntheses = await SynthesizedDictionaryEntry.find_all().to_list()
+            syntheses = await DictionaryEntry.find({"provider": "synthesis"}).to_list()
             backup_data["collections"]["synthesized_entries"] = [
                 entry.model_dump(mode="json") for entry in syntheses
             ]
@@ -497,7 +497,6 @@ async def _clear_everything_async(confirm: bool) -> None:
             Fact,
             Pronunciation,
             ProviderData,
-            SynthesizedDictionaryEntry,
             Word,
         )
         from ...wordlist import WordList
@@ -506,10 +505,10 @@ async def _clear_everything_async(confirm: bool) -> None:
         total_deleted = 0
 
         # Delete synthesized entries first (references other collections)
-        result = await SynthesizedDictionaryEntry.find().delete()
+        result = await DictionaryEntry.find({"provider": "synthesis"}).delete()
         synth_count = result.deleted_count if result else 0
         total_deleted += synth_count
-        console.print(f"  Deleted {synth_count} SynthesizedDictionaryEntry documents")
+        console.print(f"  Deleted {synth_count} DictionaryEntry synthesis documents")
 
         # Delete provider data
         result = await ProviderData.find().delete()
@@ -566,7 +565,6 @@ async def _clear_words_async(confirm: bool) -> None:
             Fact,
             Pronunciation,
             ProviderData,
-            SynthesizedDictionaryEntry,
             Word,
         )
 
@@ -574,10 +572,10 @@ async def _clear_words_async(confirm: bool) -> None:
         total_deleted = 0
 
         # Delete synthesized entries first (references words)
-        result = await SynthesizedDictionaryEntry.find().delete()
+        result = await DictionaryEntry.find({"provider": "synthesis"}).delete()
         synth_count = result.deleted_count if result else 0
         total_deleted += synth_count
-        console.print(f"  Deleted {synth_count} SynthesizedDictionaryEntry documents")
+        console.print(f"  Deleted {synth_count} DictionaryEntry synthesis documents")
 
         # Delete provider data (references words)
         result = await ProviderData.find().delete()
@@ -651,7 +649,7 @@ async def _clear_syntheses_async(confirm: bool) -> None:
     try:
         console.print("[bold blue]Clearing all AI-synthesized entries...[/bold blue]")
 
-        result = await SynthesizedDictionaryEntry.find().delete()
+        result = await DictionaryEntry.find({"provider": "synthesis"}).delete()
         deleted_count = result.deleted_count if result else 0
 
         console.print(f"[green]✓ Successfully deleted {deleted_count} synthesized entries[/green]")

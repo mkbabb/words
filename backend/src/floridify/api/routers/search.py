@@ -8,8 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from ...caching.core import CacheNamespace
-from ...caching.unified import get_unified
+from ...caching.core import CacheNamespace, get_global_cache
 from ...core.search_pipeline import get_search_engine, reset_search_engine
 from ...corpus.manager import get_corpus_manager
 from ...models.dictionary import CorpusType, Language
@@ -351,13 +350,13 @@ async def rebuild_search_index(
 
         # Clear vocabulary caches
 
-        cache = await get_unified()
+        cache = await get_global_cache()
         vocab_cleared = await cache.invalidate_namespace(CacheNamespace.CORPUS)
         caches_cleared["vocabulary_caches"] = vocab_cleared
 
         # Clear semantic caches
         # Cleanup expired entries in unified cache
-        await get_unified()
+        await get_global_cache()
         semantic_cleared = 0  # Unified cache handles expiration automatically
         caches_cleared["semantic_expired"] = semantic_cleared
 

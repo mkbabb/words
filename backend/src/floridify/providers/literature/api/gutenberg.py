@@ -14,12 +14,13 @@ from typing import Any
 from urllib.parse import urljoin
 
 import aiofiles
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
+from ....models.literature import AuthorInfo, LiteraryWork, LiteratureSource
 from ....utils.logging import get_logger
-from ...utils import RateLimitConfig, respectful_scraper
-from ..base import LiteratureConnector
-from ..models import AuthorInfo, LiteraryWork, LiteratureSource
+from ...core import ConnectorConfig, RateLimitPresets
+from ...utils import respectful_scraper
+from ..core import LiteratureConnector
 
 logger = get_logger(__name__)
 
@@ -27,17 +28,37 @@ logger = get_logger(__name__)
 class GutenbergConnector(LiteratureConnector):
     """Project Gutenberg literature connector."""
 
-    def __init__(self, cache_dir: Path | None = None):
-        super().__init__(LiteratureSource.GUTENBERG)
+    async def _fetch_from_provider(
+        self,
+        source_id: str,
+        metadata: dict[str, Any] | None = None,
+        force_refresh: bool = False,
+    ) -> Any:
+        """Fetch work from Gutenberg.
+        
+        Args:
+            source_id: Work ID
+            metadata: Optional metadata
+            force_refresh: Force refresh from source
+            
+        Returns:
+            Work content or metadata
+        """
+        # This is a stub implementation as Gutenberg uses specific methods
+        # like download_work and search_works for different operations
+        if metadata and "work" in metadata:
+            return await self.download_work(metadata["work"], force_refresh)
+        return None
+
+    def __init__(self, cache_dir: Path | None = None, config: ConnectorConfig | None = None):
+        if config is None:
+            config = ConnectorConfig(rate_limit_config=RateLimitPresets.BULK_DOWNLOAD.value)
+        super().__init__(source=LiteratureSource.GUTENBERG, config=config)
         self.api_base = "https://www.gutenberg.org"
         self.mirror_base = "https://mirror.gutenberg.org"
         self.catalog_url = "https://www.gutenberg.org/ebooks/"
 
-        # Conservative rate limiting for Gutenberg
-        self.rate_config = RateLimitConfig(
-            base_requests_per_second=1.0,
-            min_delay=1.0,
-        )
+        # Rate limiting is handled by parent class
 
         # Cache directory for downloaded texts
         from ....utils.paths import get_cache_directory
@@ -88,7 +109,7 @@ class GutenbergConnector(LiteratureConnector):
         params["query"] = " AND ".join(query_parts) if query_parts else "*"
 
         works = []
-        async with respectful_scraper("gutenberg", self.rate_config) as client:
+        async with respectful_scraper("gutenberg", self.config.rate_limit_config) as client:
             try:
                 response = await client.get(search_url, params=params)
                 soup = BeautifulSoup(response.text, "html.parser")
@@ -132,7 +153,7 @@ class GutenbergConnector(LiteratureConnector):
         """Fetch metadata from Gutenberg catalog page."""
         catalog_url = f"{self.catalog_url}{source_id}"
 
-        async with respectful_scraper("gutenberg", self.rate_config) as client:
+        async with respectful_scraper("gutenberg", self.config.rate_limit_config) as client:
             try:
                 response = await client.get(catalog_url)
                 return self._parse_gutenberg_metadata(response.text, source_id, title, author_name)
@@ -150,7 +171,7 @@ class GutenbergConnector(LiteratureConnector):
             f"files/{source_id}/{source_id}.zip",  # Zipped text
         ]
 
-        async with respectful_scraper("gutenberg", self.rate_config) as client:
+        async with respectful_scraper("gutenberg", self.config.rate_limit_config) as client:
             for format_path in formats:
                 download_url = f"{self.mirror_base}/{format_path}"
 
@@ -197,7 +218,7 @@ class GutenbergConnector(LiteratureConnector):
                 author_name = "Unknown Author"
 
         # Extract other metadata
-        metadata = {
+        metadata: dict[str, Any] = {
             "title": title,
             "author": author_name,
             "source_url": f"{self.catalog_url}{source_id}",
@@ -205,7 +226,7 @@ class GutenbergConnector(LiteratureConnector):
         }
 
         metadata_table = soup.find("table", class_="bibrec")
-        if metadata_table:
+        if metadata_table and isinstance(metadata_table, Tag):
             for row in metadata_table.find_all("tr"):
                 th = row.find("th")
                 td = row.find("td")
@@ -223,7 +244,9 @@ class GutenbergConnector(LiteratureConnector):
                         # Try to extract year
                         year_match = re.search(r"\b(18|19|20)\d{2}\b", value)
                         if year_match:
-                            metadata["year"] = int(year_match.group())
+                            metadata["publication_year"] = int(
+                                year_match.group()
+                            )  # Changed from "year" to avoid type confusion
 
         return metadata
 
@@ -241,7 +264,7 @@ class GutenbergConnector(LiteratureConnector):
             "external_ids": {"gutenberg_id": source_id},
         }
 
-    def _extract_download_count(self, book_item) -> int:
+    def _extract_download_count(self, book_item: Tag) -> int:
         """Extract download count from book listing."""
         try:
             downloads_elem = book_item.find("span", string=re.compile(r"downloads"))
@@ -331,6 +354,10 @@ class GutenbergConnector(LiteratureConnector):
         logger.info(f"⬇️ Downloading {work.title} by {work.author.name}")
 
         try:
+            # work.gutenberg_id might be None, so we need to check
+            if not work.gutenberg_id:
+                raise ValueError(f"Work {work.title} has no Gutenberg ID")
+
             raw_text = await self._fetch_work_content(work.gutenberg_id, {})
             if not raw_text:
                 raise ValueError(f"Could not download text for {work.title}")
@@ -391,6 +418,6 @@ class GutenbergConnector(LiteratureConnector):
 
     async def _fetch_url(self, url: str) -> str:
         """Fetch content from URL."""
-        async with respectful_scraper("gutenberg", self.rate_config) as client:
+        async with respectful_scraper("gutenberg", self.config.rate_limit_config) as client:
             response = await client.get(url)
             return response.text

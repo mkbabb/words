@@ -16,7 +16,6 @@ from .dictionary import (
     CorpusType,
     Definition,
     DictionaryProvider,
-    DictionaryProviderData,
     Example,
     Fact,
     Language,
@@ -24,7 +23,6 @@ from .dictionary import (
     LiteratureSourceType,
     OutputFormat,
     Pronunciation,
-    SynthesizedDictionaryEntry,
     Word,
 )
 
@@ -37,6 +35,9 @@ from .relationships import (
     WordForm,
     WordRelationship,
 )
+
+# Versioned models
+from .versioned import DictionaryEntryMetadata
 
 __all__ = [
     # Base models
@@ -51,8 +52,7 @@ __all__ = [
     "Example",
     "Fact",
     "Pronunciation",
-    "DictionaryProviderData",
-    "SynthesizedDictionaryEntry",
+    "DictionaryEntry",
     "LiteratureSource",
     # Relationships
     "WordForm",
@@ -72,4 +72,6 @@ __all__ = [
     "OutputFormat",
     "CorpusType",
     "LiteratureSourceType",
+    # Versioned models
+    "DictionaryEntryMetadata",
 ]

@@ -8,25 +8,37 @@
 
 ## Task
 
-**Aggressively** deduplicate definitions herein across the definition/part of speech pairs. Select the highest quality **ONLY**. Never merge definitions with different parts of speech. Brief reasoning (max 10 words). **Output indices merged, quality score (0-1).**
+**AGGRESSIVELY** deduplicate definitions herein. Select supreme quality **ONLY**. Never merge different parts of speech. Merge if semantic similarity >80%. Brief reasoning (max 10 words). **Output indices merged, quality score (0-1).**
 
 ## Examples
 
-#### `phaeton`
+#### `algorithm` (noun)
+0: noun: A finite sequence of well-defined instructions
+1: noun: Step-by-step procedure for calculations
+2: noun: Process or rules for problem-solving operations
+3: noun: Finite sequence of rigorous instructions for specific problems
 
-"A light, four-wheeled carriage", "A light four-wheeled carriage", "A light four-wheeled carriage drawn by horses", "A light, four-wheeled carriage drawn by horses"
+**Merge**: [0,3] precision; [1,2] simplicity
+**Keep**: 0 (comprehensive), 1 (accessible)
+**Quality**: 0.9
 
-Keep clearer punctuation and pithier phrasing: "A light, four-wheeled carriage".
+#### `sanction` (noun)
+0: noun: Official permission or approval
+1: noun: Threatened penalty for disobeying
+2: noun: Coercive measures by states
+3: noun: Formal authorization
 
-#### `example`
+**Merge**: [0,3] approval; [1,2] penalty
+**Keep**: 0 (clearer positive), 1 (clearer negative)
+**Quality**: 0.95
 
-"An instance or occurrence that is used to clarify or demonstrate a rule or principle."
-"An instance or case that illustrates a rule or concept, often used for learning or demonstration purposes."
+#### `run` (verb)
+0: verb: Move faster than walk
+1: verb: Move rapidly with feet leaving ground
+2: verb: Operate or function
+3: verb: Be in charge of
+4: verb: Make system work
 
-Keep the first: "An instance or occurrence that is used to clarify or demonstrate a rule or principle."
-
-#### `en coulisse`
-
-"Behind the scenes", "In the background", "In the background, away from public view"
-
-Keep the first: "Behind the scenes".
+**Merge**: [0,1] movement; [2,4] operation
+**Keep**: 1 (precise), 2 (general), 3 (distinct management)
+**Quality**: 0.85

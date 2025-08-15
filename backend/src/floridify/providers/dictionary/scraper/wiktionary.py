@@ -22,9 +22,10 @@ from ....models import (
     UsageNote,
     Word,
 )
-from ....models.dictionary import DictionaryProvider, DictionaryProviderData
+from ....models.dictionary import DictionaryEntry, DictionaryProvider
 from ....utils.logging import get_logger
-from ..base import DictionaryConnector
+from ...core import ConnectorConfig, RateLimitPresets
+from ..core import DictionaryConnector
 
 logger = get_logger(__name__)
 
@@ -163,9 +164,11 @@ class WiktionaryConnector(DictionaryConnector):
         "article": "adjective",  # Map to adjective
     }
 
-    def __init__(self, rate_limit: float = 30.0) -> None:
+    def __init__(self, config: ConnectorConfig | None = None) -> None:
         """Initialize enhanced Wiktionary connector."""
-        super().__init__(DictionaryProvider.WIKTIONARY)
+        if config is None:
+            config = ConnectorConfig(rate_limit_config=RateLimitPresets.API_STANDARD.value)
+        super().__init__(provider=DictionaryProvider.WIKTIONARY, config=config)
         self.base_url = "https://en.wiktionary.org/w/api.php"
         self.cleaner = WikitextCleaner()
 
@@ -186,21 +189,17 @@ class WiktionaryConnector(DictionaryConnector):
 
     async def _fetch_from_provider(
         self,
-        word_obj: Word,
+        word: str,
         state_tracker: StateTracker | None = None,
-    ) -> DictionaryProviderData | None:
+    ) -> DictionaryEntry | None:
         """Fetch comprehensive definition data from Wiktionary."""
-        await self._enforce_rate_limit()
+        # Rate limiting is handled by the base class fetch method
 
         try:
-            # Report start
-            if state_tracker:
-                await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
-
             params = {
                 "action": "query",
                 "prop": "revisions",
-                "titles": word_obj.text,
+                "titles": word,
                 "rvslots": "*",
                 "rvprop": "content",
                 "formatversion": "2",
@@ -217,8 +216,8 @@ class WiktionaryConnector(DictionaryConnector):
                     asyncio.create_task(
                         state_tracker.update(
                             stage="PROVIDER_FETCH_HTTP_CONNECTING",
-                            message=f"Connecting to {self.provider_name}",
-                            details={"word": word_obj.text, **metadata},
+                            message=f"Connecting to {self.provider.display_name}",
+                            details={"word": word, **metadata},
                         ),
                     )
                 elif stage == "downloaded":
@@ -227,8 +226,8 @@ class WiktionaryConnector(DictionaryConnector):
                         asyncio.create_task(
                             state_tracker.update(
                                 stage="PROVIDER_FETCH_HTTP_DOWNLOADING",
-                                message=f"Downloading from {self.provider_name}",
-                                details={"word": word_obj.text, **metadata},
+                                message=f"Downloading from {self.provider.display_name}",
+                                details={"word": word, **metadata},
                             ),
                         )
 
@@ -243,6 +242,10 @@ class WiktionaryConnector(DictionaryConnector):
             if state_tracker:
                 await state_tracker.update(stage=Stages.PROVIDER_FETCH_HTTP_PARSING, progress=55)
 
+            # Create Word object for processing
+            word_obj = Word(text=word)
+            await word_obj.save()
+
             result = await self._parse_wiktionary_response(word_obj, data)
 
             # Report completion
@@ -255,14 +258,14 @@ class WiktionaryConnector(DictionaryConnector):
             if state_tracker:
                 await state_tracker.update_error(f"Provider error: {e!s}")
 
-            logger.error(f"Error fetching {word_obj.text} from Wiktionary: {e}")
+            logger.error(f"Error fetching {word} from Wiktionary: {e}")
             return None
 
     async def _parse_wiktionary_response(
         self,
         word_obj: Word,
         data: dict[str, Any],
-    ) -> DictionaryProviderData | None:
+    ) -> DictionaryEntry | None:
         """Parse Wiktionary response comprehensively."""
         try:
             pages = data.get("query", {}).get("pages", [])
@@ -282,7 +285,7 @@ class WiktionaryConnector(DictionaryConnector):
         self,
         wikitext: str,
         word_obj: Word,
-    ) -> DictionaryProviderData | None:
+    ) -> DictionaryEntry | None:
         """Extract all available data from wikitext using systematic parsing."""
         try:
             parsed = wtp.parse(wikitext)
@@ -322,9 +325,9 @@ class WiktionaryConnector(DictionaryConnector):
 
                 await definition.save()  # Update the definition
 
-            return DictionaryProviderData(
+            return DictionaryEntry(
                 word_id=word_obj.id,
-                provider=self.provider_name,
+                provider=self.provider,
                 definition_ids=[d.id for d in definitions],  # type:ignore
                 etymology=(Etymology(text=etymology) if etymology else None),
                 pronunciation_id=pronunciation.id if pronunciation else None,

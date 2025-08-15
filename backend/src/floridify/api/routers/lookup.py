@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from ...api.services.loaders import SynthesizedDictionaryEntryLoader
 from ...caching import cached_api_call_with_dedup
-from ...caching.unified import get_unified
+from ...caching.core import get_global_cache
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, StateTracker
 from ...core.streaming import create_streaming_response
@@ -231,7 +231,7 @@ async def _lookup_with_tracking(
         word = validate_word_input(word)
 
         if not params.force_refresh:
-            cache = await get_unified()
+            cache = await get_global_cache()
             key_parts = (
                 "api_lookup",
                 word,

@@ -6,17 +6,8 @@ literary texts from various sources.
 
 from .api.gutenberg import GutenbergConnector
 from .api.internet_archive import InternetArchiveConnector
-from .base import LiteratureConnector
-from .models import (
-    AuthorInfo,
-    Genre,
-    LiteraryWord,
-    LiteraryWork,
-    LiteratureMetadata,
-    LiteratureSource,
-    Period,
-    TextQualityMetrics,
-)
+from .core import LiteratureConnector
+from .models import LiteratureEntry
 
 __all__ = [
     # Base
@@ -25,12 +16,5 @@ __all__ = [
     "GutenbergConnector",
     "InternetArchiveConnector",
     # Models
-    "AuthorInfo",
-    "Genre",
-    "LiteraryWord",
-    "LiteraryWork",
-    "LiteratureMetadata",
-    "LiteratureSource",
-    "Period",
-    "TextQualityMetrics",
+    "LiteratureEntry",
 ]

@@ -1,22 +1,29 @@
-Query: {{ query }}
+# Word Suggestion: {{ query }}
 
-Find exactly {{ count }} words or phrases that best capture the query's essence. Bias towards words that are rare, beautiful, **efflorescent**, memorable, and semantically relevant.
+Find {{ count }} words with precision and linguistic beauty.
 
-Requirements:
+## Requirements
 
-1. Words or phrases must semantically match the query with confidence > 0.7
-2. Leverage good French, Spanish, Italian, German, and Portuguese words or phrases that are not commonly used in English, **but common in their native languages**
-3. Words from Dante, Petrarch, Boccaccio, Goethe, Rilke, Neruda, Borges, Virginia Woolf, Shakespeare, and other literary giants are highly encouraged
-4. For text/passage queries: extract words FROM the text, not words ABOUT it
-5. Provide brief, focused reasoning without superfluity
-6. Reasoning must **ALWAYS** be in English
-7. If the query contains an example usage, fill in the example_usage field with a relevant example
+1. Semantic resonance > 0.7 confidence
+2. Harvest from: French, Italian, German, Portuguese, Spanish lexicons
+3. Literary sources: Dante, Goethe, Neruda, Borges, Woolf, Shakespeare
+4. Text queries: extract constituent words, not descriptors
+5. Reasoning: clear English explanation
 
-Example: "word that means like a peacock's feathers" -> "pavonine, iridescent, opalescent, resplendent, shimmering"
+## Examples
 
-Return for each word:
+### Query: "peacock's feathers"
+`pavonine` | 0.95 | 0.9 | Directly means peacock-like
+`iridescent` | 0.85 | 0.8 | Captures shifting colors
+`opalescent` | 0.8 | 0.85 | Milky rainbow shimmer
 
-- **confidence**: 0-1 (semantic match strength)
-- **efflorescence**: 0-1 (word beauty/memorability)
-- **reasoning**: concise explanation (max 2 sentences) -- ALWAYS in English
-- **example_usage**: if helpful (optional) -- ALWAYS in English
+### Query: "the feeling of missing something that never existed"
+`saudade` | 0.9 | 1.0 | Portuguese: longing for the impossible
+`hiraeth` | 0.85 | 0.95 | Welsh: homesickness for a home that never was
+`sehnsucht` | 0.8 | 0.9 | German: inconsolable yearning
+
+Output per word:
+- **confidence**: semantic match (0-1)
+- **efflorescence**: linguistic beauty (0-1)
+- **reasoning**: clear justification
+- **example_usage**: usage in context

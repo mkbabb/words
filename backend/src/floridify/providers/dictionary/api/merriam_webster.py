@@ -12,17 +12,18 @@ from beanie import PydanticObjectId
 
 from ....caching.decorators import cached_api_call
 from ....core.state_tracker import Stages, StateTracker
+from ....models import Etymology
 from ....models.dictionary import (
     Definition,
+    DictionaryEntry,
     DictionaryProvider,
-    DictionaryProviderData,
-    Etymology,
     Example,
     Pronunciation,
     Word,
 )
 from ....utils.logging import get_logger
-from ..base import DictionaryConnector
+from ...core import ConnectorConfig, RateLimitPresets
+from ..core import DictionaryConnector
 
 logger = get_logger(__name__)
 
@@ -39,44 +40,24 @@ class MerriamWebsterConnector(DictionaryConnector):
     - Synonyms and antonyms
     """
 
-    def __init__(self, api_key: str | None = None, rate_limit: float = 10.0) -> None:
+    def __init__(self, api_key: str | None = None, config: ConnectorConfig | None = None) -> None:
         """Initialize Merriam-Webster connector.
 
         Args:
             api_key: API key for Merriam-Webster (optional, will read from config)
-            rate_limit: Maximum requests per second (default: 10)
+            config: Connector configuration
 
         """
-        super().__init__(rate_limit)
+        if config is None:
+            config = ConnectorConfig(rate_limit_config=RateLimitPresets.API_STANDARD.value)
+        super().__init__(provider=DictionaryProvider.MERRIAM_WEBSTER, config=config)
 
         # Use provided API key or raise error if not provided
-        if api_key is None:
-            api_key = None  # Will be handled by the validation below
-
         if not api_key:
             raise ValueError("Merriam-Webster API key required")
 
         self.api_key = api_key
         self.base_url = "https://dictionaryapi.com/api/v3/references/collegiate/json"
-        self.session = httpx.AsyncClient(timeout=30.0)
-
-    @property
-    def provider_name(self) -> DictionaryProvider:
-        """Return the provider name."""
-        return DictionaryProvider.MERRIAM_WEBSTER
-
-    @property
-    def provider_version(self) -> str:
-        """Version of the Merriam-Webster API implementation."""
-        return "1.0.0"
-
-    async def __aenter__(self) -> MerriamWebsterConnector:
-        """Async context manager entry."""
-        return self
-
-    async def __aexit__(self, *args: object) -> None:
-        """Async context manager exit."""
-        await self.session.aclose()
 
     @cached_api_call(ttl_hours=24.0, key_prefix="merriam_webster")
     async def _fetch_from_api(self, word: str) -> dict[str, Any] | None:
@@ -89,13 +70,14 @@ class MerriamWebsterConnector(DictionaryConnector):
             API response data or None if not found
 
         """
-        await self._enforce_rate_limit()
+        # Rate limiting is handled by the base class fetch method
 
         url = f"{self.base_url}/{word}"
         params = {"key": self.api_key}
 
         try:
-            response = await self.session.get(url, params=params)
+            session = await self.get_api_session()
+            response = await session.get(url, params=params)
             response.raise_for_status()
 
             data = response.json()
@@ -337,14 +319,13 @@ class MerriamWebsterConnector(DictionaryConnector):
 
     async def _fetch_from_provider(
         self,
-        word_obj: Word,
+        word: str,
         state_tracker: StateTracker | None = None,
-    ) -> DictionaryProviderData | None:
+    ) -> DictionaryEntry | None:
         """Fetch definition from Merriam-Webster.
 
         Args:
-            word_obj: Word object to look up
-            state_tracker: Optional state tracker for progress
+            word: Word to look up
 
         Returns:
             ProviderData with definitions, pronunciation, and etymology
@@ -355,18 +336,21 @@ class MerriamWebsterConnector(DictionaryConnector):
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
 
             # Fetch from API
-            data = await self._fetch_from_api(word_obj.text)
+            data = await self._fetch_from_api(word)
             if not data:
                 return None
 
-            # Check that word_obj has been saved and has an ID
+            # Create Word object for processing
+            word_obj = Word(text=word)
+            await word_obj.save()
+
             if not word_obj.id:
-                raise ValueError(f"Word {word_obj.text} must be saved before processing")
+                raise ValueError(f"Word {word} must be saved before processing")
 
             # Parse components
             definitions = await self._parse_definitions(data, word_obj.id)
             if not definitions:
-                logger.warning(f"No definitions parsed for '{word_obj.text}'")
+                logger.warning(f"No definitions parsed for '{word}'")
                 return None
 
             pronunciation = self._parse_pronunciation(data, word_obj.id)
@@ -384,9 +368,9 @@ class MerriamWebsterConnector(DictionaryConnector):
                 pronunciation_id = pronunciation.id
 
             # Create provider data
-            provider_data = DictionaryProviderData(
+            provider_data = DictionaryEntry(
                 word_id=word_obj.id,
-                provider=self.provider_name,
+                provider=self.provider,
                 definition_ids=definition_ids,
                 pronunciation_id=pronunciation_id,
                 etymology=etymology,

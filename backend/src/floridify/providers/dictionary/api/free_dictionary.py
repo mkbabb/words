@@ -11,11 +11,11 @@ from typing import Any
 import httpx
 
 from ....caching.decorators import cached_api_call
-from ....core.state_tracker import Stages, StateTracker
-from ....models import Word
-from ....models.dictionary import DictionaryProvider, DictionaryProviderData
+from ....core.state_tracker import StateTracker
+from ....models.dictionary import DictionaryProvider
 from ....utils.logging import get_logger
-from ..base import DictionaryConnector
+from ...core import ConnectorConfig, RateLimitPresets
+from ..core import DictionaryConnector
 
 logger = get_logger(__name__)
 
@@ -32,34 +32,17 @@ class FreeDictionaryConnector(DictionaryConnector):
     - Source attributions
     """
 
-    def __init__(self, rate_limit: float = 60.0) -> None:
+    def __init__(self, config: ConnectorConfig | None = None) -> None:
         """Initialize Free Dictionary connector.
 
         Args:
-            rate_limit: Maximum requests per second (default: 60, very generous)
+            config: Connector configuration (default: 60 RPS)
 
         """
-        super().__init__()
+        if config is None:
+            config = ConnectorConfig(rate_limit_config=RateLimitPresets.API_FAST.value)
+        super().__init__(provider=DictionaryProvider.FREE_DICTIONARY, config=config)
         self.base_url = "https://api.dictionaryapi.dev/api/v2/entries/en"
-        self.session = httpx.AsyncClient(timeout=30.0)
-
-    @property
-    def provider_name(self) -> DictionaryProvider:
-        """Return the provider name."""
-        return DictionaryProvider.FREE_DICTIONARY
-
-    @property
-    def provider_version(self) -> str:
-        """Version of the Free Dictionary API implementation."""
-        return "1.0.0"
-
-    async def __aenter__(self) -> FreeDictionaryConnector:
-        """Async context manager entry."""
-        return self
-
-    async def __aexit__(self, *args: object) -> None:
-        """Async context manager exit."""
-        await self.session.aclose()
 
     @cached_api_call(ttl_hours=24.0, key_prefix="free_dictionary")
     async def _fetch_from_api(self, word: str) -> list[dict[str, Any]] | None:
@@ -72,14 +55,15 @@ class FreeDictionaryConnector(DictionaryConnector):
             API response data or None if not found
 
         """
-        await self._enforce_rate_limit()
+        # Rate limiting is handled by base class fetch method
 
         url = f"{self.base_url}/{word}"
 
         try:
-            response = await self.session.get(url)
+            session = await self.get_api_session()
+            response = await session.get(url)
 
-            if response.status_code == 404:
+            if response.status_code == httpx.codes.NOT_FOUND:
                 logger.debug(f"Word '{word}' not found in Free Dictionary")
                 return None
 
@@ -101,47 +85,32 @@ class FreeDictionaryConnector(DictionaryConnector):
 
     async def _fetch_from_provider(
         self,
-        word_obj: Word,
+        word: str,
         state_tracker: StateTracker | None = None,
-    ) -> DictionaryProviderData | None:
+    ) -> dict[str, Any] | None:
         """Fetch definition from Free Dictionary.
 
         Args:
-            word_obj: The word to look up
-            state_tracker: Optional state tracker for progress
+            word: The word to look up
 
         Returns:
-            ProviderData with definitions, pronunciation, and etymology
+            Dictionary data with definitions, pronunciation, and etymology
 
         """
         try:
-            if state_tracker:
-                await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
-
             # Fetch from API
-            entries = await self._fetch_from_api(word_obj.text)
+            entries = await self._fetch_from_api(word)
             if not entries:
                 return None
 
-            # Check that word_obj has been saved and has an ID
-            if not word_obj.id:
-                raise ValueError(f"Word {word_obj.text} must be saved before processing")
-
-            # Parse and create provider data
-            provider_data = DictionaryProviderData(
-                word_id=word_obj.id,
-                provider=self.provider_name,
-                definition_ids=[],
-                raw_data={"entries": entries},
-            )
-
-            if state_tracker:
-                await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
-
-            return provider_data
+            # Return raw dictionary data
+            return {
+                "word": word,
+                "provider": self.provider.value,
+                "entries": entries,
+                "raw_data": {"entries": entries},
+            }
 
         except Exception as e:
             logger.error(f"Error fetching from Free Dictionary: {e}")
-            if state_tracker:
-                await state_tracker.update_error(str(e), Stages.PROVIDER_FETCH_ERROR)
             return None

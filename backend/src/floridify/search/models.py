@@ -5,63 +5,15 @@ Unified models for corpus storage, caching, and semantic indexing.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
-from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
-from ..caching.core import QuantizationType
-from ..caching.models import CacheableMetadata
-from ..models.base import BaseMetadata
 from ..models.dictionary import Language
+from ..models.versioned import VersionInfo
 from .constants import SearchMethod
-
-
-class SemanticMetadata(Document, BaseMetadata, CacheableMetadata):
-    """MongoDB storage for semantic search metadata.
-
-    Contains metadata about semantic search indices including vocabulary hash,
-    model information, and corpus references for efficient caching and management.
-    """
-
-    # Corpus identification and bi-directional relationship
-    corpus_id: PydanticObjectId | None = Field(
-        None,
-        description="Reference to CorpusMetadata document",
-    )
-    vocabulary_hash: str = Field(
-        ...,
-        description="Hash of the vocabulary for cache invalidation",
-    )
-
-    # Model information
-    model_name: str = Field(..., description="Sentence transformer model used")
-    embedding_dimension: int = Field(..., description="Dimension of the embeddings")
-
-    # Corpus metadata
-    vocabulary_size: int = Field(
-        ...,
-        description="Number of unique terms in vocabulary",
-    )
-
-    # Performance metrics
-    build_time_ms: float = Field(..., description="Time taken to build embeddings")
-
-    # Quantization settings
-    quantization_type: QuantizationType = Field(
-        default=QuantizationType.FLOAT32,
-        description="Quantization type used for embeddings",
-    )
-
-    class Settings:
-        name = "semantic_metadata"
-        indexes = [
-            [("corpus_id", 1)],  # Lookup by CorpusMetadata reference
-            [
-                ("vocabulary_hash", 1),
-                ("model_name", 1),
-            ],  # Compound index for cache lookup
-        ]
 
 
 class SearchResult(BaseModel):
@@ -98,7 +50,93 @@ class SearchResult(BaseModel):
         }
 
 
+@dataclass
+class TrieIndex:
+    """Versioned trie index data for serialization.
+
+    Stores the trie structure, word frequencies, and metadata
+    for efficient persistence and recovery.
+    """
+
+    # Core trie data
+    trie_data: bytes = field(default_factory=bytes)
+    word_frequencies: dict[str, int] = field(default_factory=dict)
+
+    # Statistics
+    word_count: int = 0
+    max_frequency: int = 0
+    vocabulary_hash: str | None = None
+
+    # Version information
+    version_info: VersionInfo | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    model_version: str = "trie_v1"
+
+    # Corpus metadata
+    corpus_name: str | None = None
+    corpus_language: Language | None = None
+
+
+@dataclass
+class SemanticMetadata:
+    """Metadata for semantic search indices.
+
+    Stores configuration and statistics for FAISS indices
+    and sentence embeddings.
+    """
+
+    # Model configuration
+    model_name: str
+    embedding_dimension: int
+
+    # Index statistics
+    num_embeddings: int
+    index_type: str  # "Flat", "IVF", "HNSW", etc.
+
+    # Performance metrics
+    build_time_seconds: float | None = None
+    memory_usage_mb: float | None = None
+
+    # Version information
+    version_info: VersionInfo | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+
+    # Corpus metadata
+    corpus_name: str | None = None
+    corpus_hash: str | None = None
+
+
+@dataclass
+class IndexMetadata:
+    """Base metadata for all search indices.
+
+    Provides common fields for versioning and tracking
+    across different index types.
+    """
+
+    # Index identification
+    index_type: str  # "trie", "fuzzy", "semantic"
+    index_version: str  # e.g., "v1.0.0"
+
+    # Corpus information
+    corpus_name: str
+    corpus_hash: str
+    corpus_size: int
+
+    # Version tracking
+    version_info: VersionInfo | None = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+    # Performance metrics
+    build_time_seconds: float | None = None
+    last_access_time: datetime | None = None
+    access_count: int = 0
+
+
 __all__ = [
     "SearchResult",
+    "TrieIndex",
     "SemanticMetadata",
+    "IndexMetadata",
 ]

@@ -10,7 +10,7 @@ import orjson
 from fastapi import Request, Response
 from pydantic import BaseModel
 
-from ...caching.unified import UnifiedCache, get_unified
+from ...caching.core import GlobalCacheManager, get_global_cache
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -71,7 +71,7 @@ def cached_endpoint(
             cache_key = generate_cache_key(request, config, prefix)
 
             # Get unified cache
-            cache = await get_unified()
+            cache = await get_global_cache()
 
             # Try to get from cache
             cached_data = await cache.get("api", cache_key)
@@ -142,12 +142,12 @@ class CacheInvalidator:
     """Utility for invalidating related caches."""
 
     def __init__(self) -> None:
-        self._cache: UnifiedCache | None = None
+        self._cache: GlobalCacheManager | None = None
 
-    async def _get_cache(self) -> UnifiedCache:
+    async def _get_cache(self) -> GlobalCacheManager:
         """Get cache instance lazily."""
         if self._cache is None:
-            self._cache = await get_unified()
+            self._cache = await get_global_cache()
         return self._cache
 
     async def invalidate_pattern(self, pattern: str) -> int:
@@ -229,14 +229,14 @@ class ResponseCache:
         self.response = response
         self.ttl = ttl
         self.key_prefix = key_prefix
-        self.cache: UnifiedCache | None = None
+        self.cache: GlobalCacheManager | None = None
         self.cache_key: str | None = None
         self.start_time: datetime | None = None
 
-    async def _get_cache(self) -> UnifiedCache:
+    async def _get_cache(self) -> GlobalCacheManager:
         """Get cache instance lazily."""
         if self.cache is None:
-            self.cache = await get_unified()
+            self.cache = await get_global_cache()
         return self.cache
 
     async def __aenter__(self) -> Any:

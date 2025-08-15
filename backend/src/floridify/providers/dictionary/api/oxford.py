@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-import httpx
 from beanie import PydanticObjectId
 
 from ....core.state_tracker import StateTracker
@@ -16,9 +15,10 @@ from ....models import (
     Pronunciation,
     Word,
 )
-from ....models.dictionary import DictionaryProvider, DictionaryProviderData
+from ....models.dictionary import DictionaryEntry, DictionaryProvider
 from ....utils.logging import get_logger
-from ..base import DictionaryConnector
+from ...core import ConnectorConfig, RateLimitPresets
+from ..core import DictionaryConnector
 
 logger = get_logger(__name__)
 
@@ -26,70 +26,81 @@ logger = get_logger(__name__)
 class OxfordConnector(DictionaryConnector):
     """Connector for Oxford Dictionary API."""
 
-    def __init__(self, app_id: str, api_key: str, rate_limit: float = 10.0) -> None:
+    def __init__(self, app_id: str, api_key: str, config: ConnectorConfig | None = None) -> None:
         """Initialize Oxford connector.
 
         Args:
             app_id: Oxford API application ID
             api_key: Oxford API key
-            rate_limit: Requests per second (max varies by plan)
+            config: Connector configuration
 
         """
-        super().__init__(rate_limit)
+        if config is None:
+            config = ConnectorConfig(rate_limit_config=RateLimitPresets.API_CONSERVATIVE.value)
+        super().__init__(provider=DictionaryProvider.OXFORD, config=config)
         self.app_id = app_id
         self.api_key = api_key
         self.base_url = "https://od-api.oxforddictionaries.com/api/v2"
-        self.session = httpx.AsyncClient(
-            headers={
-                "app_id": self.app_id,
-                "app_key": self.api_key,
-                "Accept": "application/json",
-            },
-            timeout=120.0,
-        )
-
-    @property
-    def provider_name(self) -> DictionaryProvider:
-        """Name of the dictionary provider."""
-        return DictionaryProvider.OXFORD
+        self.headers = {
+            "app_id": self.app_id,
+            "app_key": self.api_key,
+            "Accept": "application/json",
+        }
 
     async def _fetch_from_provider(
         self,
-        word_obj: Word,
+        word: str,
         state_tracker: StateTracker | None = None,
-    ) -> DictionaryProviderData | None:
+    ) -> DictionaryEntry | None:
         """Fetch definition data for a word from Oxford API.
 
         Args:
-            word_obj: The word to look up
-            state_tracker: Optional state tracker for progress updates
+            word: The word to look up
 
         Returns:
             ProviderData if successful, None if not found or error
 
         """
-        await self._enforce_rate_limit()
 
         try:
-            # Fetch both entries and pronunciation if available
-            url = f"{self.base_url}/entries/en-us/{word_obj.text.lower()}"
+            if state_tracker:
+                from ....core.state_tracker import Stages
 
-            response = await self.session.get(url)
+                await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
+
+            # Fetch both entries and pronunciation if available
+            url = f"{self.base_url}/entries/en-us/{word.lower()}"
+
+            session = await self.get_api_session()
+            response = await session.get(url, headers=self.headers)
 
             if response.status_code == 404:
                 return None  # Word not found
             if response.status_code == 429:
                 # Rate limited - wait and retry once
                 await asyncio.sleep(1)
-                response = await self.session.get(url)
+                response = await session.get(url, headers=self.headers)
 
             response.raise_for_status()
             data = response.json()
 
-            return await self._parse_oxford_response(word_obj.text, data, word_obj)
+            # Create Word object for processing
+            word_obj = Word(text=word)
+            await word_obj.save()
+
+            result = await self._parse_oxford_response(word, data, word_obj)
+
+            if state_tracker:
+                await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
+
+            return result
 
         except Exception as e:
-            logger.error(f"Error fetching {word_obj.text} from Oxford: {e}")
+            logger.error(f"Error fetching {word} from Oxford: {e}")
+            if state_tracker:
+                from ....core.state_tracker import Stages
+
+                await state_tracker.update_error(str(e), Stages.PROVIDER_FETCH_ERROR)
             return None
 
     async def _parse_oxford_response(
@@ -97,7 +108,7 @@ class OxfordConnector(DictionaryConnector):
         word: str,
         data: dict[str, Any],
         word_obj: Word,
-    ) -> DictionaryProviderData:
+    ) -> DictionaryEntry:
         """Parse Oxford API response using new models.
 
         Args:
@@ -124,18 +135,14 @@ class OxfordConnector(DictionaryConnector):
         etymology = await self.extract_etymology(data)
 
         # Create and return ProviderData
-        return DictionaryProviderData(
+        return DictionaryEntry(
             word_id=word_obj.id,
-            provider=self.provider_name,
+            provider=self.provider,
             definition_ids=[d.id for d in definitions if d.id is not None],
             pronunciation_id=pronunciation.id if pronunciation else None,
             etymology=etymology,
             raw_data=data,
         )
-
-    async def close(self) -> None:
-        """Close the HTTP session."""
-        await self.session.aclose()
 
     async def extract_pronunciation(
         self,
