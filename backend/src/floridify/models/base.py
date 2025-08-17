@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 from datetime import UTC, datetime
+from enum import Enum
 from pathlib import Path
 from typing import Literal
 from uuid import UUID
@@ -13,6 +14,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # Explicitly export PydanticObjectId for use in other modules
 __all__ = ["BaseMetadata", "PydanticObjectId"]
+
+class Language(Enum):
+    """Supported languages with ISO codes."""
+
+    ENGLISH = "en"
+    FRENCH = "fr"
+    SPANISH = "es"
+    GERMAN = "de"
+    ITALIAN = "it"
 
 
 class BaseMetadata(BaseModel):
@@ -112,13 +122,3 @@ class AudioMedia(Document, BaseMetadata):
 
     class Settings:
         name = "audio_media"
-
-
-class Etymology(BaseModel):
-    """Word origin information."""
-
-    text: str  # e.g., "Latin 'florere' meaning 'to flower'"
-    origin_language: str | None = None  # e.g., "Latin", "Greek"
-    root_words: list[str] = Field(default_factory=list)
-    first_known_use: str | None = None  # e.g., "14th century"
-    model_info: ModelInfo | None = None  # If AI-generated

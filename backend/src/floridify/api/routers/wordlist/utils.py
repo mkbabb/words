@@ -9,7 +9,7 @@ from beanie import PydanticObjectId
 from ....api.repositories import WordListRepository
 from ....corpus.manager import get_corpus_manager
 from ....models import Word
-from ....search import SearchEngine
+from ....search import Search
 from ..search import SearchResponse
 
 
@@ -58,7 +58,7 @@ async def search_words_in_wordlist(
     )
 
     # Create search engine and perform search
-    search_engine = SearchEngine(
+    search_engine = Search(
         corpus_name=corpus_name,
         min_score=min_score,
         semantic=False,  # Disable semantic for wordlist search

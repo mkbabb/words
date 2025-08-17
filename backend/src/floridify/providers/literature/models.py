@@ -1,5 +1,14 @@
-"""Literature in-memory models - deprecated, use models.literature instead."""
+"""Literature metadata models for versioned storage.
 
-from ...models.literature import LiteratureEntry, LiteratureSource
+This module contains metadata models for literature that integrate with the
+versioned data system for proper storage and retrieval.
+"""
 
-__all__ = ["LiteratureEntry", "LiteratureSource"]
+
+class LiteratureEntryMetadata(BaseVersionedData):
+    """Literature work metadata with external content storage."""
+
+    def __init__(self, **data: Any) -> None:
+        data.setdefault("resource_type", ResourceType.LITERATURE)
+        data.setdefault("namespace", CacheNamespace.LITERATURE)
+        super().__init__(**data)

@@ -9,7 +9,7 @@ from ...caching.core import get_global_cache
 from ...caching.manager import get_version_manager
 from ...caching.models import CacheNamespace
 from ...core.state_tracker import StateTracker
-from ...models.literature import LiteratureSource
+from ...corpus.literature.models import LiteratureSource
 from ...models.versioned import (
     ContentLocation,
     ResourceType,

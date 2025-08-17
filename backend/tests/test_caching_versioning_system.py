@@ -19,7 +19,7 @@ from floridify.caching.filesystem import FilesystemBackend
 from floridify.caching.models import CacheNamespace, CompressionType
 from floridify.models import Word
 from floridify.models.dictionary import DictionaryProvider, Language
-from floridify.models.literature import AuthorInfo, Genre, LiteratureSource, Period
+from floridify.corpus.literature.models import AuthorInfo, Genre, LiteratureSource, Period
 from floridify.models.versioned import (
     BaseVersionedData,
     ContentLocation,

@@ -33,11 +33,6 @@ from .constants import (
 logger = get_logger(__name__)
 
 
-# SemanticIndex class removed - now using SemanticIndex BaseModel from models.py
-
-
-
-
 class SemanticSearch:
     def __init__(
         self,
@@ -54,13 +49,13 @@ class SemanticSearch:
         # Data model
         self.index = index
         self.corpus = corpus
-        
+
         # Runtime objects (built from index)
         self.sentence_model: SentenceTransformer | None = None
         self.sentence_embeddings: np.ndarray | None = None
         self.sentence_index: faiss.Index | None = None
         self.device: str = "cpu"
-        
+
         # Load from index if provided
         if index:
             self._load_from_index()
@@ -74,13 +69,13 @@ class SemanticSearch:
         batch_size: int | None = None,
     ) -> SemanticSearch:
         """Create SemanticSearch from a corpus.
-        
+
         Args:
             corpus: Corpus to build semantic index from
             model_name: Sentence transformer model to use
             config: Version configuration
             batch_size: Batch size for embedding generation
-            
+
         Returns:
             SemanticSearch instance with loaded index
         """
@@ -91,33 +86,33 @@ class SemanticSearch:
             batch_size=batch_size,
             config=config or VersionConfig(),
         )
-        
+
         # Create search with index
         search = cls(index=index, corpus=corpus)
-        
+
         # Initialize if index needs building
         if not index.embeddings:
             await search.initialize()
-        
+
         return search
 
     def _load_from_index(self) -> None:
         """Load data from the index model."""
         if not self.index:
             return
-            
+
         # Set device from index
         self.device = self.index.device
-        
+
         # Initialize model if needed
         if not self.sentence_model:
             self.sentence_model = self._initialize_optimized_model()
-        
+
         # Load embeddings and FAISS index if available
         if self.index.embeddings:
             embeddings_bytes = base64.b64decode(self.index.embeddings.encode('utf-8'))
             self.sentence_embeddings = pickle.loads(embeddings_bytes)
-            
+
         if self.index.index_data:
             index_bytes = base64.b64decode(self.index.index_data.encode('utf-8'))
             faiss_data = pickle.loads(index_bytes)
@@ -142,12 +137,12 @@ class SemanticSearch:
         """Initialize sentence transformer with standard optimizations."""
         if not self.index:
             raise ValueError("Index required to initialize model")
-            
+
         # Detect optimal device if not set
         if not self.device or self.device == "cpu":
             self.device = self._detect_optimal_device()
             self.index.device = self.device
-        
+
         # Initialize model with ONNX optimization if enabled
         if USE_ONNX_BACKEND:
             try:
@@ -155,7 +150,9 @@ class SemanticSearch:
                 model = SentenceTransformer(self.index.model_name, backend="onnx")
                 logger.info("✅ ONNX backend enabled with automatic model selection")
             except Exception as e:
-                logger.warning(f"Failed to load ONNX model: {e}. Falling back to PyTorch")
+                logger.warning(
+                    f"Failed to load ONNX model: {e}. Falling back to PyTorch"
+                )
                 model = SentenceTransformer(self.index.model_name)
         else:
             model = SentenceTransformer(self.index.model_name)
@@ -176,7 +173,7 @@ class SemanticSearch:
         """Encode texts with optimizations (ONNX + mixed precision + GPU)."""
         if not self.sentence_model or not self.index:
             raise ValueError("Model and index required for encoding")
-            
+
         precision: Literal["float32", "int8", "uint8", "binary", "ubinary"] = "float32"
 
         return self.sentence_model.encode(
@@ -195,17 +192,17 @@ class SemanticSearch:
         """Initialize semantic search by building embeddings."""
         if not self.index:
             raise ValueError("Index required for initialization")
-            
+
         if not self.corpus:
             # Try to load corpus from index
             self.corpus = await Corpus.get(
                 corpus_name=self.index.corpus_name,
                 config=VersionConfig(),
             )
-            
+
         if not self.corpus:
             raise ValueError(f"Could not load corpus '{self.index.corpus_name}'")
-            
+
         logger.info(
             f"Initializing semantic search for corpus '{self.index.corpus_name}' using {self.index.model_name}",
         )
@@ -227,24 +224,24 @@ class SemanticSearch:
         """
         if not self.index:
             raise ValueError("Index required for corpus update")
-            
+
         if corpus.vocabulary_hash != self.index.vocabulary_hash:
             logger.info(
                 f"Vocabulary hash changed for corpus '{corpus.corpus_name}', reinitializing semantic search",
             )
             self.corpus = corpus
-            
+
             # Create new index with updated corpus
             self.index = await SemanticIndex.create(
                 corpus=corpus,
                 model_name=self.index.model_name,
                 batch_size=self.index.batch_size,
             )
-            
+
             # Clear existing runtime data to force rebuild
             self.sentence_embeddings = None
             self.sentence_index = None
-            
+
             await self._build_embeddings_from_corpus()
         else:
             # Just update the corpus reference
@@ -287,11 +284,15 @@ class SemanticSearch:
 
         # Check if lemmatized vocabulary is available
         if not self.corpus.lemmatized_vocabulary:
-            raise ValueError(f"Corpus '{self.corpus.corpus_name}' has empty lemmatized vocabulary")
+            raise ValueError(
+                f"Corpus '{self.corpus.corpus_name}' has empty lemmatized vocabulary"
+            )
 
         # Process entire vocabulary at once for better performance
         vocab_count = len(self.corpus.lemmatized_vocabulary)
-        logger.info(f"🔄 Starting embedding generation: {vocab_count:,} lemmas (full batch)")
+        logger.info(
+            f"🔄 Starting embedding generation: {vocab_count:,} lemmas (full batch)"
+        )
 
         embedding_start = time.time()
 
@@ -300,7 +301,7 @@ class SemanticSearch:
 
         # Create trivial identity mapping since we're using lemmas directly
         variant_mapping = {i: i for i in range(len(embedding_vocabulary))}
-        
+
         # Store in index
         self.index.variant_mapping = {str(k): v for k, v in variant_mapping.items()}
         self.index.vocabulary = self.corpus.vocabulary
@@ -339,12 +340,12 @@ class SemanticSearch:
 
         total_time = time.time() - embedding_start
         embeddings_per_sec = vocab_count / total_time if total_time > 0 else 0
-        
+
         # Update index statistics
         self.index.num_embeddings = vocab_count
         self.index.embedding_dimension = dimension
         self.index.embeddings_per_second = embeddings_per_sec
-        
+
         logger.info(
             f"✅ Semantic embeddings complete: {vocab_count:,} embeddings, dim={dimension} ({total_time:.1f}s, {embeddings_per_sec:.0f} emb/s)",
         )
@@ -358,15 +359,19 @@ class SemanticSearch:
         if self.sentence_embeddings is not None:
             embeddings_bytes = pickle.dumps(self.sentence_embeddings)
             self.index.embeddings = base64.b64encode(embeddings_bytes).decode('utf-8')
-            
+
         if self.sentence_index is not None:
             index_bytes = pickle.dumps(faiss.serialize_index(self.sentence_index))
             self.index.index_data = base64.b64encode(index_bytes).decode('utf-8')
-        
+
         # Update statistics
         self.index.build_time_seconds = build_time
-        self.index.memory_usage_mb = (self.sentence_embeddings.nbytes / (1024 * 1024)) if self.sentence_embeddings is not None else 0.0
-        
+        self.index.memory_usage_mb = (
+            (self.sentence_embeddings.nbytes / (1024 * 1024))
+            if self.sentence_embeddings is not None
+            else 0.0
+        )
+
         # Detect and store index type
         if self.sentence_index:
             index_class_name = self.sentence_index.__class__.__name__
@@ -378,7 +383,7 @@ class SemanticSearch:
                 self.index.index_type = "ScalarQuantizer"
             else:
                 self.index.index_type = "Flat"
-        
+
         # Save the updated index
         await self.index.save()
 
@@ -428,7 +433,11 @@ class SemanticSearch:
         """
         # Memory baseline: FP32 vectors
         base_memory_mb = (vocab_size * dimension * 4) / (1024 * 1024)
-        model_type = "BGE-M3" if dimension == 1024 else "MiniLM" if dimension == 384 else "Custom"
+        model_type = (
+            "BGE-M3"
+            if dimension == 1024
+            else "MiniLM" if dimension == 384 else "Custom"
+        )
 
         logger.info(
             f"🔄 Building {model_type} optimized index (dim: {dimension}, vocab: {vocab_size:,}, baseline: {base_memory_mb:.1f}MB)",
@@ -477,9 +486,13 @@ class SemanticSearch:
             nbits = 8  # 8 bits per subquantizer for quality
 
             quantizer = faiss.IndexFlatL2(dimension)
-            self.sentence_index = faiss.IndexIVFPQ(quantizer, dimension, nlist, m, nbits)
+            self.sentence_index = faiss.IndexIVFPQ(
+                quantizer, dimension, nlist, m, nbits
+            )
 
-            logger.info(f"🔄 Training IVF-PQ (nlist={nlist} clusters, m={m} subquantizers)...")
+            logger.info(
+                f"🔄 Training IVF-PQ (nlist={nlist} clusters, m={m} subquantizers)..."
+            )
             self.sentence_index.train(self.sentence_embeddings)
             self.sentence_index.add(self.sentence_embeddings)
 
@@ -594,9 +607,13 @@ class SemanticSearch:
             # Create results directly - no complex mapping needed since we use lemmas directly
             results = []
             lemma_to_word_indices = self.corpus.lemma_to_word_indices
-            
+
             # Get variant mapping from index if available
-            variant_mapping = {int(k): v for k, v in self.index.variant_mapping.items()} if self.index else {}
+            variant_mapping = (
+                {int(k): v for k, v in self.index.variant_mapping.items()}
+                if self.index
+                else {}
+            )
 
             for embedding_idx, similarity in zip(
                 valid_embedding_indices, valid_similarities, strict=False
@@ -640,7 +657,7 @@ class SemanticSearch:
         """Serialize semantic search to dictionary for caching."""
         if not self.index:
             return {}
-            
+
         # Delegate to index model for serialization
         return self.index.model_dump()
 
@@ -649,13 +666,13 @@ class SemanticSearch:
         """Deserialize semantic search from cached dictionary."""
         # Load index from data
         index = SemanticIndex.model_load(data)
-        
+
         # Create instance with loaded index
         instance = cls(index=index)
-        
+
         # Load runtime objects from index
         instance._load_from_index()
-        
+
         return instance
 
     def get_stats(self) -> dict[str, Any]:
@@ -670,7 +687,7 @@ class SemanticSearch:
                 "semantic_metadata_id": None,
                 "batch_size": 0,
             }
-            
+
         return {
             "initialized": bool(self.sentence_index),
             "vocabulary_size": len(self.index.lemmatized_vocabulary),

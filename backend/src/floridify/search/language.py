@@ -14,7 +14,7 @@ from ..models.dictionary import Language
 from ..models.versioned import VersionConfig
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMode
-from .core import SearchEngine, SearchResult
+from .core import Search, SearchResult
 from .semantic.constants import DEFAULT_SENTENCE_MODEL, SemanticModel
 
 logger = get_logger(__name__)
@@ -53,7 +53,7 @@ class LanguageSearch:
         self.semantic = semantic
         self.semantic_model = semantic_model
 
-        self.search_engine: SearchEngine | None = None
+        self.search_engine: Search | None = None
         self._corpus_manager: TreeCorpusManager = get_tree_corpus_manager()
         self._initialized: bool = False
 
@@ -85,7 +85,7 @@ class LanguageSearch:
         logger.info(
             f"Creating SearchEngine for corpus '{corpus.corpus_name}' with {self.semantic_model if self.semantic else 'no semantic'}"
         )
-        self.search_engine = await SearchEngine.from_corpus(
+        self.search_engine = await Search.from_corpus(
             corpus_name=corpus.corpus_name,
             min_score=self.min_score,
             semantic=self.semantic,

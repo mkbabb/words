@@ -6,22 +6,26 @@ inherited by all metadata classes throughout the system.
 
 from __future__ import annotations
 
-from datetime import timedelta
+import json
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any
 
+from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
 
 class CompressionType(str, Enum):
     """Compression algorithms for cache data.
-    
+
     Algorithm selection is automatic based on content size:
     - < 1KB: No compression
     - 1KB-10MB: ZSTD (best balance of speed and ratio)
     - > 10MB: GZIP (maximum compression)
     """
+
     ZSTD = "zstd"  # Zstandard - fast with good compression
-    LZ4 = "lz4"    # LZ4 - extremely fast, moderate compression
+    LZ4 = "lz4"  # LZ4 - extremely fast, moderate compression
     GZIP = "gzip"  # GZIP - slower but maximum compression
     NONE = "none"  # No compression
     ZLIB = "zlib"  # Standard zlib compression (legacy)
@@ -53,208 +57,144 @@ class CacheNamespace(str, Enum):
     TRIE = "trie"
 
     LITERATURE = "literature"
-    
+
     LEXICON = "lexicon"
 
     API = "api"
 
     OPENAI = "openai_structured"
-    
+
     SCRAPING = "scraping"
 
 
-# Standardized TTL values based on data volatility
-class CacheTTL(Enum):
-    """Standardized TTL values for different cache types."""
+class ResourceType(str, Enum):
+    """Types of versioned resources in the system.
 
-    # Static data that rarely changes
-    VOCABULARY = None  # No expiration for vocabulary
-    CORPUS = timedelta(days=30)  # Corpus data refreshed monthly
-
-    # Semi-static indices
-    SEMANTIC = timedelta(days=7)  # Semantic search instances refreshed weekly
-    TRIE = timedelta(days=7)  # Trie indices refreshed weekly
-
-    # Dynamic search results
-    SEARCH_RESULT = timedelta(hours=1)  # Search results cached for 1 hour
-    API_RESPONSE = timedelta(hours=24)  # API responses cached for 24 hours
-
-    # Computation results
-    COMPUTATION = timedelta(days=7)  # Expensive computations cached for a week
-    AI_GENERATION = timedelta(days=30)  # AI-generated content cached for a month
-
-
-class CacheableMetadata(BaseModel):
-    """Base model for metadata with caching information.
-
-    This provides the standard cache fields that should be used
-    consistently across all metadata models.
+    Each resource type maps to a specific namespace and storage strategy.
+    This enum drives the polymorphic behavior of the versioning system.
     """
 
-    # Cache identification
-    cache_key: str | None = Field(
-        default=None,
-        description="Unique cache key for this resource",
-    )
-    cache_namespace: CacheNamespace | None = Field(
-        default=None,
-        description="Cache namespace for organization",
-    )
+    DICTIONARY = "dictionary"  # Dictionary entries from various providers
+    CORPUS = "corpus"  # Vocabulary corpora for language processing
+    SEMANTIC = "semantic"  # FAISS indices for semantic search
+    LITERATURE = "literature"  # Full literary texts and metadata
+    SEARCH = "search"  # Search indices and metadata
+    TRIE = "trie"  # Trie indices for prefix search
+
+
+class StorageType(str, Enum):
+    """Backend storage types for content location.
+
+    Determines where and how content is physically stored.
+    The system automatically selects the appropriate storage based on size.
+    """
+
+    MEMORY = "memory"  # In-memory storage (for hot data)
+    CACHE = "cache"  # Filesystem cache (default for most content)
+    DATABASE = "database"  # MongoDB storage (for metadata)
+    S3 = "s3"  # Cloud storage (future expansion)
+
+
+# ============================================================================
+# VERSION CONFIGURATION AND METADATA
+# ============================================================================
+
+
+class VersionConfig(BaseModel):
+    """Configuration for version operations.
+
+    Controls caching behavior, version management, and storage optimization
+    for all versioned data operations.
+    """
 
     # Cache control
-    cache_ttl: timedelta | None = Field(
-        default=None,
-        description="TTL as timedelta (not seconds)",
-    )
-    cache_tags: list[str] = Field(
-        default_factory=list,
-        description="Tags for cache invalidation",
-    )
+    force_rebuild: bool = False  # Skip cache, force fresh fetch/rebuild
+    use_cache: bool = True  # Whether to check cache first
 
-    def get_ttl_seconds(self) -> int | None:
-        """Get TTL in seconds for backward compatibility.
+    # Version control
+    version: str | None = None  # Fetch specific version (None = latest)
+    increment_version: bool = True  # Auto-increment version on save
 
-        Returns:
-            TTL in seconds or None
+    # Storage options
+    ttl: timedelta | None = None
+    compression: CompressionType | None = None  # None = auto-select
 
-        """
-        if self.cache_ttl is None:
-            return None
-        return int(self.cache_ttl.total_seconds())
-
-    def set_ttl(self, ttl: timedelta | None) -> None:
-        """Set TTL value.
-
-        Args:
-            ttl: Timedelta TTL value or None
-
-        """
-        self.cache_ttl = ttl
-
-    def generate_cache_key(
-        self,
-        resource_type: str,
-        resource_id: str,
-        version: str | None = None,
-        hash_value: str | None = None,
-    ) -> str:
-        """Generate standardized cache key.
-
-        Args:
-            resource_type: Type of resource
-            resource_id: Resource identifier
-            version: Optional version string
-            hash_value: Optional hash value
-
-        Returns:
-            Standardized cache key
-
-        """
-        # Sanitize resource_id to be URL-safe
-        safe_id = resource_id.replace("/", "_").replace(" ", "_").replace(":", "_")
-        parts = [resource_type, safe_id]
-
-        if version:
-            parts.append(f"v{version}")
-        if hash_value:
-            parts.append(hash_value[:8])
-
-        self.cache_key = ":".join(parts)
-        return self.cache_key
+    # Operation metadata
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class CacheConfig(BaseModel):
-    """Configuration for cache operations.
+class ContentLocation(BaseModel):
+    """Metadata for externally stored content.
 
-    This replaces various ad-hoc config patterns with a unified model.
+    Tracks where large content is stored when it exceeds the inline threshold.
+    Provides all information needed to retrieve and verify external content.
     """
 
-    use_cache: bool = Field(
-        default=True,
-        description="Whether to use caching",
-    )
-    force_refresh: bool = Field(
-        default=False,
-        description="Force cache refresh even if valid",
-    )
-    namespace: CacheNamespace = Field(
-        default=CacheNamespace.API,
-        description="Cache namespace to use",
-    )
-    ttl: timedelta | None = Field(
-        default=None,
-        description="TTL override as timedelta",
-    )
-    tags: list[str] = Field(
-        default_factory=list,
-        description="Additional cache tags",
-    )
-    compression: bool = Field(
-        default=True,
-        description="Whether to compress cached data",
-    )
-
-    @classmethod
-    def for_api(cls) -> CacheConfig:
-        """Create config for API responses."""
-        return cls(
-            namespace=CacheNamespace.API,
-            ttl=CacheTTL.API_RESPONSE.value,
-        )
-
-    @classmethod
-    def for_corpus(cls) -> CacheConfig:
-        """Create config for corpus data."""
-        return cls(
-            namespace=CacheNamespace.CORPUS,
-            ttl=CacheTTL.CORPUS.value,
-        )
-
-    @classmethod
-    def for_semantic(cls) -> CacheConfig:
-        """Create config for semantic indices."""
-        return cls(
-            namespace=CacheNamespace.SEMANTIC,
-            ttl=CacheTTL.SEMANTIC.value,
-        )
-
-    @classmethod
-    def for_computation(cls) -> CacheConfig:
-        """Create config for computation results."""
-        return cls(
-            namespace=CacheNamespace.SEARCH,  # Changed from COMPUTE which doesn't exist
-            ttl=CacheTTL.COMPUTATION.value,
-        )
+    storage_type: StorageType
+    cache_namespace: CacheNamespace | None = None
+    cache_key: str | None = None
+    path: str | None = None
+    compression: CompressionType | None = None
+    size_bytes: int
+    size_compressed: int | None = None
+    checksum: str
 
 
-class CacheStats(BaseModel):
-    """Statistics for cache operations."""
+class VersionInfo(BaseModel):
+    """Version tracking with chain management.
 
-    hits: int = Field(default=0, description="Cache hits")
-    misses: int = Field(default=0, description="Cache misses")
-    evictions: int = Field(default=0, description="Items evicted")
-    size_bytes: int = Field(default=0, description="Total size in bytes")
-    item_count: int = Field(default=0, description="Number of items")
-    namespaces: dict[str, int] = Field(
-        default_factory=dict,
-        description="Items per namespace",
-    )
+    Implements a doubly-linked list of versions for complete history tracking.
+    Supports dependency graphs for complex version relationships.
+    """
 
-    @property
-    def hit_rate(self) -> float:
-        """Calculate cache hit rate."""
-        total = self.hits + self.misses
-        if total == 0:
-            return 0.0
-        return self.hits / total
+    version: str = "1.0.0"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    data_hash: str
+    is_latest: bool = True
+    superseded_by: PydanticObjectId | None = None
+    supersedes: PydanticObjectId | None = None
+    dependencies: list[PydanticObjectId] = Field(default_factory=list)
 
 
-__all__ = [
-    "CacheConfig",
-    "CacheNamespace",
-    "CacheStats",
-    "CacheTTL",
-    "CacheableMetadata",
-    "CompressionType",
-    "QuantizationType",
-]
+# ============================================================================
+# BASE VERSIONED DATA MODEL
+# ============================================================================
+
+
+class BaseVersionedData(Document):
+    """Base class for all versioned data with content management.
+
+    Provides automatic storage strategy selection, content deduplication,
+    and version chain management. All versioned resources inherit from this.
+
+    Storage Strategy:
+    - Inline: Content < 1MB stored directly in document
+    - External: Content >= 1MB stored in filesystem/S3 with reference
+    """
+
+    # Identification
+    resource_id: str
+    resource_type: ResourceType
+    namespace: CacheNamespace
+
+    # Versioning
+    version_info: VersionInfo
+
+    # Content storage
+    content_location: ContentLocation | None = None
+    content_inline: dict[str, Any] | None = None
+
+    # Metadata
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list)
+    ttl: timedelta | None = None
+
+    class Settings:
+        name = "versioned_data"
+        is_root = True
+        indexes = [
+            [("resource_id", 1), ("version_info.is_latest", -1)],
+            [("namespace", 1), ("resource_type", 1)],
+            [("version_info.created_at", -1)],
+            "version_info.data_hash",
+        ]

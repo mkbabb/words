@@ -9,7 +9,7 @@ from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
 from ..text.normalize import lemmatize_word, normalize_fast
-from .base import BaseMetadata, Etymology, ModelInfo
+from .base import BaseMetadata, ModelInfo
 from .relationships import (
     Collocation,
     GrammarPattern,
@@ -17,16 +17,6 @@ from .relationships import (
     UsageNote,
     WordForm,
 )
-
-
-class Language(Enum):
-    """Supported languages with ISO codes."""
-
-    ENGLISH = "en"
-    FRENCH = "fr"
-    SPANISH = "es"
-    GERMAN = "de"
-    ITALIAN = "it"
 
 
 class DictionaryProvider(Enum):
@@ -57,34 +47,6 @@ class DictionaryProvider(Enum):
             DictionaryProvider.SYNTHESIS: "Synthesis",
         }
         return display_names.get(self, self.value.title())
-
-
-class OutputFormat(Enum):
-    """Output formats for CLI commands and data export."""
-
-    JSON = "json"
-    CSV = "csv"
-    TXT = "txt"
-    MD = "md"
-
-
-class CorpusType(Enum):
-    """Types of corpora in the system."""
-
-    LEXICON = "lexicon"  # Dictionary/vocabulary corpus
-    LITERATURE = "literature"  # Literature corpus
-    LANGUAGE = "language"  # Language-specific corpus
-    WORDLIST = "wordlist"  # Individual wordlist corpus
-    WORDLIST_NAMES = "wordlist_names"  # All wordlist names corpus
-    CUSTOM = "custom"  # User-defined corpus
-
-
-class LiteratureSourceType(Enum):
-    """Enumeration for different types of literature sources."""
-
-    BOOK = "book"
-    ARTICLE = "article"
-    DOCUMENT = "document"
 
 
 class Word(Document, BaseMetadata):
@@ -136,14 +98,12 @@ class Pronunciation(Document, BaseMetadata):
         name = "pronunciations"
 
 
-class LiteratureSource(BaseModel):
-    """Source metadata for literature examples."""
+class LiteratureSourceExample(BaseModel):
+    """Source ID for the piece of literature, and contextual information
+    for where the example came from."""
 
-    title: str
-    author: str | None = None
-    year: int | None = None
-    context: str | None = None  # Surrounding text for context
-    type: LiteratureSourceType | None = None
+    literature_id: PydanticObjectId  # FK to LiteratureSource document
+    text_pos: int
 
 
 class Example(Document, BaseMetadata):
@@ -158,7 +118,7 @@ class Example(Document, BaseMetadata):
     context: str | None = None  # User prompt/context for generated
 
     # Literature example fields
-    source: LiteratureSource | None = None
+    source: LiteratureSourceExample | None = None
 
     class Settings:
         name = "examples"
@@ -175,6 +135,16 @@ class Fact(Document, BaseMetadata):
 
     class Settings:
         name = "facts"
+
+
+class Etymology(BaseModel):
+    """Word origin information."""
+
+    text: str  # e.g., "Latin 'florere' meaning 'to flower'"
+    origin_language: str | None = None  # e.g., "Latin", "Greek"
+    root_words: list[str] = Field(default_factory=list)
+    first_known_use: str | None = None  # e.g., "14th century"
+    model_info: ModelInfo | None = None  # If AI-generated
 
 
 class Definition(Document, BaseMetadata):

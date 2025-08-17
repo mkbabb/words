@@ -91,7 +91,9 @@ class DictionaryConnector(BaseConnector):
                 "language": Language.ENGLISH.value,
             },
         )
-        logger.info(f"Saved dictionary entry for '{word}' from {self.provider.display_name}")
+        logger.info(
+            f"Saved dictionary entry for '{word}' from {self.provider.display_name}"
+        )
 
     async def fetch(
         self,
@@ -136,7 +138,9 @@ class DictionaryConnector(BaseConnector):
         except Exception as e:
             # Record error for rate limiter
             self.rate_limiter.record_error()
-            logger.error(f"Error fetching '{word}' from {self.provider.display_name}: {e}")
+            logger.error(
+                f"Error fetching '{word}' from {self.provider.display_name}: {e}"
+            )
             raise
 
     # Note: _fetch_from_provider is abstract and must be implemented by subclasses

@@ -4,7 +4,7 @@ Comprehensive mapping of Ovid's works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....models.literature import AuthorInfo, Genre, LiteraryWork, Period
+from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
 
 AUTHOR = AuthorInfo(
     name="Ovid",

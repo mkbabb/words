@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from ..models.dictionary import Language
 from .constants import SearchMethod
-from .core import SearchEngine
+from .core import Search
 from .fuzzy import FuzzySearch
 from .language import LanguageSearch
 from .models import SearchResult
@@ -21,7 +21,7 @@ __all__ = [
     "FuzzySearch",
     "Language",
     "LanguageSearch",
-    "SearchEngine",
+    "Search",
     "SearchMethod",
     "SearchResult",
     "SemanticSearch",

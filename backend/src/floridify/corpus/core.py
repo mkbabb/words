@@ -17,30 +17,10 @@ from ..models.dictionary import CorpusType, Language
 from ..models.versioned import VersionConfig
 from ..text.normalize import batch_lemmatize, batch_normalize
 from ..utils.logging import get_logger
+from .parser import parse_text_lines
 from .utils import get_vocabulary_hash
 
 logger = get_logger(__name__)
-
-# Type alias for parser functions
-ParserFunc = Callable[[str, Language], tuple[list[str], list[str]]]
-ScraperFunc = Callable[[str], Awaitable[str | dict[str, Any]]]
-
-
-class CorpusSource(BaseModel):
-    """Configuration for a corpus source."""
-
-    name: str = Field(..., description="Unique identifier for the source")
-    url: str = Field(default="", description="URL to download the corpus data")
-    parser: str = Field(..., description="Name of parser function from corpus.parser module")
-    language: Language = Field(..., description="Language of the corpus")
-    description: str = Field(default="", description="Human-readable description")
-    scraper: ScraperFunc | None = Field(
-        default=None,
-        description="Optional custom scraper function",
-        exclude=True,
-    )
-
-    model_config = {"frozen": True, "arbitrary_types_allowed": True}
 
 
 class Corpus(BaseModel):
@@ -57,7 +37,9 @@ class Corpus(BaseModel):
 
     # Core vocabulary data - dual storage for original preservation
     vocabulary: list[str] = Field(default_factory=list)  # Normalized forms for search
-    original_vocabulary: list[str] = Field(default_factory=list)  # Original forms for display
+    original_vocabulary: list[str] = Field(
+        default_factory=list
+    )  # Original forms for display
 
     # Mappings and indices
     normalized_to_original_indices: dict[int, int] = Field(default_factory=dict)
@@ -119,7 +101,9 @@ class Corpus(BaseModel):
             Fully processed Corpus instance
 
         """
-        logger.info(f"Creating corpus '{corpus_name}' with {len(vocabulary)} vocabulary items")
+        logger.info(
+            f"Creating corpus '{corpus_name}' with {len(vocabulary)} vocabulary items"
+        )
         start_time = time.perf_counter()
 
         corpus = cls(corpus_name=corpus_name, language=language)
@@ -139,6 +123,7 @@ class Corpus(BaseModel):
         ):
             if normalized_word not in normalized_to_originals:
                 normalized_to_originals[normalized_word] = []
+
             normalized_to_originals[normalized_word].append((orig_idx, original_word))
 
         # For each normalized form, pick the best original (prefer diacritics/special chars)
@@ -151,14 +136,16 @@ class Corpus(BaseModel):
             )
 
             # Could add debug logging here if needed in future
-
             normalized_vocab_with_originals.append((normalized_word, best_orig_idx))
 
         # Build final structures
         corpus.vocabulary = [item[0] for item in normalized_vocab_with_originals]
-        corpus.vocabulary_to_index = {word: idx for idx, word in enumerate(corpus.vocabulary)}
+        corpus.vocabulary_to_index = {
+            word: idx for idx, word in enumerate(corpus.vocabulary)
+        }
         corpus.normalized_to_original_indices = {
-            idx: orig_idx for idx, (_, orig_idx) in enumerate(normalized_vocab_with_originals)
+            idx: orig_idx
+            for idx, (_, orig_idx) in enumerate(normalized_vocab_with_originals)
         }
 
         # Include model name in hash for semantic search to prevent cache conflicts
@@ -167,15 +154,20 @@ class Corpus(BaseModel):
 
         # Batch process lemmas with parallelization for large vocabularies
         vocab_count = len(corpus.vocabulary)
+
         logger.info(f"🔄 Starting lemmatization: {vocab_count:,} vocabulary items")
+
         lemma_start = time.time()
         (
             corpus.lemmatized_vocabulary,
             corpus.word_to_lemma_indices,
             corpus.lemma_to_word_indices,
         ) = batch_lemmatize(corpus.vocabulary)
+
         lemma_time = time.time() - lemma_start
+
         lemma_count = len(corpus.lemmatized_vocabulary)
+
         logger.info(
             f"✅ Lemmatization complete: {vocab_count:,} → {lemma_count:,} lemmas "
             f"({lemma_time:.1f}s, {vocab_count / lemma_time:.0f} items/s)",
@@ -356,7 +348,10 @@ class Corpus(BaseModel):
             )
 
             for length in target_lengths:
-                if length in self.length_buckets and len(candidate_set) < max_candidates:
+                if (
+                    length in self.length_buckets
+                    and len(candidate_set) < max_candidates
+                ):
                     remaining = max_candidates - len(candidate_set)
                     take_count = remaining if length == query_len else remaining // 3
                     candidate_set.update(self.length_buckets[length][:take_count])
@@ -389,7 +384,9 @@ class Corpus(BaseModel):
             self.length_buckets[word_len].append(word_idx)
 
         signature_count = len(self.signature_buckets)
-        avg_signature_size = sum(len(bucket) for bucket in self.signature_buckets.values()) / max(
+        avg_signature_size = sum(
+            len(bucket) for bucket in self.signature_buckets.values()
+        ) / max(
             signature_count,
             1,
         )

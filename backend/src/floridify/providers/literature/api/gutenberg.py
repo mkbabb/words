@@ -16,7 +16,7 @@ from urllib.parse import urljoin
 import aiofiles
 from bs4 import BeautifulSoup, Tag
 
-from ....models.literature import AuthorInfo, LiteraryWork, LiteratureSource
+from ....corpus.literature.models import AuthorInfo, LiteraryWork, LiteratureSource
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ...utils import respectful_scraper

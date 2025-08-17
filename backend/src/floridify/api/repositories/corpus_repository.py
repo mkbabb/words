@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from ...corpus.manager import get_corpus_manager
-from ...search.core import SearchEngine
+from ...search.core import Search
 
 
 class CorpusCreate(BaseModel):
@@ -68,7 +68,7 @@ class CorpusRepository:
     async def search(self, corpus_name: str, params: CorpusSearchParams) -> dict[str, Any]:
         """Search within a corpus."""
         # Create search engine for this corpus
-        search_engine = SearchEngine(
+        search_engine = Search(
             corpus_name=corpus_name,
             min_score=params.min_score,
             semantic=params.semantic,

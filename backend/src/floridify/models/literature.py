@@ -1,9 +1,3 @@
-"""Literature metadata models for versioned storage.
-
-This module contains metadata models for literature that integrate with the
-versioned data system for proper storage and retrieval.
-"""
-
 from __future__ import annotations
 
 from enum import Enum
@@ -11,10 +5,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .dictionary import Language
+from .base import Language
 
 
-class LiteratureSource(str, Enum):
+class LiteratureProvider(str, Enum):
     """Literature download sources."""
 
     GUTENBERG = "gutenberg"
@@ -108,22 +102,9 @@ class AuthorInfo(BaseModel):
         return genre_to_style.get(self.primary_genre, 2)
 
 
-class LiteratureMetrics(BaseModel):
-    """Literature metrics and statistics."""
-    
-    word_count: int
-    unique_words: int
-    sentence_count: int
-    paragraph_count: int
-    chapter_count: int
-    readability_score: float | None = None
-    average_sentence_length: float | None = None
-    lexical_diversity: float | None = None
-
-
-class LiteraryWork(BaseModel):
+class LiteratureEntry(BaseModel):
     """Literary work metadata."""
-    
+
     title: str
     author: AuthorInfo
     gutenberg_id: str | None = None
@@ -131,58 +112,11 @@ class LiteraryWork(BaseModel):
     genre: Genre
     period: Period
     language: Language = Language.ENGLISH
-    
+
     # Additional metadata
     subtitle: str | None = None
     description: str | None = None
     keywords: list[str] = Field(default_factory=list)
 
-
-class LiteratureEntry(BaseModel):
-    """In-memory representation of a literary work.
-    
-    Contains the full text content and associated metadata for a literary work.
-    """
-    
-    # Identification
-    literature_id: str | None = None
-    
-    # Metadata
-    title: str
-    authors: list[str]
-    publication_year: int | None = None
-    language: Language
-    source: LiteratureSource
-    
-    # Content (loaded from external storage)
-    full_text: str
-    
-    # Computed metrics
-    text_hash: str
-    text_size_bytes: int
-    word_count: int
-    unique_words: int
-    readability_score: float | None = None
-    
-    # Extracted features
-    chapters: list[str] = Field(default_factory=list)
-    paragraphs: list[str] = Field(default_factory=list)
-    sentences: list[str] = Field(default_factory=list)
-    
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> LiteratureEntry:
-        """Create LiteratureEntry from dictionary representation."""
-        return cls.model_validate(data)
-    
-    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
-        """Export model to dictionary for storage."""
-        return super().model_dump(exclude_none=True, **kwargs)
-
-
-class LiteratureContent(BaseModel):
-    """Literature content structure."""
-    
-    chapters: list[str] = Field(default_factory=list)
-    paragraphs: list[str] = Field(default_factory=list)
-    sentences: list[str] = Field(default_factory=list)
-    extracted_vocabulary: list[str] = Field(default_factory=list)
+    # Data
+    text: str  # Full text content

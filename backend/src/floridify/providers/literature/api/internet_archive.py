@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-from ....models.literature import LiteratureSource
+from ....corpus.literature.models import LiteratureSource
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ...utils import respectful_scraper
