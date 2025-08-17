@@ -4,17 +4,19 @@ Provides unified corpus loading, management, and processing for both
 language lexicons and literature texts.
 """
 
-from .constants import LexiconFormat
-from .core import Corpus
-from .parser import parse_text_lines
-from .sources import LEXICON_SOURCES
+from .core import Corpus, CorpusSource
+from .language import LANGUAGE_CORPUS_SOURCES, LanguageCorpus, LanguageCorpusLoader
+from .literature import LiteratureCorpus, LiteratureCorpusLoader
 
 __all__ = [
     # Core
     "Corpus",
-    # Constants
-    "LexiconFormat",
-    "LEXICON_SOURCES",
-    # Utils
-    "parse_text_lines",
+    "CorpusSource",
+    # Language
+    "LanguageCorpus",
+    "LanguageCorpusLoader",
+    "LANGUAGE_CORPUS_SOURCES",
+    # Literature
+    "LiteratureCorpus",
+    "LiteratureCorpusLoader",
 ]

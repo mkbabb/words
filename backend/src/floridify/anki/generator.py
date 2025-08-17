@@ -11,7 +11,7 @@ from typing import Any
 import genanki
 
 from ..ai.connector import OpenAIConnector
-from ..ai.templates import PromptTemplateManager as PromptLoader
+from ..ai.prompt_manager import PromptManager
 from ..models import Definition, DictionaryEntry
 from ..utils.logging import get_logger
 from .ankiconnect import AnkiDirectIntegration
@@ -141,17 +141,17 @@ class AnkiCardGenerator:
     def __init__(
         self,
         openai_connector: OpenAIConnector,
-        prompt_loader: PromptLoader | None = None,
+        prompt_manager: PromptManager | None = None,
     ) -> None:
         """Initialize Anki card generator.
 
         Args:
             openai_connector: OpenAI connector for generating card content
-            prompt_loader: Optional prompt loader (creates default if None)
+            prompt_manager: Optional prompt manager (creates default if None)
 
         """
         self.openai_connector = openai_connector
-        self.prompt_loader = prompt_loader or PromptLoader()
+        self.prompt_manager = prompt_manager or PromptManager()
         self.direct_integration = AnkiDirectIntegration()
 
     async def _load_generated_examples(self, definition: Definition, limit: int = 3) -> list[str]:

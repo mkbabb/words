@@ -7,7 +7,7 @@ import time
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from ....ai.factory import get_openai_connector
+from ....ai.connector import get_openai_connector
 from ....caching.decorators import cached_api_call
 from ....utils.logging import get_logger
 

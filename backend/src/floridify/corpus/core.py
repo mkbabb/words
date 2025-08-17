@@ -1,11 +1,12 @@
 """Core corpus implementation with in-memory vocabulary data.
 
-Contains the actual vocabulary processing and storage logic.
+Contains the actual vocabulary processing and storage logic and base corpus source configuration.
 """
 
 from __future__ import annotations
 
 import time
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from beanie import PydanticObjectId
@@ -13,13 +14,33 @@ from pydantic import BaseModel, Field
 
 from ..caching.manager import get_tree_corpus_manager
 from ..models.dictionary import CorpusType, Language
-from ..models.literature import AuthorInfo, Genre, Period
 from ..models.versioned import VersionConfig
 from ..text.normalize import batch_lemmatize, batch_normalize
 from ..utils.logging import get_logger
 from .utils import get_vocabulary_hash
 
 logger = get_logger(__name__)
+
+# Type alias for parser functions
+ParserFunc = Callable[[str, Language], tuple[list[str], list[str]]]
+ScraperFunc = Callable[[str], Awaitable[str | dict[str, Any]]]
+
+
+class CorpusSource(BaseModel):
+    """Configuration for a corpus source."""
+
+    name: str = Field(..., description="Unique identifier for the source")
+    url: str = Field(default="", description="URL to download the corpus data")
+    parser: str = Field(..., description="Name of parser function from corpus.parser module")
+    language: Language = Field(..., description="Language of the corpus")
+    description: str = Field(default="", description="Human-readable description")
+    scraper: ScraperFunc | None = Field(
+        default=None,
+        description="Optional custom scraper function",
+        exclude=True,
+    )
+
+    model_config = {"frozen": True, "arbitrary_types_allowed": True}
 
 
 class Corpus(BaseModel):
@@ -106,8 +127,9 @@ class Corpus(BaseModel):
         # Store reference to original vocabulary (no copy needed - we don't modify it)
         corpus.original_vocabulary = vocabulary  # Reference, not copy
 
-        # Process vocabulary - normalize all at once, then deduplicate while preserving original mapping
-        # CRITICAL: When multiple originals map to same normalized form, prefer the one with diacritics
+        # Process vocabulary - normalize all at once, then deduplicate while preserving
+        # original mapping. CRITICAL: When multiple originals map to same normalized form,
+        # prefer the one with diacritics
         normalized_vocabulary = batch_normalize(vocabulary)
 
         # Group all originals by their normalized form
@@ -155,7 +177,8 @@ class Corpus(BaseModel):
         lemma_time = time.time() - lemma_start
         lemma_count = len(corpus.lemmatized_vocabulary)
         logger.info(
-            f"✅ Lemmatization complete: {vocab_count:,} → {lemma_count:,} lemmas ({lemma_time:.1f}s, {vocab_count / lemma_time:.0f} items/s)",
+            f"✅ Lemmatization complete: {vocab_count:,} → {lemma_count:,} lemmas "
+            f"({lemma_time:.1f}s, {vocab_count / lemma_time:.0f} items/s)",
         )
 
         # Pre-compute indices with character signature-based candidate selection
@@ -242,7 +265,10 @@ class Corpus(BaseModel):
         )
 
     def get_words_by_indices(self, indices: list[int]) -> list[str]:
-        """Get multiple normalized words by indices in single call - 3-5x faster than individual calls."""
+        """Get multiple normalized words by indices in single call.
+
+        3-5x faster than individual calls.
+        """
         return [self.vocabulary[i] for i in indices if 0 <= i < len(self.vocabulary)]
 
     def get_original_words_by_indices(self, indices: list[int]) -> list[str]:
@@ -368,7 +394,8 @@ class Corpus(BaseModel):
             1,
         )
         logger.debug(
-            f"Built signature index: {signature_count} signatures, avg size {avg_signature_size:.1f}",
+            f"Built signature index: {signature_count} signatures, "
+            f"avg size {avg_signature_size:.1f}",
         )
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
@@ -503,49 +530,3 @@ class Corpus(BaseModel):
             corpus_meta = await CorpusMetadata.get(self.corpus_id)
             if corpus_meta:
                 await corpus_meta.delete()
-
-
-class LanguageCorpus(Corpus):
-    """Language-level master corpus with aggregated statistics.
-
-    Contains language-wide vocabulary and statistics aggregated
-    from all child corpora.
-    """
-
-    # Aggregated statistics
-    total_documents: int = 0
-    total_tokens: int = 0
-    unique_sources: list[str] = Field(default_factory=list)
-
-    # Language-specific data
-    common_words: list[str] = Field(default_factory=list)
-    stop_words: set[str] = Field(default_factory=set)
-
-    def __init__(self, **data: Any) -> None:
-        """Initialize language corpus as master."""
-        data["corpus_type"] = CorpusType.LANGUAGE
-        data["is_master"] = True
-        super().__init__(**data)
-
-
-class LiteratureCorpus(Corpus):
-    """Literature-based corpus with work metadata.
-
-    Contains vocabulary extracted from specific literary works
-    with author and genre information.
-    """
-
-    # Literature metadata
-    literature_data_ids: list[PydanticObjectId] = Field(default_factory=list)
-    authors: list[AuthorInfo] = Field(default_factory=list)
-    periods: list[Period] = Field(default_factory=list)
-    genres: list[Genre] = Field(default_factory=list)
-
-    # Work-specific statistics
-    work_titles: list[str] = Field(default_factory=list)
-    publication_years: list[int] = Field(default_factory=list)
-
-    def __init__(self, **data: Any) -> None:
-        """Initialize literature corpus."""
-        data["corpus_type"] = CorpusType.LITERATURE
-        super().__init__(**data)

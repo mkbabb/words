@@ -1,7 +1,7 @@
 """Shared utilities for corpus testing."""
 import random
 import string
-from typing import Optional
+
 from floridify.models.versioned import CorpusMetadata
 
 
@@ -10,7 +10,7 @@ def create_test_vocabulary(
     unicode_ratio: float = 0.1,
     min_length: int = 3,
     max_length: int = 15,
-    seed: Optional[int] = None,
+    seed: int | None = None,
 ) -> list[str]:
     """
     Create a test vocabulary with specified characteristics.
@@ -86,7 +86,7 @@ def verify_tree_consistency(
     parent_child_ids = set(parent.child_corpus_ids)
     
     assert child_ids == parent_child_ids, \
-        f"Parent's child_corpus_ids doesn't match actual children"
+        "Parent's child_corpus_ids doesn't match actual children"
     
     # Check no circular references
     assert parent.id not in parent.child_corpus_ids, \
@@ -94,7 +94,7 @@ def verify_tree_consistency(
     
     for child in children:
         assert child.id != parent.id, \
-            f"Child has same ID as parent"
+            "Child has same ID as parent"
     
     return True
 
@@ -146,7 +146,7 @@ def create_corpus_tree(
     tree = {}
     counter = 0
     
-    def create_node(level: int, parent_id: Optional[str] = None) -> CorpusMetadata:
+    def create_node(level: int, parent_id: str | None = None) -> CorpusMetadata:
         nonlocal counter
         counter += 1
         
@@ -239,8 +239,8 @@ def calculate_tree_stats(root: CorpusMetadata, all_nodes: dict[str, CorpusMetada
 
 def simulate_vocabulary_update(
     corpus: CorpusMetadata,
-    add_words: Optional[list[str]] = None,
-    remove_words: Optional[list[str]] = None,
+    add_words: list[str] | None = None,
+    remove_words: list[str] | None = None,
 ) -> list[str]:
     """
     Simulate vocabulary update operations.

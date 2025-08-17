@@ -9,7 +9,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from ....ai.constants import SynthesisComponent
-from ....ai.factory import get_definition_synthesizer, get_openai_connector
+from ....ai.connector import get_openai_connector
+from ....ai.synthesizer import get_definition_synthesizer
 from ....caching import cached_api_call_with_dedup
 from ....core.state_tracker import StateTracker
 from ....core.streaming import create_streaming_response

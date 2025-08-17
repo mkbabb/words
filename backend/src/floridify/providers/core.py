@@ -97,9 +97,9 @@ class RateLimitPresets(Enum):
 
     # Local providers - no rate limiting needed
     LOCAL = RateLimitConfig(
-        base_requests_per_second=1000.0,
+        base_requests_per_second=100.0,  # Maximum allowed by constraint
         min_delay=0.0,
-        max_delay=0.1,
+        max_delay=1.0,  # Minimum allowed by constraint
         backoff_multiplier=1.0,
         success_speedup=1.0,
         success_threshold=1,

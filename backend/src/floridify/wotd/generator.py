@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 
-from ..ai.factory import get_openai_connector
+from ..ai.connector import get_openai_connector
 from ..utils.logging import get_logger
 from .core import (
     Author,

@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from ...caching.decorators import cached_computation_async
+from ....caching.decorators import cached_computation_async
 
 # Type alias for clarity
 ScraperFunc = Callable[..., Awaitable[str | dict[str, Any]]]

@@ -9,7 +9,7 @@ from typing import Any
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
-from ..corpus.models import CorpusMetadata
+from ..models.versioned import CorpusMetadata
 from ..models import (
     AudioMedia,
     # CorpusCacheEntry removed - using unified caching

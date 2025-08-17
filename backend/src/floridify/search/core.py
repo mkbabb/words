@@ -10,213 +10,20 @@ import itertools
 from typing import Any
 
 from ..corpus.core import Corpus
-from ..corpus.manager import get_corpus_manager
+from ..models.versioned import VersionConfig
 from ..text import normalize
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod, SearchMode
 from .fuzzy import FuzzySearch  # Using RapidFuzz implementation
-from .models import SearchResult
+from .models import SearchIndex, SearchResult
 from .semantic.constants import DEFAULT_SENTENCE_MODEL, SemanticModel
 from .semantic.core import SemanticSearch
-
-# Semantic manager removed - using direct SemanticSearch creation
 from .trie import TrieSearch
 
 logger = get_logger(__name__)
 
 
-class SearchIndex:
-    """Encapsulates search index data and configurations.
-
-    This class manages the trie index, fuzzy search configuration, and
-    semantic search references for efficient multi-method search.
-    """
-
-    def __init__(
-        self,
-        corpus: Corpus,
-        semantic_enabled: bool = True,
-        semantic_model: SemanticModel = DEFAULT_SENTENCE_MODEL,
-    ):
-        """Initialize search index.
-
-        Args:
-            corpus: Corpus containing vocabulary data
-            semantic_enabled: Whether semantic search is enabled
-            semantic_model: Model to use for semantic search
-        """
-        self.corpus = corpus
-        self.semantic_enabled = semantic_enabled
-        self.semantic_model = semantic_model
-
-        # Search components (initialized lazily)
-        self.trie_search: TrieSearch | None = None
-        self.fuzzy_search: FuzzySearch | None = None
-
-        # References to semantic index
-        self.semantic_index_id: str | None = None
-        self.has_semantic_index: bool = False
-
-        # Metadata
-        self.build_time_seconds: float = 0.0
-        self.memory_usage_mb: float = 0.0
-        self.index_type: str = "composite"
-
-    def build_trie_index(self) -> None:
-        """Build trie index for prefix search."""
-        if self.corpus and self.corpus.vocabulary:
-            self.trie_search = TrieSearch()
-
-    def build_fuzzy_index(self) -> None:
-        """Build fuzzy search index."""
-        if self.corpus:
-            self.fuzzy_search = FuzzySearch()
-
-    @classmethod
-    async def get(
-        cls,
-        corpus: Corpus,
-        semantic_enabled: bool = True,
-        semantic_model: SemanticModel = DEFAULT_SENTENCE_MODEL,
-        config: Any | None = None,
-    ) -> SearchIndex | None:
-        """Get search index from versioned storage.
-
-        Args:
-            corpus: Corpus containing vocabulary
-            semantic_enabled: Whether semantic search is enabled
-            semantic_model: Model for semantic search
-            config: Version configuration
-
-        Returns:
-            SearchIndex instance or None if not found
-        """
-        from ..caching.manager import get_version_manager
-        from ..models.versioned import ResourceType, VersionConfig
-
-        manager = get_version_manager()
-
-        # Create index ID based on corpus
-        index_id = f"{corpus.corpus_name}:search"
-
-        # Get the latest search index metadata
-        search_metadata = await manager.get_latest(
-            resource_id=index_id,
-            resource_type=ResourceType.SEARCH,
-            use_cache=config.use_cache if config else True,
-            config=config or VersionConfig(),
-        )
-
-        if not search_metadata:
-            return None
-
-        # Load content from metadata
-        content = await search_metadata.get_content()
-        if not content:
-            return None
-
-        # Create index instance
-        index = cls(
-            corpus=corpus,
-            semantic_enabled=semantic_enabled,
-            semantic_model=semantic_model,
-        )
-
-        # Restore configuration from content
-        if "semantic_index_id" in content:
-            index.semantic_index_id = content["semantic_index_id"]
-            index.has_semantic_index = True
-
-        # Rebuild indices
-        index.build_trie_index()
-        index.build_fuzzy_index()
-
-        return index
-
-    async def save(
-        self,
-        config: Any | None = None,
-    ) -> None:
-        """Save search index to versioned storage.
-
-        Args:
-            config: Version configuration
-        """
-        from ..caching.manager import get_version_manager
-        from ..models.versioned import ResourceType, VersionConfig
-
-        manager = get_version_manager()
-
-        # Create index ID
-        index_id = f"{self.corpus.corpus_name}:search"
-
-        # Prepare content to save
-        content = {
-            "corpus_name": self.corpus.corpus_name,
-            "semantic_enabled": self.semantic_enabled,
-            "semantic_model": self.semantic_model,
-            "semantic_index_id": self.semantic_index_id,
-            "has_semantic_index": self.has_semantic_index,
-        }
-
-        # Save using version manager
-        await manager.save(
-            resource_id=index_id,
-            resource_type=ResourceType.SEARCH,
-            namespace=manager._get_namespace(ResourceType.SEARCH),
-            content=content,
-            config=config or VersionConfig(),
-            metadata={
-                "corpus_id": self.corpus.corpus_id,
-                "corpus_version": self.corpus.vocabulary_hash,
-                "index_type": self.index_type,
-            },
-        )
-
-        logger.info(f"Saved search index for {index_id}")
-
-    @classmethod
-    async def get_or_create(
-        cls,
-        corpus: Corpus,
-        semantic_enabled: bool = True,
-        semantic_model: SemanticModel = DEFAULT_SENTENCE_MODEL,
-        force_rebuild: bool = False,
-        config: Any | None = None,
-    ) -> SearchIndex:
-        """Get existing search index or create new one.
-
-        Args:
-            corpus: Corpus containing vocabulary
-            semantic_enabled: Whether semantic search is enabled
-            semantic_model: Model for semantic search
-            force_rebuild: Force rebuilding even if exists
-            config: Version configuration
-
-        Returns:
-            SearchIndex instance
-        """
-        # Try to get existing unless forced rebuild
-        if not force_rebuild:
-            existing = await cls.get(corpus, semantic_enabled, semantic_model, config)
-            if existing:
-                return existing
-
-        # Create new index
-        index = cls(
-            corpus=corpus,
-            semantic_enabled=semantic_enabled,
-            semantic_model=semantic_model,
-        )
-
-        # Build indices
-        index.build_trie_index()
-        index.build_fuzzy_index()
-
-        # Save the index
-        await index.save(config)
-
-        return index
+# CompositeSearchIndex removed - functionality moved to SearchIndex model
 
 
 class SearchEngine:
@@ -234,33 +41,21 @@ class SearchEngine:
 
     def __init__(
         self,
-        corpus_name: str,
-        min_score: float = DEFAULT_MIN_SCORE,
-        semantic: bool = True,
-        semantic_model: SemanticModel = DEFAULT_SENTENCE_MODEL,
-        force_rebuild: bool = False,
+        index: SearchIndex | None = None,
+        corpus: Corpus | None = None,
     ) -> None:
-        """Initialize with corpus name and configuration.
+        """Initialize with search index and optional corpus.
 
         Args:
-            corpus_name: Name of corpus to fetch from corpus manager
-            min_score: Minimum score threshold for results
-            semantic: Enable semantic search (requires ML dependencies)
-            semantic_model: Model to use for semantic search (BGE-M3 or MiniLM)
-            force_rebuild: Force rebuild of indices and semantic search
+            index: Pre-loaded SearchIndex containing all configuration
+            corpus: Optional corpus for runtime operations
 
         """
-        self.corpus_name = corpus_name
-        self.min_score = min_score
-        self.semantic = semantic
-        self.semantic_model = semantic_model
-        self.force_rebuild = force_rebuild
+        # Data model
+        self.index = index
+        self.corpus = corpus
 
-        # Corpus will be fetched lazily
-        self.corpus: Corpus | None = None
-        self._vocabulary_hash: str = ""
-
-        # Initialize components as None - will be lazy loaded
+        # Search components (built from index)
         self.trie_search: TrieSearch | None = None
         self.fuzzy_search: FuzzySearch | None = None
         self.semantic_search: SemanticSearch | None = None
@@ -271,75 +66,102 @@ class SearchEngine:
 
         self._initialized = False
 
-        logger.debug(
-            f"SearchEngine created for corpus '{corpus_name}', semantic={'enabled' if self.semantic else 'disabled'}",
+        if index:
+            logger.debug(
+                f"SearchEngine created for corpus '{index.corpus_name}', semantic={'enabled' if index.semantic_enabled else 'disabled'}",
+            )
+
+    @classmethod
+    async def from_corpus(
+        cls,
+        corpus_name: str,
+        min_score: float = DEFAULT_MIN_SCORE,
+        semantic: bool = True,
+        semantic_model: SemanticModel = DEFAULT_SENTENCE_MODEL,
+        config: VersionConfig | None = None,
+    ) -> SearchEngine:
+        """Create SearchEngine from corpus name.
+        
+        Args:
+            corpus_name: Name of corpus to load
+            min_score: Minimum score threshold
+            semantic: Enable semantic search
+            semantic_model: Model for semantic search
+            config: Version configuration
+            
+        Returns:
+            SearchEngine instance with loaded index
+        """
+        # Get corpus
+        corpus = await Corpus.get(
+            corpus_name=corpus_name,
+            config=config or VersionConfig(),
         )
+        
+        if not corpus:
+            raise ValueError(f"Corpus '{corpus_name}' not found")
+        
+        # Get or create index
+        index = await SearchIndex.get_or_create(
+            corpus=corpus,
+            min_score=min_score,
+            semantic=semantic,
+            semantic_model=semantic_model,
+            config=config or VersionConfig(),
+        )
+        
+        # Create engine with index
+        engine = cls(index=index, corpus=corpus)
+        await engine.initialize()
+        
+        return engine
 
     async def initialize(self) -> None:
         """Initialize expensive components lazily with vocab hash-based caching."""
+        if not self.index:
+            raise ValueError("Index required for initialization")
+            
         # Quick vocab hash check - if unchanged, skip re-initialization
-        current_vocab_hash = await self._get_current_vocab_hash()
         if (
             self._initialized
-            and self._vocabulary_hash == current_vocab_hash
-            and self.corpus is not None
+            and self.corpus
+            and self.index.vocabulary_hash == self.corpus.vocabulary_hash
         ):
             logger.debug(
-                f"SearchEngine for '{self.corpus_name}' already initialized with hash {current_vocab_hash[:8]}",
+                f"SearchEngine for '{self.index.corpus_name}' already initialized with hash {self.index.vocabulary_hash[:8]}",
             )
             return
 
         logger.info(
-            f"Initializing SearchEngine for corpus '{self.corpus_name}' (hash: {current_vocab_hash[:8] if current_vocab_hash else 'unknown'})",
+            f"Initializing SearchEngine for corpus '{self.index.corpus_name}' (hash: {self.index.vocabulary_hash[:8]})",
         )
 
-        # Fetch Corpus from corpus manager
-        manager = get_corpus_manager()
-
-        # First try to get corpus metadata to get the vocab_hash
-        logger.debug(f"Fetching corpus metadata for '{self.corpus_name}'")
-        metadata = await manager.get_corpus_metadata(self.corpus_name)
-
-        if metadata is not None:
-            logger.debug(
-                f"Found metadata for '{self.corpus_name}', vocab hash: {metadata.vocabulary_hash[:8]}",
+        # Load corpus if not already loaded
+        if not self.corpus:
+            self.corpus = await Corpus.get(
+                corpus_name=self.index.corpus_name,
+                config=VersionConfig(),
             )
-            # Get corpus from cache using the vocab_hash
-            self.corpus = await manager.get_corpus(
-                self.corpus_name,
-                vocab_hash=metadata.vocabulary_hash,
-            )
-            if self.corpus:
-                logger.debug(f"Successfully loaded corpus '{self.corpus_name}' from cache")
-            else:
-                logger.warning("Could not load corpus from cache despite metadata existing")
-        else:
-            logger.warning(f"No metadata found for corpus '{self.corpus_name}'")
+            
+            if not self.corpus:
+                raise ValueError(
+                    f"Corpus '{self.index.corpus_name}' not found. It should have been created by LanguageSearch.initialize() or via get_or_create_corpus().",
+                )
 
-        if self.corpus is None:
-            logger.error(
-                f"Failed to load corpus '{self.corpus_name}' - not found in cache or metadata",
-            )
-            raise ValueError(
-                f"Corpus '{self.corpus_name}' not found. It should have been created by LanguageSearch.initialize() or via get_or_create_corpus().",
-            )
-
-        self._vocabulary_hash = self.corpus.vocabulary_hash
         combined_vocab = self.corpus.vocabulary
         logger.debug(f"Corpus loaded with {len(combined_vocab)} vocabulary items")
 
         # High-performance search components - only initialize if needed
-        if not self.trie_search or self.trie_search._vocabulary_hash != self._vocabulary_hash:
+        if self.index.has_trie:
             logger.debug("Building/updating Trie index")
-            self.trie_search = TrieSearch()
-            await self.trie_search.build_index(self.corpus)
+            self.trie_search = await TrieSearch.from_corpus(self.corpus)
 
-        if not self.fuzzy_search:
+        if self.index.has_fuzzy:
             logger.debug("Initializing Fuzzy search")
-            self.fuzzy_search = FuzzySearch(min_score=self.min_score)
+            self.fuzzy_search = FuzzySearch(min_score=self.index.min_score)
 
         # Initialize semantic search if enabled - non-blocking background task
-        if self.semantic and not self._semantic_ready:
+        if self.index.semantic_enabled and not self._semantic_ready:
             logger.debug("Semantic search enabled - initializing in background")
             # Fire and forget - semantic search initializes in background
             self._semantic_init_task = asyncio.create_task(self._initialize_semantic_background())
@@ -347,84 +169,87 @@ class SearchEngine:
         self._initialized = True
 
         logger.info(
-            f"✅ SearchEngine initialized for corpus '{self.corpus_name}' (hash: {self._vocabulary_hash[:8]})",
+            f"✅ SearchEngine initialized for corpus '{self.index.corpus_name}' (hash: {self.index.vocabulary_hash[:8]})",
         )
 
     async def _initialize_semantic_background(self) -> None:
         """Initialize semantic search in background without blocking."""
         try:
-            if not self.corpus:
-                logger.warning("Cannot initialize semantic search without corpus")
+            if not self.corpus or not self.index:
+                logger.warning("Cannot initialize semantic search without corpus and index")
                 return
 
-            logger.info(f"Starting background semantic initialization for '{self.corpus_name}'")
+            logger.info(f"Starting background semantic initialization for '{self.index.corpus_name}'")
 
-            # Create semantic search directly
+            # Create semantic search using from_corpus
             logger.info(
-                f"Creating semantic search for corpus '{self.corpus_name}' with {self.semantic_model} (background)",
+                f"Creating semantic search for corpus '{self.index.corpus_name}' with {self.index.semantic_model} (background)",
             )
-            self.semantic_search = SemanticSearch(
+            self.semantic_search = await SemanticSearch.from_corpus(
                 corpus=self.corpus,
-                model_name=self.semantic_model,
-                force_rebuild=self.force_rebuild,
+                model_name=self.index.semantic_model,
+                config=VersionConfig(),
             )
-            await self.semantic_search.initialize()
 
             self._semantic_ready = True
-            logger.info(f"✅ Semantic search ready for '{self.corpus_name}'")
+            logger.info(f"✅ Semantic search ready for '{self.index.corpus_name}'")
 
         except Exception as e:
             logger.error(f"Failed to initialize semantic search: {e}")
             self._semantic_ready = False
 
     async def _get_current_vocab_hash(self) -> str | None:
-        """Get current vocabulary hash from corpus manager."""
+        """Get current vocabulary hash from corpus."""
+        if not self.index:
+            return None
+            
         try:
-            manager = get_corpus_manager()
-            metadata = await manager.get_corpus_metadata(self.corpus_name)
-            return metadata.vocabulary_hash if metadata else None
+            corpus = await Corpus.get(
+                corpus_name=self.index.corpus_name,
+                config=VersionConfig(),
+            )
+            return corpus.vocabulary_hash if corpus else None
         except Exception:
             return None
 
     async def update_corpus(self) -> None:
         """Check if corpus has changed and update components if needed. Optimized with hash check."""
-        if not self.corpus:
+        if not self.corpus or not self.index:
             return
 
         # Quick vocabulary hash check - if unchanged, skip expensive updates
         current_vocab_hash = await self._get_current_vocab_hash()
-        if current_vocab_hash == self._vocabulary_hash:
+        if current_vocab_hash == self.index.vocabulary_hash:
             logger.debug(
-                f"Corpus unchanged for '{self.corpus_name}' (hash: {current_vocab_hash[:8] if current_vocab_hash else 'none'})",
+                f"Corpus unchanged for '{self.index.corpus_name}' (hash: {current_vocab_hash[:8] if current_vocab_hash else 'none'})",
             )
             return
 
         logger.info(
-            f"Corpus vocabulary changed for '{self.corpus_name}': {self._vocabulary_hash[:8] if self._vocabulary_hash else 'none'} -> {current_vocab_hash[:8] if current_vocab_hash else 'none'}",
+            f"Corpus vocabulary changed for '{self.index.corpus_name}': {self.index.vocabulary_hash[:8]} -> {current_vocab_hash[:8] if current_vocab_hash else 'none'}",
         )
 
         # Get updated corpus
-        manager = get_corpus_manager()
-        updated_corpus = await manager.get_corpus(self.corpus_name, vocab_hash=current_vocab_hash)
+        updated_corpus = await Corpus.get(
+            corpus_name=self.index.corpus_name,
+            config=VersionConfig(),
+        )
 
         if not updated_corpus:
-            logger.error(f"Failed to get updated corpus '{self.corpus_name}'")
+            logger.error(f"Failed to get updated corpus '{self.index.corpus_name}'")
             return
 
-        # Update corpus and hash
+        # Update corpus and index hash
         self.corpus = updated_corpus
-        self._vocabulary_hash = updated_corpus.vocabulary_hash
+        self.index.vocabulary_hash = updated_corpus.vocabulary_hash
 
         # Update search components only if needed
-        if self.trie_search and self.trie_search._vocabulary_hash != self._vocabulary_hash:
-            await self.trie_search.build_index(updated_corpus)
+        if self.trie_search:
+            self.trie_search = await TrieSearch.from_corpus(updated_corpus)
 
         # Note: FuzzySearch uses corpus on-demand, no rebuild needed
         # Update semantic search if enabled and hash changed
-        if (
-            self.semantic_search
-            and getattr(self.semantic_search, "_vocabulary_hash", None) != self._vocabulary_hash
-        ):
+        if self.semantic_search:
             await self.semantic_search.update_corpus(updated_corpus)
 
     async def search(
@@ -478,7 +303,7 @@ class SearchEngine:
         if not normalized_query:
             return []
 
-        min_score = min_score if min_score is not None else self.min_score
+        min_score = min_score if min_score is not None else (self.index.min_score if self.index else DEFAULT_MIN_SCORE)
 
         # Perform search based on mode
         if mode == SearchMode.SMART:
@@ -486,7 +311,7 @@ class SearchEngine:
                 normalized_query,
                 max_results,
                 min_score,
-                self.semantic,
+                self.index.semantic_enabled if self.index else False,
             )
         elif mode == SearchMode.EXACT:
             results = self.search_exact(normalized_query)
@@ -670,23 +495,22 @@ class SearchEngine:
 
     def get_stats(self) -> dict[str, Any]:
         """Get search engine statistics."""
-        if self.corpus:
+        if not self.index:
             return {
-                "vocabulary_size": len(self.corpus.vocabulary),
-                "min_score": self.min_score,
-                "semantic_enabled": self.semantic,
-                "semantic_ready": self._semantic_ready,
-                "semantic_model": self.semantic_model if self.semantic else None,
-                "corpus_name": self.corpus_name,
+                "vocabulary_size": 0,
+                "min_score": DEFAULT_MIN_SCORE,
+                "semantic_enabled": False,
+                "semantic_ready": False,
+                "corpus_name": "",
             }
+            
         return {
-            "vocabulary_size": 0,
-            "words": 0,
-            "phrases": 0,
-            "min_score": self.min_score,
-            "semantic_enabled": self.semantic,
-            "semantic_ready": False,
-            "corpus_name": self.corpus_name,
+            "vocabulary_size": self.index.vocabulary_size,
+            "min_score": self.index.min_score,
+            "semantic_enabled": self.index.semantic_enabled,
+            "semantic_ready": self._semantic_ready,
+            "semantic_model": self.index.semantic_model if self.index.semantic_enabled else None,
+            "corpus_name": self.index.corpus_name,
         }
 
 

@@ -1,12 +1,10 @@
 """Corpus loaders module.
 
-Provides specialized loaders for different corpus types.
+Base loader infrastructure for corpus management.
 """
 
-from .language import CorpusLanguageLoader
-from .literature import LiteratureCorpusLoader
+from .core import BaseCorpusLoader
 
 __all__ = [
-    "CorpusLanguageLoader",
-    "LiteratureCorpusLoader",
+    "BaseCorpusLoader",
 ]

@@ -7,10 +7,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..caching.manager import TreeCorpusManager, get_tree_corpus_manager
 from ..corpus.core import Corpus
 from ..corpus.loaders.language import CorpusLanguageLoader
-from ..corpus.manager import CorpusManager, get_corpus_manager
 from ..models.dictionary import Language
+from ..models.versioned import VersionConfig
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMode
 from .core import SearchEngine, SearchResult
@@ -53,7 +54,7 @@ class LanguageSearch:
         self.semantic_model = semantic_model
 
         self.search_engine: SearchEngine | None = None
-        self._corpus_manager: CorpusManager = get_corpus_manager()
+        self._corpus_manager: TreeCorpusManager = get_tree_corpus_manager()
         self._initialized: bool = False
 
     async def initialize(self) -> None:
@@ -84,17 +85,13 @@ class LanguageSearch:
         logger.info(
             f"Creating SearchEngine for corpus '{corpus.corpus_name}' with {self.semantic_model if self.semantic else 'no semantic'}"
         )
-        self.search_engine = SearchEngine(
+        self.search_engine = await SearchEngine.from_corpus(
             corpus_name=corpus.corpus_name,
             min_score=self.min_score,
             semantic=self.semantic,
             semantic_model=self.semantic_model,
-            force_rebuild=self.force_rebuild,
+            config=VersionConfig(force_rebuild=self.force_rebuild),
         )
-
-        # Initialize search engine components
-        logger.info("Initializing SearchEngine components")
-        await self.search_engine.initialize()
 
         # Semantic search is initialized during SearchEngine.initialize() if enabled
 
@@ -203,7 +200,7 @@ class LanguageSearch:
         stats.update(
             {
                 "languages": [lang.value for lang in self.languages],
-                "corpus_name": self.search_engine.corpus_name if self.search_engine else None,
+                "corpus_name": self.search_engine.index.corpus_name if self.search_engine and self.search_engine.index else None,
             },
         )
         return stats

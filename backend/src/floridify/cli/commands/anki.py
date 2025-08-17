@@ -8,7 +8,7 @@ from pathlib import Path
 import click
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from ...ai.factory import get_openai_connector
+from ...ai.connector import get_openai_connector
 from ...anki.constants import CardType
 from ...anki.generator import AnkiCardGenerator
 from ...core.lookup_pipeline import lookup_word_pipeline

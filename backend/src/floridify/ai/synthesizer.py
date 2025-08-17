@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import Any
 
 from ..caching.manager import get_version_manager
@@ -466,3 +467,39 @@ class DefinitionSynthesizer:
 
         logger.info(f"Successfully regenerated components for entry {entry_id}")
         return entry
+
+
+# Global singleton instance
+_definition_synthesizer: DefinitionSynthesizer | None = None
+
+
+def get_definition_synthesizer(
+    config_path: str | Path | None = None,
+    examples_count: int = 2,
+    force_recreate: bool = False,
+) -> DefinitionSynthesizer:
+    """Get or create the global definition synthesizer singleton.
+
+    Args:
+        config_path: Path to configuration file
+        examples_count: Number of examples to generate
+        force_recreate: Force recreation of the synthesizer
+
+    Returns:
+        Initialized definition synthesizer instance
+
+    """
+    global _definition_synthesizer
+
+    if _definition_synthesizer is None or force_recreate:
+
+        from .connector import get_openai_connector
+
+        logger.info("Initializing definition synthesizer singleton")
+        connector = get_openai_connector(config_path, force_recreate)
+        _definition_synthesizer = DefinitionSynthesizer(
+            connector, examples_count=examples_count
+        )
+        logger.success("Definition synthesizer singleton initialized")
+
+    return _definition_synthesizer

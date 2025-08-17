@@ -1,9 +1,8 @@
 """Test vocabulary aggregation mechanisms."""
-import pytest
 from typing import TYPE_CHECKING
-from floridify.models.versioned import ResourceType, VersionInfo
-from floridify.models.dictionary import CorpusType, Language
-from floridify.caching.models import CacheNamespace
+
+from floridify.models.dictionary import CorpusType
+from floridify.models.versioned import VersionInfo
 
 if TYPE_CHECKING:
     from conftest import MockCorpusMetadata

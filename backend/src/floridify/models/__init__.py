@@ -15,6 +15,7 @@ from .base import AudioMedia, BaseMetadata, Etymology, ImageMedia, ModelInfo
 from .dictionary import (
     CorpusType,
     Definition,
+    DictionaryEntry,
     DictionaryProvider,
     Example,
     Fact,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from pathlib import Path
 from typing import Any, TypeVar
 
 from openai import AsyncOpenAI
@@ -46,7 +47,7 @@ from .models import (
     WordOfTheDayResponse,
     WordSuggestionResponse,
 )
-from .templates import PromptTemplateManager
+from .prompt_manager import PromptManager
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -71,14 +72,14 @@ class OpenAIConnector:
         self.embedding_model = embedding_model
         self.temperature = temperature
         self.max_tokens = max_tokens
-        self.template_manager = PromptTemplateManager()
+        self.prompt_manager = PromptManager()
         self._last_model_info: ModelInfo | None = None  # Track last model info
 
     @property
     def last_model_info(self) -> ModelInfo | None:
         """Get the last model info that was actually used for a request."""
         return self._last_model_info
-    
+
     @property
     def last_model_used(self) -> str:
         """Get the last model that was actually used for a request (backward compat)."""
@@ -229,7 +230,7 @@ class OpenAIConnector:
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                     total_tokens=total_tokens,
-                    response_time_ms=int(api_duration * 1000)
+                    response_time_ms=int(api_duration * 1000),
                 )
 
                 total_duration = time.perf_counter() - start_time
@@ -284,7 +285,8 @@ class OpenAIConnector:
             meaning_cluster: The meaning cluster this definition belongs to.
 
         """
-        prompt = self.template_manager.get_synthesis_prompt(
+        prompt = self.prompt_manager.render(
+            "synthesize/definitions",
             word=word,
             definitions=definitions,
             meaning_cluster=meaning_cluster,
@@ -312,11 +314,12 @@ class OpenAIConnector:
         """Generate modern usage examples."""
         logger.debug(f"📝 Generating {count} example sentence(s) for '{word}' ({part_of_speech})")
 
-        prompt = self.template_manager.get_generate_examples_prompt(
-            word,
-            definition,
-            part_of_speech,
-            count,
+        prompt = self.prompt_manager.render(
+            "generate/examples",
+            word=word,
+            definition=definition,
+            part_of_speech=part_of_speech,
+            count=count,
         )
 
         try:
@@ -336,7 +339,7 @@ class OpenAIConnector:
 
     async def pronunciation(self, word: str) -> PronunciationResponse:
         """Generate pronunciation data."""
-        prompt = self.template_manager.get_pronunciation_prompt(word)
+        prompt = self.prompt_manager.render("synthesize/pronunciation", word=word)
 
         return await self._make_structured_request(
             prompt,
@@ -348,7 +351,7 @@ class OpenAIConnector:
         """Generate AI fallback provider data."""
         logger.info(f"🤖 Generating AI fallback definition for '{word}'")
 
-        prompt = self.template_manager.get_lookup_prompt(word)
+        prompt = self.prompt_manager.render("misc/lookup", word=word)
 
         try:
             result = await self._make_structured_request(
@@ -357,11 +360,8 @@ class OpenAIConnector:
                 task_name="lookup_word",
             )
 
-            if result.provider_data is None:
-                logger.info(f"🚫 AI identified '{word}' as nonsense/invalid")
-                return None
-            if result.provider_data:
-                def_count = len(result.provider_data.definitions)
+            if result.definitions:
+                def_count = len(result.definitions)
                 logger.success(
                     f"✨ Generated {def_count} definitions for '{word}' "
                     f"(confidence: {result.confidence:.1%})",
@@ -391,7 +391,11 @@ class OpenAIConnector:
 
         logger.info(f"🔢 Extracting cluster mappings for '{word}' from {def_count} definitions")
 
-        prompt = self.template_manager.get_meaning_extraction_prompt(word, definitions)
+        prompt = self.prompt_manager.render(
+            "misc/meaning_extraction",
+            word=word,
+            definitions=definitions,
+        )
 
         try:
             result = await self._make_structured_request(
@@ -437,7 +441,7 @@ class OpenAIConnector:
         examples: str | None = None,
     ) -> AnkiFillBlankResponse:
         """Generate fill-in-the-blank flashcard using structured output."""
-        prompt = self.template_manager.render_template(
+        prompt = self.prompt_manager.render(
             "misc/anki_fill_blank",
             word=word,
             definition=definition,
@@ -464,7 +468,7 @@ class OpenAIConnector:
         examples: str | None = None,
     ) -> AnkiMultipleChoiceResponse:
         """Generate best describes flashcard using structured output."""
-        prompt = self.template_manager.render_template(
+        prompt = self.prompt_manager.render(
             "misc/anki_best_describes",
             word=word,
             definition=definition,
@@ -494,7 +498,8 @@ class OpenAIConnector:
         """Generate synonyms with efflorescence ranking."""
         logger.debug(f"🔗 Generating {count} synonyms for '{word}' ({part_of_speech})")
 
-        prompt = self.template_manager.get_synthesize_synonyms_prompt(
+        prompt = self.prompt_manager.render(
+            "synthesize/synonyms",
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
@@ -540,7 +545,8 @@ class OpenAIConnector:
             f"🌸 Generating {suggestion_count} suggestions from {len(limited_words) if limited_words else 0} words",
         )
 
-        prompt = self.template_manager.get_suggestions_prompt(
+        prompt = self.prompt_manager.render(
+            "misc/suggestions",
             input_words=limited_words,
             count=suggestion_count,
         )
@@ -587,7 +593,8 @@ class OpenAIConnector:
             f"📚 Generating {fact_count} facts for '{word}' with {len(limited_previous)} previous words",
         )
 
-        prompt = self.template_manager.get_fact_generation_prompt(
+        prompt = self.prompt_manager.render(
+            "generate/facts",
             word=word,
             definition=definition,
             count=fact_count,
@@ -631,7 +638,8 @@ class OpenAIConnector:
             AntonymResponse with list of antonyms
 
         """
-        prompt = self.template_manager.get_synthesize_antonyms_prompt(
+        prompt = self.prompt_manager.render(
+            "synthesize/antonyms",
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
@@ -666,7 +674,8 @@ class OpenAIConnector:
             EtymologyResponse with etymology information
 
         """
-        prompt = self.template_manager.get_etymology_prompt(
+        prompt = self.prompt_manager.render(
+            "synthesize/etymology",
             word=word,
             provider_data=provider_data,
         )
@@ -698,7 +707,8 @@ class OpenAIConnector:
             WordFormResponse with word forms
 
         """
-        prompt = self.template_manager.get_word_forms_prompt(
+        prompt = self.prompt_manager.render(
+            "generate/word_forms",
             word=word,
             part_of_speech=part_of_speech,
         )
@@ -730,7 +740,8 @@ class OpenAIConnector:
             FrequencyBandResponse with band assessment
 
         """
-        prompt = self.template_manager.get_frequency_prompt(
+        prompt = self.prompt_manager.render(
+            "assess/frequency",
             word=word,
             definition=definition,
         )
@@ -760,7 +771,7 @@ class OpenAIConnector:
             RegisterClassificationResponse with classification
 
         """
-        prompt = self.template_manager.get_register_prompt(definition=definition)
+        prompt = self.prompt_manager.render("assess/register", definition=definition)
 
         try:
             result = await self._make_structured_request(
@@ -787,7 +798,7 @@ class OpenAIConnector:
             DomainIdentificationResponse with domain
 
         """
-        prompt = self.template_manager.get_domain_prompt(definition=definition)
+        prompt = self.prompt_manager.render("assess/domain", definition=definition)
 
         try:
             result = await self._make_structured_request(
@@ -816,7 +827,8 @@ class OpenAIConnector:
             CEFRLevelResponse with level assessment
 
         """
-        prompt = self.template_manager.get_cefr_prompt(
+        prompt = self.prompt_manager.render(
+            "assess/cefr",
             word=word,
             definition=definition,
         )
@@ -848,7 +860,8 @@ class OpenAIConnector:
             GrammarPatternResponse with patterns
 
         """
-        prompt = self.template_manager.get_grammar_patterns_prompt(
+        prompt = self.prompt_manager.render(
+            "assess/grammar_patterns",
             definition=definition,
             part_of_speech=part_of_speech,
         )
@@ -882,7 +895,8 @@ class OpenAIConnector:
             CollocationResponse with collocations
 
         """
-        prompt = self.template_manager.get_collocations_prompt(
+        prompt = self.prompt_manager.render(
+            "assess/collocations",
             word=word,
             definition=definition,
             part_of_speech=part_of_speech,
@@ -915,7 +929,8 @@ class OpenAIConnector:
             UsageNoteResponse with usage guidance
 
         """
-        prompt = self.template_manager.get_usage_notes_prompt(
+        prompt = self.prompt_manager.render(
+            "misc/usage_note_generation",
             word=word,
             definition=definition,
         )
@@ -945,7 +960,7 @@ class OpenAIConnector:
             RegionalVariantResponse with regions
 
         """
-        prompt = self.template_manager.get_regional_variants_prompt(definition=definition)
+        prompt = self.prompt_manager.render("assess/regional_variants", definition=definition)
 
         try:
             result = await self._make_structured_request(
@@ -972,7 +987,7 @@ class OpenAIConnector:
             QueryValidationResponse with validation result
 
         """
-        prompt = self.template_manager.get_query_validation_prompt(query=query)
+        prompt = self.prompt_manager.render("misc/query_validation", query=query)
 
         try:
             result = await self._make_structured_request(
@@ -1001,7 +1016,8 @@ class OpenAIConnector:
             WordSuggestionResponse with ranked suggestions
 
         """
-        prompt = self.template_manager.get_word_suggestion_prompt(
+        prompt = self.prompt_manager.render(
+            "misc/word_suggestion",
             query=query,
             count=count,
         )
@@ -1040,7 +1056,8 @@ class OpenAIConnector:
             f"{f' ({part_of_speech})' if part_of_speech else ''}",
         )
 
-        prompt = self.template_manager.get_deduplicate_prompt(
+        prompt = self.prompt_manager.render(
+            "synthesize/deduplicate",
             word=word,
             definitions=definitions,
             part_of_speech=part_of_speech,
@@ -1083,8 +1100,8 @@ class OpenAIConnector:
             f"{f' avoiding {len(previous_words)} previous words' if previous_words else ''}",
         )
 
-        prompt = self.template_manager.render_template(
-            "generate/word_of_the_day",
+        prompt = self.prompt_manager.render(
+            "wotd/word_of_the_day",
             context=context,
             previous_words=previous_words,
         )
@@ -1134,7 +1151,8 @@ class OpenAIConnector:
             f"{f' themed: {theme}' if theme else ''}",
         )
 
-        prompt = self.template_manager.get_synthetic_corpus_prompt(
+        prompt = self.prompt_manager.render(
+            "wotd/synthetic_corpus",
             style=style,
             complexity=complexity,
             era=era,
@@ -1258,10 +1276,12 @@ class OpenAIConnector:
         """
         logger.info(f"📚 Analyzing literature corpus for {author}: {len(words)} words")
 
-        # Use the literature analysis prompt template
-        # Ultra-lean analysis prompt
-        sample = ", ".join(words[:8])  # Only 8 words
-        prompt = f"{author}: {sample}\nSemantic ID [style,complexity,era,variant]:"
+        # Use the ultra-lean literature analysis prompt template
+        prompt = self.prompt_manager.render(
+            "wotd/literature_analysis_lean",
+            author=author,
+            words=words,
+        )
 
         try:
             result = await self._make_structured_request(
@@ -1281,3 +1301,54 @@ class OpenAIConnector:
         except Exception as e:
             logger.error(f"❌ Literature corpus analysis failed for {author}: {e}")
             raise
+
+
+# Global singleton instance
+_openai_connector: OpenAIConnector | None = None
+
+
+def get_openai_connector(
+    config_path: str | Path | None = None,
+    force_recreate: bool = False,
+) -> OpenAIConnector:
+    """Get or create the global OpenAI connector singleton.
+
+    Args:
+        config_path: Path to configuration file (defaults to auth/config.toml)
+        force_recreate: Force recreation of the connector
+
+    Returns:
+        Initialized OpenAI connector instance
+
+    """
+    global _openai_connector
+
+    if _openai_connector is None or force_recreate:
+
+        from ..utils.config import Config
+
+        logger.info("Initializing OpenAI connector singleton")
+        config = Config.from_file(config_path)
+
+        api_key = config.openai.api_key
+        model_name = config.openai.model
+
+        # Log configuration status (without exposing the key)
+        logger.info(f"OpenAI model: {model_name}")
+        logger.info(
+            f"API key configured: {'Yes' if api_key and len(api_key) > 20 else 'No'}"
+        )
+
+        # Only set temperature for non-reasoning models
+        temperature = None
+        if not model_name.startswith(("o1", "o3")):
+            temperature = 0.7  # Default temperature for non-reasoning models
+
+        _openai_connector = OpenAIConnector(
+            api_key=api_key,
+            model_name=model_name,
+            temperature=temperature,
+        )
+        logger.success("OpenAI connector singleton initialized")
+
+    return _openai_connector

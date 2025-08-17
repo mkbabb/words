@@ -1,24 +1,25 @@
 """Test configuration for corpus tests with real MongoDB."""
 import asyncio
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+
 import pytest
 import pytest_asyncio
+from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
-from beanie import init_beanie, PydanticObjectId
 
+from floridify.caching.manager import TreeCorpusManager
+from floridify.caching.models import CacheNamespace
+from floridify.models.dictionary import CorpusType, Language
 from floridify.models.versioned import (
     CorpusMetadata,
     DictionaryEntryMetadata,
     LiteratureEntryMetadata,
+    ResourceType,
     SearchIndexMetadata,
     SemanticIndexMetadata,
     TrieIndexMetadata,
-    ResourceType,
     VersionInfo,
 )
-from floridify.models.dictionary import CorpusType, Language
-from floridify.caching.manager import TreeCorpusManager
-from floridify.caching.models import CacheNamespace
 
 
 @pytest_asyncio.fixture(scope="session")

@@ -15,7 +15,6 @@ from typing import Any
 from ..models.dictionary import Language
 from ..text import is_phrase, normalize
 from ..utils.logging import get_logger
-from .constants import LexiconFormat
 
 logger = get_logger(__name__)
 
@@ -265,42 +264,3 @@ def parse_scraped_data(
                     phrases.append(normalized)
 
     return words, phrases
-
-
-# Parser registry - maps LexiconFormat enum to parser functions
-PARSERS = {
-    LexiconFormat.TEXT_LINES: parse_text_lines,
-    LexiconFormat.JSON_IDIOMS: parse_json_idioms,
-    LexiconFormat.FREQUENCY_LIST: parse_frequency_list,
-    LexiconFormat.JSON_DICT: parse_json_dict,
-    LexiconFormat.JSON_ARRAY: parse_json_array,
-    LexiconFormat.JSON_GITHUB_API: parse_github_api,
-    LexiconFormat.CSV_IDIOMS: parse_csv_idioms,
-    LexiconFormat.JSON_PHRASAL_VERBS: parse_json_phrasal_verbs,
-}
-
-
-def parse_content(
-    lexicon_format: LexiconFormat | str,
-    content: Any,
-    language: Language,
-) -> ParseResult:
-    """Parse content using the appropriate parser function."""
-    # Convert string to enum if needed for backward compatibility
-    if isinstance(lexicon_format, str):
-        try:
-            lexicon_format = LexiconFormat(lexicon_format)
-        except ValueError:
-            raise ValueError(f"Unknown format: {lexicon_format}")
-
-    # Handle scraped data specially since it takes a dict
-    if lexicon_format == LexiconFormat.CUSTOM_SCRAPER:
-        return parse_scraped_data(content, language)
-
-    parser_func = PARSERS.get(lexicon_format)
-    if not parser_func:
-        raise ValueError(f"Unknown format: {lexicon_format}")
-
-    # Convert content to string for text-based parsers
-    text_content = str(content) if not isinstance(content, str) else content
-    return parser_func(text_content, language)
