@@ -1,3 +1,23 @@
+"""Dictionary provider models."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from beanie import PydanticObjectId
+from pydantic import Field
+
+from ...caching.models import (
+    BaseVersionedData,
+    CacheNamespace,
+    ContentLocation,
+    ResourceType,
+)
+from ...models.base import Language
+from ...models.versioned import register_model
+
+
+@register_model(ResourceType.DICTIONARY)
 class DictionaryEntryMetadata(BaseVersionedData):
     """Dictionary entry with versioning support.
 

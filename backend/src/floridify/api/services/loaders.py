@@ -188,7 +188,7 @@ class DefinitionLoader(DataLoader):
         return loaded_definitions
 
 
-class SynthesizedDictionaryEntryLoader(DataLoader):
+class DictionaryEntryLoader(DataLoader):
     """Service for loading DictionaryEntry synthesis and converting to API response."""
 
     @staticmethod

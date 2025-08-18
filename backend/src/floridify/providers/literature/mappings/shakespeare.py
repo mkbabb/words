@@ -4,7 +4,7 @@ Comprehensive mapping of Shakespeare's works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="William Shakespeare",
@@ -19,7 +19,7 @@ AUTHOR = AuthorInfo(
 
 WORKS = [
     # Complete Collections
-    LiteraryWork(
+    LiteratureEntry(
         title="The Complete Works of William Shakespeare",
         author=AUTHOR,
         gutenberg_id="100",
@@ -28,7 +28,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Shakespeare's First Folio",
         author=AUTHOR,
         gutenberg_id="2270",
@@ -37,7 +37,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Shakespeare's Sonnets",
         author=AUTHOR,
         gutenberg_id="1041",
@@ -47,7 +47,7 @@ WORKS = [
         language=Language.ENGLISH,
     ),
     # Major Tragedies
-    LiteraryWork(
+    LiteratureEntry(
         title="Hamlet, Prince of Denmark",
         author=AUTHOR,
         gutenberg_id="1524",
@@ -56,7 +56,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Macbeth",
         author=AUTHOR,
         gutenberg_id="1533",
@@ -65,7 +65,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Othello, the Moor of Venice",
         author=AUTHOR,
         gutenberg_id="1531",
@@ -74,7 +74,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="King Lear",
         author=AUTHOR,
         gutenberg_id="1532",
@@ -83,7 +83,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Romeo and Juliet",
         author=AUTHOR,
         gutenberg_id="1513",
@@ -92,7 +92,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Julius Caesar",
         author=AUTHOR,
         gutenberg_id="1522",
@@ -101,7 +101,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Antony and Cleopatra",
         author=AUTHOR,
         gutenberg_id="1534",
@@ -110,7 +110,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Coriolanus",
         author=AUTHOR,
         gutenberg_id="1535",
@@ -119,7 +119,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Timon of Athens",
         author=AUTHOR,
         gutenberg_id="1132",
@@ -128,7 +128,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Titus Andronicus",
         author=AUTHOR,
         gutenberg_id="1507",
@@ -138,7 +138,7 @@ WORKS = [
         language=Language.ENGLISH,
     ),
     # Major Comedies
-    LiteraryWork(
+    LiteratureEntry(
         title="A Midsummer Night's Dream",
         author=AUTHOR,
         gutenberg_id="1514",
@@ -147,7 +147,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Much Ado About Nothing",
         author=AUTHOR,
         gutenberg_id="1519",
@@ -156,7 +156,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Merchant of Venice",
         author=AUTHOR,
         gutenberg_id="1515",
@@ -165,7 +165,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="As You Like It",
         author=AUTHOR,
         gutenberg_id="1523",
@@ -174,7 +174,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Twelfth Night",
         author=AUTHOR,
         gutenberg_id="1526",
@@ -183,7 +183,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Taming of the Shrew",
         author=AUTHOR,
         gutenberg_id="1508",
@@ -192,7 +192,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Tempest",
         author=AUTHOR,
         gutenberg_id="23042",
@@ -201,7 +201,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Winter's Tale",
         author=AUTHOR,
         gutenberg_id="1539",
@@ -210,7 +210,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Measure for Measure",
         author=AUTHOR,
         gutenberg_id="23045",
@@ -220,7 +220,7 @@ WORKS = [
         language=Language.ENGLISH,
     ),
     # History Plays
-    LiteraryWork(
+    LiteratureEntry(
         title="King Richard III",
         author=AUTHOR,
         gutenberg_id="1503",
@@ -229,7 +229,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="King Henry IV, Part 1",
         author=AUTHOR,
         gutenberg_id="1516",
@@ -238,7 +238,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="King Henry IV, Part 2",
         author=AUTHOR,
         gutenberg_id="1518",
@@ -247,7 +247,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="King Henry V",
         author=AUTHOR,
         gutenberg_id="1521",
@@ -256,7 +256,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="King Henry VI, Part 1",
         author=AUTHOR,
         gutenberg_id="1500",
@@ -265,7 +265,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="King Henry VI, Part 2",
         author=AUTHOR,
         gutenberg_id="1501",
@@ -274,7 +274,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="King Henry VI, Part 3",
         author=AUTHOR,
         gutenberg_id="1502",
@@ -283,7 +283,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="King Richard II",
         author=AUTHOR,
         gutenberg_id="1512",
@@ -295,7 +295,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Shakespeare."""
     return WORKS
 

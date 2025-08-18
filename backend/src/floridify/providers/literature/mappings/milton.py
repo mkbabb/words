@@ -4,7 +4,7 @@ Comprehensive mapping of Milton's works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="John Milton",
@@ -18,7 +18,7 @@ AUTHOR = AuthorInfo(
 )
 
 WORKS = [
-    LiteraryWork(
+    LiteratureEntry(
         title="Paradise Lost",
         author=AUTHOR,
         gutenberg_id="26",
@@ -27,7 +27,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Paradise Lost (Alternative edition)",
         author=AUTHOR,
         gutenberg_id="20",
@@ -36,7 +36,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Paradise Regained",
         author=AUTHOR,
         gutenberg_id="58",
@@ -45,7 +45,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Poetical Works of John Milton",
         author=AUTHOR,
         gutenberg_id="1745",
@@ -54,7 +54,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Milton: Minor Poems",
         author=AUTHOR,
         gutenberg_id="31706",
@@ -63,7 +63,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="L'Allegro, Il Penseroso, Comus, and Lycidas",
         author=AUTHOR,
         gutenberg_id="397",
@@ -72,7 +72,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Milton's Comus",
         author=AUTHOR,
         gutenberg_id="19819",
@@ -81,7 +81,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Areopagitica",
         author=AUTHOR,
         gutenberg_id="608",
@@ -90,7 +90,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Poemata: Latin, Greek and Italian Poems",
         author=AUTHOR,
         gutenberg_id="6929",
@@ -99,7 +99,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="El paraíso perdido (Spanish)",
         author=AUTHOR,
         gutenberg_id="67092",
@@ -108,7 +108,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Le Paradis Perdu (French)",
         author=AUTHOR,
         gutenberg_id="62922",
@@ -117,7 +117,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.FRENCH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="An Introduction to the Prose and Poetical Works",
         author=AUTHOR,
         gutenberg_id="44733",
@@ -126,7 +126,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="A Day with John Milton",
         author=AUTHOR,
         gutenberg_id="40130",
@@ -138,7 +138,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Milton."""
     return WORKS
 

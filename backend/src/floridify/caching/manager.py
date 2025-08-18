@@ -9,6 +9,7 @@ from typing import Any, TypeVar
 
 from beanie import PydanticObjectId
 
+from ..models.versioned import get_model_class as get_versioned_model_class
 from ..utils.logging import get_logger
 from .core import GlobalCacheManager, get_global_cache
 from .models import (
@@ -247,16 +248,8 @@ class VersionedDataManager:
         return None
 
     def _get_model_class(self, resource_type: ResourceType) -> type[BaseVersionedData]:
-        """Map resource type enum to model class."""
-        mapping = {
-            ResourceType.DICTIONARY: DictionaryEntryMetadata,
-            ResourceType.CORPUS: CorpusMetadata,
-            ResourceType.SEMANTIC: SemanticIndexMetadata,
-            ResourceType.LITERATURE: LiteratureEntryMetadata,
-            ResourceType.TRIE: TrieIndexMetadata,
-            ResourceType.SEARCH: SearchIndexMetadata,
-        }
-        return mapping[resource_type]
+        """Map resource type enum to model class using registry pattern."""
+        return get_versioned_model_class(resource_type)
 
     def _get_namespace(self, resource_type: ResourceType) -> CacheNamespace:
         """Map resource type enum to namespace."""

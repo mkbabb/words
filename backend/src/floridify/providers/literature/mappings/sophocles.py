@@ -4,7 +4,7 @@ Comprehensive mapping of Sophocles' works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="Sophocles",
@@ -18,7 +18,7 @@ AUTHOR = AuthorInfo(
 )
 
 WORKS = [
-    LiteraryWork(
+    LiteratureEntry(
         title="Plays of Sophocles: Oedipus the King; Oedipus at Colonus; Antigone",
         author=AUTHOR,
         gutenberg_id="31",
@@ -27,7 +27,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Oedipus King of Thebes",
         author=AUTHOR,
         gutenberg_id="27673",
@@ -36,7 +36,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Seven Plays in English Verse",
         author=AUTHOR,
         gutenberg_id="14484",
@@ -45,7 +45,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Antigone (Finnish Translation)",
         author=AUTHOR,
         gutenberg_id="54543",
@@ -54,7 +54,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Finnish translation
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Philoktetes",
         author=AUTHOR,
         gutenberg_id="806",
@@ -63,7 +63,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Specimens of Greek Tragedy",
         author=AUTHOR,
         gutenberg_id="7073",
@@ -72,7 +72,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Book of illustrations: Ancient Tragedy",
         author=AUTHOR,
         gutenberg_id="19559",
@@ -81,7 +81,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Edipo rey; Edipo en Colona; Antígona (Spanish Translation)",
         author=AUTHOR,
         gutenberg_id="63509",
@@ -90,7 +90,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Οιδίπους Τύραννος (Modern Greek)",
         author=AUTHOR,
         gutenberg_id="17839",
@@ -99,7 +99,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Greek original
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Αντιγόνη (Modern Greek)",
         author=AUTHOR,
         gutenberg_id="26731",
@@ -108,7 +108,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Greek original
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Οιδίπους επί Κολωνώ (Modern Greek)",
         author=AUTHOR,
         gutenberg_id="39382",
@@ -117,7 +117,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Greek original
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Antigone (Hungarian Translation)",
         author=AUTHOR,
         gutenberg_id="64403",
@@ -126,7 +126,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Hungarian
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Elektra (Hungarian Translation)",
         author=AUTHOR,
         gutenberg_id="56745",
@@ -135,7 +135,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Hungarian
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="A trachisi nők (Women of Trachis - Hungarian)",
         author=AUTHOR,
         gutenberg_id="64367",
@@ -144,7 +144,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Hungarian
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Ajas: Szomorujáték (Ajax - Hungarian)",
         author=AUTHOR,
         gutenberg_id="56920",
@@ -153,7 +153,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Hungarian
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Koning Oedipus (Dutch Translation)",
         author=AUTHOR,
         gutenberg_id="45355",
@@ -162,7 +162,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Dutch
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Oedipus király (Hungarian Translation)",
         author=AUTHOR,
         gutenberg_id="66100",
@@ -171,7 +171,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Hungarian
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Philoktetes (Hungarian Translation)",
         author=AUTHOR,
         gutenberg_id="61493",
@@ -183,7 +183,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Sophocles."""
     return WORKS
 

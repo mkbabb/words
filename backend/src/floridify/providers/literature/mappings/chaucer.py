@@ -4,7 +4,7 @@ Comprehensive mapping of Chaucer's works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="Geoffrey Chaucer",
@@ -18,7 +18,7 @@ AUTHOR = AuthorInfo(
 )
 
 WORKS = [
-    LiteraryWork(
+    LiteratureEntry(
         title="The Canterbury Tales, and Other Poems",
         author=AUTHOR,
         gutenberg_id="2383",
@@ -27,7 +27,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Chaucer's Works, Volume 4 — The Canterbury Tales (Middle English)",
         author=AUTHOR,
         gutenberg_id="22120",
@@ -36,7 +36,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Canterbury Tales",
         author=AUTHOR,
         gutenberg_id="23722",
@@ -45,7 +45,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Chaucer's Works, Volume 5 — Notes to the Canterbury Tales",
         author=AUTHOR,
         gutenberg_id="43016",
@@ -54,7 +54,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Dalle Novelle di Canterbury (Italian)",
         author=AUTHOR,
         gutenberg_id="47461",
@@ -63,7 +63,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ITALIAN,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Troilus and Criseyde",
         author=AUTHOR,
         gutenberg_id="257",
@@ -72,7 +72,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Chaucer's Works, Volume 1 — Romaunt of the Rose; Minor Poems",
         author=AUTHOR,
         gutenberg_id="43089",
@@ -81,7 +81,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Chaucer's Works, Volume 2 — Boethius and Troilus",
         author=AUTHOR,
         gutenberg_id="44833",
@@ -90,7 +90,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Chaucer's Works, Volume 3 — The House of Fame; The Legend of Good Women",
         author=AUTHOR,
         gutenberg_id="45027",
@@ -99,7 +99,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Chaucer's Works, Volume 6 — Introduction, Glossary, and Indexes",
         author=AUTHOR,
         gutenberg_id="43097",
@@ -108,7 +108,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Chaucer's Translation of Boethius's 'De Consolatione Philosophiae'",
         author=AUTHOR,
         gutenberg_id="42083",
@@ -117,7 +117,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Dryden's Palamon and Arcite",
         author=AUTHOR,
         gutenberg_id="7490",
@@ -126,7 +126,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Chaucer for Children: A Golden Key",
         author=AUTHOR,
         gutenberg_id="43984",
@@ -135,7 +135,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Chaucerian and Other Pieces",
         author=AUTHOR,
         gutenberg_id="43195",
@@ -147,7 +147,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Chaucer."""
     return WORKS
 

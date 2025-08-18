@@ -8,8 +8,8 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from ....ai.constants import SynthesisComponent
 from ....ai.connector import get_openai_connector
+from ....ai.constants import SynthesisComponent
 from ....ai.synthesizer import get_definition_synthesizer
 from ....caching import cached_api_call_with_dedup
 from ....core.state_tracker import StateTracker

@@ -24,11 +24,12 @@ class SyntheticGenerator:
 
     def __init__(self) -> None:
         self._ai_connector = get_openai_connector()
-        self._storage: WOTDStorage | None = None
+        self._storage = None
 
-    async def _get_storage(self) -> WOTDStorage:
+    async def _get_storage(self):
         """Get storage instance."""
         if self._storage is None:
+            from .storage import get_wotd_storage
             self._storage = await get_wotd_storage()
         return self._storage
 
@@ -232,6 +233,7 @@ async def generate_training_data(
     use_cached: bool = True,
 ) -> dict[str, WOTDCorpus]:
     """Generate or load training data."""
+    from .storage import get_wotd_storage
     storage = await get_wotd_storage()
     generator = SyntheticGenerator()
 
@@ -252,6 +254,7 @@ async def generate_training_data(
 
 async def get_corpus_for_training(corpus_id: str) -> list[str] | None:
     """Get corpus words as list for training."""
+    from .storage import get_wotd_storage
     storage = await get_wotd_storage()
     corpus = await storage.get_corpus(corpus_id)
 

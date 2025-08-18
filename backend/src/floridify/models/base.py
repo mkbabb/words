@@ -13,7 +13,7 @@ from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, ConfigDict, Field
 
 # Explicitly export PydanticObjectId for use in other modules
-__all__ = ["BaseMetadata", "PydanticObjectId"]
+__all__ = ["BaseMetadata", "PydanticObjectId", "AIResponseBase", "ModelInfo"]
 
 class Language(Enum):
     """Supported languages with ISO codes."""
@@ -74,6 +74,17 @@ class AccessTrackingMixin(BaseModel):
 
 class BaseMetadataWithAccess(BaseMetadata, AccessTrackingMixin):
     """Base metadata with access tracking for entities that need both."""
+
+
+class AIResponseBase(BaseModel):
+    """Base class for AI response models with confidence tracking."""
+    
+    confidence: float = Field(
+        default=0.9,
+        ge=0.0,
+        le=1.0,
+        description="Model confidence in this response (0.0-1.0)"
+    )
 
 
 class ModelInfo(BaseModel):

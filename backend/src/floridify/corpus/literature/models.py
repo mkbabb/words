@@ -1,11 +1,13 @@
-class LiteratureCorpusMetadata(CorpusMetadata):
-    """Literature-based corpus metadata."""
+"""Literature corpus models."""
 
-    literature_data_ids: list[PydanticObjectId] = Field(default_factory=list)
-    authors: list[AuthorInfo] = Field(default_factory=list)
-    periods: list[Period] = Field(default_factory=list)
-    genres: list[Genre] = Field(default_factory=list)
+from __future__ import annotations
 
-    def __init__(self, **data: Any) -> None:
-        data["corpus_type"] = CorpusType.LITERATURE
-        super().__init__(**data)
+from typing import Any
+
+from beanie import PydanticObjectId
+from pydantic import Field
+
+from ...models.literature import AuthorInfo, Genre, Period
+from ..models import CorpusMetadata, CorpusType
+
+

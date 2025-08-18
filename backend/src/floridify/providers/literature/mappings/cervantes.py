@@ -4,7 +4,7 @@ Comprehensive mapping of Cervantes' works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="Miguel de Cervantes",
@@ -18,7 +18,7 @@ AUTHOR = AuthorInfo(
 )
 
 WORKS = [
-    LiteraryWork(
+    LiteratureEntry(
         title="Don Quijote (Spanish original)",
         author=AUTHOR,
         gutenberg_id="2000",
@@ -27,7 +27,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Don Quixote",
         author=AUTHOR,
         gutenberg_id="996",
@@ -36,7 +36,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The History of Don Quixote, Volume 1",
         author=AUTHOR,
         gutenberg_id="5921",
@@ -45,7 +45,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The History of Don Quixote, Volume 2",
         author=AUTHOR,
         gutenberg_id="5946",
@@ -54,7 +54,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Don Quixote, Volume 1",
         author=AUTHOR,
         gutenberg_id="28842",
@@ -63,7 +63,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Exemplary Novels of Cervantes",
         author=AUTHOR,
         gutenberg_id="14420",
@@ -72,7 +72,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Novelas ejemplares (Spanish)",
         author=AUTHOR,
         gutenberg_id="61202",
@@ -81,7 +81,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Galatea",
         author=AUTHOR,
         gutenberg_id="63404",
@@ -90,7 +90,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Wanderings of Persiles and Sigismunda",
         author=AUTHOR,
         gutenberg_id="61561",
@@ -99,7 +99,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Numantia",
         author=AUTHOR,
         gutenberg_id="53041",
@@ -108,7 +108,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Viage al Parnaso (Spanish)",
         author=AUTHOR,
         gutenberg_id="16110",
@@ -117,7 +117,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Story of Don Quixote",
         author=AUTHOR,
         gutenberg_id="29468",
@@ -126,7 +126,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="L'ingénieux chevalier Don Quichotte (French)",
         author=AUTHOR,
         gutenberg_id="42524",
@@ -135,7 +135,7 @@ WORKS = [
         period=Period.RENAISSANCE,
         language=Language.FRENCH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Don Quijote de la Mancha (Hungarian)",
         author=AUTHOR,
         gutenberg_id="66263",
@@ -147,7 +147,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Cervantes."""
     return WORKS
 

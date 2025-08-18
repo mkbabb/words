@@ -27,8 +27,8 @@ T = TypeVar("T")
 
 
 @dataclass
-class BatchRequest:
-    """Represents a single request in a batch with its associated future."""
+class AIBatchRequest:
+    """Represents a single request in an AI batch with its associated future."""
 
     custom_id: str
     prompt: str
@@ -41,7 +41,7 @@ class BatchCollector:
     """Collects OpenAI API requests for batch processing."""
 
     def __init__(self) -> None:
-        self.requests: list[BatchRequest] = []
+        self.requests: list[AIBatchRequest] = []
         self._id_counter = 0
 
     def add_request(
@@ -54,7 +54,7 @@ class BatchCollector:
         self._id_counter += 1
         custom_id = f"req-{self._id_counter}-{uuid4().hex[:8]}"
 
-        request = BatchRequest(
+        request = AIBatchRequest(
             custom_id=custom_id,
             prompt=prompt,
             response_model=response_model,

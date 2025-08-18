@@ -55,11 +55,11 @@ class CleanupService:
 
         """
         # Import models here to avoid circular imports
-        from ...models import Definition, SynthesizedDictionaryEntry
+        from ...models import Definition, DictionaryEntry
 
         collections = [
             Definition.get_pymongo_collection(),
-            SynthesizedDictionaryEntry.get_pymongo_collection(),
+            DictionaryEntry.get_pymongo_collection(),
         ]
 
         logger.warning(f"Starting cleanup of image references for image {image_id}")

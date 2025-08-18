@@ -4,7 +4,7 @@ Comprehensive mapping of Homer's works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="Homer",
@@ -18,7 +18,7 @@ AUTHOR = AuthorInfo(
 )
 
 WORKS = [
-    LiteraryWork(
+    LiteratureEntry(
         title="The Iliad",
         author=AUTHOR,
         gutenberg_id="6130",
@@ -27,7 +27,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Iliad (Alternative Translation)",
         author=AUTHOR,
         gutenberg_id="2199",
@@ -36,7 +36,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Odyssey",
         author=AUTHOR,
         gutenberg_id="1727",
@@ -45,7 +45,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Odyssey (Alternative Translation)",
         author=AUTHOR,
         gutenberg_id="3160",
@@ -54,7 +54,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Odyssey (Third Translation)",
         author=AUTHOR,
         gutenberg_id="28797",
@@ -63,7 +63,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Odyssey of Homer",
         author=AUTHOR,
         gutenberg_id="1728",
@@ -72,7 +72,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Iliad of Homer",
         author=AUTHOR,
         gutenberg_id="16452",
@@ -81,7 +81,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Odysseys of Homer, together with the shorter poems",
         author=AUTHOR,
         gutenberg_id="48895",
@@ -90,7 +90,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="La Odisea (Spanish Translation)",
         author=AUTHOR,
         gutenberg_id="58221",
@@ -99,7 +99,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="La Ilíada (Spanish Translation)",
         author=AUTHOR,
         gutenberg_id="57654",
@@ -108,7 +108,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Homer: The Iliad; The Odyssey (W. Lucas Collins' Guide)",
         author=AUTHOR,
         gutenberg_id="59306",
@@ -120,7 +120,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Homer."""
     return WORKS
 

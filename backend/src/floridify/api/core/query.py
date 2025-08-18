@@ -102,7 +102,7 @@ class QueryOptimizer:
                 ([("word_id", ASCENDING)], {}),
                 ([("quality_score", DESCENDING)], {"sparse": True}),
             ]
-        elif model.__name__ == "SynthesizedDictionaryEntry":
+        elif model.__name__ == "DictionaryEntry":
             indexes = [
                 ([("word_id", ASCENDING)], {"unique": True}),
                 ([("accessed_at", DESCENDING)], {"sparse": True}),

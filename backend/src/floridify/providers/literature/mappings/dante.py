@@ -4,7 +4,7 @@ Comprehensive mapping of Dante's works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="Dante Alighieri",
@@ -19,7 +19,7 @@ AUTHOR = AuthorInfo(
 
 WORKS = [
     # Complete Divine Comedy
-    LiteraryWork(
+    LiteratureEntry(
         title="The divine comedy",
         author=AUTHOR,
         gutenberg_id="8800",
@@ -28,7 +28,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Divine Comedy, Longfellow's Translation, Complete",
         author=AUTHOR,
         gutenberg_id="1004",
@@ -37,7 +37,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Divine Comedy, Cary's Translation, Complete",
         author=AUTHOR,
         gutenberg_id="1008",
@@ -47,7 +47,7 @@ WORKS = [
         language=Language.ENGLISH,
     ),
     # Inferno
-    LiteraryWork(
+    LiteratureEntry(
         title="Divine Comedy, Longfellow's Translation, Hell",
         author=AUTHOR,
         gutenberg_id="1001",
@@ -56,7 +56,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Divine Comedy, Cary's Translation, Hell",
         author=AUTHOR,
         gutenberg_id="1005",
@@ -65,7 +65,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Divine Comedy of Dante Alighieri: The Inferno",
         author=AUTHOR,
         gutenberg_id="41537",
@@ -74,7 +74,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Divine Comedy, Volume 1, Hell",
         author=AUTHOR,
         gutenberg_id="1995",
@@ -84,7 +84,7 @@ WORKS = [
         language=Language.ENGLISH,
     ),
     # Purgatorio
-    LiteraryWork(
+    LiteratureEntry(
         title="Divine Comedy, Longfellow's Translation, Purgatory",
         author=AUTHOR,
         gutenberg_id="1002",
@@ -93,7 +93,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Divine Comedy, Cary's Translation, Purgatory",
         author=AUTHOR,
         gutenberg_id="1006",
@@ -102,7 +102,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Divine Comedy by Dante, Illustrated, Purgatory, Complete",
         author=AUTHOR,
         gutenberg_id="8795",
@@ -112,7 +112,7 @@ WORKS = [
         language=Language.ENGLISH,
     ),
     # Paradiso
-    LiteraryWork(
+    LiteratureEntry(
         title="Divine Comedy, Longfellow's Translation, Paradise",
         author=AUTHOR,
         gutenberg_id="1003",
@@ -121,7 +121,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Divine Comedy, Volume 3, Paradise",
         author=AUTHOR,
         gutenberg_id="1997",
@@ -130,7 +130,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Divine Comedy by Dante, Illustrated, Paradise, Complete",
         author=AUTHOR,
         gutenberg_id="8799",
@@ -140,7 +140,7 @@ WORKS = [
         language=Language.ENGLISH,
     ),
     # Italian editions
-    LiteraryWork(
+    LiteratureEntry(
         title="La Divina Commedia di Dante (Italian)",
         author=AUTHOR,
         gutenberg_id="1012",
@@ -149,7 +149,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ITALIAN,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Divina Commedia di Dante: Inferno (Italian)",
         author=AUTHOR,
         gutenberg_id="997",
@@ -158,7 +158,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ITALIAN,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Divina Commedia di Dante: Purgatorio (Italian)",
         author=AUTHOR,
         gutenberg_id="998",
@@ -167,7 +167,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ITALIAN,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Divina Commedia di Dante: Paradiso (Italian)",
         author=AUTHOR,
         gutenberg_id="999",
@@ -176,7 +176,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ITALIAN,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="La Divina Commedia di Dante: Complete (Italian)",
         author=AUTHOR,
         gutenberg_id="1000",
@@ -186,7 +186,7 @@ WORKS = [
         language=Language.ITALIAN,
     ),
     # Other languages
-    LiteraryWork(
+    LiteratureEntry(
         title="La Divina Comedia (Spanish)",
         author=AUTHOR,
         gutenberg_id="57303",
@@ -195,7 +195,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Jumalainen näytelmä (Finnish)",
         author=AUTHOR,
         gutenberg_id="12546",
@@ -204,7 +204,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,  # Finnish text
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="L'enfer (1 of 2) (French)",
         author=AUTHOR,
         gutenberg_id="22768",
@@ -214,7 +214,7 @@ WORKS = [
         language=Language.FRENCH,
     ),
     # Other works
-    LiteraryWork(
+    LiteratureEntry(
         title="The New Life (La Vita Nuova)",
         author=AUTHOR,
         gutenberg_id="41085",
@@ -223,7 +223,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="La vita nuova (Italian)",
         author=AUTHOR,
         gutenberg_id="71218",
@@ -232,7 +232,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ITALIAN,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Banquet (Il Convito)",
         author=AUTHOR,
         gutenberg_id="12867",
@@ -241,7 +241,7 @@ WORKS = [
         period=Period.MEDIEVAL,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The vision of hell",
         author=AUTHOR,
         gutenberg_id="8789",
@@ -253,7 +253,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Dante."""
     return WORKS
 

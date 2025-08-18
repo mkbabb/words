@@ -9,7 +9,7 @@ from typing import Any
 import lz4.frame
 import zstandard as zstd
 
-from ..models.versioned import CompressionType
+from .models import CompressionType
 
 
 def compress_data(data: Any, compression: CompressionType | None = None) -> bytes:

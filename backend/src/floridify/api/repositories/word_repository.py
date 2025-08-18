@@ -14,7 +14,7 @@ from ...models import (
     Example,
     Fact,
     Pronunciation,
-    SynthesizedDictionaryEntry,
+    DictionaryEntry,
     Word,
 )
 from ...models.dictionary import Language
@@ -118,7 +118,7 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
             Fact.find({"word_id": word_id_str}).delete(),
             Pronunciation.find({"word_id": word_id_str}).delete(),
             DictionaryProviderData.find({"word_id": word_id_str}).delete(),
-            SynthesizedDictionaryEntry.find({"word_id": word_id_str}).delete(),
+            DictionaryEntry.find({"word_id": word_id_str}).delete(),
         )
 
     async def get_with_counts(self, id: PydanticObjectId) -> dict[str, Any]:

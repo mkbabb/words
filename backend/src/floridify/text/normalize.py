@@ -13,8 +13,6 @@ from concurrent.futures import ProcessPoolExecutor
 
 import contractions
 import ftfy
-
-# NLTK lemmatization (modern approach)
 import nltk
 from nltk.stem import WordNetLemmatizer
 
@@ -49,7 +47,7 @@ except LookupError:
 _nltk_lemmatizer = WordNetLemmatizer()
 
 
-@functools.lru_cache(maxsize=50000)
+@functools.lru_cache(maxsize=50_000)
 def normalize_comprehensive(
     text: str,
     fix_encoding: bool = True,
@@ -126,7 +124,8 @@ def normalize_comprehensive(
     return text
 
 
-def normalize_fast(text: str, lowercase: bool = True) -> str:
+@functools.lru_cache(maxsize=50_000)
+def normalize_basic(text: str, lowercase: bool = True) -> str:
     """Fast normalization for search and lookup operations.
 
     Optimized for speed with minimal processing steps.
@@ -160,6 +159,79 @@ def normalize_fast(text: str, lowercase: bool = True) -> str:
         text = text.lower()
 
     return text
+
+
+def normalize(text: str) -> str:
+    """Global normalization function - switch between simple and comprehensive.
+
+    This is the main normalization entry point. Swap the implementation
+    to quickly test performance vs quality tradeoffs.
+
+    Args:
+        text: Input text to normalize
+
+    Returns:
+        Normalized text
+
+    """
+
+    return normalize_comprehensive(text)
+
+
+def _normalize_chunk(args: tuple[list[str], Callable[[str], str]]) -> list[str]:
+    """Helper function for batch_normalize - must be at module level for multiprocessing.
+
+    Args:
+        args: Tuple of (words, normalizer_func) for multiprocessing
+
+    """
+    words, normalizer = args
+    return [normalizer(word) for word in words if word]
+
+
+def batch_normalize(
+    vocabulary: list[str],
+    normalizer: Callable[[str], str] | None = None,
+    min_parallel_size: int = 5000,
+) -> list[str]:
+    """Batch normalization with optional custom normalizer function.
+
+    Args:
+        vocabulary: List of words to normalize
+        normalizer: Function to normalize each word (defaults to normalize_comprehensive)
+        min_parallel_size: Minimum size to use parallel processing
+
+    Returns:
+        List of normalized words
+
+    """
+    # Default to normalize_comprehensive if no normalizer provided
+    if normalizer is None:
+        normalizer = normalize_comprehensive
+    # Filter empty words first
+    valid_words = [word for word in vocabulary if word]
+
+    if len(valid_words) < min_parallel_size:
+        # Fall back to serial for small datasets
+        return [normalizer(word) for word in valid_words]
+
+    # Split into chunks for parallel processing
+    cpu_count = os.cpu_count() or 4
+    chunk_size = max(1000, len(valid_words) // cpu_count)
+    chunks = [
+        valid_words[i : i + chunk_size] for i in range(0, len(valid_words), chunk_size)
+    ]
+
+    # Process chunks in parallel - pass normalizer with each chunk
+    normalized_words = []
+    with ProcessPoolExecutor(max_workers=min(8, cpu_count)) as executor:
+        # Create args tuples for each chunk
+        chunk_args = [(chunk, normalizer) for chunk in chunks]
+        futures = [executor.submit(_normalize_chunk, args) for args in chunk_args]
+        for future in futures:
+            normalized_words.extend(future.result())
+
+    return normalized_words
 
 
 def is_valid_word(word: str, min_length: int = 2, max_length: int = 50) -> bool:
@@ -207,7 +279,9 @@ def remove_diacritics(text: str) -> str:
     nfd_text = unicodedata.normalize("NFD", text)
 
     # Remove combining marks (diacritics)
-    without_diacritics = "".join(char for char in nfd_text if unicodedata.category(char) != "Mn")
+    without_diacritics = "".join(
+        char for char in nfd_text if unicodedata.category(char) != "Mn"
+    )
 
     # Normalize back to NFC (composed form)
     return unicodedata.normalize("NFC", without_diacritics)
@@ -216,7 +290,7 @@ def remove_diacritics(text: str) -> str:
 # Lemmatization functions
 
 
-def basic_lemmatize(word: str) -> str:
+def lemmatize_basic(word: str) -> str:
     """Basic rule-based lemmatization.
 
     Uses suffix rules to find base form of words.
@@ -234,7 +308,9 @@ def basic_lemmatize(word: str) -> str:
     word_lower = word.lower()
 
     # Try suffix rules in order of specificity
-    for suffix, replacement in sorted(SUFFIX_RULES.items(), key=lambda x: len(x[0]), reverse=True):
+    for suffix, replacement in sorted(
+        SUFFIX_RULES.items(), key=lambda x: len(x[0]), reverse=True
+    ):
         if word_lower.endswith(suffix) and len(word_lower) > len(suffix) + 1:
             stem = word_lower[: -len(suffix)] + replacement
             # Validate the result is reasonable
@@ -264,8 +340,8 @@ def _get_wordnet_pos(word: str) -> str:
         return "n"  # Safe fallback
 
 
-@functools.lru_cache(maxsize=300000)  # Cache up to 300k lemmatizations
-def lemmatize_word(word: str) -> str:
+@functools.lru_cache(maxsize=300_000)  # Cache up to 300k lemmatizations
+def lemmatize_comprehensive(word: str) -> str:
     """Lemmatize a word using modern NLTK WordNet approach with POS tagging.
 
     Uses NLTK WordNetLemmatizer with POS context for accuracy (>95%).
@@ -298,12 +374,25 @@ def lemmatize_word(word: str) -> str:
             lemma = nltk_lemma
         else:
             # Fallback to rule-based approach
-            lemma = basic_lemmatize(word_lower)
+            lemma = lemmatize_basic(word_lower)
     except Exception:
         # Fallback to rule-based approach
-        lemma = basic_lemmatize(word_lower)
+        lemma = lemmatize_basic(word_lower)
 
     return lemma
+
+
+def lemmatize(word: str) -> str:
+    """Lemmatize a word using the comprehensive approach.
+
+    Args:
+        word: Word to lemmatize
+
+    Returns:
+        Lemmatized form
+
+    """
+    return lemmatize_comprehensive(word)
 
 
 def _lemmatize_chunk(chunk: list[str]) -> list[str]:
@@ -311,8 +400,6 @@ def _lemmatize_chunk(chunk: list[str]) -> list[str]:
     Helper function that reinitializes NLTK in each process.
     """
     # Each process needs its own NLTK lemmatizer
-    import nltk
-    from nltk.stem import WordNetLemmatizer
 
     # Initialize lemmatizer for this process
     process_lemmatizer = WordNetLemmatizer()
@@ -345,9 +432,9 @@ def _lemmatize_chunk(chunk: list[str]) -> list[str]:
 
             # Validate result
             if not lemma or len(lemma) < 2:
-                lemma = basic_lemmatize(word_lower)
+                lemma = lemmatize_basic(word_lower)
         except Exception:
-            lemma = basic_lemmatize(word_lower)
+            lemma = lemmatize_basic(word_lower)
 
         lemmas.append(lemma)
 
@@ -404,7 +491,7 @@ def batch_lemmatize(
 
     # For small batches, use serial processing
     if len(words) < 10000:
-        lemmas = [lemmatize_word(word) if word else "" for word in words]
+        lemmas = [lemmatize_comprehensive(word) if word else "" for word in words]
         return _build_lemma_indices(lemmas)
 
     import multiprocessing as mp
@@ -414,7 +501,9 @@ def batch_lemmatize(
     if n_processes is None:
         n_processes = min(os.cpu_count() or 4, 8)  # Cap at 8 for efficiency
 
-    logger.info(f"🚀 Parallelized lemmatization: {len(words)} words across {n_processes} processes")
+    logger.info(
+        f"🚀 Parallelized lemmatization: {len(words)} words across {n_processes} processes"
+    )
 
     # Split words into chunks
     chunks = []
@@ -438,7 +527,9 @@ def batch_lemmatize(
     for chunk_lemmas in chunk_results:
         all_lemmas.extend(chunk_lemmas)
 
-    unique_lemmas, word_to_lemma_indices, lemma_to_word_indices = _build_lemma_indices(all_lemmas)
+    unique_lemmas, word_to_lemma_indices, lemma_to_word_indices = _build_lemma_indices(
+        all_lemmas
+    )
 
     logger.info(
         f"✅ Lemmatization complete: {len(unique_lemmas)} unique lemmas from {len(words)} words",
@@ -452,7 +543,7 @@ def clear_lemma_cache() -> None:
 
     Note: Cache is managed by decorator, clearing happens automatically via TTL.
     """
-    lemmatize_word.cache_clear()
+    lemmatize_comprehensive.cache_clear()
     logger.info("Lemmatization cache cleared")
 
 
@@ -463,189 +554,10 @@ def get_lemma_cache_stats() -> dict[str, int]:
         Dictionary with cache statistics
 
     """
-    cache_info = lemmatize_word.cache_info()
+    cache_info = lemmatize_comprehensive.cache_info()
     return {
         "hits": cache_info.hits,
         "misses": cache_info.misses,
         "size": cache_info.currsize,
         "maxsize": cache_info.maxsize or 0,
     }
-
-
-# Removed unused function - now using normalize() in batch processing
-
-
-@functools.lru_cache(maxsize=10000)
-def normalize_simple(text: str) -> str:
-    """Simple normalization: lowercase, diacritic removal, basic cleanup.
-
-    Fast alternative to comprehensive normalization for performance-critical paths.
-
-    Args:
-        text: Input text to normalize
-
-    Returns:
-        Simply normalized text
-
-    """
-    if not text:
-        return ""
-
-    # Quick lowercase
-    text = text.lower().strip()
-
-    # Remove diacritics using Unicode decomposition
-    text = unicodedata.normalize("NFD", text)
-    text = "".join(char for char in text if unicodedata.category(char) != "Mn")
-    text = unicodedata.normalize("NFC", text)
-
-    # Basic punctuation cleanup - preserve apostrophes and hyphens in words
-    text = FAST_PUNCTUATION_PATTERN.sub(" ", text)
-    text = MULTIPLE_SPACE_PATTERN.sub(" ", text).strip()
-
-    return text
-
-
-def normalize_vocabulary(text: str) -> str:
-    """Vocabulary normalization that preserves important features.
-
-    This normalization is designed for language loader vocabulary:
-    - Preserves diacritics (café stays café, not cafe)
-    - Preserves internal spaces (for phrases)
-    - Preserves hyphens (for compound words)
-    - Fixes unicode encoding issues
-    - Normalizes whitespace
-    - Converts to lowercase
-
-    Args:
-        text: Input vocabulary item
-
-    Returns:
-        Normalized vocabulary item
-
-    """
-    if not text:
-        return ""
-
-    # Fix encoding issues
-    text = ftfy.fix_text(text)
-
-    # Unicode normalization to composed form (preserves diacritics)
-    text = unicodedata.normalize("NFC", text)
-
-    # Trim and normalize whitespace
-    text = text.strip()
-    text = MULTIPLE_SPACE_PATTERN.sub(" ", text)
-
-    # Convert to lowercase
-    text = text.lower()
-
-    return text
-
-
-@functools.lru_cache(maxsize=50000)
-def normalize_vocabulary_fast(text: str) -> str:
-    """Fast vocabulary normalization with caching.
-
-    Similar to normalize_comprehensive but preserves linguistic features:
-    - Fixes unicode encoding issues
-    - Normalizes whitespace (leading/trailing/multiple)
-    - Converts to lowercase
-    - Preserves diacritics and special characters
-    - Preserves internal punctuation (hyphens, apostrophes)
-
-    Args:
-        text: Input vocabulary item
-
-    Returns:
-        Normalized vocabulary item
-
-    """
-    if not text:
-        return ""
-
-    # Fix encoding issues
-    text = ftfy.fix_text(text)
-
-    # Unicode normalization to composed form (preserves diacritics)
-    text = unicodedata.normalize("NFC", text)
-
-    # Normalize whitespace
-    text = text.strip()
-    text = MULTIPLE_SPACE_PATTERN.sub(" ", text)
-
-    # Convert to lowercase
-    text = text.lower()
-
-    return text
-
-
-def normalize(text: str) -> str:
-    """Global normalization function - switch between simple and comprehensive.
-
-    This is the main normalization entry point. Swap the implementation
-    to quickly test performance vs quality tradeoffs.
-
-    Args:
-        text: Input text to normalize
-
-    Returns:
-        Normalized text
-
-    """
-    # PERFORMANCE MODE: Use simple normalization for efficiency
-    return normalize_simple(text)
-
-
-def _normalize_chunk(args: tuple[list[str], Callable[[str], str]]) -> list[str]:
-    """Helper function for batch_normalize - must be at module level for multiprocessing.
-
-    Args:
-        args: Tuple of (words, normalizer_func) for multiprocessing
-
-    """
-    words, normalizer = args
-    return [normalizer(word) for word in words if word]
-
-
-def batch_normalize(
-    vocabulary: list[str],
-    normalizer: Callable[[str], str] | None = None,
-    min_parallel_size: int = 5000,
-) -> list[str]:
-    """Batch normalization with optional custom normalizer function.
-
-    Args:
-        vocabulary: List of words to normalize
-        normalizer: Function to normalize each word (defaults to normalize_comprehensive)
-        min_parallel_size: Minimum size to use parallel processing
-
-    Returns:
-        List of normalized words
-
-    """
-    # Default to normalize_comprehensive if no normalizer provided
-    if normalizer is None:
-        normalizer = normalize_comprehensive
-    # Filter empty words first
-    valid_words = [word for word in vocabulary if word]
-
-    if len(valid_words) < min_parallel_size:
-        # Fall back to serial for small datasets
-        return [normalizer(word) for word in valid_words]
-
-    # Split into chunks for parallel processing
-    cpu_count = os.cpu_count() or 4
-    chunk_size = max(1000, len(valid_words) // cpu_count)
-    chunks = [valid_words[i : i + chunk_size] for i in range(0, len(valid_words), chunk_size)]
-
-    # Process chunks in parallel - pass normalizer with each chunk
-    normalized_words = []
-    with ProcessPoolExecutor(max_workers=min(8, cpu_count)) as executor:
-        # Create args tuples for each chunk
-        chunk_args = [(chunk, normalizer) for chunk in chunks]
-        futures = [executor.submit(_normalize_chunk, args) for args in chunk_args]
-        for future in futures:
-            normalized_words.extend(future.result())
-
-    return normalized_words

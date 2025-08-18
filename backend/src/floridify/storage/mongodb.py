@@ -9,21 +9,19 @@ from typing import Any
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
-from ..models.versioned import CorpusMetadata
+from ..caching.models import BaseVersionedData
+from ..corpus.models import CorpusMetadata
 from ..models import (
     AudioMedia,
     # CorpusCacheEntry removed - using unified caching
     Definition,
+    DictionaryEntry,
     Example,
     Fact,
     ImageMedia,
     Pronunciation,
     Word,
     WordRelationship,
-)
-from ..models.versioned import (
-    BaseVersionedData,
-    CorpusMetadata,
 )
 from ..providers.batch import BatchOperation
 from ..utils.config import Config
@@ -107,14 +105,10 @@ class MongoDBStorage:
                 # Versioning models
                 BaseVersionedData,
                 DictionaryEntry,
-                Corpus,
-                SemanticIndex,
-                Literature,
                 BatchOperation,
                 # Cache models
                 # CorpusCacheEntry removed - using unified caching
                 CorpusMetadata,
-                SemanticIndex,
             ],
         )
 

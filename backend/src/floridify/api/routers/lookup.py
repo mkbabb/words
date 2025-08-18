@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from ...api.services.loaders import SynthesizedDictionaryEntryLoader
+from ...api.services.loaders import DictionaryEntryLoader
 from ...caching import cached_api_call_with_dedup
 from ...caching.core import get_global_cache
 from ...core.lookup_pipeline import lookup_word_pipeline
@@ -136,7 +136,7 @@ async def _cached_lookup(word: str, params: LookupParams) -> DictionaryEntryResp
 
     # Use the centralized loader to convert to LookupResponse
     try:
-        response_dict = await SynthesizedDictionaryEntryLoader.load_as_lookup_response(
+        response_dict = await DictionaryEntryLoader.load_as_lookup_response(
             entry=entry,
         )
 
@@ -258,7 +258,7 @@ async def _lookup_with_tracking(
             existing = await get_synthesized_entry(word)
             if existing:
                 logger.info(f"📋 DB cache hit for '{word}'")
-                response_dict = await SynthesizedDictionaryEntryLoader.load_as_lookup_response(
+                response_dict = await DictionaryEntryLoader.load_as_lookup_response(
                     entry=existing,
                 )
                 result = DictionaryEntryResponse(**response_dict)
@@ -302,7 +302,7 @@ async def _lookup_with_tracking(
         )
 
         # Use the centralized loader to convert to LookupResponse
-        response_dict = await SynthesizedDictionaryEntryLoader.load_as_lookup_response(entry=entry)
+        response_dict = await DictionaryEntryLoader.load_as_lookup_response(entry=entry)
         result = DictionaryEntryResponse(**response_dict)
 
         # Mark as complete with result data

@@ -6,7 +6,6 @@ inherited by all metadata classes throughout the system.
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
@@ -65,6 +64,8 @@ class CacheNamespace(str, Enum):
     OPENAI = "openai_structured"
 
     SCRAPING = "scraping"
+    
+    WOTD = "wotd"
 
 
 class ResourceType(str, Enum):

@@ -3,10 +3,9 @@ from typing import Any
 from beanie import PydanticObjectId
 
 from ..caching.core import load_external_content, store_external_content
-from ..corpus.utils import get_vocabulary_hash
-
 from ..caching.manager import VersionedDataManager, get_version_manager
 from ..caching.models import CacheNamespace, ResourceType, VersionConfig
+from ..corpus.utils import get_vocabulary_hash
 from ..models.base import Language
 from .models import (
     CorpusMetadata,
@@ -111,8 +110,6 @@ class TreeCorpusManager:
         Returns:
             Master corpus with aggregated vocabulary
         """
-        from ..models.dictionary import CorpusType
-
         child_ids: list[PydanticObjectId] = []
 
         # Create children

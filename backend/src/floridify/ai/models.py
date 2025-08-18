@@ -8,20 +8,10 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from ..models import DictionaryProvider
+from ..models.base import AIResponseBase
 
 
-class ModelInfo(BaseModel):
-    """Base class for AI response models with confidence tracking."""
-    
-    confidence: float = Field(
-        default=0.9,
-        ge=0.0,
-        le=1.0,
-        description="Model confidence in this response (0.0-1.0)"
-    )
-
-
-class ExampleGenerationResponse(ModelInfo):
+class ExampleGenerationResponse(AIResponseBase):
     """Response from example generation."""
 
     example_sentences: list[str] = Field(
@@ -29,14 +19,14 @@ class ExampleGenerationResponse(ModelInfo):
     )
 
 
-class PronunciationResponse(ModelInfo):
+class PronunciationResponse(AIResponseBase):
     """Response from pronunciation generation."""
 
     phonetic: str
     ipa: str
 
 
-class DefinitionResponse(ModelInfo):
+class DefinitionResponse(AIResponseBase):
     """Clean definition model for AI responses without numpy arrays."""
 
     part_of_speech: str = Field(
@@ -60,7 +50,7 @@ class DefinitionResponse(ModelInfo):
     )
 
 
-class DictionaryEntryResponse(ModelInfo):
+class DictionaryEntryResponse(AIResponseBase):
     """Response from AI dictionary synthesis."""
 
     definitions: list[DefinitionResponse] = Field(
@@ -68,7 +58,7 @@ class DictionaryEntryResponse(ModelInfo):
     )
 
 
-class ClusterMapping(ModelInfo):
+class ClusterMapping(AIResponseBase):
     """A single cluster mapping entry."""
 
     cluster_id: str = Field(
@@ -86,7 +76,7 @@ class ClusterMapping(ModelInfo):
     )
 
 
-class ClusterMappingResponse(ModelInfo):
+class ClusterMappingResponse(AIResponseBase):
     """Response containing numerical mapping of clusters to definition IDs."""
 
     word: str = Field(description="The word being analyzed")
@@ -104,7 +94,7 @@ class TextGenerationRequest(BaseModel):
     temperature: float = Field(default=0.7, description="Temperature for generation")
 
 
-class TextGenerationResponse(ModelInfo):
+class TextGenerationResponse(AIResponseBase):
     """Response from text generation."""
 
     text: str = Field(description="Generated text content")
@@ -119,7 +109,7 @@ class LiteratureAugmentationRequest(BaseModel):
     target_count: int = Field(default=50, description="Number of words to generate")
 
 
-class LiteratureAugmentationResponse(ModelInfo):
+class LiteratureAugmentationResponse(AIResponseBase):
     """Response from literature augmentation."""
 
     words: list[str] = Field(description="Generated augmented words")
@@ -185,7 +175,7 @@ class LiteratureMetadata(BaseModel):
     unique_features: list[str] = Field(description="Unique features identified")
 
 
-class LiteratureAnalysisResponse(ModelInfo):
+class LiteratureAnalysisResponse(AIResponseBase):
     """Complete response from literature corpus analysis."""
 
     semantic_id: SemanticID = Field(description="4D semantic identifier")
@@ -198,7 +188,7 @@ class LiteratureAnalysisResponse(ModelInfo):
     word_count: int = Field(description="Number of words analyzed")
 
 
-class SynthesisResponse(ModelInfo):
+class SynthesisResponse(AIResponseBase):
     """Response from definition synthesis."""
 
     definitions: list[DefinitionResponse] = Field(
@@ -221,7 +211,7 @@ class SynonymCandidate(BaseModel):
     )
 
 
-class SynonymGenerationResponse(ModelInfo):
+class SynonymGenerationResponse(AIResponseBase):
     """Response for synonym generation with efflorescence ranking."""
 
     synonyms: list[SynonymCandidate] = Field(
@@ -242,7 +232,7 @@ class Suggestion(BaseModel):
     semantic_category: str = Field(description="Semantic category or theme")
 
 
-class SuggestionsResponse(ModelInfo):
+class SuggestionsResponse(AIResponseBase):
     """Response for word suggestions based on input words."""
 
     suggestions: list[Suggestion] = Field(description="List of word suggestions with explanations")
@@ -251,7 +241,7 @@ class SuggestionsResponse(ModelInfo):
     )
 
 
-class FactGenerationResponse(ModelInfo):
+class FactGenerationResponse(AIResponseBase):
     """Response from AI fact generation about a word."""
 
     facts: list[str] = Field(description="List of interesting, educational facts about the word")
@@ -268,7 +258,7 @@ class Collocation(BaseModel):
     frequency: float = Field(ge=0.0, le=1.0, description="Frequency score")
 
 
-class CollocationResponse(ModelInfo):
+class CollocationResponse(AIResponseBase):
     """Response for collocation generation."""
 
     collocations: list[Collocation] = Field(
@@ -286,7 +276,7 @@ class WordSuggestion(BaseModel):
     example_usage: str | None = Field(None, description="Example sentence with word in context")
 
 
-class WordSuggestionResponse(ModelInfo):
+class WordSuggestionResponse(AIResponseBase):
     """Response for AI word suggestions from descriptive queries."""
 
     suggestions: list[WordSuggestion] = Field(
@@ -298,21 +288,21 @@ class WordSuggestionResponse(ModelInfo):
     original_query: str = Field(description="The original user query")
 
 
-class QueryValidationResponse(ModelInfo):
+class QueryValidationResponse(AIResponseBase):
     """Response for query validation."""
 
     is_valid: bool = Field(description="Whether query seeks word suggestions")
     reason: str = Field(description="Explanation of validation decision")
 
 
-class GrammarPatternResponse(ModelInfo):
+class GrammarPatternResponse(AIResponseBase):
     """Response for grammar pattern extraction."""
 
     patterns: list[str] = Field(description="Common grammatical constructions (e.g., [Tn], sb/sth)")
     descriptions: list[str] = Field(description="Human-readable descriptions of patterns")
 
 
-class CEFRLevelResponse(ModelInfo):
+class CEFRLevelResponse(AIResponseBase):
     """Response for CEFR level assessment."""
 
     level: str = Field(description="CEFR level (A1-C2)")
@@ -326,7 +316,7 @@ class UsageNote(BaseModel):
     text: str = Field(description="The usage guidance text")
 
 
-class UsageNoteResponse(ModelInfo):
+class UsageNoteResponse(AIResponseBase):
     """Response for usage note generation."""
 
     notes: list[UsageNote] = Field(description="Usage guidance with type and text")
@@ -355,7 +345,7 @@ class AntonymCandidate(BaseModel):
     )
 
 
-class AntonymResponse(ModelInfo):
+class AntonymResponse(AIResponseBase):
     """Response for antonym generation with efflorescence ranking."""
 
     antonyms: list[AntonymCandidate] = Field(
@@ -363,7 +353,7 @@ class AntonymResponse(ModelInfo):
     )
 
 
-class EtymologyResponse(ModelInfo):
+class EtymologyResponse(AIResponseBase):
     """Response for etymology extraction."""
 
     text: str = Field(description="Etymology text explaining word origin")
@@ -379,13 +369,13 @@ class WordForm(BaseModel):
     text: str = Field(description="The word form text")
 
 
-class WordFormResponse(ModelInfo):
+class WordFormResponse(AIResponseBase):
     """Response for word form generation."""
 
     forms: list[WordForm] = Field(description="List of word forms with type and text")
 
 
-class RegisterClassificationResponse(ModelInfo):
+class RegisterClassificationResponse(AIResponseBase):
     """Response for register classification."""
 
     model_config = {"populate_by_name": True}  # Accept both field name and alias
@@ -397,27 +387,27 @@ class RegisterClassificationResponse(ModelInfo):
     reasoning: str = Field(description="Explanation for classification")
 
 
-class DomainIdentificationResponse(ModelInfo):
+class DomainIdentificationResponse(AIResponseBase):
     """Response for domain identification."""
 
     domain: str | None = Field(None, description="Domain/field: medical, legal, computing, etc.")
     reasoning: str = Field(description="Explanation for identification")
 
 
-class FrequencyBandResponse(ModelInfo):
+class FrequencyBandResponse(AIResponseBase):
     """Response for frequency band assessment."""
 
     band: int = Field(ge=1, le=5, description="Frequency band: 1 (most common) to 5 (least common)")
     reasoning: str = Field(description="Explanation for assessment")
 
 
-class RegionalVariantResponse(ModelInfo):
+class RegionalVariantResponse(AIResponseBase):
     """Response for regional variant detection."""
 
     regions: list[str] = Field(description="Regions where this usage is common (US, UK, AU, etc.)")
 
 
-class EnhancedDefinitionResponse(ModelInfo):
+class EnhancedDefinitionResponse(AIResponseBase):
     """Complete enhanced definition with all fields."""
 
     model_config = {"populate_by_name": True}  # Accept both field name and alias
@@ -434,7 +424,7 @@ class EnhancedDefinitionResponse(ModelInfo):
     usage_notes: list[dict[str, str]]
 
 
-class ComprehensiveSynthesisResponse(ModelInfo):
+class ComprehensiveSynthesisResponse(AIResponseBase):
     """Complete synthesis response with all components."""
 
     pronunciation: PronunciationResponse | None
@@ -446,13 +436,13 @@ class ComprehensiveSynthesisResponse(ModelInfo):
     model_info: dict[str, Any]
 
 
-class ExampleSynthesisResponse(ModelInfo):
+class ExampleSynthesisResponse(AIResponseBase):
     """Response for example sentence synthesis."""
 
     examples: list[str] = Field(description="List of natural, contextual example sentences")
 
 
-class DefinitionSynthesisResponse(ModelInfo):
+class DefinitionSynthesisResponse(AIResponseBase):
     """Response for definition text synthesis from clusters."""
 
     definition_text: str = Field(
@@ -462,7 +452,7 @@ class DefinitionSynthesisResponse(ModelInfo):
     sources_used: list[str] = Field(description="Provider sources used in synthesis")
 
 
-class MeaningClusterResponse(ModelInfo):
+class MeaningClusterResponse(AIResponseBase):
     """Response for single definition meaning cluster generation."""
 
     cluster_id: str = Field(description="Semantic cluster identifier for this definition")
@@ -472,7 +462,7 @@ class MeaningClusterResponse(ModelInfo):
 # Anki Models
 
 
-class AnkiFillBlankResponse(ModelInfo):
+class AnkiFillBlankResponse(AIResponseBase):
     """Response for fill-in-the-blank flashcard generation."""
 
     sentence: str = Field(description="Sentence with _____ where the word belongs")
@@ -483,7 +473,7 @@ class AnkiFillBlankResponse(ModelInfo):
     correct_choice: str = Field(description="Letter of correct answer (A, B, C, or D)")
 
 
-class AnkiMultipleChoiceResponse(ModelInfo):
+class AnkiMultipleChoiceResponse(AIResponseBase):
     """Response for multiple choice flashcard generation."""
 
     choice_a: str = Field(description="First answer choice")
@@ -503,7 +493,7 @@ class DeduplicatedDefinition(BaseModel):
     reasoning: str = Field(description="Brief explanation (max 10 words)")
 
 
-class DeduplicationResponse(ModelInfo):
+class DeduplicationResponse(AIResponseBase):
     """Response from definition deduplication."""
 
     deduplicated_definitions: list[DeduplicatedDefinition] = Field(
@@ -512,7 +502,7 @@ class DeduplicationResponse(ModelInfo):
     removed_count: int = Field(description="Number of duplicate definitions removed")
 
 
-class WordOfTheDayResponse(ModelInfo):
+class WordOfTheDayResponse(AIResponseBase):
     """Response for Word of the Day generation."""
 
     word: str = Field(description="The selected word")
@@ -538,7 +528,7 @@ class SyntheticWordEntry(BaseModel):
     difficulty_level: str = Field(description="Assessed difficulty level")
 
 
-class SyntheticCorpusResponse(ModelInfo):
+class SyntheticCorpusResponse(AIResponseBase):
     """Response from synthetic corpus generation."""
 
     generated_words: list[SyntheticWordEntry] = Field(description="Generated word entries")

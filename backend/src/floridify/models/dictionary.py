@@ -8,8 +8,8 @@ from typing import Any, Literal
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
-from ..text.normalize import lemmatize_word, normalize_fast
-from .base import BaseMetadata, ModelInfo
+from ..text.normalize import lemmatize_comprehensive, normalize_basic
+from .base import BaseMetadata, Language, ModelInfo
 from .relationships import (
     Collocation,
     GrammarPattern,
@@ -64,10 +64,10 @@ class Word(Document, BaseMetadata):
         """Initialize Word with automatic normalization and lemmatization."""
         # If normalized not provided, compute it
         if "normalized" not in data or not data["normalized"]:
-            data["normalized"] = normalize_fast(data.get("text", ""))
+            data["normalized"] = normalize_basic(data.get("text", ""))
         # If lemma not provided, compute it
         if "lemma" not in data or not data["lemma"]:
-            data["lemma"] = lemmatize_word(data.get("text", ""))
+            data["lemma"] = lemmatize_comprehensive(data.get("text", ""))
 
         super().__init__(**data)
 

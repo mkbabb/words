@@ -5,7 +5,7 @@ from typing import Any
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
-from ...models import Example, LiteratureSource
+from ...models import Example, LiteratureSourceExample
 from ..core.base import BaseRepository
 
 
@@ -16,7 +16,7 @@ class ExampleCreate(BaseModel):
     definition_id: str
     text: str = Field(..., min_length=1)
     translation: str | None = None
-    literature_source: LiteratureSource | None = None
+    literature_source: LiteratureSourceExample | None = None
     is_ai_generated: bool = True
     can_regenerate: bool = True
     quality_score: float | None = Field(None, ge=0, le=1)
@@ -27,7 +27,7 @@ class ExampleUpdate(BaseModel):
 
     text: str | None = Field(None, min_length=1)
     translation: str | None = None
-    literature_source: LiteratureSource | None = None
+    literature_source: LiteratureSourceExample | None = None
     quality_score: float | None = Field(None, ge=0, le=1)
 
 

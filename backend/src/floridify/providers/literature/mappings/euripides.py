@@ -4,7 +4,7 @@ Comprehensive mapping of Euripides' works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="Euripides",
@@ -18,7 +18,7 @@ AUTHOR = AuthorInfo(
 )
 
 WORKS = [
-    LiteraryWork(
+    LiteratureEntry(
         title="The Tragedies of Euripides, Volume I",
         author=AUTHOR,
         gutenberg_id="15081",
@@ -27,7 +27,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Medea of Euripides",
         author=AUTHOR,
         gutenberg_id="35451",
@@ -36,7 +36,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Electra of Euripides",
         author=AUTHOR,
         gutenberg_id="14322",
@@ -45,7 +45,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Bacchae of Euripides",
         author=AUTHOR,
         gutenberg_id="35173",
@@ -54,7 +54,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Trojan Women of Euripides",
         author=AUTHOR,
         gutenberg_id="35171",
@@ -63,7 +63,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Trojan women of Euripides (Alternative)",
         author=AUTHOR,
         gutenberg_id="10096",
@@ -72,7 +72,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Orestes",
         author=AUTHOR,
         gutenberg_id="56547",
@@ -81,7 +81,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Ίων (Ion - Greek Text)",
         author=AUTHOR,
         gutenberg_id="27389",
@@ -90,7 +90,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Greek text but in PG English collection
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Euripides and His Age",
         author=AUTHOR,
         gutenberg_id="35472",
@@ -102,7 +102,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Euripides."""
     return WORKS
 

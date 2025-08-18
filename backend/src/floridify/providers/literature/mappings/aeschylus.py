@@ -4,7 +4,7 @@ Comprehensive mapping of Aeschylus' works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="Aeschylus",
@@ -18,7 +18,7 @@ AUTHOR = AuthorInfo(
 )
 
 WORKS = [
-    LiteraryWork(
+    LiteratureEntry(
         title="Prometheus Bound and the Seven Against Thebes",
         author=AUTHOR,
         gutenberg_id="27458",
@@ -27,7 +27,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Agamemnon of Aeschylus",
         author=AUTHOR,
         gutenberg_id="14417",
@@ -36,7 +36,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Four Plays of Aeschylus",
         author=AUTHOR,
         gutenberg_id="8714",
@@ -45,7 +45,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The House of Atreus",
         author=AUTHOR,
         gutenberg_id="8604",
@@ -54,7 +54,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Lyrical Dramas of Aeschylus",
         author=AUTHOR,
         gutenberg_id="59225",
@@ -63,7 +63,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Æschylos Tragedies and Fragments",
         author=AUTHOR,
         gutenberg_id="53174",
@@ -72,7 +72,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Tragedias (Spanish)",
         author=AUTHOR,
         gutenberg_id="66023",
@@ -81,7 +81,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Προμηθεύς Δεσμώτης (Prometheus Bound - Greek)",
         author=AUTHOR,
         gutenberg_id="39251",
@@ -90,7 +90,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Greek text in PG English collection
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Αγαμέμνων (Agamemnon - Greek)",
         author=AUTHOR,
         gutenberg_id="39536",
@@ -99,7 +99,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Ευμενίδες (Eumenides - Greek)",
         author=AUTHOR,
         gutenberg_id="39208",
@@ -108,7 +108,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Επτά επί Θήβας (Seven Against Thebes - Greek)",
         author=AUTHOR,
         gutenberg_id="17996",
@@ -117,7 +117,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Χοηφόροι (Libation Bearers - Greek)",
         author=AUTHOR,
         gutenberg_id="39073",
@@ -126,7 +126,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Πέρσαι (The Persians - Greek)",
         author=AUTHOR,
         gutenberg_id="39409",
@@ -135,7 +135,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Prometheus Geboeid (Dutch)",
         author=AUTHOR,
         gutenberg_id="57697",
@@ -144,7 +144,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Dutch text
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Agamemnon (Finnish)",
         author=AUTHOR,
         gutenberg_id="53137",
@@ -156,7 +156,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Aeschylus."""
     return WORKS
 

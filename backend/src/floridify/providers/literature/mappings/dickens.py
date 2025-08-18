@@ -4,7 +4,7 @@ Comprehensive mapping of Dickens' works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="Charles Dickens",
@@ -18,7 +18,7 @@ AUTHOR = AuthorInfo(
 )
 
 WORKS = [
-    LiteraryWork(
+    LiteratureEntry(
         title="The Pickwick Papers",
         author=AUTHOR,
         gutenberg_id="580",
@@ -27,7 +27,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="David Copperfield",
         author=AUTHOR,
         gutenberg_id="766",
@@ -36,7 +36,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="A Christmas Carol",
         author=AUTHOR,
         gutenberg_id="24022",
@@ -45,7 +45,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="A Tale of Two Cities",
         author=AUTHOR,
         gutenberg_id="98",
@@ -54,7 +54,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Hard Times",
         author=AUTHOR,
         gutenberg_id="786",
@@ -63,7 +63,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Great Expectations",
         author=AUTHOR,
         gutenberg_id="1400",
@@ -72,7 +72,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Bleak House",
         author=AUTHOR,
         gutenberg_id="1023",
@@ -81,7 +81,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Nicholas Nickleby",
         author=AUTHOR,
         gutenberg_id="967",
@@ -90,7 +90,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="A Christmas Carol in Prose",
         author=AUTHOR,
         gutenberg_id="46",
@@ -99,7 +99,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Oliver Twist",
         author=AUTHOR,
         gutenberg_id="730",
@@ -108,7 +108,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Our Mutual Friend",
         author=AUTHOR,
         gutenberg_id="883",
@@ -117,7 +117,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Old Curiosity Shop",
         author=AUTHOR,
         gutenberg_id="700",
@@ -126,7 +126,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Sketches by Boz",
         author=AUTHOR,
         gutenberg_id="882",
@@ -135,7 +135,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="American Notes",
         author=AUTHOR,
         gutenberg_id="675",
@@ -144,7 +144,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Little Dorrit",
         author=AUTHOR,
         gutenberg_id="963",
@@ -153,7 +153,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Mystery of Edwin Drood",
         author=AUTHOR,
         gutenberg_id="564",
@@ -162,7 +162,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Martin Chuzzlewit",
         author=AUTHOR,
         gutenberg_id="968",
@@ -171,7 +171,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Dombey and Son",
         author=AUTHOR,
         gutenberg_id="821",
@@ -180,7 +180,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Three Ghost Stories",
         author=AUTHOR,
         gutenberg_id="1289",
@@ -189,7 +189,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Pictures from Italy",
         author=AUTHOR,
         gutenberg_id="650",
@@ -201,7 +201,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Dickens."""
     return WORKS
 

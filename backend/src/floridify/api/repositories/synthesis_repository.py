@@ -1,4 +1,4 @@
-"""Repository for SynthesizedDictionaryEntry - collection of definitions."""
+"""Repository for DictionaryEntry - collection of definitions."""
 
 from datetime import UTC, datetime
 from typing import Any
@@ -9,19 +9,18 @@ from pydantic import BaseModel, Field
 
 from ...models import (
     Definition,
+    DictionaryEntry,
     Etymology,
     Fact,
     ImageMedia,
     ModelInfo,
     Pronunciation,
-    SynthesizedDictionaryEntry,
 )
-from ...models.dictionary import DictionaryEntry
 from ..core.base import BaseRepository
 
 
 class SynthesisCreate(BaseModel):
-    """Schema for creating a synthesized entry - mirrors SynthesizedDictionaryEntry model."""
+    """Schema for creating a synthesized entry - mirrors DictionaryEntry model."""
 
     word_id: PydanticObjectId
     pronunciation_id: PydanticObjectId | None = None
@@ -212,7 +211,7 @@ class SynthesisRepository(
             .to_list()
         )
 
-    async def track_access(self, entry_id: PydanticObjectId) -> SynthesizedDictionaryEntry:
+    async def track_access(self, entry_id: PydanticObjectId) -> DictionaryEntry:
         """Track access to an entry."""
         entry = await self.get(entry_id, raise_on_missing=True)
         assert entry is not None
@@ -223,7 +222,7 @@ class SynthesisRepository(
 
         return entry
 
-    async def _cascade_delete(self, entry: SynthesizedDictionaryEntry) -> None:
+    async def _cascade_delete(self, entry: DictionaryEntry) -> None:
         """Delete is handled at word level, definitions are preserved."""
         # Definitions, pronunciations, facts, and images are independent entities
         # They should not be deleted when a synthesis is deleted
@@ -232,7 +231,7 @@ class SynthesisRepository(
     async def get_expanded(
         self,
         entry_id: PydanticObjectId | None = None,
-        entries: list[SynthesizedDictionaryEntry] | None = None,
+        entries: list[DictionaryEntry] | None = None,
         expand: set[str] | None = None,
     ) -> dict[str, Any] | list[dict[str, Any]]:
         """Get entry(ies) with expanded related entities.

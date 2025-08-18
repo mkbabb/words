@@ -7,12 +7,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
 from ..caching.manager import get_version_manager
+from ..caching.models import BaseVersionedData, CacheNamespace
 from ..corpus.core import Corpus
+from ..corpus.utils import get_vocabulary_hash
 from ..models.dictionary import Language
-from ..models.versioned import ResourceType, VersionConfig
+from ..models.versioned import ResourceType, VersionConfig, register_model
 from ..utils.logging import get_logger
 from .constants import SearchMethod
 
@@ -53,6 +56,7 @@ class SearchResult(BaseModel):
         }
 
 
+@register_model(ResourceType.TRIE)
 class TrieIndexMetadata(BaseVersionedData):
     """Trie index metadata for prefix search."""
 
@@ -68,6 +72,7 @@ class TrieIndexMetadata(BaseVersionedData):
         super().__init__(**data)
 
 
+@register_model(ResourceType.SEARCH)
 class SearchIndexMetadata(BaseVersionedData):
     """Composite search index metadata."""
 
@@ -131,7 +136,7 @@ class TrieIndex(BaseModel):
         index_id = f"{corpus_name}:trie"
 
         # Get the latest trie index metadata
-        metadata = await manager.get_latest(
+        metadata: TrieIndexMetadata | None = await manager.get_latest(
             resource_id=index_id,
             resource_type=ResourceType.TRIE,
             use_cache=config.use_cache if config else True,
@@ -272,7 +277,6 @@ class SearchIndex(BaseModel):
     # Search configuration
     min_score: float = 0.75
     semantic_enabled: bool = True
-    semantic_model: str = "all-MiniLM-L6-v2"
 
     # Component indices (embedded or referenced)
     trie_index_id: str | None = None
@@ -306,7 +310,7 @@ class SearchIndex(BaseModel):
         index_id = f"{corpus_name}:search"
 
         # Get the latest search index metadata
-        metadata = await manager.get_latest(
+        metadata: SearchIndexMetadata | None = await manager.get_latest(
             resource_id=index_id,
             resource_type=ResourceType.SEARCH,
             use_cache=config.use_cache if config else True,
@@ -329,7 +333,6 @@ class SearchIndex(BaseModel):
         corpus: Corpus,
         min_score: float = 0.75,
         semantic: bool = True,
-        semantic_model: str = "all-MiniLM-L6-v2",
     ) -> SearchIndex:
         """Create new search index from corpus.
 
@@ -342,7 +345,6 @@ class SearchIndex(BaseModel):
         Returns:
             SearchIndex instance with initialized configuration
         """
-        from ..corpus.utils import get_vocabulary_hash
 
         return cls(
             corpus_name=corpus.corpus_name,
@@ -350,7 +352,6 @@ class SearchIndex(BaseModel):
             vocabulary_hash=get_vocabulary_hash(corpus.vocabulary),
             min_score=min_score,
             semantic_enabled=semantic,
-            semantic_model=semantic_model,
             vocabulary_size=len(corpus.vocabulary),
             has_trie=True,  # Always build trie for exact/prefix search
             has_fuzzy=True,  # Always enable fuzzy
@@ -363,7 +364,6 @@ class SearchIndex(BaseModel):
         corpus: Corpus,
         min_score: float = 0.75,
         semantic: bool = True,
-        semantic_model: str = "all-MiniLM-L6-v2",
         config: VersionConfig | None = None,
     ) -> SearchIndex:
         """Get existing search index or create new one.
@@ -388,7 +388,6 @@ class SearchIndex(BaseModel):
             corpus=corpus,
             min_score=min_score,
             semantic=semantic,
-            semantic_model=semantic_model,
         )
 
         # Save the new index
@@ -427,5 +426,4 @@ __all__ = [
     "SearchResult",
     "SearchIndex",
     "TrieIndex",
-    "SemanticIndex",
 ]

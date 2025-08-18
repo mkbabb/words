@@ -4,7 +4,7 @@ Comprehensive mapping of Ovid's works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="Ovid",
@@ -18,7 +18,7 @@ AUTHOR = AuthorInfo(
 )
 
 WORKS = [
-    LiteraryWork(
+    LiteratureEntry(
         title="The Lovers Assistant; Or, New Art of Love",
         author=AUTHOR,
         gutenberg_id="31036",
@@ -27,7 +27,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="El arte de amar (Spanish)",
         author=AUTHOR,
         gutenberg_id="67961",
@@ -36,7 +36,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Metamorphoses of Ovid, Books I-VII",
         author=AUTHOR,
         gutenberg_id="21765",
@@ -45,7 +45,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Ars Amatoria; or, The Art Of Love",
         author=AUTHOR,
         gutenberg_id="47677",
@@ -54,7 +54,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Metamorphoses of Ovid, Books VIII-XV",
         author=AUTHOR,
         gutenberg_id="26073",
@@ -63,7 +63,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Amores; or, Amours",
         author=AUTHOR,
         gutenberg_id="47676",
@@ -72,7 +72,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Last Poems of Ovid",
         author=AUTHOR,
         gutenberg_id="21920",
@@ -81,7 +81,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Fasti (Latin)",
         author=AUTHOR,
         gutenberg_id="8738",
@@ -90,7 +90,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Latin text
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Remedia Amoris; or, The Remedy of Love",
         author=AUTHOR,
         gutenberg_id="47678",
@@ -99,7 +99,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Metamorphoses of Publius Ovidus Naso in English blank verse",
         author=AUTHOR,
         gutenberg_id="28621",
@@ -108,7 +108,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Metamorfóseos o Transformaciones (1 de 4) (Spanish)",
         author=AUTHOR,
         gutenberg_id="66337",
@@ -117,7 +117,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Metamorfóseos o Transformaciones (2 de 4) (Spanish)",
         author=AUTHOR,
         gutenberg_id="66338",
@@ -126,7 +126,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Metamorfóseos o Transformaciones (3 de 4) (Spanish)",
         author=AUTHOR,
         gutenberg_id="66339",
@@ -135,7 +135,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Metamorfóseos o Transformaciones (4 de 4) (Spanish)",
         author=AUTHOR,
         gutenberg_id="66340",
@@ -144,7 +144,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.SPANISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Amores: elegías amatorias (Spanish)",
         author=AUTHOR,
         gutenberg_id="68015",
@@ -156,7 +156,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Ovid."""
     return WORKS
 

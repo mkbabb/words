@@ -4,7 +4,7 @@ Comprehensive mapping of Tolstoy's works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="Leo Tolstoy",
@@ -18,7 +18,7 @@ AUTHOR = AuthorInfo(
 )
 
 WORKS = [
-    LiteraryWork(
+    LiteratureEntry(
         title="War and Peace",
         author=AUTHOR,
         gutenberg_id="2600",
@@ -27,7 +27,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Anna Karenina",
         author=AUTHOR,
         gutenberg_id="1399",
@@ -36,7 +36,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="What Is Art?",
         author=AUTHOR,
         gutenberg_id="64908",
@@ -45,7 +45,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="What Men Live By, and Other Tales",
         author=AUTHOR,
         gutenberg_id="6157",
@@ -54,7 +54,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Kingdom of God Is Within You",
         author=AUTHOR,
         gutenberg_id="43302",
@@ -63,7 +63,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Master and Man",
         author=AUTHOR,
         gutenberg_id="986",
@@ -72,7 +72,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Kreutzer Sonata and Other Stories",
         author=AUTHOR,
         gutenberg_id="689",
@@ -81,7 +81,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Детство/Childhood (Russian)",
         author=AUTHOR,
         gutenberg_id="19681",
@@ -90,7 +90,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,  # Russian text
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Resurrection",
         author=AUTHOR,
         gutenberg_id="1938",
@@ -99,7 +99,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Father Sergius",
         author=AUTHOR,
         gutenberg_id="985",
@@ -108,7 +108,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Forged Coupon, and Other Stories",
         author=AUTHOR,
         gutenberg_id="243",
@@ -117,7 +117,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Where Love is There God is Also",
         author=AUTHOR,
         gutenberg_id="38616",
@@ -126,7 +126,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Childhood",
         author=AUTHOR,
         gutenberg_id="2142",
@@ -135,7 +135,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Sevastopol",
         author=AUTHOR,
         gutenberg_id="47197",
@@ -144,7 +144,7 @@ WORKS = [
         period=Period.VICTORIAN,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Youth",
         author=AUTHOR,
         gutenberg_id="2637",
@@ -156,7 +156,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Tolstoy."""
     return WORKS
 

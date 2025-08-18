@@ -11,7 +11,8 @@ from pydantic import BaseModel, Field
 from ...caching.core import CacheNamespace, get_global_cache
 from ...core.search_pipeline import get_search_engine, reset_search_engine
 from ...corpus.manager import get_corpus_manager
-from ...models.dictionary import CorpusType, Language
+from ...corpus.models import CorpusType
+from ...models.base import Language
 from ...search.constants import SearchMode
 from ...search.language import get_language_search
 from ...search.models import SearchResult

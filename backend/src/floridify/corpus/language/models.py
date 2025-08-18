@@ -1,12 +1,12 @@
-class LanguageCorpusMetadata(CorpusMetadata):
-    """Language-level master corpus metadata."""
+"""Language corpus models."""
 
-    # Aggregated statistics
-    total_documents: int = 0
-    total_tokens: int = 0
-    unique_sources: list[str] = Field(default_factory=list)
+from __future__ import annotations
 
-    def __init__(self, **data: Any) -> None:
-        data["corpus_type"] = CorpusType.LANGUAGE
-        data["is_master"] = True
-        super().__init__(**data)
+from typing import Any
+
+from pydantic import Field
+
+from ..models import CorpusMetadata, CorpusType
+
+
+

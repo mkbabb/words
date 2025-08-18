@@ -6,18 +6,17 @@ Contains the actual vocabulary processing and storage logic and base corpus sour
 from __future__ import annotations
 
 import time
-from collections.abc import Awaitable, Callable
 from typing import Any
 
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
-from ..caching.manager import get_tree_corpus_manager
-from ..models.dictionary import CorpusType, Language
+from ..models.base import Language
 from ..models.versioned import VersionConfig
 from ..text.normalize import batch_lemmatize, batch_normalize
 from ..utils.logging import get_logger
-from .parser import parse_text_lines
+from .manager import get_tree_corpus_manager
+from .models import CorpusType
 from .utils import get_vocabulary_hash
 
 logger = get_logger(__name__)

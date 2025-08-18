@@ -7,15 +7,11 @@ from typing import Any
 
 from ...caching.core import get_global_cache
 from ...caching.manager import get_version_manager
-from ...caching.models import CacheNamespace
+from ...caching.models import CacheNamespace, ContentLocation, StorageType
 from ...core.state_tracker import StateTracker
-from ...corpus.literature.models import LiteratureSource
-from ...models.versioned import (
-    ContentLocation,
-    ResourceType,
-    StorageType,
-    VersionConfig,
-)
+from ...models.literature import LiteratureProvider
+from ...models.versioned import ResourceType, VersionConfig
+from ...providers.literature.models import LiteratureEntryMetadata
 from ...utils.logging import get_logger
 from ..core import BaseConnector, ConnectorConfig, ProviderType
 
@@ -27,7 +23,7 @@ class LiteratureConnector(BaseConnector):
 
     def __init__(
         self,
-        source: LiteratureSource,
+        source: LiteratureProvider,
         config: ConnectorConfig | None = None,
     ):
         super().__init__(
@@ -54,7 +50,7 @@ class LiteratureConnector(BaseConnector):
         full_resource_id = f"literature_{self.source.value}_{source_id}"
 
         # Get from versioned storage
-        versioned = await manager.get_latest(
+        versioned: LiteratureEntryMetadata | None = await manager.get_latest(
             resource_id=full_resource_id,
             resource_type=ResourceType.LITERATURE,
             config=config or VersionConfig(),

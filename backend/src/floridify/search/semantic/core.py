@@ -16,7 +16,7 @@ from ...corpus.core import Corpus
 from ...models.versioned import VersionConfig
 from ...utils.logging import get_logger
 from ..constants import SearchMethod
-from ..models import SearchResult, SemanticIndex
+from ..models import SearchResult
 from .constants import (
     DEFAULT_SENTENCE_MODEL,
     ENABLE_GPU_ACCELERATION,
@@ -29,6 +29,7 @@ from .constants import (
     USE_ONNX_BACKEND,
     SemanticModel,
 )
+from .models import SemanticIndex
 
 logger = get_logger(__name__)
 

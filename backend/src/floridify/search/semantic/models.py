@@ -1,3 +1,33 @@
+"""Semantic search models."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from beanie import PydanticObjectId
+from pydantic import BaseModel, Field
+
+from ...caching.manager import get_version_manager
+from ...caching.models import (
+    BaseVersionedData,
+    CacheNamespace,
+    QuantizationType,
+    ResourceType,
+    VersionConfig,
+)
+from ...corpus.core import Corpus
+from ...models.versioned import register_model
+from ...utils.logging import get_logger
+
+logger = get_logger(__name__)
+
+__all__ = [
+    "SemanticIndex",
+    "SemanticIndexMetadata",
+]
+
+
+@register_model(ResourceType.SEMANTIC)
 class SemanticIndexMetadata(BaseVersionedData):
     """FAISS semantic search index metadata."""
 
@@ -80,7 +110,7 @@ class SemanticIndex(BaseModel):
         index_id = f"{corpus_name}:semantic:{model_name}"
 
         # Get the latest semantic index metadata
-        metadata = await manager.get_latest(
+        metadata: SemanticIndexMetadata | None = await manager.get_latest(
             resource_id=index_id,
             resource_type=ResourceType.SEMANTIC,
             use_cache=config.use_cache if config else True,

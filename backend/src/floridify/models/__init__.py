@@ -3,26 +3,27 @@
 # Base models and metadata
 
 # Word of the Day models
+# Corpus models
+from ..corpus.models import CorpusType
 from ..wordlist.word_of_the_day import (
     NotificationFrequency,
     WordOfTheDayBatch,
     WordOfTheDayConfig,
     WordOfTheDayEntry,
 )
-from .base import AudioMedia, BaseMetadata, Etymology, ImageMedia, ModelInfo
+
+# Base models for language and other constants
+from .base import AIResponseBase, AudioMedia, BaseMetadata, ImageMedia, Language, ModelInfo
 
 # Core models from definition.py (includes constants)
 from .dictionary import (
-    CorpusType,
     Definition,
     DictionaryEntry,
     DictionaryProvider,
+    Etymology,
     Example,
     Fact,
-    Language,
-    LiteratureSource,
-    LiteratureSourceType,
-    OutputFormat,
+    LiteratureSourceExample,
     Pronunciation,
     Word,
 )
@@ -37,8 +38,8 @@ from .relationships import (
     WordRelationship,
 )
 
-# Versioned models
-from .versioned import DictionaryEntryMetadata
+# Versioned models - removed to avoid circular import
+# DictionaryEntryMetadata is in providers.dictionary.models
 
 __all__ = [
     # Base models
@@ -47,6 +48,7 @@ __all__ = [
     "ImageMedia",
     "AudioMedia",
     "ModelInfo",
+    "AIResponseBase",
     # Core documents
     "Word",
     "Definition",
@@ -54,7 +56,7 @@ __all__ = [
     "Fact",
     "Pronunciation",
     "DictionaryEntry",
-    "LiteratureSource",
+    "LiteratureSourceExample",
     # Relationships
     "WordForm",
     "GrammarPattern",
@@ -70,9 +72,7 @@ __all__ = [
     # Constants
     "Language",
     "DictionaryProvider",
-    "OutputFormat",
     "CorpusType",
-    "LiteratureSourceType",
-    # Versioned models
-    "DictionaryEntryMetadata",
+    # Versioned models - removed to avoid circular import
+    # "DictionaryEntryMetadata",  # Available in providers.dictionary.models
 ]

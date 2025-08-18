@@ -12,6 +12,7 @@ from ...models.versioned import (
     ResourceType,
     VersionConfig,
 )
+from ...providers.dictionary.models import DictionaryEntryMetadata
 from ...utils.logging import get_logger
 from ..core import BaseConnector, ConnectorConfig, ProviderType
 
@@ -50,7 +51,7 @@ class DictionaryConnector(BaseConnector):
         full_resource_id = f"{word}_{self.provider.value}"
 
         # Get from versioned storage
-        versioned = await manager.get_latest(
+        versioned: DictionaryEntryMetadata | None = await manager.get_latest(
             resource_id=full_resource_id,
             resource_type=ResourceType.DICTIONARY,
             config=config or VersionConfig(),
@@ -142,5 +143,3 @@ class DictionaryConnector(BaseConnector):
                 f"Error fetching '{word}' from {self.provider.display_name}: {e}"
             )
             raise
-
-    # Note: _fetch_from_provider is abstract and must be implemented by subclasses

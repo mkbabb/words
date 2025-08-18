@@ -4,7 +4,7 @@ Comprehensive mapping of Goethe's works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="Johann Wolfgang von Goethe",
@@ -18,7 +18,7 @@ AUTHOR = AuthorInfo(
 )
 
 WORKS = [
-    LiteraryWork(
+    LiteratureEntry(
         title="The Sorrows of Young Werther",
         author=AUTHOR,
         gutenberg_id="2527",
@@ -27,7 +27,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Faust [Part 1]",
         author=AUTHOR,
         gutenberg_id="14591",
@@ -36,7 +36,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Faust: A Tragedy",
         author=AUTHOR,
         gutenberg_id="63203",
@@ -45,7 +45,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Faust: Der Tragödie erster Teil (German)",
         author=AUTHOR,
         gutenberg_id="2229",
@@ -54,7 +54,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.GERMAN,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Faust: Eine Tragödie [erster Teil] (German)",
         author=AUTHOR,
         gutenberg_id="21000",
@@ -63,7 +63,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.GERMAN,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Wilhelm Meister's Apprenticeship and Travels, Vol. I",
         author=AUTHOR,
         gutenberg_id="36483",
@@ -72,7 +72,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Die Wahlverwandtschaften (German)",
         author=AUTHOR,
         gutenberg_id="2403",
@@ -81,7 +81,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.GERMAN,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Autobiography of Goethe",
         author=AUTHOR,
         gutenberg_id="52654",
@@ -90,7 +90,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Goethe's Theory of Colours",
         author=AUTHOR,
         gutenberg_id="50572",
@@ -99,7 +99,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Letters from Switzerland and Travels in Italy",
         author=AUTHOR,
         gutenberg_id="53205",
@@ -108,7 +108,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Italienische Reise — Band 1 (German)",
         author=AUTHOR,
         gutenberg_id="2404",
@@ -117,7 +117,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.GERMAN,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Maxims and Reflections",
         author=AUTHOR,
         gutenberg_id="33670",
@@ -126,7 +126,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Erotica Romana",
         author=AUTHOR,
         gutenberg_id="7889",
@@ -135,7 +135,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Poems of Goethe",
         author=AUTHOR,
         gutenberg_id="5615",
@@ -144,7 +144,7 @@ WORKS = [
         period=Period.ROMANTIC,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Hermann and Dorothea",
         author=AUTHOR,
         gutenberg_id="2054",
@@ -156,7 +156,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Goethe."""
     return WORKS
 

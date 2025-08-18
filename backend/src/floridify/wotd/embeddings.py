@@ -74,7 +74,8 @@ from .constants import (
     MATRYOSHKA_MODELS,
     MODEL_DIMENSIONS,
 )
-from .storage import get_wotd_storage
+
+# from .storage import get_wotd_storage  # Import lazily to avoid circular imports
 
 logger = get_logger(__name__)
 
@@ -460,6 +461,7 @@ class Embedder:
 
         Checks cache first, computes if needed, stores result.
         """
+        from .storage import get_wotd_storage
         storage = await get_wotd_storage()
 
         # Check cache

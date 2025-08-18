@@ -4,7 +4,7 @@ Comprehensive mapping of Virgil's works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="Virgil",
@@ -18,7 +18,7 @@ AUTHOR = AuthorInfo(
 )
 
 WORKS = [
-    LiteraryWork(
+    LiteratureEntry(
         title="The Aeneid (Dryden Translation)",
         author=AUTHOR,
         gutenberg_id="228",
@@ -27,7 +27,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Aeneidos (Latin Original)",
         author=AUTHOR,
         gutenberg_id="227",
@@ -36,7 +36,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Latin text
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Aeneid (Mackail Translation)",
         author=AUTHOR,
         gutenberg_id="22456",
@@ -45,7 +45,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Georgics",
         author=AUTHOR,
         gutenberg_id="232",
@@ -54,7 +54,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Georgicon (Latin Original)",
         author=AUTHOR,
         gutenberg_id="231",
@@ -63,7 +63,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Latin text
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Aeneid of Virgil (Alternative)",
         author=AUTHOR,
         gutenberg_id="61596",
@@ -72,7 +72,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Æneid of Virgil, Translated into English Verse",
         author=AUTHOR,
         gutenberg_id="18466",
@@ -81,7 +81,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Bucolics and Eclogues",
         author=AUTHOR,
         gutenberg_id="230",
@@ -90,7 +90,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Bucolics and Eclogues (Latin Original)",
         author=AUTHOR,
         gutenberg_id="229",
@@ -99,7 +99,7 @@ WORKS = [
         period=Period.ANCIENT,
         language=Language.ENGLISH,  # Latin text
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="The Æneid of Virgil translated into English prose",
         author=AUTHOR,
         gutenberg_id="73488",
@@ -111,7 +111,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Virgil."""
     return WORKS
 

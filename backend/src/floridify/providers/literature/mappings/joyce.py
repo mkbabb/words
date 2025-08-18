@@ -4,7 +4,7 @@ Comprehensive mapping of Joyce's works available on Project Gutenberg.
 """
 
 from ....models.dictionary import Language
-from ....corpus.literature.models import AuthorInfo, Genre, LiteraryWork, Period
+from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(
     name="James Joyce",
@@ -18,7 +18,7 @@ AUTHOR = AuthorInfo(
 )
 
 WORKS = [
-    LiteraryWork(
+    LiteratureEntry(
         title="Ulysses",
         author=AUTHOR,
         gutenberg_id="4300",
@@ -27,7 +27,7 @@ WORKS = [
         period=Period.MODERNIST,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Dubliners",
         author=AUTHOR,
         gutenberg_id="2814",
@@ -36,7 +36,7 @@ WORKS = [
         period=Period.MODERNIST,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="A Portrait of the Artist as a Young Man",
         author=AUTHOR,
         gutenberg_id="4217",
@@ -45,7 +45,7 @@ WORKS = [
         period=Period.MODERNIST,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Chamber Music",
         author=AUTHOR,
         gutenberg_id="2817",
@@ -54,7 +54,7 @@ WORKS = [
         period=Period.MODERNIST,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Exiles: A Play in Three Acts",
         author=AUTHOR,
         gutenberg_id="55945",
@@ -63,7 +63,7 @@ WORKS = [
         period=Period.MODERNIST,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Dubliners (Alternative edition)",
         author=AUTHOR,
         gutenberg_id="7872",
@@ -72,7 +72,7 @@ WORKS = [
         period=Period.MODERNIST,
         language=Language.ENGLISH,
     ),
-    LiteraryWork(
+    LiteratureEntry(
         title="Chamber Music (Alternative edition)",
         author=AUTHOR,
         gutenberg_id="20601",
@@ -84,7 +84,7 @@ WORKS = [
 ]
 
 
-def get_works() -> list[LiteraryWork]:
+def get_works() -> list[LiteratureEntry]:
     """Get all works by Joyce."""
     return WORKS
 

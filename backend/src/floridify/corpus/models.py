@@ -13,6 +13,7 @@ from ..caching.models import (
     ResourceType,
 )
 from ..models.base import Language
+from ..models.versioned import register_model
 
 
 class CorpusType(Enum):
@@ -45,6 +46,7 @@ class CorpusSource(BaseModel):
     model_config = {"frozen": True, "arbitrary_types_allowed": True}
 
 
+@register_model(ResourceType.CORPUS)
 class CorpusMetadata(BaseVersionedData):
     """Corpus metadata with tree hierarchy for vocabulary management."""
 

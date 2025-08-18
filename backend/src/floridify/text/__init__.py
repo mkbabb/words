@@ -16,11 +16,11 @@ from .normalize import (
     # Validation
     is_valid_word,
     # Lemmatization
-    lemmatize_word,
+    lemmatize_comprehensive,
     # Core normalization
     normalize,
     normalize_comprehensive,
-    normalize_fast,
+    normalize_basic,
     normalize_simple,
     # Diacritics
     remove_diacritics,
@@ -35,13 +35,13 @@ __all__ = [
     # Core normalization
     "normalize",
     "normalize_comprehensive",
-    "normalize_fast",
+    "normalize_basic",
     "normalize_simple",
     "batch_normalize",
     "is_valid_word",
     "remove_diacritics",
     # Lemmatization
-    "lemmatize_word",
+    "lemmatize_comprehensive",
     "batch_lemmatize",
     "clear_lemma_cache",
     "get_lemma_cache_stats",

@@ -15,14 +15,12 @@ from .decorators import (
 )
 from .models import (
     CacheNamespace,
-    CacheTTL,
     CompressionType,
     QuantizationType,
 )
 
 __all__ = [
     "CacheNamespace",
-    "CacheTTL",
     "CompressionType",
     "QuantizationType",
     "GlobalCacheManager",
