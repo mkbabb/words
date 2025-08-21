@@ -11,8 +11,8 @@ from typing import Any
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
+from ..caching.models import VersionConfig
 from ..models.base import Language
-from ..models.versioned import VersionConfig
 from ..text.normalize import batch_lemmatize, batch_normalize
 from ..utils.logging import get_logger
 from .manager import get_tree_corpus_manager
@@ -521,8 +521,308 @@ class Corpus(BaseModel):
     async def delete(self) -> None:
         """Delete corpus from storage."""
         if self.corpus_id:
-            from ..models.versioned import CorpusMetadata
 
-            corpus_meta = await CorpusMetadata.get(self.corpus_id)
+            # TODO: Implement proper deletion through version manager
+            corpus_meta = None  # await CorpusMetadata.get(self.corpus_id)
             if corpus_meta:
                 await corpus_meta.delete()
+
+
+class MultisourceCorpus(Corpus):
+    """Multi-source corpus with tree structure and vocabulary aggregation.
+    
+    Provides hierarchical management of multiple corpus sources with automatic
+    vocabulary aggregation from child corpora.
+    """
+    
+    # Source management
+    source_corpora: dict[str, Corpus] = Field(default_factory=dict)
+    source_metadata: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    
+    async def add_source(
+        self,
+        source_name: str,
+        vocabulary: list[str] | None = None,
+        corpus: Corpus | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Add a new source to the multi-source corpus.
+        
+        Args:
+            source_name: Unique identifier for the source
+            vocabulary: Raw vocabulary list to create corpus from
+            corpus: Existing corpus to add as source
+            metadata: Additional metadata for the source
+        """
+        if source_name in self.source_corpora:
+            logger.warning(f"Source '{source_name}' already exists, updating...")
+            
+        if corpus:
+            source_corpus = corpus
+        elif vocabulary:
+            source_corpus = await Corpus.create(
+                corpus_name=f"{self.corpus_name}_{source_name}",
+                vocabulary=vocabulary,
+                language=self.language,
+                semantic=self.metadata.get("semantic_enabled", False),
+                model_name=self.metadata.get("model_name"),
+            )
+        else:
+            raise ValueError("Either vocabulary or corpus must be provided")
+            
+        # Set parent relationship
+        source_corpus.parent_corpus_id = self.corpus_id
+        
+        # Store source
+        self.source_corpora[source_name] = source_corpus
+        self.source_metadata[source_name] = metadata or {}
+        
+        # Update child IDs
+        if source_corpus.corpus_id and source_corpus.corpus_id not in self.child_corpus_ids:
+            self.child_corpus_ids.append(source_corpus.corpus_id)
+            
+        # Update sources list
+        if source_name not in self.sources:
+            self.sources.append(source_name)
+            
+        # Aggregate vocabulary
+        await self.aggregate_vocabulary()
+        
+    async def remove_source(self, source_name: str) -> None:
+        """Remove a source from the multi-source corpus.
+        
+        Args:
+            source_name: Name of the source to remove
+        """
+        if source_name not in self.source_corpora:
+            logger.warning(f"Source '{source_name}' not found")
+            return
+            
+        source_corpus = self.source_corpora[source_name]
+        
+        # Remove from collections
+        del self.source_corpora[source_name]
+        del self.source_metadata[source_name]
+        
+        # Update child IDs
+        if source_corpus.corpus_id in self.child_corpus_ids:
+            self.child_corpus_ids.remove(source_corpus.corpus_id)
+            
+        # Update sources list
+        if source_name in self.sources:
+            self.sources.remove(source_name)
+            
+        # Re-aggregate vocabulary
+        await self.aggregate_vocabulary()
+        
+    async def update_source(
+        self,
+        source_name: str,
+        vocabulary: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Update an existing source.
+        
+        Args:
+            source_name: Name of the source to update
+            vocabulary: New vocabulary for the source
+            metadata: Updated metadata
+        """
+        if source_name not in self.source_corpora:
+            logger.warning(f"Source '{source_name}' not found, adding as new")
+            await self.add_source(source_name, vocabulary, metadata=metadata)
+            return
+            
+        if vocabulary:
+            # Re-create corpus with new vocabulary
+            updated_corpus = await Corpus.create(
+                corpus_name=f"{self.corpus_name}_{source_name}",
+                vocabulary=vocabulary,
+                language=self.language,
+                semantic=self.metadata.get("semantic_enabled", False),
+                model_name=self.metadata.get("model_name"),
+            )
+            updated_corpus.parent_corpus_id = self.corpus_id
+            updated_corpus.corpus_id = self.source_corpora[source_name].corpus_id
+            
+            self.source_corpora[source_name] = updated_corpus
+            
+        if metadata:
+            self.source_metadata[source_name].update(metadata)
+            
+        # Re-aggregate vocabulary
+        await self.aggregate_vocabulary()
+        
+    async def update_sources_bulk(
+        self,
+        updates: dict[str, dict[str, Any]],
+    ) -> None:
+        """Update multiple sources in a single operation.
+        
+        Args:
+            updates: Dict mapping source names to update data
+                    Each update can contain 'vocabulary' and/or 'metadata'
+        """
+        for source_name, update_data in updates.items():
+            await self.update_source(
+                source_name,
+                vocabulary=update_data.get("vocabulary"),
+                metadata=update_data.get("metadata"),
+            )
+            
+    async def re_download_source(
+        self,
+        source_name: str,
+        download_func: Any = None,
+    ) -> None:
+        """Re-download and update a source.
+        
+        Args:
+            source_name: Name of the source to re-download
+            download_func: Async function to download source data
+        """
+        if source_name not in self.source_corpora:
+            raise ValueError(f"Source '{source_name}' not found")
+            
+        if not download_func:
+            raise ValueError("download_func must be provided")
+            
+        # Download new data
+        logger.info(f"Re-downloading source '{source_name}'...")
+        new_vocabulary = await download_func(self.source_metadata[source_name])
+        
+        # Update source with new data
+        await self.update_source(source_name, vocabulary=new_vocabulary)
+        
+        # Update metadata
+        self.source_metadata[source_name]["last_downloaded"] = time.time()
+        
+    async def aggregate_vocabulary(self) -> None:
+        """Aggregate vocabulary from all child sources."""
+        if not self.source_corpora:
+            return
+            
+        logger.info(f"Aggregating vocabulary from {len(self.source_corpora)} sources")
+        
+        # Collect all vocabularies
+        all_vocabularies = []
+        all_original_vocabularies = []
+        
+        for source_name, source_corpus in self.source_corpora.items():
+            all_vocabularies.extend(source_corpus.vocabulary)
+            all_original_vocabularies.extend(source_corpus.original_vocabulary)
+            
+        # Deduplicate while preserving originals
+        unique_normalized = list(dict.fromkeys(all_vocabularies))
+        
+        # Build mapping from normalized to best original
+        normalized_to_original: dict[str, str] = {}
+        for norm, orig in zip(all_vocabularies, all_original_vocabularies):
+            if norm not in normalized_to_original or len(orig) > len(normalized_to_original[norm]):
+                normalized_to_original[norm] = orig
+                
+        # Update corpus vocabulary
+        self.vocabulary = unique_normalized
+        self.original_vocabulary = [normalized_to_original[norm] for norm in unique_normalized]
+        
+        # Rebuild indices
+        self.vocabulary_to_index = {word: idx for idx, word in enumerate(self.vocabulary)}
+        self._build_signature_index()
+        
+        # Update statistics
+        self.unique_word_count = len(self.vocabulary)
+        self.total_word_count = len(all_vocabularies)
+        self.vocabulary_stats.update({
+            "source_count": len(self.source_corpora),
+            "total_words": self.total_word_count,
+            "unique_words": self.unique_word_count,
+            "deduplication_ratio": float(self.unique_word_count) / max(1, self.total_word_count),
+        })
+        
+        # Update hash
+        self.vocabulary_hash = get_vocabulary_hash(
+            self.vocabulary,
+            self.metadata.get("model_name"),
+        )
+        
+        logger.info(
+            f"Aggregated {self.total_word_count:,} words → {self.unique_word_count:,} unique"
+        )
+        
+    async def get_source_vocabulary(self, source_name: str) -> list[str]:
+        """Get vocabulary from a specific source.
+        
+        Args:
+            source_name: Name of the source
+            
+        Returns:
+            List of words from the source
+        """
+        if source_name not in self.source_corpora:
+            raise ValueError(f"Source '{source_name}' not found")
+            
+        return self.source_corpora[source_name].vocabulary
+        
+    async def save(self, config: VersionConfig | None = None) -> None:
+        """Save multi-source corpus and all child sources."""
+        # Mark as master corpus
+        self.is_master = True
+        
+        # Save child sources first
+        for source_name, source_corpus in self.source_corpora.items():
+            await source_corpus.save(config)
+            
+        # Save master corpus
+        await super().save(config)
+        
+        # Update tree relationships
+        manager = get_tree_corpus_manager()
+        if self.corpus_id:
+            for child_id in self.child_corpus_ids:
+                await manager.update_parent(child_id, self.corpus_id)
+                
+    @classmethod
+    async def create_from_sources(
+        cls,
+        corpus_name: str,
+        sources: dict[str, list[str] | Corpus],
+        language: Language = Language.ENGLISH,
+        corpus_type: CorpusType = CorpusType.LEXICON,
+        semantic: bool = False,
+        model_name: str | None = None,
+    ) -> MultisourceCorpus:
+        """Create multi-source corpus from multiple sources.
+        
+        Args:
+            corpus_name: Name for the master corpus
+            sources: Dict mapping source names to vocabularies or corpora
+            language: Language of the corpus
+            corpus_type: Type of corpus
+            semantic: Enable semantic search
+            model_name: Embedding model name
+            
+        Returns:
+            Configured MultisourceCorpus instance
+        """
+        # Create empty master corpus
+        corpus = cls(
+            corpus_name=corpus_name,
+            corpus_type=corpus_type,
+            language=language,
+            is_master=True,
+        )
+        
+        corpus.metadata = {
+            "semantic_enabled": semantic,
+            "model_name": model_name,
+            "creation_time": time.time(),
+        }
+        
+        # Add all sources
+        for source_name, source_data in sources.items():
+            if isinstance(source_data, Corpus):
+                await corpus.add_source(source_name, corpus=source_data)
+            else:
+                await corpus.add_source(source_name, vocabulary=source_data)
+                
+        return corpus

@@ -55,7 +55,7 @@ class CleanupService:
 
         """
         # Import models here to avoid circular imports
-        from ...models import Definition, DictionaryEntry
+        from ...models.dictionary import Definition, DictionaryEntry
 
         collections = [
             Definition.get_pymongo_collection(),

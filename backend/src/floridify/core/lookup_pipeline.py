@@ -9,14 +9,13 @@ import traceback
 
 from ..ai import get_definition_synthesizer
 from ..ai.synthesis_functions import cluster_definitions
-from ..models import (
+from ..models.base import Etymology, Language
+from ..models.dictionary import (
     Definition,
     DictionaryEntry,
     DictionaryProvider,
-    Language,
     Word,
 )
-from ..models.base import Etymology
 from ..providers.base import DictionaryConnector
 from ..providers.dictionary.api.oxford import OxfordConnector
 from ..providers.dictionary.local.apple_dictionary import AppleDictionaryConnector

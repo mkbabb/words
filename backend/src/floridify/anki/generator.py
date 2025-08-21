@@ -8,11 +8,11 @@ import time
 from pathlib import Path
 from typing import Any
 
-import genanki
+import genanki  # type: ignore[import-untyped]
 
 from ..ai.connector import OpenAIConnector
 from ..ai.prompt_manager import PromptManager
-from ..models import Definition, DictionaryEntry
+from ..models.dictionary import Definition, DictionaryEntry
 from ..utils.logging import get_logger
 from .ankiconnect import AnkiDirectIntegration
 from .templates import AnkiCardTemplate, CardType
@@ -95,7 +95,7 @@ def render_template(template: str, fields: dict[str, Any]) -> str:
 async def extract_definitions(entry: DictionaryEntry) -> list[Definition]:
     """Extract definitions from DictionaryEntry."""
     # Load definitions from IDs
-    from ..models import Definition
+    from ..models.dictionary import Definition
 
     definitions = []
     for def_id in entry.definition_ids:
@@ -168,7 +168,7 @@ class AnkiCardGenerator:
         if not definition.example_ids:
             return []
 
-        from ..models import Example
+        from ..models.dictionary import Example
 
         examples = (
             await Example.find(Example.definition_id == definition.id, Example.type == "generated")

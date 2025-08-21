@@ -8,7 +8,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
-import diskcache as dc
+import diskcache as dc  # type: ignore[import-untyped]
 
 from ..utils.logging import get_logger
 from ..utils.paths import get_cache_directory

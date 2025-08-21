@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ...models import Fact
+from ...models.dictionary import Fact
 from ..core.base import BaseRepository
 
 

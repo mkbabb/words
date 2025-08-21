@@ -11,8 +11,9 @@ from typing import Any
 import torch
 
 from ..utils.logging import get_logger
-from .embeddings import get_embedder
-from .encoders import get_semantic_encoder
+from .core import SemanticID
+from .embeddings import Embedder, get_embedder
+from .encoders import UnifiedSemanticEncoder, get_semantic_encoder
 
 logger = get_logger(__name__)
 
@@ -42,14 +43,14 @@ class WOTDInference:
             raise FileNotFoundError(f"Semantic IDs not found: {self.semantic_ids_path}")
 
         # Initialize components
-        self.embedder = None
-        self.semantic_encoder = None
-        self.semantic_ids = {}
-        self.id_to_corpus = {}  # Reverse mapping
+        self.embedder: Embedder | None = None
+        self.semantic_encoder: UnifiedSemanticEncoder | None = None
+        self.semantic_ids: dict[str, SemanticID] = {}
+        self.id_to_corpus: dict[int, str] = {}  # Reverse mapping
 
         logger.info(f"🚀 Initializing WOTD inference from {model_dir}")
 
-    async def load_models(self):
+    async def load_models(self) -> None:
         """Load all trained models and mappings."""
         try:
             # Load embedder (same model used during training)

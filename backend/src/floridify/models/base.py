@@ -133,3 +133,14 @@ class AudioMedia(Document, BaseMetadata):
 
     class Settings:
         name = "audio_media"
+
+
+# Explicit exports
+__all__ = [
+    "Language",
+    "BaseMetadata",
+    "ModelInfo",
+    "AIResponseBase",
+    "ImageMedia",
+    "AudioMedia",
+]

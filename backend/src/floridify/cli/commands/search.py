@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ...core.search_pipeline import search_word_pipeline
-from ...models.dictionary import Language
+from ...models.base import Language
 from ...search.constants import SearchMode
 from ...search.language import get_language_search
 from ...utils.logging import get_logger

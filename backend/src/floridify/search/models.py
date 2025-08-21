@@ -14,7 +14,7 @@ from ..caching.manager import get_version_manager
 from ..caching.models import BaseVersionedData, CacheNamespace
 from ..corpus.core import Corpus
 from ..corpus.utils import get_vocabulary_hash
-from ..models.dictionary import Language
+from ..models.base import Language
 from ..models.versioned import ResourceType, VersionConfig, register_model
 from ..utils.logging import get_logger
 from .constants import SearchMethod

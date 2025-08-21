@@ -7,7 +7,7 @@ import pickle
 import time
 from typing import Any, Literal
 
-import faiss
+import faiss  # type: ignore[import-untyped]
 import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer

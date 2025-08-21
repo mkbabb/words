@@ -9,7 +9,7 @@ work management, and vocabulary extraction from literary texts.
 # TODO: LiteratureCorpusLoader needs to be implemented
 # from .loader import LiteratureCorpusLoader
 
-__all__ = [
+__all__: list[str] = [
     # "LiteratureCorpus",  # TODO: Implement in core.py
     # "LiteratureCorpusLoader",  # TODO: Implement loader
 ]

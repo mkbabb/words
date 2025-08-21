@@ -8,16 +8,15 @@ from beanie import PydanticObjectId
 from beanie.operators import RegEx
 from pydantic import BaseModel, Field
 
-from ...models import (
+from ...models.base import Language
+from ...models.dictionary import (
     Definition,
-    DictionaryProviderData,
+    DictionaryEntry,
     Example,
     Fact,
     Pronunciation,
-    DictionaryEntry,
     Word,
 )
-from ...models.dictionary import Language
 from ..core.base import BaseRepository
 
 
@@ -117,7 +116,7 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
             Example.find({"word_id": word_id_str}).delete(),
             Fact.find({"word_id": word_id_str}).delete(),
             Pronunciation.find({"word_id": word_id_str}).delete(),
-            DictionaryProviderData.find({"word_id": word_id_str}).delete(),
+            DictionaryEntry.find({"word_id": word_id_str}).delete(),
             DictionaryEntry.find({"word_id": word_id_str}).delete(),
         )
 

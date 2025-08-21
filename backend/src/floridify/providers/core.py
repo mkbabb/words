@@ -28,6 +28,7 @@ class ProviderType(str, Enum):
     """Provider type enumeration."""
 
     DICTIONARY = "dictionary"
+    LANGUAGE = "language"
     LITERATURE = "literature"
     SYNTHESIS = "synthesis"
 
@@ -249,7 +250,7 @@ class BaseConnector(ABC):
     @abstractmethod
     async def _fetch_from_provider(
         self,
-        word: str,
+        query: str,
         state_tracker: StateTracker | None = None,
     ) -> Any | None:
         """Implementation-specific fetch method.
@@ -257,7 +258,7 @@ class BaseConnector(ABC):
         Must be implemented by subclasses to fetch from actual provider.
 
         Args:
-            word: Word/resource identifier
+            query: Query/resource identifier
             state_tracker: Optional state tracker for progress updates
 
         Returns:

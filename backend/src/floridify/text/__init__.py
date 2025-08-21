@@ -19,8 +19,8 @@ from .normalize import (
     lemmatize_comprehensive,
     # Core normalization
     normalize,
-    normalize_comprehensive,
     normalize_basic,
+    normalize_comprehensive,
     normalize_simple,
     # Diacritics
     remove_diacritics,

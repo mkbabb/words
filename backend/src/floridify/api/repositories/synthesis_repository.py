@@ -7,13 +7,11 @@ from beanie import PydanticObjectId
 from beanie.operators import In
 from pydantic import BaseModel, Field
 
-from ...models import (
+from ...models.base import Etymology, ImageMedia, ModelInfo
+from ...models.dictionary import (
     Definition,
     DictionaryEntry,
-    Etymology,
     Fact,
-    ImageMedia,
-    ModelInfo,
     Pronunciation,
 )
 from ..core.base import BaseRepository

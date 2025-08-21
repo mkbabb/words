@@ -10,41 +10,41 @@ class WOTDStorage:
     """Minimal WOTD storage for testing imports."""
 
     def __init__(self) -> None:
-        self._data = {}
+        self._data: dict[str, Any] = {}
 
-    async def save_corpus(self, corpus) -> None:
+    async def save_corpus(self, corpus: Any) -> None:
         """Save corpus placeholder."""
         pass
 
-    async def save_multiple_corpora(self, corpora) -> None:
+    async def save_multiple_corpora(self, corpora: Any) -> None:
         """Save multiple corpora placeholder."""
         pass
 
-    async def get_corpus(self, corpus_id: str):
+    async def get_corpus(self, corpus_id: str) -> Any | None:
         """Get corpus placeholder."""
         return None
 
-    async def load_corpora_dict(self) -> dict:
+    async def load_corpora_dict(self) -> dict[str, Any]:
         """Load corpora dict placeholder."""
         return {}
 
-    async def list_corpora(self, limit: int = 50) -> list:
+    async def list_corpora(self, limit: int = 50) -> list[Any]:
         """List corpora placeholder."""
         return []
 
-    async def save_training_results(self, results) -> None:
+    async def save_training_results(self, results: Any) -> None:
         """Save training results placeholder."""
         pass
 
-    async def get_latest_training_results(self):
+    async def get_latest_training_results(self) -> Any | None:
         """Get latest training results placeholder."""
         return None
 
-    async def save_semantic_ids(self, semantic_ids: dict) -> None:
+    async def save_semantic_ids(self, semantic_ids: dict[str, Any]) -> None:
         """Save semantic IDs placeholder."""
         pass
 
-    async def get_semantic_ids(self) -> dict:
+    async def get_semantic_ids(self) -> dict[str, Any]:
         """Get semantic IDs placeholder."""
         return {}
 
@@ -61,7 +61,7 @@ class WOTDStorage:
         pass
 
 
-_storage = None
+_storage: WOTDStorage | None = None
 
 async def get_wotd_storage() -> WOTDStorage:
     """Get minimal storage instance."""

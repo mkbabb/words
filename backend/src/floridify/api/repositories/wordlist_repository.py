@@ -9,7 +9,7 @@ from beanie.operators import RegEx
 from pydantic import BaseModel, Field
 
 from ...corpus.manager import CorpusManager, get_corpus_manager
-from ...models.dictionary import Language, Word
+from ...models.base import Language, Word
 from ...text import normalize
 from ...utils.logging import get_logger
 from ...wordlist.constants import MasteryLevel, Temperature

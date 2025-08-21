@@ -7,8 +7,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..models import DictionaryProvider
 from ..models.base import AIResponseBase
+from ..models.dictionary import DictionaryProvider
 
 
 class ExampleGenerationResponse(AIResponseBase):

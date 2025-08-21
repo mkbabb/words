@@ -7,7 +7,7 @@ word game quality (Scrabble, linguistic corpora) and academic rigor.
 
 from __future__ import annotations
 
-from ...models.dictionary import Language
+from ...models.base import Language
 from ..core import CorpusSource
 from .scrapers.wikipedia_french_expressions import scrape_french_expressions
 
@@ -73,7 +73,7 @@ LANGUAGE_CORPUS_SOURCES = [
         parser="parse_scraped_data",
         language=Language.FRENCH,
         description="French proverbs and expressions from Wikipedia",
-        scraper=scrape_french_expressions,  # Custom scraper for Wikipedia
+        scraper="scrape_french_expressions",  # Custom scraper for Wikipedia
     ),
     # Spanish - Core Vocabulary
     CorpusSource(

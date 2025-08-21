@@ -10,7 +10,7 @@ from beanie import PydanticObjectId
 from beanie.odm.enums import SortDirection
 from pydantic import BaseModel, Field
 
-from ...models import AudioMedia
+from ...models.base import AudioMedia
 from ..core import BaseRepository, PaginationParams, SortParams
 
 

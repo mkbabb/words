@@ -6,7 +6,7 @@ import gzip
 import pickle
 from typing import Any
 
-import lz4.frame
+import lz4.frame  # type: ignore[import-untyped]
 import zstandard as zstd
 
 from .models import CompressionType

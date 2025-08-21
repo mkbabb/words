@@ -6,12 +6,11 @@ from typing import Any, TypeVar
 
 from beanie import Document
 
-from ...models import (
-    AudioMedia,
+from ...models.base import AudioMedia, ImageMedia
+from ...models.dictionary import (
     Definition,
     DictionaryEntry,
     Example,
-    ImageMedia,
     Pronunciation,
     Word,
 )

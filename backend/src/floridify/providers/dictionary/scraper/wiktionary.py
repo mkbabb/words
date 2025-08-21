@@ -8,7 +8,7 @@ import re
 from typing import Any
 
 import httpx
-import wikitextparser as wtp
+import wikitextparser as wtp  # type: ignore[import-untyped]
 from beanie import PydanticObjectId
 
 from ....caching.decorators import cached_computation_async

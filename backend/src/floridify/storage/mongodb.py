@@ -11,18 +11,16 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from ..caching.models import BaseVersionedData
 from ..corpus.models import CorpusMetadata
-from ..models import (
-    AudioMedia,
-    # CorpusCacheEntry removed - using unified caching
+from ..models.base import AudioMedia, ImageMedia
+from ..models.dictionary import (
     Definition,
     DictionaryEntry,
     Example,
     Fact,
-    ImageMedia,
     Pronunciation,
     Word,
-    WordRelationship,
 )
+from ..models.relationships import WordRelationship
 from ..providers.batch import BatchOperation
 from ..utils.config import Config
 from ..utils.logging import get_logger

@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from ...caching.core import get_global_cache
 from ...core.search_pipeline import get_search_engine
-from ...models.dictionary import Language
+from ...models.base import Language
 from ...storage.mongodb import _ensure_initialized, get_storage
 from ...utils.logging import get_logger
 

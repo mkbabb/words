@@ -8,8 +8,7 @@ import click
 from rich.console import Console
 
 from ...core.lookup_pipeline import lookup_word_pipeline
-from ...models import Definition
-from ...models.dictionary import DictionaryProvider, Language
+from ...models.dictionary import Definition, DictionaryProvider, Language
 from ...utils.logging import get_logger
 from ..utils.formatting import (
     format_error,

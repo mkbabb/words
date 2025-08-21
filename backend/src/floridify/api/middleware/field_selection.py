@@ -94,7 +94,7 @@ async def load_related_fields(obj: Document, fields: set[str], depth: int = 1) -
             if fk_value:
                 # Dynamically import the related model
                 # This is a simplified version - in production you'd have a registry
-                from ...models import Definition, Example, Pronunciation, Word
+                from ...models.dictionary import Definition, Example, Pronunciation, Word
 
                 model_map = {
                     "word": Word,

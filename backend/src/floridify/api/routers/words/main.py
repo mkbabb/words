@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from ....models import Word
-from ....models.dictionary import Language
+from ....models.base import Language
 from ...core import (
     ErrorDetail,
     ErrorResponse,

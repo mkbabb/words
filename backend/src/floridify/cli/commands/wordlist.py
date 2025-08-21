@@ -11,7 +11,7 @@ from rich.table import Table
 
 from ...api.repositories.wordlist_repository import WordListRepository
 from ...core.lookup_pipeline import lookup_word_pipeline
-from ...models import Word
+from ...models.dictionary import Word
 from ...storage.mongodb import _ensure_initialized
 from ...utils.logging import get_logger
 from ...wordlist import WordList

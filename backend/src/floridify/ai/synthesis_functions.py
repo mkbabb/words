@@ -13,19 +13,20 @@ if TYPE_CHECKING:
 
 from ..audio import AudioSynthesizer
 from ..core.state_tracker import Stages
-from ..models import (
-    Collocation,
+from ..models.base import Etymology, ModelInfo
+from ..models.dictionary import (
     Definition,
     DictionaryEntry,
-    Etymology,
     Example,
     Fact,
+    Pronunciation,
+    Word,
+)
+from ..models.relationships import (
+    Collocation,
     GrammarPattern,
     MeaningCluster,
-    ModelInfo,
-    Pronunciation,
     UsageNote,
-    Word,
     WordForm,
 )
 from ..utils.logging import get_logger

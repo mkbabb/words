@@ -33,3 +33,5 @@ node_modules/
 cache/
 dist/
 benchmark_results/
+
+.serena/

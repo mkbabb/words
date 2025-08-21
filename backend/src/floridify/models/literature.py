@@ -118,4 +118,4 @@ class LiteratureEntry(BaseModel):
     keywords: list[str] = Field(default_factory=list)
 
     # Data
-    text: str  # Full text content
+    text: str | None = None  # Full text content (loaded separately)

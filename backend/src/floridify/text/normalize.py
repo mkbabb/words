@@ -11,10 +11,10 @@ import unicodedata
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
 
-import contractions
+import contractions  # type: ignore[import-untyped]
 import ftfy
-import nltk
-from nltk.stem import WordNetLemmatizer
+import nltk  # type: ignore[import-untyped]
+from nltk.stem import WordNetLemmatizer  # type: ignore[import-untyped]
 
 from ..utils.logging import get_logger
 from .constants import (

@@ -226,3 +226,15 @@ class DictionaryEntry(Document, BaseMetadata):
 
     # Synthesis metadata (populated for synthesized entries)
     model_info: ModelInfo | None = None  # AI model info for synthesized entries
+
+# Explicit exports
+__all__ = [
+    "DictionaryProvider",
+    "Definition",
+    "DictionaryEntry",
+    "Example",
+    "Fact",
+    "LiteratureSourceExample",
+    "Pronunciation",
+    "Word",
+]

@@ -6,7 +6,7 @@ Supports exact, fuzzy, and semantic search with first-class phrase/idiom support
 
 from __future__ import annotations
 
-from ..models.dictionary import Language
+from ..models.base import Language
 from .constants import SearchMethod
 from .core import Search
 from .fuzzy import FuzzySearch

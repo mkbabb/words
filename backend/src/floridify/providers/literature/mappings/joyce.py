@@ -3,7 +3,7 @@
 Comprehensive mapping of Joyce's works available on Project Gutenberg.
 """
 
-from ....models.dictionary import Language
+from ....models.base import Language
 from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
 
 AUTHOR = AuthorInfo(

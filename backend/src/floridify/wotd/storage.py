@@ -22,7 +22,7 @@ class WOTDStorage:
 
     def __init__(self) -> None:
         """Initialize WOTD storage."""
-        self._data = {
+        self._data: dict[str, Any] = {
             "corpora": {},
             "training_results": [],
             "semantic_ids": {},

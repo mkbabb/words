@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-import wikitextparser as wtp
+import wikitextparser as wtp  # type: ignore[import-untyped]
 
 from ....models import Word
 from ....models.dictionary import DictionaryEntry, DictionaryProvider, Language

@@ -12,7 +12,7 @@ import json
 from io import StringIO
 from typing import Any
 
-from ..models.dictionary import Language
+from ..models.base import Language
 from ..text import is_phrase, normalize
 from ..utils.logging import get_logger
 

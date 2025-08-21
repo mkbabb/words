@@ -9,13 +9,13 @@ from typing import Any
 from ..caching.manager import get_version_manager
 from ..caching.models import CacheNamespace
 from ..core.state_tracker import Stages, StateTracker
-from ..models import (
+from ..models.base import Language
+from ..models.dictionary import (
     Definition,
+    DictionaryEntry,
     DictionaryProvider,
-    Language,
     Word,
 )
-from ..models.dictionary import DictionaryEntry
 from ..models.versioned import ResourceType, VersionConfig
 from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger

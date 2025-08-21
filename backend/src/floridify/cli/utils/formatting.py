@@ -17,8 +17,7 @@ from rich.progress import (
 from rich.table import Table
 from rich.text import Text
 
-from ...models import Definition, DictionaryEntry
-from ...models.dictionary import DictionaryProvider, Language
+from ...models.dictionary import Definition, DictionaryEntry, DictionaryProvider, Language
 from ...search import SearchResult
 from ...search.constants import SearchMethod
 

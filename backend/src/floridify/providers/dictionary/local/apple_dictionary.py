@@ -61,7 +61,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             return
 
         try:
-            from CoreServices import DCSCopyTextDefinition
+            from CoreServices import DCSCopyTextDefinition  # type: ignore[import-untyped]
 
             self._dictionary_service = DCSCopyTextDefinition
             logger.info("Apple Dictionary Services initialized successfully")

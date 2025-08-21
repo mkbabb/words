@@ -8,11 +8,11 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from ...models import (
+from ...models.dictionary import (
     DictionaryEntry,
+    DictionaryProvider,
     Word,
 )
-from ...models.dictionary import DictionaryProvider
 from ...storage.mongodb import MongoDBStorage
 from ..utils.formatting import format_error
 
@@ -182,12 +182,12 @@ async def _get_quality_metrics() -> dict[str, str]:
 
             if sample_entries:
                 # Calculate average providers per word
-                from ...models import ProviderData
+                # ProviderData is now DictionaryEntry
 
                 total_providers = 0
                 for word in sample_entries:
-                    provider_count = await ProviderData.find(
-                        ProviderData.word_id == word.id,
+                    provider_count = await DictionaryEntry.find(
+                        DictionaryEntry.word_id == word.id,
                     ).count()
                     total_providers += provider_count
                 avg_providers = total_providers / len(sample_entries)
@@ -331,7 +331,7 @@ async def _cleanup_database_async(dry_run: bool, older_than: int, confirm: bool)
     """Async implementation of database cleanup."""
     from datetime import datetime, timedelta
 
-    from ...models import ProviderData
+    # ProviderData is now DictionaryEntry
 
     console.print(f"[bold blue]Database cleanup (dry run: {dry_run})[/bold blue]")
     console.print(f"Removing entries older than {older_than} days\n")
@@ -345,16 +345,16 @@ async def _cleanup_database_async(dry_run: bool, older_than: int, confirm: bool)
         cutoff_date = datetime.utcnow() - timedelta(days=older_than)
 
         # Find old provider data entries
-        old_providers = await ProviderData.find(
-            ProviderData.updated_at < cutoff_date,
+        old_providers = await DictionaryEntry.find(
+            DictionaryEntry.updated_at < cutoff_date,
         ).to_list()
 
         console.print(f"Found {len(old_providers)} old provider entries")
 
         if old_providers and not dry_run:
             # Delete old provider data
-            delete_result = await ProviderData.find(
-                ProviderData.updated_at < cutoff_date,
+            delete_result = await DictionaryEntry.find(
+                DictionaryEntry.updated_at < cutoff_date,
             ).delete()
 
             deleted_count = delete_result.deleted_count if delete_result else 0
@@ -367,8 +367,8 @@ async def _cleanup_database_async(dry_run: bool, older_than: int, confirm: bool)
         # Find orphaned words (words with no provider data)
         words_with_no_data = []
         async for word in Word.find():
-            provider_count = await ProviderData.find(
-                ProviderData.word_id == word.id,
+            provider_count = await DictionaryEntry.find(
+                DictionaryEntry.word_id == word.id,
             ).count()
             if provider_count == 0:
                 words_with_no_data.append(word)
@@ -491,12 +491,12 @@ async def _clear_everything_async(confirm: bool) -> None:
     try:
         console.print("[bold red]Clearing entire database...[/bold red]")
 
-        from ...models import (
+        from ...models.dictionary import (
             Definition,
+            DictionaryEntry,
             Example,
             Fact,
             Pronunciation,
-            ProviderData,
             Word,
         )
         from ...wordlist import WordList
@@ -511,7 +511,7 @@ async def _clear_everything_async(confirm: bool) -> None:
         console.print(f"  Deleted {synth_count} DictionaryEntry synthesis documents")
 
         # Delete provider data
-        result = await ProviderData.find().delete()
+        result = await DictionaryEntry.find().delete()
         provider_count = result.deleted_count if result else 0
         total_deleted += provider_count
         console.print(f"  Deleted {provider_count} ProviderData documents")
@@ -559,12 +559,12 @@ async def _clear_words_async(confirm: bool) -> None:
     try:
         console.print("[bold blue]Clearing all words and related data...[/bold blue]")
 
-        from ...models import (
+        from ...models.dictionary import (
             Definition,
+            DictionaryEntry,
             Example,
             Fact,
             Pronunciation,
-            ProviderData,
             Word,
         )
 
@@ -578,7 +578,7 @@ async def _clear_words_async(confirm: bool) -> None:
         console.print(f"  Deleted {synth_count} DictionaryEntry synthesis documents")
 
         # Delete provider data (references words)
-        result = await ProviderData.find().delete()
+        result = await DictionaryEntry.find().delete()
         provider_count = result.deleted_count if result else 0
         total_deleted += provider_count
         console.print(f"  Deleted {provider_count} ProviderData documents")
@@ -621,7 +621,7 @@ async def _clear_definitions_async(confirm: bool) -> None:
     try:
         console.print("[bold blue]Clearing all definitions...[/bold blue]")
 
-        from ...models import Definition
+        from ...models.dictionary import Definition
 
         result = await Definition.find().delete()
         deleted_count = result.deleted_count if result else 0
@@ -675,9 +675,9 @@ async def _clear_providers_async(confirm: bool) -> None:
     try:
         console.print("[bold blue]Clearing all provider data...[/bold blue]")
 
-        from ...models import ProviderData
+        # ProviderData is now DictionaryEntry
 
-        result = await ProviderData.find().delete()
+        result = await DictionaryEntry.find().delete()
         deleted_count = result.deleted_count if result else 0
 
         console.print(f"[green]✓ Successfully deleted {deleted_count} provider entries[/green]")

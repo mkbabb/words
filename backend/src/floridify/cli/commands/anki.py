@@ -12,8 +12,7 @@ from ...ai.connector import get_openai_connector
 from ...anki.constants import CardType
 from ...anki.generator import AnkiCardGenerator
 from ...core.lookup_pipeline import lookup_word_pipeline
-from ...models import Word
-from ...models.dictionary import DictionaryProvider, Language
+from ...models.dictionary import DictionaryProvider, Language, Word
 from ...search.language import get_language_search
 from ...storage.mongodb import _ensure_initialized
 from ...text import normalize

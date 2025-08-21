@@ -13,7 +13,8 @@ from google.oauth2 import service_account
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from ..models import AudioMedia, Pronunciation
+from ..models.base import AudioMedia
+from ..models.dictionary import Pronunciation
 from ..utils.config import Config
 from ..utils.paths import get_project_root
 

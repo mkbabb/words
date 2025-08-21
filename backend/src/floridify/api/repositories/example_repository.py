@@ -5,7 +5,7 @@ from typing import Any
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
-from ...models import Example, LiteratureSourceExample
+from ...models.dictionary import Example, LiteratureSourceExample
 from ..core.base import BaseRepository
 
 
