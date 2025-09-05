@@ -15,9 +15,9 @@ import pytest
 
 from floridify.caching.core import GlobalCacheManager
 from floridify.caching.filesystem import FilesystemBackend
-from floridify.caching.models import CacheNamespace, CompressionType
-from floridify.models.dictionary import Language
-from floridify.models.versioned import (
+from floridify.caching.models import (
+    CacheNamespace,
+    CompressionType,
     ContentLocation,
     StorageType,
     VersionConfig,

@@ -5,11 +5,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from floridify.caching.manager import TreeCorpusManager
+from floridify.caching.models import CorpusMetadata
 from floridify.corpus.loaders.language import CorpusLanguageLoader
 from floridify.corpus.loaders.literature import LiteratureCorpusLoader
 from floridify.corpus.sources import LexiconSourceConfig
 from floridify.models.dictionary import CorpusType, Language
-from floridify.models.versioned import CorpusMetadata
 from floridify.providers.literature.models import Author, LiteraryWork
 
 

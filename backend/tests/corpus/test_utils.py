@@ -2,7 +2,7 @@
 import random
 import string
 
-from floridify.models.versioned import CorpusMetadata
+from floridify.corpus.core import Corpus
 
 
 def create_test_vocabulary(
@@ -60,8 +60,8 @@ def create_test_vocabulary(
 
 
 def verify_tree_consistency(
-    parent: CorpusMetadata,
-    children: list[CorpusMetadata],
+    parent: Corpus.Metadata,
+    children: list[Corpus.Metadata],
 ) -> bool:
     """
     Verify parent-child relationships are consistent.
@@ -100,8 +100,8 @@ def verify_tree_consistency(
 
 
 def assert_vocabulary_aggregated(
-    parent: CorpusMetadata,
-    children: list[CorpusMetadata],
+    parent: Corpus.Metadata,
+    children: list[Corpus.Metadata],
 ) -> None:
     """
     Assert parent vocabulary contains all child vocabularies.
@@ -131,7 +131,7 @@ def create_corpus_tree(
     depth: int = 3,
     branching_factor: int = 2,
     vocab_size: int = 100,
-) -> dict[str, CorpusMetadata]:
+) -> dict[str, Corpus.Metadata]:
     """
     Create a test corpus tree with specified structure.
     
@@ -141,17 +141,17 @@ def create_corpus_tree(
         vocab_size: Vocabulary size for each corpus
     
     Returns:
-        Dictionary mapping corpus names to CorpusMetadata objects
+        Dictionary mapping corpus names to Corpus.Metadata objects
     """
     tree = {}
     counter = 0
     
-    def create_node(level: int, parent_id: str | None = None) -> CorpusMetadata:
+    def create_node(level: int, parent_id: str | None = None) -> Corpus.Metadata:
         nonlocal counter
         counter += 1
         
         is_root = parent_id is None
-        corpus = CorpusMetadata(
+        corpus = Corpus.Metadata(
             corpus_name=f"Corpus_L{level}_N{counter}",
             corpus_type="LANGUAGE" if is_root else "LITERATURE",
             is_master=is_root,
@@ -183,7 +183,7 @@ def create_corpus_tree(
     return tree
 
 
-def calculate_tree_stats(root: CorpusMetadata, all_nodes: dict[str, CorpusMetadata]) -> dict:
+def calculate_tree_stats(root: Corpus.Metadata, all_nodes: dict[str, Corpus.Metadata]) -> dict:
     """
     Calculate statistics for a corpus tree.
     
@@ -203,7 +203,7 @@ def calculate_tree_stats(root: CorpusMetadata, all_nodes: dict[str, CorpusMetada
         "max_children": 0,
     }
     
-    def traverse(node: CorpusMetadata, depth: int = 0):
+    def traverse(node: Corpus.Metadata, depth: int = 0):
         stats["max_depth"] = max(stats["max_depth"], depth)
         
         # Add vocabulary
@@ -238,7 +238,7 @@ def calculate_tree_stats(root: CorpusMetadata, all_nodes: dict[str, CorpusMetada
 
 
 def simulate_vocabulary_update(
-    corpus: CorpusMetadata,
+    corpus: Corpus.Metadata,
     add_words: list[str] | None = None,
     remove_words: list[str] | None = None,
 ) -> list[str]:
@@ -268,7 +268,7 @@ def simulate_vocabulary_update(
     return vocab
 
 
-def generate_test_statistics(corpus: CorpusMetadata) -> dict:
+def generate_test_statistics(corpus: Corpus.Metadata) -> dict:
     """
     Generate comprehensive statistics for a corpus.
     

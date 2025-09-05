@@ -26,7 +26,7 @@ class WOTDStorage:
             "corpora": {},
             "training_results": [],
             "semantic_ids": {},
-            "embeddings": {}
+            "embeddings": {},
         }
 
     async def save_corpus(self, corpus: WOTDCorpus) -> None:
@@ -81,7 +81,7 @@ class WOTDStorage:
             "corpus_count": len(self._data["corpora"]),
             "training_results_count": len(self._data["training_results"]),
             "semantic_ids_count": len(self._data["semantic_ids"]),
-            "embeddings_count": len(self._data["embeddings"])
+            "embeddings_count": len(self._data["embeddings"]),
         }
 
     async def get_cached_embeddings(self, cache_key: str) -> dict[str, Any] | None:
@@ -97,8 +97,8 @@ class WOTDStorage:
 async def get_wotd_storage() -> WOTDStorage:
     """Get the global WOTD storage instance."""
     global _wotd_storage
-    
+
     if _wotd_storage is None:
         _wotd_storage = WOTDStorage()
-    
+
     return _wotd_storage

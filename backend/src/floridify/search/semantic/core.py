@@ -111,11 +111,11 @@ class SemanticSearch:
 
         # Load embeddings and FAISS index if available
         if self.index.embeddings:
-            embeddings_bytes = base64.b64decode(self.index.embeddings.encode('utf-8'))
+            embeddings_bytes = base64.b64decode(self.index.embeddings.encode("utf-8"))
             self.sentence_embeddings = pickle.loads(embeddings_bytes)
 
         if self.index.index_data:
-            index_bytes = base64.b64decode(self.index.index_data.encode('utf-8'))
+            index_bytes = base64.b64decode(self.index.index_data.encode("utf-8"))
             faiss_data = pickle.loads(index_bytes)
             self.sentence_index = faiss.deserialize_index(faiss_data)
 
@@ -151,9 +151,7 @@ class SemanticSearch:
                 model = SentenceTransformer(self.index.model_name, backend="onnx")
                 logger.info("✅ ONNX backend enabled with automatic model selection")
             except Exception as e:
-                logger.warning(
-                    f"Failed to load ONNX model: {e}. Falling back to PyTorch"
-                )
+                logger.warning(f"Failed to load ONNX model: {e}. Falling back to PyTorch")
                 model = SentenceTransformer(self.index.model_name)
         else:
             model = SentenceTransformer(self.index.model_name)
@@ -285,15 +283,11 @@ class SemanticSearch:
 
         # Check if lemmatized vocabulary is available
         if not self.corpus.lemmatized_vocabulary:
-            raise ValueError(
-                f"Corpus '{self.corpus.corpus_name}' has empty lemmatized vocabulary"
-            )
+            raise ValueError(f"Corpus '{self.corpus.corpus_name}' has empty lemmatized vocabulary")
 
         # Process entire vocabulary at once for better performance
         vocab_count = len(self.corpus.lemmatized_vocabulary)
-        logger.info(
-            f"🔄 Starting embedding generation: {vocab_count:,} lemmas (full batch)"
-        )
+        logger.info(f"🔄 Starting embedding generation: {vocab_count:,} lemmas (full batch)")
 
         embedding_start = time.time()
 
@@ -359,11 +353,11 @@ class SemanticSearch:
         # Update index with embeddings data
         if self.sentence_embeddings is not None:
             embeddings_bytes = pickle.dumps(self.sentence_embeddings)
-            self.index.embeddings = base64.b64encode(embeddings_bytes).decode('utf-8')
+            self.index.embeddings = base64.b64encode(embeddings_bytes).decode("utf-8")
 
         if self.sentence_index is not None:
             index_bytes = pickle.dumps(faiss.serialize_index(self.sentence_index))
-            self.index.index_data = base64.b64encode(index_bytes).decode('utf-8')
+            self.index.index_data = base64.b64encode(index_bytes).decode("utf-8")
 
         # Update statistics
         self.index.build_time_seconds = build_time
@@ -397,10 +391,10 @@ class SemanticSearch:
         import pickle
 
         if index_data.embeddings:
-            embeddings_bytes = base64.b64decode(index_data.embeddings.encode('utf-8'))
+            embeddings_bytes = base64.b64decode(index_data.embeddings.encode("utf-8"))
             self.sentence_embeddings = pickle.loads(embeddings_bytes)
         if index_data.index_data:
-            index_bytes = base64.b64decode(index_data.index_data.encode('utf-8'))
+            index_bytes = base64.b64decode(index_data.index_data.encode("utf-8"))
             faiss_data = pickle.loads(index_bytes)
             self.sentence_index = faiss.deserialize_index(faiss_data)
 
@@ -434,11 +428,7 @@ class SemanticSearch:
         """
         # Memory baseline: FP32 vectors
         base_memory_mb = (vocab_size * dimension * 4) / (1024 * 1024)
-        model_type = (
-            "BGE-M3"
-            if dimension == 1024
-            else "MiniLM" if dimension == 384 else "Custom"
-        )
+        model_type = "BGE-M3" if dimension == 1024 else "MiniLM" if dimension == 384 else "Custom"
 
         logger.info(
             f"🔄 Building {model_type} optimized index (dim: {dimension}, vocab: {vocab_size:,}, baseline: {base_memory_mb:.1f}MB)",
@@ -487,13 +477,9 @@ class SemanticSearch:
             nbits = 8  # 8 bits per subquantizer for quality
 
             quantizer = faiss.IndexFlatL2(dimension)
-            self.sentence_index = faiss.IndexIVFPQ(
-                quantizer, dimension, nlist, m, nbits
-            )
+            self.sentence_index = faiss.IndexIVFPQ(quantizer, dimension, nlist, m, nbits)
 
-            logger.info(
-                f"🔄 Training IVF-PQ (nlist={nlist} clusters, m={m} subquantizers)..."
-            )
+            logger.info(f"🔄 Training IVF-PQ (nlist={nlist} clusters, m={m} subquantizers)...")
             self.sentence_index.train(self.sentence_embeddings)
             self.sentence_index.add(self.sentence_embeddings)
 
@@ -611,9 +597,7 @@ class SemanticSearch:
 
             # Get variant mapping from index if available
             variant_mapping = (
-                {int(k): v for k, v in self.index.variant_mapping.items()}
-                if self.index
-                else {}
+                {int(k): v for k, v in self.index.variant_mapping.items()} if self.index else {}
             )
 
             for embedding_idx, similarity in zip(

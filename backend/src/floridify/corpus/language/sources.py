@@ -8,8 +8,7 @@ word game quality (Scrabble, linguistic corpora) and academic rigor.
 from __future__ import annotations
 
 from ...models.base import Language
-from ..core import CorpusSource
-from .scrapers.wikipedia_french_expressions import scrape_french_expressions
+from ..models import CorpusSource
 
 # High-quality language corpus sources with verified URLs
 # Quality over quantity - comprehensive, non-overlapping sources

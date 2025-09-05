@@ -1,6 +1,4 @@
-"""Literature scraper providers."""
+"""Literature scraper module."""
 
-# Web scraping literature providers would go here
-# For example: custom site scrapers, document extractors, etc.
-
-__all__: list[str] = []
+# Import directly from .url when needed to avoid circular imports
+__all__ = ["URLLiteratureConnector"]

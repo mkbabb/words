@@ -10,17 +10,25 @@ from typing import Any
 import httpx
 from bs4 import BeautifulSoup, Tag
 
-from ....utils.logging import get_logger
+from .....utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-async def scrape_french_expressions(url: str = "", **kwargs: Any) -> dict[str, Any]:
+async def scrape_french_expressions(
+    url: str = "",
+    session: httpx.AsyncClient | None = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
     """Scrape French expressions from Wikipedia glossary page.
+
+    Args:
+        url: URL to scrape (defaults to Wikipedia glossary)
+        session: Optional HTTP client session to use
+        **kwargs: Additional arguments
 
     Returns:
         Dictionary with 'data' key containing expressions list
-
     """
     target_url = (
         url or "https://en.wikipedia.org/wiki/Glossary_of_French_words_and_expressions_in_English"
@@ -28,11 +36,17 @@ async def scrape_french_expressions(url: str = "", **kwargs: Any) -> dict[str, A
 
     logger.info(f"Scraping French expressions from: {target_url}")
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.get(target_url)
+    if session:
+        response = await session.get(target_url)
         response.raise_for_status()
+        html_text = response.text
+    else:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(target_url)
+            response.raise_for_status()
+            html_text = response.text
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    soup = BeautifulSoup(html_text, "html.parser")
     expressions = []
 
     # Find all dt/dd pairs in the main content

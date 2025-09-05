@@ -87,9 +87,9 @@ class Pronunciation(Document, BaseMetadata):
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     phonetic: str  # e.g., "on koo-LEES"
     ipa: str = ""  # American IPA - default to empty string for backwards compatibility
-    audio_file_ids: list[PydanticObjectId] = (
-        []
-    )  # FK to AudioMedia documents - optimized with ObjectIds
+    audio_file_ids: list[
+        PydanticObjectId
+    ] = []  # FK to AudioMedia documents - optimized with ObjectIds
     syllables: list[str] = []
     stress_pattern: str | None = None  # Primary/secondary stress
     model_info: ModelInfo | None = None  # If AI-generated
@@ -158,16 +158,12 @@ class Definition(Document, BaseMetadata):
     word_forms: list[WordForm] = []  # List of WordForm objects
 
     # Examples and relationships
-    example_ids: list[PydanticObjectId] = (
-        []
-    )  # FK to Example documents - optimized with ObjectIds
+    example_ids: list[PydanticObjectId] = []  # FK to Example documents - optimized with ObjectIds
     synonyms: list[str] = []
     antonyms: list[str] = []
 
     # Usage and context
-    language_register: (
-        Literal["formal", "informal", "neutral", "slang", "technical"] | None
-    ) = None
+    language_register: Literal["formal", "informal", "neutral", "slang", "technical"] | None = None
     domain: str | None = None  # medical, legal, computing
     region: str | None = None  # US, UK, AU
     usage_notes: list[UsageNote] = []
@@ -186,15 +182,11 @@ class Definition(Document, BaseMetadata):
     )  # 1-5, Oxford 3000/5000 style
 
     # Media and provenance
-    image_ids: list[PydanticObjectId] = (
-        []
-    )  # FK to ImageMedia documents - optimized with ObjectIds
+    image_ids: list[PydanticObjectId] = []  # FK to ImageMedia documents - optimized with ObjectIds
     dictionary_entry_id: PydanticObjectId | None = (
         None  # FK to DictionaryEntry - optimized with ObjectId
     )
-    providers: list[DictionaryProvider] = (
-        []
-    )  # List of providers this definition is sourced from
+    providers: list[DictionaryProvider] = []  # List of providers this definition is sourced from
     model_info: ModelInfo | None = None  # If AI-generated/synthesized
 
     class Settings:
@@ -209,12 +201,8 @@ class DictionaryEntry(Document, BaseMetadata):
         default_factory=list
     )  # FK to Definition documents
     pronunciation_id: PydanticObjectId | None = None  # FK to Pronunciation document
-    fact_ids: list[PydanticObjectId] = Field(
-        default_factory=list
-    )  # FK to Fact documents
-    image_ids: list[PydanticObjectId] = Field(
-        default_factory=list
-    )  # FK to ImageMedia documents
+    fact_ids: list[PydanticObjectId] = Field(default_factory=list)  # FK to Fact documents
+    image_ids: list[PydanticObjectId] = Field(default_factory=list)  # FK to ImageMedia documents
 
     # Provider information
     provider: DictionaryProvider
@@ -226,6 +214,7 @@ class DictionaryEntry(Document, BaseMetadata):
 
     # Synthesis metadata (populated for synthesized entries)
     model_info: ModelInfo | None = None  # AI model info for synthesized entries
+
 
 # Explicit exports
 __all__ = [

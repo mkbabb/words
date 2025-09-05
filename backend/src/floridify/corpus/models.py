@@ -1,19 +1,10 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
 
-from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
-from ..caching.models import (
-    BaseVersionedData,
-    CacheNamespace,
-    ContentLocation,
-    ResourceType,
-)
 from ..models.base import Language
-from ..models.versioned import register_model
 
 
 class CorpusType(Enum):
@@ -44,30 +35,3 @@ class CorpusSource(BaseModel):
     )
 
     model_config = {"frozen": True, "arbitrary_types_allowed": True}
-
-
-@register_model(ResourceType.CORPUS)
-class CorpusMetadata(BaseVersionedData):
-    """Corpus metadata with tree hierarchy for vocabulary management."""
-
-    corpus_type: CorpusType
-    language: Language
-
-    # Tree hierarchy
-    parent_corpus_id: PydanticObjectId | None = None
-    child_corpus_ids: list[PydanticObjectId] = Field(default_factory=list)
-    is_master: bool = False
-
-    # Vocabulary (external if large)
-    vocabulary_size: int
-    vocabulary_hash: str
-    vocabulary: ContentLocation | None = None  # External storage for large vocabs
-
-    # Statistics (external)
-    word_frequencies: ContentLocation | None = None
-    metadata_stats: dict[str, Any] = Field(default_factory=dict)
-
-    def __init__(self, **data: Any) -> None:
-        data.setdefault("resource_type", ResourceType.CORPUS)
-        data.setdefault("namespace", CacheNamespace.CORPUS)
-        super().__init__(**data)

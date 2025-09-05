@@ -17,9 +17,9 @@ from typing import Any
 import httpx
 import wikitextparser as wtp  # type: ignore[import-untyped]
 
-from ....models import Word
-from ....models.dictionary import DictionaryEntry, DictionaryProvider, Language
-from ....models.versioned import VersionInfo
+from ....caching.models import VersionInfo
+from ....models.base import Language
+from ....models.dictionary import DictionaryEntry, DictionaryProvider, Word
 from ....utils.logging import get_logger
 from ...batch import BatchOperation
 from ...core import ConnectorConfig

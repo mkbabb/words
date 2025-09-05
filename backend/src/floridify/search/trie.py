@@ -30,16 +30,16 @@ class TrieSearch:
 
     def __init__(self, index: TrieIndex | None = None) -> None:
         """Initialize the trie search with an optional index.
-        
+
         Args:
             index: Pre-loaded TrieIndex to use
         """
         # Index data model
         self.index = index
-        
+
         # Runtime trie (built from index)
         self._trie: marisa_trie.Trie | None = None
-        
+
         # Load trie from index if provided
         if index:
             self._load_from_index()
@@ -59,7 +59,7 @@ class TrieSearch:
             corpus=corpus,
             config=VersionConfig(),
         )
-        
+
         # Load the trie from the index
         self._load_from_index()
 
@@ -67,7 +67,7 @@ class TrieSearch:
         """Load trie from the index model."""
         if not self.index or not self.index.trie_data:
             return
-            
+
         # Build marisa trie from word list
         self._trie = marisa_trie.Trie(self.index.trie_data)
         logger.debug(f"Loaded trie with {self.index.word_count} words")
@@ -125,19 +125,25 @@ class TrieSearch:
         if self.index and self.index.word_frequencies:
             if len(matches) <= max_results:
                 # Simple sort for small results
-                frequency_pairs = [(word, self.index.word_frequencies.get(word, 0)) for word in matches]
+                frequency_pairs = [
+                    (word, self.index.word_frequencies.get(word, 0)) for word in matches
+                ]
                 frequency_pairs.sort(key=lambda x: x[1], reverse=True)
                 matches = [word for word, _ in frequency_pairs]
             else:
                 # Use numpy for large results
-                frequencies = np.array([self.index.word_frequencies.get(word, 0) for word in matches])
+                frequencies = np.array(
+                    [self.index.word_frequencies.get(word, 0) for word in matches]
+                )
                 top_indices = np.argsort(-frequencies)[:max_results]
                 matches = [matches[i] for i in top_indices]
-        
+
         # Return original words with diacritics if available
         if self.index and self.index.normalized_to_original:
-            return [self.index.normalized_to_original.get(word, word) for word in matches[:max_results]]
-        
+            return [
+                self.index.normalized_to_original.get(word, word) for word in matches[:max_results]
+            ]
+
         return matches[:max_results]
 
     @classmethod
@@ -147,11 +153,11 @@ class TrieSearch:
         config: VersionConfig | None = None,
     ) -> TrieSearch:
         """Create TrieSearch from a corpus.
-        
+
         Args:
             corpus: Corpus to build trie from
             config: Version configuration
-            
+
         Returns:
             TrieSearch instance with loaded index
         """
@@ -160,7 +166,6 @@ class TrieSearch:
             corpus=corpus,
             config=config or VersionConfig(),
         )
-        
+
         # Create search with index
         return cls(index=index)
-

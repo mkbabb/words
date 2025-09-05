@@ -1325,7 +1325,6 @@ def get_openai_connector(
     global _openai_connector
 
     if _openai_connector is None or force_recreate:
-
         from ..utils.config import Config
 
         logger.info("Initializing OpenAI connector singleton")
@@ -1336,9 +1335,7 @@ def get_openai_connector(
 
         # Log configuration status (without exposing the key)
         logger.info(f"OpenAI model: {model_name}")
-        logger.info(
-            f"API key configured: {'Yes' if api_key and len(api_key) > 20 else 'No'}"
-        )
+        logger.info(f"API key configured: {'Yes' if api_key and len(api_key) > 20 else 'No'}")
 
         # Only set temperature for non-reasoning models
         temperature = None

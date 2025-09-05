@@ -16,8 +16,8 @@ from floridify.providers.dictionary.local.apple_dictionary import (
     AppleDictionaryConnector,
 )
 from floridify.providers.dictionary.scraper.wiktionary import (
-    WiktionaryConnector,
     WikitextCleaner,
+    WiktionaryConnector,
 )
 from floridify.providers.dictionary.scraper.wordhippo import WordHippoConnector
 from floridify.providers.dictionary.wholesale.wiktionary_wholesale import (

@@ -1,7 +1,7 @@
 """Test edge cases and boundary conditions."""
 import asyncio
 
-from floridify.models.versioned import CorpusMetadata
+from floridify.corpus.core import Corpus
 
 
 class TestEdgeCases:
@@ -9,7 +9,7 @@ class TestEdgeCases:
     
     async def test_empty_corpus_creation(self):
         """Test creating corpus with zero vocabulary."""
-        empty_corpus = CorpusMetadata(
+        empty_corpus = Corpus.Metadata(
             corpus_name="Empty",
             corpus_type="LANGUAGE",
             content_inline={"vocabulary": []},
@@ -30,7 +30,7 @@ class TestEdgeCases:
         """Test various Unicode characters in vocabulary."""
         unicode_vocab = sample_vocabularies["unicode"]
         
-        corpus = CorpusMetadata(
+        corpus = Corpus.Metadata(
             corpus_name="Unicode_Test",
             corpus_type="LANGUAGE",
             content_inline={"vocabulary": unicode_vocab},
@@ -53,7 +53,7 @@ class TestEdgeCases:
             "\u200B",  # Zero-width space
         ]
         
-        edge_corpus = CorpusMetadata(
+        edge_corpus = Corpus.Metadata(
             corpus_name="Edge_Unicode",
             corpus_type="LANGUAGE",
             content_inline={"vocabulary": edge_cases},
@@ -66,7 +66,7 @@ class TestEdgeCases:
         """Test performance with 100k+ words."""
         massive_vocab = [f"word_{i:06d}" for i in range(100000)]
         
-        corpus = CorpusMetadata(
+        corpus = Corpus.Metadata(
             corpus_name="Massive",
             corpus_type="LANGUAGE",
         )
@@ -87,7 +87,7 @@ class TestEdgeCases:
     async def test_deeply_nested_tree(self):
         """Test 10+ level hierarchy performance."""
         # Create deep tree
-        root = CorpusMetadata(
+        root = Corpus.Metadata(
             corpus_name="Root",
             corpus_type="LANGUAGE",
             is_master=True,
@@ -97,7 +97,7 @@ class TestEdgeCases:
         depth = 10
         
         for i in range(depth):
-            child = CorpusMetadata(
+            child = Corpus.Metadata(
                 corpus_name=f"Level_{i+1}",
                 corpus_type="LITERATURE",
                 parent_corpus_id=current.id,
@@ -153,7 +153,7 @@ class TestEdgeCases:
         
         # Test just below threshold
         below_threshold = [f"word_{i}" for i in range(threshold - 1)]
-        corpus_below = CorpusMetadata(
+        corpus_below = Corpus.Metadata(
             corpus_name="Below_Threshold",
             corpus_type="LANGUAGE",
             content_inline={"vocabulary": below_threshold},
@@ -165,7 +165,7 @@ class TestEdgeCases:
         
         # Test exactly at threshold
         at_threshold = [f"word_{i}" for i in range(threshold)]
-        corpus_at = CorpusMetadata(
+        corpus_at = Corpus.Metadata(
             corpus_name="At_Threshold",
             corpus_type="LANGUAGE",
         )
@@ -179,7 +179,7 @@ class TestEdgeCases:
         
         # Test above threshold
         above_threshold = [f"word_{i}" for i in range(threshold + 1)]
-        corpus_above = CorpusMetadata(
+        corpus_above = Corpus.Metadata(
             corpus_name="Above_Threshold",
             corpus_type="LANGUAGE",
         )
@@ -203,7 +203,7 @@ class TestEdgeCases:
         ]
         
         for i, content in enumerate(test_cases):
-            corpus = CorpusMetadata(
+            corpus = Corpus.Metadata(
                 corpus_name=f"Null_Test_{i}",
                 corpus_type="LANGUAGE",
                 content_inline=content if content else None,
@@ -248,7 +248,7 @@ class TestEdgeCases:
             "quote's",  # Apostrophe
         ]
         
-        corpus = CorpusMetadata(
+        corpus = Corpus.Metadata(
             corpus_name="Special_Chars",
             corpus_type="LANGUAGE",
             content_inline={"vocabulary": special_vocab},

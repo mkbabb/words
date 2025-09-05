@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from ..caching.manager import get_version_manager
-from ..caching.models import CacheNamespace
+from ..caching.models import CacheNamespace, ResourceType, VersionConfig
 from ..core.state_tracker import Stages, StateTracker
 from ..models.base import Language
 from ..models.dictionary import (
@@ -16,7 +16,6 @@ from ..models.dictionary import (
     DictionaryProvider,
     Word,
 )
-from ..models.versioned import ResourceType, VersionConfig
 from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger
 from .connector import OpenAIConnector
@@ -89,9 +88,7 @@ class DefinitionSynthesizer:
             return None
 
         # DEDUPLICATION: Use AI to identify and merge near-duplicates before clustering
-        logger.info(
-            f"Deduplicating {len(all_definitions)} definitions before clustering"
-        )
+        logger.info(f"Deduplicating {len(all_definitions)} definitions before clustering")
 
         dedup_response = await self.ai.deduplicate_definitions(
             word=word,
@@ -144,16 +141,10 @@ class DefinitionSynthesizer:
 
         # Run all synthesis operations in parallel
         synthesized_definitions, pronunciation, etymology, facts = await asyncio.gather(
-            self._synthesize_definitions(
-                word_obj, clustered_definitions, state_tracker
-            ),
-            synthesize_pronunciation(
-                word_obj.text, providers_data, self.ai, state_tracker
-            ),
+            self._synthesize_definitions(word_obj, clustered_definitions, state_tracker),
+            synthesize_pronunciation(word_obj.text, providers_data, self.ai, state_tracker),
             synthesize_etymology(word_obj, providers_data, self.ai, state_tracker),
-            generate_facts(
-                word_obj, unique_definitions, self.ai, self.facts_count, state_tracker
-            ),
+            generate_facts(word_obj, unique_definitions, self.ai, self.facts_count, state_tracker),
         )
 
         # Create synthesized entry
@@ -173,7 +164,9 @@ class DefinitionSynthesizer:
         if state_tracker:
             await state_tracker.update_stage(Stages.STORAGE_SAVE)
 
-        await self._save_entry_with_version_manager(entry, word.text if isinstance(word, Word) else word)
+        await self._save_entry_with_version_manager(
+            entry, word.text if isinstance(word, Word) else word
+        )
         logger.success(
             f"Created synthesized entry for '{word}' with {len(synthesized_definitions)} definitions",
         )
@@ -210,19 +203,13 @@ class DefinitionSynthesizer:
         # Create tasks for parallel synthesis
         synthesis_tasks = []
 
-        async def synthesize_cluster(
-            cluster_id: str, cluster_defs: list[Definition]
-        ) -> Definition:
-            logger.info(
-                f"Synthesizing cluster '{cluster_id}' with {len(cluster_defs)} definitions"
-            )
+        async def synthesize_cluster(cluster_id: str, cluster_defs: list[Definition]) -> Definition:
+            logger.info(f"Synthesizing cluster '{cluster_id}' with {len(cluster_defs)} definitions")
 
             # Convert definitions to dict format, retaining provider info
             def_dicts = []
             for d in cluster_defs:
-                provider = (
-                    d.providers[0] if d.providers else DictionaryProvider.WIKTIONARY
-                )
+                provider = d.providers[0] if d.providers else DictionaryProvider.WIKTIONARY
                 def_dicts.append(
                     {
                         "text": d.text,
@@ -254,9 +241,7 @@ class DefinitionSynthesizer:
                 text=synthesis_result["definition_text"],
                 meaning_cluster=cluster_defs[0].meaning_cluster,
                 providers=(
-                    list(providers_set)
-                    if providers_set
-                    else [DictionaryProvider.SYNTHESIS]
+                    list(providers_set) if providers_set else [DictionaryProvider.SYNTHESIS]
                 ),
                 model_info=self.ai.last_model_info,  # Set model info from AI connector
             )
@@ -301,7 +286,11 @@ class DefinitionSynthesizer:
         # Generate fallback definitions
         dictionary_entry = await self.ai.lookup_fallback(word)
 
-        if not dictionary_entry or not hasattr(dictionary_entry, 'definitions') or not dictionary_entry.definitions:
+        if (
+            not dictionary_entry
+            or not hasattr(dictionary_entry, "definitions")
+            or not dictionary_entry.definitions
+        ):
             logger.warning(f"No definitions generated for '{word}'")
             return None
 
@@ -309,9 +298,7 @@ class DefinitionSynthesizer:
         definitions: list[Definition] = []
         for ai_def in dictionary_entry.definitions:
             # Create definition
-            assert (
-                word_obj.id is not None
-            )  # Word should have been saved before this point
+            assert word_obj.id is not None  # Word should have been saved before this point
             definition = Definition(
                 word_id=word_obj.id,
                 part_of_speech=ai_def.part_of_speech,
@@ -352,33 +339,33 @@ class DefinitionSynthesizer:
         word: str,
     ) -> None:
         """Save DictionaryEntry using the version manager.
-        
+
         Args:
             entry: DictionaryEntry to save
             word: Word text for resource ID
         """
         manager = get_version_manager()
-        
+
         # Create resource ID based on word and provider
         resource_id = f"{word}:{entry.provider.value}"
-        
+
         # Convert entry to dict format for storage
         entry_dict = entry.model_dump(mode="json")
-        
+
         # Prepare metadata
         metadata: dict[str, Any] = {
             "word": word,
             "provider": entry.provider.value,
             "word_id": str(entry.word_id) if entry.word_id else None,
         }
-        
+
         # Add model info to metadata if available
         if entry.model_info:
             if isinstance(entry.model_info, dict):
                 metadata["model_info"] = entry.model_info
             else:
                 metadata["model_info"] = entry.model_info.model_dump(mode="json")
-        
+
         # Save using version manager
         await manager.save(
             resource_id=resource_id,
@@ -388,10 +375,10 @@ class DefinitionSynthesizer:
             config=VersionConfig(),
             metadata=metadata,
         )
-        
+
         # Also save to MongoDB for compatibility
         await entry.save()
-        
+
         logger.debug(f"Saved dictionary entry '{resource_id}' using version manager")
 
     async def regenerate_entry_components(
@@ -492,14 +479,11 @@ def get_definition_synthesizer(
     global _definition_synthesizer
 
     if _definition_synthesizer is None or force_recreate:
-
         from .connector import get_openai_connector
 
         logger.info("Initializing definition synthesizer singleton")
         connector = get_openai_connector(config_path, force_recreate)
-        _definition_synthesizer = DefinitionSynthesizer(
-            connector, examples_count=examples_count
-        )
+        _definition_synthesizer = DefinitionSynthesizer(connector, examples_count=examples_count)
         logger.success("Definition synthesizer singleton initialized")
 
     return _definition_synthesizer

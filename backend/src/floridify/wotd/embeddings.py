@@ -462,6 +462,7 @@ class Embedder:
         Checks cache first, computes if needed, stores result.
         """
         from .storage import get_wotd_storage
+
         storage = await get_wotd_storage()
 
         # Check cache

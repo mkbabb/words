@@ -8,18 +8,15 @@ from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from floridify.caching.manager import TreeCorpusManager
-from floridify.caching.models import CacheNamespace
-from floridify.models.dictionary import CorpusType, Language
-from floridify.models.versioned import (
-    CorpusMetadata,
-    DictionaryEntryMetadata,
-    LiteratureEntryMetadata,
-    ResourceType,
-    SearchIndexMetadata,
-    SemanticIndexMetadata,
-    TrieIndexMetadata,
-    VersionInfo,
-)
+from floridify.caching.models import CacheNamespace, ResourceType, VersionInfo
+from floridify.corpus.core import Corpus
+from floridify.corpus.models import CorpusType
+from floridify.models.base import Language
+from floridify.providers.dictionary.models import DictionaryProviderEntry
+from floridify.providers.language.models import LanguageEntry
+from floridify.providers.literature.models import LiteratureEntry
+from floridify.search.models import SearchIndex, TrieIndex
+from floridify.search.semantic.models import SemanticIndex
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -40,12 +37,13 @@ async def test_db(motor_client: AsyncIOMotorClient):
     await init_beanie(
         database=db,
         document_models=[
-            CorpusMetadata,
-            DictionaryEntryMetadata,
-            LiteratureEntryMetadata,
-            SearchIndexMetadata,
-            SemanticIndexMetadata,
-            TrieIndexMetadata,
+            Corpus.Metadata,
+            DictionaryProviderEntry.Metadata,
+            LanguageEntry.Metadata,
+            LiteratureEntry.Metadata,
+            SearchIndex.Metadata,
+            SemanticIndex.Metadata,
+            TrieIndex.Metadata,
         ],
     )
     
@@ -77,9 +75,9 @@ async def sample_vocabularies() -> dict[str, list[str]]:
 
 @pytest_asyncio.fixture
 async def corpus_tree(test_db, tree_manager: TreeCorpusManager, sample_vocabularies: dict[str, list[str]]):
-    """Create a 3-level test tree using real CorpusMetadata."""
+    """Create a 3-level test tree using real Corpus.Metadata."""
     # Create language corpus (master)
-    language_corpus = CorpusMetadata(
+    language_corpus = Corpus.Metadata(
         resource_id="English",
         resource_type=ResourceType.CORPUS,
         namespace=CacheNamespace.CORPUS,
@@ -99,7 +97,7 @@ async def corpus_tree(test_db, tree_manager: TreeCorpusManager, sample_vocabular
     await language_corpus.save()
     
     # Create work corpora (children)
-    work1 = CorpusMetadata(
+    work1 = Corpus.Metadata(
         resource_id="Shakespeare_Works",
         resource_type=ResourceType.CORPUS,
         namespace=CacheNamespace.CORPUS,
@@ -118,7 +116,7 @@ async def corpus_tree(test_db, tree_manager: TreeCorpusManager, sample_vocabular
     )
     await work1.save()
     
-    work2 = CorpusMetadata(
+    work2 = Corpus.Metadata(
         resource_id="Modern_Works",
         resource_type=ResourceType.CORPUS,
         namespace=CacheNamespace.CORPUS,
@@ -138,7 +136,7 @@ async def corpus_tree(test_db, tree_manager: TreeCorpusManager, sample_vocabular
     await work2.save()
     
     # Create chapter corpus (grandchild)
-    chapter1 = CorpusMetadata(
+    chapter1 = Corpus.Metadata(
         resource_id="Hamlet",
         resource_type=ResourceType.CORPUS,
         namespace=CacheNamespace.CORPUS,
@@ -192,23 +190,23 @@ def assert_helpers():
     """Common assertion helpers."""
     class Helpers:
         @staticmethod
-        def assert_parent_child_linked(parent: CorpusMetadata, child: CorpusMetadata):
+        def assert_parent_child_linked(parent: Corpus.Metadata, child: Corpus.Metadata):
             """Verify parent-child relationship is properly linked."""
             assert child.id in parent.child_corpus_ids
             assert parent.id == child.parent_corpus_id
         
         @staticmethod
-        def assert_vocabulary_contains(corpus: CorpusMetadata, expected_words: list[str]):
+        def assert_vocabulary_contains(corpus: Corpus.Metadata, expected_words: list[str]):
             """Verify corpus contains expected vocabulary."""
             vocab = corpus.content_inline.get("vocabulary", []) if corpus.content_inline else []
             assert all(word in vocab for word in expected_words)
         
         @staticmethod
-        def assert_tree_consistency(root: CorpusMetadata, all_nodes: dict[str, CorpusMetadata]):
+        def assert_tree_consistency(root: Corpus.Metadata, all_nodes: dict[str, Corpus.Metadata]):
             """Verify entire tree structure is consistent."""
             visited = set()
             
-            def check_node(node: CorpusMetadata):
+            def check_node(node: Corpus.Metadata):
                 if node.id in visited:
                     raise ValueError(f"Circular reference detected at {node.resource_id}")
                 visited.add(node.id)

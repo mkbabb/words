@@ -128,7 +128,7 @@ def cached_api_call(
 
             # Get unified cache
             cache = await get_global_cache()
-            
+
             # Map key_prefix to namespace
             namespace = CACHE_NAMESPACE_MAP.get(key_prefix, CacheNamespace.API)
 
@@ -145,7 +145,9 @@ def cached_api_call(
                 result = await func(*args, **kwargs)
 
                 # Cache the result
-                await cache.set(namespace, cache_key, result, ttl_override=timedelta(hours=ttl_hours))
+                await cache.set(
+                    namespace, cache_key, result, ttl_override=timedelta(hours=ttl_hours)
+                )
 
                 elapsed = (time.time() - start_time) * 1000
                 logger.debug(f"✅ Cached result for {func.__name__} (took {elapsed:.2f}ms)")
@@ -189,7 +191,7 @@ def cached_computation_async(
 
             # Get unified cache
             cache = await get_global_cache()
-            
+
             # Map key_prefix to namespace
             namespace = CACHE_NAMESPACE_MAP.get(key_prefix, CacheNamespace.API)
 
@@ -240,7 +242,7 @@ def cached_computation_sync(
 
                 # Get unified cache
                 cache = await get_global_cache()
-                
+
                 # Map key_prefix to namespace
                 namespace = CACHE_NAMESPACE_MAP.get(key_prefix, CacheNamespace.API)
 
@@ -254,7 +256,9 @@ def cached_computation_sync(
                 result = func(*args, **kwargs)
 
                 # Cache the result
-                await cache.set(namespace, cache_key, result, ttl_override=timedelta(hours=ttl_hours))
+                await cache.set(
+                    namespace, cache_key, result, ttl_override=timedelta(hours=ttl_hours)
+                )
 
                 logger.debug(f"✅ Cached sync computation result for {func.__name__}")
                 return result
@@ -411,7 +415,7 @@ def cached_api_call_with_dedup(
             try:
                 # Get unified cache
                 cache = await get_global_cache()
-                
+
                 # Map key_prefix to namespace
                 namespace = CACHE_NAMESPACE_MAP.get(key_prefix, CacheNamespace.API)
 
@@ -428,7 +432,9 @@ def cached_api_call_with_dedup(
                 result = await func(*args, **kwargs)
 
                 # Cache the result
-                await cache.set(namespace, cache_key, result, ttl_override=timedelta(hours=ttl_hours))
+                await cache.set(
+                    namespace, cache_key, result, ttl_override=timedelta(hours=ttl_hours)
+                )
 
                 elapsed = (time.time() - start_time) * 1000
                 logger.debug(f"✅ Cached API result for {func.__name__} (took {elapsed:.2f}ms)")

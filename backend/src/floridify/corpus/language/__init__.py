@@ -5,7 +5,6 @@ source management, and vocabulary processing.
 """
 
 from .core import LanguageCorpus
-from .models import LanguageCorpusMetadata
 
 __all__ = [
     "LanguageCorpus",

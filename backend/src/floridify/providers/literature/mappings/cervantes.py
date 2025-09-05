@@ -4,7 +4,8 @@ Comprehensive mapping of Cervantes' works available on Project Gutenberg.
 """
 
 from ....models.base import Language
-from ....models.literature import AuthorInfo, Genre, LiteratureEntry, Period
+from ....models.literature import AuthorInfo, Genre, Period
+from ..models import LiteratureEntry
 
 AUTHOR = AuthorInfo(
     name="Miguel de Cervantes",

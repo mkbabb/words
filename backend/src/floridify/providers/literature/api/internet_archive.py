@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-from ....corpus.literature.models import LiteratureSource
+from ....models.literature import LiteratureProvider
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ...utils import respectful_scraper
@@ -22,7 +22,7 @@ class InternetArchiveConnector(LiteratureConnector):
     def __init__(self, config: ConnectorConfig | None = None) -> None:
         if config is None:
             config = ConnectorConfig(rate_limit_config=RateLimitPresets.BULK_DOWNLOAD.value)
-        super().__init__(source=LiteratureSource.INTERNET_ARCHIVE, config=config)
+        super().__init__(provider=LiteratureProvider.INTERNET_ARCHIVE, config=config)
         self.api_base = "https://archive.org"
         self.search_url = "https://archive.org/advancedsearch.php"
 

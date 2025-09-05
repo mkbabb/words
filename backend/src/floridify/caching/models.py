@@ -64,7 +64,7 @@ class CacheNamespace(str, Enum):
     OPENAI = "openai_structured"
 
     SCRAPING = "scraping"
-    
+
     WOTD = "wotd"
 
 

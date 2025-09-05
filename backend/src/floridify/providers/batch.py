@@ -7,8 +7,8 @@ from typing import Any
 from beanie import Document
 from pydantic import Field
 
-from ..models.base import BaseMetadata
-from ..models.dictionary import DictionaryProvider, Language
+from ..models.base import BaseMetadata, Language
+from ..models.dictionary import DictionaryProvider
 
 
 class BatchStatus(str, Enum):

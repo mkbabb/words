@@ -1,14 +1,14 @@
 """Test vocabulary aggregation mechanisms."""
 from typing import TYPE_CHECKING
 
+from floridify.caching.models import VersionInfo
+from floridify.corpus.core import Corpus
 from floridify.models.dictionary import CorpusType
-from floridify.models.versioned import VersionInfo
 
 if TYPE_CHECKING:
-    from conftest import MockCorpusMetadata
+    pass
 
 # Import the mock from conftest
-from .conftest import MockCorpusMetadata
 
 
 class TestVocabularyAggregation:
@@ -38,7 +38,7 @@ class TestVocabularyAggregation:
         original_vocab = set(master.content_inline.get("vocabulary", []))
         
         # Add new child with unique vocabulary
-        new_child = MockCorpusMetadata(
+        new_child = MockCorpus.Metadata(
             resource_id="New_Child",
             corpus_type=CorpusType.LITERATURE,
             parent_corpus_id=master.id,
@@ -118,7 +118,7 @@ class TestVocabularyAggregation:
         """Test vocabularies >10k words trigger external storage."""
         large_vocab = sample_vocabularies["large"]
         
-        corpus = CorpusMetadata(
+        corpus = Corpus.Metadata(
             corpus_name="Large_Corpus",
             corpus_type="LANGUAGE",
         )
@@ -147,7 +147,7 @@ class TestVocabularyAggregation:
         master = corpus_tree["master"]
         
         # Add empty child
-        empty_child = CorpusMetadata(
+        empty_child = Corpus.Metadata(
             corpus_name="Empty_Child",
             corpus_type="LITERATURE",
             parent_corpus_id=master.id,
@@ -166,13 +166,13 @@ class TestVocabularyAggregation:
         """Test Unicode vocabulary aggregation."""
         unicode_vocab = sample_vocabularies["unicode"]
         
-        parent = CorpusMetadata(
+        parent = Corpus.Metadata(
             corpus_name="Unicode_Parent",
             corpus_type="LANGUAGE",
             is_master=True,
         )
         
-        child = CorpusMetadata(
+        child = Corpus.Metadata(
             corpus_name="Unicode_Child",
             corpus_type="LITERATURE",
             parent_corpus_id=parent.id,

@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # Explicitly export PydanticObjectId for use in other modules
 __all__ = ["BaseMetadata", "PydanticObjectId", "AIResponseBase", "ModelInfo"]
 
+
 class Language(Enum):
     """Supported languages with ISO codes."""
 
@@ -78,12 +79,9 @@ class BaseMetadataWithAccess(BaseMetadata, AccessTrackingMixin):
 
 class AIResponseBase(BaseModel):
     """Base class for AI response models with confidence tracking."""
-    
+
     confidence: float = Field(
-        default=0.9,
-        ge=0.0,
-        le=1.0,
-        description="Model confidence in this response (0.0-1.0)"
+        default=0.9, ge=0.0, le=1.0, description="Model confidence in this response (0.0-1.0)"
     )
 
 

@@ -10,10 +10,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from beanie import PydanticObjectId
 
-from floridify.caching.core import GlobalCacheManager
-from floridify.caching.filesystem import FilesystemBackend
 from floridify.models import Definition, Example, Pronunciation, Word
 from floridify.models.dictionary import DictionaryEntry, DictionaryProvider, Language
 from floridify.providers.core import ConnectorConfig
@@ -341,7 +338,7 @@ class TestWiktionaryWholesaleConnector:
     async def test_title_list_download(self, connector):
         """Test downloading Wiktionary title lists."""
         from floridify.providers.dictionary.wholesale.wiktionary_wholesale import (
-            WiktionaryTitleListDownloader
+            WiktionaryTitleListDownloader,
         )
         
         downloader = WiktionaryTitleListDownloader(
@@ -361,7 +358,7 @@ class TestWiktionaryWholesaleConnector:
     async def test_vocabulary_extraction(self, connector):
         """Test extracting vocabulary from title lists."""
         from floridify.providers.dictionary.wholesale.wiktionary_wholesale import (
-            WiktionaryTitleListDownloader
+            WiktionaryTitleListDownloader,
         )
         
         if pytest.skip_network_tests:

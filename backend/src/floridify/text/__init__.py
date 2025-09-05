@@ -21,7 +21,6 @@ from .normalize import (
     normalize,
     normalize_basic,
     normalize_comprehensive,
-    normalize_simple,
     # Diacritics
     remove_diacritics,
 )
@@ -36,7 +35,6 @@ __all__ = [
     "normalize",
     "normalize_comprehensive",
     "normalize_basic",
-    "normalize_simple",
     "batch_normalize",
     "is_valid_word",
     "remove_diacritics",

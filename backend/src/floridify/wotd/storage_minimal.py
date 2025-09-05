@@ -63,6 +63,7 @@ class WOTDStorage:
 
 _storage: WOTDStorage | None = None
 
+
 async def get_wotd_storage() -> WOTDStorage:
     """Get minimal storage instance."""
     global _storage

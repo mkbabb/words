@@ -15,7 +15,7 @@ from ..caching.models import (
 )
 
 # Registry for model classes to avoid circular imports
-_MODEL_REGISTRY: dict[ResourceType, type[BaseVersionedData]] = {}
+MODEL_REGISTRY: dict[ResourceType, type[BaseVersionedData]] = {}
 
 T = TypeVar("T", bound=type[BaseVersionedData])
 
@@ -24,7 +24,7 @@ def register_model(resource_type: ResourceType) -> Callable[[T], T]:
     """Decorator to register a model class with its resource type."""
 
     def decorator(cls: T) -> T:
-        _MODEL_REGISTRY[resource_type] = cls
+        MODEL_REGISTRY[resource_type] = cls
         return cls
 
     return decorator
@@ -35,12 +35,12 @@ def get_model_class(resource_type: ResourceType) -> type[BaseVersionedData]:
 
     All model classes should be registered using the @register_model decorator.
     """
-    if resource_type not in _MODEL_REGISTRY:
+    if resource_type not in MODEL_REGISTRY:
         raise ValueError(
             f"No model registered for resource type: {resource_type}. "
             f"Ensure the model class uses @register_model decorator."
         )
-    return _MODEL_REGISTRY[resource_type]
+    return MODEL_REGISTRY[resource_type]
 
 
 # Re-export commonly used classes

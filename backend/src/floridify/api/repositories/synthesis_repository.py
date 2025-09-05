@@ -107,22 +107,16 @@ class SynthesisRepository(
         super().__init__(DictionaryEntry)
 
     # Core queries matching model relationships
-    async def find_by_word(
-        self, word_id: PydanticObjectId | str
-    ) -> DictionaryEntry | None:
+    async def find_by_word(self, word_id: PydanticObjectId | str) -> DictionaryEntry | None:
         """Find synthesized entry for a word."""
         word_oid = PydanticObjectId(word_id) if isinstance(word_id, str) else word_id
-        return await DictionaryEntry.find_one({
-            "word_id": word_oid,
-            "provider": "synthesis"
-        })
+        return await DictionaryEntry.find_one({"word_id": word_oid, "provider": "synthesis"})
 
     async def find_by_model(self, model_name: str) -> list[DictionaryEntry]:
         """Find entries synthesized by a specific model."""
-        return await DictionaryEntry.find({
-            "model_info.name": model_name,
-            "provider": "synthesis"
-        }).to_list()
+        return await DictionaryEntry.find(
+            {"model_info.name": model_name, "provider": "synthesis"}
+        ).to_list()
 
     # CRUD for related definitions
     async def add_definition(

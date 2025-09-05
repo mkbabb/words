@@ -1,436 +1,301 @@
-"""Literature corpus implementation with provider pattern and enhanced metadata."""
+"""Literature corpus implementation with provider integration.
+
+Minimal implementation following KISS principles - inherits from Corpus,
+delegates tree operations to TreeCorpusManager.
+"""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
-from beanie import Document, PydanticObjectId
-from pydantic import BaseModel, Field
+from beanie import PydanticObjectId
 
-from ...caching.models import BaseVersionedData, ResourceType, VersionConfig
 from ...models.base import Language
-from ...models.literature import (
-    AuthorInfo,
-    Genre,
-    LiteratureEntry,
-    LiteratureProvider,
-    Period,
-)
-from ...models.versioned import register_model
+from ...models.literature import AuthorInfo, Genre, Period
+from ...providers.literature.api.gutenberg import GutenbergConnector
 from ...providers.literature.core import LiteratureConnector
+from ...providers.literature.models import LiteratureSource
 from ...utils.logging import get_logger
-from ..core import MultisourceCorpus
+from ..core import Corpus
+from ..manager import get_tree_corpus_manager
 from ..models import CorpusType
 
 logger = get_logger(__name__)
 
 
-class LiteratureEntryMetadata(BaseModel):
-    """Enhanced metadata for literature entries."""
+class LiteratureCorpus(Corpus):
+    """Literature corpus with work management.
     
-    title: str
-    author: AuthorInfo
-    provider: LiteratureProvider
-    source_url: str | None = None
-    gutenberg_id: str | None = None
-    year: int | None = None
-    genre: Genre | None = None
-    period: Period | None = None
-    language: Language = Language.ENGLISH
-    query: str | None = None
-    file_path: str | None = None  # For LOCAL_FILE provider
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
-class EnhancedLiteratureEntry(LiteratureEntry):
-    """Enhanced literature entry with provider information and metadata."""
+    Inherits all fields and functionality from Corpus.
+    Adds literature-specific source management via TreeCorpusManager.
+    """
     
-    provider: LiteratureProvider
-    source_url: str | None = None
-    query: str | None = None
-    file_path: str | None = None
-    extracted_vocabulary: list[str] = Field(default_factory=list)
-    metadata: LiteratureEntryMetadata | None = None
-
-
-@register_model(ResourceType.LITERATURE)
-class LiteratureCorpusMetadata(BaseVersionedData, Document):
-    """MongoDB metadata for literature corpus with versioning."""
-    
-    corpus_name: str
-    corpus_type: CorpusType = CorpusType.LITERATURE
-    language: Language
-    providers: list[LiteratureProvider] = Field(default_factory=list)
-    authors: list[str] = Field(default_factory=list)
-    genres: list[Genre] = Field(default_factory=list)
-    periods: list[Period] = Field(default_factory=list)
-    
-    # Tree structure
-    parent_id: PydanticObjectId | None = None
-    child_ids: list[PydanticObjectId] = Field(default_factory=list)
-    is_master: bool = False
-    
-    # Statistics
-    total_works: int = 0
-    total_vocabulary: int = 0
-    unique_vocabulary: int = 0
-    provider_counts: dict[str, int] = Field(default_factory=dict)
-    
-    class Settings:
-        """Beanie document settings."""
-        
-        name = "literature_corpora"
-        indexes = [
-            "corpus_name",
-            "language",
-            "providers",
-            "authors",
-            "genres",
-            "periods",
-            "is_latest",
-        ]
-
-
-class FileSystemConnector(LiteratureConnector):
-    """Connector for local file system literature sources."""
-    
-    provider = LiteratureProvider.LOCAL_FILE
-    
-    def __init__(self, file_path: str | Path) -> None:
-        """Initialize with file path.
+    async def add_literature_source(
+        self,
+        source: LiteratureSource,
+        connector: LiteratureConnector | None = None,
+    ) -> PydanticObjectId | None:
+        """Add a literature work as child corpus.
         
         Args:
-            file_path: Path to the literature file
+            source: Literature source configuration
+            connector: Optional connector to use (defaults to Gutenberg)
+            
+        Returns:
+            Child corpus ID if created
         """
-        from ...providers.core import ConnectorConfig
+        logger.info(f"Adding literature source: {source.name}")
         
-        super().__init__(
-            source=LiteratureProvider.LOCAL_FILE,
-            config=ConnectorConfig(),
+        # Use provided connector or default to Gutenberg
+        if not connector:
+            connector = GutenbergConnector()
+        
+        # Fetch work content
+        entry = await connector.fetch(source.url or source.name)
+        
+        if not entry:
+            logger.warning(f"Failed to fetch work: {source.name}")
+            return None
+        
+        # Extract vocabulary from text
+        vocabulary = []
+        if hasattr(entry, "text") and entry.text:
+            # Simple word extraction
+            words = re.findall(r"\b[a-zA-Z]+\b", entry.text)
+            vocabulary = list(set(word.lower() for word in words))
+        elif hasattr(entry, "extracted_vocabulary"):
+            vocabulary = entry.extracted_vocabulary
+        
+        if not vocabulary:
+            logger.warning(f"No vocabulary extracted for work: {source.name}")
+            return None
+        
+        # Create child corpus from work vocabulary
+        child = await Corpus.create(
+            corpus_name=f"{self.corpus_name}_{source.name}",
+            vocabulary=vocabulary,
+            language=source.language,
+            semantic=self.metadata.get("semantic_enabled", False),
+            model_name=self.metadata.get("model_name"),
         )
-        self.file_path = Path(file_path)
-        if not self.file_path.exists():
-            raise FileNotFoundError(f"File not found: {file_path}")
-            
-    async def _fetch_from_provider(self, identifier: str) -> str:
-        """Fetch content from local file.
+        
+        # Set corpus type
+        child.corpus_type = CorpusType.LITERATURE
+        
+        # Add metadata about the work
+        child.metadata.update({
+            "title": source.name,
+            "author": source.author.name if source.author else "Unknown",
+            "genre": source.genre.value if source.genre else None,
+            "period": source.period.value if source.period else None,
+        })
+        
+        # Save child corpus
+        await child.save()
+        
+        if not child.corpus_id:
+            logger.warning(f"Failed to save child corpus for work: {source.name}")
+            return None
+        
+        # Update tree relationships via TreeCorpusManager
+        manager = get_tree_corpus_manager()
+        
+        # Ensure parent has ID
+        if not self.corpus_id:
+            await self.save()
+        
+        # Update parent-child relationship
+        if self.corpus_id:
+            await manager.update_parent(self.corpus_id, child.corpus_id)
+        
+        # Aggregate vocabularies into parent
+        if self.corpus_id and child.corpus_id:
+            self.child_corpus_ids.append(child.corpus_id)
+            # Note: aggregate_vocabularies aggregates from the corpus and its children automatically
+            await manager.aggregate_vocabularies(self.corpus_id)
+        
+        logger.info(
+            f"Added work '{source.name}' with {len(vocabulary)} unique words"
+        )
+        
+        return child.corpus_id
+    
+    async def add_author_works(
+        self,
+        author: AuthorInfo,
+        work_ids: list[str],
+        connector: LiteratureConnector | None = None,
+    ) -> list[PydanticObjectId]:
+        """Add multiple works from an author.
         
         Args:
-            identifier: File identifier (can be relative path)
+            author: Author information
+            work_ids: List of work IDs (e.g., Gutenberg IDs)
+            connector: Optional connector to use
             
         Returns:
-            File contents as string
+            List of created child corpus IDs
         """
-        # If identifier is provided, use it as additional path
-        if identifier and identifier != str(self.file_path):
-            target_path = self.file_path.parent / identifier
-        else:
-            target_path = self.file_path
-            
-        if not target_path.exists():
-            raise FileNotFoundError(f"File not found: {target_path}")
-            
-        return target_path.read_text(encoding="utf-8")
+        logger.info(f"Adding {len(work_ids)} works by {author.name}")
         
-    async def list_files(self, pattern: str = "*.txt") -> list[Path]:
-        """List files matching pattern.
+        if not connector:
+            connector = GutenbergConnector()
         
-        Args:
-            pattern: Glob pattern for file matching
-            
-        Returns:
-            List of matching file paths
-        """
-        if self.file_path.is_dir():
-            return list(self.file_path.glob(pattern))
-        return [self.file_path] if self.file_path.match(pattern) else []
-
-
-class LiteratureCorpus(MultisourceCorpus):
-    """Literature-specific corpus with enhanced metadata and provider support."""
-    
-    # Literature-specific fields
-    corpus_type: CorpusType = CorpusType.LITERATURE
-    providers: list[LiteratureProvider] = Field(default_factory=list)
-    literature_entries: dict[str, EnhancedLiteratureEntry] = Field(default_factory=dict)
-    provider_works: dict[LiteratureProvider, list[str]] = Field(default_factory=dict)
-    
-    # Metadata collections
-    authors: dict[str, AuthorInfo] = Field(default_factory=dict)
-    genres: set[Genre] = Field(default_factory=set)
-    periods: set[Period] = Field(default_factory=set)
-    
-    async def add_literature_work(
-        self,
-        work: LiteratureEntry | EnhancedLiteratureEntry,
-        provider: LiteratureProvider,
-        vocabulary: list[str] | None = None,
-        source_url: str | None = None,
-        file_path: str | None = None,
-    ) -> None:
-        """Add a literature work to the corpus.
+        child_ids = []
         
-        Args:
-            work: Literature work entry
-            provider: Provider of the work
-            vocabulary: Extracted vocabulary from the work
-            source_url: Source URL if from web
-            file_path: File path if from local file
-        """
-        # Create enhanced entry
-        if isinstance(work, EnhancedLiteratureEntry):
-            enhanced_work = work
-        else:
-            enhanced_work = EnhancedLiteratureEntry(
-                **work.model_dump(),
-                provider=provider,
-                source_url=source_url,
-                file_path=file_path,
-                extracted_vocabulary=vocabulary or [],
-                metadata=LiteratureEntryMetadata(
-                    title=work.title,
-                    author=work.author,
-                    provider=provider,
-                    source_url=source_url,
-                    gutenberg_id=work.gutenberg_id,
-                    year=work.year,
-                    genre=work.genre,
-                    period=work.period,
-                    language=work.language,
-                    file_path=file_path,
-                ),
+        for work_id in work_ids:
+            source = LiteratureSource(
+                name=f"{author.name}_{work_id}",
+                url=work_id,  # Gutenberg ID or URL
+                author=author,
+                genre=author.primary_genre,
+                period=author.period,
+                language=author.language or Language.ENGLISH,
             )
             
-        # Store work
-        work_id = f"{provider.value}_{work.title}_{work.author.name}".replace(" ", "_")
-        self.literature_entries[work_id] = enhanced_work
+            try:
+                child_id = await self.add_literature_source(source, connector)
+                if child_id:
+                    child_ids.append(child_id)
+            except Exception as e:
+                logger.error(f"Failed to add work {work_id}: {e}")
+                continue
         
-        # Update provider tracking
-        if provider not in self.providers:
-            self.providers.append(provider)
-        if provider not in self.provider_works:
-            self.provider_works[provider] = []
-        if work_id not in self.provider_works[provider]:
-            self.provider_works[provider].append(work_id)
-            
-        # Update metadata collections
-        self.authors[work.author.name] = work.author
-        if work.genre:
-            self.genres.add(work.genre)
-        if work.period:
-            self.periods.add(work.period)
-            
-        # Add vocabulary as source
-        if vocabulary:
-            await self.add_source(
-                source_name=work_id,
-                vocabulary=vocabulary,
-                metadata={
-                    "title": work.title,
-                    "author": work.author.name,
-                    "provider": provider.value,
-                    "genre": work.genre.value if work.genre else None,
-                    "period": work.period.value if work.period else None,
-                },
-            )
-            
-    async def add_file_system_work(
+        logger.info(f"Successfully added {len(child_ids)} works")
+        return child_ids
+    
+    async def add_file_work(
         self,
-        file_path: str | Path,
+        file_path: Path | str,
         metadata: dict[str, Any] | None = None,
-        extract_vocabulary: bool = True,
-    ) -> None:
-        """Add a work from the local file system.
+    ) -> PydanticObjectId | None:
+        """Add a work from local file system.
         
         Args:
             file_path: Path to the literature file
-            metadata: Optional metadata for the work
-            extract_vocabulary: Whether to extract vocabulary
+            metadata: Optional metadata about the work
+            
+        Returns:
+            Child corpus ID if created
         """
         file_path = Path(file_path)
         
-        # Create connector
-        connector = FileSystemConnector(file_path)
+        if not file_path.exists():
+            logger.error(f"File not found: {file_path}")
+            return None
         
-        # Fetch content
-        content = await connector._fetch_from_provider(str(file_path))
+        # Read file content
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except Exception as e:
+            logger.error(f"Failed to read file {file_path}: {e}")
+            return None
         
-        # Extract vocabulary if requested
-        vocabulary = []
-        if extract_vocabulary:
-            # Simple word extraction (can be enhanced)
-            import re
-            words = re.findall(r'\b[a-zA-Z]+\b', content if isinstance(content, str) else str(content))
-            vocabulary = list(set(words))
-            
-        # Create work entry
-        work_metadata = metadata or {}
-        work = LiteratureEntry(
-            title=work_metadata.get("title", file_path.stem),
+        # Extract vocabulary
+        words = re.findall(r"\b[a-zA-Z]+\b", text)
+        vocabulary = list(set(word.lower() for word in words))
+        
+        # Create source from metadata
+        meta = metadata or {}
+        source = LiteratureSource(
+            name=meta.get("title", file_path.stem),
             author=AuthorInfo(
-                name=work_metadata.get("author", "Unknown"),
-                period=Period(work_metadata.get("period", Period.CONTEMPORARY)),
-                primary_genre=Genre(work_metadata.get("genre", Genre.NOVEL)),
-                language=Language(work_metadata.get("language", Language.ENGLISH)),
-            ),
-            genre=Genre(work_metadata.get("genre", Genre.NOVEL)),
-            period=Period(work_metadata.get("period", Period.CONTEMPORARY)),
-            language=Language(work_metadata.get("language", Language.ENGLISH)),
-            text="",  # Empty text for now
+                name=meta.get("author", "Unknown"),
+                period=Period(meta.get("period", Period.CONTEMPORARY)),
+                primary_genre=Genre(meta.get("genre", Genre.NOVEL)),
+            )
+            if "author" in meta
+            else None,
+            genre=Genre(meta.get("genre", Genre.NOVEL)) if "genre" in meta else None,
+            period=Period(meta.get("period", Period.CONTEMPORARY))
+            if "period" in meta
+            else None,
+            language=Language(meta.get("language", Language.ENGLISH))
+            if "language" in meta
+            else Language.ENGLISH,
         )
         
-        # Add to corpus
-        await self.add_literature_work(
-            work=work,
-            provider=LiteratureProvider.LOCAL_FILE,
+        # Create child corpus directly (no connector needed)
+        child = await Corpus.create(
+            corpus_name=f"{self.corpus_name}_{source.name}",
             vocabulary=vocabulary,
-            file_path=str(file_path),
+            language=source.language,
+            semantic=self.metadata.get("semantic_enabled", False),
+            model_name=self.metadata.get("model_name"),
         )
         
-        logger.info(f"Added local file: {file_path.name} with {len(vocabulary)} words")
+        child.corpus_type = CorpusType.LITERATURE
+        child.metadata.update({
+            "file_path": str(file_path),
+            "title": source.name,
+            "author": source.author.name if source.author else "Unknown",
+        })
         
-    async def add_directory(
+        await child.save()
+        
+        if child.corpus_id:
+            # Update tree relationships
+            manager = get_tree_corpus_manager()
+            
+            if not self.corpus_id:
+                await self.save()
+            
+            if self.corpus_id:
+                await manager.update_parent(self.corpus_id, child.corpus_id)
+                self.child_corpus_ids.append(child.corpus_id)
+                # Note: aggregate_vocabularies aggregates from the corpus and its children automatically
+                await manager.aggregate_vocabularies(self.corpus_id)
+            
+            logger.info(f"Added file work '{source.name}' with {len(vocabulary)} words")
+        
+        return child.corpus_id
+    
+    async def remove_work(self, work_name: str) -> None:
+        """Remove a literature work by name.
+        
+        Args:
+            work_name: Name of work to remove
+        """
+        manager = get_tree_corpus_manager()
+        
+        # Find child corpus with matching name
+        child_name = f"{self.corpus_name}_{work_name}"
+        
+        # Get child corpus using keyword argument
+        child_meta = await manager.get_corpus(corpus_name=child_name)
+        if not child_meta or not child_meta.id:
+            logger.warning(f"Work '{work_name}' not found")
+            return
+        
+        # Use manager to properly remove and delete child
+        if self.corpus_id and child_meta.id:
+            await manager.remove_child(
+                parent_id=self.corpus_id,
+                child_id=child_meta.id,
+                delete_child=True  # Delete the child corpus
+            )
+            
+            # Update local child_corpus_ids list
+            if child_meta.id in self.child_corpus_ids:
+                self.child_corpus_ids.remove(child_meta.id)
+        
+        logger.info(f"Removed work: {work_name}")
+    
+    async def update_work(
         self,
-        directory_path: str | Path,
-        pattern: str = "*.txt",
-        metadata_func: Any = None,
+        work_name: str,
+        source: LiteratureSource,
+        connector: LiteratureConnector | None = None,
     ) -> None:
-        """Add all matching files from a directory.
+        """Update a literature work.
         
         Args:
-            directory_path: Path to the directory
-            pattern: Glob pattern for file matching
-            metadata_func: Function to extract metadata from filename
+            work_name: Current work name
+            source: New source configuration
+            connector: Optional connector to use
         """
-        directory_path = Path(directory_path)
-        if not directory_path.is_dir():
-            raise ValueError(f"Not a directory: {directory_path}")
-            
-        connector = FileSystemConnector(directory_path)
-        files = await connector.list_files(pattern)
-        
-        for file_path in files:
-            metadata = metadata_func(file_path) if metadata_func else None
-            await self.add_file_system_work(file_path, metadata)
-            
-        logger.info(f"Added {len(files)} files from {directory_path}")
-        
-    async def get_works_by_author(self, author_name: str) -> list[EnhancedLiteratureEntry]:
-        """Get all works by a specific author.
-        
-        Args:
-            author_name: Name of the author
-            
-        Returns:
-            List of works by the author
-        """
-        return [
-            work
-            for work in self.literature_entries.values()
-            if work.author.name == author_name
-        ]
-        
-    async def get_works_by_genre(self, genre: Genre) -> list[EnhancedLiteratureEntry]:
-        """Get all works of a specific genre.
-        
-        Args:
-            genre: Genre to filter by
-            
-        Returns:
-            List of works in the genre
-        """
-        return [
-            work
-            for work in self.literature_entries.values()
-            if work.genre == genre
-        ]
-        
-    async def get_works_by_period(self, period: Period) -> list[EnhancedLiteratureEntry]:
-        """Get all works from a specific period.
-        
-        Args:
-            period: Period to filter by
-            
-        Returns:
-            List of works from the period
-        """
-        return [
-            work
-            for work in self.literature_entries.values()
-            if work.period == period
-        ]
-        
-    async def save(self, config: VersionConfig | None = None) -> None:
-        """Save literature corpus with enhanced metadata."""
-        # Create metadata document
-        metadata = LiteratureCorpusMetadata(
-            corpus_name=self.corpus_name,
-            corpus_type=self.corpus_type,
-            language=self.language,
-            providers=self.providers,
-            authors=list(self.authors.keys()),
-            genres=list(self.genres),
-            periods=list(self.periods),
-            parent_id=self.parent_corpus_id,
-            child_ids=self.child_corpus_ids,
-            is_master=self.is_master,
-            total_works=len(self.literature_entries),
-            total_vocabulary=self.total_word_count,
-            unique_vocabulary=self.unique_word_count,
-            provider_counts={
-                provider.value: len(self.provider_works.get(provider, []))
-                for provider in self.providers
-            },
-        )
-        
-        # Set content
-        content = self.model_dump()
-        await metadata.set_content(content)
-        
-        # Save metadata
-        await metadata.save_version(config)
-        
-        # Update corpus_id
-        if metadata.id and not self.corpus_id:
-            self.corpus_id = metadata.id
-            
-    @classmethod
-    async def create_from_providers(
-        cls,
-        corpus_name: str,
-        language: Language,
-        providers: dict[LiteratureProvider, list[LiteratureEntry]],
-        semantic: bool = False,
-        model_name: str | None = None,
-    ) -> LiteratureCorpus:
-        """Create literature corpus from multiple providers.
-        
-        Args:
-            corpus_name: Name for the corpus
-            language: Language of the corpus
-            providers: Dict mapping providers to lists of works
-            semantic: Enable semantic search
-            model_name: Embedding model name
-            
-        Returns:
-            Configured LiteratureCorpus instance
-        """
-        corpus = cls(
-            corpus_name=corpus_name,
-            corpus_type=CorpusType.LITERATURE,
-            language=language,
-            is_master=True,
-        )
-        
-        corpus.metadata = {
-            "semantic_enabled": semantic,
-            "model_name": model_name,
-        }
-        
-        # Add all works
-        for provider, works in providers.items():
-            for work in works:
-                await corpus.add_literature_work(work, provider)
-                
-        return corpus
+        # Simple approach: remove old, add new
+        await self.remove_work(work_name)
+        await self.add_literature_source(source, connector)

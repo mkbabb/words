@@ -16,11 +16,12 @@ from urllib.parse import urljoin
 import aiofiles
 from bs4 import BeautifulSoup, Tag
 
-from ....corpus.literature.models import AuthorInfo, LiteraryWork, LiteratureSource
+from ....models.literature import AuthorInfo, LiteratureProvider
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ...utils import respectful_scraper
 from ..core import LiteratureConnector
+from ..models import LiteratureEntry
 
 logger = get_logger(__name__)
 
@@ -35,12 +36,12 @@ class GutenbergConnector(LiteratureConnector):
         force_refresh: bool = False,
     ) -> Any:
         """Fetch work from Gutenberg.
-        
+
         Args:
             source_id: Work ID
             metadata: Optional metadata
             force_refresh: Force refresh from source
-            
+
         Returns:
             Work content or metadata
         """
@@ -53,7 +54,7 @@ class GutenbergConnector(LiteratureConnector):
     def __init__(self, cache_dir: Path | None = None, config: ConnectorConfig | None = None):
         if config is None:
             config = ConnectorConfig(rate_limit_config=RateLimitPresets.BULK_DOWNLOAD.value)
-        super().__init__(source=LiteratureSource.GUTENBERG, config=config)
+        super().__init__(provider=LiteratureProvider.GUTENBERG, config=config)
         self.api_base = "https://www.gutenberg.org"
         self.mirror_base = "https://mirror.gutenberg.org"
         self.catalog_url = "https://www.gutenberg.org/ebooks/"
@@ -288,7 +289,7 @@ class GutenbergConnector(LiteratureConnector):
             logger.debug(f"Failed to extract from ZIP: {e}")
         return None
 
-    def _clean_gutenberg_text(self, text: str, work: LiteraryWork | None = None) -> str:
+    def _clean_gutenberg_text(self, text: str, work: LiteratureEntry | None = None) -> str:
         """Clean Project Gutenberg text headers and footers.
 
         Enhanced version incorporating patterns from wotd/literature.
@@ -337,7 +338,7 @@ class GutenbergConnector(LiteratureConnector):
 
         return main_text
 
-    async def download_work(self, work: LiteraryWork, force_refresh: bool = False) -> str:
+    async def download_work(self, work: LiteratureEntry, force_refresh: bool = False) -> str:
         """Download a literary work with caching.
 
         Migrated from wotd/literature/connector.py.
@@ -377,7 +378,7 @@ class GutenbergConnector(LiteratureConnector):
     async def download_author_works(
         self,
         author: AuthorInfo,
-        works: list[LiteraryWork],
+        works: list[LiteratureEntry],
         max_works: int | None = None,
     ) -> dict[str, str]:
         """Download all works for an author.
@@ -400,7 +401,7 @@ class GutenbergConnector(LiteratureConnector):
         )
         return results
 
-    def _get_cache_path(self, work: LiteraryWork) -> Path:
+    def _get_cache_path(self, work: LiteratureEntry) -> Path:
         """Get cache file path for a work."""
         author_dir = self.cache_dir / work.author.name.lower().replace(" ", "_")
         author_dir.mkdir(exist_ok=True)

@@ -4,142 +4,125 @@ from __future__ import annotations
 
 from typing import Any
 
+import httpx
+
 from ...caching.manager import get_version_manager
-from ...caching.models import CacheNamespace
+from ...caching.models import CacheNamespace, ResourceType, VersionConfig
 from ...core.state_tracker import StateTracker
-from ...models.dictionary import DictionaryProvider, Language
-from ...models.versioned import (
-    ResourceType,
-    VersionConfig,
-)
-from ...providers.dictionary.models import DictionaryEntryMetadata
+from ...models.dictionary import DictionaryProvider
 from ...utils.logging import get_logger
-from ..core import BaseConnector, ConnectorConfig, ProviderType
+from ..core import BaseConnector, ConnectorConfig
 
 logger = get_logger(__name__)
 
 
 class DictionaryConnector(BaseConnector):
-    """Base class for dictionary providers."""
+    """Base dictionary connector with versioned storage."""
 
     def __init__(
         self,
         provider: DictionaryProvider,
         config: ConnectorConfig | None = None,
-    ):
-        super().__init__(
-            provider_type=ProviderType.DICTIONARY,
-            config=config,
-        )
+    ) -> None:
+        """Initialize dictionary connector."""
+        super().__init__(config or ConnectorConfig())
         self.provider = provider
+
+    def get_resource_type(self) -> ResourceType:
+        """Get the resource type for dictionary entries."""
+        return ResourceType.DICTIONARY
+
+    def get_cache_namespace(self) -> CacheNamespace:
+        """Get the cache namespace for dictionary entries."""
+        return CacheNamespace.DICTIONARY
 
     async def get(
         self,
-        word: str,
+        resource_id: str,
         config: VersionConfig | None = None,
     ) -> dict[str, Any] | None:
-        """Get dictionary entry from versioned storage.
-
-        Args:
-            word: Word to look up
-            config: Version configuration
-
-        Returns:
-            Dictionary entry data or None if not found
-        """
+        """Get dictionary entry from versioned storage."""
         manager = get_version_manager()
-        full_resource_id = f"{word}_{self.provider.value}"
+        full_resource_id = f"{resource_id}_{self.provider.value}"
 
-        # Get from versioned storage
-        versioned: DictionaryEntryMetadata | None = await manager.get_latest(
+        result = await manager.get_latest(
             resource_id=full_resource_id,
-            resource_type=ResourceType.DICTIONARY,
+            resource_type=self.get_resource_type(),
             config=config or VersionConfig(),
         )
 
-        if not versioned:
-            return None
-
-        # Load content
-        content = await versioned.get_content()
-        return content
+        if result:
+            # Access the content field for the actual data
+            return result.content if result else None
+        return None
 
     async def save(
         self,
-        word: str,
-        content: Any,
+        resource_id: str,
+        content: dict[str, Any],
         config: VersionConfig | None = None,
     ) -> None:
-        """Save dictionary entry using version manager.
-
-        Args:
-            word: Word to save
-            content: Dictionary entry data
-            config: Version configuration
-        """
+        """Save dictionary entry to versioned storage."""
         manager = get_version_manager()
-        full_resource_id = f"{word}_{self.provider.value}"
+        full_resource_id = f"{resource_id}_{self.provider.value}"
 
         await manager.save(
             resource_id=full_resource_id,
-            resource_type=ResourceType.DICTIONARY,
-            namespace=CacheNamespace.DICTIONARY,
+            resource_type=self.get_resource_type(),
+            namespace=self.get_cache_namespace(),
             content=content,
-            config=config or VersionConfig(),
             metadata={
-                "word": word,
+                "word": resource_id,  # Keep word in metadata for backward compatibility
                 "provider": self.provider.value,
-                "language": Language.ENGLISH.value,
+                "provider_display_name": self.provider.display_name,
             },
+            config=config or VersionConfig(),
         )
-        logger.info(
-            f"Saved dictionary entry for '{word}' from {self.provider.display_name}"
-        )
+
+        logger.info(f"Saved dictionary entry for '{resource_id}' from {self.provider.display_name}")
 
     async def fetch(
         self,
-        word: str,
+        resource_id: str,
         config: VersionConfig | None = None,
         state_tracker: StateTracker | None = None,
     ) -> dict[str, Any] | None:
-        """Fetch definition from provider and optionally save.
-
-        Args:
-            word: Word to fetch
-            config: Version configuration
-            state_tracker: Optional state tracker for progress updates
-
-        Returns:
-            Dictionary entry data or None
-        """
+        """Fetch dictionary entry from provider and optionally save."""
         config = config or VersionConfig()
 
-        # Apply rate limiting
+        # Check if we should use cached version
+        if not config.force_rebuild:
+            cached = await self.get(resource_id, config)
+            if cached:
+                logger.info(
+                    f"Using cached entry for '{resource_id}' from {self.provider.display_name}"
+                )
+                return cached
+
+        # Rate limiting
         await self.rate_limiter.acquire()
 
-        try:
-            # Call the implementation-specific method
-            logger.info(f"Fetching '{word}' from {self.provider.display_name}")
-            data = await self._fetch_from_provider(word, state_tracker)
-
-            if data:
-                # Record success for rate limiter
-                self.rate_limiter.record_success()
-
-                # Save if configured to do so
-                if self.config.save_versioned:
-                    await self.save(word, data, config)
-
-                return data  # type: ignore[no-any-return]
-
-            # Still record success even if no data (not an error)
-            self.rate_limiter.record_success()
-            return None
-
-        except Exception as e:
-            # Record error for rate limiter
-            self.rate_limiter.record_error()
-            logger.error(
-                f"Error fetching '{word}' from {self.provider.display_name}: {e}"
+        # Track state
+        if state_tracker:
+            await state_tracker.update(
+                stage="fetching",
+                message=f"{resource_id} from {self.provider.display_name}",
             )
-            raise
+
+        # Fetch from provider
+        logger.info(f"Fetching '{resource_id}' from {self.provider.display_name}")
+        result = await self._fetch_from_provider(resource_id, state_tracker)
+
+        # Save if configured
+        if result and self.config.save_versioned:
+            await self.save(resource_id, result, config)
+
+        return result
+
+    @property
+    def get_api_session(self) -> httpx.AsyncClient:
+        """Get API session (alias for api_client).
+
+        Provided for backward compatibility.
+        """
+        return self.api_client

@@ -1,8 +1,6 @@
 """Test update and deletion propagation mechanisms."""
 import asyncio
 
-from floridify.models.versioned import CorpusMetadata
-
 
 class TestUpdatePropagation:
     """Test change propagation through tree."""
@@ -94,13 +92,13 @@ class TestUpdatePropagation:
     async def test_version_chain_consistency(self):
         """Test supersedes/superseded_by links remain consistent."""
         # Create version chain
-        v1 = CorpusMetadata(
+        v1 = Corpus.Metadata(
             corpus_name="Version1",
             corpus_type="LANGUAGE",
             is_latest=False,
         )
         
-        v2 = CorpusMetadata(
+        v2 = Corpus.Metadata(
             corpus_name="Version2",
             corpus_type="LANGUAGE",
             supersedes=v1.id,
@@ -108,7 +106,7 @@ class TestUpdatePropagation:
         )
         v1.superseded_by = v2.id
         
-        v3 = CorpusMetadata(
+        v3 = Corpus.Metadata(
             corpus_name="Version3",
             corpus_type="LANGUAGE",
             supersedes=v2.id,
@@ -130,13 +128,13 @@ class TestDeletionCascade:
     async def test_version_chain_repair(self):
         """Test deleting middle version repairs chain."""
         # Create chain: v1 -> v2 -> v3
-        v1 = CorpusMetadata(
+        v1 = Corpus.Metadata(
             corpus_name="V1",
             corpus_type="LANGUAGE",
             is_latest=False,
         )
         
-        v2 = CorpusMetadata(
+        v2 = Corpus.Metadata(
             corpus_name="V2",
             corpus_type="LANGUAGE",
             supersedes=v1.id,
@@ -144,7 +142,7 @@ class TestDeletionCascade:
         )
         v1.superseded_by = v2.id
         
-        v3 = CorpusMetadata(
+        v3 = Corpus.Metadata(
             corpus_name="V3",
             corpus_type="LANGUAGE",
             supersedes=v2.id,
@@ -162,13 +160,13 @@ class TestDeletionCascade:
     
     async def test_latest_version_deletion(self):
         """Test deleting latest version promotes previous."""
-        v1 = CorpusMetadata(
+        v1 = Corpus.Metadata(
             corpus_name="V1",
             corpus_type="LANGUAGE",
             is_latest=False,
         )
         
-        v2 = CorpusMetadata(
+        v2 = Corpus.Metadata(
             corpus_name="V2",
             corpus_type="LANGUAGE",
             supersedes=v1.id,
@@ -203,7 +201,7 @@ class TestDeletionCascade:
         
     async def test_external_content_cleanup(self):
         """Test external storage is cleaned up on deletion."""
-        corpus = CorpusMetadata(
+        corpus = Corpus.Metadata(
             corpus_name="External_Corpus",
             corpus_type="LANGUAGE",
             content_location={
@@ -229,7 +227,7 @@ class TestDeletionCascade:
     
     async def test_cache_invalidation_on_delete(self):
         """Test caches are properly cleared on deletion."""
-        corpus = CorpusMetadata(
+        corpus = Corpus.Metadata(
             corpus_name="Cached_Corpus",
             corpus_type="LANGUAGE",
         )

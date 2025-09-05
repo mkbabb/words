@@ -17,22 +17,21 @@ TEST_DATABASE_NAME = "test_floridify"
 
 def get_document_models():
     """Import all Beanie document models."""
-    from floridify.models.versioned import (
-        CorpusMetadata,
-        DictionaryEntryMetadata,
-        LiteratureEntryMetadata,
-        SearchIndexMetadata,
-        SemanticIndexMetadata,
-        TrieIndexMetadata,
-    )
+    from floridify.corpus.core import Corpus
+    from floridify.providers.dictionary.models import DictionaryProviderEntry
+    from floridify.providers.language.models import LanguageEntry
+    from floridify.providers.literature.models import LiteratureEntry
+    from floridify.search.models import SearchIndex, TrieIndex
+    from floridify.search.semantic.models import SemanticIndex
     
     return [
-        CorpusMetadata,
-        DictionaryEntryMetadata,
-        LiteratureEntryMetadata,
-        SearchIndexMetadata,
-        SemanticIndexMetadata,
-        TrieIndexMetadata,
+        Corpus.Metadata,
+        DictionaryProviderEntry.Metadata,
+        LanguageEntry.Metadata,
+        LiteratureEntry.Metadata,
+        SearchIndex.Metadata,
+        SemanticIndex.Metadata,
+        TrieIndex.Metadata,
     ]
 
 

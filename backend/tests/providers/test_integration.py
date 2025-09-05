@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from floridify.caching.core import GlobalCacheManager
-from floridify.caching.models import CacheNamespace
+from floridify.caching.models import CacheNamespace, ResourceType, VersionConfig
 from floridify.corpus.loaders.language import CorpusLanguageLoader
 from floridify.corpus.loaders.literature import LiteratureCorpusLoader
 from floridify.corpus.sources import LexiconSourceConfig
@@ -16,7 +16,6 @@ from floridify.models.dictionary import (
     DictionaryProvider,
     Language,
 )
-from floridify.models.versioned import ResourceType, VersionConfig
 from floridify.providers.batch import BatchOperation, BatchStatus
 from floridify.providers.core import ConnectorConfig, ProviderType
 from floridify.providers.dictionary.api.free_dictionary import FreeDictionaryConnector

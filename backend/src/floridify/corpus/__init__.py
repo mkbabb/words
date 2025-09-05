@@ -5,21 +5,21 @@ language lexicons and literature texts.
 """
 
 from .core import Corpus
-from .models import CorpusSource
-
-# TODO: Missing classes that need to be implemented:
-# from .language import LANGUAGE_CORPUS_SOURCES, LanguageCorpus, LanguageCorpusLoader
-# from .literature import LiteratureCorpus, LiteratureCorpusLoader
+from .language.core import LanguageCorpus
+from .literature.core import LiteratureCorpus
+from .manager import TreeCorpusManager, get_tree_corpus_manager
+from .models import CorpusSource, CorpusType
 
 __all__ = [
     # Core
     "Corpus",
     "CorpusSource",
-    # Language - TODO: Implement these classes
-    # "LanguageCorpus",
-    # "LanguageCorpusLoader",
-    # "LANGUAGE_CORPUS_SOURCES",
-    # Literature - TODO: Implement these classes
-    # "LiteratureCorpus",
-    # "LiteratureCorpusLoader",
+    "CorpusType",
+    # Language
+    "LanguageCorpus",
+    # Literature
+    "LiteratureCorpus",
+    # Manager
+    "TreeCorpusManager",
+    "get_tree_corpus_manager",
 ]

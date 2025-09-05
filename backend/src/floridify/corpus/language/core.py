@@ -1,182 +1,130 @@
-"""Language corpus implementation with provider pattern support."""
+"""Language corpus implementation with provider integration.
+
+Minimal implementation following KISS principles - inherits from Corpus,
+delegates tree operations to TreeCorpusManager.
+"""
 
 from __future__ import annotations
 
-from pydantic import Field
+from beanie import PydanticObjectId
 
-from ...caching.models import VersionConfig
 from ...models.base import Language
-from ...providers.language import (
-    LanguageConnector,
-    LanguageEntry,
-    LanguageEntryMetadata,
-    LanguageProvider,
-)
-from ..core import MultisourceCorpus
+from ...providers.language.models import LanguageSource
+from ...providers.language.scraper.url import URLLanguageConnector
+from ...providers.language.sources import LANGUAGE_CORPUS_SOURCES_BY_LANGUAGE
+from ...utils.logging import get_logger
+from ..core import Corpus
+from ..manager import get_tree_corpus_manager
 from ..models import CorpusType
-from .models import LanguageCorpusMetadata
+
+logger = get_logger(__name__)
 
 
-class LanguageCorpus(MultisourceCorpus):
-    """Language-specific corpus with provider pattern integration."""
+class LanguageCorpus(Corpus):
+    """Language corpus with provider integration.
     
-    # Language-specific fields
-    corpus_type: CorpusType = CorpusType.LANGUAGE
-    providers: list[LanguageProvider] = Field(default_factory=list)
-    language_entries: dict[str, LanguageEntry] = Field(default_factory=dict)
-    provider_vocabularies: dict[LanguageProvider, list[str]] = Field(default_factory=dict)
+    Inherits all fields and functionality from Corpus.
+    Adds language-specific source management via TreeCorpusManager.
+    """
     
-    async def add_provider(
+    async def add_language_source(
         self,
-        provider: LanguageProvider,
-        connector: LanguageConnector,
-        vocabulary: list[str] | None = None,
-    ) -> None:
-        """Add a language provider as a source.
+        source: LanguageSource,
+    ) -> PydanticObjectId | None:
+        """Add a language source as child corpus.
         
         Args:
-            provider: Provider enum value
-            connector: Connector instance for fetching
-            vocabulary: Pre-fetched vocabulary (optional)
+            source: Language source configuration
+            
+        Returns:
+            Child corpus ID if created
         """
-        if provider not in self.providers:
-            self.providers.append(provider)
-            
-        # Fetch vocabulary if not provided
-        if vocabulary is None:
-            result = await connector.fetch(provider.value)
-            vocabulary = result if result else []
-            
-        # Store provider vocabulary
-        self.provider_vocabularies[provider] = vocabulary
+        logger.info(f"Adding language source: {source.name}")
         
-        # Add as source to parent class
-        await self.add_source(
-            source_name=provider.value,
+        # Fetch vocabulary using connector
+        connector = URLLanguageConnector()
+        result = await connector.fetch(source.url)
+        
+        if not result or not isinstance(result, dict):
+            logger.warning(f"No vocabulary fetched for source: {source.name}")
+            return None
+        
+        # Extract vocabulary from result
+        vocabulary = result.get("vocabulary", [])
+        if not vocabulary:
+            logger.warning(f"No vocabulary in result for source: {source.name}")
+            return None
+        
+        # Create child corpus from source vocabulary
+        child = await Corpus.create(
+            corpus_name=f"{self.corpus_name}_{source.name}",
             vocabulary=vocabulary,
-            metadata={
-                "provider": provider.value,
-                "source_url": connector.source_url,
-                "parser": connector.parser_name,
-                "scraper": connector.scraper_name,
-            },
+            language=source.language,
+            semantic=self.metadata.get("semantic_enabled", False),
+            model_name=self.metadata.get("model_name"),
         )
         
+        # Set corpus type
+        child.corpus_type = CorpusType.LANGUAGE
         
-            
-    async def remove_provider(self, provider: LanguageProvider) -> None:
-        """Remove a language provider.
+        # Save child corpus
+        await child.save()
         
-        Args:
-            provider: Provider to remove
-        """
-        if provider in self.providers:
-            self.providers.remove(provider)
-            
-        # Remove from provider vocabularies
-        if provider in self.provider_vocabularies:
-            del self.provider_vocabularies[provider]
-            
-        # Remove language entries from this provider
-        entries_to_remove = [
-            entry_id
-            for entry_id, entry in self.language_entries.items()
-            if entry.provider == provider
-        ]
-        for entry_id in entries_to_remove:
-            del self.language_entries[entry_id]
-            
-        # Remove source from parent class
-        await self.remove_source(provider.value)
+        if not child.corpus_id:
+            logger.warning(f"Failed to save child corpus for source: {source.name}")
+            return None
         
-    async def get_provider_vocabulary(
-        self,
-        provider: LanguageProvider,
-    ) -> list[str]:
-        """Get vocabulary from a specific provider.
+        # Update tree relationships via TreeCorpusManager
+        manager = get_tree_corpus_manager()
         
-        Args:
-            provider: Provider enum value
-            
-        Returns:
-            List of words from the provider
-        """
-        return self.provider_vocabularies.get(provider, [])
+        # Ensure parent has ID
+        if not self.corpus_id:
+            await self.save()
         
-    async def get_entries_by_provider(
-        self,
-        provider: LanguageProvider,
-    ) -> list[LanguageEntry]:
-        """Get all entries from a specific provider.
+        # Update parent-child relationship
+        if self.corpus_id:
+            await manager.update_parent(self.corpus_id, child.corpus_id)
         
-        Args:
-            provider: Provider to filter by
-            
-        Returns:
-            List of language entries from the provider
-        """
-        return [
-            entry
-            for entry in self.language_entries.values()
-            if entry.provider == provider
-        ]
+        # Aggregate vocabularies into parent
+        if self.corpus_id and child.corpus_id:
+            self.child_corpus_ids.append(child.corpus_id)
+            # Note: aggregate_vocabularies aggregates from the corpus and its children automatically
+            await manager.aggregate_vocabularies(self.corpus_id)
         
-    async def save(self, config: VersionConfig | None = None) -> None:
-        """Save language corpus with metadata."""
-        # Create metadata document
-        metadata = LanguageCorpusMetadata(
-            corpus_name=self.corpus_name,
-            corpus_type=self.corpus_type,
-            language=self.language,
-            providers=self.providers,
-            parent_id=self.parent_corpus_id,
-            child_ids=self.child_corpus_ids,
-            is_master=self.is_master,
-            total_entries=len(self.language_entries),
-            unique_entries=len(self.vocabulary),
-            provider_counts={
-                provider.value: len(self.provider_vocabularies.get(provider, []))
-                for provider in self.providers
-            },
+        logger.info(
+            f"Added source '{source.name}' with {len(vocabulary)} words"
         )
         
-        # Set content
-        content = self.model_dump()
-        await metadata.set_content(content)
-        
-        # Save metadata
-        await metadata.save_version(config)
-        
-        # Update corpus_id
-        if metadata.id and not self.corpus_id:
-            self.corpus_id = metadata.id
-            
+        return child.corpus_id
+    
     @classmethod
-    async def create_from_providers(
+    async def create_from_language(
         cls,
         corpus_name: str,
         language: Language,
-        providers: dict[LanguageProvider, LanguageConnector],
         semantic: bool = False,
         model_name: str | None = None,
     ) -> LanguageCorpus:
-        """Create language corpus from multiple providers.
+        """Create corpus from all available sources for a language.
         
         Args:
             corpus_name: Name for the corpus
-            language: Language of the corpus
-            providers: Dict mapping providers to connectors
+            language: Target language
             semantic: Enable semantic search
             model_name: Embedding model name
             
         Returns:
-            Configured LanguageCorpus instance
+            Configured LanguageCorpus with all language sources
         """
+        logger.info(f"Creating language corpus for {language.value}")
+        
+        # Create master corpus
         corpus = cls(
             corpus_name=corpus_name,
             corpus_type=CorpusType.LANGUAGE,
             language=language,
             is_master=True,
+            vocabulary=[],  # Empty vocabulary initially, will be aggregated from sources
         )
         
         corpus.metadata = {
@@ -184,8 +132,77 @@ class LanguageCorpus(MultisourceCorpus):
             "model_name": model_name,
         }
         
-        # Add all providers
-        for provider, connector in providers.items():
-            await corpus.add_provider(provider, connector)
-            
+        # Save to get corpus ID
+        await corpus.save()
+        
+        # Get all sources for language
+        sources = LANGUAGE_CORPUS_SOURCES_BY_LANGUAGE.get(language, [])
+        
+        if not sources:
+            logger.warning(f"No sources found for language: {language.value}")
+            return corpus
+        
+        logger.info(f"Adding {len(sources)} sources for {language.value}")
+        
+        # Add all sources
+        for source in sources:
+            try:
+                await corpus.add_language_source(source)
+            except Exception as e:
+                logger.error(f"Failed to add source {source.name}: {e}")
+                continue
+        
+        # Final save with aggregated vocabulary
+        await corpus.save()
+        
+        logger.info(
+            f"Created language corpus with {len(corpus.vocabulary)} unique words"
+        )
+        
         return corpus
+    
+    async def remove_source(self, source_name: str) -> None:
+        """Remove a language source by name.
+        
+        Args:
+            source_name: Name of source to remove
+        """
+        manager = get_tree_corpus_manager()
+        
+        # Find child corpus with matching name
+        child_name = f"{self.corpus_name}_{source_name}"
+        
+        # Get child corpus using keyword argument
+        child_meta = await manager.get_corpus(corpus_name=child_name)
+        if not child_meta or not child_meta.id:
+            logger.warning(f"Source '{source_name}' not found")
+            return
+        
+        # Use manager to properly remove and delete child
+        if self.corpus_id and child_meta.id:
+            await manager.remove_child(
+                parent_id=self.corpus_id,
+                child_id=child_meta.id,
+                delete_child=True  # Delete the child corpus
+            )
+            
+            # Update local child_corpus_ids list
+            if child_meta.id in self.child_corpus_ids:
+                self.child_corpus_ids.remove(child_meta.id)
+        
+        logger.info(f"Removed source: {source_name}")
+    
+    async def update_source(
+        self,
+        source_name: str,
+        source: LanguageSource,
+    ) -> None:
+        """Update a language source.
+        
+        Args:
+            source_name: Current source name
+            source: New source configuration
+        """
+        # Simple approach: remove old, add new
+        await self.remove_source(source_name)
+        await self.add_language_source(source)

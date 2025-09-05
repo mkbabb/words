@@ -10,7 +10,7 @@ from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from ..caching.models import BaseVersionedData
-from ..corpus.models import CorpusMetadata
+from ..corpus.core import Corpus
 from ..models.base import AudioMedia, ImageMedia
 from ..models.dictionary import (
     Definition,
@@ -106,7 +106,7 @@ class MongoDBStorage:
                 BatchOperation,
                 # Cache models
                 # CorpusCacheEntry removed - using unified caching
-                CorpusMetadata,
+                Corpus.Metadata,
             ],
         )
 

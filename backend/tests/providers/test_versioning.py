@@ -7,8 +7,8 @@ import json
 import pytest
 
 from floridify.caching.manager import VersionedDataManager
-from floridify.caching.models import CacheNamespace
-from floridify.models.versioned import (
+from floridify.caching.models import (
+    CacheNamespace,
     ContentLocation,
     CorpusMetadata,
     DictionaryEntryMetadata,

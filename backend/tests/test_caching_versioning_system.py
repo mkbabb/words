@@ -12,24 +12,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
-from beanie import PydanticObjectId
 
 from floridify.caching.core import GlobalCacheManager
 from floridify.caching.filesystem import FilesystemBackend
-from floridify.caching.models import CacheNamespace, CompressionType
-from floridify.models import Word
-from floridify.models.dictionary import DictionaryProvider, Language
+from floridify.caching.models import CacheNamespace, StorageType, VersionInfo
 from floridify.corpus.literature.models import AuthorInfo, Genre, LiteratureSource, Period
-from floridify.models.versioned import (
-    BaseVersionedData,
-    ContentLocation,
-    DictionaryEntryMetadata,
-    LiteratureEntryMetadata,
-    ResourceType,
-    StorageType,
-    VersionConfig,
-    VersionInfo,
-)
+from floridify.models import Word
+from floridify.models.base import Language
+from floridify.models.dictionary import DictionaryProvider
 
 
 class TestDictionaryEntryCaching:
@@ -100,7 +90,7 @@ class TestDictionaryEntryCaching:
             is_latest=True
         )
         
-        entry_v1 = DictionaryEntryMetadata(
+        entry_v1 = DictionaryProviderEntry.Metadata(
             resource_id=sample_word.text,
             word=sample_word.text,
             provider=DictionaryProvider.WIKTIONARY.value,
@@ -137,7 +127,7 @@ class TestDictionaryEntryCaching:
             supersedes=entry_v1.id
         )
         
-        entry_v2 = DictionaryEntryMetadata(
+        entry_v2 = DictionaryProviderEntry.Metadata(
             resource_id=sample_word.text,
             word=sample_word.text,
             provider=DictionaryProvider.WIKTIONARY.value,
@@ -192,7 +182,7 @@ class TestDictionaryEntryCaching:
             is_latest=True
         )
         
-        entry = DictionaryEntryMetadata(
+        entry = DictionaryProviderEntry.Metadata(
             resource_id=sample_word.text + "_large",
             word=sample_word.text + "_large",
             provider=DictionaryProvider.WIKTIONARY.value,
@@ -349,7 +339,7 @@ class TestLiteratureEntryCaching:
             is_latest=True
         )
         
-        entry_v1 = LiteratureEntryMetadata(
+        entry_v1 = LiteratureEntry.Metadata(
             resource_id="evolving_novel",
             title="Evolving Novel",
             authors=[sample_author],
@@ -386,7 +376,7 @@ class TestLiteratureEntryCaching:
             supersedes=entry_v1.id
         )
         
-        entry_v2 = LiteratureEntryMetadata(
+        entry_v2 = LiteratureEntry.Metadata(
             resource_id="evolving_novel",
             title="Evolving Novel",
             authors=[sample_author],
@@ -452,7 +442,7 @@ class TestLiteratureEntryCaching:
             is_latest=True
         )
         
-        entry = LiteratureEntryMetadata(
+        entry = LiteratureEntry.Metadata(
             resource_id="war_and_peace_large",
             title="War and Peace - Large Edition",
             authors=[sample_author],
@@ -592,7 +582,7 @@ class TestCacheVersioningIntegration:
                 is_latest=(version_num == 3)  # Only v3 is latest
             )
             
-            entry = DictionaryEntryMetadata(
+            entry = DictionaryProviderEntry.Metadata(
                 resource_id=f"{word.text}_concurrent_{version_num}",
                 word=word.text,
                 provider=DictionaryProvider.WIKTIONARY.value,
@@ -673,7 +663,7 @@ class TestCacheVersioningIntegration:
             is_latest=True
         )
         
-        entry_1 = DictionaryEntryMetadata(
+        entry_1 = DictionaryProviderEntry.Metadata(
             resource_id=f"{word.text}_dedup_1",
             word=word.text,
             provider=DictionaryProvider.WIKTIONARY.value,
@@ -681,7 +671,7 @@ class TestCacheVersioningIntegration:
             version_info=version_info_1
         )
         
-        entry_2 = DictionaryEntryMetadata(
+        entry_2 = DictionaryProviderEntry.Metadata(
             resource_id=f"{word.text}_dedup_2",
             word=word.text,
             provider=DictionaryProvider.OXFORD.value,  # Different provider

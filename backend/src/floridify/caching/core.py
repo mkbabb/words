@@ -234,9 +234,7 @@ class GlobalCacheManager[T: FilesystemBackend]:
         pattern = f"{namespace.value}:*"
         await self.l2_backend.clear_pattern(pattern)
 
-    async def _promote_to_memory(
-        self, ns: NamespaceConfig, key: str, data: Any
-    ) -> None:
+    async def _promote_to_memory(self, ns: NamespaceConfig, key: str, data: Any) -> None:
         """Promote data from L2 to L1."""
         async with ns.lock:
             # LRU eviction if needed
@@ -415,9 +413,9 @@ async def store_external_content(
 
     # Store in cache backend
     cache = await get_global_cache()
-    
+
     backend_key = f"{namespace.value}:{key}"
-    
+
     await cache.l2_backend.set(backend_key, compressed)
 
     return ContentLocation(

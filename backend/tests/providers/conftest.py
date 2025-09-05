@@ -12,7 +12,16 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from floridify.caching.core import GlobalCacheManager
 from floridify.caching.manager import TreeCorpusManager, VersionedDataManager
-from floridify.caching.models import CacheNamespace
+from floridify.caching.models import (
+    CacheNamespace,
+    CorpusMetadata,
+    DictionaryEntryMetadata,
+    LiteratureEntryMetadata,
+    ResourceType,
+    SemanticIndexMetadata,
+    TrieIndexMetadata,
+    VersionConfig,
+)
 from floridify.models.dictionary import (
     Definition,
     DictionaryEntry,
@@ -21,15 +30,6 @@ from floridify.models.dictionary import (
     Language,
     Pronunciation,
     Word,
-)
-from floridify.models.versioned import (
-    CorpusMetadata,
-    DictionaryEntryMetadata,
-    LiteratureEntryMetadata,
-    ResourceType,
-    SemanticIndexMetadata,
-    TrieIndexMetadata,
-    VersionConfig,
 )
 from floridify.providers.batch import BatchOperation
 from floridify.providers.core import ConnectorConfig, ProviderType

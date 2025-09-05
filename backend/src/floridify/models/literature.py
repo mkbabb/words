@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from .base import Language
 
@@ -16,6 +16,7 @@ class LiteratureProvider(str, Enum):
     HATHI_TRUST = "hathi_trust"
     STANDARD_EBOOKS = "standard_ebooks"
     LOCAL_FILE = "local_file"
+    CUSTOM_URL = "custom_url"
 
 
 class Genre(str, Enum):
@@ -99,23 +100,3 @@ class AuthorInfo(BaseModel):
             Genre.COMEDY: 3,
         }
         return genre_to_style.get(self.primary_genre, 2)
-
-
-class LiteratureEntry(BaseModel):
-    """Literary work metadata."""
-
-    title: str
-    author: AuthorInfo
-    gutenberg_id: str | None = None
-    year: int | None = None
-    genre: Genre
-    period: Period
-    language: Language = Language.ENGLISH
-
-    # Additional metadata
-    subtitle: str | None = None
-    description: str | None = None
-    keywords: list[str] = Field(default_factory=list)
-
-    # Data
-    text: str | None = None  # Full text content (loaded separately)

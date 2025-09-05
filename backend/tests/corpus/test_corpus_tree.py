@@ -2,9 +2,8 @@
 import pytest
 from beanie import PydanticObjectId
 
-from floridify.caching.models import CacheNamespace
+from floridify.caching.models import CacheNamespace, CorpusMetadata, ResourceType, VersionInfo
 from floridify.models.dictionary import CorpusType, Language
-from floridify.models.versioned import CorpusMetadata, ResourceType, VersionInfo
 
 
 def create_test_corpus(
@@ -16,7 +15,7 @@ def create_test_corpus(
 ) -> CorpusMetadata:
     """Helper to create a test corpus with required fields."""
     vocabulary = vocabulary or []
-    return CorpusMetadata(
+    return Corpus.Metadata(
         resource_id=corpus_name,
         resource_type=ResourceType.CORPUS,
         namespace=CacheNamespace.CORPUS,

@@ -8,14 +8,15 @@ from typing import Any
 from beanie import PydanticObjectId
 
 from ....core.state_tracker import StateTracker
-from ....models import (
+from ....models.dictionary import (
     Definition,
+    DictionaryEntry,
+    DictionaryProvider,
     Etymology,
     Example,
     Pronunciation,
     Word,
 )
-from ....models.dictionary import DictionaryEntry, DictionaryProvider
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ..core import DictionaryConnector

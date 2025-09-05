@@ -11,11 +11,16 @@ from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
 from ..caching.manager import get_version_manager
-from ..caching.models import BaseVersionedData, CacheNamespace
+from ..caching.models import (
+    BaseVersionedData,
+    CacheNamespace,
+    ResourceType,
+    VersionConfig,
+)
 from ..corpus.core import Corpus
 from ..corpus.utils import get_vocabulary_hash
 from ..models.base import Language
-from ..models.versioned import ResourceType, VersionConfig, register_model
+from ..models.versioned import register_model
 from ..utils.logging import get_logger
 from .constants import SearchMethod
 
@@ -56,39 +61,7 @@ class SearchResult(BaseModel):
         }
 
 
-@register_model(ResourceType.TRIE)
-class TrieIndexMetadata(BaseVersionedData):
-    """Trie index metadata for prefix search."""
-
-    corpus_ids: list[PydanticObjectId]
-    node_count: int
-    max_depth: int
-    supports_fuzzy: bool = False
-    memory_usage_bytes: int
-
-    def __init__(self, **data: Any) -> None:
-        data.setdefault("resource_type", ResourceType.TRIE)
-        data.setdefault("namespace", CacheNamespace.TRIE)
-        super().__init__(**data)
-
-
-@register_model(ResourceType.SEARCH)
-class SearchIndexMetadata(BaseVersionedData):
-    """Composite search index metadata."""
-
-    trie_index_id: PydanticObjectId | None = None
-    semantic_index_id: PydanticObjectId | None = None
-    corpus_id: PydanticObjectId
-
-    # Configuration
-    search_config: dict[str, Any] = Field(default_factory=dict)
-    supported_languages: list[Language] = Field(default_factory=list)
-    max_results: int = 100
-
-    def __init__(self, **data: Any) -> None:
-        data.setdefault("resource_type", ResourceType.SEARCH)
-        data.setdefault("namespace", CacheNamespace.SEARCH)
-        super().__init__(**data)
+# Metadata classes moved to nested pattern inside main classes
 
 
 class TrieIndex(BaseModel):
@@ -97,9 +70,10 @@ class TrieIndex(BaseModel):
     Contains all trie data, frequencies, and search structures.
     """
 
-    # Core identification
+    # Index identification
+    index_id: PydanticObjectId = Field(default_factory=PydanticObjectId)
+    corpus_id: PydanticObjectId
     corpus_name: str
-    corpus_hash: str
     vocabulary_hash: str
 
     # Trie data - sorted word list for marisa-trie
@@ -117,27 +91,48 @@ class TrieIndex(BaseModel):
     max_frequency: int = 0
     build_time_seconds: float = 0.0
 
+    @register_model(ResourceType.TRIE)
+    class Metadata(BaseVersionedData):
+        """Minimal trie metadata for versioning."""
+
+        corpus_id: PydanticObjectId
+
+        def __init__(self, **data: Any) -> None:
+            data.setdefault("resource_type", ResourceType.TRIE)
+            data.setdefault("namespace", CacheNamespace.TRIE)
+            super().__init__(**data)
+
     @classmethod
     async def get(
         cls,
-        corpus_name: str,
+        corpus_id: PydanticObjectId | None = None,
+        corpus_name: str | None = None,
         config: VersionConfig | None = None,
     ) -> TrieIndex | None:
-        """Get trie index from versioned storage.
+        """Get trie index from versioned storage by ID or name.
 
         Args:
-            corpus_name: Name of the corpus
+            corpus_id: Corpus ObjectId (preferred)
+            corpus_name: Name of the corpus (fallback)
             config: Version configuration
 
         Returns:
             TrieIndex instance or None if not found
         """
+        if not corpus_id and not corpus_name:
+            raise ValueError("Either corpus_id or corpus_name must be provided")
+            
         manager = get_version_manager()
-        index_id = f"{corpus_name}:trie"
+        
+        # Build resource ID based on what we have
+        if corpus_id:
+            resource_id = f"{str(corpus_id)}:trie"
+        else:
+            resource_id = f"{corpus_name}:trie"
 
         # Get the latest trie index metadata
-        metadata: TrieIndexMetadata | None = await manager.get_latest(
-            resource_id=index_id,
+        metadata: TrieIndex.Metadata | None = await manager.get_latest(
+            resource_id=resource_id,
             resource_type=ResourceType.TRIE,
             use_cache=config.use_cache if config else True,
             config=config or VersionConfig(),
@@ -151,7 +146,11 @@ class TrieIndex(BaseModel):
         if not content:
             return None
 
-        return cls.model_validate(content)
+        index = cls.model_validate(content)
+        # Ensure the index ID is set from metadata
+        if metadata.id:
+            index.index_id = metadata.id
+        return index
 
     @classmethod
     async def create(
@@ -175,7 +174,7 @@ class TrieIndex(BaseModel):
         # Build frequency map
         word_frequencies = {}
         max_frequency = 0
-        frequencies = getattr(corpus, 'word_frequencies', None)
+        frequencies = getattr(corpus, "word_frequencies", None)
 
         for word in corpus.vocabulary:
             if frequencies:
@@ -193,8 +192,8 @@ class TrieIndex(BaseModel):
         build_time = time.perf_counter() - start_time
 
         return cls(
+            corpus_id=corpus.id if hasattr(corpus, "id") else PydanticObjectId(),
             corpus_name=corpus.corpus_name,
-            corpus_hash=corpus.vocabulary_hash,
             vocabulary_hash=corpus.vocabulary_hash,
             trie_data=sorted(corpus.vocabulary),  # Sorted for marisa-trie
             word_frequencies=word_frequencies,
@@ -220,14 +219,18 @@ class TrieIndex(BaseModel):
         Returns:
             TrieIndex instance
         """
-        # Try to get existing
-        existing = await cls.get(corpus.corpus_name, config)
+        # Try to get existing using corpus ID if available, otherwise name
+        existing = await cls.get(
+            corpus_id=corpus.corpus_id,
+            corpus_name=corpus.corpus_name,
+            config=config
+        )
         if existing and existing.vocabulary_hash == corpus.vocabulary_hash:
-            logger.debug(f"Using cached trie index for '{corpus.corpus_name}'")
+            logger.debug(f"Using cached trie index for corpus '{corpus.corpus_name}'")
             return existing
 
         # Create new
-        logger.info(f"Building new trie index for '{corpus.corpus_name}'")
+        logger.info(f"Building new trie index for corpus '{corpus.corpus_name}'")
         index = await cls.create(corpus)
 
         # Save the new index
@@ -244,23 +247,18 @@ class TrieIndex(BaseModel):
             config: Version configuration
         """
         manager = get_version_manager()
-        index_id = f"{self.corpus_name}:trie"
+        resource_id = f"{self.corpus_name}:trie"
 
         # Save using version manager
         await manager.save(
-            resource_id=index_id,
+            resource_id=resource_id,
             resource_type=ResourceType.TRIE,
             namespace=manager._get_namespace(ResourceType.TRIE),
             content=self.model_dump(),
             config=config or VersionConfig(),
-            metadata={
-                "corpus_hash": self.corpus_hash,
-                "vocabulary_hash": self.vocabulary_hash,
-                "word_count": self.word_count,
-            },
         )
 
-        logger.debug(f"Saved trie index for {index_id}")
+        logger.debug(f"Saved trie index for {resource_id}")
 
 
 class SearchIndex(BaseModel):
@@ -269,9 +267,10 @@ class SearchIndex(BaseModel):
     Contains all configuration, references, and state for multi-method search.
     """
 
-    # Core identification
+    # Index identification
+    index_id: PydanticObjectId = Field(default_factory=PydanticObjectId)
+    corpus_id: PydanticObjectId
     corpus_name: str
-    corpus_hash: str
     vocabulary_hash: str
 
     # Search configuration
@@ -279,8 +278,8 @@ class SearchIndex(BaseModel):
     semantic_enabled: bool = True
 
     # Component indices (embedded or referenced)
-    trie_index_id: str | None = None
-    semantic_index_id: str | None = None
+    trie_index_id: PydanticObjectId | None = None
+    semantic_index_id: PydanticObjectId | None = None
 
     # Component states
     has_trie: bool = False
@@ -291,27 +290,46 @@ class SearchIndex(BaseModel):
     vocabulary_size: int = 0
     total_indices: int = 0
 
+    @register_model(ResourceType.SEARCH)
+    class Metadata(BaseVersionedData):
+        """Minimal search metadata for versioning."""
+
+        def __init__(self, **data: Any) -> None:
+            data.setdefault("resource_type", ResourceType.SEARCH)
+            data.setdefault("namespace", CacheNamespace.SEARCH)
+            super().__init__(**data)
+
     @classmethod
     async def get(
         cls,
-        corpus_name: str,
+        corpus_id: PydanticObjectId | None = None,
+        corpus_name: str | None = None,
         config: VersionConfig | None = None,
     ) -> SearchIndex | None:
-        """Get search index from versioned storage.
+        """Get search index from versioned storage by ID or name.
 
         Args:
-            corpus_name: Name of the corpus
+            corpus_id: Corpus ObjectId (preferred)
+            corpus_name: Name of the corpus (fallback)
             config: Version configuration
 
         Returns:
             SearchIndex instance or None if not found
         """
+        if not corpus_id and not corpus_name:
+            raise ValueError("Either corpus_id or corpus_name must be provided")
+            
         manager = get_version_manager()
-        index_id = f"{corpus_name}:search"
+        
+        # Build resource ID based on what we have
+        if corpus_id:
+            resource_id = f"{str(corpus_id)}:search"
+        else:
+            resource_id = f"{corpus_name}:search"
 
         # Get the latest search index metadata
-        metadata: SearchIndexMetadata | None = await manager.get_latest(
-            resource_id=index_id,
+        metadata: SearchIndex.Metadata | None = await manager.get_latest(
+            resource_id=resource_id,
             resource_type=ResourceType.SEARCH,
             use_cache=config.use_cache if config else True,
             config=config or VersionConfig(),
@@ -325,7 +343,11 @@ class SearchIndex(BaseModel):
         if not content:
             return None
 
-        return cls.model_validate(content)
+        index = cls.model_validate(content)
+        # Ensure the index ID is set from metadata
+        if metadata.id:
+            index.index_id = metadata.id
+        return index
 
     @classmethod
     async def create(
@@ -340,15 +362,13 @@ class SearchIndex(BaseModel):
             corpus: Corpus containing vocabulary
             min_score: Minimum score threshold for results
             semantic: Enable semantic search
-            semantic_model: Model for semantic search
 
         Returns:
             SearchIndex instance with initialized configuration
         """
-
         return cls(
+            corpus_id=corpus.id if hasattr(corpus, "id") else PydanticObjectId(),
             corpus_name=corpus.corpus_name,
-            corpus_hash=corpus.vocabulary_hash,
             vocabulary_hash=get_vocabulary_hash(corpus.vocabulary),
             min_score=min_score,
             semantic_enabled=semantic,
@@ -372,15 +392,18 @@ class SearchIndex(BaseModel):
             corpus: Corpus containing vocabulary
             min_score: Minimum score threshold
             semantic: Enable semantic search
-            semantic_model: Model for semantic search
             config: Version configuration
 
         Returns:
             SearchIndex instance
         """
-        # Try to get existing
-        existing = await cls.get(corpus.corpus_name, config)
-        if existing and existing.vocabulary_hash == corpus.vocabulary_hash:
+        # Try to get existing using corpus ID if available, otherwise name
+        existing = await cls.get(
+            corpus_id=corpus.corpus_id,
+            corpus_name=corpus.corpus_name,
+            config=config
+        )
+        if existing and existing.vocabulary_hash == get_vocabulary_hash(corpus.vocabulary):
             return existing
 
         # Create new
@@ -404,22 +427,21 @@ class SearchIndex(BaseModel):
             config: Version configuration
         """
         manager = get_version_manager()
-        index_id = f"{self.corpus_name}:search"
+        resource_id = f"{self.corpus_name}:search"
 
         # Save using version manager
         await manager.save(
-            resource_id=index_id,
+            resource_id=resource_id,
             resource_type=ResourceType.SEARCH,
             namespace=manager._get_namespace(ResourceType.SEARCH),
             content=self.model_dump(),
             config=config or VersionConfig(),
             metadata={
-                "corpus_hash": self.corpus_hash,
                 "vocabulary_size": self.vocabulary_size,
             },
         )
 
-        logger.debug(f"Saved search index for {index_id}")
+        logger.debug(f"Saved search index for {resource_id}")
 
 
 __all__ = [

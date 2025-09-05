@@ -54,9 +54,7 @@ class VersionedDataManager:
         if not config.force_rebuild:
             existing = await self._find_by_hash(resource_id, content_hash)
             if existing:
-                logger.debug(
-                    f"Found existing version for {resource_id} with same content"
-                )
+                logger.debug(f"Found existing version for {resource_id} with same content")
                 return existing
 
         # Get latest for version increment
@@ -110,9 +108,7 @@ class VersionedDataManager:
             cache_key = f"{resource_type.value}:{resource_id}"
             await self.cache.set(namespace, cache_key, versioned, config.ttl)
 
-        logger.info(
-            f"Saved {resource_type.value} '{resource_id}' version {new_version}"
-        )
+        logger.info(f"Saved {resource_type.value} '{resource_id}' version {new_version}")
         return versioned
 
     async def get_latest(
@@ -178,14 +174,10 @@ class VersionedDataManager:
         config = VersionConfig(version=version, use_cache=use_cache)
         return await self.get_latest(resource_id, resource_type, use_cache, config)
 
-    async def list_versions(
-        self, resource_id: str, resource_type: ResourceType
-    ) -> list[str]:
+    async def list_versions(self, resource_id: str, resource_type: ResourceType) -> list[str]:
         """List all versions of a resource."""
         model_class = self._get_model_class(resource_type)
-        results = await model_class.find(
-            model_class.resource_id == resource_id
-        ).to_list()
+        results = await model_class.find(model_class.resource_id == resource_id).to_list()
         return [r.version_info.version for r in results]
 
     async def delete_version(
@@ -203,17 +195,13 @@ class VersionedDataManager:
             if result.version_info.superseded_by:
                 next_version = await model_class.get(result.version_info.superseded_by)
                 if next_version:
-                    next_version.version_info.supersedes = (
-                        result.version_info.supersedes
-                    )
+                    next_version.version_info.supersedes = result.version_info.supersedes
                     await next_version.save()
 
             if result.version_info.supersedes:
                 prev_version = await model_class.get(result.version_info.supersedes)
                 if prev_version:
-                    prev_version.version_info.superseded_by = (
-                        result.version_info.superseded_by
-                    )
+                    prev_version.version_info.superseded_by = result.version_info.superseded_by
                     if result.version_info.is_latest:
                         prev_version.version_info.is_latest = True
                     await prev_version.save()
@@ -232,9 +220,7 @@ class VersionedDataManager:
 
         return False
 
-    async def _find_by_hash(
-        self, resource_id: str, content_hash: str
-    ) -> BaseVersionedData | None:
+    async def _find_by_hash(self, resource_id: str, content_hash: str) -> BaseVersionedData | None:
         """Find existing version with same content hash."""
         # Check all resource types for deduplication
         for resource_type in ResourceType:

@@ -12,11 +12,11 @@ from beanie import PydanticObjectId
 
 from ....caching.decorators import cached_api_call
 from ....core.state_tracker import Stages, StateTracker
-from ....models import Etymology
 from ....models.dictionary import (
     Definition,
     DictionaryEntry,
     DictionaryProvider,
+    Etymology,
     Example,
     Pronunciation,
     Word,

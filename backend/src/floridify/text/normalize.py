@@ -218,9 +218,7 @@ def batch_normalize(
     # Split into chunks for parallel processing
     cpu_count = os.cpu_count() or 4
     chunk_size = max(1000, len(valid_words) // cpu_count)
-    chunks = [
-        valid_words[i : i + chunk_size] for i in range(0, len(valid_words), chunk_size)
-    ]
+    chunks = [valid_words[i : i + chunk_size] for i in range(0, len(valid_words), chunk_size)]
 
     # Process chunks in parallel - pass normalizer with each chunk
     normalized_words = []
@@ -279,9 +277,7 @@ def remove_diacritics(text: str) -> str:
     nfd_text = unicodedata.normalize("NFD", text)
 
     # Remove combining marks (diacritics)
-    without_diacritics = "".join(
-        char for char in nfd_text if unicodedata.category(char) != "Mn"
-    )
+    without_diacritics = "".join(char for char in nfd_text if unicodedata.category(char) != "Mn")
 
     # Normalize back to NFC (composed form)
     return unicodedata.normalize("NFC", without_diacritics)
@@ -308,9 +304,7 @@ def lemmatize_basic(word: str) -> str:
     word_lower = word.lower()
 
     # Try suffix rules in order of specificity
-    for suffix, replacement in sorted(
-        SUFFIX_RULES.items(), key=lambda x: len(x[0]), reverse=True
-    ):
+    for suffix, replacement in sorted(SUFFIX_RULES.items(), key=lambda x: len(x[0]), reverse=True):
         if word_lower.endswith(suffix) and len(word_lower) > len(suffix) + 1:
             stem = word_lower[: -len(suffix)] + replacement
             # Validate the result is reasonable
@@ -501,9 +495,7 @@ def batch_lemmatize(
     if n_processes is None:
         n_processes = min(os.cpu_count() or 4, 8)  # Cap at 8 for efficiency
 
-    logger.info(
-        f"🚀 Parallelized lemmatization: {len(words)} words across {n_processes} processes"
-    )
+    logger.info(f"🚀 Parallelized lemmatization: {len(words)} words across {n_processes} processes")
 
     # Split words into chunks
     chunks = []
@@ -527,9 +519,7 @@ def batch_lemmatize(
     for chunk_lemmas in chunk_results:
         all_lemmas.extend(chunk_lemmas)
 
-    unique_lemmas, word_to_lemma_indices, lemma_to_word_indices = _build_lemma_indices(
-        all_lemmas
-    )
+    unique_lemmas, word_to_lemma_indices, lemma_to_word_indices = _build_lemma_indices(all_lemmas)
 
     logger.info(
         f"✅ Lemmatization complete: {len(unique_lemmas)} unique lemmas from {len(words)} words",

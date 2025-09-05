@@ -43,7 +43,7 @@ class DefinitionResponse(AIResponseBase):
         le=1.0,
         description="Relevancy score for this definition within its meaning cluster (0.0-1.0, where 1.0 is most commonly used).",
     )
-    
+
     source_providers: list[DictionaryProvider] = Field(
         default_factory=list,
         description="List of providers that contributed to this definition.",

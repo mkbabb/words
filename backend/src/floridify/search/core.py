@@ -161,9 +161,7 @@ class Search:
         if self.index.semantic_enabled and not self._semantic_ready:
             logger.debug("Semantic search enabled - initializing in background")
             # Fire and forget - semantic search initializes in background
-            self._semantic_init_task = asyncio.create_task(
-                self._initialize_semantic_background()
-            )
+            self._semantic_init_task = asyncio.create_task(self._initialize_semantic_background())
 
         self._initialized = True
 
@@ -175,9 +173,7 @@ class Search:
         """Initialize semantic search in background without blocking."""
         try:
             if not self.corpus or not self.index:
-                logger.warning(
-                    "Cannot initialize semantic search without corpus and index"
-                )
+                logger.warning("Cannot initialize semantic search without corpus and index")
                 return
 
             logger.info(
@@ -326,9 +322,7 @@ class Search:
             results = self.search_fuzzy(normalized_query, max_results, min_score)
         elif mode == SearchMode.SEMANTIC:
             if not self.semantic_search:
-                raise ValueError(
-                    "Semantic search is not enabled for this SearchEngine instance"
-                )
+                raise ValueError("Semantic search is not enabled for this SearchEngine instance")
 
             results = self.search_semantic(normalized_query, max_results, min_score)
         else:
@@ -357,9 +351,7 @@ class Search:
 
         return [
             SearchResult(
-                word=self._get_original_word(
-                    match
-                ),  # Return original word with diacritics
+                word=self._get_original_word(match),  # Return original word with diacritics
                 lemmatized_word=None,
                 score=1.0,
                 method=SearchMethod.EXACT,
@@ -451,9 +443,7 @@ class Search:
         if semantic and self.semantic_search:
             # If fuzzy found good results, be more selective with semantic
             semantic_limit = (
-                max_results // 2
-                if len(fuzzy_results) >= max_results // 2
-                else max_results
+                max_results // 2 if len(fuzzy_results) >= max_results // 2 else max_results
             )
             semantic_results = self.search_semantic(query, semantic_limit, min_score)
 
@@ -500,8 +490,7 @@ class Search:
                 existing_priority = self.METHOD_PRIORITY.get(existing.method, 0)
 
                 if (result_priority > existing_priority) or (
-                    result_priority == existing_priority
-                    and result.score > existing.score
+                    result_priority == existing_priority and result.score > existing.score
                 ):
                     word_to_result[result.word] = result
 
@@ -523,9 +512,7 @@ class Search:
             "min_score": self.index.min_score,
             "semantic_enabled": self.index.semantic_enabled,
             "semantic_ready": self._semantic_ready,
-            "semantic_model": (
-                self.index.semantic_model if self.index.semantic_enabled else None
-            ),
+            "semantic_model": (self.index.semantic_model if self.index.semantic_enabled else None),
             "corpus_name": self.index.corpus_name,
         }
 

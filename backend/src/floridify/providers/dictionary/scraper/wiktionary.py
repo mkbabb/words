@@ -13,16 +13,19 @@ from beanie import PydanticObjectId
 
 from ....caching.decorators import cached_computation_async
 from ....core.state_tracker import Stages, StateTracker
-from ....models import (
-    Collocation,
+from ....models.dictionary import (
     Definition,
+    DictionaryEntry,
+    DictionaryProvider,
     Etymology,
     Example,
     Pronunciation,
-    UsageNote,
     Word,
 )
-from ....models.dictionary import DictionaryEntry, DictionaryProvider
+from ....models.relationships import (
+    Collocation,
+    UsageNote,
+)
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ..core import DictionaryConnector

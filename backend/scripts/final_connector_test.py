@@ -46,8 +46,8 @@ async def init_database():
 
 async def test_connector_comprehensive(connector_class, name, test_word, **init_kwargs):
     """Test a connector comprehensively."""
-    from src.floridify.models import Word
     from floridify.models.dictionary import Language
+    from src.floridify.models import Word
     from src.floridify.models.provider import VersionedProviderData
     from src.floridify.providers.base import VersionConfig
     

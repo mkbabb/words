@@ -9,15 +9,15 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import timedelta
 from enum import Enum
-from typing import Any, TypeVar
+from typing import Any, Self, TypeVar
 
 import httpx
 from pydantic import BaseModel, Field
 
+from ..caching.models import CacheNamespace, ResourceType, VersionConfig
 from ..core.state_tracker import StateTracker
-from ..models.versioned import VersionConfig
 from ..utils.logging import get_logger
-from .utils import AdaptiveRateLimiter, RateLimitConfig, RespectfulHttpClient
+from .utils import AdaptiveRateLimiter, RateLimitConfig
 
 logger = get_logger(__name__)
 
@@ -110,9 +110,16 @@ class RateLimitPresets(Enum):
 class ConnectorConfig(BaseModel):
     """Configuration for connectors with integrated rate limiting."""
 
-    # Rate limiting configuration as sub-model
-    rate_limit_config: RateLimitConfig = Field(
-        default_factory=RateLimitConfig, description="Rate limiting configuration"
+    # Rate limiting configuration
+    rate_limit_preset: RateLimitPresets | None = Field(
+        default=None, description="Rate limit preset to use"
+    )
+    rate_limit_config: RateLimitConfig | None = Field(
+        default=None, description="Custom rate limiting configuration"
+    )
+    user_agent: str = Field(
+        default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        description="User agent for requests",
     )
 
     # Connection configuration
@@ -130,173 +137,125 @@ class ConnectorConfig(BaseModel):
 
 
 class BaseConnector(ABC):
-    """Abstract base class for all connectors.
-
-    Provides standard interface with RespectfulHttpClient integration:
-    - get: Retrieve from storage
-    - save: Save to storage
-    - fetch: Fetch from provider and optionally save
-    - get_or_fetch: Get existing or fetch new
-    """
+    """Base connector for all data providers."""
 
     def __init__(
         self,
-        provider_type: ProviderType,
         config: ConnectorConfig | None = None,
-    ):
-        self.provider_type = provider_type
+    ) -> None:
+        """Initialize base connector with configuration."""
         self.config = config or ConnectorConfig()
-        self.provider_version = "1.0.0"
+        self._scraper_session: httpx.AsyncClient | None = None
+        self._api_client: httpx.AsyncClient | None = None
 
-        # Initialize rate limiter
-        self.rate_limiter = AdaptiveRateLimiter(self.config.rate_limit_config)
-
-        # Sessions will be created on demand
-        self._scraper_session: RespectfulHttpClient | None = None
-        self._api_session: httpx.AsyncClient | None = None
-
-    async def get_scraper_session(self) -> RespectfulHttpClient:
-        """Get or create scraper session with rate limiting.
-
-        Used for web scraping (WordHippo, Wiktionary scraper, etc.)
-        """
-        if self._scraper_session is None:
-            self._scraper_session = RespectfulHttpClient(
-                rate_limiter=self.rate_limiter,
-                timeout=self.config.timeout,
-                max_connections=self.config.max_connections,
-            )
-        return self._scraper_session
-
-    async def get_api_session(self) -> httpx.AsyncClient:
-        """Get or create API session.
-
-        Used for API calls (Merriam-Webster, Oxford, etc.)
-        """
-        if self._api_session is None:
-            self._api_session = httpx.AsyncClient(
-                timeout=self.config.timeout,
-                limits=httpx.Limits(
-                    max_connections=self.config.max_connections,
-                    max_keepalive_connections=self.config.max_connections,
-                ),
-            )
-        return self._api_session
-
-    async def close(self) -> None:
-        """Close all sessions."""
-        # Note: RespectfulHttpClient doesn't have a close method
-        # It's designed to be used as a context manager
-        # We'll just close the API session
-        if self._api_session:
-            await self._api_session.aclose()
-        # Reset scraper session so it gets recreated next time
-        self._scraper_session = None
+        # Set up rate limiter
+        if config and config.rate_limit_preset:
+            # Use preset configuration
+            self.rate_limiter = AdaptiveRateLimiter(config.rate_limit_preset.value)
+        elif config and config.rate_limit_config:
+            # Use custom configuration
+            self.rate_limiter = AdaptiveRateLimiter(config.rate_limit_config)
+        else:
+            # Use default configuration
+            self.rate_limiter = AdaptiveRateLimiter(RateLimitConfig())
 
     @abstractmethod
     async def get(
         self,
-        word: str,
+        resource_id: str,
         config: VersionConfig | None = None,
     ) -> Any | None:
-        """Get resource from versioned storage.
-
-        Args:
-            word: Word/resource to retrieve
-            config: Version configuration
-
-        Returns:
-            Resource data or None if not found
-        """
+        """Get resource from versioned storage."""
+        pass
 
     @abstractmethod
     async def save(
         self,
-        word: str,
+        resource_id: str,
         content: Any,
         config: VersionConfig | None = None,
     ) -> None:
-        """Save resource to versioned storage.
-
-        Args:
-            word: Word/resource identifier
-            content: Content to save
-            config: Version configuration
-        """
+        """Save resource to versioned storage."""
+        pass
 
     @abstractmethod
     async def fetch(
         self,
-        word: str,
+        resource_id: str,
         config: VersionConfig | None = None,
         state_tracker: StateTracker | None = None,
     ) -> Any | None:
-        """Fetch resource from provider and optionally save.
-
-        This method should:
-        1. Call _fetch_from_provider to get data
-        2. If config.save_versioned is True, save the data
-        3. Return the fetched data
-
-        Args:
-            word: Word/resource to fetch
-            config: Version configuration
-            state_tracker: Optional state tracker for progress updates
-
-        Returns:
-            Fetched data or None
-        """
+        """Fetch resource from provider and optionally save."""
+        pass
 
     @abstractmethod
     async def _fetch_from_provider(
         self,
-        query: str,
+        query: Any,
         state_tracker: StateTracker | None = None,
     ) -> Any | None:
-        """Implementation-specific fetch method.
+        """Implementation-specific fetch method."""
+        pass
 
-        Must be implemented by subclasses to fetch from actual provider.
+    @abstractmethod
+    def get_resource_type(self) -> ResourceType:
+        """Get the resource type for this connector."""
+        pass
 
-        Args:
-            query: Query/resource identifier
-            state_tracker: Optional state tracker for progress updates
-
-        Returns:
-            Fetched data or None
-        """
+    @abstractmethod
+    def get_cache_namespace(self) -> CacheNamespace:
+        """Get the cache namespace for this connector."""
+        pass
 
     async def get_or_fetch(
         self,
-        word: str,
+        resource_id: str,
         config: VersionConfig | None = None,
         state_tracker: StateTracker | None = None,
     ) -> Any | None:
-        """Get existing resource or fetch from provider.
+        """Get existing resource or fetch from provider."""
+        # Try to get from storage first
+        result = await self.get(resource_id, config)
+        if result:
+            return result
 
-        Args:
-            word: Word/resource identifier
-            config: Version configuration
-            state_tracker: Optional state tracker for progress updates
+        # Fetch from provider if not found
+        return await self.fetch(resource_id, config, state_tracker)
 
-        Returns:
-            Resource data or None
-        """
-        config = config or VersionConfig()
+    @property
+    def scraper_session(self) -> httpx.AsyncClient:
+        """Get or create scraper session."""
+        if self._scraper_session is None:
+            self._scraper_session = httpx.AsyncClient(
+                timeout=httpx.Timeout(60.0),
+                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                headers={"User-Agent": self.config.user_agent},
+            )
+        return self._scraper_session
 
-        # Try to get existing unless forced refresh
-        if not config.force_rebuild:
-            existing = await self.get(word, config)
-            if existing:
-                logger.debug(f"Found existing entry for '{word}'")
-                return existing
+    @property
+    def api_client(self) -> httpx.AsyncClient:
+        """Get or create API client."""
+        if self._api_client is None:
+            self._api_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(30.0),
+                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            )
+        return self._api_client
 
-        # Fetch from provider (will save if configured)
-        return await self.fetch(word, config, state_tracker)
-
-    async def __aenter__(self) -> BaseConnector:
+    async def __aenter__(self) -> Self:
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, *args: object) -> None:
+    async def __aexit__(self, *args: Any) -> None:
         """Async context manager exit."""
         await self.close()
+
+    async def close(self) -> None:
+        """Close all connections."""
+        if self._scraper_session:
+            await self._scraper_session.aclose()
+            self._scraper_session = None
+        if self._api_client:
+            await self._api_client.aclose()
+            self._api_client = None
