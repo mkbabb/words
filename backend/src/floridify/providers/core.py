@@ -7,6 +7,7 @@ and caching integration with RespectfulHttpClient support.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable
 from datetime import timedelta
 from enum import Enum
 from typing import Any, Self, TypeVar
@@ -14,6 +15,7 @@ from typing import Any, Self, TypeVar
 import httpx
 from pydantic import BaseModel, Field
 
+from ..caching.manager import get_version_manager
 from ..caching.models import CacheNamespace, ResourceType, VersionConfig
 from ..core.state_tracker import StateTracker
 from ..utils.logging import get_logger
@@ -111,11 +113,8 @@ class ConnectorConfig(BaseModel):
     """Configuration for connectors with integrated rate limiting."""
 
     # Rate limiting configuration
-    rate_limit_preset: RateLimitPresets | None = Field(
-        default=None, description="Rate limit preset to use"
-    )
     rate_limit_config: RateLimitConfig | None = Field(
-        default=None, description="Custom rate limiting configuration"
+        default=None, description="Rate limiting configuration"
     )
     user_agent: str = Field(
         default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -149,53 +148,12 @@ class BaseConnector(ABC):
         self._api_client: httpx.AsyncClient | None = None
 
         # Set up rate limiter
-        if config and config.rate_limit_preset:
-            # Use preset configuration
-            self.rate_limiter = AdaptiveRateLimiter(config.rate_limit_preset.value)
-        elif config and config.rate_limit_config:
+        if config and config.rate_limit_config:
             # Use custom configuration
             self.rate_limiter = AdaptiveRateLimiter(config.rate_limit_config)
         else:
             # Use default configuration
             self.rate_limiter = AdaptiveRateLimiter(RateLimitConfig())
-
-    @abstractmethod
-    async def get(
-        self,
-        resource_id: str,
-        config: VersionConfig | None = None,
-    ) -> Any | None:
-        """Get resource from versioned storage."""
-        pass
-
-    @abstractmethod
-    async def save(
-        self,
-        resource_id: str,
-        content: Any,
-        config: VersionConfig | None = None,
-    ) -> None:
-        """Save resource to versioned storage."""
-        pass
-
-    @abstractmethod
-    async def fetch(
-        self,
-        resource_id: str,
-        config: VersionConfig | None = None,
-        state_tracker: StateTracker | None = None,
-    ) -> Any | None:
-        """Fetch resource from provider and optionally save."""
-        pass
-
-    @abstractmethod
-    async def _fetch_from_provider(
-        self,
-        query: Any,
-        state_tracker: StateTracker | None = None,
-    ) -> Any | None:
-        """Implementation-specific fetch method."""
-        pass
 
     @abstractmethod
     def get_resource_type(self) -> ResourceType:
@@ -205,6 +163,113 @@ class BaseConnector(ABC):
     @abstractmethod
     def get_cache_namespace(self) -> CacheNamespace:
         """Get the cache namespace for this connector."""
+        pass
+
+    @abstractmethod
+    def get_provider_identifier(self) -> str:
+        """Get the provider identifier for resource IDs."""
+        pass
+
+    async def get(
+        self,
+        resource_id: str,
+        config: VersionConfig | None = None,
+    ) -> Any | None:
+        """Get resource from versioned storage."""
+        from ..caching.core import get_versioned_content
+        
+        manager = get_version_manager()
+        full_resource_id = f"{resource_id}_{self.get_provider_identifier()}"
+
+        result = await manager.get_latest(
+            resource_id=full_resource_id,
+            resource_type=self.get_resource_type(),
+            config=config or VersionConfig(),
+        )
+
+        if result:
+            return await get_versioned_content(result)
+        return None
+
+    def get_metadata_for_resource(self, resource_id: str) -> dict[str, Any]:
+        """Get provider-specific metadata for a resource.
+
+        Override in subclasses to customize metadata fields.
+        """
+        return {
+            "resource_id": resource_id,
+            "provider": self.get_provider_identifier(),
+            "resource_type": self.get_resource_type().value,
+        }
+
+    async def save(
+        self,
+        resource_id: str,
+        content: Any,
+        config: VersionConfig | None = None,
+    ) -> None:
+        """Save resource to versioned storage."""
+        manager = get_version_manager()
+        full_resource_id = f"{resource_id}_{self.get_provider_identifier()}"
+
+        await manager.save(
+            resource_id=full_resource_id,
+            content=content,
+            resource_type=self.get_resource_type(),
+            namespace=self.get_cache_namespace(),
+            metadata=self.get_metadata_for_resource(resource_id),
+            config=config or VersionConfig(),
+        )
+
+        logger.info(
+            f"Saved {self.get_resource_type().value} entry for '{resource_id}' from {self.get_provider_identifier()}"
+        )
+
+    async def fetch(
+        self,
+        resource_id: str,
+        config: VersionConfig | None = None,
+        state_tracker: StateTracker | None = None,
+    ) -> Any | None:
+        """Fetch resource from provider and optionally save."""
+        config = config or VersionConfig()
+
+        # Check cache first unless force refresh
+        if not config.force_rebuild:
+            cached_result = await self.get(resource_id, config)
+            if cached_result is not None:
+                logger.info(
+                    f"Using cached {self.get_resource_type().value} entry for '{resource_id}' from {self.get_provider_identifier()}"
+                )
+                return cached_result
+
+        # Rate limiting
+        await self.rate_limiter.acquire()
+
+        # Track state
+        if state_tracker:
+            await state_tracker.update(
+                stage="fetching",
+                message=f"{resource_id} from {self.get_provider_identifier()}",
+            )
+
+        # Fetch from provider
+        logger.info(f"Fetching '{resource_id}' from {self.get_provider_identifier()}")
+        result = await self._fetch_from_provider(resource_id, state_tracker)
+
+        # Save if we got a result and saving is enabled
+        if result is not None and self.config.save_versioned:
+            await self.save(resource_id, result, config)
+
+        return result
+
+    @abstractmethod
+    def _fetch_from_provider(
+        self,
+        query: Any,
+        state_tracker: StateTracker | None = None,
+    ) -> Awaitable[Any | None]:
+        """Implementation-specific fetch method."""
         pass
 
     async def get_or_fetch(

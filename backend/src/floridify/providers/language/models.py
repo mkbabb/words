@@ -5,12 +5,10 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from beanie import Document
 from pydantic import BaseModel, Field
 
 from ...caching.models import BaseVersionedData, ResourceType
 from ...models.base import Language
-from ...models.versioned import register_model
 
 
 class ScraperType(Enum):
@@ -34,6 +32,14 @@ class LanguageProvider(Enum):
 
     # For now, only custom URL provider
     CUSTOM_URL = "custom_url"
+
+    @property
+    def display_name(self) -> str:
+        """Get human-readable display name for the provider."""
+        display_names: dict[LanguageProvider, str] = {
+            LanguageProvider.CUSTOM_URL: "Custom URL Source",
+        }
+        return display_names.get(self, self.value.replace("_", " ").title())
 
 
 class LanguageSource(BaseModel):
@@ -63,18 +69,14 @@ class LanguageEntry(BaseModel):
     source: LanguageSource = Field(..., description="Language source configuration")
 
     # Vocabulary collection
-    vocabulary: list[str] = Field(
-        default_factory=list, description="List of words/phrases"
-    )
+    vocabulary: list[str] = Field(default_factory=list, description="List of words/phrases")
 
     # Optional categorization
     phrases: list[str] = Field(default_factory=list, description="Extracted phrases")
     idioms: list[str] = Field(default_factory=list, description="Extracted idioms")
 
     # Additional runtime data
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
-    )
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
     @property
     def vocabulary_count(self) -> int:
@@ -93,9 +95,33 @@ class LanguageEntry(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    @register_model(ResourceType.CORPUS)
-    class Metadata(BaseVersionedData, Document):
+    class Metadata(BaseVersionedData):
         """Minimal language metadata for versioning."""
+        
+        def __init__(self, **data: Any) -> None:
+            import hashlib
+            import json
+            from datetime import datetime
+
+            from ...caching.models import CacheNamespace, VersionInfo
+            
+            data.setdefault("resource_type", ResourceType.LANGUAGE)
+            data.setdefault("namespace", CacheNamespace.LANGUAGE)
+            
+            # Create default version_info if not provided
+            if "version_info" not in data:
+                # Generate data hash from content
+                content_str = json.dumps(data.get("content_inline", {}), sort_keys=True, default=str)
+                data_hash = hashlib.sha256(content_str.encode()).hexdigest()
+                
+                data["version_info"] = VersionInfo(
+                    version="1",
+                    created_at=datetime.utcnow(),
+                    data_hash=data_hash,
+                    is_latest=True
+                )
+            
+            super().__init__(**data)
 
         class Settings:
             """Beanie settings."""

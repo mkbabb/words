@@ -5,12 +5,17 @@ from __future__ import annotations
 from typing import Any
 
 from ....core.state_tracker import StateTracker
-from ....providers.core import ConnectorConfig
+from ....providers.core import ConnectorConfig, RateLimitPresets
 from ....utils.logging import get_logger
-from ..core import PARSER_MAP, SCRAPER_MAP, LanguageConnector
+from ..core import LanguageConnector
 from ..models import LanguageProvider, LanguageSource, ParserType, ScraperType
-from ..parsers import parse_scraped_data, parse_text_lines
-from .scrapers import default_scraper
+from ..parsers import (
+    parse_csv_words,
+    parse_json_vocabulary,
+    parse_scraped_data,
+    parse_text_lines,
+)
+from .scrapers import default_scraper, scrape_french_expressions
 
 logger = get_logger(__name__)
 
@@ -29,6 +34,8 @@ class URLLanguageConnector(LanguageConnector):
             provider: Language provider enum value
             config: Connector configuration
         """
+        if config is None:
+            config = ConnectorConfig(rate_limit_config=RateLimitPresets.SCRAPER_RESPECTFUL.value)
         super().__init__(provider=provider, config=config)
 
     async def _fetch_from_provider(
@@ -54,25 +61,28 @@ class URLLanguageConnector(LanguageConnector):
                     message=f"Downloading {source.name} from {source.url}",
                 )
 
-            # Get the appropriate scraper
+            # Get the appropriate scraper and fetch content
             scraper_type = source.scraper or ScraperType.DEFAULT
-            scraper_func = SCRAPER_MAP.get(scraper_type, default_scraper)
-
-            # Fetch content using scraper with session
+            content: dict[str, Any] | str
             async with self.scraper_session as client:
-                content = await scraper_func(source.url, session=client)
+                if scraper_type == ScraperType.FRENCH_EXPRESSIONS:
+                    content = await scrape_french_expressions(source.url, session=client)
+                else:  # DEFAULT or unknown
+                    content = await default_scraper(source.url, session=client)
 
-            # Determine parser to use
+            # Determine parser to use and parse content
             if isinstance(content, dict):
                 # Structured data from custom scraper
-                parser_func = parse_scraped_data
+                words, phrases = parse_scraped_data(content, source.language)
             else:
                 # Text data - use configured parser
                 parser_type = source.parser or ParserType.TEXT_LINES
-                parser_func = PARSER_MAP.get(parser_type, parse_text_lines)
-
-            # Parse content
-            words, phrases = parser_func(content, source.language)
+                if parser_type == ParserType.JSON_VOCABULARY:
+                    words, phrases = parse_json_vocabulary(content, source.language)
+                elif parser_type == ParserType.CSV_WORDS:
+                    words, phrases = parse_csv_words(content, source.language)
+                else:  # TEXT_LINES or unknown
+                    words, phrases = parse_text_lines(content, source.language)
 
             # Combine words and phrases
             vocabulary = words + phrases

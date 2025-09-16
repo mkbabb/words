@@ -10,7 +10,6 @@ from beanie import PydanticObjectId
 from ....core.state_tracker import StateTracker
 from ....models.dictionary import (
     Definition,
-    DictionaryEntry,
     DictionaryProvider,
     Etymology,
     Example,
@@ -52,7 +51,7 @@ class OxfordConnector(DictionaryConnector):
         self,
         word: str,
         state_tracker: StateTracker | None = None,
-    ) -> DictionaryEntry | None:
+    ) -> dict[str, Any] | None:
         """Fetch definition data for a word from Oxford API.
 
         Args:
@@ -72,7 +71,7 @@ class OxfordConnector(DictionaryConnector):
             # Fetch both entries and pronunciation if available
             url = f"{self.base_url}/entries/en-us/{word.lower()}"
 
-            session = await self.get_api_session()
+            session = self.api_client
             response = await session.get(url, headers=self.headers)
 
             if response.status_code == 404:
@@ -109,7 +108,7 @@ class OxfordConnector(DictionaryConnector):
         word: str,
         data: dict[str, Any],
         word_obj: Word,
-    ) -> DictionaryEntry:
+    ) -> dict[str, Any]:
         """Parse Oxford API response using new models.
 
         Args:
@@ -135,15 +134,39 @@ class OxfordConnector(DictionaryConnector):
         # Extract etymology
         etymology = await self.extract_etymology(data)
 
-        # Create and return ProviderData
-        return DictionaryEntry(
-            word_id=word_obj.id,
-            provider=self.provider,
-            definition_ids=[d.id for d in definitions if d.id is not None],
-            pronunciation_id=pronunciation.id if pronunciation else None,
-            etymology=etymology,
-            raw_data=data,
-        )
+        # Create and return provider data as dict
+        return {
+            "word": word,
+            "provider": self.provider.value,
+            "definitions": [
+                {
+                    "id": str(definition.id),
+                    "part_of_speech": definition.part_of_speech,
+                    "text": definition.text,
+                    "sense_number": definition.sense_number,
+                    "synonyms": definition.synonyms,
+                    "antonyms": definition.antonyms,
+                    "example_ids": [str(eid) for eid in definition.example_ids],
+                    "language_register": definition.language_register,
+                    "domain": definition.domain,
+                    "frequency_band": definition.frequency_band,
+                }
+                for definition in definitions
+            ],
+            "pronunciation": {
+                "id": str(pronunciation.id),
+                "phonetic": pronunciation.phonetic,
+                "ipa": pronunciation.ipa,
+                "syllables": pronunciation.syllables,
+                "stress_pattern": pronunciation.stress_pattern,
+            } if pronunciation else None,
+            "etymology": {
+                "text": etymology.text,
+                "origin_language": etymology.origin_language,
+                "root_words": etymology.root_words,
+            } if etymology else None,
+            "raw_data": data,
+        }
 
     async def extract_pronunciation(
         self,

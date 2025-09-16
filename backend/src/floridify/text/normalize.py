@@ -528,6 +528,56 @@ def batch_lemmatize(
     return unique_lemmas, word_to_lemma_indices, lemma_to_word_indices
 
 
+@functools.lru_cache(maxsize=50_000)
+def get_word_signature(word: str) -> str:
+    """Generate a phonetic signature for a word.
+
+    Creates a simplified representation for grouping similar-sounding words.
+
+    Args:
+        word: Input word
+
+    Returns:
+        Phonetic signature (max 6 characters)
+    """
+    if not word:
+        return ""
+
+    # Normalize and prepare
+    signature = word.lower().strip()
+
+    # Remove non-alphabetic characters
+    signature = "".join(c for c in signature if c.isalpha())
+
+    if not signature:
+        return ""
+
+    # Common phonetic simplifications
+    # Ph -> F
+    signature = signature.replace("ph", "f")
+
+    # CK -> K
+    signature = signature.replace("ck", "k")
+
+    # Double consonants -> single
+    prev = ""
+    result = []
+    for char in signature:
+        if char != prev or char in "aeiou":
+            result.append(char)
+        prev = char
+    signature = "".join(result)
+
+    # Remove vowels except first
+    if signature:
+        first_char = signature[0]
+        rest = "".join(c for c in signature[1:] if c not in "aeiou")
+        signature = first_char + rest
+
+    # Truncate to 6 characters
+    return signature[:6]
+
+
 def clear_lemma_cache() -> None:
     """Clear the lemmatization cache.
 

@@ -9,8 +9,8 @@ from __future__ import annotations
 import marisa_trie
 import numpy as np
 
+from ..caching.models import VersionConfig
 from ..corpus.core import Corpus
-from ..models.versioned import VersionConfig
 from ..text import normalize
 from ..utils.logging import get_logger
 from .models import TrieIndex
@@ -92,9 +92,8 @@ class TrieSearch:
 
         # Use marisa-trie's optimized exact search
         if normalized_query in self._trie:
-            # Return original word with diacritics if available
-            if self.index and normalized_query in self.index.normalized_to_original:
-                return self.index.normalized_to_original[normalized_query]
+            # Just return the normalized query itself
+            # The caller should handle mapping to original form
             return normalized_query
 
         return None

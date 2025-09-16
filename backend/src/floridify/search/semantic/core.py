@@ -7,13 +7,13 @@ import pickle
 import time
 from typing import Any, Literal
 
-import faiss  # type: ignore[import-untyped]
+import faiss
 import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 
+from ...caching.models import VersionConfig
 from ...corpus.core import Corpus
-from ...models.versioned import VersionConfig
 from ...utils.logging import get_logger
 from ..constants import SearchMethod
 from ..models import SearchResult
@@ -613,21 +613,29 @@ class SemanticSearch:
 
                 # Map lemma index to original word
                 if lemma_idx < len(lemma_to_word_indices):
-                    original_word_idx = lemma_to_word_indices[lemma_idx]
-                    word = self.corpus.get_original_word_by_index(original_word_idx)
+                    original_word_indices = lemma_to_word_indices[lemma_idx]
+                    # Use first index if multiple mappings exist
+                    if isinstance(original_word_indices, list) and original_word_indices:
+                        word = self.corpus.get_original_word_by_index(original_word_indices[0])
+                    elif isinstance(original_word_indices, int):
+                        word = self.corpus.get_original_word_by_index(original_word_indices)
+                    else:
+                        word = lemma
                 else:
                     word = lemma  # Direct use if mapping unavailable
 
-                results.append(
-                    SearchResult(
-                        word=word,
-                        lemmatized_word=lemma,
-                        score=float(similarity),
-                        method=SearchMethod.SEMANTIC,
-                        language=None,
-                        metadata=None,
-                    ),
-                )
+                # Only add result if we have a valid word
+                if word:
+                    results.append(
+                        SearchResult(
+                            word=word,
+                            lemmatized_word=lemma,
+                            score=float(similarity),
+                            method=SearchMethod.SEMANTIC,
+                            language=None,
+                            metadata=None,
+                        ),
+                    )
 
                 if len(results) >= max_results:
                     break

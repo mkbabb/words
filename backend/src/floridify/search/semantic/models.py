@@ -7,6 +7,7 @@ from typing import Any
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
+from ...caching.core import get_versioned_content
 from ...caching.manager import get_version_manager
 from ...caching.models import (
     BaseVersionedData,
@@ -15,7 +16,6 @@ from ...caching.models import (
     VersionConfig,
 )
 from ...corpus.core import Corpus
-from ...models.versioned import register_model
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -65,7 +65,6 @@ class SemanticIndex(BaseModel):
     memory_usage_mb: float = 0.0
     embeddings_per_second: float = 0.0
 
-    @register_model(ResourceType.SEMANTIC)
     class Metadata(BaseVersionedData):
         """Minimal semantic metadata for versioning."""
 
@@ -98,10 +97,10 @@ class SemanticIndex(BaseModel):
         """
         if not corpus_id and not corpus_name:
             raise ValueError("Either corpus_id or corpus_name must be provided")
-            
+
         model_name = model_name or "all-MiniLM-L6-v2"
         manager = get_version_manager()
-        
+
         # Build resource ID based on what we have
         if corpus_id:
             resource_id = f"{str(corpus_id)}:semantic:{model_name}"
@@ -120,7 +119,7 @@ class SemanticIndex(BaseModel):
             return None
 
         # Load content from metadata
-        content = await metadata.get_content()
+        content = await get_versioned_content(metadata)
         if not content:
             return None
 
@@ -190,7 +189,7 @@ class SemanticIndex(BaseModel):
             corpus_id=corpus.corpus_id,
             corpus_name=corpus.corpus_name,
             model_name=model_name,
-            config=config
+            config=config,
         )
         if existing and existing.vocabulary_hash == corpus.vocabulary_hash:
             logger.debug(

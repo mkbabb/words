@@ -9,13 +9,12 @@ from __future__ import annotations
 import re
 import zipfile
 from io import BytesIO
-from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
-import aiofiles
 from bs4 import BeautifulSoup, Tag
 
+from ....core.state_tracker import StateTracker
 from ....models.literature import AuthorInfo, LiteratureProvider
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
@@ -32,26 +31,38 @@ class GutenbergConnector(LiteratureConnector):
     async def _fetch_from_provider(
         self,
         source_id: str,
-        metadata: dict[str, Any] | None = None,
-        force_refresh: bool = False,
+        state_tracker: StateTracker | None = None,
     ) -> Any:
         """Fetch work from Gutenberg.
 
         Args:
             source_id: Work ID
-            metadata: Optional metadata
-            force_refresh: Force refresh from source
+            state_tracker: Optional state tracker
 
         Returns:
             Work content or metadata
         """
         # This is a stub implementation as Gutenberg uses specific methods
         # like download_work and search_works for different operations
-        if metadata and "work" in metadata:
-            return await self.download_work(metadata["work"], force_refresh)
-        return None
+        try:
+            # Create a minimal work entry to download
+            from ....models.literature import AuthorInfo, Genre, Period
 
-    def __init__(self, cache_dir: Path | None = None, config: ConnectorConfig | None = None):
+            work = LiteratureEntry(
+                title=f"Work {source_id}",
+                author=AuthorInfo(
+                    name="Unknown", period=Period.CONTEMPORARY, primary_genre=Genre.NOVEL
+                ),
+                gutenberg_id=source_id,
+                work_id=source_id,
+            )
+            return await self.download_work(work, force_refresh=False)
+        except Exception as e:
+            if state_tracker:
+                await state_tracker.update_error(f"Gutenberg fetch failed: {e}")
+            return None
+
+    def __init__(self, config: ConnectorConfig | None = None):
         if config is None:
             config = ConnectorConfig(rate_limit_config=RateLimitPresets.BULK_DOWNLOAD.value)
         super().__init__(provider=LiteratureProvider.GUTENBERG, config=config)
@@ -60,12 +71,6 @@ class GutenbergConnector(LiteratureConnector):
         self.catalog_url = "https://www.gutenberg.org/ebooks/"
 
         # Rate limiting is handled by parent class
-
-        # Cache directory for downloaded texts
-        from ....utils.paths import get_cache_directory
-
-        self.cache_dir = cache_dir or get_cache_directory("literature")
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Text cleaning patterns from wotd/literature
         self.header_patterns = [
@@ -343,14 +348,6 @@ class GutenbergConnector(LiteratureConnector):
 
         Migrated from wotd/literature/connector.py.
         """
-        cache_file = self._get_cache_path(work)
-
-        # Check cache first
-        if not force_refresh and cache_file.exists():
-            logger.debug(f"📋 Using cached text for {work.title}")
-            async with aiofiles.open(cache_file, encoding="utf-8") as f:
-                return await f.read()
-
         # Fetch and clean the text
         logger.info(f"⬇️ Downloading {work.title} by {work.author.name}")
 
@@ -365,10 +362,7 @@ class GutenbergConnector(LiteratureConnector):
 
             clean_text = self._clean_gutenberg_text(raw_text, work)
 
-            # Cache the cleaned text
-            await self._cache_text(cache_file, clean_text)
-
-            logger.info(f"✅ Downloaded and cached {work.title} ({len(clean_text)} chars)")
+            logger.info(f"✅ Downloaded {work.title} ({len(clean_text)} chars)")
             return clean_text
 
         except Exception as e:
@@ -400,22 +394,6 @@ class GutenbergConnector(LiteratureConnector):
             f"✅ Downloaded {len(results)}/{len(works_to_download)} works for {author.name}"
         )
         return results
-
-    def _get_cache_path(self, work: LiteratureEntry) -> Path:
-        """Get cache file path for a work."""
-        author_dir = self.cache_dir / work.author.name.lower().replace(" ", "_")
-        author_dir.mkdir(exist_ok=True)
-
-        safe_title = re.sub(r"[^\w\s-]", "", work.title.lower())
-        safe_title = re.sub(r"[-\s]+", "-", safe_title)[:100]
-
-        return author_dir / f"{safe_title}_{work.gutenberg_id}.txt"
-
-    async def _cache_text(self, cache_file: Path, text: str) -> None:
-        """Cache text to disk."""
-        cache_file.parent.mkdir(parents=True, exist_ok=True)
-        async with aiofiles.open(cache_file, "w", encoding="utf-8") as f:
-            await f.write(text)
 
     async def _fetch_url(self, url: str) -> str:
         """Fetch content from URL."""

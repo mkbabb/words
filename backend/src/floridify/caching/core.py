@@ -319,6 +319,49 @@ async def shutdown_global_cache() -> None:
 
 
 # ============================================================================
+# VERSIONED DATA CONTENT OPERATIONS
+# ============================================================================
+
+
+async def get_versioned_content(versioned_data: Any) -> dict[str, Any] | None:
+    """Retrieve content from a versioned data object.
+
+    This is a standalone function that retrieves content from BaseVersionedData objects.
+    Handles both inline and external storage strategies.
+
+    Args:
+        versioned_data: A BaseVersionedData instance (or subclass)
+
+    Returns:
+        The content dictionary or None if not found
+    """
+    # Check if it's a versioned data object with content
+    if not hasattr(versioned_data, "content_inline"):
+        return None
+
+    # Inline content takes precedence
+    if versioned_data.content_inline is not None:
+        # Ensure it's a dict
+        content = versioned_data.content_inline
+        if isinstance(content, dict):
+            return content
+        return None
+
+    # External content
+    if hasattr(versioned_data, "content_location") and versioned_data.content_location:
+        location = versioned_data.content_location
+        if location.cache_key and location.cache_namespace:
+            cache = await get_global_cache()
+            content = await cache.get(namespace=location.cache_namespace, key=location.cache_key)
+            # Cast to expected return type
+            if isinstance(content, dict):
+                return content
+            return None if content is None else dict(content)
+
+    return None
+
+
+# ============================================================================
 # EXTERNAL CONTENT STORAGE - Moved from models/storage.py
 # ============================================================================
 

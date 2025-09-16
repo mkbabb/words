@@ -51,6 +51,8 @@ class CacheNamespace(str, Enum):
 
     CORPUS = "corpus"
 
+    LANGUAGE = "language"
+
     SEMANTIC = "semantic"
 
     TRIE = "trie"
@@ -77,6 +79,7 @@ class ResourceType(str, Enum):
 
     DICTIONARY = "dictionary"  # Dictionary entries from various providers
     CORPUS = "corpus"  # Vocabulary corpora for language processing
+    LANGUAGE = "language"  # Language provider entries and vocabulary
     SEMANTIC = "semantic"  # FAISS indices for semantic search
     LITERATURE = "literature"  # Full literary texts and metadata
     SEARCH = "search"  # Search indices and metadata
@@ -199,3 +202,62 @@ class BaseVersionedData(Document):
             [("version_info.created_at", -1)],
             "version_info.data_hash",
         ]
+
+    # get_content method removed - use get_versioned_content() from caching.core instead
+
+    async def set_content(self, content: Any, force_external: bool = False) -> None:
+        """Store content with automatic strategy selection.
+
+        Args:
+            content: The content to store
+            force_external: If True, force external storage regardless of size
+
+        Storage strategy:
+        - Small content (< 16KB): Inline storage
+        - Large content (>= 16KB) or force_external: External storage
+        """
+        import json
+
+        from ..caching import get_global_cache
+
+        # Serialize to measure size with ObjectId handling
+        def json_encoder(obj: Any) -> str:
+            from enum import Enum
+
+            from beanie import PydanticObjectId
+
+            if isinstance(obj, PydanticObjectId):
+                return str(obj)
+            elif isinstance(obj, Enum):
+                return str(obj.value)
+            raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+        content_str = json.dumps(content, sort_keys=True, default=json_encoder)
+        content_size = len(content_str.encode())
+
+        # Size threshold for inline vs external storage (16KB)
+        size_threshold = 16 * 1024
+
+        if not force_external and content_size < size_threshold:
+            # Store inline
+            self.content_inline = content
+            self.content_location = None
+        else:
+            # Store externally
+            cache = await get_global_cache()
+            cache_key = f"{self.resource_type.value}:{self.resource_id}:content:{self.version_info.data_hash[:8]}"
+
+            await cache.set(
+                namespace=self.namespace, key=cache_key, value=content, ttl_override=self.ttl
+            )
+
+            import hashlib
+
+            self.content_location = ContentLocation(
+                cache_namespace=self.namespace,
+                cache_key=cache_key,
+                storage_type=StorageType.CACHE,
+                size_bytes=content_size,
+                checksum=hashlib.sha256(content_str.encode()).hexdigest(),
+            )
+            self.content_inline = None

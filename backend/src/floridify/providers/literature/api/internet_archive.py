@@ -26,6 +26,34 @@ class InternetArchiveConnector(LiteratureConnector):
         self.api_base = "https://archive.org"
         self.search_url = "https://archive.org/advancedsearch.php"
 
+    async def _fetch_from_provider(
+        self,
+        source_id: str,
+        state_tracker: Any | None = None,
+    ) -> Any:
+        """Fetch work from Internet Archive.
+        
+        Args:
+            source_id: Work ID
+            state_tracker: Optional state tracker
+            
+        Returns:
+            Work content or metadata
+        """
+        # This is a stub implementation as InternetArchive uses specific methods
+        # like _fetch_work_content and _fetch_work_metadata for different operations
+        try:
+            metadata = await self._fetch_work_metadata(source_id)
+            if metadata:
+                content = await self._fetch_work_content(source_id, metadata)
+                if content:
+                    return {"metadata": metadata, "content": content}
+            return None
+        except Exception as e:
+            if state_tracker:
+                await state_tracker.update_error(f"Internet Archive fetch failed: {e}")
+            return None
+
     async def search_works(
         self,
         author_name: str | None = None,

@@ -11,7 +11,6 @@ from beanie import PydanticObjectId
 from ....core.state_tracker import Stages, StateTracker
 from ....models.dictionary import (
     Definition,
-    DictionaryEntry,
     DictionaryProvider,
     Etymology,
     Example,
@@ -205,7 +204,7 @@ class AppleDictionaryConnector(DictionaryConnector):
         self,
         word: str,
         state_tracker: StateTracker | None = None,
-    ) -> DictionaryEntry | None:
+    ) -> dict[str, Any] | None:
         """Fetch definition data for a word from Apple Dictionary.
 
         Args:
@@ -213,7 +212,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             state_tracker: Optional state tracker for progress updates
 
         Returns:
-            ProviderData if successful, None if not found or error
+            Dictionary data if successful, None if not found or error
 
         """
         if not word:
@@ -286,15 +285,39 @@ class AppleDictionaryConnector(DictionaryConnector):
             # Extract etymology
             etymology = await self.extract_etymology(raw_data)
 
-            # Create ProviderData
-            provider_data = DictionaryEntry(
-                word_id=word_obj.id,
-                provider=self.provider,
-                definition_ids=[d.id for d in definitions if d.id is not None],
-                pronunciation_id=pronunciation.id if pronunciation else None,
-                etymology=etymology,
-                raw_data=raw_data,
-            )
+            # Create provider data as dict (matching the pattern from other providers)
+            provider_data = {
+                "word": word,
+                "provider": self.provider.value,
+                "definitions": [
+                    {
+                        "id": str(d.id),
+                        "part_of_speech": d.part_of_speech,
+                        "text": d.text,
+                        "sense_number": d.sense_number,
+                        "synonyms": d.synonyms,
+                        "antonyms": d.antonyms,
+                        "example_ids": [str(eid) for eid in d.example_ids],
+                        "language_register": d.language_register,
+                        "domain": d.domain,
+                        "frequency_band": d.frequency_band,
+                    }
+                    for d in definitions
+                ],
+                "pronunciation": {
+                    "id": str(pronunciation.id),
+                    "phonetic": pronunciation.phonetic,
+                    "ipa": pronunciation.ipa,
+                    "syllables": pronunciation.syllables,
+                    "stress_pattern": pronunciation.stress_pattern,
+                } if pronunciation else None,
+                "etymology": {
+                    "text": etymology.text,
+                    "origin_language": etymology.origin_language,
+                    "root_words": etymology.root_words,
+                } if etymology else None,
+                "raw_data": raw_data,
+            }
 
             if state_tracker:
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
@@ -327,7 +350,9 @@ class AppleDictionaryConnector(DictionaryConnector):
             "platform_version": platform.mac_ver()[0] if platform.system() == "Darwin" else None,
             "is_available": self._is_available(),
             "service_initialized": self._dictionary_service is not None,
-            "rate_limit_config": self.config.rate_limit_config.model_dump(),
+            "rate_limit_config": self.config.rate_limit_config.model_dump()
+            if self.config.rate_limit_config
+            else None,
         }
 
     async def extract_pronunciation(

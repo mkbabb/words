@@ -4,12 +4,6 @@ Provides literature-specific corpus functionality including loading,
 work management, and vocabulary extraction from literary texts.
 """
 
-# TODO: LiteratureCorpus needs to be implemented in core.py
-# from .core import LiteratureCorpus
-# TODO: LiteratureCorpusLoader needs to be implemented
-# from .loader import LiteratureCorpusLoader
+from .core import LiteratureCorpus
 
-__all__: list[str] = [
-    # "LiteratureCorpus",  # TODO: Implement in core.py
-    # "LiteratureCorpusLoader",  # TODO: Implement loader
-]
+__all__: list[str] = ["LiteratureCorpus"]

@@ -112,7 +112,7 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
             logger.info(f"Downloading Wiktionary dump from {url}")
 
             # Stream download with progress
-            session = await self.get_api_session()
+            session = self.api_client
             async with session.stream("GET", url) as response:
                 response.raise_for_status()
 

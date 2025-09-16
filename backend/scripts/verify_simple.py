@@ -11,14 +11,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import importlib.util
 
 spec = importlib.util.spec_from_file_location(
-    "constants", 
-    Path(__file__).parent.parent / "src/floridify/search/semantic/constants.py"
+    "constants", Path(__file__).parent.parent / "src/floridify/search/semantic/constants.py"
 )
 constants = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(constants)
 
 print("✅ Model Configuration Verification")
-print("="*50)
+print("=" * 50)
 print(f"Supported Models: {constants.BGE_M3_MODEL}, {constants.MINI_LM_MODEL}")
 print(f"Default Model: {constants.DEFAULT_SENTENCE_MODEL}")
 print()

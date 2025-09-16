@@ -28,7 +28,8 @@ from rich.progress import (
 from rich.table import Table
 from rich.text import Text
 
-from ...models.dictionary import DictionaryProvider, Language
+from ...models.base import Language
+from ...models.dictionary import DictionaryProvider
 from ...providers.scrape import (
     BulkScraper,
     BulkScrapingConfig,

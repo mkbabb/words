@@ -6,7 +6,6 @@ Each function takes content and returns (words, phrases) tuple.
 
 from __future__ import annotations
 
-import base64
 import csv
 import json
 from io import StringIO
@@ -22,7 +21,13 @@ ParseResult = tuple[list[str], list[str]]
 
 
 def parse_text_lines(content: str, language: Language) -> ParseResult:
-    """Parse simple text file with one word per line."""
+    """Parse text content with one word/phrase per line or frequency lists.
+    
+    Handles:
+    - Simple word lists (one per line)
+    - Frequency lists (word frequency pairs)
+    - Comments starting with #
+    """
     words = []
     phrases = []
 
@@ -31,34 +36,20 @@ def parse_text_lines(content: str, language: Language) -> ParseResult:
         if not line or line.startswith("#"):
             continue
 
-        normalized = normalize(line)
-        if not normalized:
-            continue
-
-        if is_phrase(normalized):
-            phrases.append(normalized)
-        else:
-            words.append(normalized)
-
-    return words, phrases
-
-
-def parse_frequency_list(content: str, language: Language) -> ParseResult:
-    """Parse frequency list format (word frequency pairs)."""
-    words = []
-    phrases = []
-
-    for line in content.strip().split("\n"):
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-
-        # Split on whitespace and take the first part (word)
+        # Check if line contains a phrase (multiple words)
+        # or if it's a frequency list (word followed by number)
         parts = line.split()
         if not parts:
             continue
-
-        word = parts[0]
+        
+        # If there's only one part or the second part is a number (frequency),
+        # treat the first part as the word/phrase
+        if len(parts) == 1 or (len(parts) >= 2 and parts[1].isdigit()):
+            word = parts[0]
+        else:
+            # Otherwise, treat the whole line as a potential phrase
+            word = line
+            
         normalized = normalize(word)
         if not normalized:
             continue
@@ -68,195 +59,216 @@ def parse_frequency_list(content: str, language: Language) -> ParseResult:
         else:
             words.append(normalized)
 
-    return words, phrases
+    return list(set(words)), list(set(phrases))
 
 
-def parse_json_idioms(content: str, language: Language) -> ParseResult:
-    """Parse JSON file containing idioms and phrases."""
-    try:
-        data = json.loads(content)
-    except json.JSONDecodeError:
-        return [], []
-
-    phrases = []
-
-    # Extract items from various JSON structures
-    if isinstance(data, list):
-        items = data
-    elif isinstance(data, dict) and "idioms" in data:
-        idioms = data["idioms"]
-        items = idioms if isinstance(idioms, list) else []
-    elif isinstance(data, dict):
-        items = list(data.values())
+def parse_json_vocabulary(content: str | dict[str, Any], language: Language) -> ParseResult:
+    """Parse JSON vocabulary data from string or dict.
+    
+    Handles various JSON structures:
+    - {"words": [...], "phrases": [...]}
+    - {"vocabulary": [...]}
+    - {"idioms": [...]}
+    - Simple arrays [...]
+    - Dictionary keys as vocabulary
+    - GitHub API responses
+    """
+    # Handle both string and dict inputs
+    if isinstance(content, str):
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError:
+            logger.warning("Failed to parse JSON content")
+            return [], []
+    elif isinstance(content, dict):
+        data = content
     else:
         return [], []
 
-    for item in items:
-        # Extract phrase text from item
-        if isinstance(item, str):
-            phrase_text = item
-        elif isinstance(item, dict):
-            phrase_text = item.get("idiom") or item.get("phrase") or item.get("text") or ""
-        else:
-            continue
-
-        if not phrase_text:
-            continue
-
-        normalized = normalize(phrase_text)
-        if normalized and is_phrase(normalized):
-            phrases.append(normalized)
-
-    return [], phrases
-
-
-def parse_json_dict(content: str, language: Language) -> ParseResult:
-    """Parse JSON dictionary format."""
-    try:
-        data = json.loads(content)
-    except json.JSONDecodeError:
-        return [], []
-
     words = []
     phrases = []
 
-    if isinstance(data, dict):
-        for key in data.keys():
-            normalized = normalize(key)
-            if not normalized:
-                continue
-
-            if is_phrase(normalized):
-                phrases.append(normalized)
-            else:
-                words.append(normalized)
-
-    return words, phrases
-
-
-def parse_json_vocabulary(content: str, language: Language) -> ParseResult:
-    """Parse JSON vocabulary array (alias for parse_json_array)."""
-    return parse_json_array(content, language)
-
-
-def parse_csv_words(content: str, language: Language) -> ParseResult:
-    """Parse CSV with words (wrapper for csv_idioms without phrase handling)."""
-    # For simple word lists, everything goes to words
-    all_items, _ = parse_csv_idioms(content, language)
-    return all_items, []
-
-
-def parse_json_array(content: str, language: Language) -> ParseResult:
-    """Parse JSON array format."""
-    try:
-        data = json.loads(content)
-    except json.JSONDecodeError:
-        return [], []
-
-    words = []
-    phrases = []
-
+    # Handle simple array
     if isinstance(data, list):
         for item in data:
             if isinstance(item, str):
                 normalized = normalize(item)
                 if not normalized:
                     continue
-
                 if is_phrase(normalized):
                     phrases.append(normalized)
                 else:
                     words.append(normalized)
+            elif isinstance(item, dict):
+                # Handle objects with text fields
+                text = (
+                    item.get("word") or 
+                    item.get("text") or 
+                    item.get("idiom") or 
+                    item.get("phrase") or 
+                    item.get("term") or
+                    item.get("name") or  # GitHub files
+                    ""
+                )
+                if text:
+                    normalized = normalize(text)
+                    if normalized:
+                        if is_phrase(normalized):
+                            phrases.append(normalized)
+                        else:
+                            words.append(normalized)
+    
+    # Handle dictionary
+    elif isinstance(data, dict):
+        # Extract from specific keys
+        for key in ["words", "vocabulary", "vocab", "terms"]:
+            if key in data and isinstance(data[key], list):
+                for item in data[key]:
+                    if isinstance(item, str):
+                        normalized = normalize(item)
+                        if normalized:
+                            if is_phrase(normalized):
+                                phrases.append(normalized)
+                            else:
+                                words.append(normalized)
 
-    return words, phrases
+        # Extract phrases from phrase-specific keys
+        for key in ["phrases", "idioms", "expressions", "phrasal_verbs"]:
+            if key in data and isinstance(data[key], list):
+                for item in data[key]:
+                    if isinstance(item, str):
+                        normalized = normalize(item)
+                        if normalized:
+                            phrases.append(normalized)
+                    elif isinstance(item, dict):
+                        # Extract from nested structure
+                        text = (
+                            item.get("idiom") or 
+                            item.get("phrase") or 
+                            item.get("text") or
+                            item.get("expression") or
+                            ""
+                        )
+                        if text:
+                            normalized = normalize(text)
+                            if normalized:
+                                phrases.append(normalized)
+
+        # Use dictionary keys as vocabulary if no explicit vocabulary keys found
+        if not words and not phrases and len(data) > 0:
+            # Check if this looks like a word dictionary (not a structured data object)
+            sample_keys = list(data.keys())[:5]
+            if all(key and not key.startswith("_") and len(key) < 50 for key in sample_keys):
+                for key in data.keys():
+                    normalized = normalize(key)
+                    if normalized:
+                        if is_phrase(normalized):
+                            phrases.append(normalized)
+                        else:
+                            words.append(normalized)
+
+    return list(set(words)), list(set(phrases))
 
 
-def parse_github_api(content: str, language: Language) -> ParseResult:
-    """Parse GitHub API response format."""
-    try:
-        data = json.loads(content)
-        if isinstance(data, dict) and "content" in data:
-            # Decode base64 content
-            decoded_content = base64.b64decode(data["content"]).decode("utf-8")
-            # Delegate to JSON array parser
-            return parse_json_array(decoded_content, language)
-    except Exception:
-        pass
-    return [], []
-
-
-def parse_csv_idioms(content: str, language: Language) -> ParseResult:
-    """Parse CSV format with idiom/definition columns."""
+def parse_csv_words(content: str, language: Language) -> ParseResult:
+    """Parse CSV with word/phrase data.
+    
+    Handles:
+    - CSV with headers (word, text, vocabulary, term, idiom, phrase columns)
+    - Simple CSV without headers
+    - Falls back to text parsing if not valid CSV
+    """
+    words = []
     phrases = []
 
     try:
-        csv_reader = csv.DictReader(StringIO(content))
+        lines = content.strip().split("\n")
+        if not lines:
+            return [], []
+            
+        first_line = lines[0]
 
-        for row in csv_reader:
-            # Extract idiom text from common column names
-            idiom_text = (
-                row.get("idiom")
-                or row.get("phrase")
-                or row.get("expression")
-                or row.get("text")
-                or ""
-            ).strip()
+        # Check if content looks like CSV with headers
+        if "," in first_line and any(
+            col in first_line.lower()
+            for col in ["word", "text", "vocabulary", "term", "frequency", "type", "idiom", "phrase"]
+        ):
+            csv_reader = csv.DictReader(StringIO(content))
 
-            if not idiom_text:
-                continue
+            for row in csv_reader:
+                # Extract text from common column names
+                text = (
+                    row.get("word") or
+                    row.get("text") or
+                    row.get("vocabulary") or
+                    row.get("term") or
+                    row.get("idiom") or
+                    row.get("phrase") or
+                    row.get("expression") or
+                    ""
+                ).strip()
 
-            normalized = normalize(idiom_text)
-            if normalized and is_phrase(normalized):
-                phrases.append(normalized)
+                if not text:
+                    # Try first column if no named columns match
+                    first_col = list(row.values())[0] if row else ""
+                    text = first_col.strip() if first_col else ""
+
+                if text:
+                    normalized = normalize(text)
+                    if normalized:
+                        # Check type column if it exists
+                        item_type = row.get("type", "").lower()
+                        if item_type in ["phrase", "idiom", "expression"] or is_phrase(normalized):
+                            phrases.append(normalized)
+                        else:
+                            words.append(normalized)
+        else:
+            # Fall back to simple CSV parsing without headers
+            simple_csv_reader = csv.reader(StringIO(content))
+            for csv_row in simple_csv_reader:
+                if csv_row:
+                    # Take first column
+                    text = csv_row[0].strip()
+                    if text:
+                        normalized = normalize(text)
+                        if normalized:
+                            if is_phrase(normalized):
+                                phrases.append(normalized)
+                            else:
+                                words.append(normalized)
 
     except Exception as e:
-        logger.warning(f"Failed to parse CSV idioms: {e}")
-        return [], []
+        logger.debug(f"CSV parsing failed, falling back to text parsing: {e}")
+        # Fall back to text parsing
+        return parse_text_lines(content, language)
 
-    return [], phrases
-
-
-def parse_json_phrasal_verbs(content: str, language: Language) -> ParseResult:
-    """Parse JSON format with phrasal verbs."""
-    phrases = []
-
-    try:
-        data = json.loads(content)
-
-        if isinstance(data, list):
-            for entry in data:
-                if isinstance(entry, dict):
-                    # Extract verb text
-                    verb_text = (
-                        entry.get("verb") or entry.get("phrasal_verb") or entry.get("phrase") or ""
-                    ).strip()
-
-                    if not verb_text:
-                        continue
-
-                    # Clean up verb text
-                    verb_text = verb_text.replace("*", "").replace("+", "").strip()
-
-                    normalized = normalize(verb_text)
-                    if normalized and is_phrase(normalized):
-                        phrases.append(normalized)
-
-    except Exception as e:
-        logger.warning(f"Failed to parse JSON phrasal verbs: {e}")
-        return [], []
-
-    return [], phrases
+    return list(set(words)), list(set(phrases))
 
 
 def parse_scraped_data(
     content: dict[str, Any],
     language: Language,
 ) -> ParseResult:
-    """Parse data returned by custom scrapers."""
+    """Parse scraped data from custom scrapers.
+    
+    This handles the output from specialized scrapers that return
+    structured data instead of raw text.
+    """
     words = []
     phrases = []
 
-    # Extract words if present
+    # Direct vocabulary extraction
+    if "vocabulary" in content and isinstance(content["vocabulary"], list):
+        for item in content["vocabulary"]:
+            if isinstance(item, str):
+                normalized = normalize(item)
+                if normalized:
+                    if is_phrase(normalized):
+                        phrases.append(normalized)
+                    else:
+                        words.append(normalized)
+
+    # Separate words and phrases
     if "words" in content and isinstance(content["words"], list):
         for word in content["words"]:
             if isinstance(word, str):
@@ -264,15 +276,62 @@ def parse_scraped_data(
                 if normalized:
                     words.append(normalized)
 
-    # Extract phrases if present
     if "phrases" in content and isinstance(content["phrases"], list):
-        for phrase_data in content["phrases"]:
-            phrase_text = (
-                phrase_data if isinstance(phrase_data, str) else phrase_data.get("text", "")
-            )
-            if phrase_text:
-                normalized = normalize(phrase_text)
-                if normalized and is_phrase(normalized):
+        for phrase in content["phrases"]:
+            if isinstance(phrase, str):
+                normalized = normalize(phrase)
+                if normalized:
                     phrases.append(normalized)
 
-    return words, phrases
+    # Handle expressions/idioms
+    for key in ["expressions", "idioms"]:
+        if key in content and isinstance(content[key], list):
+            for item in content[key]:
+                if isinstance(item, str):
+                    normalized = normalize(item)
+                    if normalized:
+                        phrases.append(normalized)
+                elif isinstance(item, dict):
+                    text = item.get("text") or item.get("expression") or ""
+                    if text:
+                        normalized = normalize(text)
+                        if normalized:
+                            phrases.append(normalized)
+
+    return list(set(words)), list(set(phrases))
+
+
+# Backwards compatibility aliases
+def parse_frequency_list(content: str, language: Language) -> ParseResult:
+    """Alias for parse_text_lines (handles frequency lists)."""
+    return parse_text_lines(content, language)
+
+
+def parse_json_dict(content: str, language: Language) -> ParseResult:
+    """Alias for parse_json_vocabulary (handles dict keys)."""
+    return parse_json_vocabulary(content, language)
+
+
+def parse_json_idioms(content: str, language: Language) -> ParseResult:
+    """Alias for parse_json_vocabulary (handles idioms)."""
+    return parse_json_vocabulary(content, language)
+
+
+def parse_json_array(content: str, language: Language) -> ParseResult:
+    """Alias for parse_json_vocabulary (handles arrays)."""
+    return parse_json_vocabulary(content, language)
+
+
+def parse_github_api(content: str, language: Language) -> ParseResult:
+    """Alias for parse_json_vocabulary (handles GitHub API)."""
+    return parse_json_vocabulary(content, language)
+
+
+def parse_csv_idioms(content: str, language: Language) -> ParseResult:
+    """Alias for parse_csv_words (handles idioms in CSV)."""
+    return parse_csv_words(content, language)
+
+
+def parse_json_phrasal_verbs(content: str, language: Language) -> ParseResult:
+    """Alias for parse_json_vocabulary (handles phrasal verbs)."""
+    return parse_json_vocabulary(content, language)

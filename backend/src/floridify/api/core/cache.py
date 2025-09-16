@@ -2,7 +2,7 @@
 
 import hashlib
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from functools import wraps
 from typing import Any
 
@@ -10,7 +10,10 @@ import orjson
 from fastapi import Request, Response
 from pydantic import BaseModel
 
-from ...caching.core import GlobalCacheManager, get_global_cache
+from ...caching import get_global_cache
+from ...caching.core import GlobalCacheManager
+from ...caching.filesystem import FilesystemBackend
+from ...caching.models import CacheNamespace
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -74,7 +77,7 @@ def cached_endpoint(
             cache = await get_global_cache()
 
             # Try to get from cache
-            cached_data = await cache.get("api", cache_key)
+            cached_data = await cache.get(CacheNamespace.API, cache_key)
 
             if cached_data:
                 # Parse cached response
@@ -121,10 +124,9 @@ def cached_endpoint(
             }
 
             await cache.set(
-                "api",
+                CacheNamespace.API,
                 cache_key,
                 orjson.dumps(cache_data).decode(),
-                ttl=timedelta(seconds=config.ttl),
             )
 
             # Set cache headers
@@ -142,9 +144,9 @@ class CacheInvalidator:
     """Utility for invalidating related caches."""
 
     def __init__(self) -> None:
-        self._cache: GlobalCacheManager | None = None
+        self._cache: GlobalCacheManager[FilesystemBackend] | None = None
 
-    async def _get_cache(self) -> GlobalCacheManager:
+    async def _get_cache(self) -> GlobalCacheManager[FilesystemBackend]:
         """Get cache instance lazily."""
         if self._cache is None:
             self._cache = await get_global_cache()
@@ -158,10 +160,9 @@ class CacheInvalidator:
         # In a real implementation with Redis, we'd use SCAN and DEL
         invalidation_key = f"invalidation:{pattern}"
         await cache.set(
-            "api",
+            CacheNamespace.API,
             invalidation_key,
             datetime.now(UTC).isoformat(),
-            ttl=timedelta(hours=24),  # Keep for 24 hours
         )
 
         logger.info(f"Marked pattern for invalidation: {pattern}")
@@ -229,11 +230,11 @@ class ResponseCache:
         self.response = response
         self.ttl = ttl
         self.key_prefix = key_prefix
-        self.cache: GlobalCacheManager | None = None
+        self.cache: GlobalCacheManager[FilesystemBackend] | None = None
         self.cache_key: str | None = None
         self.start_time: datetime | None = None
 
-    async def _get_cache(self) -> GlobalCacheManager:
+    async def _get_cache(self) -> GlobalCacheManager[FilesystemBackend]:
         """Get cache instance lazily."""
         if self.cache is None:
             self.cache = await get_global_cache()
@@ -246,7 +247,7 @@ class ResponseCache:
 
         # Check cache
         cache = await self._get_cache()
-        cached = await cache.get("api", self.cache_key)
+        cached = await cache.get(CacheNamespace.API, self.cache_key)
 
         if cached:
             self.response.headers["X-Cache"] = "HIT"

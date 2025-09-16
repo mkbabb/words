@@ -2,14 +2,28 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from ....core.state_tracker import StateTracker
 from ....models.literature import AuthorInfo, Genre, LiteratureProvider, Period
 from ....providers.core import ConnectorConfig
 from ....utils.logging import get_logger
-from ..core import PARSER_MAP, SCRAPER_MAP, LiteratureConnector
-from ..models import LiteratureEntry, LiteratureSource, ParserType, ScraperType
-from ..parsers import extract_metadata, parse_text
-from .scrapers import default_literature_scraper
+from ..core import LiteratureConnector
+from ..models import LiteratureSource, ParserType, ScraperType
+from ..parsers import (
+    extract_metadata,
+    parse_epub,
+    parse_html,
+    parse_markdown,
+    parse_pdf,
+    parse_text,
+)
+from .scrapers import (
+    default_literature_scraper,
+    scrape_archive_org,
+    scrape_gutenberg,
+    scrape_wikisource,
+)
 
 logger = get_logger(__name__)
 
@@ -34,7 +48,7 @@ class URLLiteratureConnector(LiteratureConnector):
         self,
         query: LiteratureSource,
         state_tracker: StateTracker | None = None,
-    ) -> LiteratureEntry | None:
+    ) -> dict[str, Any] | None:
         """Fetch literature text from URL.
 
         Args:
@@ -42,7 +56,7 @@ class URLLiteratureConnector(LiteratureConnector):
             state_tracker: Optional state tracker for progress updates
 
         Returns:
-            LiteratureEntry with text content
+            Dictionary with literature content
         """
         source = query
 
@@ -53,41 +67,58 @@ class URLLiteratureConnector(LiteratureConnector):
                     message=f"Downloading {source.name} from {source.url}",
                 )
 
-            # Get the appropriate scraper
+            # Get the appropriate scraper and fetch content
             scraper_type = source.scraper or ScraperType.DEFAULT
-            scraper_func = SCRAPER_MAP.get(scraper_type, default_literature_scraper)
-
-            # Fetch content using scraper with session
             async with self.scraper_session as client:
-                content = await scraper_func(source.url, session=client)
+                if scraper_type == ScraperType.GUTENBERG:
+                    content = await scrape_gutenberg(source.url, session=client)
+                elif scraper_type == ScraperType.ARCHIVE_ORG:
+                    content = await scrape_archive_org(source.url, session=client)
+                elif scraper_type == ScraperType.WIKISOURCE:
+                    content = await scrape_wikisource(source.url, session=client)
+                else:  # DEFAULT or unknown
+                    content = await default_literature_scraper(source.url, session=client)
 
-            # Determine parser to use
+            # Determine parser to use and parse content
             parser_type = source.parser or ParserType.PLAIN_TEXT
-            parser_func = PARSER_MAP.get(parser_type, parse_text)
-
-            # Parse content
-            text = parser_func(content)
+            if parser_type == ParserType.MARKDOWN:
+                text = parse_markdown(content)
+            elif parser_type == ParserType.HTML:
+                text = parse_html(content)
+            elif parser_type == ParserType.EPUB:
+                text = parse_epub(content)
+            elif parser_type == ParserType.PDF:
+                text = parse_pdf(content)
+            else:  # PLAIN_TEXT or unknown
+                text = parse_text(content)
             metadata = extract_metadata(content) if isinstance(content, dict) else {}
 
-            # Create LiteratureEntry
-            return LiteratureEntry(
-                title=metadata.get("title", source.name),
-                author=source.author
-                or AuthorInfo(
-                    name=metadata.get("author", "Unknown"),
-                    period=source.period or Period.CONTEMPORARY,
-                    primary_genre=source.genre or Genre.NOVEL,
-                ),
-                provider=self.provider,
-                genre=source.genre or Genre.NOVEL,
+            # Return dict matching the pattern from other providers
+            author = source.author or AuthorInfo(
+                name=metadata.get("author", "Unknown"),
                 period=source.period or Period.CONTEMPORARY,
-                language=source.language,
-                text=text,
-                year=metadata.get("year"),
-                source_url=source.url,
-                gutenberg_id=metadata.get("gutenberg_id"),
-                work_id=source.name,
+                primary_genre=source.genre or Genre.NOVEL,
             )
+            
+            return {
+                "title": metadata.get("title", source.name),
+                "author": {
+                    "name": author.name,
+                    "period": author.period.value if hasattr(author.period, 'value') else author.period,
+                    "primary_genre": author.primary_genre.value if hasattr(author.primary_genre, 'value') else author.primary_genre,
+                },
+                "source": source.name,
+                "genre": (source.genre or Genre.NOVEL).value if hasattr(source.genre or Genre.NOVEL, 'value') else source.genre or Genre.NOVEL,
+                "period": (source.period or Period.CONTEMPORARY).value if hasattr(source.period or Period.CONTEMPORARY, 'value') else source.period or Period.CONTEMPORARY,
+                "language": source.language.value if hasattr(source.language, 'value') else source.language,
+                "text": text,
+                "year": metadata.get("year"),
+                "gutenberg_id": metadata.get("gutenberg_id"),
+                "work_id": source.name,
+                "provider": self.provider.value,
+                "source_url": source.url,
+                "raw_data": {"content_length": len(text), "metadata": metadata},
+            }
 
         except Exception as e:
             logger.error(f"Failed to fetch from {source.name}: {e}")

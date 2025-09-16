@@ -43,7 +43,7 @@ class FuzzySearch:
 
         # Enhanced candidate selection for better recall
         max_candidates = max_results * 40
-        candidates = corpus.get_candidates(query, max_candidates=max_candidates)
+        candidates = corpus.get_candidates(query, max_results=max_candidates)
         vocabulary = corpus.get_words_by_indices(candidates) if candidates else []
 
         if not vocabulary:

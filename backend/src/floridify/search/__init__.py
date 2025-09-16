@@ -10,7 +10,6 @@ from ..models.base import Language
 from .constants import SearchMethod
 from .core import Search
 from .fuzzy import FuzzySearch
-from .language import LanguageSearch
 from .models import SearchResult
 
 # Semantic search with graceful degradation when dependencies unavailable
@@ -20,7 +19,6 @@ from .trie import TrieSearch
 __all__ = [
     "FuzzySearch",
     "Language",
-    "LanguageSearch",
     "Search",
     "SearchMethod",
     "SearchResult",

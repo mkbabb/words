@@ -15,7 +15,7 @@ from floridify.search.semantic.constants import (
 )
 
 print("✅ Model Configuration Verification")
-print("="*50)
+print("=" * 50)
 print("Supported Models: BGE-M3, MiniLM")
 print(f"Default Model: {DEFAULT_SENTENCE_MODEL}")
 print()

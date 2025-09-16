@@ -5,13 +5,11 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from beanie import Document
 from pydantic import BaseModel, Field
 
 from ...caching.models import BaseVersionedData, ResourceType
 from ...models.base import Language
 from ...models.literature import AuthorInfo, Genre, LiteratureProvider, Period
-from ...models.versioned import register_model
 
 
 class ScraperType(Enum):
@@ -53,30 +51,37 @@ class LiteratureSource(BaseModel):
 class LiteratureEntry(BaseModel):
     """In-memory representation of a literary work with composed source."""
 
-    # Composed source configuration
-    source: LiteratureSource = Field(..., description="Literature source configuration")
+    # Core identification (required fields)
+    title: str = Field(description="Title of the work")
+    author: AuthorInfo = Field(description="Author information")
 
-    # Core identification
-    title: str = Field(..., description="Title of the work")
-    author: AuthorInfo = Field(..., description="Author information")
+    # Composed source configuration (optional for backward compatibility)
+    source: LiteratureSource | None = Field(
+        default=None, description="Literature source configuration"
+    )
 
-    # External IDs
-    work_id: str | None = Field(None, description="Provider-specific work ID")
-    gutenberg_id: str | None = Field(None, description="Project Gutenberg ID")
+    # External IDs (all optional)
+    work_id: str | None = Field(default=None, description="Provider-specific work ID")
+    gutenberg_id: str | None = Field(default=None, description="Project Gutenberg ID")
 
-    # Additional metadata
-    year: int | None = Field(None, description="Year of publication")
-    subtitle: str | None = Field(None, description="Subtitle if any")
-    description: str | None = Field(None, description="Work description")
+    # Additional metadata (all optional)
+    year: int | None = Field(default=None, description="Year of publication")
+    subtitle: str | None = Field(default=None, description="Subtitle if any")
+    description: str | None = Field(default=None, description="Work description")
     keywords: list[str] = Field(default_factory=list, description="Keywords/tags")
+
+    # Direct genre/period/language fields for backward compatibility
+    genre: Genre | None = Field(default=None, description="Genre of the work")
+    period: Period | None = Field(default=None, description="Historical period")
+    language: Language = Field(default=Language.ENGLISH, description="Language of the work")
 
     # Vocabulary data
     extracted_vocabulary: list[str] = Field(
         default_factory=list, description="Extracted vocabulary"
     )
 
-    # Content
-    text: str | None = Field(None, description="Full text content (loaded separately)")
+    # Content (optional)
+    text: str | None = Field(default=None, description="Full text content (loaded separately)")
 
     # Additional runtime data
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
@@ -86,29 +91,50 @@ class LiteratureEntry(BaseModel):
         """Number of unique vocabulary items."""
         return len(self.extracted_vocabulary)
 
-    @property
-    def genre(self) -> Genre | None:
-        """Get genre from source."""
-        return self.source.genre
+    def get_genre(self) -> Genre | None:
+        """Get genre from source or direct field."""
+        return self.source.genre if self.source else self.genre
 
-    @property
-    def period(self) -> Period | None:
-        """Get period from source."""
-        return self.source.period
+    def get_period(self) -> Period | None:
+        """Get period from source or direct field."""
+        return self.source.period if self.source else self.period
 
-    @property
-    def language(self) -> Language:
-        """Get language from source."""
-        return self.source.language
+    def get_language(self) -> Language:
+        """Get language from source or direct field."""
+        return self.source.language if self.source else self.language
 
     model_config = {"arbitrary_types_allowed": True}
 
-    @register_model(ResourceType.LITERATURE)
-    class Metadata(BaseVersionedData, Document):
+    class Metadata(BaseVersionedData):
         """Minimal literature metadata for versioning."""
 
         provider: LiteratureProvider | None = None
         work_id: str | None = None
+        
+        def __init__(self, **data: Any) -> None:
+            import hashlib
+            import json
+            from datetime import datetime
+
+            from ...caching.models import CacheNamespace, VersionInfo
+            
+            data.setdefault("resource_type", ResourceType.LITERATURE)
+            data.setdefault("namespace", CacheNamespace.LITERATURE)
+            
+            # Create default version_info if not provided
+            if "version_info" not in data:
+                # Generate data hash from content
+                content_str = json.dumps(data.get("content_inline", {}), sort_keys=True, default=str)
+                data_hash = hashlib.sha256(content_str.encode()).hexdigest()
+                
+                data["version_info"] = VersionInfo(
+                    version="1",
+                    created_at=datetime.utcnow(),
+                    data_hash=data_hash,
+                    is_latest=True
+                )
+            
+            super().__init__(**data)
 
         class Settings:
             """Beanie settings."""

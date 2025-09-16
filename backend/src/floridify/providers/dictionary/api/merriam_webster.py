@@ -7,14 +7,12 @@ from __future__ import annotations
 
 from typing import Any
 
-import httpx
 from beanie import PydanticObjectId
 
 from ....caching.decorators import cached_api_call
 from ....core.state_tracker import Stages, StateTracker
 from ....models.dictionary import (
     Definition,
-    DictionaryEntry,
     DictionaryProvider,
     Etymology,
     Example,
@@ -59,43 +57,7 @@ class MerriamWebsterConnector(DictionaryConnector):
         self.api_key = api_key
         self.base_url = "https://dictionaryapi.com/api/v3/references/collegiate/json"
 
-    @cached_api_call(ttl_hours=24.0, key_prefix="merriam_webster")
-    async def _fetch_from_api(self, word: str) -> dict[str, Any] | None:
-        """Fetch word data from Merriam-Webster API.
-
-        Args:
-            word: The word to look up
-
-        Returns:
-            API response data or None if not found
-
-        """
-        # Rate limiting is handled by the base class fetch method
-
-        url = f"{self.base_url}/{word}"
-        params = {"key": self.api_key}
-
-        try:
-            session = await self.get_api_session()
-            response = await session.get(url, params=params)
-            response.raise_for_status()
-
-            data = response.json()
-
-            # API returns list of suggestions if word not found
-            if isinstance(data, list) and data and isinstance(data[0], dict):
-                return data[0]  # Return first matching entry
-            logger.warning(f"No definition found for '{word}' in Merriam-Webster")
-            return None
-
-        except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error from Merriam-Webster API: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Error fetching from Merriam-Webster: {e}")
-            return None
-
-    def _parse_pronunciation(
+    def extract_pronunciation(
         self,
         data: dict[str, Any],
         word_id: PydanticObjectId,
@@ -136,7 +98,7 @@ class MerriamWebsterConnector(DictionaryConnector):
             logger.debug(f"Error parsing pronunciation: {e}")
             return None
 
-    def _parse_etymology(self, data: dict[str, Any]) -> Etymology | None:
+    def extract_etymology(self, data: dict[str, Any]) -> Etymology | None:
         """Parse etymology data from API response.
 
         Args:
@@ -180,7 +142,7 @@ class MerriamWebsterConnector(DictionaryConnector):
             logger.debug(f"Error parsing etymology: {e}")
             return None
 
-    async def _parse_definitions(
+    async def extract_definitions(
         self,
         data: dict[str, Any],
         word_id: PydanticObjectId,
@@ -317,11 +279,12 @@ class MerriamWebsterConnector(DictionaryConnector):
 
         return examples
 
+    @cached_api_call(ttl_hours=24.0, key_prefix="merriam_webster")
     async def _fetch_from_provider(
         self,
         word: str,
         state_tracker: StateTracker | None = None,
-    ) -> DictionaryEntry | None:
+    ) -> dict[str, Any] | None:
         """Fetch definition from Merriam-Webster.
 
         Args:
@@ -336,8 +299,19 @@ class MerriamWebsterConnector(DictionaryConnector):
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
 
             # Fetch from API
-            data = await self._fetch_from_api(word)
-            if not data:
+            url = f"{self.base_url}/{word}"
+            params = {"key": self.api_key}
+
+            response = await self.api_client.get(url, params=params)
+            response.raise_for_status()
+
+            data = response.json()
+
+            # API returns list of suggestions if word not found
+            if isinstance(data, list) and data and isinstance(data[0], dict):
+                data = data[0]  # Return first matching entry
+            else:
+                logger.warning(f"No definition found for '{word}' in Merriam-Webster")
                 return None
 
             # Create Word object for processing
@@ -348,13 +322,13 @@ class MerriamWebsterConnector(DictionaryConnector):
                 raise ValueError(f"Word {word} must be saved before processing")
 
             # Parse components
-            definitions = await self._parse_definitions(data, word_obj.id)
+            definitions = await self.extract_definitions(data, word_obj.id)
             if not definitions:
                 logger.warning(f"No definitions parsed for '{word}'")
                 return None
 
-            pronunciation = self._parse_pronunciation(data, word_obj.id)
-            etymology = self._parse_etymology(data)
+            pronunciation = self.extract_pronunciation(data, word_obj.id)
+            etymology = self.extract_etymology(data)
 
             # Get definition IDs (already saved in parsing)
             definition_ids = [
@@ -367,15 +341,34 @@ class MerriamWebsterConnector(DictionaryConnector):
                 await pronunciation.save()
                 pronunciation_id = pronunciation.id
 
-            # Create provider data
-            provider_data = DictionaryEntry(
-                word_id=word_obj.id,
-                provider=self.provider,
-                definition_ids=definition_ids,
-                pronunciation_id=pronunciation_id,
-                etymology=etymology,
-                raw_data=data,
-            )
+            # Create provider data as dict
+            provider_data = {
+                "word": word,
+                "provider": self.provider.value,
+                "definitions": [
+                    {
+                        "id": str(definition.id),
+                        "part_of_speech": definition.part_of_speech,
+                        "text": definition.text,
+                        "sense_number": definition.sense_number,
+                        "synonyms": definition.synonyms,
+                        "example_ids": [str(eid) for eid in definition.example_ids],
+                    }
+                    for definition in definitions
+                ],
+                "pronunciation": {
+                    "id": str(pronunciation.id),
+                    "phonetic": pronunciation.phonetic,
+                    "ipa": pronunciation.ipa,
+                    "syllables": pronunciation.syllables,
+                } if pronunciation else None,
+                "etymology": {
+                    "text": etymology.text,
+                    "origin_language": etymology.origin_language,
+                    "root_words": etymology.root_words,
+                } if etymology else None,
+                "raw_data": data,
+            }
 
             if state_tracker:
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)

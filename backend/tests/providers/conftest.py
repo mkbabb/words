@@ -11,17 +11,14 @@ from httpx import AsyncClient, Response
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from floridify.caching.core import GlobalCacheManager
-from floridify.caching.manager import TreeCorpusManager, VersionedDataManager
+from floridify.caching.manager import VersionedDataManager
 from floridify.caching.models import (
+    BaseVersionedData,
     CacheNamespace,
-    CorpusMetadata,
-    DictionaryEntryMetadata,
-    LiteratureEntryMetadata,
     ResourceType,
-    SemanticIndexMetadata,
-    TrieIndexMetadata,
     VersionConfig,
 )
+from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.dictionary import (
     Definition,
     DictionaryEntry,
@@ -36,18 +33,24 @@ from floridify.providers.core import ConnectorConfig, ProviderType
 
 
 @pytest_asyncio.fixture(scope="function")
-async def mongodb_client() -> AsyncIterator[AsyncIOMotorClient]:
+async def mongodb_client() -> AsyncIterator[AsyncIOMotorClient[Any]]:
     """Create test MongoDB client."""
-    client = AsyncIOMotorClient("mongodb://localhost:27017")
+    client: AsyncIOMotorClient[Any] = AsyncIOMotorClient("mongodb://localhost:27017")
     yield client
     client.close()
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_db(mongodb_client: AsyncIOMotorClient) -> AsyncIterator[Any]:
+async def test_db(mongodb_client: AsyncIOMotorClient[Any]) -> AsyncIterator[Any]:
     """Initialize test database with Beanie models."""
     db = mongodb_client["test_floridify_providers"]
-    
+
+    # Import Metadata models
+    from floridify.corpus.core import Corpus
+    from floridify.providers.dictionary.models import DictionaryProviderEntry
+    from floridify.providers.language.models import LanguageEntry
+    from floridify.providers.literature.models import LiteratureEntry
+
     # Initialize Beanie with all document models
     await init_beanie(
         database=db,
@@ -58,31 +61,33 @@ async def test_db(mongodb_client: AsyncIOMotorClient) -> AsyncIterator[Any]:
             DictionaryEntry,
             Pronunciation,
             Example,
-            # Versioned models
-            CorpusMetadata,
-            DictionaryEntryMetadata,
-            LiteratureEntryMetadata,
-            SemanticIndexMetadata,
-            TrieIndexMetadata,
+            # Versioned models - include specific Metadata subclasses
+            BaseVersionedData,
+            DictionaryProviderEntry.Metadata,
+            LanguageEntry.Metadata,
+            LiteratureEntry.Metadata,
+            Corpus.Metadata,
             # Batch operations
             BatchOperation,
         ],
     )
-    
+
     yield db
-    
+
     # Clean up after test
     for collection_name in await db.list_collection_names():
         await db.drop_collection(collection_name)
 
 
 @pytest.fixture
-def cache_manager() -> GlobalCacheManager:
+def cache_manager(tmp_path) -> GlobalCacheManager:
     """Create test cache manager with in-memory backend."""
-    manager = GlobalCacheManager()
-    # Reset any existing caches
-    manager.l1_caches.clear()
-    manager.l2_cache = None
+    from floridify.caching.filesystem import FilesystemBackend
+    
+    # Create a temporary filesystem backend for testing
+    backend = FilesystemBackend(cache_dir=tmp_path / "test_cache")
+    manager = GlobalCacheManager(backend)
+    # Each test gets a fresh cache manager
     return manager
 
 
@@ -119,17 +124,17 @@ def connector_config() -> ConnectorConfig:
 def mock_http_client() -> AsyncMock:
     """Create mock HTTP client for API testing."""
     client = AsyncMock(spec=AsyncClient)
-    
+
     # Setup default response
     response = MagicMock(spec=Response)
     response.status_code = 200
     response.json.return_value = {"test": "data"}
     response.text = '{"test": "data"}'
     response.raise_for_status = MagicMock()
-    
+
     client.get.return_value = response
     client.post.return_value = response
-    
+
     return client
 
 
@@ -174,9 +179,7 @@ def sample_pronunciation(sample_word: Word) -> Pronunciation:
 
 @pytest.fixture
 def sample_dictionary_entry(
-    sample_word: Word, 
-    sample_definition: Definition, 
-    sample_pronunciation: Pronunciation
+    sample_word: Word, sample_definition: Definition, sample_pronunciation: Pronunciation
 ) -> DictionaryEntry:
     """Create sample dictionary entry for testing."""
     return DictionaryEntry(
@@ -248,15 +251,19 @@ def version_config() -> VersionConfig:
 
 
 @pytest.fixture
-async def sample_corpus_metadata(test_db: Any) -> CorpusMetadata:
+async def sample_corpus_metadata(test_db: Any) -> Any:
     """Create sample corpus metadata."""
-    corpus = CorpusMetadata(
+    from floridify.caching.models import VersionInfo
+    from floridify.corpus.core import Corpus
+
+    corpus = Corpus.Metadata(
         resource_id="test_corpus",
         resource_type=ResourceType.CORPUS,
         namespace=CacheNamespace.CORPUS,
-        corpus_type="lexicon",
-        language="en",
-        vocabulary_size=1000,
+        version_info=VersionInfo(
+            version="1.0.0",
+            data_hash="test_hash",
+        ),
         content_inline={"vocabulary": ["word1", "word2", "word3"]},
     )
     await corpus.save()
@@ -295,7 +302,7 @@ async def cleanup_cache():
     # Clean up any filesystem cache
     import shutil
     from pathlib import Path
-    
+
     cache_dir = Path("/tmp/floridify_test_cache")
     if cache_dir.exists():
         shutil.rmtree(cache_dir)

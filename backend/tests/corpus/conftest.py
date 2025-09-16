@@ -1,5 +1,8 @@
 """Test configuration for corpus tests with real MongoDB."""
+
 import asyncio
+import time
+import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -7,9 +10,9 @@ import pytest_asyncio
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from floridify.caching.manager import TreeCorpusManager
 from floridify.caching.models import CacheNamespace, ResourceType, VersionInfo
 from floridify.corpus.core import Corpus
+from floridify.corpus.manager import TreeCorpusManager
 from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
 from floridify.providers.dictionary.models import DictionaryProviderEntry
@@ -19,20 +22,27 @@ from floridify.search.models import SearchIndex, TrieIndex
 from floridify.search.semantic.models import SemanticIndex
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 async def motor_client() -> AsyncGenerator[AsyncIOMotorClient, None]:
     """Create a MongoDB client for testing."""
     client = AsyncIOMotorClient("mongodb://localhost:27017")
-    yield client
-    client.close()
+    try:
+        # Test connection
+        await client.admin.command("ping")
+        yield client
+    except Exception as e:
+        pytest.skip(f"MongoDB not available: {e}")
+    finally:
+        client.close()
 
 
 @pytest_asyncio.fixture(scope="function")
 async def test_db(motor_client: AsyncIOMotorClient):
     """Initialize test database and clean up after each test."""
-    # Use a test database
-    db = motor_client["test_floridify_corpus"]
-    
+    # Use a unique test database for each test
+    db_name = f"test_floridify_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
+    db = motor_client[db_name]
+
     # Initialize Beanie with all document models
     await init_beanie(
         database=db,
@@ -46,12 +56,11 @@ async def test_db(motor_client: AsyncIOMotorClient):
             TrieIndex.Metadata,
         ],
     )
-    
+
     yield db
-    
-    # Clean up - drop all collections after test
-    for collection_name in await db.list_collection_names():
-        await db.drop_collection(collection_name)
+
+    # Clean up - drop the entire database after test
+    await motor_client.drop_database(db_name)
 
 
 @pytest_asyncio.fixture
@@ -74,7 +83,9 @@ async def sample_vocabularies() -> dict[str, list[str]]:
 
 
 @pytest_asyncio.fixture
-async def corpus_tree(test_db, tree_manager: TreeCorpusManager, sample_vocabularies: dict[str, list[str]]):
+async def corpus_tree(
+    test_db, tree_manager: TreeCorpusManager, sample_vocabularies: dict[str, list[str]]
+):
     """Create a 3-level test tree using real Corpus.Metadata."""
     # Create language corpus (master)
     language_corpus = Corpus.Metadata(
@@ -95,7 +106,7 @@ async def corpus_tree(test_db, tree_manager: TreeCorpusManager, sample_vocabular
         vocabulary_hash="test_hash",
     )
     await language_corpus.save()
-    
+
     # Create work corpora (children)
     work1 = Corpus.Metadata(
         resource_id="Shakespeare_Works",
@@ -115,7 +126,7 @@ async def corpus_tree(test_db, tree_manager: TreeCorpusManager, sample_vocabular
         vocabulary_hash="test_hash_1",
     )
     await work1.save()
-    
+
     work2 = Corpus.Metadata(
         resource_id="Modern_Works",
         resource_type=ResourceType.CORPUS,
@@ -134,7 +145,7 @@ async def corpus_tree(test_db, tree_manager: TreeCorpusManager, sample_vocabular
         vocabulary_hash="test_hash_2",
     )
     await work2.save()
-    
+
     # Create chapter corpus (grandchild)
     chapter1 = Corpus.Metadata(
         resource_id="Hamlet",
@@ -153,14 +164,14 @@ async def corpus_tree(test_db, tree_manager: TreeCorpusManager, sample_vocabular
         vocabulary_hash="test_hash_3",
     )
     await chapter1.save()
-    
+
     # Update parent references
     language_corpus.child_corpus_ids = [work1.id, work2.id]
     await language_corpus.save()
-    
+
     work1.child_corpus_ids = [chapter1.id]
     await work1.save()
-    
+
     return {
         "master": language_corpus,
         "work1": work1,
@@ -172,52 +183,55 @@ async def corpus_tree(test_db, tree_manager: TreeCorpusManager, sample_vocabular
 @pytest_asyncio.fixture
 async def concurrent_executor():
     """Helper for concurrent operation testing."""
+
     async def execute_concurrent(tasks, delay=0.01):
         """Execute tasks concurrently with optional delay between starts."""
+
         async def delayed_task(task, d):
             await asyncio.sleep(d)
             return await task
-        
+
         return await asyncio.gather(
-            *[delayed_task(task, i * delay) for i, task in enumerate(tasks)],
-            return_exceptions=True
+            *[delayed_task(task, i * delay) for i, task in enumerate(tasks)], return_exceptions=True
         )
+
     return execute_concurrent
 
 
 @pytest.fixture
 def assert_helpers():
     """Common assertion helpers."""
+
     class Helpers:
         @staticmethod
         def assert_parent_child_linked(parent: Corpus.Metadata, child: Corpus.Metadata):
             """Verify parent-child relationship is properly linked."""
             assert child.id in parent.child_corpus_ids
             assert parent.id == child.parent_corpus_id
-        
+
         @staticmethod
         def assert_vocabulary_contains(corpus: Corpus.Metadata, expected_words: list[str]):
             """Verify corpus contains expected vocabulary."""
             vocab = corpus.content_inline.get("vocabulary", []) if corpus.content_inline else []
             assert all(word in vocab for word in expected_words)
-        
+
         @staticmethod
         def assert_tree_consistency(root: Corpus.Metadata, all_nodes: dict[str, Corpus.Metadata]):
             """Verify entire tree structure is consistent."""
             visited = set()
-            
+
             def check_node(node: Corpus.Metadata):
                 if node.id in visited:
                     raise ValueError(f"Circular reference detected at {node.resource_id}")
                 visited.add(node.id)
-                
+
                 for child_id in node.child_corpus_ids:
                     child = next((n for n in all_nodes.values() if n.id == child_id), None)
                     if child:
                         assert child.parent_corpus_id == node.id
                         check_node(child)
-            
+
             check_node(root)
             return True
-    
+
     return Helpers()

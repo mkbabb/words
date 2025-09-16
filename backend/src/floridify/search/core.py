@@ -9,8 +9,8 @@ import asyncio
 import itertools
 from typing import Any
 
+from ..caching.models import VersionConfig
 from ..corpus.core import Corpus
-from ..models.versioned import VersionConfig
 from ..text import normalize
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod, SearchMode
@@ -186,7 +186,7 @@ class Search:
             )
             self.semantic_search = await SemanticSearch.from_corpus(
                 corpus=self.corpus,
-                model_name=self.index.semantic_model,
+                model_name=self.index.semantic_model,  # type: ignore[arg-type]
                 config=VersionConfig(),
             )
 
@@ -251,11 +251,44 @@ class Search:
         if self.semantic_search:
             await self.semantic_search.update_corpus(updated_corpus)
 
+    async def build_indices(self) -> None:
+        """Build search indices from corpus.
+
+        Creates trie and fuzzy indices. For semantic, use initialize() instead.
+        """
+        if not self.corpus:
+            raise ValueError("Corpus required to build indices")
+
+        # Create minimal index if not present
+        if not self.index:
+            from .models import SearchIndex
+
+            self.index = SearchIndex(
+                corpus_name=self.corpus.corpus_name,
+                corpus_id=self.corpus.corpus_id,
+                vocabulary_hash=self.corpus.vocabulary_hash,
+                min_score=DEFAULT_MIN_SCORE,
+                has_trie=True,
+                has_fuzzy=True,
+                semantic_enabled=False,
+            )
+
+        # Build trie index
+        self.trie_search = await TrieSearch.from_corpus(self.corpus)
+        self.index.has_trie = True
+
+        # Build fuzzy index
+        self.fuzzy_search = FuzzySearch(min_score=self.index.min_score)
+        self.index.has_fuzzy = True
+
+        self._initialized = True
+
     async def search(
         self,
         query: str,
         max_results: int = 20,
         min_score: float | None = None,
+        method: SearchMethod | None = None,
     ) -> list[SearchResult]:
         """Smart cascading search with early termination optimization and caching.
 
@@ -265,9 +298,23 @@ class Search:
             query: Search query
             max_results: Maximum results to return
             min_score: Minimum score threshold
+            method: Optional specific search method to use
 
         """
-        # Use the new search_with_mode method with SMART mode
+        # If specific method requested, use it
+        if method:
+            if method == SearchMethod.EXACT and self.trie_search:
+                result = self.trie_search.search_exact(query)
+                if result:
+                    return [SearchResult(word=result, score=1.0, method=SearchMethod.EXACT)]
+                return []
+            elif method == SearchMethod.FUZZY and self.fuzzy_search and self.corpus:
+                results = self.fuzzy_search.search(query, self.corpus)
+                return results[:max_results]
+            elif method == SearchMethod.SEMANTIC and self.semantic_search:
+                return self.semantic_search.search(query, max_results=max_results)
+
+        # Otherwise use smart mode
         return await self.search_with_mode(
             query=query,
             mode=SearchMode.SMART,
@@ -472,7 +519,9 @@ class Search:
         # Use O(1) dict lookup instead of O(n) list.index()
         idx = self.corpus.vocabulary_to_index.get(normalized_word)
         if idx is not None:
-            return self.corpus.get_original_word_by_index(idx)
+            original = self.corpus.get_original_word_by_index(idx)
+            if original:
+                return original
 
         return normalized_word
 

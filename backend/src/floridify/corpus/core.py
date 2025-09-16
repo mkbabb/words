@@ -20,12 +20,8 @@ from ..caching.models import (
     VersionConfig,
 )
 from ..models.base import Language
-from ..models.versioned import register_model
-from ..search.phonetics import get_word_signature  # type: ignore
-from ..search.semantic.models import SemanticIndex
 from ..text.normalize import batch_lemmatize, batch_normalize
 from ..utils.logging import get_logger
-from .manager import get_tree_corpus_manager
 from .models import CorpusType
 from .utils import get_vocabulary_hash
 
@@ -34,7 +30,7 @@ logger = get_logger(__name__)
 
 class Corpus(BaseModel):
     """Represents a corpus of vocabulary with semantic and search capabilities.
-    
+
     Now uses PydanticObjectId as primary key with optional corpus_name that
     defaults to a generated slug using coolname.
     """
@@ -86,31 +82,30 @@ class Corpus(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    @register_model(ResourceType.CORPUS)
     class Metadata(BaseVersionedData):
         # Corpus identification
         corpus_name: str = ""
         corpus_type: CorpusType = CorpusType.LEXICON
         language: Language = Language.ENGLISH
-        
+
         # Tree structure
         parent_corpus_id: PydanticObjectId | None = None
         child_corpus_ids: list[PydanticObjectId] = Field(default_factory=list)
         is_master: bool = False
-        
+
         # Vocabulary reference
         content_location: ContentLocation | None = None
 
         def __init__(self, **data: Any) -> None:
             data.setdefault("resource_type", ResourceType.CORPUS)
             data.setdefault("namespace", CacheNamespace.CORPUS)
-           
+
             super().__init__(**data)
 
     def model_post_init(self, __context: Any) -> None:
         """Post-initialization to inject slug name if needed."""
         super().model_post_init(__context)
-        
+
         # Generate slug name if not provided
         if not self.corpus_name:
             self.corpus_name = coolname.generate_slug(2)
@@ -150,23 +145,22 @@ class Corpus(BaseModel):
         normalized_vocabulary = batch_normalize(vocabulary)
         logger.info(f"Normalized to {len(normalized_vocabulary)} unique words")
 
-        # Track original forms for each normalized word
-        normalized_to_original_indices: dict[int, list[int]] = {}
-        for i, (norm_word, orig_word) in enumerate(
-            zip(normalized_vocabulary, vocabulary)
-        ):
-            norm_idx = normalized_vocabulary.index(norm_word)
-            if norm_idx not in normalized_to_original_indices:
-                normalized_to_original_indices[norm_idx] = []
-            if i not in normalized_to_original_indices[norm_idx]:
-                normalized_to_original_indices[norm_idx].append(i)
-
         # Sort and deduplicate normalized vocabulary
         unique_normalized = sorted(set(normalized_vocabulary))
         logger.info(f"Final vocabulary: {len(unique_normalized)} unique normalized words")
 
         # Create vocabulary-to-index mapping
         vocabulary_to_index = {word: i for i, word in enumerate(unique_normalized)}
+
+        # Build normalized_to_original_indices AFTER sorting
+        # Maps from index in sorted vocabulary to indices in original_vocabulary
+        normalized_to_original_indices: dict[int, list[int]] = {}
+        for orig_idx, (orig_word, norm_word) in enumerate(zip(vocabulary, normalized_vocabulary)):
+            if norm_word in vocabulary_to_index:
+                sorted_idx = vocabulary_to_index[norm_word]
+                if sorted_idx not in normalized_to_original_indices:
+                    normalized_to_original_indices[sorted_idx] = []
+                normalized_to_original_indices[sorted_idx].append(orig_idx)
 
         # Create the corpus instance
         corpus = cls(
@@ -189,6 +183,8 @@ class Corpus(BaseModel):
 
         # Create semantic index if requested
         if semantic:
+            from ..search.semantic.models import SemanticIndex
+
             model_name = model_name or "all-MiniLM-L6-v2"
             logger.info(f"Creating semantic index with model {model_name}")
 
@@ -203,6 +199,34 @@ class Corpus(BaseModel):
                 logger.warning(f"Failed to create semantic index: {e}")
 
         return corpus
+
+    async def _rebuild_indices(self) -> None:
+        """Rebuild all indices from vocabulary."""
+        # Rebuild vocabulary_to_index
+        self.vocabulary_to_index = {word: i for i, word in enumerate(self.vocabulary)}
+
+        # Rebuild normalized_to_original_indices if needed
+        if self.original_vocabulary and not self.normalized_to_original_indices:
+            self.normalized_to_original_indices = {}
+            normalized_orig = batch_normalize(self.original_vocabulary)
+            for orig_idx, norm_word in enumerate(normalized_orig):
+                if norm_word in self.vocabulary_to_index:
+                    sorted_idx = self.vocabulary_to_index[norm_word]
+                    if sorted_idx not in self.normalized_to_original_indices:
+                        self.normalized_to_original_indices[sorted_idx] = []
+                    self.normalized_to_original_indices[sorted_idx].append(orig_idx)
+
+        # Rebuild signature index
+        self._build_signature_index()
+
+        # Rebuild unified indices (lemmatization)
+        await self._create_unified_indices()
+
+        # Update metadata
+        self.unique_word_count = len(self.vocabulary)
+        self.vocabulary_hash = get_vocabulary_hash(self.vocabulary)
+
+        logger.info(f"Rebuilt indices for corpus {self.corpus_name}")
 
     async def _create_unified_indices(self) -> None:
         """Create unified indexing and lemmatization maps."""
@@ -259,19 +283,14 @@ class Corpus(BaseModel):
         if original_indices := self.normalized_to_original_indices.get(normalized_index):
             # Return the first original form
             return self.original_vocabulary[original_indices[0]]
-        return None
+        # If no mapping exists, return the normalized word itself
+        return self.get_word_by_index(normalized_index)
 
     def get_words_by_indices(self, indices: list[int]) -> list[str]:
         """Get multiple words by their indices."""
-        return [
-            word
-            for idx in indices
-            if (word := self.get_word_by_index(idx)) is not None
-        ]
+        return [word for idx in indices if (word := self.get_word_by_index(idx)) is not None]
 
-    def get_original_words_by_indices(
-        self, normalized_indices: list[int]
-    ) -> list[str]:
+    def get_original_words_by_indices(self, normalized_indices: list[int]) -> list[str]:
         """Get original forms of words by their normalized indices."""
         return [
             word
@@ -324,6 +343,8 @@ class Corpus(BaseModel):
 
         # Signature-based candidates
         if use_signatures and self.signature_buckets:
+            from ..text.normalize import get_word_signature
+
             query_sig = get_word_signature(normalized_query)
             if query_sig in self.signature_buckets:
                 sig_candidates = self.signature_buckets[query_sig]
@@ -345,6 +366,8 @@ class Corpus(BaseModel):
 
     def _build_signature_index(self) -> None:
         """Build signature-based index for efficient searching."""
+        from ..text.normalize import get_word_signature
+
         self.signature_buckets.clear()
         self.length_buckets.clear()
 
@@ -407,27 +430,19 @@ class Corpus(BaseModel):
         """
         if not corpus_id and not corpus_name:
             raise ValueError("Either corpus_id or corpus_name must be provided")
-            
+
+        from .manager import get_tree_corpus_manager
+
         manager = get_tree_corpus_manager()
 
-        # Get the corpus metadata
-        corpus_metadata = await manager.get_corpus(
+        # Get the corpus directly from manager
+        # The manager already returns a Corpus object, not metadata
+        corpus = await manager.get_corpus(
             corpus_id=corpus_id,
             corpus_name=corpus_name,
             config=config,
         )
 
-        if not corpus_metadata:
-            return None
-
-        # Load content from metadata
-        content = await corpus_metadata.get_content()
-        if not content:
-            return None
-
-        corpus = cls.model_load(content)
-        # Ensure the ID is set from metadata
-        corpus.corpus_id = corpus_metadata.id
         return corpus
 
     @classmethod
@@ -479,9 +494,7 @@ class Corpus(BaseModel):
 
         return corpus
 
-    async def save(
-        self, config: VersionConfig | None = None, update_metadata: bool = True
-    ) -> bool:
+    async def save(self, config: VersionConfig | None = None, update_metadata: bool = True) -> bool:
         """Save corpus to versioned storage.
 
         Args:
@@ -491,6 +504,8 @@ class Corpus(BaseModel):
         Returns:
             True if saved successfully
         """
+        from .manager import get_tree_corpus_manager
+
         manager = get_tree_corpus_manager()
 
         # Update metadata if requested
@@ -512,25 +527,33 @@ class Corpus(BaseModel):
             is_master=self.is_master,
         )
 
-        if saved and saved.id:
-            self.corpus_id = saved.id
+        if saved and saved.corpus_id:
+            self.corpus_id = saved.corpus_id
 
         return bool(saved)
 
     async def delete(self) -> None:
-        """Delete corpus from storage using TreeCorpusManager."""
+        """Delete corpus from storage."""
         if not self.corpus_id:
             logger.warning("Cannot delete corpus without ID")
             return
-            
-        manager = get_tree_corpus_manager()
-        deleted = await manager.delete_corpus(
-            corpus_id=self.corpus_id,
-            cascade=False  # Don't cascade by default
-        )
-        
-        if deleted:
-            logger.info(f"Deleted corpus {self.corpus_name} (ID: {self.corpus_id})")
-        else:
-            logger.warning(f"Failed to delete corpus {self.corpus_name} (ID: {self.corpus_id})")
 
+        # Delete through version manager
+        from ..caching.manager import get_version_manager
+        from ..caching.models import ResourceType
+
+        vm = get_version_manager()
+
+        # Get the latest version to delete
+        metadata = await vm.get_latest(
+            resource_id=self.corpus_name, resource_type=ResourceType.CORPUS
+        )
+
+        if metadata and metadata.version_info:
+            await vm.delete_version(
+                resource_id=self.corpus_name,
+                resource_type=ResourceType.CORPUS,
+                version=metadata.version_info.version,
+            )
+
+        logger.info(f"Deleted corpus {self.corpus_name} (ID: {self.corpus_id})")

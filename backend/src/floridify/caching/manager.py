@@ -9,9 +9,10 @@ from typing import Any, TypeVar
 
 from beanie import PydanticObjectId
 
-from ..models.versioned import get_model_class as get_versioned_model_class
+from ..models.registry import get_model_class as get_versioned_model_class
 from ..utils.logging import get_logger
 from .core import GlobalCacheManager, get_global_cache
+from .filesystem import FilesystemBackend
 from .models import (
     BaseVersionedData,
     CacheNamespace,
@@ -30,7 +31,7 @@ class VersionedDataManager:
 
     def __init__(self) -> None:
         """Initialize with cache integration."""
-        self.cache: GlobalCacheManager | None = (
+        self.cache: GlobalCacheManager[FilesystemBackend] | None = (
             None  # Will be initialized lazily (GlobalCacheManager)
         )
         self.lock = asyncio.Lock()
@@ -46,8 +47,8 @@ class VersionedDataManager:
         dependencies: list[PydanticObjectId] | None = None,
     ) -> BaseVersionedData:
         """Save with versioning and optimal serialization."""
-        # Single serialization with sorted keys
-        content_str = json.dumps(content, sort_keys=True)
+        # Single serialization with sorted keys and ObjectId handling
+        content_str = json.dumps(content, sort_keys=True, default=self._json_encoder)
         content_hash = hashlib.sha256(content_str.encode()).hexdigest()
 
         # Check for duplicate
@@ -72,20 +73,65 @@ class VersionedDataManager:
 
         # Create versioned instance
         model_class = self._get_model_class(resource_type)
-        versioned = model_class(
-            resource_id=resource_id,
-            resource_type=resource_type,
-            namespace=namespace,
-            version_info=VersionInfo(
+
+        # Prepare constructor parameters
+        constructor_params = {
+            "resource_id": resource_id,
+            "resource_type": resource_type,
+            "namespace": namespace,
+            "version_info": VersionInfo(
                 version=new_version,
                 data_hash=content_hash,
                 is_latest=True,
                 supersedes=latest.id if latest else None,
                 dependencies=dependencies or [],
             ),
-            metadata={**config.metadata, **(metadata or {})},
-            ttl=config.ttl,
-        )
+            "ttl": config.ttl,
+        }
+
+        # Handle metadata - extract model-specific fields vs generic metadata
+        combined_metadata = {**config.metadata, **(metadata or {})}
+        generic_metadata = {}
+
+        # For corpus models, extract corpus-specific fields
+        if resource_type == ResourceType.CORPUS:
+            corpus_fields = [
+                "corpus_name",
+                "corpus_type",
+                "language",
+                "parent_corpus_id",
+                "child_corpus_ids",
+                "is_master",
+            ]
+            for field in corpus_fields:
+                if field in combined_metadata:
+                    # Convert enum values if needed
+                    value = combined_metadata.pop(field)
+                    if field == "corpus_type" and isinstance(value, str):
+                        from ..corpus.models import CorpusType
+
+                        value = CorpusType(value)
+                    elif field == "language" and isinstance(value, str):
+                        from ..models.base import Language
+
+                        value = Language(value)
+                    constructor_params[field] = value
+
+            # Remaining metadata goes to generic metadata
+            generic_metadata = combined_metadata
+        elif resource_type == ResourceType.TRIE:
+            # For trie models, extract corpus_id
+            if "corpus_id" in combined_metadata:
+                constructor_params["corpus_id"] = combined_metadata.pop("corpus_id")
+            # Remaining metadata goes to generic metadata
+            generic_metadata = combined_metadata
+        else:
+            # For other resource types, all metadata is generic
+            generic_metadata = combined_metadata
+
+        constructor_params["metadata"] = generic_metadata
+
+        versioned = model_class(**constructor_params)
 
         # Set content with automatic storage strategy
         await versioned.set_content(content)
@@ -142,14 +188,12 @@ class VersionedDataManager:
         if config.version:
             # Get specific version
             result = await model_class.find_one(
-                model_class.resource_id == resource_id,
-                model_class.version_info.version == config.version,
+                {"resource_id": resource_id, "version_info.version": config.version}
             )
         else:
             # Get latest
             result = await model_class.find_one(
-                model_class.resource_id == resource_id,
-                model_class.version_info.is_latest,
+                {"resource_id": resource_id, "version_info.is_latest": True}
             )
 
         # Cache result
@@ -177,7 +221,7 @@ class VersionedDataManager:
     async def list_versions(self, resource_id: str, resource_type: ResourceType) -> list[str]:
         """List all versions of a resource."""
         model_class = self._get_model_class(resource_type)
-        results = await model_class.find(model_class.resource_id == resource_id).to_list()
+        results = await model_class.find({"resource_id": resource_id}).to_list()
         return [r.version_info.version for r in results]
 
     async def delete_version(
@@ -186,8 +230,7 @@ class VersionedDataManager:
         """Delete a specific version."""
         model_class = self._get_model_class(resource_type)
         result = await model_class.find_one(
-            model_class.resource_id == resource_id,
-            model_class.version_info.version == version,
+            {"resource_id": resource_id, "version_info.version": version}
         )
 
         if result:
@@ -222,15 +265,23 @@ class VersionedDataManager:
 
     async def _find_by_hash(self, resource_id: str, content_hash: str) -> BaseVersionedData | None:
         """Find existing version with same content hash."""
-        # Check all resource types for deduplication
+        # Check all resource types for deduplication, but skip uninitialized collections
         for resource_type in ResourceType:
-            model_class = self._get_model_class(resource_type)
-            result = await model_class.find_one(
-                model_class.resource_id == resource_id,
-                model_class.version_info.data_hash == content_hash,
-            )
-            if result:
-                return result
+            try:
+                model_class = self._get_model_class(resource_type)
+                # Check if the collection is initialized
+                collection = model_class.get_pymongo_collection()
+                if collection is None:
+                    continue  # Skip uninitialized collections
+
+                result = await model_class.find_one(
+                    {"resource_id": resource_id, "version_info.data_hash": content_hash}
+                )
+                if result:
+                    return result
+            except Exception:
+                # Skip resource types that can't be queried
+                continue
         return None
 
     def _get_model_class(self, resource_type: ResourceType) -> type[BaseVersionedData]:
@@ -242,6 +293,7 @@ class VersionedDataManager:
         mapping = {
             ResourceType.DICTIONARY: CacheNamespace.DICTIONARY,
             ResourceType.CORPUS: CacheNamespace.CORPUS,
+            ResourceType.LANGUAGE: CacheNamespace.LANGUAGE,
             ResourceType.SEMANTIC: CacheNamespace.SEMANTIC,
             ResourceType.LITERATURE: CacheNamespace.LITERATURE,
             ResourceType.TRIE: CacheNamespace.TRIE,
@@ -254,6 +306,16 @@ class VersionedDataManager:
         major, minor, patch = version.split(".")
 
         return f"{major}.{minor}.{int(patch) + 1}"
+
+    def _json_encoder(self, obj: Any) -> str:
+        """Custom JSON encoder for complex objects like PydanticObjectId."""
+        from enum import Enum
+
+        if isinstance(obj, PydanticObjectId):
+            return str(obj)
+        elif isinstance(obj, Enum):
+            return obj.value
+        raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
 # Global singleton instance

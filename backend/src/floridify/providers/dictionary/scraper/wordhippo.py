@@ -10,7 +10,6 @@ from bs4 import BeautifulSoup
 from ....core.state_tracker import StateTracker
 from ....models.dictionary import (
     Definition,
-    DictionaryEntry,
     DictionaryProvider,
     Etymology,
     Example,
@@ -106,15 +105,38 @@ class WordHippoConnector(DictionaryConnector):
                 "sentences_count": len(sentences),
             }
 
-            # word_obj.id is guaranteed to be not None after save()
-            return DictionaryEntry(
-                word_id=word_obj.id,
-                provider=DictionaryProvider.WORDHIPPO,
-                definition_ids=[d.id for d in definitions if d.id is not None],
-                pronunciation_id=pronunciation.id if pronunciation else None,
-                etymology=etymology,
-                raw_data=raw_data,
-            )
+            # Return dict matching the pattern from other providers
+            return {
+                "word": word,
+                "provider": self.provider.value,
+                "definitions": [
+                    {
+                        "id": str(d.id),
+                        "part_of_speech": d.part_of_speech,
+                        "text": d.text,
+                        "sense_number": d.sense_number,
+                        "synonyms": d.synonyms,
+                        "antonyms": d.antonyms,
+                        "example_ids": [str(eid) for eid in d.example_ids],
+                    }
+                    for d in definitions
+                ],
+                "pronunciation": {
+                    "id": str(pronunciation.id),
+                    "phonetic": pronunciation.phonetic,
+                    "ipa": pronunciation.ipa,
+                    "syllables": pronunciation.syllables,
+                } if pronunciation else None,
+                "etymology": {
+                    "text": etymology.text if etymology else None,
+                    "origin_language": etymology.origin_language if etymology else None,
+                    "root_words": etymology.root_words if etymology else [],
+                } if etymology else None,
+                "synonyms": synonyms,
+                "antonyms": antonyms,
+                "sentences": sentences,
+                "raw_data": raw_data,
+            }
 
         except Exception as e:
             logger.error(f"Error fetching {word} from WordHippo: {e}")
