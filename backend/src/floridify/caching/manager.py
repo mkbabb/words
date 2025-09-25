@@ -5,13 +5,14 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from enum import Enum
 from typing import Any, TypeVar
 
 from beanie import PydanticObjectId
 
 from ..models.registry import get_model_class as get_versioned_model_class
 from ..utils.logging import get_logger
-from .core import GlobalCacheManager, get_global_cache
+from .core import GlobalCacheManager, get_global_cache, set_versioned_content
 from .filesystem import FilesystemBackend
 from .models import (
     BaseVersionedData,
@@ -51,10 +52,38 @@ class VersionedDataManager:
         content_str = json.dumps(content, sort_keys=True, default=self._json_encoder)
         content_hash = hashlib.sha256(content_str.encode()).hexdigest()
 
-        # Check for duplicate
+        # Check for duplicate content
+        # But we need to check if metadata has changed for corpus resources
         if not config.force_rebuild:
             existing = await self._find_by_hash(resource_id, content_hash)
-            if existing:
+            if existing and resource_type == ResourceType.CORPUS and metadata:
+                # For corpus resources, check if critical metadata fields have changed
+                critical_fields = ["child_corpus_ids", "parent_corpus_id", "is_master"]
+                metadata_changed = False
+
+                for field in critical_fields:
+                    if field in metadata:
+                        # Type-safe metadata comparison
+                        # Access metadata through model_dump
+                        existing_data = existing.model_dump() if hasattr(existing, "model_dump") else {}
+                        existing_value = existing_data.get("metadata", {}).get(field)
+                        new_value = metadata.get(field)
+                        if existing_value != new_value:
+                            metadata_changed = True
+                            logger.debug(
+                                f"Metadata field {field} changed: {existing_value} -> {new_value}"
+                            )
+                            break
+
+                if not metadata_changed:
+                    logger.debug(
+                        f"Found existing version for {resource_id} with same content and metadata"
+                    )
+                    return existing
+                logger.info(
+                    f"Content matches but metadata changed for {resource_id}, creating new version"
+                )
+            elif existing:
                 logger.debug(f"Found existing version for {resource_id} with same content")
                 return existing
 
@@ -62,7 +91,9 @@ class VersionedDataManager:
         latest = None
         if config.increment_version:
             latest = await self.get_latest(
-                resource_id, resource_type, use_cache=not config.force_rebuild
+                resource_id,
+                resource_type,
+                use_cache=not config.force_rebuild,
             )
 
         new_version = config.version or (
@@ -75,7 +106,7 @@ class VersionedDataManager:
         model_class = self._get_model_class(resource_type)
 
         # Prepare constructor parameters
-        constructor_params = {
+        constructor_params: dict[str, Any] = {
             "resource_id": resource_id,
             "resource_type": resource_type,
             "namespace": namespace,
@@ -105,17 +136,7 @@ class VersionedDataManager:
             ]
             for field in corpus_fields:
                 if field in combined_metadata:
-                    # Convert enum values if needed
-                    value = combined_metadata.pop(field)
-                    if field == "corpus_type" and isinstance(value, str):
-                        from ..corpus.models import CorpusType
-
-                        value = CorpusType(value)
-                    elif field == "language" and isinstance(value, str):
-                        from ..models.base import Language
-
-                        value = Language(value)
-                    constructor_params[field] = value
+                    constructor_params[field] = combined_metadata.pop(field)
 
             # Remaining metadata goes to generic metadata
             generic_metadata = combined_metadata
@@ -123,6 +144,14 @@ class VersionedDataManager:
             # For trie models, extract corpus_id
             if "corpus_id" in combined_metadata:
                 constructor_params["corpus_id"] = combined_metadata.pop("corpus_id")
+            # Remaining metadata goes to generic metadata
+            generic_metadata = combined_metadata
+        elif resource_type == ResourceType.SEMANTIC:
+            # For semantic models, extract corpus_id and model_name
+            if "corpus_id" in combined_metadata:
+                constructor_params["corpus_id"] = combined_metadata.pop("corpus_id")
+            if "model_name" in combined_metadata:
+                constructor_params["model_name"] = combined_metadata.pop("model_name")
             # Remaining metadata goes to generic metadata
             generic_metadata = combined_metadata
         else:
@@ -134,24 +163,35 @@ class VersionedDataManager:
         versioned = model_class(**constructor_params)
 
         # Set content with automatic storage strategy
-        await versioned.set_content(content)
+        await set_versioned_content(versioned, content)
 
         # Atomic save with version chain update
         async with self.lock:
-            if latest and config.increment_version:
-                latest.version_info.is_latest = False
-                latest.version_info.superseded_by = versioned.id
-                await latest.save()
-
+            # Save new version first to ensure it exists
             await versioned.save()
+
+            # Then update previous version to point to it
+            # If this fails, we still have a valid new version
+            if latest and config.increment_version:
+                try:
+                    latest.version_info.is_latest = False
+                    latest.version_info.superseded_by = versioned.id
+                    await latest.save()
+                except Exception as e:
+                    logger.warning(f"Failed to update previous version chain: {e}")
 
             # Tree structures handled by TreeCorpusManager for corpus types
 
-        # Cache if enabled
+        # Cache if enabled - invalidate old and set new
         if config.use_cache:
             if self.cache is None:
                 self.cache = await get_global_cache()
             cache_key = f"{resource_type.value}:{resource_id}"
+
+            # Invalidate any existing cache entry to ensure fresh reads
+            await self.cache.delete(namespace, cache_key)
+
+            # Set new cache entry
             await self.cache.set(namespace, cache_key, versioned, config.ttl)
 
         logger.info(f"Saved {resource_type.value} '{resource_id}' version {new_version}")
@@ -188,12 +228,16 @@ class VersionedDataManager:
         if config.version:
             # Get specific version
             result = await model_class.find_one(
-                {"resource_id": resource_id, "version_info.version": config.version}
+                {"resource_id": resource_id, "version_info.version": config.version},
             )
         else:
-            # Get latest
-            result = await model_class.find_one(
-                {"resource_id": resource_id, "version_info.is_latest": True}
+            # Get latest - sort by ID descending to get the most recent if multiple have is_latest=True
+            result = (
+                await model_class.find(
+                    {"resource_id": resource_id, "version_info.is_latest": True},
+                )
+                .sort("-_id")
+                .first_or_none()
             )
 
         # Cache result
@@ -225,12 +269,15 @@ class VersionedDataManager:
         return [r.version_info.version for r in results]
 
     async def delete_version(
-        self, resource_id: str, resource_type: ResourceType, version: str
+        self,
+        resource_id: str,
+        resource_type: ResourceType,
+        version: str,
     ) -> bool:
         """Delete a specific version."""
         model_class = self._get_model_class(resource_type)
         result = await model_class.find_one(
-            {"resource_id": resource_id, "version_info.version": version}
+            {"resource_id": resource_id, "version_info.version": version},
         )
 
         if result:
@@ -275,7 +322,7 @@ class VersionedDataManager:
                     continue  # Skip uninitialized collections
 
                 result = await model_class.find_one(
-                    {"resource_id": resource_id, "version_info.data_hash": content_hash}
+                    {"resource_id": resource_id, "version_info.data_hash": content_hash},
                 )
                 if result:
                     return result
@@ -309,12 +356,14 @@ class VersionedDataManager:
 
     def _json_encoder(self, obj: Any) -> str:
         """Custom JSON encoder for complex objects like PydanticObjectId."""
-        from enum import Enum
+        from datetime import datetime
 
         if isinstance(obj, PydanticObjectId):
             return str(obj)
-        elif isinstance(obj, Enum):
-            return obj.value
+        if isinstance(obj, Enum):
+            return str(obj.value)
+        if isinstance(obj, datetime):
+            return obj.isoformat()
         raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
@@ -327,6 +376,7 @@ def get_version_manager() -> VersionedDataManager:
 
     Returns:
         VersionedDataManager singleton
+
     """
     global _version_manager
     if _version_manager is None:

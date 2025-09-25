@@ -22,7 +22,7 @@ ParseResult = tuple[list[str], list[str]]
 
 def parse_text_lines(content: str, language: Language) -> ParseResult:
     """Parse text content with one word/phrase per line or frequency lists.
-    
+
     Handles:
     - Simple word lists (one per line)
     - Frequency lists (word frequency pairs)
@@ -41,7 +41,7 @@ def parse_text_lines(content: str, language: Language) -> ParseResult:
         parts = line.split()
         if not parts:
             continue
-        
+
         # If there's only one part or the second part is a number (frequency),
         # treat the first part as the word/phrase
         if len(parts) == 1 or (len(parts) >= 2 and parts[1].isdigit()):
@@ -49,7 +49,7 @@ def parse_text_lines(content: str, language: Language) -> ParseResult:
         else:
             # Otherwise, treat the whole line as a potential phrase
             word = line
-            
+
         normalized = normalize(word)
         if not normalized:
             continue
@@ -64,7 +64,7 @@ def parse_text_lines(content: str, language: Language) -> ParseResult:
 
 def parse_json_vocabulary(content: str | dict[str, Any], language: Language) -> ParseResult:
     """Parse JSON vocabulary data from string or dict.
-    
+
     Handles various JSON structures:
     - {"words": [...], "phrases": [...]}
     - {"vocabulary": [...]}
@@ -102,13 +102,13 @@ def parse_json_vocabulary(content: str | dict[str, Any], language: Language) -> 
             elif isinstance(item, dict):
                 # Handle objects with text fields
                 text = (
-                    item.get("word") or 
-                    item.get("text") or 
-                    item.get("idiom") or 
-                    item.get("phrase") or 
-                    item.get("term") or
-                    item.get("name") or  # GitHub files
-                    ""
+                    item.get("word")
+                    or item.get("text")
+                    or item.get("idiom")
+                    or item.get("phrase")
+                    or item.get("term")
+                    or item.get("name")  # GitHub files
+                    or ""
                 )
                 if text:
                     normalized = normalize(text)
@@ -117,7 +117,7 @@ def parse_json_vocabulary(content: str | dict[str, Any], language: Language) -> 
                             phrases.append(normalized)
                         else:
                             words.append(normalized)
-    
+
     # Handle dictionary
     elif isinstance(data, dict):
         # Extract from specific keys
@@ -133,7 +133,7 @@ def parse_json_vocabulary(content: str | dict[str, Any], language: Language) -> 
                                 words.append(normalized)
 
         # Extract phrases from phrase-specific keys
-        for key in ["phrases", "idioms", "expressions", "phrasal_verbs"]:
+        for key in ["phrases", "expressions", "phrasal_verbs"]:
             if key in data and isinstance(data[key], list):
                 for item in data[key]:
                     if isinstance(item, str):
@@ -143,16 +143,24 @@ def parse_json_vocabulary(content: str | dict[str, Any], language: Language) -> 
                     elif isinstance(item, dict):
                         # Extract from nested structure
                         text = (
-                            item.get("idiom") or 
-                            item.get("phrase") or 
-                            item.get("text") or
-                            item.get("expression") or
-                            ""
+                            item.get("idiom")
+                            or item.get("phrase")
+                            or item.get("text")
+                            or item.get("expression")
+                            or ""
                         )
                         if text:
                             normalized = normalize(text)
                             if normalized:
                                 phrases.append(normalized)
+
+        # Extract idioms as vocabulary items (they're multi-word expressions)
+        if "idioms" in data and isinstance(data["idioms"], list):
+            for item in data["idioms"]:
+                if isinstance(item, str):
+                    normalized = normalize(item)
+                    if normalized:
+                        words.append(normalized)  # Add idioms to vocabulary
 
         # Use dictionary keys as vocabulary if no explicit vocabulary keys found
         if not words and not phrases and len(data) > 0:
@@ -172,7 +180,7 @@ def parse_json_vocabulary(content: str | dict[str, Any], language: Language) -> 
 
 def parse_csv_words(content: str, language: Language) -> ParseResult:
     """Parse CSV with word/phrase data.
-    
+
     Handles:
     - CSV with headers (word, text, vocabulary, term, idiom, phrase columns)
     - Simple CSV without headers
@@ -185,27 +193,36 @@ def parse_csv_words(content: str, language: Language) -> ParseResult:
         lines = content.strip().split("\n")
         if not lines:
             return [], []
-            
+
         first_line = lines[0]
 
         # Check if content looks like CSV with headers
         if "," in first_line and any(
             col in first_line.lower()
-            for col in ["word", "text", "vocabulary", "term", "frequency", "type", "idiom", "phrase"]
+            for col in [
+                "word",
+                "text",
+                "vocabulary",
+                "term",
+                "frequency",
+                "type",
+                "idiom",
+                "phrase",
+            ]
         ):
             csv_reader = csv.DictReader(StringIO(content))
 
             for row in csv_reader:
                 # Extract text from common column names
                 text = (
-                    row.get("word") or
-                    row.get("text") or
-                    row.get("vocabulary") or
-                    row.get("term") or
-                    row.get("idiom") or
-                    row.get("phrase") or
-                    row.get("expression") or
-                    ""
+                    row.get("word")
+                    or row.get("text")
+                    or row.get("vocabulary")
+                    or row.get("term")
+                    or row.get("idiom")
+                    or row.get("phrase")
+                    or row.get("expression")
+                    or ""
                 ).strip()
 
                 if not text:
@@ -250,7 +267,7 @@ def parse_scraped_data(
     language: Language,
 ) -> ParseResult:
     """Parse scraped data from custom scrapers.
-    
+
     This handles the output from specialized scrapers that return
     structured data instead of raw text.
     """

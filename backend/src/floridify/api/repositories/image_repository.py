@@ -139,10 +139,10 @@ class ImageRepository(BaseRepository[ImageMedia, ImageCreate, ImageUpdate]):
         if version is not None and image.version != version:
             raise ValueError(f"Version mismatch: expected {version}, got {image.version}")
 
-        # Update fields
+        # Update fields using TypedFieldUpdater
+        from ..core.protocols import TypedFieldUpdater
         update_data = data.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(image, field, value)
+        TypedFieldUpdater.update_fields(image, update_data)
 
         image.version += 1
         await image.save()

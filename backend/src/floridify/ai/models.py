@@ -149,7 +149,8 @@ class LiteratureAugmentation(BaseModel):
     suggested_additions: list[str] = Field(description="Words to add")
     suggested_removals: list[str] = Field(description="Words to remove")
     thematic_clusters: dict[str, list[str]] = Field(
-        default_factory=dict, description="Thematic word clusters"
+        default_factory=dict,
+        description="Thematic word clusters",
     )
 
 
@@ -158,7 +159,9 @@ class LiteratureQualityMetrics(BaseModel):
 
     coverage_score: float = Field(ge=0.0, le=1.0, description="Coverage of author's vocabulary")
     distinctiveness_score: float = Field(
-        ge=0.0, le=1.0, description="Uniqueness compared to general English"
+        ge=0.0,
+        le=1.0,
+        description="Uniqueness compared to general English",
     )
     coherence_score: float = Field(ge=0.0, le=1.0, description="Internal consistency")
     balance_score: float = Field(ge=0.0, le=1.0, description="Distribution across categories")

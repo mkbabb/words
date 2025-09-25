@@ -57,10 +57,14 @@ class RateLimitConfig(BaseModel):
     min_delay: float = Field(default=0.5, ge=0.0, description="Minimum delay between requests")
     max_delay: float = Field(default=10.0, ge=1.0, description="Maximum delay for backoff")
     backoff_multiplier: float = Field(
-        default=2.0, ge=1.0, description="Exponential backoff multiplier"
+        default=2.0,
+        ge=1.0,
+        description="Exponential backoff multiplier",
     )
     success_speedup: float = Field(
-        default=1.1, ge=1.0, description="Rate increase after successful requests"
+        default=1.1,
+        ge=1.0,
+        description="Rate increase after successful requests",
     )
     success_threshold: int = Field(default=10, ge=1, description="Successes needed before speedup")
     max_consecutive_errors: int = Field(default=5, ge=1, description="Stop after this many errors")
@@ -77,7 +81,8 @@ class ScrapingSession(BaseModel):
     failed_items: int = Field(default=0, description="Items that failed processing")
     start_time: datetime = Field(default_factory=datetime.now, description="Session start time")
     last_checkpoint: datetime = Field(
-        default_factory=datetime.now, description="Last checkpoint time"
+        default_factory=datetime.now,
+        description="Last checkpoint time",
     )
     errors: list[str] = Field(default_factory=list, description="List of error messages")
     cache_namespace: str = Field(default="scraping", description="Cache namespace for this session")

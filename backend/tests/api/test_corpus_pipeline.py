@@ -1,5 +1,4 @@
-"""
-Comprehensive tests for the corpus pipeline REST API endpoints.
+"""Comprehensive tests for the corpus pipeline REST API endpoints.
 Tests TTL-based corpus management, search within corpus, and cache behavior.
 """
 
@@ -7,8 +6,9 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from ..conftest import assert_response_structure
 from httpx import AsyncClient
+
+from ..conftest import assert_response_structure
 
 
 class TestCorpusPipelineAPI:
@@ -70,7 +70,8 @@ class TestCorpusPipelineAPI:
         """Test corpus creation input validation."""
         # Empty words list
         response = await async_client.post(
-            "/api/v1/corpus", json={"words": [], "name": "empty_corpus"}
+            "/api/v1/corpus",
+            json={"words": [], "name": "empty_corpus"},
         )
         assert response.status_code in [400, 422]
 
@@ -86,7 +87,8 @@ class TestCorpusPipelineAPI:
 
         # Invalid TTL (negative)
         response = await async_client.post(
-            "/api/v1/corpus", json={"words": ["test"], "ttl_hours": -1.0}
+            "/api/v1/corpus",
+            json={"words": ["test"], "ttl_hours": -1.0},
         )
         assert response.status_code in [400, 422]
 
@@ -105,7 +107,7 @@ class TestCorpusPipelineAPI:
 
         # Search within corpus
         search_response = await async_client.post(
-            f"/api/v1/corpus/{corpus_id}/search?query=test&max_results=10"
+            f"/api/v1/corpus/{corpus_id}/search?query=test&max_results=10",
         )
 
         assert search_response.status_code == 200
@@ -135,7 +137,7 @@ class TestCorpusPipelineAPI:
 
         # Search with misspelling
         search_response = await async_client.post(
-            f"/api/v1/corpus/{corpus_id}/search?query=beatuful&min_score=0.3"
+            f"/api/v1/corpus/{corpus_id}/search?query=beatuful&min_score=0.3",
         )
 
         assert search_response.status_code == 200
@@ -231,7 +233,7 @@ class TestCorpusPipelineAPI:
         fake_corpus_id = "nonexistent_corpus_123"
 
         search_response = await async_client.post(
-            f"/api/v1/corpus/{fake_corpus_id}/search?query=test"
+            f"/api/v1/corpus/{fake_corpus_id}/search?query=test",
         )
 
         assert search_response.status_code == 404
@@ -322,7 +324,10 @@ class TestCorpusPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_corpus_search_performance(
-        self, async_client: AsyncClient, performance_thresholds, benchmark
+        self,
+        async_client: AsyncClient,
+        performance_thresholds,
+        benchmark,
     ):
         """Benchmark corpus search performance."""
         # Create corpus with substantial word list
@@ -334,7 +339,7 @@ class TestCorpusPipelineAPI:
 
         async def search_operation():
             response = await async_client.post(
-                f"/api/v1/corpus/{corpus_id}/search?query=searchword&max_results=20"
+                f"/api/v1/corpus/{corpus_id}/search?query=searchword&max_results=20",
             )
             assert response.status_code == 200
             return response.json()

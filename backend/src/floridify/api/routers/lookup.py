@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import time
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from ...api.services.loaders import DictionaryEntryLoader
 from ...caching import cached_api_call_with_dedup
 from ...caching.core import get_global_cache
+from ...caching.models import CacheNamespace
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, StateTracker
 from ...core.streaming import create_streaming_response
@@ -243,7 +244,10 @@ async def _lookup_with_tracking(
             cache_key = hashlib.sha256(str(key_parts).encode()).hexdigest()
 
             # Check memory cache
-            cached_result: DictionaryEntryResponse | None = await cache.get("api", cache_key)
+            cached_result = cast(
+                "DictionaryEntryResponse | None",
+                await cache.get(CacheNamespace.API, cache_key),
+            )
             if cached_result is not None:
                 logger.info(f"🎯 Memory cache hit for '{word}'")
                 await _report_cached_progress(
@@ -264,7 +268,12 @@ async def _lookup_with_tracking(
                 result = DictionaryEntryResponse(**response_dict)
 
                 # Store in memory cache for next time
-                await cache.set("api", cache_key, result, ttl=timedelta(hours=1.0))
+                await cache.set(
+                    CacheNamespace.API,
+                    cache_key,
+                    result,
+                    ttl_override=timedelta(hours=1.0),
+                )
 
                 await _report_cached_progress(
                     state_tracker,

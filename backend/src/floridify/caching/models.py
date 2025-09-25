@@ -6,12 +6,14 @@ inherited by all metadata classes throughout the system.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+import hashlib
+import json
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 
 from beanie import Document, PydanticObjectId
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class CompressionType(str, Enum):
@@ -152,7 +154,7 @@ class VersionInfo(BaseModel):
     """
 
     version: str = "1.0.0"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     data_hash: str
     is_latest: bool = True
     superseded_by: PydanticObjectId | None = None
@@ -203,61 +205,20 @@ class BaseVersionedData(Document):
             "version_info.data_hash",
         ]
 
-    # get_content method removed - use get_versioned_content() from caching.core instead
+    @model_validator(mode="before")
+    @classmethod
+    def _apply_defaults(cls, values: Any) -> Any:
+        """Populate missing defaults for new metadata documents."""
+        if not isinstance(values, dict):
+            return values
 
-    async def set_content(self, content: Any, force_external: bool = False) -> None:
-        """Store content with automatic strategy selection.
-
-        Args:
-            content: The content to store
-            force_external: If True, force external storage regardless of size
-
-        Storage strategy:
-        - Small content (< 16KB): Inline storage
-        - Large content (>= 16KB) or force_external: External storage
-        """
-        import json
-
-        from ..caching import get_global_cache
-
-        # Serialize to measure size with ObjectId handling
-        def json_encoder(obj: Any) -> str:
-            from enum import Enum
-
-            from beanie import PydanticObjectId
-
-            if isinstance(obj, PydanticObjectId):
-                return str(obj)
-            elif isinstance(obj, Enum):
-                return str(obj.value)
-            raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
-
-        content_str = json.dumps(content, sort_keys=True, default=json_encoder)
-        content_size = len(content_str.encode())
-
-        # Size threshold for inline vs external storage (16KB)
-        size_threshold = 16 * 1024
-
-        if not force_external and content_size < size_threshold:
-            # Store inline
-            self.content_inline = content
-            self.content_location = None
-        else:
-            # Store externally
-            cache = await get_global_cache()
-            cache_key = f"{self.resource_type.value}:{self.resource_id}:content:{self.version_info.data_hash[:8]}"
-
-            await cache.set(
-                namespace=self.namespace, key=cache_key, value=content, ttl_override=self.ttl
+        if "version_info" not in values:
+            content = values.get("content_inline") or {}
+            content_str = json.dumps(content, sort_keys=True, default=str)
+            values["version_info"] = VersionInfo(
+                version="1.0.0",
+                created_at=datetime.now(UTC),
+                data_hash=hashlib.sha256(content_str.encode()).hexdigest(),
             )
 
-            import hashlib
-
-            self.content_location = ContentLocation(
-                cache_namespace=self.namespace,
-                cache_key=cache_key,
-                storage_type=StorageType.CACHE,
-                size_bytes=content_size,
-                checksum=hashlib.sha256(content_str.encode()).hexdigest(),
-            )
-            self.content_inline = None
+        return values

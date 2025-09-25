@@ -21,6 +21,7 @@ async def default_literature_scraper(
 
     Returns:
         Text content from the URL
+
     """
     if not url:
         raise ValueError("URL is required")
@@ -29,11 +30,10 @@ async def default_literature_scraper(
         response = await session.get(url)
         response.raise_for_status()
         return response.text
-    else:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.text
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.get(url)
+        response.raise_for_status()
+        return response.text
 
 
 async def scrape_gutenberg(

@@ -23,9 +23,9 @@ from floridify.search.semantic.models import SemanticIndex
 
 
 @pytest_asyncio.fixture(scope="function")
-async def motor_client() -> AsyncGenerator[AsyncIOMotorClient, None]:
+async def motor_client(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClient, None]:
     """Create a MongoDB client for testing."""
-    client = AsyncIOMotorClient("mongodb://localhost:27017")
+    client = AsyncIOMotorClient(mongodb_server, serverSelectionTimeoutMS=500)
     try:
         # Test connection
         await client.admin.command("ping")
@@ -84,7 +84,9 @@ async def sample_vocabularies() -> dict[str, list[str]]:
 
 @pytest_asyncio.fixture
 async def corpus_tree(
-    test_db, tree_manager: TreeCorpusManager, sample_vocabularies: dict[str, list[str]]
+    test_db,
+    tree_manager: TreeCorpusManager,
+    sample_vocabularies: dict[str, list[str]],
 ):
     """Create a 3-level test tree using real Corpus.Metadata."""
     # Create language corpus (master)
@@ -192,7 +194,8 @@ async def concurrent_executor():
             return await task
 
         return await asyncio.gather(
-            *[delayed_task(task, i * delay) for i, task in enumerate(tasks)], return_exceptions=True
+            *[delayed_task(task, i * delay) for i, task in enumerate(tasks)],
+            return_exceptions=True,
         )
 
     return execute_concurrent

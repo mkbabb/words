@@ -161,10 +161,13 @@ async def find_best_match(
         Best matching search result or None
 
     """
+    # Map semantic parameter to SearchMode
+    mode = SearchMode.SMART if semantic else SearchMode.FAST
+
     results = await search_word_pipeline(
         word=word,
         languages=languages,
-        semantic=semantic,
+        mode=mode,
         max_results=1,
     )
 

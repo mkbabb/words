@@ -264,7 +264,7 @@ class Embedder:
             )
         except Exception as e:
             logger.warning(
-                f"⚠️ Embedding computation failed with batch_size={optimal_batch_size}: {e}"
+                f"⚠️ Embedding computation failed with batch_size={optimal_batch_size}: {e}",
             )
             logger.info("🔄 Retrying with batch_size=1")
             # Fallback to single-item processing

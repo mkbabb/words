@@ -5,7 +5,7 @@ from .models import LanguageEntry, LanguageProvider, LanguageSource
 
 __all__ = [
     "LanguageConnector",
-    "LanguageProvider",
     "LanguageEntry",
+    "LanguageProvider",
     "LanguageSource",
 ]

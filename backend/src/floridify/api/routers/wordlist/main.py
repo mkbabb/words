@@ -151,7 +151,7 @@ async def generate_wordlist_slug() -> dict[str, str]:
     """
     try:
         # Generate slug using existing utility (empty list for words since name is independent)
-        slug_name = generate_wordlist_name([])
+        slug_name = generate_wordlist_name()
         return {"name": slug_name}
     except Exception:
         # Fallback to a simple timestamp-based name if generation fails

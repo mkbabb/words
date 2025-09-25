@@ -6,9 +6,10 @@ from typing import Any
 
 from ...caching.models import CacheNamespace, ResourceType, VersionConfig
 from ...core.state_tracker import StateTracker
-from ...models.dictionary import DictionaryEntry, DictionaryProvider
+from ...models.dictionary import DictionaryProvider
 from ...utils.logging import get_logger
 from ..core import BaseConnector, ConnectorConfig
+from .models import DictionaryProviderEntry
 
 logger = get_logger(__name__)
 
@@ -33,44 +34,77 @@ class DictionaryConnector(BaseConnector):
         """Get the cache namespace for dictionary entries."""
         return CacheNamespace.DICTIONARY
 
-    def get_provider_identifier(self) -> str:
-        """Get the provider identifier for resource IDs."""
+    def get_cache_key_suffix(self) -> str:
         return self.provider.value
 
     def get_metadata_for_resource(self, resource_id: str) -> dict[str, Any]:
         """Get dictionary-specific metadata for a resource."""
         return {
-            "word": resource_id,  # Keep word in metadata for backward compatibility
+            "word": resource_id,
             "provider": self.provider.value,
             "provider_display_name": self.provider.display_name,
         }
+
+    def _coerce_entry(
+        self,
+        payload: DictionaryProviderEntry | dict[str, Any],
+    ) -> DictionaryProviderEntry:
+        if isinstance(payload, DictionaryProviderEntry):
+            return payload
+        return DictionaryProviderEntry.model_validate(payload)
+
+    def model_dump(self, content: Any) -> Any:
+        entry = self._coerce_entry(content)
+        return entry.model_dump(mode="json")
+
+    def model_load(self, content: Any) -> Any:
+        return DictionaryProviderEntry.model_validate(content)
+
+    async def get(
+        self,
+        resource_id: str,
+        config: VersionConfig | None = None,
+    ) -> DictionaryProviderEntry | None:
+        result = await super().get(resource_id, config)
+        if result is None:
+            return None
+        return self._coerce_entry(result)
 
     async def fetch(
         self,
         resource_id: str,
         config: VersionConfig | None = None,
         state_tracker: StateTracker | None = None,
-    ) -> DictionaryEntry | None:
-        """Fetch dictionary entry from provider and convert to DictionaryEntry.
-        
-        This method overrides the base fetch() to return a typed DictionaryEntry object
-        instead of a raw dictionary. The flow is:
-        1. Call parent fetch() which returns dict from _fetch_from_provider
-        2. Convert the dict to a DictionaryEntry object
-        3. Return the typed object
-        
-        Note: For now, we return the dict directly to maintain compatibility.
-        Future versions will implement full DictionaryEntry conversion.
-        """
-        # Get the dictionary data from the provider
-        result = await super().fetch(resource_id, config, state_tracker)
-        
-        if result is None:
-            return None
-            
-        # For now, return the dict as-is to maintain compatibility
-        # TODO: Implement conversion from dict to DictionaryEntry
-        # This will require creating Word, Definition, Pronunciation objects
-        # and getting their IDs to populate the DictionaryEntry
-        return result
+    ) -> DictionaryProviderEntry | None:
+        """Fetch dictionary entry from provider and convert to provider model."""
+        config = config or VersionConfig()
 
+        if not config.force_rebuild:
+            cached = await self.get(resource_id, config)
+            if cached is not None:
+                logger.info(
+                    "%s using cached %s entry for '%s'",
+                    self.provider.value,
+                    self.get_resource_type().value,
+                    resource_id,
+                )
+                return cached
+
+        await self.rate_limiter.acquire()
+
+        if state_tracker:
+            await state_tracker.update(
+                stage="fetching",
+                message=f"{resource_id} from {self.provider.value}",
+            )
+
+        entry = await self._fetch_from_provider(resource_id, state_tracker)
+        if entry is None:
+            return None
+
+        typed_entry = self._coerce_entry(entry)
+
+        if self.config.save_versioned:
+            await self.save(resource_id, typed_entry, config)
+
+        return typed_entry

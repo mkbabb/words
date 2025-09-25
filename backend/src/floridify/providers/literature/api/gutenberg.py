@@ -41,6 +41,7 @@ class GutenbergConnector(LiteratureConnector):
 
         Returns:
             Work content or metadata
+
         """
         # This is a stub implementation as Gutenberg uses specific methods
         # like download_work and search_works for different operations
@@ -51,7 +52,9 @@ class GutenbergConnector(LiteratureConnector):
             work = LiteratureEntry(
                 title=f"Work {source_id}",
                 author=AuthorInfo(
-                    name="Unknown", period=Period.CONTEMPORARY, primary_genre=Genre.NOVEL
+                    name="Unknown",
+                    period=Period.CONTEMPORARY,
+                    primary_genre=Genre.NOVEL,
                 ),
                 gutenberg_id=source_id,
                 work_id=source_id,
@@ -251,7 +254,7 @@ class GutenbergConnector(LiteratureConnector):
                         year_match = re.search(r"\b(18|19|20)\d{2}\b", value)
                         if year_match:
                             metadata["publication_year"] = int(
-                                year_match.group()
+                                year_match.group(),
                             )  # Changed from "year" to avoid type confusion
 
         return metadata
@@ -391,7 +394,7 @@ class GutenbergConnector(LiteratureConnector):
                 continue
 
         logger.info(
-            f"✅ Downloaded {len(results)}/{len(works_to_download)} works for {author.name}"
+            f"✅ Downloaded {len(results)}/{len(works_to_download)} works for {author.name}",
         )
         return results
 

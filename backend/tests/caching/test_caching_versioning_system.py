@@ -8,31 +8,35 @@ import asyncio
 import hashlib
 import json
 import tempfile
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
+import pytest_asyncio
 
-from floridify.caching.core import GlobalCacheManager
+from floridify.caching.core import GlobalCacheManager, get_versioned_content, set_versioned_content
+from floridify.caching.filesystem import FilesystemBackend
 from floridify.caching.models import CacheNamespace, VersionInfo
 from floridify.models.base import Language
 from floridify.models.dictionary import DictionaryProvider, Word
-from floridify.models.literature import AuthorInfo, Genre, Period
+from floridify.models.literature import AuthorInfo, Genre, LiteratureProvider, Period
 from floridify.providers.dictionary.models import DictionaryProviderEntry
-from floridify.providers.literature.models import LiteratureEntry, LiteratureSource
+from floridify.providers.literature.models import LiteratureEntry
 
 
 class TestDictionaryEntryCaching:
     """Test caching functionality for DictionaryEntry objects."""
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def cache_manager(self):
         """Create a cache manager with temporary directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            manager = GlobalCacheManager(cache_dir=tmpdir)
+            backend = FilesystemBackend(Path(tmpdir))
+            manager = GlobalCacheManager(backend)
             await manager.initialize()
             yield manager
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def sample_word(self, test_db):
         """Create a sample word for testing."""
         word = Word(text="cache_test", language=Language.ENGLISH)
@@ -49,7 +53,7 @@ class TestDictionaryEntryCaching:
                     "part_of_speech": "noun",
                     "text": "A test for caching system",
                     "examples": ["This is a cache test example."],
-                }
+                },
             ],
             "pronunciation": "/keɪʃ tɛst/",
             "etymology": "From test + cache",
@@ -90,12 +94,12 @@ class TestDictionaryEntryCaching:
             version_info=version_info_v1,
         )
 
-        await entry_v1.set_content(content_v1)
+        await set_versioned_content(entry_v1, content_v1)
         await entry_v1.save()
 
         # Verify v1 is saved and marked as latest
         assert entry_v1.version_info.is_latest is True
-        retrieved_content_v1 = await entry_v1.get_content()
+        retrieved_content_v1 = await get_versioned_content(entry_v1)
         assert retrieved_content_v1 == content_v1
 
         # Create version 2
@@ -111,7 +115,10 @@ class TestDictionaryEntryCaching:
         data_hash_v2 = hashlib.sha256(json.dumps(content_v2, sort_keys=True).encode()).hexdigest()
 
         version_info_v2 = VersionInfo(
-            version="2.0.0", data_hash=data_hash_v2, is_latest=True, supersedes=entry_v1.id
+            version="2.0.0",
+            data_hash=data_hash_v2,
+            is_latest=True,
+            supersedes=entry_v1.id,
         )
 
         entry_v2 = DictionaryProviderEntry.Metadata(
@@ -122,7 +129,7 @@ class TestDictionaryEntryCaching:
             version_info=version_info_v2,
         )
 
-        await entry_v2.set_content(content_v2)
+        await set_versioned_content(entry_v2, content_v2)
         await entry_v2.save()
 
         # Update v1 to point to v2
@@ -137,7 +144,7 @@ class TestDictionaryEntryCaching:
         assert entry_v2.version_info.supersedes == entry_v1.id
 
         # Verify content integrity
-        retrieved_content_v2 = await entry_v2.get_content()
+        retrieved_content_v2 = await get_versioned_content(entry_v2)
         assert retrieved_content_v2 == content_v2
         assert len(retrieved_content_v2["definitions"]) == 2
 
@@ -152,7 +159,7 @@ class TestDictionaryEntryCaching:
                     "text": f"Definition {i}: " + "A" * 1000,  # 1KB per definition
                     "part_of_speech": "noun",
                     "examples": [f"Example {i}: " + "B" * 500 for _ in range(5)],
-                }
+                },
             )
 
         large_content = {
@@ -174,7 +181,7 @@ class TestDictionaryEntryCaching:
         )
 
         # Set large content (should trigger external storage)
-        await entry.set_content(large_content)
+        await set_versioned_content(entry, large_content)
         await entry.save()
 
         # Verify external storage was used
@@ -184,7 +191,7 @@ class TestDictionaryEntryCaching:
         assert entry.content_location.size_bytes > 1_000_000
 
         # Verify content can be retrieved
-        retrieved_content = await entry.get_content()
+        retrieved_content = await get_versioned_content(entry)
         assert retrieved_content is not None
         assert len(retrieved_content["definitions"]) == 1000
         assert retrieved_content["etymology"] == large_content["etymology"]
@@ -232,7 +239,7 @@ class TestDictionaryEntryCaching:
                     * 10,
                     "part_of_speech": "noun" if i % 2 == 0 else "verb",
                     "examples": [f"Example sentence {i} with repeated patterns and words. " * 5],
-                }
+                },
             )
 
         compressible_data = {
@@ -257,11 +264,12 @@ class TestDictionaryEntryCaching:
 class TestLiteratureEntryCaching:
     """Test caching functionality for LiteratureEntry objects."""
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def cache_manager(self):
         """Create a cache manager with temporary directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            manager = GlobalCacheManager(cache_dir=tmpdir)
+            backend = FilesystemBackend(Path(tmpdir))
+            manager = GlobalCacheManager(backend)
             await manager.initialize()
             yield manager
 
@@ -324,7 +332,7 @@ class TestLiteratureEntryCaching:
             resource_id="evolving_novel",
             title="Evolving Novel",
             authors=[sample_author],
-            source=LiteratureSource.LOCAL_FILE,
+            source=LiteratureProvider.LOCAL_FILE,
             language=Language.ENGLISH,
             text_hash=text_hash_v1,
             text_size_bytes=len(content_v1["full_text"]),
@@ -333,7 +341,7 @@ class TestLiteratureEntryCaching:
             version_info=version_info_v1,
         )
 
-        await entry_v1.set_content(content_v1)
+        await set_versioned_content(entry_v1, content_v1)
         await entry_v1.save()
 
         # Version 2: Extended content
@@ -351,14 +359,17 @@ class TestLiteratureEntryCaching:
         text_hash_v2 = hashlib.sha256(content_v2["full_text"].encode()).hexdigest()
 
         version_info_v2 = VersionInfo(
-            version="2.0.0", data_hash=text_hash_v2, is_latest=True, supersedes=entry_v1.id
+            version="2.0.0",
+            data_hash=text_hash_v2,
+            is_latest=True,
+            supersedes=entry_v1.id,
         )
 
         entry_v2 = LiteratureEntry.Metadata(
             resource_id="evolving_novel",
             title="Evolving Novel",
             authors=[sample_author],
-            source=LiteratureSource.LOCAL_FILE,
+            source=LiteratureProvider.LOCAL_FILE,
             language=Language.ENGLISH,
             text_hash=text_hash_v2,
             text_size_bytes=len(content_v2["full_text"]),
@@ -367,7 +378,7 @@ class TestLiteratureEntryCaching:
             version_info=version_info_v2,
         )
 
-        await entry_v2.set_content(content_v2)
+        await set_versioned_content(entry_v2, content_v2)
         await entry_v2.save()
 
         # Update v1 version chain
@@ -378,11 +389,12 @@ class TestLiteratureEntryCaching:
         # Verify version progression
         assert entry_v2.version_info.is_latest is True
         assert entry_v1.version_info.is_latest is False
-        assert entry_v2.word_count > entry_v1.word_count
+        # Compare word counts from content, not metadata
+        assert content_v2["word_count"] > content_v1["word_count"]
 
         # Verify content integrity
-        retrieved_v1 = await entry_v1.get_content()
-        retrieved_v2 = await entry_v2.get_content()
+        retrieved_v1 = await get_versioned_content(entry_v1)
+        retrieved_v2 = await get_versioned_content(entry_v2)
 
         assert len(retrieved_v1["chapters"]) == 1
         assert len(retrieved_v2["chapters"]) == 2
@@ -423,7 +435,7 @@ class TestLiteratureEntryCaching:
             resource_id="war_and_peace_large",
             title="War and Peace - Large Edition",
             authors=[sample_author],
-            source=LiteratureSource.GUTENBERG,
+            source=LiteratureProvider.GUTENBERG,
             language=Language.ENGLISH,
             text_hash=text_hash,
             text_size_bytes=len(large_content["full_text"]),
@@ -433,7 +445,7 @@ class TestLiteratureEntryCaching:
         )
 
         # Should trigger external storage
-        await entry.set_content(large_content)
+        await set_versioned_content(entry, large_content)
         await entry.save()
 
         # Verify external storage
@@ -443,7 +455,7 @@ class TestLiteratureEntryCaching:
         assert entry.content_inline is None
 
         # Verify retrieval
-        retrieved_content = await entry.get_content()
+        retrieved_content = await get_versioned_content(entry)
         assert retrieved_content is not None
         assert len(retrieved_content["chapters"]) == 50
         assert retrieved_content["title"] == "War and Peace - Large Edition"
@@ -485,11 +497,12 @@ class TestLiteratureEntryCaching:
 class TestCacheVersioningIntegration:
     """Test integration between caching and versioning systems."""
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def cache_manager(self):
         """Create a cache manager with temporary directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            manager = GlobalCacheManager(cache_dir=tmpdir)
+            backend = FilesystemBackend(Path(tmpdir))
+            manager = GlobalCacheManager(backend)
             await manager.initialize()
             yield manager
 
@@ -500,13 +513,13 @@ class TestCacheVersioningIntegration:
         await word.save()
 
         # Version 1
-        data_v1 = {"content": "version 1", "timestamp": datetime.utcnow().isoformat()}
+        data_v1 = {"content": "version 1", "timestamp": datetime.now(UTC).isoformat()}
         cache_key_v1 = f"dict:{word.text}:v1.0.0"
 
         await cache_manager.set(CacheNamespace.DICTIONARY, cache_key_v1, data_v1)
 
         # Version 2
-        data_v2 = {"content": "version 2", "timestamp": datetime.utcnow().isoformat()}
+        data_v2 = {"content": "version 2", "timestamp": datetime.now(UTC).isoformat()}
         cache_key_v2 = f"dict:{word.text}:v2.0.0"
 
         await cache_manager.set(CacheNamespace.DICTIONARY, cache_key_v2, data_v2)
@@ -549,7 +562,7 @@ class TestCacheVersioningIntegration:
             content = {
                 "version": f"v{version_num}",
                 "data": f"concurrent content {version_num}",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
             data_hash = hashlib.sha256(json.dumps(content, sort_keys=True).encode()).hexdigest()
@@ -568,7 +581,7 @@ class TestCacheVersioningIntegration:
                 version_info=version_info,
             )
 
-            await entry.set_content(content)
+            await set_versioned_content(entry, content)
             await entry.save()
             return entry
 
@@ -590,10 +603,10 @@ class TestCacheVersioningIntegration:
         namespace = CacheNamespace.DICTIONARY
         short_ttl_key = "short_ttl_test"
 
-        data = {"content": "expires soon", "created": datetime.utcnow().isoformat()}
+        data = {"content": "expires soon", "created": datetime.now(UTC).isoformat()}
 
         # Store with very short TTL (1 second)
-        await cache_manager.set(namespace, short_ttl_key, data, ttl=timedelta(seconds=1))
+        await cache_manager.set(namespace, short_ttl_key, data, ttl_override=timedelta(seconds=1))
 
         # Should be available immediately
         immediate_result = await cache_manager.get(namespace, short_ttl_key)
@@ -620,7 +633,7 @@ class TestCacheVersioningIntegration:
         }
 
         content_hash = hashlib.sha256(
-            json.dumps(identical_content, sort_keys=True).encode()
+            json.dumps(identical_content, sort_keys=True).encode(),
         ).hexdigest()
 
         # Create two entries with identical content
@@ -648,17 +661,17 @@ class TestCacheVersioningIntegration:
             version_info=version_info_2,
         )
 
-        await entry_1.set_content(identical_content)
+        await set_versioned_content(entry_1, identical_content)
         await entry_1.save()
 
-        await entry_2.set_content(identical_content)
+        await set_versioned_content(entry_2, identical_content)
         await entry_2.save()
 
         # Both should have the same content hash
         assert entry_1.version_info.data_hash == entry_2.version_info.data_hash
 
         # Content should be retrievable for both
-        content_1 = await entry_1.get_content()
-        content_2 = await entry_2.get_content()
+        content_1 = await get_versioned_content(entry_1)
+        content_2 = await get_versioned_content(entry_2)
 
         assert content_1 == content_2 == identical_content

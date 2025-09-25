@@ -40,7 +40,7 @@ class ProviderDataUpdate(BaseModel):
 
 
 class ProviderDataRepository(
-    BaseRepository[DictionaryEntry, ProviderDataCreate, ProviderDataUpdate]
+    BaseRepository[DictionaryEntry, ProviderDataCreate, ProviderDataUpdate],
 ):
     """Repository for versioned provider data operations."""
 
@@ -140,7 +140,7 @@ class ProviderDataRepository(
                     "word_id": word_id,
                     "provider": provider,
                     "created_at": {"$lte": date},
-                }
+                },
             )
             .sort("-created_at")
             .limit(1)
@@ -171,7 +171,7 @@ class ProviderDataRepository(
                     "provider": provider,
                     "language": language,
                     "version_info.is_latest": True,
-                }
+                },
             },
             {"$group": {"_id": "$word_text"}},
             {"$limit": limit},
@@ -289,7 +289,7 @@ class BatchOperationUpdate(BaseModel):
 
 
 class BatchOperationRepository(
-    BaseRepository[BatchOperation, BatchOperationCreate, BatchOperationUpdate]
+    BaseRepository[BatchOperation, BatchOperationCreate, BatchOperationUpdate],
 ):
     """Repository for batch operation management."""
 
@@ -308,7 +308,7 @@ class BatchOperationRepository(
             List of active operations
 
         """
-        query = {"status": BatchStatus.IN_PROGRESS}
+        query: dict[str, Any] = {"status": BatchStatus.IN_PROGRESS}
         if provider:
             query["provider"] = provider
 
@@ -327,7 +327,9 @@ class BatchOperationRepository(
             List of resumable operations
 
         """
-        query = {"status": {"$in": [BatchStatus.IN_PROGRESS, BatchStatus.PARTIAL]}}
+        query: dict[str, Any] = {
+            "status": {"$in": [BatchStatus.IN_PROGRESS, BatchStatus.PARTIAL]},
+        }
         if provider:
             query["provider"] = provider
 
@@ -390,7 +392,7 @@ class BatchOperationRepository(
 
         cutoff_date = datetime.now(UTC) - timedelta(days=older_than_days)
 
-        query = {
+        query: dict[str, Any] = {
             "created_at": {"$lt": cutoff_date},
             "status": BatchStatus.COMPLETED,
         }
@@ -423,7 +425,7 @@ class ProviderConfigUpdate(BaseModel):
 
 
 class ProviderConfigurationRepository(
-    BaseRepository[ProviderConfiguration, ProviderConfigCreate, ProviderConfigUpdate]
+    BaseRepository[ProviderConfiguration, ProviderConfigCreate, ProviderConfigUpdate],
 ):
     """Repository for provider configuration management."""
 

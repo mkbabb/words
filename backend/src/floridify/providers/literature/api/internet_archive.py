@@ -32,13 +32,14 @@ class InternetArchiveConnector(LiteratureConnector):
         state_tracker: Any | None = None,
     ) -> Any:
         """Fetch work from Internet Archive.
-        
+
         Args:
             source_id: Work ID
             state_tracker: Optional state tracker
-            
+
         Returns:
             Work content or metadata
+
         """
         # This is a stub implementation as InternetArchive uses specific methods
         # like _fetch_work_content and _fetch_work_metadata for different operations

@@ -33,6 +33,7 @@ class TrieSearch:
 
         Args:
             index: Pre-loaded TrieIndex to use
+
         """
         # Index data model
         self.index = index
@@ -46,13 +47,13 @@ class TrieSearch:
 
     async def initialize(self) -> None:
         """Initialize the trie search (no-op for compatibility)."""
-        pass
 
     async def build_from_corpus(self, corpus: Corpus) -> None:
         """Build the trie index from a corpus.
 
         Args:
             corpus: Corpus object containing vocabulary
+
         """
         # Get or create trie index
         self.index = await TrieIndex.get_or_create(
@@ -132,7 +133,7 @@ class TrieSearch:
             else:
                 # Use numpy for large results
                 frequencies = np.array(
-                    [self.index.word_frequencies.get(word, 0) for word in matches]
+                    [self.index.word_frequencies.get(word, 0) for word in matches],
                 )
                 top_indices = np.argsort(-frequencies)[:max_results]
                 matches = [matches[i] for i in top_indices]
@@ -159,6 +160,7 @@ class TrieSearch:
 
         Returns:
             TrieSearch instance with loaded index
+
         """
         # Get or create index
         index = await TrieIndex.get_or_create(

@@ -7,21 +7,23 @@ import hashlib
 import json
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, TypeVar
+from typing import Any, Generic, TypeVar
 
 from beanie import Document, PydanticObjectId
 from beanie.odm.enums import SortDirection
 from beanie.operators import In
 from fastapi import Request, Response
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.generics import GenericModel
 
 from .exceptions import ErrorResponse, NotFoundException, VersionConflictException
-
-T = TypeVar("T", bound=Document)
-CreateSchema = TypeVar("CreateSchema", bound=BaseModel)
-UpdateSchema = TypeVar("UpdateSchema", bound=BaseModel)
-ResponseT = TypeVar("ResponseT")
-ListT = TypeVar("ListT")  # Generic type for list responses
+from .protocols import (
+    HasId,
+    TypedFieldUpdater,
+    VersionedDocument,
+    format_datetime,
+    serialize_for_response,
+)
 
 
 class PaginationParams(BaseModel):
@@ -66,7 +68,13 @@ class FieldSelection(BaseModel):
         return data
 
 
-class ListResponse[ListT](BaseModel):
+T = TypeVar("T", bound=Document)
+CreateSchema = TypeVar("CreateSchema", bound=BaseModel)
+UpdateSchema = TypeVar("UpdateSchema", bound=BaseModel)
+ListT = TypeVar("ListT")
+
+
+class ListResponse(GenericModel, Generic[ListT]):  # noqa: UP046
     """Standard list response with pagination metadata."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -107,7 +115,7 @@ class BatchResponse(BaseModel):
     failed: int
 
 
-class BaseRepository[T: Document, CreateSchema: BaseModel, UpdateSchema: BaseModel](ABC):
+class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):  # noqa: UP046
     """Base repository for CRUD operations."""
 
     def __init__(self, model: type[T]):
@@ -146,7 +154,7 @@ class BaseRepository[T: Document, CreateSchema: BaseModel, UpdateSchema: BaseMod
             )
 
         # Check version for optimistic locking
-        if version is not None and hasattr(doc, "version"):
+        if version is not None and isinstance(doc, VersionedDocument):
             if doc.version != version:
                 raise VersionConflictException(
                     expected=version,
@@ -154,13 +162,12 @@ class BaseRepository[T: Document, CreateSchema: BaseModel, UpdateSchema: BaseMod
                     resource=self.model.__name__,
                 )
 
-        # Update fields
+        # Update fields with type-safe field updater
         update_data = data.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(doc, field, value)
+        TypedFieldUpdater.update_fields(doc, update_data)
 
         # Increment version if applicable
-        if hasattr(doc, "version"):
+        if isinstance(doc, VersionedDocument):
             doc.version += 1
 
         await doc.save()
@@ -278,10 +285,11 @@ class ResponseBuilder:
     ) -> ResourceResponse:
         """Build a standardized resource response."""
         # Extract ID if not provided
-        if resource_id is None and hasattr(data, "id"):
-            resource_id = str(data.id)
-        elif resource_id is None and isinstance(data, dict) and "id" in data:
-            resource_id = str(data["id"])
+        if resource_id is None:
+            if isinstance(data, HasId):
+                resource_id = str(data.id)
+            elif isinstance(data, dict) and "id" in data:
+                resource_id = str(data["id"])
 
         # Build links
         links = {
@@ -295,14 +303,12 @@ class ResponseBuilder:
         if version is not None:
             metadata["version"] = version
         if updated_at is not None:
-            metadata["last_modified"] = (
-                updated_at.isoformat() if hasattr(updated_at, "isoformat") else str(updated_at)
-            )
+            metadata["last_modified"] = format_datetime(updated_at)
         if additional_metadata:
             metadata.update(additional_metadata)
 
         # Convert data to dict if it's a Pydantic model
-        response_data = data.model_dump(mode="json") if hasattr(data, "model_dump") else data
+        response_data = serialize_for_response(data)
 
         return ResourceResponse(
             data=response_data,
@@ -317,14 +323,12 @@ class ResponseBuilder:
         pagination: PaginationParams,
         resource_type: str | None = None,
         additional_metadata: dict[str, Any] | None = None,
-    ) -> ListResponse[Any]:
+    ) -> ListResponse[dict[str, Any]]:
         """Build a standardized list response."""
         # Convert items to dicts if they're Pydantic models
-        serialized_items = [
-            item.model_dump(mode="json") if hasattr(item, "model_dump") else item for item in items
-        ]
+        serialized_items = [serialize_for_response(item) for item in items]
 
-        response: ListResponse[Any] = ListResponse(
+        response: ListResponse[dict[str, Any]] = ListResponse(
             items=serialized_items,
             total=total,
             offset=pagination.offset,

@@ -1,13 +1,13 @@
-"""
-Comprehensive tests for the search pipeline REST API endpoints.
+"""Comprehensive tests for the search pipeline REST API endpoints.
 Tests exact, fuzzy, and basic search functionality without FAISS dependencies.
 """
 
 import asyncio
 
 import pytest
-from ..conftest import assert_response_structure
 from httpx import AsyncClient
+
+from ..conftest import assert_response_structure
 
 
 class TestSearchPipelineAPI:
@@ -15,7 +15,11 @@ class TestSearchPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_search_exact_match(
-        self, async_client: AsyncClient, word_factory, definition_factory, test_words
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
+        test_words,
     ):
         """Test exact word matching in search."""
         # Setup test words
@@ -46,7 +50,10 @@ class TestSearchPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_search_fuzzy_matching(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test fuzzy matching for misspelled words."""
         # Setup test words
@@ -76,7 +83,10 @@ class TestSearchPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_search_with_path_parameter(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test search using path parameter variant."""
         # Setup test data
@@ -95,7 +105,10 @@ class TestSearchPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_search_query_parameters(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test search with various query parameters."""
         # Setup multiple test words
@@ -125,7 +138,10 @@ class TestSearchPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_search_suggestions_endpoint(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test search suggestions for autocomplete."""
         # Setup test words with common prefix
@@ -181,7 +197,10 @@ class TestSearchPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_search_unicode_support(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test search with Unicode characters."""
         # Setup Unicode words
@@ -202,7 +221,10 @@ class TestSearchPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_search_special_characters(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test search with special characters and punctuation."""
         # Setup words with special characters
@@ -222,7 +244,10 @@ class TestSearchPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_search_case_insensitivity(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test that search is case insensitive."""
         # Setup test word
@@ -245,7 +270,10 @@ class TestSearchPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_search_concurrent_requests(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test handling of concurrent search requests."""
         # Setup test words
@@ -268,7 +296,10 @@ class TestSearchPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_search_response_caching(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test search response caching behavior."""
         # Setup test data
@@ -317,7 +348,10 @@ class TestSearchPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_search_result_scoring(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test that search results are properly scored and ordered."""
         # Setup words with varying similarity to query
@@ -348,7 +382,10 @@ class TestSearchPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_search_method_indication(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test that search results indicate the method used."""
         # Setup test words
@@ -374,7 +411,10 @@ class TestSearchPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_search_phrase_detection(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test search behavior with multi-word phrases."""
         # Setup phrasal expressions

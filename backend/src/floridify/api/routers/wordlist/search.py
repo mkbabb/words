@@ -88,7 +88,7 @@ async def search_wordlists(
     # Use corpus-based fuzzy search (no TTL expiration)
     search_results = await search_wordlist_names(
         query=query,
-        repo=repo,
+        _repo=repo,
         max_results=limit,
         min_score=0.3,  # Allow broader matches for name search
     )

@@ -8,6 +8,7 @@ from beanie import PydanticObjectId
 from bs4 import BeautifulSoup
 
 from ....core.state_tracker import StateTracker
+from ....models.base import Language
 from ....models.dictionary import (
     Definition,
     DictionaryProvider,
@@ -20,6 +21,7 @@ from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ...utils import respectful_scraper
 from ..core import DictionaryConnector
+from ..models import DictionaryProviderEntry
 
 logger = get_logger(__name__)
 
@@ -44,7 +46,7 @@ class WordHippoConnector(DictionaryConnector):
         self,
         word: str,
         state_tracker: StateTracker | None = None,
-    ) -> DictionaryEntry | None:
+    ) -> DictionaryProviderEntry | None:
         """Fetch definition data for a word from WordHippo.
 
         Args:
@@ -52,7 +54,7 @@ class WordHippoConnector(DictionaryConnector):
             state_tracker: Optional state tracker for progress updates
 
         Returns:
-            DictionaryEntry if successful, None if not found or error
+            dict[str, Any] if successful, None if not found or error
 
         """
         try:
@@ -105,11 +107,11 @@ class WordHippoConnector(DictionaryConnector):
                 "sentences_count": len(sentences),
             }
 
-            # Return dict matching the pattern from other providers
-            return {
-                "word": word,
-                "provider": self.provider.value,
-                "definitions": [
+            return DictionaryProviderEntry(
+                word=word,
+                provider=self.provider.value,
+                language=Language.ENGLISH,
+                definitions=[
                     {
                         "id": str(d.id),
                         "part_of_speech": d.part_of_speech,
@@ -121,22 +123,15 @@ class WordHippoConnector(DictionaryConnector):
                     }
                     for d in definitions
                 ],
-                "pronunciation": {
-                    "id": str(pronunciation.id),
-                    "phonetic": pronunciation.phonetic,
-                    "ipa": pronunciation.ipa,
-                    "syllables": pronunciation.syllables,
-                } if pronunciation else None,
-                "etymology": {
-                    "text": etymology.text if etymology else None,
-                    "origin_language": etymology.origin_language if etymology else None,
-                    "root_words": etymology.root_words if etymology else [],
-                } if etymology else None,
-                "synonyms": synonyms,
-                "antonyms": antonyms,
-                "sentences": sentences,
-                "raw_data": raw_data,
-            }
+                pronunciation=pronunciation.phonetic if pronunciation else None,
+                etymology=etymology.text if etymology else None,
+                examples=sentences,
+                raw_data=raw_data,
+                provider_metadata={
+                    "synonyms": synonyms,
+                    "antonyms": antonyms,
+                },
+            )
 
         except Exception as e:
             logger.error(f"Error fetching {word} from WordHippo: {e}")
@@ -579,4 +574,4 @@ class WordHippoConnector(DictionaryConnector):
 
     async def close(self) -> None:
         """Close the HTTP session."""
-        pass  # No persistent client to close
+        # No persistent client to close

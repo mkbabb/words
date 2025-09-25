@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from ....core.state_tracker import StateTracker
 from ....models.literature import AuthorInfo, Genre, LiteratureProvider, Period
 from ....providers.core import ConnectorConfig
 from ....utils.logging import get_logger
 from ..core import LiteratureConnector
-from ..models import LiteratureSource, ParserType, ScraperType
+from ..models import LiteratureEntry, LiteratureSource, ParserType, ScraperType
 from ..parsers import (
     extract_metadata,
     parse_epub,
@@ -41,6 +39,7 @@ class URLLiteratureConnector(LiteratureConnector):
         Args:
             provider: Literature provider enum value
             config: Connector configuration
+
         """
         super().__init__(provider=provider, config=config)
 
@@ -48,7 +47,7 @@ class URLLiteratureConnector(LiteratureConnector):
         self,
         query: LiteratureSource,
         state_tracker: StateTracker | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> LiteratureEntry | None:
         """Fetch literature text from URL.
 
         Args:
@@ -57,6 +56,7 @@ class URLLiteratureConnector(LiteratureConnector):
 
         Returns:
             Dictionary with literature content
+
         """
         source = query
 
@@ -69,15 +69,15 @@ class URLLiteratureConnector(LiteratureConnector):
 
             # Get the appropriate scraper and fetch content
             scraper_type = source.scraper or ScraperType.DEFAULT
-            async with self.scraper_session as client:
-                if scraper_type == ScraperType.GUTENBERG:
-                    content = await scrape_gutenberg(source.url, session=client)
-                elif scraper_type == ScraperType.ARCHIVE_ORG:
-                    content = await scrape_archive_org(source.url, session=client)
-                elif scraper_type == ScraperType.WIKISOURCE:
-                    content = await scrape_wikisource(source.url, session=client)
-                else:  # DEFAULT or unknown
-                    content = await default_literature_scraper(source.url, session=client)
+            client = self.scraper_session
+            if scraper_type == ScraperType.GUTENBERG:
+                content = await scrape_gutenberg(source.url, session=client)
+            elif scraper_type == ScraperType.ARCHIVE_ORG:
+                content = await scrape_archive_org(source.url, session=client)
+            elif scraper_type == ScraperType.WIKISOURCE:
+                content = await scrape_wikisource(source.url, session=client)
+            else:  # DEFAULT or unknown
+                content = await default_literature_scraper(source.url, session=client)
 
             # Determine parser to use and parse content
             parser_type = source.parser or ParserType.PLAIN_TEXT
@@ -99,33 +99,31 @@ class URLLiteratureConnector(LiteratureConnector):
                 period=source.period or Period.CONTEMPORARY,
                 primary_genre=source.genre or Genre.NOVEL,
             )
-            
-            return {
-                "title": metadata.get("title", source.name),
-                "author": {
-                    "name": author.name,
-                    "period": author.period.value if hasattr(author.period, 'value') else author.period,
-                    "primary_genre": author.primary_genre.value if hasattr(author.primary_genre, 'value') else author.primary_genre,
-                },
-                "source": source.name,
-                "genre": (source.genre or Genre.NOVEL).value if hasattr(source.genre or Genre.NOVEL, 'value') else source.genre or Genre.NOVEL,
-                "period": (source.period or Period.CONTEMPORARY).value if hasattr(source.period or Period.CONTEMPORARY, 'value') else source.period or Period.CONTEMPORARY,
-                "language": source.language.value if hasattr(source.language, 'value') else source.language,
-                "text": text,
-                "year": metadata.get("year"),
-                "gutenberg_id": metadata.get("gutenberg_id"),
-                "work_id": source.name,
-                "provider": self.provider.value,
-                "source_url": source.url,
-                "raw_data": {"content_length": len(text), "metadata": metadata},
-            }
+
+            return LiteratureEntry(
+                title=metadata.get("title", source.name),
+                author=author,
+                source=source,
+                work_id=source.name,
+                gutenberg_id=metadata.get("gutenberg_id"),
+                year=metadata.get("year"),
+                subtitle=metadata.get("subtitle"),
+                description=metadata.get("description", source.description),
+                keywords=metadata.get("keywords", []),
+                genre=source.genre or metadata.get("genre"),
+                period=source.period or metadata.get("period"),
+                language=source.language,
+                extracted_vocabulary=metadata.get("extracted_vocabulary", []),
+                text=text,
+                metadata={"source_url": source.url, **metadata},
+            )
 
         except Exception as e:
             logger.error(f"Failed to fetch from {source.name}: {e}")
             if state_tracker:
                 await state_tracker.update(
                     stage="error",
-                    message=f"Failed to fetch {source.name}: {str(e)}",
+                    message=f"Failed to fetch {source.name}: {e!s}",
                     error=str(e),
                 )
             return None

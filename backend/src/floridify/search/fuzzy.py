@@ -43,23 +43,49 @@ class FuzzySearch:
 
         # Enhanced candidate selection for better recall
         max_candidates = max_results * 40
-        candidates = corpus.get_candidates(query, max_results=max_candidates)
+
+        # Try to get candidates with normalized query
+        candidates = corpus.get_candidates(query.lower(), max_results=max_candidates)
         vocabulary = corpus.get_words_by_indices(candidates) if candidates else []
 
+        # For multi-word queries, also get candidates for each word separately
+        if not vocabulary and " " in query:
+            all_candidates = set()
+            for word in query.split():
+                word_candidates = corpus.get_candidates(word.lower(), max_results=max_candidates // 2)
+                all_candidates.update(word_candidates)
+
+            if all_candidates:
+                vocabulary = corpus.get_words_by_indices(list(all_candidates))
+
+        # If still no vocabulary, use a reasonable subset of the corpus
         if not vocabulary:
-            return []
+            # Fall back to full vocabulary for fuzzy matching on small corpora
+            # or first N words for large corpora
+            if len(corpus.vocabulary) <= 1000:
+                vocabulary = corpus.vocabulary
+            else:
+                vocabulary = corpus.vocabulary[:1000]
+
+            if not vocabulary:
+                return []
 
         # Multi-scorer approach for robustness
         matches = []
         seen_words = set()
 
+        # Normalize query for consistent matching
+        normalized_query = query.lower()
+
         # Primary scorer: WRatio for general accuracy
+        # Lower cutoff for multi-word queries
+        primary_cutoff = min_score_threshold * 50 if " " in query else min_score_threshold * 75
         primary_results = process.extract(
-            query,
+            normalized_query,
             vocabulary,
             limit=max_results * 3,
             scorer=fuzz.WRatio,
-            score_cutoff=min_score_threshold * 75,  # Slightly more permissive
+            score_cutoff=primary_cutoff,
         )
 
         # Add primary results
@@ -71,12 +97,14 @@ class FuzzySearch:
 
         # Secondary scorer: Token set ratio for phrase matching
         if " " in query or len(query) >= 8:
+            # Even lower cutoff for multi-word queries
+            secondary_cutoff = min_score_threshold * 40 if " " in query else min_score_threshold * 65
             secondary_results = process.extract(
-                query,
+                normalized_query,
                 vocabulary,
                 limit=max_results * 2,
                 scorer=fuzz.token_set_ratio,
-                score_cutoff=min_score_threshold * 65,
+                score_cutoff=secondary_cutoff,
             )
 
             for result in secondary_results:
@@ -100,13 +128,22 @@ class FuzzySearch:
             )
 
             if corrected_score >= min_score_threshold:
+                # Get lemmatized word if available
+                lemmatized_word = None
+                if word in corpus.vocabulary_to_index:
+                    word_idx = corpus.vocabulary_to_index[word]
+                    if corpus.word_to_lemma_indices and word_idx in corpus.word_to_lemma_indices:
+                        lemma_idx = corpus.word_to_lemma_indices[word_idx]
+                        if lemma_idx < len(corpus.lemmatized_vocabulary):
+                            lemmatized_word = corpus.lemmatized_vocabulary[lemma_idx]
+
                 final_matches.append(
                     SearchResult(
                         word=word,
                         score=corrected_score,
                         method=SearchMethod.FUZZY,
-                        lemmatized_word=None,
-                        language=None,
+                        lemmatized_word=lemmatized_word,
+                        language=corpus.language,
                         metadata={"scoring_method": method} if method == "secondary" else None,
                     ),
                 )

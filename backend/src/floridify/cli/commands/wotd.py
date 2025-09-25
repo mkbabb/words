@@ -47,7 +47,7 @@ def train(
             Panel.fit(
                 "🚀 Starting WOTD ML Training Pipeline",
                 style="bold blue",
-            )
+            ),
         )
 
         # Create training configuration
@@ -102,7 +102,7 @@ def train(
                         f"🎯 Training completed successfully!\n"
                         f"Models saved to: {output_dir or './models/wotd'}",
                         style="bold green",
-                    )
+                    ),
                 )
 
             except Exception as e:
@@ -111,7 +111,7 @@ def train(
                     Panel.fit(
                         f"Training failed: {e}",
                         style="bold red",
-                    )
+                    ),
                 )
                 raise click.ClickException(str(e))
 
@@ -120,7 +120,10 @@ def train(
 
 @wotd.command()
 @click.option(
-    "--style", type=click.Choice([s.value for s in Style]), required=True, help="Word style"
+    "--style",
+    type=click.Choice([s.value for s in Style]),
+    required=True,
+    help="Word style",
 )
 @click.option(
     "--complexity",
@@ -129,7 +132,10 @@ def train(
     help="Word complexity",
 )
 @click.option(
-    "--era", type=click.Choice([e.value for e in Era]), required=True, help="Historical era"
+    "--era",
+    type=click.Choice([e.value for e in Era]),
+    required=True,
+    help="Historical era",
 )
 @click.option("--num-words", default=50, help="Number of words to generate")
 @click.option("--theme", help="Optional thematic focus")
@@ -150,7 +156,7 @@ def generate(
                 f"🧬 Generating Synthetic Corpus\n"
                 f"Style: {style} | Complexity: {complexity} | Era: {era}",
                 style="bold blue",
-            )
+            ),
         )
 
         # Generate corpus
@@ -206,7 +212,7 @@ def generate(
                         Panel.fit(
                             f"📁 Corpus saved to: {output_path}",
                             style="bold green",
-                        )
+                        ),
                     )
                 else:
                     # Save to storage automatically
@@ -217,7 +223,7 @@ def generate(
                         Panel.fit(
                             f"✨ Generated {len(corpus.words)} words successfully!",
                             style="bold green",
-                        )
+                        ),
                     )
 
             except Exception as e:
@@ -226,7 +232,7 @@ def generate(
                     Panel.fit(
                         f"Generation failed: {e}",
                         style="bold red",
-                    )
+                    ),
                 )
                 raise click.ClickException(str(e))
 
@@ -242,7 +248,7 @@ def status():
             Panel.fit(
                 "📊 WOTD System Status",
                 style="bold blue",
-            )
+            ),
         )
 
         try:
@@ -340,7 +346,7 @@ def status():
                 Panel.fit(
                     f"Status check failed: {e}",
                     style="bold red",
-                )
+                ),
             )
             raise click.ClickException(str(e))
 

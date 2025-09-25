@@ -7,7 +7,7 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ....ai.connector import OpenAIConnector, get_openai_connector
-from ....models import (
+from ....wordlist.word_of_the_day.models import (
     NotificationFrequency,
     WordOfTheDayBatch,
     WordOfTheDayConfig,

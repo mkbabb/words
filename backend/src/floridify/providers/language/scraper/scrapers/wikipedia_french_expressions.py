@@ -29,6 +29,7 @@ async def scrape_french_expressions(
 
     Returns:
         Dictionary with 'data' key containing expressions list
+
     """
     target_url = (
         url or "https://en.wikipedia.org/wiki/Glossary_of_French_words_and_expressions_in_English"

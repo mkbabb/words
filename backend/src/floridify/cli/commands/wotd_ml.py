@@ -470,7 +470,7 @@ def literature(
 
         if results.model_paths:
             console.print(
-                f"\n[yellow]Models saved to:[/yellow] {results.model_paths.get('models_directory')}"
+                f"\n[yellow]Models saved to:[/yellow] {results.model_paths.get('models_directory')}",
             )
 
     asyncio.run(run_literature_training())

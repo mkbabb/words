@@ -13,8 +13,7 @@ def create_test_vocabulary(
     max_length: int = 15,
     seed: int | None = None,
 ) -> list[str]:
-    """
-    Create a test vocabulary with specified characteristics.
+    """Create a test vocabulary with specified characteristics.
 
     Args:
         size: Number of words to generate
@@ -25,6 +24,7 @@ def create_test_vocabulary(
 
     Returns:
         List of generated words
+
     """
     if seed is not None:
         random.seed(seed)
@@ -86,8 +86,7 @@ def verify_tree_consistency(
     parent: Corpus.Metadata,
     children: list[Corpus.Metadata],
 ) -> bool:
-    """
-    Verify parent-child relationships are consistent.
+    """Verify parent-child relationships are consistent.
 
     Args:
         parent: Parent corpus
@@ -98,6 +97,7 @@ def verify_tree_consistency(
 
     Raises:
         AssertionError: If inconsistency found
+
     """
     # Check all children reference parent
     for child in children:
@@ -126,8 +126,7 @@ def assert_vocabulary_aggregated(
     parent: Corpus.Metadata,
     children: list[Corpus.Metadata],
 ) -> None:
-    """
-    Assert parent vocabulary contains all child vocabularies.
+    """Assert parent vocabulary contains all child vocabularies.
 
     Args:
         parent: Parent corpus with aggregated vocabulary
@@ -135,6 +134,7 @@ def assert_vocabulary_aggregated(
 
     Raises:
         AssertionError: If vocabulary not properly aggregated
+
     """
     parent_vocab = set(parent.content_inline.get("vocabulary", []))
 
@@ -154,8 +154,7 @@ def create_corpus_tree(
     branching_factor: int = 2,
     vocab_size: int = 100,
 ) -> dict[str, Corpus.Metadata]:
-    """
-    Create a test corpus tree with specified structure.
+    """Create a test corpus tree with specified structure.
 
     Args:
         depth: Tree depth
@@ -164,6 +163,7 @@ def create_corpus_tree(
 
     Returns:
         Dictionary mapping corpus names to Corpus.Metadata objects
+
     """
     tree = {}
     counter = 0
@@ -180,7 +180,7 @@ def create_corpus_tree(
             parent_corpus_id=parent_id,
             child_corpus_ids=[],
             content_inline={
-                "vocabulary": create_test_vocabulary(vocab_size, unicode_ratio=0.1, seed=counter)
+                "vocabulary": create_test_vocabulary(vocab_size, unicode_ratio=0.1, seed=counter),
             },
         )
 
@@ -202,8 +202,7 @@ def create_corpus_tree(
 
 
 def calculate_tree_stats(root: Corpus.Metadata, all_nodes: dict[str, Corpus.Metadata]) -> dict:
-    """
-    Calculate statistics for a corpus tree.
+    """Calculate statistics for a corpus tree.
 
     Args:
         root: Root corpus
@@ -211,6 +210,7 @@ def calculate_tree_stats(root: Corpus.Metadata, all_nodes: dict[str, Corpus.Meta
 
     Returns:
         Dictionary with tree statistics
+
     """
     stats = {
         "total_nodes": len(all_nodes),
@@ -260,8 +260,7 @@ def simulate_vocabulary_update(
     add_words: list[str] | None = None,
     remove_words: list[str] | None = None,
 ) -> list[str]:
-    """
-    Simulate vocabulary update operations.
+    """Simulate vocabulary update operations.
 
     Args:
         corpus: Corpus to update
@@ -270,6 +269,7 @@ def simulate_vocabulary_update(
 
     Returns:
         Updated vocabulary
+
     """
     vocab = corpus.content_inline.get("vocabulary", []).copy()
 
@@ -287,14 +287,14 @@ def simulate_vocabulary_update(
 
 
 def generate_test_statistics(corpus: Corpus.Metadata) -> dict:
-    """
-    Generate comprehensive statistics for a corpus.
+    """Generate comprehensive statistics for a corpus.
 
     Args:
         corpus: Corpus to analyze
 
     Returns:
         Dictionary of statistics
+
     """
     vocab = corpus.content_inline.get("vocabulary", [])
 

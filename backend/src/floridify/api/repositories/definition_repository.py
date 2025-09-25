@@ -190,7 +190,9 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         return example
 
     async def remove_example(
-        self, definition_id: PydanticObjectId, example_id: PydanticObjectId
+        self,
+        definition_id: PydanticObjectId,
+        example_id: PydanticObjectId,
     ) -> bool:
         """Remove an example from a definition."""
         definition = await self.get(definition_id, raise_on_missing=True)

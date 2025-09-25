@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ...caching.core import CacheNamespace, get_global_cache
 from ...core.search_pipeline import get_search_engine, reset_search_engine
@@ -49,8 +49,8 @@ class SearchResponse(BaseModel):
         """Check if search returned any results."""
         return len(self.results) > 0
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "query": "test",
                 "results": [{"word": "test", "score": 1.0, "method": "exact", "is_phrase": False}],
@@ -59,6 +59,7 @@ class SearchResponse(BaseModel):
                 "metadata": {"search_time_ms": 15},
             },
         }
+    )
 
 
 class RebuildIndexRequest(BaseModel):
@@ -327,23 +328,22 @@ async def rebuild_search_index(
         corpus_manager = get_corpus_manager()
 
         # Determine corpus types to rebuild
-        target_corpus_types = []
+        target_corpus_types: list[CorpusType] = []
         if request.rebuild_all_corpora:
             target_corpus_types = [
-                CorpusType.LANGUAGE_SEARCH,
+                CorpusType.LANGUAGE,
                 CorpusType.WORDLIST,
                 CorpusType.WORDLIST_NAMES,
             ]
         else:
             corpus_type_map = {
-                "language_search": CorpusType.LANGUAGE_SEARCH,
+                "language_search": CorpusType.LANGUAGE,
                 "wordlist": CorpusType.WORDLIST,
                 "wordlist_names": CorpusType.WORDLIST_NAMES,
                 "custom": CorpusType.CUSTOM,
             }
             target_corpus_types = [
-                corpus_type_map.get(ct.lower(), CorpusType.LANGUAGE_SEARCH)
-                for ct in request.corpus_types
+                corpus_type_map.get(ct.lower(), CorpusType.LANGUAGE) for ct in request.corpus_types
             ]
 
         # Always clear all caches during rebuild to ensure fresh data
@@ -352,8 +352,8 @@ async def rebuild_search_index(
         # Clear vocabulary caches
 
         cache = await get_global_cache()
-        vocab_cleared = await cache.invalidate_namespace(CacheNamespace.CORPUS)
-        caches_cleared["vocabulary_caches"] = vocab_cleared
+        await cache.clear_namespace(CacheNamespace.CORPUS)
+        caches_cleared["vocabulary_caches"] = 0
 
         # Clear semantic caches
         # Cleanup expired entries in unified cache
@@ -362,8 +362,7 @@ async def rebuild_search_index(
         caches_cleared["semantic_expired"] = semantic_cleared
 
         # Clear corpus caches
-        corpus_cleared_result = await corpus_manager.invalidate_all_corpora()
-        corpus_cleared = corpus_cleared_result.get("total", 0)
+        corpus_cleared = await corpus_manager.invalidate_all_corpora()
         caches_cleared["corpus_caches"] = corpus_cleared
 
         # Lemmatization cache management
@@ -377,7 +376,7 @@ async def rebuild_search_index(
         semantic_start = time.perf_counter()
 
         for corpus_type in target_corpus_types:
-            if corpus_type == CorpusType.LANGUAGE_SEARCH:
+            if corpus_type == CorpusType.LANGUAGE:
                 # Rebuild language search corpus (main search engine)
                 await reset_search_engine()
                 search_engine = await get_search_engine(

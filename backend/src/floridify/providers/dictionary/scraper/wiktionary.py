@@ -13,10 +13,10 @@ from beanie import PydanticObjectId
 
 from ....caching.decorators import cached_computation_async
 from ....core.state_tracker import Stages, StateTracker
+from ....models.base import Language
 from ....models.dictionary import (
     Definition,
     DictionaryProvider,
-    Etymology,
     Example,
     Pronunciation,
     Word,
@@ -28,6 +28,7 @@ from ....models.relationships import (
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ..core import DictionaryConnector
+from ..models import DictionaryProviderEntry
 
 logger = get_logger(__name__)
 
@@ -193,7 +194,7 @@ class WiktionaryConnector(DictionaryConnector):
         self,
         word: str,
         state_tracker: StateTracker | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> DictionaryProviderEntry | None:
         """Fetch comprehensive definition data from Wiktionary."""
         # Rate limiting is handled by the base class fetch method
 
@@ -267,7 +268,7 @@ class WiktionaryConnector(DictionaryConnector):
         self,
         word_obj: Word,
         data: dict[str, Any],
-    ) -> dict[str, Any] | None:
+    ) -> DictionaryProviderEntry | None:
         """Parse Wiktionary response comprehensively."""
         try:
             pages = data.get("query", {}).get("pages", [])
@@ -287,7 +288,7 @@ class WiktionaryConnector(DictionaryConnector):
         self,
         wikitext: str,
         word_obj: Word,
-    ) -> dict[str, Any] | None:
+    ) -> DictionaryProviderEntry | None:
         """Extract all available data from wikitext using systematic parsing."""
         try:
             parsed = wtp.parse(wikitext)
@@ -321,10 +322,11 @@ class WiktionaryConnector(DictionaryConnector):
 
                 await definition.save()  # Update the definition
 
-            return {
-                "word": word_obj.text,
-                "provider": self.provider.value,
-                "definitions": [
+            return DictionaryProviderEntry(
+                word=word_obj.text,
+                provider=self.provider.value,
+                language=Language.ENGLISH,
+                definitions=[
                     {
                         "id": str(definition.id),
                         "part_of_speech": definition.part_of_speech,
@@ -351,20 +353,16 @@ class WiktionaryConnector(DictionaryConnector):
                     }
                     for definition in definitions
                 ],
-                "pronunciation": {
-                    "id": str(pronunciation.id),
-                    "phonetic": pronunciation.phonetic,
-                    "ipa": pronunciation.ipa,
-                    "syllables": pronunciation.syllables,
-                    "stress_pattern": pronunciation.stress_pattern,
-                } if pronunciation else None,
-                "etymology": {
-                    "text": etymology,
-                    "origin_language": None,
-                    "root_words": [],
-                } if etymology else None,
-                "raw_data": {"wikitext": wikitext},
-            }
+                pronunciation=pronunciation.phonetic if pronunciation else None,
+                etymology=etymology,
+                examples=[],
+                raw_data={"wikitext": wikitext},
+                provider_metadata={
+                    "pronunciation": pronunciation.model_dump(mode="json")
+                    if pronunciation
+                    else None,
+                },
+            )
 
         except Exception as e:
             logger.error(f"Error in comprehensive extraction: {e}")

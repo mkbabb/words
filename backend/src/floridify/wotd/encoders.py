@@ -412,7 +412,8 @@ class HierarchicalVQEncoder(nn.Module):
         # cdist computes pairwise distances between all vectors
         codebook = self.codebooks[level]
         distances = torch.cdist(
-            z_proj.unsqueeze(0), codebook.unsqueeze(0)
+            z_proj.unsqueeze(0),
+            codebook.unsqueeze(0),
         )  # [1, batch, codebook_size]
         indices = distances.argmin(dim=-1).squeeze(0)  # Get index of nearest codebook entry
 

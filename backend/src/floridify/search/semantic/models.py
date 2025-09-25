@@ -51,7 +51,7 @@ class SemanticIndex(BaseModel):
     lemmatized_vocabulary: list[str] = Field(default_factory=list)
     variant_mapping: dict[str, int] = Field(default_factory=dict)  # embedding idx -> lemma idx
     lemma_to_embeddings: dict[str, list[int]] = Field(
-        default_factory=dict
+        default_factory=dict,
     )  # lemma idx -> embedding idxs
 
     # Index configuration
@@ -70,11 +70,8 @@ class SemanticIndex(BaseModel):
 
         corpus_id: PydanticObjectId
         model_name: str
-
-        def __init__(self, **data: Any) -> None:
-            data.setdefault("resource_type", ResourceType.SEMANTIC)
-            data.setdefault("namespace", CacheNamespace.SEMANTIC)
-            super().__init__(**data)
+        resource_type: ResourceType = ResourceType.SEMANTIC
+        namespace: CacheNamespace = CacheNamespace.SEMANTIC
 
     @classmethod
     async def get(
@@ -94,6 +91,7 @@ class SemanticIndex(BaseModel):
 
         Returns:
             SemanticIndex instance or None if not found
+
         """
         if not corpus_id and not corpus_name:
             raise ValueError("Either corpus_id or corpus_name must be provided")
@@ -103,7 +101,7 @@ class SemanticIndex(BaseModel):
 
         # Build resource ID based on what we have
         if corpus_id:
-            resource_id = f"{str(corpus_id)}:semantic:{model_name}"
+            resource_id = f"{corpus_id!s}:semantic:{model_name}"
         else:
             resource_id = f"{corpus_name}:semantic:{model_name}"
 
@@ -145,6 +143,7 @@ class SemanticIndex(BaseModel):
 
         Returns:
             SemanticIndex instance ready for embedding generation
+
         """
         from .constants import DEFAULT_BATCH_SIZE, MODEL_BATCH_SIZES
 
@@ -183,6 +182,7 @@ class SemanticIndex(BaseModel):
 
         Returns:
             SemanticIndex instance
+
         """
         # Try to get existing using corpus ID if available, otherwise name
         existing = await cls.get(
@@ -193,7 +193,7 @@ class SemanticIndex(BaseModel):
         )
         if existing and existing.vocabulary_hash == corpus.vocabulary_hash:
             logger.debug(
-                f"Using cached semantic index for corpus '{corpus.corpus_name}' with model '{model_name}'"
+                f"Using cached semantic index for corpus '{corpus.corpus_name}' with model '{model_name}'",
             )
             return existing
 
@@ -206,17 +206,20 @@ class SemanticIndex(BaseModel):
         )
 
         # Save the new index
-        await index.save(config)
+        await index.save(config, corpus_id=corpus.id if hasattr(corpus, 'id') else None)
         return index
 
     async def save(
         self,
         config: VersionConfig | None = None,
+        corpus_id: PydanticObjectId | None = None,
     ) -> None:
         """Save semantic index to versioned storage.
 
         Args:
             config: Version configuration
+            corpus_id: ID of the associated corpus
+
         """
         manager = get_version_manager()
         resource_id = f"{self.corpus_name}:semantic:{self.model_name}"
@@ -231,6 +234,7 @@ class SemanticIndex(BaseModel):
             metadata={
                 "vocabulary_hash": self.vocabulary_hash,
                 "model_name": self.model_name,
+                "corpus_id": corpus_id,
                 "num_embeddings": self.num_embeddings,
                 "embedding_dimension": self.embedding_dimension,
             },
@@ -240,7 +244,8 @@ class SemanticIndex(BaseModel):
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Serialize index to dictionary for caching."""
-        return super().model_dump(exclude_none=True, **kwargs)
+        kwargs['exclude_none'] = True
+        return super().model_dump(**kwargs)
 
     @classmethod
     def model_load(cls, data: dict[str, Any]) -> SemanticIndex:

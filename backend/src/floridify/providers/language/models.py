@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ...caching.models import BaseVersionedData, ResourceType
+from ...caching.models import BaseVersionedData, CacheNamespace, ResourceType
 from ...models.base import Language
 
 
@@ -97,31 +97,9 @@ class LanguageEntry(BaseModel):
 
     class Metadata(BaseVersionedData):
         """Minimal language metadata for versioning."""
-        
-        def __init__(self, **data: Any) -> None:
-            import hashlib
-            import json
-            from datetime import datetime
 
-            from ...caching.models import CacheNamespace, VersionInfo
-            
-            data.setdefault("resource_type", ResourceType.LANGUAGE)
-            data.setdefault("namespace", CacheNamespace.LANGUAGE)
-            
-            # Create default version_info if not provided
-            if "version_info" not in data:
-                # Generate data hash from content
-                content_str = json.dumps(data.get("content_inline", {}), sort_keys=True, default=str)
-                data_hash = hashlib.sha256(content_str.encode()).hexdigest()
-                
-                data["version_info"] = VersionInfo(
-                    version="1",
-                    created_at=datetime.utcnow(),
-                    data_hash=data_hash,
-                    is_latest=True
-                )
-            
-            super().__init__(**data)
+        resource_type: ResourceType = ResourceType.LANGUAGE
+        namespace: CacheNamespace = CacheNamespace.LANGUAGE
 
         class Settings:
             """Beanie settings."""

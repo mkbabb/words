@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 
 import click
 from rich.console import Console
@@ -232,7 +233,6 @@ async def _backup_database_async(output: str | None, backup_format: str, compres
     """Async implementation of database backup."""
     import gzip
     import json
-    from datetime import datetime
     from pathlib import Path
 
     from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -250,7 +250,7 @@ async def _backup_database_async(output: str | None, backup_format: str, compres
     try:
         backup_data = {
             "metadata": {
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "format_version": "1.0",
                 "backup_type": "full",
             },
@@ -329,8 +329,6 @@ def cleanup_database(dry_run: bool, older_than: int, confirm: bool) -> None:
 
 async def _cleanup_database_async(dry_run: bool, older_than: int, confirm: bool) -> None:
     """Async implementation of database cleanup."""
-    from datetime import datetime, timedelta
-
     # ProviderData is now DictionaryEntry
 
     console.print(f"[bold blue]Database cleanup (dry run: {dry_run})[/bold blue]")
@@ -342,7 +340,7 @@ async def _cleanup_database_async(dry_run: bool, older_than: int, confirm: bool)
             return
 
     try:
-        cutoff_date = datetime.utcnow() - timedelta(days=older_than)
+        cutoff_date = datetime.now(UTC) - timedelta(days=older_than)
 
         # Find old provider data entries
         old_providers = await DictionaryEntry.find(
@@ -361,7 +359,7 @@ async def _cleanup_database_async(dry_run: bool, older_than: int, confirm: bool)
             console.print(f"[green]Deleted {deleted_count} old provider entries[/green]")
         elif old_providers:
             console.print(
-                f"[yellow]Would delete {len(old_providers)} old provider entries[/yellow]"
+                f"[yellow]Would delete {len(old_providers)} old provider entries[/yellow]",
             )
 
         # Find orphaned words (words with no provider data)
@@ -597,7 +595,7 @@ async def _clear_words_async(confirm: bool) -> None:
         console.print(f"  Deleted {word_count} Word documents")
 
         console.print(
-            f"\n[green]✓ Successfully deleted {total_deleted} word-related documents[/green]"
+            f"\n[green]✓ Successfully deleted {total_deleted} word-related documents[/green]",
         )
 
     except Exception as e:

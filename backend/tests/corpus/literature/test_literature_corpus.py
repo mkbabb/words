@@ -30,14 +30,14 @@ class TestLiteratureCorpus:
         # Save to MongoDB
         await corpus.save()
 
-        assert corpus.id is not None
+        assert corpus.corpus_id is not None
         assert corpus.corpus_name == "shakespeare_works"
-        assert corpus.corpus_type == CorpusType.LITERATURE.value
+        assert corpus.corpus_type == CorpusType.LITERATURE
         assert len(corpus.vocabulary) == 4
         assert "thou" in corpus.vocabulary
 
         # Verify retrieval from MongoDB
-        loaded = await LiteratureCorpus.get(corpus.id)
+        loaded = await LiteratureCorpus.get(corpus.corpus_id)
         assert loaded is not None
         assert loaded.corpus_name == "shakespeare_works"
         assert loaded.vocabulary == corpus.vocabulary
@@ -50,6 +50,7 @@ class TestLiteratureCorpus:
             corpus_name="english_literature",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
+            vocabulary=[],
             is_master=True,
         )
         await parent.save()
@@ -63,16 +64,22 @@ class TestLiteratureCorpus:
                 birth_year=1564,
                 death_year=1616,
                 nationality="English",
+                period=Period.RENAISSANCE,
+                primary_genre=Genre.DRAMA,
             ),
             text="To be or not to be, that is the question",
-            gutenberg_id=1524,
+            gutenberg_id="1524",
         )
-        mock_connector.fetch.return_value = mock_entry
+        mock_connector.fetch_source.return_value = mock_entry
 
         # Create literature source
         source = LiteratureSource(
             name="Hamlet",
-            author=AuthorInfo(name="Shakespeare, William"),
+            author=AuthorInfo(
+                name="Shakespeare, William",
+                period=Period.RENAISSANCE,
+                primary_genre=Genre.DRAMA,
+            ),
             genre=Genre.DRAMA,
             period=Period.RENAISSANCE,
             language=Language.ENGLISH,
@@ -83,16 +90,16 @@ class TestLiteratureCorpus:
         child_id = await parent.add_literature_source(source, connector=mock_connector)
 
         assert child_id is not None
-        mock_connector.fetch.assert_called_once_with("1524")
+        mock_connector.fetch_source.assert_called_once_with(source)
 
         # Verify child corpus was created
         manager = TreeCorpusManager()
-        children = await manager.get_children(parent.id)
+        children = await manager.get_children(parent.corpus_id)
         assert len(children) == 1
 
         child = children[0]
         assert child.corpus_name == "english_literature_Hamlet"
-        assert child.corpus_type == CorpusType.LITERATURE.value
+        assert child.corpus_type == CorpusType.LITERATURE
         assert child.metadata["title"] == "Hamlet"
         assert child.metadata["author"] == "Shakespeare, William"
         assert child.metadata["genre"] == Genre.DRAMA.value
@@ -106,6 +113,7 @@ class TestLiteratureCorpus:
             corpus_name="shakespeare_collection",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
+            vocabulary=[],
             is_master=True,
         )
         await master.save()
@@ -124,15 +132,23 @@ class TestLiteratureCorpus:
         for title, gutenberg_id, text in works:
             mock_entry = LiteratureEntry(
                 title=title,
-                author=AuthorInfo(name="Shakespeare, William"),
+                author=AuthorInfo(
+                    name="Shakespeare, William",
+                    period=Period.RENAISSANCE,
+                    primary_genre=Genre.DRAMA,
+                ),
                 text=text,
-                gutenberg_id=gutenberg_id,
+                gutenberg_id=str(gutenberg_id),
             )
-            mock_connector.fetch.return_value = mock_entry
+            mock_connector.fetch_source.return_value = mock_entry
 
             source = LiteratureSource(
                 name=title,
-                author=AuthorInfo(name="Shakespeare, William"),
+                author=AuthorInfo(
+                    name="Shakespeare, William",
+                    period=Period.RENAISSANCE,
+                    primary_genre=Genre.DRAMA,
+                ),
                 genre=Genre.DRAMA,
                 language=Language.ENGLISH,
                 url=str(gutenberg_id),
@@ -146,7 +162,7 @@ class TestLiteratureCorpus:
 
         # Verify all children were added
         manager = TreeCorpusManager()
-        children = await manager.get_children(master.id)
+        children = await manager.get_children(master.corpus_id)
         assert len(children) == 3
 
         # Check titles
@@ -165,6 +181,7 @@ class TestLiteratureCorpus:
             corpus_name="world_literature",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
+            vocabulary=[],
             is_master=True,
         )
         await root.save()
@@ -174,7 +191,8 @@ class TestLiteratureCorpus:
             corpus_name="shakespeare",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
-            parent_corpus_id=root.id,
+            vocabulary=[],
+            parent_corpus_id=root.corpus_id,
         )
         await author_corpus.save()
 
@@ -186,7 +204,7 @@ class TestLiteratureCorpus:
             corpus_name="hamlet",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
-            parent_corpus_id=author_corpus.id,
+            parent_corpus_id=author_corpus.corpus_id,
             vocabulary=["prince", "denmark", "ghost", "revenge"],
         )
         work_corpus.metadata.update(
@@ -195,7 +213,7 @@ class TestLiteratureCorpus:
                 "author": "Shakespeare, William",
                 "genre": Genre.TRAGEDY.value,
                 "period": Period.RENAISSANCE.value,
-            }
+            },
         )
         await work_corpus.save()
 
@@ -203,7 +221,7 @@ class TestLiteratureCorpus:
         await manager.add_child(author_corpus, work_corpus)
 
         # Verify tree structure
-        tree = await manager.get_tree(root.id)
+        tree = await manager.get_tree(root.corpus_id)
         assert tree is not None
         assert len(tree["children"]) == 1  # author_corpus
         assert len(tree["children"][0]["children"]) == 1  # work_corpus
@@ -217,6 +235,7 @@ class TestLiteratureCorpus:
             corpus_name="poetry_collection",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
+            vocabulary=[],
             is_master=True,
         )
         await parent.save()
@@ -226,7 +245,7 @@ class TestLiteratureCorpus:
             corpus_name="poem1",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
-            parent_corpus_id=parent.id,
+            parent_corpus_id=parent.corpus_id,
             vocabulary=["rose", "red", "love", "sweet"],
         )
         await poem1.save()
@@ -235,7 +254,7 @@ class TestLiteratureCorpus:
             corpus_name="poem2",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
-            parent_corpus_id=parent.id,
+            parent_corpus_id=parent.corpus_id,
             vocabulary=["violet", "blue", "love", "true"],
         )
         await poem2.save()
@@ -246,10 +265,10 @@ class TestLiteratureCorpus:
         await manager.add_child(parent, poem2)
 
         # Aggregate vocabulary
-        await manager.aggregate_vocabulary(parent.id)
+        await manager.aggregate_vocabulary(parent.corpus_id)
 
         # Reload parent
-        reloaded = await LiteratureCorpus.get(parent.id)
+        reloaded = await LiteratureCorpus.get(parent.corpus_id)
         assert reloaded is not None
 
         # Check aggregated vocabulary
@@ -264,6 +283,7 @@ class TestLiteratureCorpus:
             corpus_name="victorian_novels",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
+            vocabulary=[],
         )
 
         # Add metadata
@@ -274,13 +294,13 @@ class TestLiteratureCorpus:
                 "authors": ["Charles Dickens", "Jane Austen", "Charlotte Bronte"],
                 "date_range": "1837-1901",
                 "characteristics": ["social realism", "industrialization", "class conflict"],
-            }
+            },
         )
 
         await corpus.save()
 
         # Verify metadata persistence
-        loaded = await LiteratureCorpus.get(corpus.id)
+        loaded = await LiteratureCorpus.get(corpus.corpus_id)
         assert loaded is not None
         assert loaded.metadata["period"] == Period.VICTORIAN.value
         assert Genre.NOVEL.value in loaded.metadata["genres"]
@@ -298,7 +318,7 @@ class TestLiteratureCorpus:
         )
         await corpus.save()
 
-        original_id = corpus.id
+        original_id = corpus.corpus_id
         original_version = corpus.version_info.version
 
         # Update vocabulary
@@ -308,7 +328,7 @@ class TestLiteratureCorpus:
 
         # Check version was updated
         assert corpus.version_info.version != original_version
-        assert corpus.id == original_id  # Same document
+        assert corpus.corpus_id == original_id  # Same document
 
         # Load and verify
         loaded = await LiteratureCorpus.get(original_id)
@@ -323,12 +343,13 @@ class TestLiteratureCorpus:
             corpus_name="test_errors",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
+            vocabulary=[],
         )
         await corpus.save()
 
         # Mock connector that fails
         mock_connector = AsyncMock(spec=GutenbergConnector)
-        mock_connector.fetch.return_value = None  # Simulate fetch failure
+        mock_connector.fetch_source.return_value = None  # Simulate fetch failure
 
         source = LiteratureSource(
             name="NonExistentWork",
@@ -342,7 +363,7 @@ class TestLiteratureCorpus:
 
         # Verify no child was added
         manager = TreeCorpusManager()
-        children = await manager.get_children(corpus.id)
+        children = await manager.get_children(corpus.corpus_id)
         assert len(children) == 0
 
     @pytest.mark.asyncio
@@ -362,8 +383,8 @@ class TestLiteratureCorpus:
             corpora.append(corpus)
 
         # Batch retrieval
-        ids = [c.id for c in corpora]
-        loaded = await LiteratureCorpus.find_many({"_id": {"$in": ids}}).to_list()
+        ids = [c.corpus_id for c in corpora]
+        loaded = await LiteratureCorpus.get_many_by_ids(ids)
 
         assert len(loaded) == 5
         work_numbers = [c.metadata["work_number"] for c in loaded]
@@ -387,22 +408,22 @@ class TestLiteratureCorpus:
                 "desire",
                 "longing",
             ],
-            semantic=True,  # Enable semantic search
         )
         corpus.metadata.update(
             {
                 "genre": Genre.POETRY.value,
                 "themes": ["emotion", "human nature"],
                 "searchable": True,
-            }
+                "semantic_enabled": True,  # Store semantic flag in metadata
+            },
         )
         await corpus.save()
 
         # Verify searchable metadata
-        loaded = await LiteratureCorpus.get(corpus.id)
+        loaded = await LiteratureCorpus.get(corpus.corpus_id)
         assert loaded is not None
         assert loaded.metadata["searchable"] is True
-        assert loaded.semantic is True
+        assert loaded.metadata.get("semantic_enabled", False) is True  # Check in metadata
 
         # Vocabulary should be available for search
         assert "love" in loaded.vocabulary
@@ -416,6 +437,7 @@ class TestLiteratureCorpus:
             corpus_name="parallel_parent",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
+            vocabulary=[],
             is_master=True,
         )
         await parent.save()
@@ -426,7 +448,7 @@ class TestLiteratureCorpus:
                 corpus_name=f"parallel_child_{index}",
                 language=Language.ENGLISH,
                 corpus_type=CorpusType.LITERATURE,
-                parent_corpus_id=parent.id,
+                parent_corpus_id=parent.corpus_id,
                 vocabulary=[f"word_{index}"],
             )
             await child.save()

@@ -14,6 +14,7 @@ from typing import Any, ParamSpec, TypeVar, cast
 from ..utils.logging import get_logger
 from .core import get_global_cache
 from .models import CacheNamespace
+from .protocols import is_request_with_headers, serialize_cache_value
 
 # Modern type parameters using ParamSpec
 P = ParamSpec("P")
@@ -44,27 +45,13 @@ def _efficient_cache_key_parts(
     # Process kwargs efficiently without sorting
     if len(kwargs) <= 3:  # Fast path for simple kwargs (most API calls)
         for key, value in kwargs.items():
-            if value is None or isinstance(value, str | int | float | bool):
-                key_parts.append((key, value))
-            elif hasattr(value, "value"):  # Enum-like objects
-                key_parts.append((key, value.value))
-            else:
-                key_parts.append((key, hash(value)))
+            serialized = serialize_cache_value(value)
+            key_parts.append((key, serialized))
     else:  # Fallback with sorting only for complex cases
         for key in sorted(kwargs.keys()):
             value = kwargs[key]
-            if value is None or isinstance(value, str | int | float | bool):
-                key_parts.append((key, value))
-            elif hasattr(value, "value"):  # Enum-like objects
-                key_parts.append((key, value.value))
-            elif isinstance(value, list | tuple) and len(value) < 10:
-                key_parts.append((key, tuple(value) if isinstance(value, list) else value))
-            else:
-                # For complex objects, use hash instead of string representation
-                try:
-                    key_parts.append((key, f"_hash_{hash(value)}_"))
-                except TypeError:
-                    key_parts.append((key, f"_id_{id(value)}_"))
+            serialized = serialize_cache_value(value)
+            key_parts.append((key, serialized))
 
     return tuple(key_parts)
 
@@ -106,7 +93,7 @@ def cached_api_call(
             headers = None
             if include_headers:
                 request = kwargs.get("request")
-                if request and hasattr(request, "headers"):
+                if request and is_request_with_headers(request):
                     # Include select headers that might affect response
                     relevant_headers = {"accept-language", "accept-encoding"}
                     headers = {
@@ -146,7 +133,10 @@ def cached_api_call(
 
                 # Cache the result
                 await cache.set(
-                    namespace, cache_key, result, ttl_override=timedelta(hours=ttl_hours)
+                    namespace,
+                    cache_key,
+                    result,
+                    ttl_override=timedelta(hours=ttl_hours),
                 )
 
                 elapsed = (time.time() - start_time) * 1000
@@ -257,7 +247,10 @@ def cached_computation_sync(
 
                 # Cache the result
                 await cache.set(
-                    namespace, cache_key, result, ttl_override=timedelta(hours=ttl_hours)
+                    namespace,
+                    cache_key,
+                    result,
+                    ttl_override=timedelta(hours=ttl_hours),
                 )
 
                 logger.debug(f"✅ Cached sync computation result for {func.__name__}")
@@ -301,7 +294,7 @@ def cached_computation(
     return decorator
 
 
-def deduplicated[**P, R](func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+def deduplicated(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
     """Decorator to prevent duplicate concurrent calls to the same function.
 
     If multiple calls are made with the same arguments while one is in progress,
@@ -316,7 +309,7 @@ def deduplicated[**P, R](func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitab
     """
 
     @functools.wraps(func)
-    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
         # Generate cache key for deduplication
         key_parts = _efficient_cache_key_parts(func, args, kwargs)
         cache_key = _generate_cache_key(key_parts)
@@ -325,10 +318,10 @@ def deduplicated[**P, R](func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitab
         if cache_key in _active_calls:
             logger.debug(f"🔄 Deduplicating call to {func.__name__} - waiting for existing call")
             # Wait for the existing call to complete
-            return cast("R", await _active_calls[cache_key])
+            return await _active_calls[cache_key]
 
         # Create a future for this call
-        future: asyncio.Future[R] = asyncio.Future()
+        future: asyncio.Future[Any] = asyncio.Future()
         _active_calls[cache_key] = future
 
         try:
@@ -382,7 +375,7 @@ def cached_api_call_with_dedup(
             headers = None
             if include_headers:
                 request = kwargs.get("request")
-                if request and hasattr(request, "headers"):
+                if request and is_request_with_headers(request):
                     # Include select headers that might affect response
                     relevant_headers = {"accept-language", "accept-encoding"}
                     headers = {
@@ -433,7 +426,10 @@ def cached_api_call_with_dedup(
 
                 # Cache the result
                 await cache.set(
-                    namespace, cache_key, result, ttl_override=timedelta(hours=ttl_hours)
+                    namespace,
+                    cache_key,
+                    result,
+                    ttl_override=timedelta(hours=ttl_hours),
                 )
 
                 elapsed = (time.time() - start_time) * 1000

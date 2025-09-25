@@ -194,11 +194,11 @@ def setup_logging(level: str = "INFO") -> None:
     loguru_logger.info(f"Logging configured with level: {level.upper()}")
 
 
-def log_timing[T](func: Callable[..., T]) -> Callable[..., T]:
+def log_timing(func: Callable[..., Any]) -> Callable[..., Any]:
     """Decorator to log function execution time with enhanced context."""
 
     @functools.wraps(func)
-    async def async_wrapper(*args: Any, **kwargs: Any) -> T:
+    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         start_time = time.perf_counter()
         func_name = f"{func.__module__}.{func.__name__}"
 
@@ -207,7 +207,7 @@ def log_timing[T](func: Callable[..., T]) -> Callable[..., T]:
 
         func_logger.debug(f"⏱️  Starting {func_name}")
         try:
-            result: T = await func(*args, **kwargs)  # type: ignore[misc]
+            result = await func(*args, **kwargs)
             elapsed = time.perf_counter() - start_time
             func_logger.info(f"✅ {func_name} completed in {elapsed:.2f}s", duration=elapsed)
             return result
@@ -221,7 +221,7 @@ def log_timing[T](func: Callable[..., T]) -> Callable[..., T]:
             raise
 
     @functools.wraps(func)
-    def sync_wrapper(*args: Any, **kwargs: Any) -> T:
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
         start_time = time.perf_counter()
         func_name = f"{func.__module__}.{func.__name__}"
 
@@ -244,8 +244,8 @@ def log_timing[T](func: Callable[..., T]) -> Callable[..., T]:
             raise
 
     if asyncio.iscoroutinefunction(func):
-        return cast("Callable[..., T]", async_wrapper)
-    return cast("Callable[..., T]", sync_wrapper)
+        return async_wrapper
+    return sync_wrapper
 
 
 def log_stage(stage_name: str, emoji: str = "🔄") -> Callable[[Callable[..., T]], Callable[..., T]]:

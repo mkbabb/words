@@ -9,8 +9,8 @@ from typing import Any
 
 from beanie import PydanticObjectId
 
-from ....caching.decorators import cached_api_call
 from ....core.state_tracker import Stages, StateTracker
+from ....models.base import Language
 from ....models.dictionary import (
     Definition,
     DictionaryProvider,
@@ -22,6 +22,7 @@ from ....models.dictionary import (
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ..core import DictionaryConnector
+from ..models import DictionaryProviderEntry
 
 logger = get_logger(__name__)
 
@@ -279,12 +280,11 @@ class MerriamWebsterConnector(DictionaryConnector):
 
         return examples
 
-    @cached_api_call(ttl_hours=24.0, key_prefix="merriam_webster")
     async def _fetch_from_provider(
         self,
         word: str,
         state_tracker: StateTracker | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> DictionaryProviderEntry | None:
         """Fetch definition from Merriam-Webster.
 
         Args:
@@ -330,22 +330,24 @@ class MerriamWebsterConnector(DictionaryConnector):
             pronunciation = self.extract_pronunciation(data, word_obj.id)
             etymology = self.extract_etymology(data)
 
-            # Get definition IDs (already saved in parsing)
-            definition_ids = [
-                definition.id for definition in definitions if definition.id is not None
-            ]
-
-            # Save pronunciation if exists
-            pronunciation_id = None
             if pronunciation:
                 await pronunciation.save()
-                pronunciation_id = pronunciation.id
 
-            # Create provider data as dict
-            provider_data = {
-                "word": word,
-                "provider": self.provider.value,
-                "definitions": [
+            # Collect all examples from the raw data
+            all_examples = []
+            for section in data.get("def", []):
+                for sense_group in section.get("sseq", []):
+                    for sense_item in sense_group:
+                        if isinstance(sense_item, list) and len(sense_item) >= 2:
+                            if sense_item[0] == "sense" and isinstance(sense_item[1], dict):
+                                dt = sense_item[1].get("dt", [])
+                                all_examples.extend(self._extract_examples(dt))
+
+            entry = DictionaryProviderEntry(
+                word=word,
+                provider=self.provider.value,
+                language=Language.ENGLISH,
+                definitions=[
                     {
                         "id": str(definition.id),
                         "part_of_speech": definition.part_of_speech,
@@ -356,24 +358,21 @@ class MerriamWebsterConnector(DictionaryConnector):
                     }
                     for definition in definitions
                 ],
-                "pronunciation": {
-                    "id": str(pronunciation.id),
-                    "phonetic": pronunciation.phonetic,
-                    "ipa": pronunciation.ipa,
-                    "syllables": pronunciation.syllables,
-                } if pronunciation else None,
-                "etymology": {
-                    "text": etymology.text,
-                    "origin_language": etymology.origin_language,
-                    "root_words": etymology.root_words,
-                } if etymology else None,
-                "raw_data": data,
-            }
+                pronunciation=pronunciation.phonetic if pronunciation else None,
+                etymology=etymology.text if etymology else None,
+                examples=all_examples,
+                raw_data=data,
+                provider_metadata={
+                    "pronunciation": pronunciation.model_dump(mode="json")
+                    if pronunciation
+                    else None,
+                },
+            )
 
             if state_tracker:
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
 
-            return provider_data
+            return entry
 
         except Exception as e:
             logger.error(f"Error fetching from Merriam-Webster: {e}")

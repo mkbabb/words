@@ -7,13 +7,8 @@ from beanie import PydanticObjectId
 from beanie.operators import In
 from pydantic import BaseModel, Field
 
-from ...models.base import Etymology, ImageMedia, ModelInfo
-from ...models.dictionary import (
-    Definition,
-    DictionaryEntry,
-    Fact,
-    Pronunciation,
-)
+from ...models import Etymology, ImageMedia, ModelInfo
+from ...models.dictionary import Definition, DictionaryEntry, Fact, Pronunciation
 from ..core.base import BaseRepository
 
 
@@ -115,12 +110,14 @@ class SynthesisRepository(
     async def find_by_model(self, model_name: str) -> list[DictionaryEntry]:
         """Find entries synthesized by a specific model."""
         return await DictionaryEntry.find(
-            {"model_info.name": model_name, "provider": "synthesis"}
+            {"model_info.name": model_name, "provider": "synthesis"},
         ).to_list()
 
     # CRUD for related definitions
     async def add_definition(
-        self, entry_id: PydanticObjectId, definition_id: PydanticObjectId
+        self,
+        entry_id: PydanticObjectId,
+        definition_id: PydanticObjectId,
     ) -> DictionaryEntry:
         """Add a definition to the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
@@ -134,7 +131,9 @@ class SynthesisRepository(
         return entry
 
     async def remove_definition(
-        self, entry_id: PydanticObjectId, definition_id: PydanticObjectId
+        self,
+        entry_id: PydanticObjectId,
+        definition_id: PydanticObjectId,
     ) -> DictionaryEntry:
         """Remove a definition from the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
@@ -148,7 +147,9 @@ class SynthesisRepository(
         return entry
 
     async def add_fact(
-        self, entry_id: PydanticObjectId, fact_id: PydanticObjectId
+        self,
+        entry_id: PydanticObjectId,
+        fact_id: PydanticObjectId,
     ) -> DictionaryEntry:
         """Add a fact to the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
@@ -162,7 +163,9 @@ class SynthesisRepository(
         return entry
 
     async def set_pronunciation(
-        self, entry_id: PydanticObjectId, pronunciation_id: PydanticObjectId
+        self,
+        entry_id: PydanticObjectId,
+        pronunciation_id: PydanticObjectId,
     ) -> DictionaryEntry:
         """Set the pronunciation for the synthesis."""
         entry = await self.get(entry_id, raise_on_missing=True)
@@ -269,13 +272,13 @@ class SynthesisRepository(
 
         if all_definition_ids:
             definitions = await Definition.find(
-                In(Definition.id, list(all_definition_ids))
+                In(Definition.id, list(all_definition_ids)),
             ).to_list()
             definitions_map = {str(d.id): d.model_dump() for d in definitions}
 
         if all_pronunciation_ids:
             pronunciations = await Pronunciation.find(
-                In(Pronunciation.id, list(all_pronunciation_ids))
+                In(Pronunciation.id, list(all_pronunciation_ids)),
             ).to_list()
             pronunciations_map = {str(p.id): p.model_dump() for p in pronunciations}
 
@@ -302,7 +305,7 @@ class SynthesisRepository(
 
                 if "pronunciation" in expand and entry.pronunciation_id:
                     entry_dict["pronunciation"] = pronunciations_map.get(
-                        str(entry.pronunciation_id)
+                        str(entry.pronunciation_id),
                     )
 
                 if "facts" in expand:

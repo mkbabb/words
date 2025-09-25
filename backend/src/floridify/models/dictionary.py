@@ -100,7 +100,8 @@ class Pronunciation(Document, BaseMetadata):
 
 class LiteratureSourceExample(BaseModel):
     """Source ID for the piece of literature, and contextual information
-    for where the example came from."""
+    for where the example came from.
+    """
 
     literature_id: PydanticObjectId  # FK to LiteratureSource document
     text_pos: int
@@ -198,7 +199,7 @@ class DictionaryEntry(Document, BaseMetadata):
     # Foreign keys to related entities
     word_id: PydanticObjectId  # FK to Word document
     definition_ids: list[PydanticObjectId] = Field(
-        default_factory=list
+        default_factory=list,
     )  # FK to Definition documents
     pronunciation_id: PydanticObjectId | None = None  # FK to Pronunciation document
     fact_ids: list[PydanticObjectId] = Field(default_factory=list)  # FK to Fact documents
@@ -218,9 +219,9 @@ class DictionaryEntry(Document, BaseMetadata):
 
 # Explicit exports
 __all__ = [
-    "DictionaryProvider",
     "Definition",
     "DictionaryEntry",
+    "DictionaryProvider",
     "Example",
     "Fact",
     "LiteratureSourceExample",

@@ -1,5 +1,4 @@
-"""
-Comprehensive tests for the wordlist pipeline REST API endpoints.
+"""Comprehensive tests for the wordlist pipeline REST API endpoints.
 Tests CRUD operations, file upload, spaced repetition, learning analytics, and search.
 """
 
@@ -7,10 +6,11 @@ import asyncio
 import io
 
 import pytest
-from ..conftest import assert_response_structure, assert_valid_object_id
 from httpx import AsyncClient
 
 from floridify.wordlist.models import WordList
+
+from ..conftest import assert_response_structure, assert_valid_object_id
 
 
 class TestWordlistPipelineAPI:
@@ -50,7 +50,8 @@ class TestWordlistPipelineAPI:
         """Test wordlist creation input validation."""
         # Empty name
         response = await async_client.post(
-            "/api/v1/wordlists", json={"name": "", "description": "Test"}
+            "/api/v1/wordlists",
+            json={"name": "", "description": "Test"},
         )
         assert response.status_code in [400, 422]
 
@@ -112,7 +113,9 @@ class TestWordlistPipelineAPI:
         """Test retrieving detailed wordlist information."""
         # Create test wordlist
         wordlist = await wordlist_factory(
-            name="Detailed List", description="Test description", words=["word1", "word2", "word3"]
+            name="Detailed List",
+            description="Test description",
+            words=["word1", "word2", "word3"],
         )
 
         response = await async_client.get(f"/api/v1/wordlists/{wordlist.id}")
@@ -264,7 +267,7 @@ class TestWordlistPipelineAPI:
         wordlist = await wordlist_factory(words=words)
 
         response = await async_client.get(
-            f"/api/v1/wordlists/{wordlist.id}/words/search?query=test&limit=10"
+            f"/api/v1/wordlists/{wordlist.id}/words/search?query=test&limit=10",
         )
 
         assert response.status_code == 200
@@ -296,7 +299,8 @@ class TestWordlistPipelineAPI:
         review_data = {"word": "review", "mastery_level": "BRONZE", "quality_score": 0.8}
 
         review_response = await async_client.post(
-            f"/api/v1/wordlists/{wordlist.id}/review", json=review_data
+            f"/api/v1/wordlists/{wordlist.id}/review",
+            json=review_data,
         )
 
         assert review_response.status_code == 200
@@ -317,11 +321,12 @@ class TestWordlistPipelineAPI:
                 {"word": "bulk1", "mastery_level": "BRONZE", "quality_score": 0.7},
                 {"word": "bulk2", "mastery_level": "SILVER", "quality_score": 0.9},
                 {"word": "bulk3", "mastery_level": "BRONZE", "quality_score": 0.6},
-            ]
+            ],
         }
 
         response = await async_client.post(
-            f"/api/v1/wordlists/{wordlist.id}/review/bulk", json=bulk_review_data
+            f"/api/v1/wordlists/{wordlist.id}/review/bulk",
+            json=bulk_review_data,
         )
 
         assert response.status_code == 200
@@ -340,7 +345,8 @@ class TestWordlistPipelineAPI:
         session_data = {"duration_minutes": 30, "words_studied": 15, "words_mastered": 5}
 
         response = await async_client.post(
-            f"/api/v1/wordlists/{wordlist.id}/review/study-session", json=session_data
+            f"/api/v1/wordlists/{wordlist.id}/review/study-session",
+            json=session_data,
         )
 
         assert response.status_code == 200
@@ -413,7 +419,10 @@ class TestWordlistPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_wordlist_performance_large_list(
-        self, async_client: AsyncClient, performance_thresholds, benchmark
+        self,
+        async_client: AsyncClient,
+        performance_thresholds,
+        benchmark,
     ):
         """Test performance with large wordlist operations."""
         # Create large wordlist
@@ -433,7 +442,9 @@ class TestWordlistPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_wordlist_concurrent_operations(
-        self, async_client: AsyncClient, wordlist_factory
+        self,
+        async_client: AsyncClient,
+        wordlist_factory,
     ):
         """Test concurrent wordlist operations."""
         # Create wordlist
@@ -455,7 +466,9 @@ class TestWordlistPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_wordlist_spaced_repetition_algorithm(
-        self, async_client: AsyncClient, wordlist_factory
+        self,
+        async_client: AsyncClient,
+        wordlist_factory,
     ):
         """Test spaced repetition algorithm (SM-2) implementation."""
         # Create wordlist
@@ -470,7 +483,8 @@ class TestWordlistPipelineAPI:
 
         for review_data in reviews:
             response = await async_client.post(
-                f"/api/v1/wordlists/{wordlist.id}/review", json=review_data
+                f"/api/v1/wordlists/{wordlist.id}/review",
+                json=review_data,
             )
             assert response.status_code == 200
 

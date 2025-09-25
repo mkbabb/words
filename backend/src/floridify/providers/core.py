@@ -7,7 +7,6 @@ and caching integration with RespectfulHttpClient support.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable
 from datetime import timedelta
 from enum import Enum
 from typing import Any, Self, TypeVar
@@ -15,7 +14,6 @@ from typing import Any, Self, TypeVar
 import httpx
 from pydantic import BaseModel, Field
 
-from ..caching.manager import get_version_manager
 from ..caching.models import CacheNamespace, ResourceType, VersionConfig
 from ..core.state_tracker import StateTracker
 from ..utils.logging import get_logger
@@ -114,7 +112,8 @@ class ConnectorConfig(BaseModel):
 
     # Rate limiting configuration
     rate_limit_config: RateLimitConfig | None = Field(
-        default=None, description="Rate limiting configuration"
+        default=None,
+        description="Rate limiting configuration",
     )
     user_agent: str = Field(
         default="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -158,17 +157,21 @@ class BaseConnector(ABC):
     @abstractmethod
     def get_resource_type(self) -> ResourceType:
         """Get the resource type for this connector."""
-        pass
 
     @abstractmethod
     def get_cache_namespace(self) -> CacheNamespace:
         """Get the cache namespace for this connector."""
-        pass
 
     @abstractmethod
-    def get_provider_identifier(self) -> str:
-        """Get the provider identifier for resource IDs."""
-        pass
+    def model_dump(self, content: Any) -> Any:
+        """Prepare content for persistence."""
+        if hasattr(content, "model_dump"):
+            return content.model_dump(mode="json")  # type: ignore[attr-defined]
+        return content
+
+    def model_load(self, content: Any) -> Any:
+        """Convert persisted payload back into provider object."""
+        return content
 
     async def get(
         self,
@@ -177,9 +180,10 @@ class BaseConnector(ABC):
     ) -> Any | None:
         """Get resource from versioned storage."""
         from ..caching.core import get_versioned_content
-        
+        from ..caching.manager import get_version_manager
+
         manager = get_version_manager()
-        full_resource_id = f"{resource_id}_{self.get_provider_identifier()}"
+        full_resource_id = f"{resource_id}_{self.get_cache_key_suffix()}"
 
         result = await manager.get_latest(
             resource_id=full_resource_id,
@@ -188,19 +192,18 @@ class BaseConnector(ABC):
         )
 
         if result:
-            return await get_versioned_content(result)
+            payload = await get_versioned_content(result)
+            if payload is not None:
+                return self.model_load(payload)
         return None
 
-    def get_metadata_for_resource(self, resource_id: str) -> dict[str, Any]:
-        """Get provider-specific metadata for a resource.
+    def get_cache_key_suffix(self) -> str:
+        """Suffix used when building cache keys."""
+        return self.__class__.__name__
 
-        Override in subclasses to customize metadata fields.
-        """
-        return {
-            "resource_id": resource_id,
-            "provider": self.get_provider_identifier(),
-            "resource_type": self.get_resource_type().value,
-        }
+    def get_metadata_for_resource(self, resource_id: str) -> dict[str, Any]:
+        """Base metadata for persisted entries."""
+        return {"resource_id": resource_id, "resource_type": self.get_resource_type().value}
 
     async def save(
         self,
@@ -209,12 +212,16 @@ class BaseConnector(ABC):
         config: VersionConfig | None = None,
     ) -> None:
         """Save resource to versioned storage."""
+        from ..caching.manager import get_version_manager
+
         manager = get_version_manager()
-        full_resource_id = f"{resource_id}_{self.get_provider_identifier()}"
+        full_resource_id = f"{resource_id}_{self.get_cache_key_suffix()}"
+
+        content_to_save = self.model_dump(content)
 
         await manager.save(
             resource_id=full_resource_id,
-            content=content,
+            content=content_to_save,
             resource_type=self.get_resource_type(),
             namespace=self.get_cache_namespace(),
             metadata=self.get_metadata_for_resource(resource_id),
@@ -222,55 +229,28 @@ class BaseConnector(ABC):
         )
 
         logger.info(
-            f"Saved {self.get_resource_type().value} entry for '{resource_id}' from {self.get_provider_identifier()}"
+            "%s saved %s entry for '%s'",
+            self.get_cache_key_suffix(),
+            self.get_resource_type().value,
+            resource_id,
         )
 
+    @abstractmethod
     async def fetch(
         self,
         resource_id: str,
         config: VersionConfig | None = None,
         state_tracker: StateTracker | None = None,
     ) -> Any | None:
-        """Fetch resource from provider and optionally save."""
-        config = config or VersionConfig()
-
-        # Check cache first unless force refresh
-        if not config.force_rebuild:
-            cached_result = await self.get(resource_id, config)
-            if cached_result is not None:
-                logger.info(
-                    f"Using cached {self.get_resource_type().value} entry for '{resource_id}' from {self.get_provider_identifier()}"
-                )
-                return cached_result
-
-        # Rate limiting
-        await self.rate_limiter.acquire()
-
-        # Track state
-        if state_tracker:
-            await state_tracker.update(
-                stage="fetching",
-                message=f"{resource_id} from {self.get_provider_identifier()}",
-            )
-
-        # Fetch from provider
-        logger.info(f"Fetching '{resource_id}' from {self.get_provider_identifier()}")
-        result = await self._fetch_from_provider(resource_id, state_tracker)
-
-        # Save if we got a result and saving is enabled
-        if result is not None and self.config.save_versioned:
-            await self.save(resource_id, result, config)
-
-        return result
+        """Fetch resource from provider and optionally persist."""
 
     @abstractmethod
-    def _fetch_from_provider(
+    async def _fetch_from_provider(
         self,
         query: Any,
         state_tracker: StateTracker | None = None,
-    ) -> Awaitable[Any | None]:
+    ) -> Any | None:
         """Implementation-specific fetch method."""
-        pass
 
     async def get_or_fetch(
         self,
@@ -312,7 +292,7 @@ class BaseConnector(ABC):
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, *args: Any) -> None:
+    async def __aexit__(self, *args: object) -> None:
         """Async context manager exit."""
         await self.close()
 

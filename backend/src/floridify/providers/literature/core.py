@@ -6,10 +6,10 @@ from typing import Any
 
 from ...caching.models import CacheNamespace, ResourceType, VersionConfig
 from ...core.state_tracker import StateTracker
-from ...models.literature import LiteratureProvider
+from ...models.literature import AuthorInfo, LiteratureProvider
 from ...utils.logging import get_logger
 from ..core import BaseConnector, ConnectorConfig
-from .models import LiteratureEntry
+from .models import LiteratureEntry, LiteratureSource
 
 logger = get_logger(__name__)
 
@@ -34,6 +34,9 @@ class LiteratureConnector(BaseConnector):
         """Get the cache namespace for literature entries."""
         return CacheNamespace.LITERATURE
 
+    def get_cache_key_suffix(self) -> str:
+        return self.provider.value
+
     def get_provider_identifier(self) -> str:
         """Get the provider identifier for resource IDs."""
         return self.provider.value
@@ -46,29 +49,92 @@ class LiteratureConnector(BaseConnector):
             "provider_display_name": self.provider.value.replace("_", " ").title(),
         }
 
+    def _coerce_entry(self, payload: LiteratureEntry | dict[str, Any]) -> LiteratureEntry:
+        if isinstance(payload, LiteratureEntry):
+            entry = payload
+        else:
+            entry = LiteratureEntry.model_validate(payload)
+
+        if not isinstance(entry.author, AuthorInfo):
+            entry = entry.model_copy(update={"author": AuthorInfo.model_validate(entry.author)})
+
+        if entry.source and not isinstance(entry.source, LiteratureSource):
+            entry = entry.model_copy(
+                update={"source": LiteratureSource.model_validate(entry.source)}
+            )
+
+        return entry
+
+    def model_dump(self, content: Any) -> Any:
+        entry = self._coerce_entry(content)
+        return entry.model_dump(mode="json")
+
+    def model_load(self, content: Any) -> Any:
+        return self._coerce_entry(content)
+
+    async def get(
+        self,
+        resource_id: str,
+        config: VersionConfig | None = None,
+    ) -> LiteratureEntry | None:
+        result = await super().get(resource_id, config)
+        if result is None:
+            return None
+        return self._coerce_entry(result)
+
     async def fetch(
         self,
         resource_id: str,
         config: VersionConfig | None = None,
         state_tracker: StateTracker | None = None,
     ) -> LiteratureEntry | None:
-        """Fetch literature entry from provider and convert to LiteratureEntry.
-        
-        This method overrides the base fetch() to return a typed LiteratureEntry object
-        instead of a raw dictionary. The flow is:
-        1. Call parent fetch() which returns dict from _fetch_from_provider
-        2. Convert the dict to a LiteratureEntry object
-        3. Return the typed object
-        
-        Note: For now, we return the dict directly to maintain compatibility.
-        Future versions will implement full LiteratureEntry conversion.
-        """
-        # Get the dictionary data from the provider
-        result = await super().fetch(resource_id, config, state_tracker)
-        
-        if result is None:
+        config = config or VersionConfig()
+
+        if not config.force_rebuild:
+            cached = await self.get(resource_id, config)
+            if cached is not None:
+                return cached
+
+        cached_entry = await self.get(resource_id)
+        if cached_entry is None or cached_entry.source is None:
+            raise ValueError("Cannot refresh literature entry without source metadata")
+
+        return await self.fetch_source(
+            cached_entry.source, config=config, state_tracker=state_tracker
+        )
+
+    async def fetch_source(
+        self,
+        source: LiteratureSource,
+        config: VersionConfig | None = None,
+        state_tracker: StateTracker | None = None,
+    ) -> LiteratureEntry | None:
+        config = config or VersionConfig()
+        resource_id = source.name or source.url
+
+        if not resource_id:
+            raise ValueError("Literature sources require a name or URL")
+
+        if not config.force_rebuild:
+            cached = await self.get(resource_id, config)
+            if cached is not None:
+                return cached
+
+        await self.rate_limiter.acquire()
+
+        if state_tracker:
+            await state_tracker.update(
+                stage="fetching",
+                message=f"{resource_id} from {self.provider.value}",
+            )
+
+        payload = await self._fetch_from_provider(source, state_tracker)
+        if payload is None:
             return None
-            
-        # For now, return the dict as-is to maintain compatibility
-        # TODO: Convert dict to LiteratureEntry
-        return result
+
+        entry = self._coerce_entry(payload)
+
+        if self.config.save_versioned:
+            await self.save(resource_id, entry, config)
+
+        return entry

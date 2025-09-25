@@ -8,7 +8,7 @@ from ....core.state_tracker import StateTracker
 from ....providers.core import ConnectorConfig, RateLimitPresets
 from ....utils.logging import get_logger
 from ..core import LanguageConnector
-from ..models import LanguageProvider, LanguageSource, ParserType, ScraperType
+from ..models import LanguageEntry, LanguageProvider, LanguageSource, ParserType, ScraperType
 from ..parsers import (
     parse_csv_words,
     parse_json_vocabulary,
@@ -33,6 +33,7 @@ class URLLanguageConnector(LanguageConnector):
         Args:
             provider: Language provider enum value
             config: Connector configuration
+
         """
         if config is None:
             config = ConnectorConfig(rate_limit_config=RateLimitPresets.SCRAPER_RESPECTFUL.value)
@@ -42,7 +43,7 @@ class URLLanguageConnector(LanguageConnector):
         self,
         query: LanguageSource,
         state_tracker: StateTracker | None = None,
-    ) -> dict[str, Any] | None:
+    ) -> LanguageEntry | None:
         """Fetch vocabulary from URL.
 
         Args:
@@ -51,6 +52,7 @@ class URLLanguageConnector(LanguageConnector):
 
         Returns:
             Dictionary containing vocabulary data
+
         """
         source = query
 
@@ -64,48 +66,59 @@ class URLLanguageConnector(LanguageConnector):
             # Get the appropriate scraper and fetch content
             scraper_type = source.scraper or ScraperType.DEFAULT
             content: dict[str, Any] | str
-            async with self.scraper_session as client:
-                if scraper_type == ScraperType.FRENCH_EXPRESSIONS:
-                    content = await scrape_french_expressions(source.url, session=client)
-                else:  # DEFAULT or unknown
-                    content = await default_scraper(source.url, session=client)
+            client = self.scraper_session
+            if scraper_type == ScraperType.FRENCH_EXPRESSIONS:
+                content = await scrape_french_expressions(source.url, session=client)
+            else:  # DEFAULT or unknown
+                content = await default_scraper(source.url, session=client)
 
             # Determine parser to use and parse content
+            parser_type = source.parser or ParserType.TEXT_LINES
             if isinstance(content, dict):
                 # Structured data from custom scraper
                 words, phrases = parse_scraped_data(content, source.language)
-            else:
-                # Text data - use configured parser
-                parser_type = source.parser or ParserType.TEXT_LINES
-                if parser_type == ParserType.JSON_VOCABULARY:
-                    words, phrases = parse_json_vocabulary(content, source.language)
-                elif parser_type == ParserType.CSV_WORDS:
-                    words, phrases = parse_csv_words(content, source.language)
-                else:  # TEXT_LINES or unknown
-                    words, phrases = parse_text_lines(content, source.language)
+            # Text data - use configured parser
+            elif parser_type == ParserType.JSON_VOCABULARY:
+                words, phrases = parse_json_vocabulary(content, source.language)
+            elif parser_type == ParserType.CSV_WORDS:
+                words, phrases = parse_csv_words(content, source.language)
+            else:  # TEXT_LINES or unknown
+                words, phrases = parse_text_lines(content, source.language)
 
-            # Combine words and phrases
-            vocabulary = words + phrases
+            vocabulary = list(dict.fromkeys([*words, *phrases]))
+            idioms: list[str] = []
+            metadata: dict[str, Any] = {}
 
-            # Return structured data
-            return {
-                "source_name": source.name,
-                "language": source.language.value,
-                "provider": self.provider.value,
-                "vocabulary": vocabulary,
-                "vocabulary_count": len(vocabulary),
-                "words": words,
-                "phrases": phrases,
-                "source_url": source.url,
-                "description": source.description,
-            }
+            # Extract idioms from parsed JSON data
+            if parser_type == ParserType.JSON_VOCABULARY and isinstance(content, str):
+                try:
+                    import json
+
+                    json_data = json.loads(content)
+                    if isinstance(json_data, dict) and "idioms" in json_data:
+                        idioms = list(dict.fromkeys(json_data.get("idioms", [])))
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    pass
+
+            if isinstance(content, dict):
+                idioms = list(dict.fromkeys(content.get("idioms", [])))
+                metadata = content.get("metadata", {})
+
+            return LanguageEntry(
+                provider=self.provider,
+                source=source,
+                vocabulary=vocabulary,
+                phrases=list(dict.fromkeys(phrases)),
+                idioms=idioms,
+                metadata=metadata,
+            )
 
         except Exception as e:
             logger.error(f"Failed to fetch from {source.name}: {e}")
             if state_tracker:
                 await state_tracker.update(
                     stage="error",
-                    message=f"Failed to fetch {source.name}: {str(e)}",
+                    message=f"Failed to fetch {source.name}: {e!s}",
                     error=str(e),
                 )
             return None

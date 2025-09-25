@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ...caching.models import BaseVersionedData, ResourceType
+from ...caching.models import BaseVersionedData, CacheNamespace, ResourceType
 from ...models.base import Language
 from ...models.literature import AuthorInfo, Genre, LiteratureProvider, Period
 
@@ -57,7 +57,8 @@ class LiteratureEntry(BaseModel):
 
     # Composed source configuration (optional for backward compatibility)
     source: LiteratureSource | None = Field(
-        default=None, description="Literature source configuration"
+        default=None,
+        description="Literature source configuration",
     )
 
     # External IDs (all optional)
@@ -77,7 +78,8 @@ class LiteratureEntry(BaseModel):
 
     # Vocabulary data
     extracted_vocabulary: list[str] = Field(
-        default_factory=list, description="Extracted vocabulary"
+        default_factory=list,
+        description="Extracted vocabulary",
     )
 
     # Content (optional)
@@ -110,31 +112,8 @@ class LiteratureEntry(BaseModel):
 
         provider: LiteratureProvider | None = None
         work_id: str | None = None
-        
-        def __init__(self, **data: Any) -> None:
-            import hashlib
-            import json
-            from datetime import datetime
-
-            from ...caching.models import CacheNamespace, VersionInfo
-            
-            data.setdefault("resource_type", ResourceType.LITERATURE)
-            data.setdefault("namespace", CacheNamespace.LITERATURE)
-            
-            # Create default version_info if not provided
-            if "version_info" not in data:
-                # Generate data hash from content
-                content_str = json.dumps(data.get("content_inline", {}), sort_keys=True, default=str)
-                data_hash = hashlib.sha256(content_str.encode()).hexdigest()
-                
-                data["version_info"] = VersionInfo(
-                    version="1",
-                    created_at=datetime.utcnow(),
-                    data_hash=data_hash,
-                    is_latest=True
-                )
-            
-            super().__init__(**data)
+        resource_type: ResourceType = ResourceType.LITERATURE
+        namespace: CacheNamespace = CacheNamespace.LITERATURE
 
         class Settings:
             """Beanie settings."""

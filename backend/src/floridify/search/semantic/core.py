@@ -79,6 +79,7 @@ class SemanticSearch:
 
         Returns:
             SemanticSearch instance with loaded index
+
         """
         # Get or create index
         index = await SemanticIndex.get_or_create(
@@ -283,7 +284,13 @@ class SemanticSearch:
 
         # Check if lemmatized vocabulary is available
         if not self.corpus.lemmatized_vocabulary:
-            raise ValueError(f"Corpus '{self.corpus.corpus_name}' has empty lemmatized vocabulary")
+            logger.warning(f"Corpus '{self.corpus.corpus_name}' has empty lemmatized vocabulary - no embeddings to build")
+            # Set empty embeddings and index for consistency
+            self.embeddings = np.array([], dtype=np.float32).reshape(0, 1024)  # BGE-M3 dimension
+            self.variant_mapping = {}
+            self.index.embeddings = self.embeddings
+            self.index.variant_mapping = self.variant_mapping
+            return
 
         # Process entire vocabulary at once for better performance
         vocab_count = len(self.corpus.lemmatized_vocabulary)
@@ -351,13 +358,17 @@ class SemanticSearch:
             raise ValueError("Index and corpus required")
 
         # Update index with embeddings data
-        if self.sentence_embeddings is not None:
+        if self.sentence_embeddings is not None and self.sentence_embeddings.size > 0:
             embeddings_bytes = pickle.dumps(self.sentence_embeddings)
             self.index.embeddings = base64.b64encode(embeddings_bytes).decode("utf-8")
+        else:
+            self.index.embeddings = ""  # Empty string for empty embeddings
 
         if self.sentence_index is not None:
             index_bytes = pickle.dumps(faiss.serialize_index(self.sentence_index))
             self.index.index_data = base64.b64encode(index_bytes).decode("utf-8")
+        else:
+            self.index.index_data = ""  # Empty string for no index
 
         # Update statistics
         self.index.build_time_seconds = build_time
@@ -383,7 +394,7 @@ class SemanticSearch:
         await self.index.save()
 
         logger.info(
-            f"Saved semantic index for '{self.index.corpus_name}' with {self.index.num_embeddings} embeddings"
+            f"Saved semantic index for '{self.index.corpus_name}' with {self.index.num_embeddings} embeddings",
         )
 
     def _load_index_from_data(self, index_data: SemanticIndex) -> None:
@@ -426,6 +437,12 @@ class SemanticSearch:
         - m: PQ subquantizers dividing vector into subspaces
         - nbits: Bits per subquantizer (8 for quality/size balance)
         """
+        # Handle empty corpus
+        if vocab_size == 0 or self.sentence_embeddings is None or self.sentence_embeddings.size == 0:
+            logger.warning("No embeddings to index - creating empty index")
+            self.sentence_index = faiss.IndexFlatL2(dimension)
+            return
+
         # Memory baseline: FP32 vectors
         base_memory_mb = (vocab_size * dimension * 4) / (1024 * 1024)
         model_type = "BGE-M3" if dimension == 1024 else "MiniLM" if dimension == 384 else "Custom"
@@ -440,7 +457,7 @@ class SemanticSearch:
             self.sentence_index.add(self.sentence_embeddings)
             actual_memory_mb = base_memory_mb
             logger.info(
-                f"✅ IndexFlatL2: exact search, {actual_memory_mb:.1f}MB (100% of baseline)"
+                f"✅ IndexFlatL2: exact search, {actual_memory_mb:.1f}MB (100% of baseline)",
             )
 
         elif vocab_size <= MEDIUM_CORPUS_THRESHOLD:
@@ -562,7 +579,7 @@ class SemanticSearch:
 
         try:
             # Normalize query to match corpus normalization
-            normalized_query = query
+            normalized_query = query.strip() if query else ""
             if not normalized_query:
                 return []
 
@@ -601,7 +618,9 @@ class SemanticSearch:
             )
 
             for embedding_idx, similarity in zip(
-                valid_embedding_indices, valid_similarities, strict=False
+                valid_embedding_indices,
+                valid_similarities,
+                strict=False,
             ):
                 # Use variant mapping from index or direct mapping
                 lemma_idx = variant_mapping.get(embedding_idx, embedding_idx)

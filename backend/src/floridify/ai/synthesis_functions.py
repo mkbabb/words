@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 from ..audio import AudioSynthesizer
 from ..core.state_tracker import Stages
-from ..models.base import Etymology, ModelInfo
+from ..models import Etymology, ModelInfo
 from ..models.dictionary import (
     Definition,
     DictionaryEntry,

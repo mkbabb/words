@@ -1,13 +1,14 @@
 """Field selection middleware for API responses."""
 
+from collections.abc import Iterable
 from typing import Any
 
 from beanie import Document
 from pydantic import BaseModel
 
 
-def select_fields[T: BaseModel](
-    obj: T,
+def select_fields(
+    obj: BaseModel,
     include: set[str] | None = None,
     exclude: set[str] | None = None,
 ) -> dict[str, Any]:
@@ -58,11 +59,11 @@ class FieldSelector:
         self.include = parse_field_param(include)
         self.exclude = parse_field_param(exclude)
 
-    def select[T: BaseModel](self, obj: T) -> dict[str, Any]:
+    def select(self, obj: BaseModel) -> dict[str, Any]:
         """Apply field selection to an object."""
         return select_fields(obj, self.include, self.exclude)
 
-    def select_many[T: BaseModel](self, objs: list[T]) -> list[dict[str, Any]]:
+    def select_many(self, objs: Iterable[BaseModel]) -> list[dict[str, Any]]:
         """Apply field selection to multiple objects."""
         return [self.select(obj) for obj in objs]
 
@@ -89,7 +90,9 @@ async def load_related_fields(obj: Document, fields: set[str], depth: int = 1) -
         if field_name.endswith("_id") and field_name[:-3] in fields:
             # Load related document
             related_field = field_name[:-3]
-            fk_value = getattr(obj, field_name, None)
+            # Type-safe field access using model_dump
+            obj_data = obj.model_dump() if hasattr(obj, "model_dump") else {}
+            fk_value = obj_data.get(field_name)
 
             if fk_value:
                 # Dynamically import the related model

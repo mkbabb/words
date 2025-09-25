@@ -11,7 +11,7 @@ from typing import Literal
 from google.cloud import texttospeech_v1 as texttospeech
 from google.oauth2 import service_account
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.base import AudioMedia
 from ..models.dictionary import Pronunciation
@@ -41,8 +41,7 @@ class AudioSynthesisConfig(BaseModel):
     # Quality settings
     sample_rate_hertz: int = 24000  # 24kHz for high quality
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class AudioSynthesizer:

@@ -8,7 +8,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-import coolname  # type: ignore
+import coolname
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
@@ -18,6 +18,7 @@ from ..caching.models import (
     ContentLocation,
     ResourceType,
     VersionConfig,
+    VersionInfo,
 )
 from ..models.base import Language
 from ..text.normalize import batch_lemmatize, batch_normalize
@@ -43,7 +44,8 @@ class Corpus(BaseModel):
     # Core vocabulary data - sorted normalized vocabulary
     vocabulary: list[str]
     original_vocabulary: list[str] = Field(
-        default_factory=list, description="Original forms of words"
+        default_factory=list,
+        description="Original forms of words",
     )
 
     # Normalized to original indices (for mapping back to original forms)
@@ -80,6 +82,10 @@ class Corpus(BaseModel):
     # Word frequency data
     word_frequencies: dict[str, int] = Field(default_factory=dict)
 
+    # Version tracking (populated from metadata when loaded)
+    version_info: VersionInfo | None = None
+    _metadata_id: PydanticObjectId | None = None  # Internal reference to metadata document
+
     model_config = {"arbitrary_types_allowed": True}
 
     class Metadata(BaseVersionedData):
@@ -95,12 +101,8 @@ class Corpus(BaseModel):
 
         # Vocabulary reference
         content_location: ContentLocation | None = None
-
-        def __init__(self, **data: Any) -> None:
-            data.setdefault("resource_type", ResourceType.CORPUS)
-            data.setdefault("namespace", CacheNamespace.CORPUS)
-
-            super().__init__(**data)
+        resource_type: ResourceType = ResourceType.CORPUS
+        namespace: CacheNamespace = CacheNamespace.CORPUS
 
     def model_post_init(self, __context: Any) -> None:
         """Post-initialization to inject slug name if needed."""
@@ -131,6 +133,7 @@ class Corpus(BaseModel):
 
         Returns:
             Corpus instance
+
         """
         if not vocabulary:
             vocabulary = []
@@ -138,7 +141,7 @@ class Corpus(BaseModel):
         # Log incoming vocabulary
         logger.info(
             f"Creating corpus with {len(vocabulary)} words"
-            f"{f' named {corpus_name}' if corpus_name else ''}"
+            f"{f' named {corpus_name}' if corpus_name else ''}",
         )
 
         # Normalize the vocabulary
@@ -155,7 +158,9 @@ class Corpus(BaseModel):
         # Build normalized_to_original_indices AFTER sorting
         # Maps from index in sorted vocabulary to indices in original_vocabulary
         normalized_to_original_indices: dict[int, list[int]] = {}
-        for orig_idx, (orig_word, norm_word) in enumerate(zip(vocabulary, normalized_vocabulary)):
+        for orig_idx, (orig_word, norm_word) in enumerate(
+            zip(vocabulary, normalized_vocabulary, strict=False)
+        ):
             if norm_word in vocabulary_to_index:
                 sorted_idx = vocabulary_to_index[norm_word]
                 if sorted_idx not in normalized_to_original_indices:
@@ -251,7 +256,7 @@ class Corpus(BaseModel):
         lemma_to_idx = {lemma: i for i, lemma in enumerate(unique_lemmas)}
 
         # Build word-to-lemma and lemma-to-words mappings
-        for word_idx, (word, lemma) in enumerate(zip(self.vocabulary, lemmas)):
+        for word_idx, (word, lemma) in enumerate(zip(self.vocabulary, lemmas, strict=False)):
             lemma_idx = lemma_to_idx[lemma]
 
             # Map word index to lemma index
@@ -264,7 +269,7 @@ class Corpus(BaseModel):
 
         logger.info(
             f"Created lemmatization maps: {len(unique_lemmas)} lemmas "
-            f"from {len(self.vocabulary)} words"
+            f"from {len(self.vocabulary)} words",
         )
 
     def get_word_by_index(self, index: int) -> str | None:
@@ -279,6 +284,7 @@ class Corpus(BaseModel):
 
         Returns:
             Original form of the word or None if not found
+
         """
         if original_indices := self.normalized_to_original_indices.get(normalized_index):
             # Return the first original form
@@ -317,9 +323,18 @@ class Corpus(BaseModel):
 
         Returns:
             List of vocabulary indices
+
         """
         candidates = set()
-        normalized_query = batch_normalize([query])[0]
+
+        # Handle empty query
+        if not query or not query.strip():
+            return []
+
+        normalized_queries = batch_normalize([query])
+        if not normalized_queries:
+            return []
+        normalized_query = normalized_queries[0]
 
         # Direct lookup
         if normalized_query in self.vocabulary_to_index:
@@ -392,7 +407,7 @@ class Corpus(BaseModel):
 
         logger.info(
             f"Built signature index: {len(self.signature_buckets)} signatures, "
-            f"{len(self.length_buckets)} length buckets"
+            f"{len(self.length_buckets)} length buckets",
         )
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
@@ -408,6 +423,7 @@ class Corpus(BaseModel):
 
         Returns:
             Corpus instance
+
         """
         return cls.model_validate(data)
 
@@ -427,6 +443,7 @@ class Corpus(BaseModel):
 
         Returns:
             Corpus instance or None if not found
+
         """
         if not corpus_id and not corpus_name:
             raise ValueError("Either corpus_id or corpus_name must be provided")
@@ -471,6 +488,7 @@ class Corpus(BaseModel):
 
         Returns:
             Corpus instance
+
         """
         # Try to get existing by ID or name
         existing = await cls.get(corpus_id, corpus_name, config)
@@ -494,6 +512,27 @@ class Corpus(BaseModel):
 
         return corpus
 
+    @classmethod
+    async def get_many_by_ids(
+        cls,
+        corpus_ids: list[PydanticObjectId],
+        config: VersionConfig | None = None,
+    ) -> list[Corpus]:
+        """Get multiple corpora by their IDs in batch.
+
+        Args:
+            corpus_ids: List of corpus IDs to retrieve
+            config: Version configuration
+
+        Returns:
+            List of Corpus instances (may be shorter than input if some IDs don't exist)
+
+        """
+        from .manager import get_tree_corpus_manager
+
+        manager = get_tree_corpus_manager()
+        return await manager.get_corpora_by_ids(corpus_ids, config)
+
     async def save(self, config: VersionConfig | None = None, update_metadata: bool = True) -> bool:
         """Save corpus to versioned storage.
 
@@ -503,6 +542,7 @@ class Corpus(BaseModel):
 
         Returns:
             True if saved successfully
+
         """
         from .manager import get_tree_corpus_manager
 
@@ -513,6 +553,13 @@ class Corpus(BaseModel):
             self.last_updated = time.time()
             self.unique_word_count = len(self.vocabulary)
             self.vocabulary_hash = get_vocabulary_hash(self.vocabulary)
+
+        # Handle versioning - create or update config for version increment
+        if not config:
+            config = VersionConfig()
+
+        # Version updates should be handled through explicit config params
+        # No more private attribute magic
 
         # Save through manager (which will set the corpus_id)
         saved = await manager.save_corpus(
@@ -530,7 +577,41 @@ class Corpus(BaseModel):
         if saved and saved.corpus_id:
             self.corpus_id = saved.corpus_id
 
+            # Update version info from the saved metadata
+            # We need to get the metadata to access version_info
+            try:
+                metadata = await manager.vm.get_latest(
+                    resource_id=self.corpus_name,
+                    resource_type=ResourceType.CORPUS,
+                )
+                if metadata and metadata.version_info:
+                    self.version_info = metadata.version_info
+                    self._metadata_id = metadata.id
+            except Exception as e:
+                logger.warning(f"Failed to update version info: {e}")
+
         return bool(saved)
+
+    def update_version(self, change_description: str = "") -> None:
+        """Mark the corpus for version update on next save.
+
+        Args:
+            change_description: Description of changes made
+
+        """
+        if not self.version_info:
+            # Initialize version info if it doesn't exist
+            self.version_info = VersionInfo(
+                version="1.0.0",
+                data_hash="",  # Will be computed on save
+                is_latest=True,
+            )
+
+        # Set a flag that the manager will recognize for version increment
+        self._needs_version_update = True
+        # Store change description for metadata
+        if change_description:
+            self._change_description = change_description
 
     async def delete(self) -> None:
         """Delete corpus from storage."""
@@ -546,7 +627,8 @@ class Corpus(BaseModel):
 
         # Get the latest version to delete
         metadata = await vm.get_latest(
-            resource_id=self.corpus_name, resource_type=ResourceType.CORPUS
+            resource_id=self.corpus_name,
+            resource_type=ResourceType.CORPUS,
         )
 
         if metadata and metadata.version_info:

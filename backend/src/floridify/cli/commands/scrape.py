@@ -211,7 +211,7 @@ class BulkScrapingInterface:
                         self.progress,
                         title="[bold white]Progress[/bold white]",
                         border_style="green",
-                    )
+                    ),
                 )
                 self.layout["stats"].update(self.create_stats_panel(progress_data))
                 self.layout["footer"].update(self.create_footer_panel(progress_data))
@@ -244,7 +244,7 @@ class BulkScrapingInterface:
                     self.progress,
                     title="[bold white]Progress - COMPLETED[/bold white]",
                     border_style="green",
-                )
+                ),
             )
             self.layout["stats"].update(self.create_stats_panel(progress_data))
             self.layout["footer"].update(self.create_footer_panel(progress_data))
@@ -272,14 +272,14 @@ async def run_scraping_session(
     language_enum = Language(language)
 
     console.print(
-        f"\\n[bold green]Starting {provider.display_name} bulk scraping for {language_enum.value.title()}[/bold green]"
+        f"\\n[bold green]Starting {provider.display_name} bulk scraping for {language_enum.value.title()}[/bold green]",
     )
     console.print(f"[dim]Batch size: {batch_size}, Max concurrent: {max_concurrent}[/dim]")
 
     # Handle session resumption
     if resume_session_id:
         console.print(
-            f"[yellow]Resuming {provider.display_name} scraping session: {resume_session_id}[/yellow]"
+            f"[yellow]Resuming {provider.display_name} scraping session: {resume_session_id}[/yellow]",
         )
         result = await resume_session(resume_session_id)
         if not result:
@@ -287,7 +287,7 @@ async def run_scraping_session(
             return
         scraper, session = result
         console.print(
-            f"[green]Resumed session:[/green] {session.get_progress_percentage():.1f}% complete"
+            f"[green]Resumed session:[/green] {session.get_progress_percentage():.1f}% complete",
         )
     else:
         # Create new session
@@ -316,7 +316,7 @@ async def run_scraping_session(
         progress = await interface.run_with_monitoring(scraper)
 
         console.print(
-            f"\\n[bold green]✅ {provider.display_name} bulk scraping completed![/bold green]"
+            f"\\n[bold green]✅ {provider.display_name} bulk scraping completed![/bold green]",
         )
         console.print(f"[green]Processed: {progress.processed_words:,} words[/green]")
         console.print(f"[green]Success rate: {progress.success_rate:.1%}[/green]")
@@ -348,7 +348,7 @@ def scraper_options(default_concurrent: int = 5):
         func = click.option("--resume-session", "-r", help="Resume from existing session ID")(func)
         func = click.option("--session-name", "-n", help="Name for this scraping session")(func)
         func = click.option("--force-refresh", is_flag=True, help="Force refresh existing data")(
-            func
+            func,
         )
         func = click.option(
             "--skip-existing/--include-existing",
@@ -371,7 +371,13 @@ def scrape_group():
 @scrape_group.command(name="wordhippo")
 @scraper_options(default_concurrent=5)
 def scrape_wordhippo(
-    language, batch_size, max_concurrent, resume_session, session_name, force_refresh, skip_existing
+    language,
+    batch_size,
+    max_concurrent,
+    resume_session,
+    session_name,
+    force_refresh,
+    skip_existing,
 ):
     """Bulk scrape WordHippo for comprehensive synonym/antonym/example data."""
     asyncio.run(
@@ -384,14 +390,20 @@ def scrape_wordhippo(
             session_name,
             force_refresh,
             skip_existing,
-        )
+        ),
     )
 
 
 @scrape_group.command(name="oxford")
 @scraper_options(default_concurrent=3)
 def scrape_oxford(
-    language, batch_size, max_concurrent, resume_session, session_name, force_refresh, skip_existing
+    language,
+    batch_size,
+    max_concurrent,
+    resume_session,
+    session_name,
+    force_refresh,
+    skip_existing,
 ):
     """Bulk scrape Oxford Dictionary API for comprehensive definitions."""
     asyncio.run(
@@ -404,14 +416,20 @@ def scrape_oxford(
             session_name,
             force_refresh,
             skip_existing,
-        )
+        ),
     )
 
 
 @scrape_group.command(name="merriam-webster")
 @scraper_options(default_concurrent=3)
 def scrape_merriam_webster(
-    language, batch_size, max_concurrent, resume_session, session_name, force_refresh, skip_existing
+    language,
+    batch_size,
+    max_concurrent,
+    resume_session,
+    session_name,
+    force_refresh,
+    skip_existing,
 ):
     """Bulk scrape Merriam-Webster Dictionary API."""
     asyncio.run(
@@ -424,14 +442,20 @@ def scrape_merriam_webster(
             session_name,
             force_refresh,
             skip_existing,
-        )
+        ),
     )
 
 
 @scrape_group.command(name="free-dictionary")
 @scraper_options(default_concurrent=5)
 def scrape_free_dictionary(
-    language, batch_size, max_concurrent, resume_session, session_name, force_refresh, skip_existing
+    language,
+    batch_size,
+    max_concurrent,
+    resume_session,
+    session_name,
+    force_refresh,
+    skip_existing,
 ):
     """Bulk scrape FreeDictionary API for comprehensive definitions."""
     asyncio.run(
@@ -444,14 +468,20 @@ def scrape_free_dictionary(
             session_name,
             force_refresh,
             skip_existing,
-        )
+        ),
     )
 
 
 @scrape_group.command(name="apple-dictionary")
 @scraper_options(default_concurrent=5)
 def scrape_apple_dictionary(
-    language, batch_size, max_concurrent, resume_session, session_name, force_refresh, skip_existing
+    language,
+    batch_size,
+    max_concurrent,
+    resume_session,
+    session_name,
+    force_refresh,
+    skip_existing,
 ):
     """Bulk scrape Apple Dictionary (macOS) for local definitions."""
     asyncio.run(
@@ -464,7 +494,7 @@ def scrape_apple_dictionary(
             session_name,
             force_refresh,
             skip_existing,
-        )
+        ),
     )
 
 
@@ -489,10 +519,10 @@ def scrape_wiktionary_wholesale(language: str, download_all: bool):
 
         if download_all:
             console.print(
-                f"\\n[bold green]Starting Wiktionary wholesale download for {language_enum.value.title()}[/bold green]"
+                f"\\n[bold green]Starting Wiktionary wholesale download for {language_enum.value.title()}[/bold green]",
             )
             console.print(
-                "[yellow]This will download the complete Wiktionary dump (several GB)[/yellow]"
+                "[yellow]This will download the complete Wiktionary dump (several GB)[/yellow]",
             )
 
             if not click.confirm("Continue with wholesale download?"):
@@ -507,7 +537,7 @@ def scrape_wiktionary_wholesale(language: str, download_all: bool):
             console.print(f"[green]Processed: {progress.processed_words:,} entries[/green]")
         else:
             console.print(
-                f"\\n[bold green]Starting Wiktionary vocabulary-based scraping for {language_enum.value.title()}[/bold green]"
+                f"\\n[bold green]Starting Wiktionary vocabulary-based scraping for {language_enum.value.title()}[/bold green]",
             )
 
             await run_scraping_session(
@@ -567,7 +597,14 @@ def list_sessions_cmd():
                 status = f"[red]{status}[/red]"
 
             table.add_row(
-                session_id, name, provider, language, status, progress, success_rate, created
+                session_id,
+                name,
+                provider,
+                language,
+                status,
+                progress,
+                success_rate,
+                created,
             )
 
         console.print(table)
@@ -593,7 +630,7 @@ def resume_session_cmd(session_id: str) -> None:
 
         scraper, session = result
         console.print(
-            f"[green]Resumed session:[/green] {session.get_progress_percentage():.1f}% complete"
+            f"[green]Resumed session:[/green] {session.get_progress_percentage():.1f}% complete",
         )
         console.print(f"[blue]Provider:[/blue] {session.provider.display_name}")
         console.print(f"[blue]Language:[/blue] {session.language.value.title()}")
@@ -697,7 +734,7 @@ def show_status(session_id: str | None) -> None:
                 console.print("\\n[yellow]Active Sessions:[/yellow]")
                 for session in active_sessions:
                     console.print(
-                        f"  • {session['session_id'][:8]} - {session['provider']} ({session['progress_percentage']:.1f}%)"
+                        f"  • {session['session_id'][:8]} - {session['provider']} ({session['progress_percentage']:.1f}%)",
                     )
 
     asyncio.run(_run())

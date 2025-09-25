@@ -5,14 +5,14 @@ This should be run to validate the changes made to make providers return dicts i
 """
 
 import json
-import asyncio
 from typing import Any
+
 
 # Mock the required imports to check structure without actually running providers
 class MockProvider:
     def __init__(self, name: str):
         self.name = name
-        
+
     def create_mock_response(self) -> dict[str, Any]:
         """Create a mock response with the expected dict structure"""
         return {
@@ -25,21 +25,21 @@ class MockProvider:
                     "text": "A mock definition",
                     "sense_number": "1",
                     "synonyms": ["example", "sample"],
-                    "example_ids": ["mock-ex-1"]
+                    "example_ids": ["mock-ex-1"],
                 }
             ],
             "pronunciation": {
                 "id": "mock-pron-1",
                 "phonetic": "test",
                 "ipa": "/tɛst/",
-                "syllables": ["test"]
+                "syllables": ["test"],
             },
             "etymology": {
                 "text": "From Latin test",
                 "origin_language": "latin",
-                "root_words": ["test"]
+                "root_words": ["test"],
             },
-            "raw_data": {"mock": "data"}
+            "raw_data": {"mock": "data"},
         }
 
 
@@ -52,24 +52,24 @@ def validate_provider_response_structure(response: dict[str, Any], provider_name
             if field not in response:
                 print(f"❌ {provider_name}: Missing required field '{field}'")
                 return False
-        
+
         # Check field types
         if not isinstance(response["word"], str):
             print(f"❌ {provider_name}: 'word' should be a string")
             return False
-            
+
         if not isinstance(response["provider"], str):
             print(f"❌ {provider_name}: 'provider' should be a string")
             return False
-            
+
         if not isinstance(response["definitions"], list):
             print(f"❌ {provider_name}: 'definitions' should be a list")
             return False
-            
+
         if not isinstance(response["raw_data"], dict):
             print(f"❌ {provider_name}: 'raw_data' should be a dict")
             return False
-        
+
         # Check that definitions have expected structure
         if response["definitions"]:
             definition = response["definitions"][0]
@@ -78,24 +78,24 @@ def validate_provider_response_structure(response: dict[str, Any], provider_name
                 if field not in definition:
                     print(f"❌ {provider_name}: Definition missing required field '{field}'")
                     return False
-        
+
         # Check optional fields have correct types when present
         if "pronunciation" in response and response["pronunciation"] is not None:
             if not isinstance(response["pronunciation"], dict):
                 print(f"❌ {provider_name}: 'pronunciation' should be a dict or None")
                 return False
-                
+
         if "etymology" in response and response["etymology"] is not None:
             if not isinstance(response["etymology"], dict):
                 print(f"❌ {provider_name}: 'etymology' should be a dict or None")
                 return False
-        
+
         # Ensure it's JSON serializable
         json.dumps(response)
-        
+
         print(f"✅ {provider_name}: Response structure is valid and JSON serializable")
         return True
-        
+
     except Exception as e:
         print(f"❌ {provider_name}: Error validating response: {e}")
         return False
@@ -105,22 +105,17 @@ def main():
     """Test the expected provider response structures"""
     print("Testing Dictionary Provider Response Consistency")
     print("=" * 50)
-    
-    providers = [
-        "FREE_DICTIONARY",
-        "MERRIAM_WEBSTER", 
-        "OXFORD",
-        "WIKTIONARY"
-    ]
-    
+
+    providers = ["FREE_DICTIONARY", "MERRIAM_WEBSTER", "OXFORD", "WIKTIONARY"]
+
     all_valid = True
-    
+
     for provider in providers:
         mock = MockProvider(provider)
         response = mock.create_mock_response()
         is_valid = validate_provider_response_structure(response, provider)
         all_valid = all_valid and is_valid
-    
+
     print("\n" + "=" * 50)
     if all_valid:
         print("✅ All providers return consistent dict structures")
@@ -129,7 +124,7 @@ def main():
     else:
         print("❌ Some providers have inconsistent structures")
         return 1
-        
+
     return 0
 
 

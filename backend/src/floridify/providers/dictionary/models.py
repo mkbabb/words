@@ -35,27 +35,5 @@ class DictionaryProviderEntry(BaseModel):
     class Metadata(BaseVersionedData):
         """Minimal dictionary metadata for versioning."""
 
-        def __init__(self, **data: Any) -> None:
-            import hashlib
-            import json
-            from datetime import datetime
-
-            from ...caching.models import VersionInfo
-            
-            data.setdefault("resource_type", ResourceType.DICTIONARY)
-            data.setdefault("namespace", CacheNamespace.DICTIONARY)
-            
-            # Create default version_info if not provided
-            if "version_info" not in data:
-                # Generate data hash from content
-                content_str = json.dumps(data.get("content_inline", {}), sort_keys=True, default=str)
-                data_hash = hashlib.sha256(content_str.encode()).hexdigest()
-                
-                data["version_info"] = VersionInfo(
-                    version="1",
-                    created_at=datetime.utcnow(),
-                    data_hash=data_hash,
-                    is_latest=True
-                )
-            
-            super().__init__(**data)
+        resource_type: ResourceType = ResourceType.DICTIONARY
+        namespace: CacheNamespace = CacheNamespace.DICTIONARY

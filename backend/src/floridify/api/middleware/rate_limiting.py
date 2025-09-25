@@ -185,9 +185,11 @@ ai_limiter = OpenAIRateLimiter(
 
 def get_client_key(request: Request) -> str:
     """Extract client identifier from request."""
-    # Try to get authenticated user ID
-    if hasattr(request.state, "user_id"):
+    # Try to get authenticated user ID through safe access
+    try:
         return f"user:{request.state.user_id}"
+    except AttributeError:
+        pass  # Fall through to IP-based identification
 
     # Fall back to IP address
     forwarded_for = request.headers.get("X-Forwarded-For")

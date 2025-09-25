@@ -30,6 +30,7 @@ class LanguageCorpus(Corpus):
     async def add_language_source(
         self,
         source: LanguageSource,
+        connector: URLLanguageConnector | None = None,
     ) -> PydanticObjectId | None:
         """Add a language source as child corpus.
 
@@ -38,19 +39,20 @@ class LanguageCorpus(Corpus):
 
         Returns:
             Child corpus ID if created
+
         """
         logger.info(f"Adding language source: {source.name}")
 
         # Fetch vocabulary using connector
-        connector = URLLanguageConnector()
-        result = await connector.fetch(source.url)
+        connector = connector or URLLanguageConnector()
+        result = await connector.fetch_source(source)
 
-        if not result or not isinstance(result, dict):
+        if not result:
             logger.warning(f"No vocabulary fetched for source: {source.name}")
             return None
 
         # Extract vocabulary from result
-        vocabulary = result.get("vocabulary", [])
+        vocabulary = result.vocabulary
         if not vocabulary:
             logger.warning(f"No vocabulary in result for source: {source.name}")
             return None
@@ -85,11 +87,26 @@ class LanguageCorpus(Corpus):
         if self.corpus_id:
             await manager.update_parent(self.corpus_id, child.corpus_id)
 
+            # Refresh parent to get updated children list
+            from ...caching.models import VersionConfig
+
+            fresh_parent = await manager.get_corpus(
+                corpus_id=self.corpus_id,
+                config=VersionConfig(use_cache=False),
+            )
+            if fresh_parent:
+                self.child_corpus_ids = fresh_parent.child_corpus_ids
+
         # Aggregate vocabularies into parent
         if self.corpus_id and child.corpus_id:
-            self.child_corpus_ids.append(child.corpus_id)
-            # Note: aggregate_vocabularies aggregates from the corpus and its children automatically
+            # Note: update_parent already adds the child to parent's child_corpus_ids
+            # aggregate_vocabularies aggregates from the corpus and its children automatically
             await manager.aggregate_vocabularies(self.corpus_id)
+
+            # Update local vocabulary to reflect aggregated result
+            updated_corpus = await manager.get_corpus(corpus_id=self.corpus_id)
+            if updated_corpus and updated_corpus.vocabulary:
+                self.vocabulary = updated_corpus.vocabulary
 
         logger.info(f"Added source '{source.name}' with {len(vocabulary)} words")
 
@@ -111,6 +128,7 @@ class LanguageCorpus(Corpus):
 
         Returns:
             LanguageCorpus instance
+
         """
         corpus = cls(
             corpus_name=name,
@@ -138,6 +156,7 @@ class LanguageCorpus(Corpus):
 
         Returns:
             Configured LanguageCorpus with all language sources
+
         """
         logger.info(f"Creating language corpus for {language.value}")
 
@@ -187,29 +206,81 @@ class LanguageCorpus(Corpus):
 
         Args:
             source_name: Name of source to remove
+
         """
         manager = get_tree_corpus_manager()
 
-        # Find child corpus with matching name
+        # Find child corpus with matching name from parent's children
         child_name = f"{self.corpus_name}_{source_name}"
+        logger.info(f"Looking for child corpus named: {child_name}")
 
-        # Get child corpus using keyword argument
-        child_meta = await manager.get_corpus(corpus_name=child_name)
-        if not child_meta or not child_meta.corpus_id:
-            logger.warning(f"Source '{source_name}' not found")
+        # Ensure we have the latest parent state with children
+        if self.corpus_id:
+            from ...caching.models import VersionConfig
+
+            fresh_parent = await manager.get_corpus(
+                corpus_id=self.corpus_id,
+                config=VersionConfig(use_cache=False),
+            )
+            if fresh_parent:
+                self.child_corpus_ids = fresh_parent.child_corpus_ids
+                logger.info(
+                    f"Parent has {len(self.child_corpus_ids)} children: {self.child_corpus_ids}"
+                )
+
+        # Look through parent's actual children rather than global search
+        child_id_to_remove = None
+        for child_id in self.child_corpus_ids:
+            potential_child = await manager.get_corpus(corpus_id=child_id)
+            logger.info(
+                f"Checking child {child_id}: name={potential_child.corpus_name if potential_child else 'None'}, looking for={child_name}"
+            )
+            if potential_child and potential_child.corpus_name == child_name:
+                # CRITICAL: Use the ID from parent's list, not the child's corpus_id
+                # They may differ due to versioning
+                child_id_to_remove = child_id
+                logger.info(f"Found matching child: using child_id={child_id} from parent's list")
+                break
+
+        if not child_id_to_remove:
+            logger.warning(
+                f"Source '{source_name}' not found in children (child_name: {child_name})"
+            )
             return
 
+        logger.info(f"Found child corpus {child_id_to_remove} to remove")
+
         # Use manager to properly remove and delete child
-        if self.corpus_id and child_meta.corpus_id:
-            await manager.remove_child(
+        if self.corpus_id and child_id_to_remove:
+            logger.info(
+                f"Calling remove_child with parent_id={self.corpus_id}, child_id={child_id_to_remove}"
+            )
+            success = await manager.remove_child(
                 parent_id=self.corpus_id,
-                child_id=child_meta.corpus_id,
+                child_id=child_id_to_remove,
                 delete_child=True,  # Delete the child corpus
             )
 
-            # Update local child_corpus_ids list
-            if child_meta.corpus_id in self.child_corpus_ids:
-                self.child_corpus_ids.remove(child_meta.corpus_id)
+            logger.info(f"remove_child returned: {success}")
+
+            if success:
+                # Re-aggregate vocabularies after removing child
+                await manager.aggregate_vocabularies(self.corpus_id)
+
+                # Sync local state with database state - force fresh read
+                from ...caching.models import VersionConfig
+
+                updated_corpus = await manager.get_corpus(
+                    corpus_id=self.corpus_id,
+                    config=VersionConfig(use_cache=False, force_rebuild=True),
+                )
+                if updated_corpus:
+                    logger.info(
+                        f"After removal, parent children: {updated_corpus.child_corpus_ids}"
+                    )
+                    logger.info(f"After removal, parent vocabulary: {updated_corpus.vocabulary}")
+                    self.child_corpus_ids = updated_corpus.child_corpus_ids
+                    self.vocabulary = updated_corpus.vocabulary
 
         logger.info(f"Removed source: {source_name}")
 
@@ -223,6 +294,7 @@ class LanguageCorpus(Corpus):
         Args:
             source_name: Current source name
             source: New source configuration
+
         """
         # Simple approach: remove old, add new
         await self.remove_source(source_name)

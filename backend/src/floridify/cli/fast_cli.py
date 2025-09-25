@@ -96,7 +96,7 @@ semantic search, and Anki flashcard generation.[/dim]
             "wordhippo",
             "ai_fallback",
             "synthesis",
-        ]
+        ],
     ),
     multiple=True,
     help="Dictionary providers to use",
@@ -135,7 +135,9 @@ def scrape(ctx: click.Context) -> None:
 # Define individual scrape subcommands with lazy loading
 @scrape.command()
 @click.option(
-    "--skip-existing/--include-existing", default=True, help="Skip words that already have data"
+    "--skip-existing/--include-existing",
+    default=True,
+    help="Skip words that already have data",
 )
 @click.option("--force-refresh", is_flag=True, help="Force refresh existing data")
 @click.option("-n", "--session-name", help="Name for this scraping session")
@@ -158,7 +160,9 @@ def apple_dictionary(**kwargs: Any) -> None:
 
 @scrape.command()
 @click.option(
-    "--skip-existing/--include-existing", default=True, help="Skip words that already have data"
+    "--skip-existing/--include-existing",
+    default=True,
+    help="Skip words that already have data",
 )
 @click.option("--force-refresh", is_flag=True, help="Force refresh existing data")
 @click.option("-n", "--session-name", help="Name for this scraping session")
@@ -181,7 +185,9 @@ def wordhippo(**kwargs: Any) -> None:
 
 @scrape.command()
 @click.option(
-    "--skip-existing/--include-existing", default=True, help="Skip words that already have data"
+    "--skip-existing/--include-existing",
+    default=True,
+    help="Skip words that already have data",
 )
 @click.option("--force-refresh", is_flag=True, help="Force refresh existing data")
 @click.option("-n", "--session-name", help="Name for this scraping session")
@@ -204,7 +210,9 @@ def free_dictionary(**kwargs: Any) -> None:
 
 @scrape.command()
 @click.option(
-    "--skip-existing/--include-existing", default=True, help="Skip words that already have data"
+    "--skip-existing/--include-existing",
+    default=True,
+    help="Skip words that already have data",
 )
 @click.option("--force-refresh", is_flag=True, help="Force refresh existing data")
 @click.option("-n", "--session-name", help="Name for this scraping session")

@@ -174,7 +174,6 @@ def normalize(text: str) -> str:
         Normalized text
 
     """
-
     return normalize_comprehensive(text)
 
 
@@ -539,6 +538,7 @@ def get_word_signature(word: str) -> str:
 
     Returns:
         Phonetic signature (max 6 characters)
+
     """
     if not word:
         return ""

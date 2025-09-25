@@ -9,19 +9,16 @@ import traceback
 
 from ..ai import get_definition_synthesizer
 from ..ai.synthesis_functions import cluster_definitions
-from ..models.base import Etymology, Language
+from ..models import Etymology
+from ..models.base import Language
 from ..models.dictionary import (
     Definition,
     DictionaryEntry,
     DictionaryProvider,
     Word,
 )
-from ..providers.base import DictionaryConnector
-from ..providers.dictionary.api.oxford import OxfordConnector
-from ..providers.dictionary.local.apple_dictionary import AppleDictionaryConnector
-from ..providers.dictionary.scraper.wiktionary import WiktionaryConnector
+from ..providers.factory import create_connector
 from ..storage.mongodb import get_storage, get_synthesized_entry
-from ..utils.config import Config
 from ..utils.logging import (
     get_logger,
     log_metrics,
@@ -251,22 +248,11 @@ async def _get_provider_definition(
     logger.debug(f"📖 Fetching definition from {provider.value} for '{word}'")
 
     try:
-        connector: DictionaryConnector
-
-        if provider == DictionaryProvider.WIKTIONARY:
-            connector = WiktionaryConnector()
-        elif provider == DictionaryProvider.OXFORD:
-            config = Config.from_file()
-            if not config.oxford.app_id or not config.oxford.api_key:
-                raise ValueError(
-                    "Oxford Dictionary API credentials not configured. "
-                    "Please update auth/config.toml with your Oxford app_id and api_key.",
-                )
-            connector = OxfordConnector(app_id=config.oxford.app_id, api_key=config.oxford.api_key)
-        elif provider == DictionaryProvider.APPLE_DICTIONARY:
-            connector = AppleDictionaryConnector()
-        else:
-            logger.warning(f"Unsupported provider: {provider.value}")
+        # Use factory function to create connector
+        try:
+            connector = create_connector(provider)
+        except ValueError as e:
+            logger.warning(f"Failed to create connector for {provider.value}: {e}")
             return None
 
         storage = await get_storage()

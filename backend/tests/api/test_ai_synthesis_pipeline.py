@@ -1,5 +1,4 @@
-"""
-Comprehensive tests for the AI synthesis pipeline REST API endpoints.
+"""Comprehensive tests for the AI synthesis pipeline REST API endpoints.
 Tests all 40+ AI endpoints with proper OpenAI mocking and rate limiting validation.
 """
 
@@ -7,8 +6,9 @@ import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
-from ..conftest import assert_response_structure
 from httpx import AsyncClient
+
+from ..conftest import assert_response_structure
 
 
 class TestAISynthesisPipelineAPI:
@@ -266,7 +266,9 @@ class TestAISynthesisPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_regional_variants_assessment(
-        self, async_client: AsyncClient, mock_openai_client
+        self,
+        async_client: AsyncClient,
+        mock_openai_client,
     ):
         """Test regional variant detection."""
         request_data = {"definition": "A type of sweet biscuit often eaten with tea"}
@@ -282,7 +284,9 @@ class TestAISynthesisPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_query_validation_for_word_suggestions(
-        self, async_client: AsyncClient, mock_openai_client
+        self,
+        async_client: AsyncClient,
+        mock_openai_client,
     ):
         """Test query validation for word suggestion requests."""
         request_data = {"query": "I need words that describe complex emotions"}
@@ -354,7 +358,8 @@ class TestAISynthesisPipelineAPI:
 
         # Test empty required fields
         response = await async_client.post(
-            "/api/v1/ai/generate/examples", json={"word": "", "part_of_speech": "noun"}
+            "/api/v1/ai/generate/examples",
+            json={"word": "", "part_of_speech": "noun"},
         )
         assert response.status_code in [400, 422]
 
@@ -365,7 +370,8 @@ class TestAISynthesisPipelineAPI:
         tasks = []
         for i in range(20):  # Exceed rate limit
             task = async_client.post(
-                "/api/v1/ai/synthesize/pronunciation", json={"word": f"test{i}"}
+                "/api/v1/ai/synthesize/pronunciation",
+                json={"word": f"test{i}"},
             )
             tasks.append(task)
 
@@ -381,13 +387,14 @@ class TestAISynthesisPipelineAPI:
     async def test_ai_error_handling(self, async_client: AsyncClient, mocker):
         """Test AI endpoint error handling when OpenAI fails."""
         # Mock OpenAI to fail
-        mock_client = mocker.patch("floridify.ai.connectors.OpenAIConnector")
+        mock_client = mocker.patch("floridify.ai.connector.OpenAIConnector")
         mock_client.return_value.generate_response = AsyncMock(
-            side_effect=Exception("OpenAI API error")
+            side_effect=Exception("OpenAI API error"),
         )
 
         response = await async_client.post(
-            "/api/v1/ai/synthesize/pronunciation", json={"word": "test"}
+            "/api/v1/ai/synthesize/pronunciation",
+            json={"word": "test"},
         )
 
         # Should handle error gracefully
@@ -417,7 +424,11 @@ class TestAISynthesisPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_batch_ai_synthesis(
-        self, async_client: AsyncClient, mock_openai_client, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        mock_openai_client,
+        word_factory,
+        definition_factory,
     ):
         """Test batch AI synthesis operations."""
         # Create test word with definition
@@ -425,7 +436,7 @@ class TestAISynthesisPipelineAPI:
         definition = await definition_factory(word_instance=word)
 
         # Create synthesized entry for regeneration
-        from src.floridify.models import DictionaryEntry, DictionaryProvider
+        from floridify.models import DictionaryEntry, DictionaryProvider
 
         entry = await DictionaryEntry(
             resource_id=f"{word.text}:synthesis",
@@ -450,13 +461,15 @@ class TestAISynthesisPipelineAPI:
 
         # First request
         response1 = await async_client.post(
-            "/api/v1/ai/synthesize/pronunciation", json=request_data
+            "/api/v1/ai/synthesize/pronunciation",
+            json=request_data,
         )
         assert response1.status_code == 200
 
         # Second identical request should hit cache
         response2 = await async_client.post(
-            "/api/v1/ai/synthesize/pronunciation", json=request_data
+            "/api/v1/ai/synthesize/pronunciation",
+            json=request_data,
         )
         assert response2.status_code == 200
 
@@ -465,14 +478,19 @@ class TestAISynthesisPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_ai_performance_benchmarks(
-        self, async_client: AsyncClient, mock_openai_client, performance_thresholds, benchmark
+        self,
+        async_client: AsyncClient,
+        mock_openai_client,
+        performance_thresholds,
+        benchmark,
     ):
         """Benchmark AI endpoint performance."""
         request_data = {"word": "performance"}
 
         async def ai_operation():
             response = await async_client.post(
-                "/api/v1/ai/synthesize/pronunciation", json=request_data
+                "/api/v1/ai/synthesize/pronunciation",
+                json=request_data,
             )
             assert response.status_code == 200
             return response.json()

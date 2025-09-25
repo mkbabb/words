@@ -21,6 +21,7 @@ def compress_data(data: Any, compression: CompressionType | None = None) -> byte
 
     Returns:
         Compressed bytes
+
     """
     # Serialize first if needed
     if isinstance(data, bytes):
@@ -33,9 +34,9 @@ def compress_data(data: Any, compression: CompressionType | None = None) -> byte
     if compression == CompressionType.ZSTD:
         cctx = zstd.ZstdCompressor(level=3)
         return cctx.compress(serialized)
-    elif compression == CompressionType.LZ4:
+    if compression == CompressionType.LZ4:
         return lz4.frame.compress(serialized, compression_level=0)
-    elif compression == CompressionType.GZIP:
+    if compression == CompressionType.GZIP:
         return gzip.compress(serialized, compresslevel=6)
 
     return serialized
@@ -50,6 +51,7 @@ def decompress_data(data: bytes, compression: CompressionType | None = None) -> 
 
     Returns:
         Decompressed and deserialized data
+
     """
     # Decompress first if needed
     if compression == CompressionType.ZSTD:
@@ -78,10 +80,10 @@ def auto_select_compression(size_bytes: int) -> CompressionType | None:
 
     Returns:
         Optimal compression type or None for no compression
+
     """
     if size_bytes < 1024:  # < 1KB
         return None
-    elif size_bytes < 10_000_000:  # < 10MB
+    if size_bytes < 10_000_000:  # < 10MB
         return CompressionType.ZSTD  # Best balance
-    else:
-        return CompressionType.GZIP  # Best for large files
+    return CompressionType.GZIP  # Best for large files

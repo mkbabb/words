@@ -82,33 +82,32 @@ class TestTreeStructure:
 
         manager = TreeCorpusManager()
         parent = corpus_tree["master"]
-        child = corpus_tree["sources"]
+        child = corpus_tree["work1"]
 
         # Test 1: Can't make parent its own child
-        original_children = parent.child_corpus_ids.copy()
         parent.child_corpus_ids.append(parent.id)
 
-        # Should detect circular reference when saving
-        saved = await manager.save_corpus(parent)
+        # Should detect circular reference when saving metadata directly
+        saved = await manager.save_metadata(parent)
         # Manager should have cleaned the circular reference
         assert parent.id not in saved.child_corpus_ids
 
         # Test 2: Can't create circular parent-child relationship
         # Try to make child the parent of its own parent
         result = await manager.update_parent(parent, child.id)
-        # Should reject or return None
-        assert result is None or result.parent_corpus_id != child.id
+        # Should reject (return False) or None
+        assert result in (None, False)
 
         # Test 3: Verify tree remains consistent after operations
         # Reload to ensure consistency
-        reloaded_parent = await manager.get_corpus(parent.id)
-        reloaded_child = await manager.get_corpus(child.id)
+        reloaded_parent = await manager.get_corpus(corpus_id=parent.id)
+        reloaded_child = await manager.get_corpus(corpus_id=child.id)
 
         # Parent should not be in its own children
-        assert reloaded_parent.id not in reloaded_parent.child_corpus_ids
+        assert reloaded_parent.corpus_id not in reloaded_parent.child_corpus_ids
         # Child's parent should not create a cycle
         if reloaded_child.parent_corpus_id:
-            assert reloaded_child.parent_corpus_id != reloaded_child.id
+            assert reloaded_child.parent_corpus_id != reloaded_child.corpus_id
 
     @pytest.mark.asyncio
     async def test_orphan_detection(self, test_db, corpus_tree):
@@ -183,7 +182,7 @@ class TestTreeStructure:
 
         assert master.is_master is True
         # Compare the enum value (string) since Beanie serializes enums
-        assert master.corpus_type == CorpusType.LANGUAGE.value
+        assert master.corpus_type == CorpusType.LANGUAGE
         assert master.parent_corpus_id is None
         assert len(master.child_corpus_ids) > 0
 

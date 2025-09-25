@@ -146,7 +146,8 @@ class OpenAIConnector:
                 # For small outputs like 30-50 tokens, we need 10-20x more for reasoning
                 reasoning_multiplier = 30 if max_tokens_value <= 50 else 15
                 request_params["max_completion_tokens"] = max(
-                    4000, max_tokens_value * reasoning_multiplier
+                    4000,
+                    max_tokens_value * reasoning_multiplier,
                 )
             else:
                 # Non-reasoning models with completion tokens use standard allocation

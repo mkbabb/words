@@ -128,10 +128,10 @@ class AudioRepository(BaseRepository[AudioMedia, AudioCreate, AudioUpdate]):
         if version is not None and audio.version != version:
             raise ValueError(f"Version mismatch: expected {version}, got {audio.version}")
 
-        # Update fields
+        # Update fields using TypedFieldUpdater
+        from ..core.protocols import TypedFieldUpdater
         update_data = data.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(audio, field, value)
+        TypedFieldUpdater.update_fields(audio, update_data)
 
         audio.version += 1
         await audio.save()

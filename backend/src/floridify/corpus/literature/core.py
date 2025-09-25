@@ -45,6 +45,7 @@ class LiteratureCorpus(Corpus):
 
         Returns:
             Child corpus ID if created
+
         """
         logger.info(f"Adding literature source: {source.name}")
 
@@ -53,7 +54,7 @@ class LiteratureCorpus(Corpus):
             connector = GutenbergConnector()
 
         # Fetch work content
-        entry = await connector.fetch(source.url or source.name)
+        entry = await connector.fetch_source(source)
 
         if not entry:
             logger.warning(f"Failed to fetch work: {source.name}")
@@ -61,11 +62,11 @@ class LiteratureCorpus(Corpus):
 
         # Extract vocabulary from text
         vocabulary = []
-        if hasattr(entry, "text") and entry.text:
+        if entry.text:
             # Simple word extraction
             words = re.findall(r"\b[a-zA-Z]+\b", entry.text)
             vocabulary = list(set(word.lower() for word in words))
-        elif hasattr(entry, "extracted_vocabulary"):
+        elif entry.extracted_vocabulary:
             vocabulary = entry.extracted_vocabulary
 
         if not vocabulary:
@@ -81,20 +82,30 @@ class LiteratureCorpus(Corpus):
             model_name=self.metadata.get("model_name"),
         )
 
-        # Set corpus type
+        # Set corpus type after creation
         child.corpus_type = CorpusType.LITERATURE
 
         # Add metadata about the work
+        genre_obj = entry.get_genre() or source.genre
+        period_obj = entry.get_period() or source.period
+        author_name = (
+            entry.author.name
+            if entry.author
+            else source.author.name
+            if source.author
+            else "Unknown"
+        )
+
         child.metadata.update(
             {
                 "title": source.name,
-                "author": source.author.name if source.author else "Unknown",
-                "genre": source.genre.value if source.genre else None,
-                "period": source.period.value if source.period else None,
-            }
+                "author": author_name,
+                "genre": genre_obj.value if genre_obj else None,
+                "period": period_obj.value if period_obj else None,
+            },
         )
 
-        # Save child corpus
+        # Save child corpus with the LITERATURE type
         await child.save()
 
         if not child.corpus_id:
@@ -112,11 +123,26 @@ class LiteratureCorpus(Corpus):
         if self.corpus_id:
             await manager.update_parent(self.corpus_id, child.corpus_id)
 
+            # Refresh parent to get updated child_corpus_ids
+            fresh_parent = await manager.get_corpus(corpus_id=self.corpus_id)
+            if fresh_parent:
+                logger.debug(f"Before refresh: self.child_corpus_ids = {self.child_corpus_ids}")
+                logger.debug(f"Fresh parent has: {fresh_parent.child_corpus_ids}")
+                self.child_corpus_ids = fresh_parent.child_corpus_ids
+                logger.debug(f"After refresh: self.child_corpus_ids = {self.child_corpus_ids}")
+
         # Aggregate vocabularies into parent
         if self.corpus_id and child.corpus_id:
-            self.child_corpus_ids.append(child.corpus_id)
-            # Note: aggregate_vocabularies aggregates from the corpus and its children automatically
+            # Note: update_parent already added child to parent's child_corpus_ids
+            # aggregate_vocabularies aggregates from the corpus and its children automatically
+            logger.debug(f"Before aggregate: self.child_corpus_ids = {self.child_corpus_ids}")
             await manager.aggregate_vocabularies(self.corpus_id)
+
+            # Refresh again after aggregate to ensure we have latest state
+            fresh_parent2 = await manager.get_corpus(corpus_id=self.corpus_id)
+            if fresh_parent2:
+                self.child_corpus_ids = fresh_parent2.child_corpus_ids
+                logger.debug(f"After aggregate: self.child_corpus_ids = {self.child_corpus_ids}")
 
         logger.info(f"Added work '{source.name}' with {len(vocabulary)} unique words")
 
@@ -137,6 +163,7 @@ class LiteratureCorpus(Corpus):
 
         Returns:
             List of created child corpus IDs
+
         """
         logger.info(f"Adding {len(work_ids)} works by {author.name}")
 
@@ -179,6 +206,7 @@ class LiteratureCorpus(Corpus):
 
         Returns:
             Child corpus ID if created
+
         """
         file_path = Path(file_path)
 
@@ -230,7 +258,7 @@ class LiteratureCorpus(Corpus):
                 "file_path": str(file_path),
                 "title": source.name,
                 "author": source.author.name if source.author else "Unknown",
-            }
+            },
         )
 
         await child.save()
@@ -257,6 +285,7 @@ class LiteratureCorpus(Corpus):
 
         Args:
             work_name: Name of work to remove
+
         """
         manager = get_tree_corpus_manager()
 
@@ -295,6 +324,7 @@ class LiteratureCorpus(Corpus):
             work_name: Current work name
             source: New source configuration
             connector: Optional connector to use
+
         """
         # Simple approach: remove old, add new
         await self.remove_work(work_name)

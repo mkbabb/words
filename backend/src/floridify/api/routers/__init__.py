@@ -18,10 +18,11 @@ from .words import (
     examples_router as examples,
     main_router as words,
 )
-from .wotd import (
-    main_router as wotd_main,
-    ml_router as wotd_ml,
-)
+
+# from .wotd import (
+#     main_router as wotd_main,
+#     ml_router as wotd_ml,
+# )
 
 __all__ = [
     "ai",
@@ -39,6 +40,6 @@ __all__ = [
     "wordlist_words",
     "wordlists",
     "words",
-    "wotd_main",
-    "wotd_ml",
+    # "wotd_main",
+    # "wotd_ml",
 ]

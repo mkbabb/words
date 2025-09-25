@@ -14,11 +14,9 @@ class WOTDStorage:
 
     async def save_corpus(self, corpus: Any) -> None:
         """Save corpus placeholder."""
-        pass
 
     async def save_multiple_corpora(self, corpora: Any) -> None:
         """Save multiple corpora placeholder."""
-        pass
 
     async def get_corpus(self, corpus_id: str) -> Any | None:
         """Get corpus placeholder."""
@@ -34,7 +32,6 @@ class WOTDStorage:
 
     async def save_training_results(self, results: Any) -> None:
         """Save training results placeholder."""
-        pass
 
     async def get_latest_training_results(self) -> Any | None:
         """Get latest training results placeholder."""
@@ -42,7 +39,6 @@ class WOTDStorage:
 
     async def save_semantic_ids(self, semantic_ids: dict[str, Any]) -> None:
         """Save semantic IDs placeholder."""
-        pass
 
     async def get_semantic_ids(self) -> dict[str, Any]:
         """Get semantic IDs placeholder."""
@@ -58,7 +54,6 @@ class WOTDStorage:
 
     async def cache_embeddings(self, cache_key: str, embeddings: dict[str, Any]) -> None:
         """Cache embeddings placeholder."""
-        pass
 
 
 _storage: WOTDStorage | None = None

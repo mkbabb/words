@@ -38,6 +38,7 @@ class FilesystemBackend:
             cache_dir: Directory for cache storage (defaults to system cache dir)
             size_limit: Maximum cache size in bytes (default 10GB)
             default_ttl: Default time-to-live for cached items
+
         """
         if cache_dir is None:
             cache_dir = get_cache_directory() / "unified"
@@ -56,7 +57,7 @@ class FilesystemBackend:
         )
 
         logger.info(
-            f"FilesystemBackend initialized at {cache_dir} with {size_limit / (1024**3):.1f}GB limit"
+            f"FilesystemBackend initialized at {cache_dir} with {size_limit / (1024**3):.1f}GB limit",
         )
 
     async def get(self, key: str) -> Any | None:
@@ -131,6 +132,10 @@ class FilesystemBackend:
         """Clear all cached items."""
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, self.cache.clear)
+
+    async def clear(self) -> None:
+        """Alias for clear_all for backwards compatibility."""
+        await self.clear_all()
 
     async def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""

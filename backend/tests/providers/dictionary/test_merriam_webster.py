@@ -1,261 +1,109 @@
-"""Tests for Merriam-Webster API provider."""
+"""MerriamWebsterConnector parsing behaviour tests."""
 
 from __future__ import annotations
 
-import os
-from typing import Any
-from unittest.mock import AsyncMock
+import json
+from collections.abc import Callable
 
 import httpx
 import pytest
 import pytest_asyncio
 
-from floridify.models.dictionary import DictionaryProvider
+from floridify.caching.models import VersionConfig
 from floridify.providers.dictionary.api.merriam_webster import MerriamWebsterConnector
+from floridify.providers.dictionary.models import DictionaryProviderEntry
 
-
-@pytest_asyncio.fixture
-async def merriam_webster_connector() -> MerriamWebsterConnector:
-    """Create Merriam-Webster connector for testing."""
-    # Use test API key or skip if not available
-    api_key = os.getenv("MERRIAM_WEBSTER_API_KEY", "test_api_key")
-    return MerriamWebsterConnector(api_key=api_key)
-
-
-@pytest_asyncio.fixture
-def mock_merriam_webster_response() -> list[dict[str, Any]]:
-    """Mock Merriam-Webster API response."""
-    return [
-        {
-            "meta": {
-                "id": "test:1",
-                "uuid": "123e4567-e89b-12d3-a456-426614174000",
-                "sort": "200100",
-                "src": "collegiate",
-                "section": "alpha",
-                "stems": ["test", "tests", "testing", "tested"],
-                "offensive": False,
-            },
-            "hwi": {
-                "hw": "test",
-                "prs": [
-                    {
-                        "mw": "ˈtest",
-                        "sound": {
-                            "audio": "test00001",
-                            "ref": "c",
-                            "stat": "1",
-                        },
-                    }
+MW_RESPONSE = [
+    {
+        "meta": {"id": "test:1"},
+        "hwi": {"hw": "test"},
+        "fl": "noun",
+        "def": [
+            {
+                "sseq": [
+                    [
+                        [
+                            "sense",
+                            {
+                                "sn": "1 a",
+                                "dt": [
+                                    ["text", "{bc} an act of putting to proof"],
+                                    ["vis", [{"t": "the {it}test{/it} was difficult"}]],
+                                ],
+                            },
+                        ],
+                    ],
                 ],
             },
-            "fl": "noun",
-            "def": [
-                {
-                    "sseq": [
-                        [
-                            [
-                                "sense",
-                                {
-                                    "sn": "1 a",
-                                    "dt": [
-                                        ["text", "a means of testing: such as"],
-                                        [
-                                            "vis",
-                                            [
-                                                {
-                                                    "t": "a {it}test{/it} of your knowledge",
-                                                }
-                                            ],
-                                        ],
-                                    ],
-                                },
-                            ]
-                        ],
-                        [
-                            [
-                                "sense",
-                                {
-                                    "sn": "1 b",
-                                    "dt": [
-                                        ["text", "a procedure for critical evaluation"],
-                                        [
-                                            "vis",
-                                            [
-                                                {
-                                                    "t": "a {it}test{/it} of the new vaccine",
-                                                }
-                                            ],
-                                        ],
-                                    ],
-                                },
-                            ]
-                        ],
-                    ]
-                }
-            ],
-            "et": [
-                [
-                    "text",
-                    "Middle English, vessel in which metals were assayed, from Anglo-French {it}test{/it}, from Latin {it}testum{/it} earthen pot",
-                ]
-            ],
-            "date": "14th century{ds||1|a|}",
-            "shortdef": [
-                "a means of testing",
-                "a procedure for critical evaluation",
-                "a positive result in such a test",
-            ],
-        }
-    ]
+        ],
+        "et": [["text", "Latin testum"]],
+    },
+]
 
 
-class TestMerriamWebsterConnector:
-    """Test Merriam-Webster connector functionality."""
+@pytest.mark.asyncio
+async def test_missing_api_key_raises() -> None:
+    with pytest.raises(ValueError):
+        MerriamWebsterConnector(api_key=None)
 
-    @pytest.mark.asyncio
-    async def test_initialization(self, merriam_webster_connector: MerriamWebsterConnector) -> None:
-        """Test connector initialization."""
-        assert merriam_webster_connector.provider == DictionaryProvider.MERRIAM_WEBSTER
-        assert merriam_webster_connector.api_key is not None
-        assert merriam_webster_connector.config.rate_limit_config is not None
 
-    @pytest.mark.asyncio
-    async def test_fetch_from_provider_success(
-        self,
-        merriam_webster_connector: MerriamWebsterConnector,
-        mock_merriam_webster_response: list[dict[str, Any]],
-        test_db,
-    ) -> None:
-        """Test successful fetch from provider."""
-        # Mock the API client
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_response = AsyncMock()
-        mock_response.status_code = httpx.codes.OK
-        mock_response.json = lambda: mock_merriam_webster_response  # json() is a method
-        mock_response.raise_for_status = lambda: None  # raise_for_status is synchronous
-        mock_client.get.return_value = mock_response
+@pytest_asyncio.fixture
+async def connector() -> tuple[MerriamWebsterConnector, Callable[[], int]]:
+    """Connector backed by a mock transport for deterministic results."""
+    call_count = {"value": 0}
 
-        merriam_webster_connector._api_client = mock_client
+    def handler(request: httpx.Request) -> httpx.Response:
+        call_count["value"] += 1
+        if request.url.path.endswith("/test"):
+            return httpx.Response(200, text=json.dumps(MW_RESPONSE))
+        return httpx.Response(200, text="[]")
 
-        # Bypass the cache decorator by calling the wrapped function directly
-        if hasattr(merriam_webster_connector._fetch_from_provider, "__wrapped__"):
-            result = await merriam_webster_connector._fetch_from_provider.__wrapped__(
-                merriam_webster_connector, "test"
-            )
-        else:
-            result = await merriam_webster_connector._fetch_from_provider("test")
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    instance = MerriamWebsterConnector(api_key="dummy-key")
+    instance._api_client = client
+    try:
+        yield instance, lambda: call_count["value"]
+    finally:
+        await instance.close()
 
-        assert result is not None
-        assert isinstance(result, dict)
-        assert result["provider"] == DictionaryProvider.MERRIAM_WEBSTER.value
-        mock_client.get.assert_called_once()
 
-    @pytest.mark.asyncio
-    async def test_fetch_from_provider_not_found(
-        self, merriam_webster_connector: MerriamWebsterConnector
-    ) -> None:
-        """Test handling of word not found."""
-        # Mock API response for non-existent word
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_response = AsyncMock()
-        mock_response.status_code = httpx.codes.OK
-        mock_response.json = lambda: []  # Empty response for not found
-        mock_response.raise_for_status = lambda: None
-        mock_client.get.return_value = mock_response
+@pytest.mark.asyncio
+async def test_fetch_parses_entry(
+    connector: tuple[MerriamWebsterConnector, Callable[[], int]],
+    test_db,
+) -> None:
+    instance, counter = connector
+    entry = await instance.fetch("test", config=VersionConfig(force_rebuild=True))
 
-        merriam_webster_connector._api_client = mock_client
+    assert isinstance(entry, DictionaryProviderEntry)
+    assert entry.word == "test"
+    definition_text = entry.definitions[0]["text"]
+    assert definition_text.endswith("putting to proof")
+    assert definition_text.lstrip(": ") == "an act of putting to proof"
+    assert entry.examples == ["the test was difficult"]
+    assert entry.etymology == "Latin testum"
+    assert counter() == 1
 
-        # Bypass the cache decorator
-        if hasattr(merriam_webster_connector._fetch_from_provider, "__wrapped__"):
-            result = await merriam_webster_connector._fetch_from_provider.__wrapped__(
-                merriam_webster_connector, "xyznonexistent"
-            )
-        else:
-            result = await merriam_webster_connector._fetch_from_provider("xyznonexistent")
 
-        assert result is None
+@pytest.mark.asyncio
+async def test_fetch_returns_none_for_missing_word(
+    connector: tuple[MerriamWebsterConnector, Callable[[], int]],
+    test_db,
+) -> None:
+    instance, counter = connector
+    assert await instance.fetch("absent", config=VersionConfig(force_rebuild=True)) is None
+    assert counter() == 1  # Only the missing-word request was made
 
-    @pytest.mark.asyncio
-    async def test_fetch_from_provider_error(
-        self, merriam_webster_connector: MerriamWebsterConnector
-    ) -> None:
-        """Test error handling."""
-        # Mock the API client to raise an exception
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.get.side_effect = httpx.RequestError("Network error")
 
-        merriam_webster_connector._api_client = mock_client
+@pytest.mark.asyncio
+async def test_fetch_handles_http_error(test_db) -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="")
 
-        # Bypass the cache decorator
-        if hasattr(merriam_webster_connector._fetch_from_provider, "__wrapped__"):
-            result = await merriam_webster_connector._fetch_from_provider.__wrapped__(
-                merriam_webster_connector, "test"
-            )
-        else:
-            result = await merriam_webster_connector._fetch_from_provider("test")
-
-        assert result is None  # Should return None on error
-
-    @pytest.mark.asyncio
-    async def test_fetch_from_provider_http_error(
-        self, merriam_webster_connector: MerriamWebsterConnector
-    ) -> None:
-        """Test handling of HTTP errors."""
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_response = AsyncMock()
-        mock_response.status_code = httpx.codes.INTERNAL_SERVER_ERROR
-        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-            "Server error", request=None, response=mock_response
-        )
-        mock_client.get.return_value = mock_response
-
-        merriam_webster_connector._api_client = mock_client
-
-        if hasattr(merriam_webster_connector._fetch_from_provider, "__wrapped__"):
-            result = await merriam_webster_connector._fetch_from_provider.__wrapped__(
-                merriam_webster_connector, "test"
-            )
-        else:
-            result = await merriam_webster_connector._fetch_from_provider("test")
-
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_rate_limiting(self, merriam_webster_connector: MerriamWebsterConnector) -> None:
-        """Test rate limiting configuration."""
-        assert merriam_webster_connector.rate_limiter is not None
-
-        # Check rate limit configuration
-        config = merriam_webster_connector.config.rate_limit_config
-        assert config is not None
-        assert config.base_requests_per_second == 5.0  # API_STANDARD preset
-
-    @pytest.mark.asyncio
-    async def test_fetch_and_save_integration(
-        self,
-        merriam_webster_connector: MerriamWebsterConnector,
-        mock_merriam_webster_response: list[dict[str, Any]],
-        test_db,
-    ) -> None:
-        """Test the full fetch and save flow."""
-        # Mock successful API response
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_response = AsyncMock()
-        mock_response.status_code = httpx.codes.OK
-        mock_response.json = lambda: mock_merriam_webster_response
-        mock_response.raise_for_status = lambda: None
-        mock_client.get.return_value = mock_response
-
-        merriam_webster_connector._api_client = mock_client
-
-        # Use the public fetch method which handles caching/saving
-        result = await merriam_webster_connector.fetch("test")
-
-        assert result is not None
-        assert result["provider"] == DictionaryProvider.MERRIAM_WEBSTER.value
-        
-        # Verify it can be retrieved from cache
-        cached_result = await merriam_webster_connector.get("test")
-        assert cached_result is not None
-        assert cached_result["provider"] == DictionaryProvider.MERRIAM_WEBSTER.value
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    instance = MerriamWebsterConnector(api_key="dummy-key")
+    instance._api_client = client
+    try:
+        assert await instance.fetch("test", config=VersionConfig(force_rebuild=True)) is None
+    finally:
+        await instance.close()

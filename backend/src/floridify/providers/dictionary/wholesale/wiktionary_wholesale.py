@@ -25,7 +25,6 @@ from ...batch import BatchOperation
 from ...core import ConnectorConfig
 from ...utils import RateLimitConfig
 from ..core import DictionaryConnector
-from ..scraper.wiktionary import WiktionaryConnector
 
 logger = get_logger(__name__)
 
@@ -56,7 +55,7 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
         """
         if config is None:
             config = ConnectorConfig(
-                rate_limit_config=RateLimitConfig(base_requests_per_second=10.0)
+                rate_limit_config=RateLimitConfig(base_requests_per_second=10.0),
             )
         super().__init__(provider=DictionaryProvider.WIKTIONARY, config=config)
         self.language = language
@@ -64,7 +63,19 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize a regular Wiktionary connector for parsing
-        self.parser = WiktionaryConnector(config=config)
+        from ..scraper import wiktionary as wiktionary_scraper
+
+        class ParserProxy(wiktionary_scraper.WiktionaryConnector):
+            def get_metadata_for_resource(self, resource_id: str) -> dict[str, Any]:
+                return {}
+
+            def model_dump(self, content: Any) -> Any:
+                return content
+
+            def model_load(self, content: Any) -> Any:
+                return content
+
+        self.parser = ParserProxy(config=config)
 
         # Wikimedia dump URLs
         self.dump_base_url = f"https://dumps.wikimedia.org/{language.value}wiktionary/latest"
@@ -131,7 +142,7 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
                                     "download_progress": progress,
                                     "downloaded_bytes": downloaded,
                                     "total_bytes": total_size,
-                                }
+                                },
                             )
 
                             if downloaded % (100 * 1024 * 1024) == 0:  # Log every 100MB
@@ -415,7 +426,7 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
                                 {
                                     "part_of_speech": section.title.strip().lower(),
                                     "text": definition,
-                                }
+                                },
                             )
 
         return data

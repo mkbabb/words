@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-import base64
 from datetime import UTC, datetime
 from enum import Enum
-from pathlib import Path
 from typing import Literal
-from uuid import UUID
 
 from beanie import Document, PydanticObjectId
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 # Explicitly export PydanticObjectId for use in other modules
-__all__ = ["BaseMetadata", "PydanticObjectId", "AIResponseBase", "ModelInfo"]
+__all__ = ["AIResponseBase", "BaseMetadata", "ModelInfo", "PydanticObjectId"]
 
 
 class Language(Enum):
@@ -34,19 +31,16 @@ class BaseMetadata(BaseModel):
         arbitrary_types_allowed=True,
         str_strip_whitespace=True,
         use_enum_values=True,
-        # JSON serialization configuration
-        json_encoders={
-            datetime: lambda v: v.isoformat(),
-            PydanticObjectId: str,
-            UUID: str,
-            Path: str,
-            bytes: lambda v: base64.b64encode(v).decode("utf-8"),
-        },
     )
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     version: int = Field(default=1, ge=1)
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_datetime(self, value: datetime) -> str:
+        """Serialize datetime to ISO format."""
+        return value.isoformat()
 
     def mark_updated(self) -> None:
         """Update the timestamp and increment version."""
@@ -68,9 +62,11 @@ class AccessTrackingMixin(BaseModel):
         """Mark entity as accessed."""
         self.last_accessed = datetime.now(UTC)
         self.access_count += 1
-        # Also mark as updated if this entity has that capability
-        if hasattr(self, "mark_updated"):
+        # Also mark as updated if this entity has that method
+        try:
             self.mark_updated()
+        except AttributeError:
+            pass  # Method not available
 
 
 class BaseMetadataWithAccess(BaseMetadata, AccessTrackingMixin):
@@ -81,7 +77,10 @@ class AIResponseBase(BaseModel):
     """Base class for AI response models with confidence tracking."""
 
     confidence: float = Field(
-        default=0.9, ge=0.0, le=1.0, description="Model confidence in this response (0.0-1.0)"
+        default=0.9,
+        ge=0.0,
+        le=1.0,
+        description="Model confidence in this response (0.0-1.0)",
     )
 
 
@@ -135,10 +134,10 @@ class AudioMedia(Document, BaseMetadata):
 
 # Explicit exports
 __all__ = [
-    "Language",
-    "BaseMetadata",
-    "ModelInfo",
     "AIResponseBase",
-    "ImageMedia",
     "AudioMedia",
+    "BaseMetadata",
+    "ImageMedia",
+    "Language",
+    "ModelInfo",
 ]

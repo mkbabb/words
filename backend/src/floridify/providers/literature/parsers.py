@@ -14,21 +14,21 @@ def parse_text(content: str | dict[str, Any]) -> str:
 
     Returns:
         Clean text content
+
     """
     if isinstance(content, dict):
         # Extract text from structured data
         if "text" in content:
             return str(content["text"])
-        elif "content" in content:
+        if "content" in content:
             return str(content["content"])
-        elif "body" in content:
+        if "body" in content:
             return str(content["body"])
-        else:
-            # Try to extract from nested structure
-            for key in ["data", "result", "response"]:
-                if key in content and isinstance(content[key], str):
-                    return str(content[key])
-            return str(content)
+        # Try to extract from nested structure
+        for key in ["data", "result", "response"]:
+            if key in content and isinstance(content[key], str):
+                return str(content[key])
+        return str(content)
 
     # Clean text content
     text = str(content)
@@ -113,6 +113,7 @@ def extract_metadata(content: str | dict[str, Any]) -> dict[str, Any]:
 
     Returns:
         Extracted metadata dictionary
+
     """
     metadata = {}
 

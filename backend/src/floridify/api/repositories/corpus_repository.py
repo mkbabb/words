@@ -67,14 +67,12 @@ class CorpusRepository:
 
     async def search(self, corpus_name: str, params: CorpusSearchParams) -> dict[str, Any]:
         """Search within a corpus."""
-        # Create search engine for this corpus
-        search_engine = Search(
+        search_engine = await Search.from_corpus(
             corpus_name=corpus_name,
             min_score=params.min_score,
             semantic=params.semantic,
+            config=None,
         )
-
-        await search_engine.initialize()
 
         # Perform search
         results = await search_engine.search(

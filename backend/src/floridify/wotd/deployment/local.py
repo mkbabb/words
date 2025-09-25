@@ -371,5 +371,5 @@ if __name__ == "__main__":
             host=args.host,
             port=args.port,
             model_dir=args.model_dir,
-        )
+        ),
     )

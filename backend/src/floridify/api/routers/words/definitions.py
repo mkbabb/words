@@ -435,7 +435,10 @@ async def regenerate_components(
             elif component == "regional_variants":
                 definition.region = result
             else:
-                setattr(definition, component, result)
+                # Update definition field with AI result
+                definition_data = {component: result}
+                from ....api.core.protocols import TypedFieldUpdater
+                TypedFieldUpdater.update_fields(definition, definition_data)
 
             updates[component] = result
 

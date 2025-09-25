@@ -9,6 +9,8 @@ import asyncio
 import itertools
 from typing import Any
 
+from beanie import PydanticObjectId
+
 from ..caching.models import VersionConfig
 from ..corpus.core import Corpus
 from ..text import normalize
@@ -88,6 +90,7 @@ class Search:
 
         Returns:
             SearchEngine instance with loaded index
+
         """
         # Get corpus
         corpus = await Corpus.get(
@@ -177,7 +180,7 @@ class Search:
                 return
 
             logger.info(
-                f"Starting background semantic initialization for '{self.index.corpus_name}'"
+                f"Starting background semantic initialization for '{self.index.corpus_name}'",
             )
 
             # Create semantic search using from_corpus
@@ -265,7 +268,7 @@ class Search:
 
             self.index = SearchIndex(
                 corpus_name=self.corpus.corpus_name,
-                corpus_id=self.corpus.corpus_id,
+                corpus_id=self.corpus.corpus_id or PydanticObjectId(),  # Use empty ID if None
                 vocabulary_hash=self.corpus.vocabulary_hash,
                 min_score=DEFAULT_MIN_SCORE,
                 has_trie=True,
@@ -306,10 +309,37 @@ class Search:
             if method == SearchMethod.EXACT and self.trie_search:
                 result = self.trie_search.search_exact(query)
                 if result:
-                    return [SearchResult(word=result, score=1.0, method=SearchMethod.EXACT)]
+                    # Map back to original form with diacritics if available
+                    original = self._get_original_word(result)
+                    return [SearchResult(
+                        word=original,
+                        score=1.0,
+                        method=SearchMethod.EXACT,
+                        lemmatized_word=None,
+                        language=self.corpus.language if self.corpus else None,
+                        metadata=None
+                    )]
                 return []
+            elif method == SearchMethod.PREFIX and self.trie_search:
+                matches = self.trie_search.search_prefix(query, max_results=max_results)
+                # Map back to original forms with diacritics
+                results = []
+                for match in matches:
+                    original = self._get_original_word(match)
+                    results.append(SearchResult(
+                        word=original,
+                        score=1.0,
+                        method=SearchMethod.PREFIX,
+                        lemmatized_word=None,
+                        language=self.corpus.language if self.corpus else None,
+                        metadata=None
+                    ))
+                return results
             elif method == SearchMethod.FUZZY and self.fuzzy_search and self.corpus:
                 results = self.fuzzy_search.search(query, self.corpus)
+                if min_score is not None:
+                    results = [r for r in results if r.score >= min_score]
+                # Fuzzy search already handles diacritic mapping internally
                 return results[:max_results]
             elif method == SearchMethod.SEMANTIC and self.semantic_search:
                 return self.semantic_search.search(query, max_results=max_results)
@@ -467,6 +497,44 @@ class Search:
         except Exception as e:
             logger.warning(f"Semantic search failed: {e}")
             return []
+
+    async def cascade_search(
+        self,
+        query: str,
+        max_results: int = 20,
+        min_score: float | None = None,
+    ) -> list[SearchResult]:
+        """Cascading search with automatic method fallback.
+
+        Tries methods in order: exact → fuzzy → semantic (if enabled).
+
+        Args:
+            query: Search query
+            max_results: Maximum results to return
+            min_score: Minimum score threshold
+
+        Returns:
+            List of search results from the first method that finds matches
+        """
+        # Try exact match first
+        results = await self.search(query, method=SearchMethod.EXACT, max_results=max_results)
+        if results:
+            return results
+
+        # Fall back to fuzzy
+        results = await self.search(
+            query, method=SearchMethod.FUZZY, max_results=max_results, min_score=min_score
+        )
+        if results:
+            return results
+
+        # Finally try semantic if enabled
+        if self.semantic_search:
+            results = await self.search(
+                query, method=SearchMethod.SEMANTIC, max_results=max_results, min_score=min_score
+            )
+
+        return results if results else []
 
     async def _smart_search_cascade(
         self,

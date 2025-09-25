@@ -967,7 +967,8 @@ class WOTDTrainer:
 
         # Execute all variations concurrently for speed
         batch_results = await asyncio.gather(
-            *[process_variation(v) for v in variations], return_exceptions=True
+            *[process_variation(v) for v in variations],
+            return_exceptions=True,
         )
 
         for result in batch_results:
@@ -1244,7 +1245,7 @@ class WOTDTrainer:
                 word_embeddings_list.append(
                     embeddings.clone()
                     if isinstance(embeddings, torch.Tensor)
-                    else torch.tensor(embeddings, dtype=torch.float32)
+                    else torch.tensor(embeddings, dtype=torch.float32),
                 )
                 semantic_targets.append(corpus_semantic_id)
 
@@ -1291,17 +1292,22 @@ class WOTDTrainer:
         )
 
     async def _train_semantic_encoder(
-        self, embeddings: torch.Tensor, targets: torch.Tensor
+        self,
+        embeddings: torch.Tensor,
+        targets: torch.Tensor,
     ) -> float:
         """Train the semantic encoder using proper FSQ training with reconstruction loss."""
         import torch
 
         # Use AdamW optimizer with cosine annealing for better convergence
         optimizer = torch.optim.AdamW(
-            self.encoder.encoder.parameters(), lr=self.config.encoder_lr * 0.05, weight_decay=1e-4
+            self.encoder.encoder.parameters(),
+            lr=self.config.encoder_lr * 0.05,
+            weight_decay=1e-4,
         )
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=self.config.encoder_epochs
+            optimizer,
+            T_max=self.config.encoder_epochs,
         )
 
         # Set encoder to training mode
@@ -1386,7 +1392,7 @@ class WOTDTrainer:
             # Log progress every 10 epochs
             if epoch % 10 == 0:
                 logger.info(
-                    f"  Epoch {epoch}/{self.config.encoder_epochs}, Loss: {avg_epoch_loss:.4f}"
+                    f"  Epoch {epoch}/{self.config.encoder_epochs}, Loss: {avg_epoch_loss:.4f}",
                 )
 
         avg_loss = total_loss / num_batches if num_batches > 0 else 0.0

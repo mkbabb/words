@@ -22,8 +22,8 @@ from .models import (
 __all__ = [
     "CacheNamespace",
     "CompressionType",
-    "QuantizationType",
     "GlobalCacheManager",
+    "QuantizationType",
     "cached_api_call",
     "cached_api_call_with_dedup",
     "cached_computation",

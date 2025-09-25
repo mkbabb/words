@@ -8,7 +8,8 @@ import asyncio
 import json
 import tempfile
 import time
-from collections.abc import AsyncIterator
+import types
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -202,7 +203,7 @@ class BatchContext:
         self.connector = connector
         self.collector = BatchCollector()
         self.executor = BatchExecutor(connector.client)
-        self._original_method: Any = None
+        self._original_method: Callable[..., Awaitable[Any]] | None = None
 
     async def __aenter__(self) -> "BatchContext":
         """Enter batch mode by patching the connector."""
@@ -213,17 +214,21 @@ class BatchContext:
         batch_context = self
 
         # Create wrapper that collects requests
-        def batch_wrapper(prompt: str, response_model: type[BaseModel], **kwargs: Any) -> Any:
+        async def batch_wrapper(
+            connector: OpenAIConnector,
+            prompt: str,
+            response_model: type[BaseModel],
+            **kwargs: Any,
+        ) -> Any:
             # Add to batch and return future
             future = batch_context.collector.add_request(prompt, response_model, **kwargs)
             logger.debug(
                 f"📥 Collected request #{len(batch_context.collector.requests)}: {response_model.__name__}",
             )
-            # Return a task that will be resolved when batch executes
-            return asyncio.create_task(batch_context._await_future(future))
+            return await batch_context._await_future(future)
 
         # Patch the method
-        self.connector._make_structured_request = batch_wrapper
+        self.connector._make_structured_request = types.MethodType(batch_wrapper, self.connector)
         logger.info("✅ Batch mode activated - collecting API requests")
         return self
 

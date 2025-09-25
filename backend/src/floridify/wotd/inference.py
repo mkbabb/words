@@ -175,7 +175,9 @@ class WOTDInference:
         }
 
     def find_similar_corpora(
-        self, target_id: tuple[int, int, int, int], max_distance: int = 2
+        self,
+        target_id: tuple[int, int, int, int],
+        max_distance: int = 2,
     ) -> list[str]:
         """Find corpora with similar semantic IDs.
 

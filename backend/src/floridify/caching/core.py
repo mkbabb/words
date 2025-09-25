@@ -9,14 +9,23 @@ import pickle
 import time
 from collections.abc import Callable
 from datetime import timedelta
-from typing import Any, TypeVar
+from enum import Enum
+from typing import Any, Generic, TypeVar
 
+from beanie import PydanticObjectId
 from pydantic import BaseModel
 
 from ..utils.logging import get_logger
 from .compression import compress_data, decompress_data
 from .filesystem import FilesystemBackend
-from .models import CacheNamespace, CompressionType, ContentLocation, StorageType
+from .models import (
+    BaseVersionedData,
+    CacheNamespace,
+    CompressionType,
+    ContentLocation,
+    StorageType,
+)
+from .protocols import VersionedContent
 
 logger = get_logger(__name__)
 
@@ -45,7 +54,7 @@ class NamespaceConfig:
         self.stats = {"hits": 0, "misses": 0, "evictions": 0}
 
 
-class GlobalCacheManager[T: FilesystemBackend]:
+class GlobalCacheManager(Generic[T]):  # noqa: UP046
     """Two-tier cache: L1 memory + L2 filesystem.
 
     Optimized for minimal serialization overhead.
@@ -56,14 +65,31 @@ class GlobalCacheManager[T: FilesystemBackend]:
 
         Args:
             l2_backend: Filesystem backend for L2 storage
+
         """
         self.namespaces: dict[CacheNamespace, NamespaceConfig] = {}
         self.l2_backend = l2_backend
+        self.l1_caches: dict[CacheNamespace, NamespaceConfig] = {}
         self._init_default_namespaces()
+
+    async def initialize(self) -> None:
+        """Initialize the cache manager.
+
+        Sets up L1 cache references and prepares the system for operations.
+        """
+        # Set up L1 cache references (aliases to namespaces for backwards compatibility)
+        self.l1_caches = self.namespaces
+        logger.info("GlobalCacheManager initialized")
 
     def _init_default_namespaces(self) -> None:
         """Initialize namespaces with optimized configs."""
         configs = [
+            NamespaceConfig(
+                CacheNamespace.DEFAULT,
+                memory_limit=200,
+                memory_ttl=timedelta(hours=6),
+                disk_ttl=timedelta(days=1),
+            ),
             NamespaceConfig(
                 CacheNamespace.DICTIONARY,
                 memory_limit=500,
@@ -109,6 +135,39 @@ class GlobalCacheManager[T: FilesystemBackend]:
                 memory_ttl=timedelta(hours=1),
                 disk_ttl=timedelta(hours=24),
                 compression=CompressionType.ZSTD,
+            ),
+            # Add commonly used namespaces that might not be explicitly configured
+            NamespaceConfig(
+                CacheNamespace.API,
+                memory_limit=100,
+                memory_ttl=timedelta(hours=1),
+                disk_ttl=timedelta(hours=12),
+            ),
+            NamespaceConfig(
+                CacheNamespace.LANGUAGE,
+                memory_limit=100,
+                memory_ttl=timedelta(days=7),
+                disk_ttl=timedelta(days=30),
+                compression=CompressionType.ZSTD,
+            ),
+            NamespaceConfig(
+                CacheNamespace.OPENAI,
+                memory_limit=200,
+                memory_ttl=timedelta(hours=24),
+                disk_ttl=timedelta(days=7),
+                compression=CompressionType.ZSTD,
+            ),
+            NamespaceConfig(
+                CacheNamespace.LEXICON,
+                memory_limit=100,
+                memory_ttl=timedelta(days=7),
+                disk_ttl=timedelta(days=30),
+            ),
+            NamespaceConfig(
+                CacheNamespace.WOTD,
+                memory_limit=50,
+                memory_ttl=timedelta(days=1),
+                disk_ttl=timedelta(days=7),
             ),
         ]
 
@@ -234,6 +293,20 @@ class GlobalCacheManager[T: FilesystemBackend]:
         pattern = f"{namespace.value}:*"
         await self.l2_backend.clear_pattern(pattern)
 
+    async def clear(self) -> None:
+        """Clear all caches (both L1 and L2).
+
+        This is for backwards compatibility with tests.
+        """
+        # Clear all namespace memory caches
+        for ns in self.namespaces.values():
+            async with ns.lock:
+                ns.memory_cache.clear()
+                ns.stats = {"hits": 0, "misses": 0, "evictions": 0}
+
+        # Clear L2 backend
+        await self.l2_backend.clear_all()
+
     async def _promote_to_memory(self, ns: NamespaceConfig, key: str, data: Any) -> None:
         """Promote data from L2 to L1."""
         async with ns.lock:
@@ -247,14 +320,10 @@ class GlobalCacheManager[T: FilesystemBackend]:
 
     async def _compress_data(self, data: Any, compression: CompressionType) -> bytes:
         """Compress data with specified algorithm."""
-        from .compression import compress_data
-
         return compress_data(data, compression)
 
     async def _decompress_data(self, data: bytes, compression: CompressionType) -> Any:
         """Decompress data."""
-        from .compression import decompress_data
-
         return decompress_data(data, compression)
 
     def get_stats(self, namespace: CacheNamespace | None = None) -> dict[str, Any]:
@@ -293,6 +362,7 @@ async def get_global_cache(
 
     Returns:
         GlobalCacheManager singleton
+
     """
     global _global_cache
 
@@ -334,9 +404,10 @@ async def get_versioned_content(versioned_data: Any) -> dict[str, Any] | None:
 
     Returns:
         The content dictionary or None if not found
+
     """
     # Check if it's a versioned data object with content
-    if not hasattr(versioned_data, "content_inline"):
+    if not isinstance(versioned_data, VersionedContent):
         return None
 
     # Inline content takes precedence
@@ -348,7 +419,7 @@ async def get_versioned_content(versioned_data: Any) -> dict[str, Any] | None:
         return None
 
     # External content
-    if hasattr(versioned_data, "content_location") and versioned_data.content_location:
+    if versioned_data.content_location:
         location = versioned_data.content_location
         if location.cache_key and location.cache_namespace:
             cache = await get_global_cache()
@@ -359,6 +430,55 @@ async def get_versioned_content(versioned_data: Any) -> dict[str, Any] | None:
             return None if content is None else dict(content)
 
     return None
+
+
+def _json_default(obj: Any) -> str:
+    """Serialize enums and Pydantic types in a stable way."""
+    if isinstance(obj, PydanticObjectId):
+        return str(obj)
+    if isinstance(obj, Enum):
+        return str(obj.value)
+    return str(obj)
+
+
+async def set_versioned_content(
+    versioned_data: BaseVersionedData,
+    content: Any,
+    *,
+    force_external: bool = False,
+) -> None:
+    """Store versioned content using inline or external storage."""
+    content_str = json.dumps(content, sort_keys=True, default=_json_default)
+    content_size = len(content_str.encode())
+
+    inline_threshold = 16 * 1024
+
+    if not force_external and content_size < inline_threshold:
+        versioned_data.content_inline = content
+        versioned_data.content_location = None
+        return
+
+    cache = await get_global_cache()
+    cache_key = (
+        f"{versioned_data.resource_type.value}:{versioned_data.resource_id}:"
+        f"content:{versioned_data.version_info.data_hash[:8]}"
+    )
+
+    await cache.set(
+        namespace=versioned_data.namespace,
+        key=cache_key,
+        value=content,
+        ttl_override=versioned_data.ttl,
+    )
+
+    versioned_data.content_location = ContentLocation(
+        cache_namespace=versioned_data.namespace,
+        cache_key=cache_key,
+        storage_type=StorageType.CACHE,
+        size_bytes=content_size,
+        checksum=hashlib.sha256(content_str.encode()).hexdigest(),
+    )
+    versioned_data.content_inline = None
 
 
 # ============================================================================
@@ -376,8 +496,8 @@ async def load_external_content(location: ContentLocation) -> Any:
 
     Returns:
         Deserialized content from external storage
-    """
 
+    """
     if location.storage_type == StorageType.CACHE:
         # Load from cache backend
         cache = await get_global_cache()
@@ -424,8 +544,8 @@ async def store_external_content(
 
     Returns:
         ContentLocation object with storage metadata
-    """
 
+    """
     # Serialize efficiently based on type
     if isinstance(content, BaseModel):
         # Pydantic models: use model_dump for dict conversion

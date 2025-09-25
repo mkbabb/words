@@ -165,7 +165,8 @@ class DefinitionSynthesizer:
             await state_tracker.update_stage(Stages.STORAGE_SAVE)
 
         await self._save_entry_with_version_manager(
-            entry, word.text if isinstance(word, Word) else word
+            entry,
+            word.text if isinstance(word, Word) else word,
         )
         logger.success(
             f"Created synthesized entry for '{word}' with {len(synthesized_definitions)} definitions",
@@ -215,7 +216,7 @@ class DefinitionSynthesizer:
                         "text": d.text,
                         "part_of_speech": d.part_of_speech,
                         "provider": provider.value,
-                    }
+                    },
                 )
 
             # Synthesize definition text
@@ -343,6 +344,7 @@ class DefinitionSynthesizer:
         Args:
             entry: DictionaryEntry to save
             word: Word text for resource ID
+
         """
         manager = get_version_manager()
 

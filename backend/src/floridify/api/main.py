@@ -29,8 +29,8 @@ from .routers import (
     # wordlist_words,
     # wordlists,
     words,
-    wotd_main,
-    wotd_ml,
+    # wotd_main,
+    # wotd_ml,
 )
 
 # Configure logging for the application
@@ -110,8 +110,8 @@ app.include_router(words, prefix=f"{API_V1_PREFIX}/words", tags=["words"])
 # app.include_router(wordlist_words, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-words"])
 # app.include_router(wordlist_reviews, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-reviews"])
 # app.include_router(wordlist_search, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-search"])
-app.include_router(wotd_main, prefix=f"{API_V1_PREFIX}/wotd", tags=["wotd"])
-app.include_router(wotd_ml, prefix=f"{API_V1_PREFIX}/wotd", tags=["wotd-ml"])
+# app.include_router(wotd_main, prefix=f"{API_V1_PREFIX}/wotd", tags=["wotd"])
+# app.include_router(wotd_ml, prefix=f"{API_V1_PREFIX}/wotd", tags=["wotd-ml"])
 app.include_router(audio, prefix=API_V1_PREFIX, tags=["audio"])
 app.include_router(images, prefix=f"{API_V1_PREFIX}/images", tags=["images"])
 

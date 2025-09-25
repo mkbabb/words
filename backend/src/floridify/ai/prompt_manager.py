@@ -1,6 +1,4 @@
-"""
-Streamlined prompt template manager for AI operations.
-"""
+"""Streamlined prompt template manager for AI operations."""
 
 from pathlib import Path
 from typing import Any
@@ -19,6 +17,7 @@ class PromptManager:
         Args:
             prompts_dir: Directory containing prompt templates.
                         Defaults to ai/prompts relative to this file.
+
         """
         self.prompts_dir = prompts_dir or Path(__file__).parent / "prompts"
 
@@ -41,6 +40,7 @@ class PromptManager:
 
         Raises:
             FileNotFoundError: If template not found
+
         """
         # Support nested paths (e.g., "assess/cefr" or "synthesize/definitions")
         base_path = self.prompts_dir / name
@@ -62,6 +62,7 @@ class PromptManager:
 
         Returns:
             Raw template content
+
         """
         path = self._find_template_path(name)
         content = path.read_text(encoding="utf-8")
@@ -76,6 +77,7 @@ class PromptManager:
 
         Returns:
             Rendered template string
+
         """
         # Find the template file
         path = self._find_template_path(name)
@@ -92,6 +94,7 @@ class PromptManager:
 
         Returns:
             List of template names (without extensions)
+
         """
         templates = []
 
@@ -106,7 +109,7 @@ class PromptManager:
                         template_name = str(rel_path.with_suffix(""))
                         templates.append(template_name)
                         break
-                    elif not ext and not path.suffix:
+                    if not ext and not path.suffix:
                         # Handle files without extension
                         rel_path = path.relative_to(self.prompts_dir)
                         templates.append(str(rel_path))
@@ -122,6 +125,7 @@ class PromptManager:
 
         Returns:
             True if template exists
+
         """
         try:
             self._find_template_path(name)

@@ -75,6 +75,6 @@ class BatchOperation(Document, BaseMetadata):
                 "error": error,
                 "error_code": error_code,
                 "timestamp": datetime.now(UTC),
-            }
+            },
         )
         self.failed_items += 1

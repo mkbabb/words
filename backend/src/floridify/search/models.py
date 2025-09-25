@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from beanie import PydanticObjectId
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..caching.core import get_versioned_content
 from ..caching.manager import get_version_manager
@@ -47,10 +47,8 @@ class SearchResult(BaseModel):
         """Compare by score for sorting (higher score is better)."""
         return self.score > other.score
 
-    class Config:
-        """Pydantic configuration."""
-
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "word": "example",
                 "score": 0.95,
@@ -59,6 +57,7 @@ class SearchResult(BaseModel):
                 "metadata": {"frequency": 1000},
             },
         }
+    )
 
 
 # Metadata classes moved to nested pattern inside main classes
@@ -95,11 +94,8 @@ class TrieIndex(BaseModel):
         """Minimal trie metadata for versioning."""
 
         corpus_id: PydanticObjectId
-
-        def __init__(self, **data: Any) -> None:
-            data.setdefault("resource_type", ResourceType.TRIE)
-            data.setdefault("namespace", CacheNamespace.TRIE)
-            super().__init__(**data)
+        resource_type: ResourceType = ResourceType.TRIE
+        namespace: CacheNamespace = CacheNamespace.TRIE
 
     @classmethod
     async def get(
@@ -117,6 +113,7 @@ class TrieIndex(BaseModel):
 
         Returns:
             TrieIndex instance or None if not found
+
         """
         if not corpus_id and not corpus_name:
             raise ValueError("Either corpus_id or corpus_name must be provided")
@@ -125,7 +122,7 @@ class TrieIndex(BaseModel):
 
         # Build resource ID based on what we have
         if corpus_id:
-            resource_id = f"{str(corpus_id)}:trie"
+            resource_id = f"{corpus_id!s}:trie"
         else:
             resource_id = f"{corpus_name}:trie"
 
@@ -163,6 +160,7 @@ class TrieIndex(BaseModel):
 
         Returns:
             TrieIndex instance with built trie data
+
         """
         import time
 
@@ -185,7 +183,9 @@ class TrieIndex(BaseModel):
 
         # Build normalized to original mapping
         normalized_to_original = {}
-        for norm_word, orig_word in zip(corpus.vocabulary, corpus.original_vocabulary):
+        for norm_word, orig_word in zip(
+            corpus.vocabulary, corpus.original_vocabulary, strict=False
+        ):
             normalized_to_original[norm_word] = orig_word
 
         build_time = time.perf_counter() - start_time
@@ -217,10 +217,13 @@ class TrieIndex(BaseModel):
 
         Returns:
             TrieIndex instance
+
         """
         # Try to get existing using corpus ID if available, otherwise name
         existing = await cls.get(
-            corpus_id=corpus.corpus_id, corpus_name=corpus.corpus_name, config=config
+            corpus_id=corpus.corpus_id,
+            corpus_name=corpus.corpus_name,
+            config=config,
         )
         if existing and existing.vocabulary_hash == corpus.vocabulary_hash:
             logger.debug(f"Using cached trie index for corpus '{corpus.corpus_name}'")
@@ -242,6 +245,7 @@ class TrieIndex(BaseModel):
 
         Args:
             config: Version configuration
+
         """
         manager = get_version_manager()
         resource_id = f"{self.corpus_name}:trie"
@@ -294,10 +298,8 @@ class SearchIndex(BaseModel):
     class Metadata(BaseVersionedData):
         """Minimal search metadata for versioning."""
 
-        def __init__(self, **data: Any) -> None:
-            data.setdefault("resource_type", ResourceType.SEARCH)
-            data.setdefault("namespace", CacheNamespace.SEARCH)
-            super().__init__(**data)
+        resource_type: ResourceType = ResourceType.SEARCH
+        namespace: CacheNamespace = CacheNamespace.SEARCH
 
     @classmethod
     async def get(
@@ -315,6 +317,7 @@ class SearchIndex(BaseModel):
 
         Returns:
             SearchIndex instance or None if not found
+
         """
         if not corpus_id and not corpus_name:
             raise ValueError("Either corpus_id or corpus_name must be provided")
@@ -323,7 +326,7 @@ class SearchIndex(BaseModel):
 
         # Build resource ID based on what we have
         if corpus_id:
-            resource_id = f"{str(corpus_id)}:search"
+            resource_id = f"{corpus_id!s}:search"
         else:
             resource_id = f"{corpus_name}:search"
 
@@ -367,6 +370,7 @@ class SearchIndex(BaseModel):
 
         Returns:
             SearchIndex instance with initialized configuration
+
         """
         return cls(
             corpus_id=corpus.corpus_id if corpus.corpus_id else PydanticObjectId(),
@@ -401,10 +405,13 @@ class SearchIndex(BaseModel):
 
         Returns:
             SearchIndex instance
+
         """
         # Try to get existing using corpus ID if available, otherwise name
         existing = await cls.get(
-            corpus_id=corpus.corpus_id, corpus_name=corpus.corpus_name, config=config
+            corpus_id=corpus.corpus_id,
+            corpus_name=corpus.corpus_name,
+            config=config,
         )
         if existing and existing.vocabulary_hash == get_vocabulary_hash(corpus.vocabulary):
             return existing
@@ -429,6 +436,7 @@ class SearchIndex(BaseModel):
 
         Args:
             config: Version configuration
+
         """
         manager = get_version_manager()
         resource_id = f"{self.corpus_name}:search"
@@ -449,7 +457,7 @@ class SearchIndex(BaseModel):
 
 
 __all__ = [
-    "SearchResult",
     "SearchIndex",
+    "SearchResult",
     "TrieIndex",
 ]

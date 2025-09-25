@@ -1,5 +1,4 @@
-"""
-Comprehensive tests for the lookup pipeline REST API endpoints.
+"""Comprehensive tests for the lookup pipeline REST API endpoints.
 Tests both /api/v1/lookup/{word} and streaming variants with full pipeline coverage.
 """
 
@@ -8,10 +7,11 @@ import json
 from unittest.mock import AsyncMock
 
 import pytest
-from ..conftest import assert_response_structure, assert_valid_object_id
 from httpx import AsyncClient
 
 from floridify.models.dictionary import Definition, DictionaryEntry, Word
+
+from ..conftest import assert_response_structure, assert_valid_object_id
 
 
 class TestLookupPipelineAPI:
@@ -67,7 +67,10 @@ class TestLookupPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_lookup_word_not_found_triggers_providers(
-        self, async_client: AsyncClient, mock_dictionary_providers, mock_openai_client
+        self,
+        async_client: AsyncClient,
+        mock_dictionary_providers,
+        mock_openai_client,
     ):
         """Test lookup of non-existent word triggers provider lookup."""
         # Request non-existent word
@@ -87,7 +90,10 @@ class TestLookupPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_lookup_with_query_parameters(
-        self, async_client: AsyncClient, mock_dictionary_providers, mock_openai_client
+        self,
+        async_client: AsyncClient,
+        mock_dictionary_providers,
+        mock_openai_client,
     ):
         """Test lookup with various query parameters."""
         # Test force_refresh parameter
@@ -108,7 +114,11 @@ class TestLookupPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_lookup_caching_behavior(
-        self, async_client: AsyncClient, word_factory, definition_factory, mock_dictionary_providers
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
+        mock_dictionary_providers,
     ):
         """Test that lookups are properly cached."""
         # Setup test data
@@ -132,11 +142,15 @@ class TestLookupPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_lookup_streaming_endpoint(
-        self, async_client: AsyncClient, mock_dictionary_providers, mock_openai_client
+        self,
+        async_client: AsyncClient,
+        mock_dictionary_providers,
+        mock_openai_client,
     ):
         """Test streaming lookup endpoint with Server-Sent Events."""
         response = await async_client.get(
-            "/api/v1/lookup/streaming/stream", headers={"Accept": "text/event-stream"}
+            "/api/v1/lookup/streaming/stream",
+            headers={"Accept": "text/event-stream"},
         )
 
         assert response.status_code == 200
@@ -160,7 +174,10 @@ class TestLookupPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_lookup_with_ai_synthesis(
-        self, async_client: AsyncClient, mock_dictionary_providers, mock_openai_client
+        self,
+        async_client: AsyncClient,
+        mock_dictionary_providers,
+        mock_openai_client,
     ):
         """Test lookup with AI synthesis enabled."""
         response = await async_client.get("/api/v1/lookup/synthesize")
@@ -174,7 +191,8 @@ class TestLookupPipelineAPI:
 
         # Verify synthesized entry was created
         entry = await DictionaryEntry.find_one(
-            DictionaryEntry.word_id is not None, DictionaryEntry.provider == "synthesis"
+            DictionaryEntry.word_id is not None,
+            DictionaryEntry.provider == "synthesis",
         )
         assert entry is not None
 
@@ -200,7 +218,9 @@ class TestLookupPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_lookup_unicode_support(
-        self, async_client: AsyncClient, mock_dictionary_providers
+        self,
+        async_client: AsyncClient,
+        mock_dictionary_providers,
     ):
         """Test lookup with Unicode characters."""
         unicode_words = ["café", "naïve", "résumé", "日本語"]
@@ -213,7 +233,10 @@ class TestLookupPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_lookup_concurrent_requests(
-        self, async_client: AsyncClient, mock_dictionary_providers, mock_openai_client
+        self,
+        async_client: AsyncClient,
+        mock_dictionary_providers,
+        mock_openai_client,
     ):
         """Test handling of concurrent lookup requests."""
         # Create multiple concurrent requests for same word
@@ -234,7 +257,10 @@ class TestLookupPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_lookup_response_headers(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test proper HTTP headers in lookup responses."""
         # Setup test data
@@ -252,13 +278,17 @@ class TestLookupPipelineAPI:
         # Test conditional request
         etag = response.headers["ETag"]
         conditional_response = await async_client.get(
-            "/api/v1/lookup/headers", headers={"If-None-Match": etag}
+            "/api/v1/lookup/headers",
+            headers={"If-None-Match": etag},
         )
         assert conditional_response.status_code == 304
 
     @pytest.mark.asyncio
     async def test_lookup_database_integration(
-        self, async_client: AsyncClient, mock_dictionary_providers, mock_openai_client
+        self,
+        async_client: AsyncClient,
+        mock_dictionary_providers,
+        mock_openai_client,
     ):
         """Test proper database operations during lookup."""
         word = "database"
@@ -282,7 +312,8 @@ class TestLookupPipelineAPI:
 
         # Verify synthesized entry was created
         entry = await DictionaryEntry.find_one(
-            DictionaryEntry.word_id == created_word.id, DictionaryEntry.provider == "synthesis"
+            DictionaryEntry.word_id == created_word.id,
+            DictionaryEntry.provider == "synthesis",
         )
         assert entry is not None
 
@@ -290,17 +321,19 @@ class TestLookupPipelineAPI:
     async def test_lookup_provider_fallback_chain(self, async_client: AsyncClient, mocker):
         """Test provider fallback when primary sources fail."""
         # Mock primary provider to fail
-        mock_wiktionary = mocker.patch("floridify.connectors.wiktionary.WiktionaryConnector")
+        mock_wiktionary = mocker.patch(
+            "floridify.providers.dictionary.scraper.wiktionary.WiktionaryConnector",
+        )
         mock_wiktionary.return_value.lookup_word = AsyncMock(
-            side_effect=Exception("Provider error")
+            side_effect=Exception("Provider error"),
         )
 
         # Mock AI fallback to succeed
-        mock_ai = mocker.patch("floridify.ai.connectors.OpenAIConnector")
+        mock_ai = mocker.patch("floridify.ai.connector.OpenAIConnector")
         mock_ai.return_value.generate_response = AsyncMock(
             return_value={
-                "definitions": [{"part_of_speech": "noun", "text": "AI generated definition"}]
-            }
+                "definitions": [{"part_of_speech": "noun", "text": "AI generated definition"}],
+            },
         )
 
         response = await async_client.get("/api/v1/lookup/fallback")
@@ -338,7 +371,10 @@ class TestLookupPipelineAPI:
 
     @pytest.mark.asyncio
     async def test_lookup_with_multiple_definitions(
-        self, async_client: AsyncClient, word_factory, definition_factory
+        self,
+        async_client: AsyncClient,
+        word_factory,
+        definition_factory,
     ):
         """Test lookup for word with multiple definitions."""
         # Setup word with multiple definitions

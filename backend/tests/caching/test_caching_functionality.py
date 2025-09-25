@@ -8,7 +8,7 @@ import asyncio
 import hashlib
 import json
 import tempfile
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -102,7 +102,7 @@ class TestCacheBasicFunctionality:
             data = {"expires": "soon"}
 
             # Set with TTL
-            await manager.set(namespace, key, data, ttl=timedelta(seconds=1))
+            await manager.set(namespace, key, data, ttl_override=timedelta(seconds=1))
 
             # Should be available immediately
             immediate = await manager.get(namespace, key)
@@ -154,7 +154,7 @@ class TestCacheBasicFunctionality:
 
             async def cache_operation(i: int):
                 key = f"concurrent_key_{i}"
-                data = {"index": i, "timestamp": datetime.utcnow().isoformat()}
+                data = {"index": i, "timestamp": datetime.now(UTC).isoformat()}
 
                 await manager.set(namespace, key, data)
                 retrieved = await manager.get(namespace, key)
@@ -420,17 +420,17 @@ class TestCachePerformance:
                 batch_data[key] = data
 
             # Set all items
-            start_time = datetime.utcnow()
+            start_time = datetime.now(UTC)
             for key, data in batch_data.items():
                 await manager.set(namespace, key, data)
-            set_duration = (datetime.utcnow() - start_time).total_seconds()
+            set_duration = (datetime.now(UTC) - start_time).total_seconds()
 
             # Get all items
-            start_time = datetime.utcnow()
+            start_time = datetime.now(UTC)
             retrieved_data = {}
-            for key in batch_data.keys():
+            for key in batch_data:
                 retrieved_data[key] = await manager.get(namespace, key)
-            get_duration = (datetime.utcnow() - start_time).total_seconds()
+            get_duration = (datetime.now(UTC) - start_time).total_seconds()
 
             # Verify all data retrieved correctly
             assert len(retrieved_data) == 100

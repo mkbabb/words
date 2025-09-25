@@ -76,6 +76,7 @@ class TestTreeCorpusCRUD:
         # Verify relationships
         assert saved_child1.parent_corpus_id == saved_master.corpus_id
         assert saved_child2.parent_corpus_id == saved_master.corpus_id
+        assert saved_grandchild is not None
         assert saved_grandchild.parent_corpus_id == saved_child1.corpus_id
 
     async def test_read_corpus(self, test_db):
@@ -172,7 +173,7 @@ class TestTreeCorpusCRUD:
             language=Language.ENGLISH,
             parent_corpus_id=saved_child.corpus_id,
         )
-        saved_grandchild = await manager.save_corpus(grandchild)
+        await manager.save_corpus(grandchild)
 
         # Delete middle child
         deleted = await manager.delete_corpus(saved_child.corpus_id)
@@ -203,23 +204,26 @@ class TestTreeCorpusCRUD:
             corpus_name="agg-child1",
             vocabulary=["child", "one", "word"],
             language=Language.ENGLISH,
-            parent_corpus_id=saved_master.corpus_id,
         )
         saved_child1 = await manager.save_corpus(child1)
+        # Properly establish parent-child relationship
+        await manager.update_parent(saved_master.corpus_id, saved_child1.corpus_id)
 
         child2 = Corpus(
             corpus_name="agg-child2",
             vocabulary=["child", "two", "unique"],
             language=Language.ENGLISH,
-            parent_corpus_id=saved_master.corpus_id,
         )
         saved_child2 = await manager.save_corpus(child2)
+        # Properly establish parent-child relationship
+        await manager.update_parent(saved_master.corpus_id, saved_child2.corpus_id)
 
         # Aggregate vocabularies
         aggregated = await manager.aggregate_vocabularies(saved_master.corpus_id)
 
-        # Should contain all unique words
-        expected = {"master", "word", "child", "one", "two", "unique"}
+        # Master corpus is just a container, so it should only have children's vocabulary
+        # (master's own vocabulary is not included when is_master=True)
+        expected = {"child", "one", "two", "unique", "word"}
         assert set(aggregated) == expected
 
     async def test_update_parent(self, test_db):

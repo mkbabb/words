@@ -310,12 +310,16 @@ class AppleDictionaryConnector(DictionaryConnector):
                     "ipa": pronunciation.ipa,
                     "syllables": pronunciation.syllables,
                     "stress_pattern": pronunciation.stress_pattern,
-                } if pronunciation else None,
+                }
+                if pronunciation
+                else None,
                 "etymology": {
                     "text": etymology.text,
                     "origin_language": etymology.origin_language,
                     "root_words": etymology.root_words,
-                } if etymology else None,
+                }
+                if etymology
+                else None,
                 "raw_data": raw_data,
             }
 
