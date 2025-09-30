@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..models.dictionary import DictionaryProvider
 from ..utils.config import Config
+from .dictionary.api.free_dictionary import FreeDictionaryConnector
 from .dictionary.api.merriam_webster import MerriamWebsterConnector
 from .dictionary.api.oxford import OxfordConnector
 from .dictionary.core import DictionaryConnector
@@ -47,14 +48,7 @@ def create_connector(
         return AppleDictionaryConnector()
 
     elif provider == DictionaryProvider.MERRIAM_WEBSTER:
-        # Check for merriam_webster config directly
-        try:
-            if not config.merriam_webster.api_key:
-                raise ValueError(
-                    "Merriam-Webster API key not configured. "
-                    "Please update auth/config.toml with your Merriam-Webster api_key."
-                )
-        except AttributeError:
+        if not config.merriam_webster or not config.merriam_webster.api_key:
             raise ValueError(
                 "Merriam-Webster API key not configured. "
                 "Please update auth/config.toml with your Merriam-Webster api_key."
@@ -63,6 +57,9 @@ def create_connector(
 
     elif provider == DictionaryProvider.WORDHIPPO:
         return WordHippoConnector()
+
+    elif provider == DictionaryProvider.FREE_DICTIONARY:
+        return FreeDictionaryConnector()
 
     else:
         raise ValueError(f"Unsupported provider: {provider.value}")

@@ -125,7 +125,7 @@ class AdaptiveRateLimiter:
 
     async def acquire(self) -> None:
         """Acquire permission to make a request."""
-        now = asyncio.get_event_loop().time()
+        now = asyncio.get_running_loop().time()
 
         # Check if we're in backoff period
         if now < self.backoff_until:
@@ -143,7 +143,7 @@ class AdaptiveRateLimiter:
             sleep_time += random.uniform(0.1, 0.3)
             await asyncio.sleep(sleep_time)
 
-        self.last_request_time = asyncio.get_event_loop().time()
+        self.last_request_time = asyncio.get_running_loop().time()
 
     def record_success(self) -> None:
         """Record a successful request."""
@@ -166,7 +166,7 @@ class AdaptiveRateLimiter:
 
         if retry_after and self.config.respect_retry_after:
             # Use server-specified retry delay
-            self.backoff_until = asyncio.get_event_loop().time() + retry_after
+            self.backoff_until = asyncio.get_running_loop().time() + retry_after
             logger.info(f"⏸️ Server requested {retry_after}s delay")
         else:
             # Apply exponential backoff
@@ -174,7 +174,7 @@ class AdaptiveRateLimiter:
                 self.config.min_delay * (self.config.backoff_multiplier**self.consecutive_errors),
                 self.config.max_delay,
             )
-            self.backoff_until = asyncio.get_event_loop().time() + backoff_delay
+            self.backoff_until = asyncio.get_running_loop().time() + backoff_delay
             logger.warning(f"⚠️ Error backoff: {backoff_delay:.2f}s")
 
         # Reduce rate on errors

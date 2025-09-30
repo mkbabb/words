@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import pickle
 import time
 from typing import Any, Literal
@@ -39,12 +40,14 @@ class SemanticSearch:
         self,
         index: SemanticIndex | None = None,
         corpus: Corpus | None = None,
+        query_cache_size: int = 100,
     ):
         """Initialize semantic search with index and optional corpus.
 
         Args:
             index: Pre-loaded SemanticIndex containing all data
             corpus: Optional corpus for runtime operations
+            query_cache_size: Size of LRU cache for query embeddings (default: 100)
 
         """
         # Data model
@@ -56,6 +59,11 @@ class SemanticSearch:
         self.sentence_embeddings: np.ndarray | None = None
         self.sentence_index: faiss.Index | None = None
         self.device: str = "cpu"
+
+        # Query embedding cache (LRU)
+        self.query_cache: dict[str, np.ndarray] = {}
+        self.query_cache_size = query_cache_size
+        self.query_cache_order: list[str] = []  # For LRU tracking
 
         # Load from index if provided
         if index:
@@ -168,6 +176,54 @@ class SemanticSearch:
             f"🔧 Model optimized: device={self.device}, onnx={USE_ONNX_BACKEND}, fp16={USE_MIXED_PRECISION}",
         )
         return model
+
+    def _get_cached_query_embedding(self, query: str) -> np.ndarray | None:
+        """Get cached query embedding using LRU eviction.
+
+        Args:
+            query: Normalized query string
+
+        Returns:
+            Cached embedding if available, None otherwise
+
+        """
+        # Generate cache key from query (use hash for consistent keys)
+        cache_key = hashlib.md5(query.encode()).hexdigest()
+
+        if cache_key in self.query_cache:
+            # Move to end of LRU order (most recently used)
+            if cache_key in self.query_cache_order:
+                self.query_cache_order.remove(cache_key)
+            self.query_cache_order.append(cache_key)
+            logger.debug(f"Query embedding cache HIT for: {query[:50]}...")
+            return self.query_cache[cache_key]
+
+        return None
+
+    def _cache_query_embedding(self, query: str, embedding: np.ndarray) -> None:
+        """Cache query embedding with LRU eviction.
+
+        Args:
+            query: Normalized query string
+            embedding: Query embedding to cache
+
+        """
+        cache_key = hashlib.md5(query.encode()).hexdigest()
+
+        # LRU eviction if cache is full
+        if len(self.query_cache) >= self.query_cache_size:
+            if self.query_cache_order:
+                # Remove least recently used
+                oldest_key = self.query_cache_order.pop(0)
+                self.query_cache.pop(oldest_key, None)
+                logger.debug(f"Evicted oldest query from cache (size: {self.query_cache_size})")
+
+        # Add to cache
+        self.query_cache[cache_key] = embedding
+        self.query_cache_order.append(cache_key)
+        logger.debug(
+            f"Cached query embedding (cache size: {len(self.query_cache)}/{self.query_cache_size})"
+        )
 
     def _encode(self, texts: list[str]) -> np.ndarray:
         """Encode texts with optimizations (ONNX + mixed precision + GPU)."""
@@ -284,12 +340,15 @@ class SemanticSearch:
 
         # Check if lemmatized vocabulary is available
         if not self.corpus.lemmatized_vocabulary:
-            logger.warning(f"Corpus '{self.corpus.corpus_name}' has empty lemmatized vocabulary - no embeddings to build")
+            logger.warning(
+                f"Corpus '{self.corpus.corpus_name}' has empty lemmatized vocabulary - no embeddings to build"
+            )
             # Set empty embeddings and index for consistency
-            self.embeddings = np.array([], dtype=np.float32).reshape(0, 1024)  # BGE-M3 dimension
-            self.variant_mapping = {}
-            self.index.embeddings = self.embeddings
-            self.index.variant_mapping = self.variant_mapping
+            self.sentence_embeddings = np.array([], dtype=np.float32).reshape(
+                0, 1024
+            )  # BGE-M3 dimension
+            self.index.embeddings = ""  # Empty string for serialized empty embeddings
+            self.index.variant_mapping = {}
             return
 
         # Process entire vocabulary at once for better performance
@@ -438,7 +497,11 @@ class SemanticSearch:
         - nbits: Bits per subquantizer (8 for quality/size balance)
         """
         # Handle empty corpus
-        if vocab_size == 0 or self.sentence_embeddings is None or self.sentence_embeddings.size == 0:
+        if (
+            vocab_size == 0
+            or self.sentence_embeddings is None
+            or self.sentence_embeddings.size == 0
+        ):
             logger.warning("No embeddings to index - creating empty index")
             self.sentence_index = faiss.IndexFlatL2(dimension)
             return
@@ -583,10 +646,18 @@ class SemanticSearch:
             if not normalized_query:
                 return []
 
-            query_embedding: np.ndarray = self._encode([normalized_query])[0]
+            # Check cache first
+            query_embedding = self._get_cached_query_embedding(normalized_query)
 
             if query_embedding is None:
-                return []
+                # Cache miss - generate embedding
+                query_embedding = self._encode([normalized_query])[0]
+
+                if query_embedding is None:
+                    return []
+
+                # Cache the embedding for future queries
+                self._cache_query_embedding(normalized_query, query_embedding)
 
             # Search using FAISS - need to reshape to 2D array for batch processing
             distances, indices = self.sentence_index.search(

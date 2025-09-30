@@ -89,17 +89,29 @@ class Corpus(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     class Metadata(BaseVersionedData):
-        # Corpus identification
+        """Corpus metadata for versioned persistence.
+
+        Note: This Metadata class serves as the persistence layer for corpus versioning.
+        It contains identification and tree structure fields needed to reconstruct
+        the corpus state from storage. This is different from pure cache validation
+        metadata in other classes like TrieIndex.Metadata.
+        """
+
+        # Corpus identification (needed for persistence)
         corpus_name: str = ""
         corpus_type: CorpusType = CorpusType.LEXICON
         language: Language = Language.ENGLISH
 
-        # Tree structure
+        # Tree structure (part of versioned state)
         parent_corpus_id: PydanticObjectId | None = None
         child_corpus_ids: list[PydanticObjectId] = Field(default_factory=list)
         is_master: bool = False
 
-        # Vocabulary reference
+        # Vocabulary metadata (versioning)
+        vocabulary_size: int = 0
+        vocabulary_hash: str = ""
+
+        # Storage configuration
         content_location: ContentLocation | None = None
         resource_type: ResourceType = ResourceType.CORPUS
         namespace: CacheNamespace = CacheNamespace.CORPUS
@@ -224,6 +236,11 @@ class Corpus(BaseModel):
         # Rebuild signature index
         self._build_signature_index()
 
+        # Clear lemmatization data to force rebuild
+        self.lemmatized_vocabulary = []
+        self.word_to_lemma_indices = {}
+        self.lemma_to_word_indices = {}
+
         # Rebuild unified indices (lemmatization)
         await self._create_unified_indices()
 
@@ -271,6 +288,113 @@ class Corpus(BaseModel):
             f"Created lemmatization maps: {len(unique_lemmas)} lemmas "
             f"from {len(self.vocabulary)} words",
         )
+
+    async def add_words(self, words: list[str]) -> int:
+        """Add words to the corpus incrementally.
+
+        Args:
+            words: List of words to add
+
+        Returns:
+            Number of new unique words added
+
+        """
+        if not words:
+            return 0
+
+        logger.info(f"Adding {len(words)} words to corpus {self.corpus_name}")
+
+        # Normalize new words
+        normalized_new = batch_normalize(words)
+
+        # Track original count
+        original_unique_count = len(self.vocabulary)
+
+        # Add to original_vocabulary
+        start_idx = len(self.original_vocabulary)
+        self.original_vocabulary.extend(words)
+
+        # Merge with existing vocabulary (set-based deduplication)
+        merged_vocab = set(self.vocabulary) | set(normalized_new)
+
+        # Sort and update
+        self.vocabulary = sorted(merged_vocab)
+
+        # Rebuild all indices to maintain consistency
+        await self._rebuild_indices()
+
+        # Update word frequencies if provided
+        for word in normalized_new:
+            if word in self.word_frequencies:
+                self.word_frequencies[word] += 1
+            else:
+                self.word_frequencies[word] = 1
+
+        # Update counts
+        new_unique_count = len(self.vocabulary)
+        added_count = new_unique_count - original_unique_count
+        self.total_word_count = len(self.original_vocabulary)
+        self.last_updated = time.time()
+
+        logger.info(
+            f"Added {added_count} unique words to corpus {self.corpus_name} "
+            f"(total: {new_unique_count})",
+        )
+
+        return added_count
+
+    async def remove_words(self, words: list[str]) -> int:
+        """Remove words from the corpus incrementally.
+
+        Args:
+            words: List of words to remove
+
+        Returns:
+            Number of unique words removed
+
+        """
+        if not words:
+            return 0
+
+        logger.info(f"Removing {len(words)} words from corpus {self.corpus_name}")
+
+        # Normalize words to remove
+        normalized_remove = set(batch_normalize(words))
+
+        # Track original count
+        original_unique_count = len(self.vocabulary)
+
+        # Remove from vocabulary
+        self.vocabulary = sorted([w for w in self.vocabulary if w not in normalized_remove])
+
+        # Remove from original_vocabulary and rebuild mapping
+        # This is trickier - we need to track which original words map to removed normalized words
+        normalized_orig = batch_normalize(self.original_vocabulary)
+        keep_indices = [
+            i for i, norm_word in enumerate(normalized_orig)
+            if norm_word not in normalized_remove
+        ]
+        self.original_vocabulary = [self.original_vocabulary[i] for i in keep_indices]
+
+        # Rebuild all indices to maintain consistency
+        await self._rebuild_indices()
+
+        # Remove from word frequencies
+        for word in normalized_remove:
+            self.word_frequencies.pop(word, None)
+
+        # Update counts
+        new_unique_count = len(self.vocabulary)
+        removed_count = original_unique_count - new_unique_count
+        self.total_word_count = len(self.original_vocabulary)
+        self.last_updated = time.time()
+
+        logger.info(
+            f"Removed {removed_count} unique words from corpus {self.corpus_name} "
+            f"(remaining: {new_unique_count})",
+        )
+
+        return removed_count
 
     def get_word_by_index(self, index: int) -> str | None:
         """Get a word by its index in the normalized vocabulary."""

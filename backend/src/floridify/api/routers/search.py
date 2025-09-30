@@ -6,60 +6,22 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from ...caching.core import CacheNamespace, get_global_cache
 from ...core.search_pipeline import get_search_engine, reset_search_engine
 from ...corpus.manager import get_corpus_manager
 from ...corpus.models import CorpusType
 from ...models.base import Language
+from ...models.parameters import SearchParams
+from ...models.responses import SearchResponse
 from ...search.constants import SearchMode
 from ...search.language import get_language_search
-from ...search.models import SearchResult
 from ...text import clear_lemma_cache, get_lemma_cache_stats
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
-
-
-class SearchParams(BaseModel):
-    """Parameters for search endpoint."""
-
-    language: Language = Field(default=Language.ENGLISH, description="Search language")
-    max_results: int = Field(default=20, ge=1, le=100, description="Maximum results")
-    min_score: float = Field(default=0.6, ge=0.0, le=1.0, description="Minimum score")
-    mode: SearchMode = Field(
-        default=SearchMode.SMART,
-        description="Search mode: smart, exact, fuzzy, semantic",
-    )
-
-
-class SearchResponse(BaseModel):
-    """Response for search operations with unified SearchResult model."""
-
-    query: str = Field(..., description="Original search query")
-    results: list[SearchResult] = Field(..., description="Search results")
-    total_found: int = Field(..., description="Total number of matches")
-    language: Language = Field(..., description="Language searched")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Search metadata")
-
-    @property
-    def has_results(self) -> bool:
-        """Check if search returned any results."""
-        return len(self.results) > 0
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "query": "test",
-                "results": [{"word": "test", "score": 1.0, "method": "exact", "is_phrase": False}],
-                "total_found": 1,
-                "language": "en",
-                "metadata": {"search_time_ms": 15},
-            },
-        }
-    )
 
 
 class RebuildIndexRequest(BaseModel):
@@ -163,46 +125,41 @@ class RebuildIndexResponse(BaseModel):
 
 
 def parse_search_params(
-    language: str = Query(default="en", description="Language code"),
+    languages: list[str] = Query(default=["en"], description="Language codes"),
     max_results: int = Query(default=20, ge=1, le=100, description="Maximum results"),
     min_score: float = Query(default=0.6, ge=0.0, le=1.0, description="Minimum score"),
     mode: str = Query(default="smart", description="Search mode: smart, exact, fuzzy, semantic"),
+    force_rebuild: bool = Query(default=False, description="Force rebuild indices"),
+    corpus_id: str | None = Query(default=None, description="Specific corpus ID"),
+    corpus_name: str | None = Query(default=None, description="Specific corpus name"),
 ) -> SearchParams:
-    """Parse and validate search parameters."""
-    try:
-        language_enum = Language(language.lower())
-    except ValueError:
-        language_enum = Language.ENGLISH
-
-    try:
-        mode_enum = SearchMode(mode.lower())
-    except ValueError:
-        mode_enum = SearchMode.SMART
-
+    """Parse and validate search parameters using shared model."""
+    # Use the shared model's validators
     return SearchParams(
-        language=language_enum,
+        languages=languages,  # validators handle conversion
         max_results=max_results,
         min_score=min_score,
-        mode=mode_enum,
+        mode=mode,  # validators handle conversion
+        force_rebuild=force_rebuild,
+        corpus_id=corpus_id,
+        corpus_name=corpus_name,
     )
 
 
-# @cached_api_call(
-#     ttl_hours=1.0,
-#     key_prefix="search",
-# )
 async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
     """Cached search implementation."""
-    logger.info(f"Searching for '{query}' in {params.language.value} (mode={params.mode.value})")
+    # Convert string mode to enum
+    mode_enum = SearchMode(params.mode)
+    logger.info(f"Searching for '{query}' in {[lang.value for lang in params.languages]} (mode={mode_enum.value})")
 
     try:
         # Get language search instance
-        language_search = await get_language_search(languages=[params.language])
+        language_search = await get_language_search(languages=params.languages)
 
         # Perform search with specified mode
         results = await language_search.search_with_mode(
             query=query,
-            mode=params.mode,
+            mode=mode_enum,
             max_results=params.max_results,
             min_score=params.min_score,
         )
@@ -214,7 +171,9 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
             query=query,
             results=response_items,
             total_found=len(results),
-            language=params.language,
+            languages=params.languages,
+            mode=params.mode,
+            metadata={},
         )
 
     except Exception as e:
@@ -283,9 +242,10 @@ async def get_search_suggestions(
 
     # Override parameters for suggestions
     suggestion_params = SearchParams(
-        language=params.language,
+        languages=params.languages,
         max_results=limit,
         min_score=0.3,  # Lower threshold for suggestions
+        mode=params.mode,
     )
 
     try:

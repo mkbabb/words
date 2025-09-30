@@ -64,6 +64,9 @@ dependencies = [
     "boto3>=1.40.7",
     "botocore>=1.40.7",
     "lz4>=4.4.4",
+    # Document parsing
+    "pypdf>=4.0.0",        # Modern PDF parsing (fork of PyPDF2)
+    "ebooklib>=0.18",      # EPUB parsing
 ]
 
 [project.scripts]

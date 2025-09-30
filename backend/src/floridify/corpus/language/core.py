@@ -230,17 +230,21 @@ class LanguageCorpus(Corpus):
 
         # Look through parent's actual children rather than global search
         child_id_to_remove = None
-        for child_id in self.child_corpus_ids:
-            potential_child = await manager.get_corpus(corpus_id=child_id)
-            logger.info(
-                f"Checking child {child_id}: name={potential_child.corpus_name if potential_child else 'None'}, looking for={child_name}"
-            )
-            if potential_child and potential_child.corpus_name == child_name:
-                # CRITICAL: Use the ID from parent's list, not the child's corpus_id
-                # They may differ due to versioning
-                child_id_to_remove = child_id
-                logger.info(f"Found matching child: using child_id={child_id} from parent's list")
-                break
+        # Safely iterate over children, handling potential None values
+        if self.child_corpus_ids:
+            for child_id in self.child_corpus_ids:
+                potential_child = await manager.get_corpus(corpus_id=child_id)
+                logger.info(
+                    f"Checking child {child_id}: name={potential_child.corpus_name if potential_child else 'None'}, looking for={child_name}"
+                )
+                if potential_child and potential_child.corpus_name == child_name:
+                    # CRITICAL: Use the ID from parent's list, not the child's corpus_id
+                    # They may differ due to versioning
+                    child_id_to_remove = child_id
+                    logger.info(
+                        f"Found matching child: using child_id={child_id} from parent's list"
+                    )
+                    break
 
         if not child_id_to_remove:
             logger.warning(

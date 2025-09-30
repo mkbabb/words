@@ -64,6 +64,8 @@ async def search_word_pipeline(
     max_results: int = 20,
     min_score: float | None = None,
     force_rebuild: bool = False,
+    corpus_id: any = None,
+    corpus_name: str | None = None,
 ) -> list[SearchResult]:
     """Generalized word search pipeline - isomorphic with backend API.
 
@@ -77,6 +79,8 @@ async def search_word_pipeline(
         max_results: Maximum number of results
         min_score: Minimum score threshold
         force_rebuild: Force rebuild of search indices
+        corpus_id: Optional specific corpus ID to search
+        corpus_name: Optional specific corpus name to search
 
     Returns:
         List of search results ranked by relevance
@@ -92,19 +96,44 @@ async def search_word_pipeline(
     try:
         # Query processing
 
-        # Get language search (replace get_search_engine)
-        language_search = await get_language_search(
-            languages=languages,
-            force_rebuild=force_rebuild,
-        )
+        # If corpus_id or corpus_name provided, use direct corpus search
+        if corpus_id or corpus_name:
+            from ..corpus.core import Corpus
+            from ..search.core import Search
 
-        # Perform search with specified mode
-        results = await language_search.search_with_mode(
-            query=word,
-            mode=mode,
-            max_results=max_results,
-            min_score=min_score,
-        )
+            # Get corpus by ID or name
+            corpus = await Corpus.get(corpus_id=corpus_id, corpus_name=corpus_name)
+            if corpus is None:
+                logger.error(f"Corpus not found: {corpus_id or corpus_name}")
+                return []
+
+            # Create search engine for this corpus
+            search_engine = await Search.from_corpus(
+                corpus_name=corpus.corpus_name,
+                semantic=True,
+            )
+
+            # Perform search
+            results = await search_engine.search_with_mode(
+                query=word,
+                mode=mode,
+                max_results=max_results,
+                min_score=min_score,
+            )
+        else:
+            # Use language-based search (existing behavior)
+            language_search = await get_language_search(
+                languages=languages,
+                force_rebuild=force_rebuild,
+            )
+
+            # Perform search with specified mode
+            results = await language_search.search_with_mode(
+                query=word,
+                mode=mode,
+                max_results=max_results,
+                min_score=min_score,
+            )
 
         # Search completed
 
@@ -162,7 +191,7 @@ async def find_best_match(
 
     """
     # Map semantic parameter to SearchMode
-    mode = SearchMode.SMART if semantic else SearchMode.FAST
+    mode = SearchMode.SMART if semantic else SearchMode.EXACT
 
     results = await search_word_pipeline(
         word=word,

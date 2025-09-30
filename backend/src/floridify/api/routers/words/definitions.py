@@ -438,6 +438,7 @@ async def regenerate_components(
                 # Update definition field with AI result
                 definition_data = {component: result}
                 from ....api.core.protocols import TypedFieldUpdater
+
                 TypedFieldUpdater.update_fields(definition, definition_data)
 
             updates[component] = result

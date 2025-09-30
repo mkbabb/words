@@ -91,7 +91,7 @@ class FreeDictionaryConnector(DictionaryConnector):
                             if not def_text:
                                 continue
                             definition_entry = {
-                                "definition": def_text,
+                                "text": def_text,
                                 "part_of_speech": part_of_speech,
                                 "synonyms": definition.get("synonyms", []),
                                 "antonyms": definition.get("antonyms", []),

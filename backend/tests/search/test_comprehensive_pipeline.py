@@ -24,39 +24,117 @@ async def multilingual_corpus(test_db) -> Corpus:
     """Create corpus with multilingual and diacritic-containing vocabulary."""
     vocabulary = [
         # English base forms and inflections
-        "run", "running", "ran", "runner", "runs",
-        "walk", "walking", "walked", "walker", "walks",
-        "speak", "speaking", "spoke", "spoken", "speaker",
+        "run",
+        "running",
+        "ran",
+        "runner",
+        "runs",
+        "walk",
+        "walking",
+        "walked",
+        "walker",
+        "walks",
+        "speak",
+        "speaking",
+        "spoke",
+        "spoken",
+        "speaker",
         # French words with diacritics
-        "café", "crème", "château", "naïve", "résumé", "élève",
-        "à", "où", "déjà", "être", "noël", "maïs",
+        "café",
+        "crème",
+        "château",
+        "naïve",
+        "résumé",
+        "élève",
+        "à",
+        "où",
+        "déjà",
+        "être",
+        "noël",
+        "maïs",
         # Spanish words with diacritics
-        "niño", "señor", "año", "mañana", "español", "corazón",
+        "niño",
+        "señor",
+        "año",
+        "mañana",
+        "español",
+        "corazón",
         # German words with umlauts
-        "über", "schön", "müller", "größe", "öffnen", "äpfel",
+        "über",
+        "schön",
+        "müller",
+        "größe",
+        "öffnen",
+        "äpfel",
         # Mixed cases and special characters
-        "naïveté", "résumé", "café-au-lait", "vis-à-vis",
+        "naïveté",
+        "résumé",
+        "café-au-lait",
+        "vis-à-vis",
         # Test normalization
-        "cafe", "creme", "chateau", "naive", "resume",
+        "cafe",
+        "creme",
+        "chateau",
+        "naive",
+        "resume",
     ]
 
     # Create lemmatized forms (simplified for testing)
     lemmatized = [
         # English lemmas
-        "run", "run", "run", "runner", "run",
-        "walk", "walk", "walk", "walker", "walk",
-        "speak", "speak", "speak", "speak", "speaker",
+        "run",
+        "run",
+        "run",
+        "runner",
+        "run",
+        "walk",
+        "walk",
+        "walk",
+        "walker",
+        "walk",
+        "speak",
+        "speak",
+        "speak",
+        "speak",
+        "speaker",
         # French (keep base forms)
-        "café", "crème", "château", "naïve", "résumé", "élève",
-        "à", "où", "déjà", "être", "noël", "maïs",
+        "café",
+        "crème",
+        "château",
+        "naïve",
+        "résumé",
+        "élève",
+        "à",
+        "où",
+        "déjà",
+        "être",
+        "noël",
+        "maïs",
         # Spanish (keep base forms)
-        "niño", "señor", "año", "mañana", "español", "corazón",
+        "niño",
+        "señor",
+        "año",
+        "mañana",
+        "español",
+        "corazón",
         # German (keep base forms)
-        "über", "schön", "müller", "größe", "öffnen", "äpfel",
+        "über",
+        "schön",
+        "müller",
+        "größe",
+        "öffnen",
+        "äpfel",
         # Mixed
-        "naïveté", "résumé", "café-au-lait", "vis-à-vis",
+        "naïveté",
+        "résumé",
+        "café-au-lait",
+        "vis-à-vis",
         # Normalized
-        "cafe", "creme", "chateau", "naive", "resume",
+        "cafe",
+        "creme",
+        "chateau",
+        "naive",
+        "resume",
     ]
 
     # Create corpus with properly built indices
@@ -111,13 +189,15 @@ async def large_corpus(test_db) -> Corpus:
 
     for base in base_words:
         for i in range(200):  # 200 variations per base word = 1400 words total
-            vocabulary.extend([
-                f"{base}{i}",
-                f"{base}ing{i}",
-                f"{base}ed{i}",
-                f"{base}er{i}",
-                f"{base}s{i}",
-            ])
+            vocabulary.extend(
+                [
+                    f"{base}{i}",
+                    f"{base}ing{i}",
+                    f"{base}ed{i}",
+                    f"{base}er{i}",
+                    f"{base}s{i}",
+                ]
+            )
 
     corpus = Corpus(
         corpus_name="large_test_corpus",
@@ -152,7 +232,7 @@ async def literature_corpus(test_db) -> Corpus:
     # Extract unique words
     words = []
     for word in text.lower().split():
-        cleaned = ''.join(c for c in word if c.isalnum() or c in "-'")
+        cleaned = "".join(c for c in word if c.isalnum() or c in "-'")
         if cleaned and cleaned not in ["", "'"]:
             words.append(cleaned)
 
@@ -169,7 +249,7 @@ async def literature_corpus(test_db) -> Corpus:
             "title": "A Tale of Two Cities",
             "author": "Charles Dickens",
             "year": 1859,
-        }
+        },
     )
 
     # Build indices
@@ -189,7 +269,7 @@ class TestLemmatization:
         """Test that searching for lemma finds all inflections."""
         search = await Search.from_corpus(
             corpus_name=multilingual_corpus.corpus_name,
-            semantic=False  # Disable for speed
+            semantic=False,  # Disable for speed
         )
 
         # Search for base form should find inflections
@@ -208,8 +288,7 @@ class TestLemmatization:
     async def test_inflection_search_finds_base(self, multilingual_corpus):
         """Test that searching for inflection can find base form."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         # Search for inflected form
@@ -250,8 +329,7 @@ class TestDiacritics:
     async def test_diacritic_exact_search(self, multilingual_corpus):
         """Test exact search with diacritics."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         # Search with diacritics
@@ -263,8 +341,7 @@ class TestDiacritics:
     async def test_normalized_diacritic_search(self, multilingual_corpus):
         """Test searching without diacritics finds words with diacritics."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         # Search without diacritics should find both
@@ -278,8 +355,7 @@ class TestDiacritics:
     async def test_french_diacritics(self, multilingual_corpus):
         """Test French words with various diacritics."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         # Test various French diacritics
@@ -293,8 +369,7 @@ class TestDiacritics:
     async def test_german_umlauts(self, multilingual_corpus):
         """Test German words with umlauts."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         # Test German umlauts
@@ -312,8 +387,7 @@ class TestMultilingual:
     async def test_spanish_search(self, multilingual_corpus):
         """Test Spanish word search."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         # Search Spanish words
@@ -347,8 +421,7 @@ class TestMultilingual:
     async def test_compound_words(self, multilingual_corpus):
         """Test compound words with hyphens."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         # Search compound words
@@ -366,8 +439,7 @@ class TestSearchPipeline:
     async def test_cascade_search_fallback(self, multilingual_corpus):
         """Test cascade search falls back through methods."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         # Search for slightly misspelled word
@@ -382,8 +454,7 @@ class TestSearchPipeline:
     async def test_search_result_metadata(self, multilingual_corpus):
         """Test search results contain proper metadata."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         results = await search.search_with_mode("run", mode=SearchMode.SMART)
@@ -398,8 +469,7 @@ class TestSearchPipeline:
     async def test_search_result_ordering(self, multilingual_corpus):
         """Test search results are properly ordered by score."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         results = await search.search_with_mode("run", mode=SearchMode.SMART)
@@ -412,14 +482,13 @@ class TestSearchPipeline:
     async def test_search_with_limit(self, multilingual_corpus):
         """Test limiting search results."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         results = await search.search_with_mode(
             "r",  # Query that matches many words
             mode=SearchMode.SMART,  # Use SMART mode for search
-            max_results=5
+            max_results=5,
         )
 
         assert len(results) <= 5
@@ -432,16 +501,10 @@ class TestVersioning:
     async def test_index_versioning(self, multilingual_corpus):
         """Test search index versioning."""
         # Create first index
-        index1 = await SearchIndex.get_or_create(
-            corpus=multilingual_corpus,
-            semantic=False
-        )
+        index1 = await SearchIndex.get_or_create(corpus=multilingual_corpus, semantic=False)
 
         # Create second index (should reuse if vocabulary unchanged)
-        index2 = await SearchIndex.get_or_create(
-            corpus=multilingual_corpus,
-            semantic=False
-        )
+        index2 = await SearchIndex.get_or_create(corpus=multilingual_corpus, semantic=False)
 
         # Should have same vocabulary hash
         assert index1.vocabulary_hash == index2.vocabulary_hash
@@ -477,6 +540,7 @@ class TestVersioning:
 
         # Force increment by passing config
         from floridify.caching.models import VersionConfig
+
         saved2 = await manager.save_corpus(corpus2, config=VersionConfig(increment_version=True))
 
         # Get version from metadata since Corpus doesn't have version_info
@@ -485,6 +549,7 @@ class TestVersioning:
 
         # Version should increment - use proper version comparison
         from packaging import version
+
         assert version.parse(version2) > version.parse(version1)
 
     @pytest.mark.asyncio
@@ -521,10 +586,7 @@ class TestPerformance:
     @pytest.mark.asyncio
     async def test_large_corpus_search_performance(self, large_corpus):
         """Test search performance on large corpus."""
-        search = await Search.from_corpus(
-            corpus_name=large_corpus.corpus_name,
-            semantic=False
-        )
+        search = await Search.from_corpus(corpus_name=large_corpus.corpus_name, semantic=False)
 
         # Warm up
         await search.search_with_mode("test", mode=SearchMode.SMART)
@@ -547,10 +609,7 @@ class TestPerformance:
     @pytest.mark.asyncio
     async def test_concurrent_search_performance(self, large_corpus):
         """Test concurrent search performance."""
-        search = await Search.from_corpus(
-            corpus_name=large_corpus.corpus_name,
-            semantic=False
-        )
+        search = await Search.from_corpus(corpus_name=large_corpus.corpus_name, semantic=False)
 
         queries = [f"test{i}" for i in range(50)]
 
@@ -569,10 +628,7 @@ class TestPerformance:
         import sys
 
         # Create search engine
-        search = await Search.from_corpus(
-            corpus_name=large_corpus.corpus_name,
-            semantic=False
-        )
+        search = await Search.from_corpus(corpus_name=large_corpus.corpus_name, semantic=False)
 
         # Check memory usage (rough estimate)
         if search.index:
@@ -588,10 +644,7 @@ class TestLiteratureCorpus:
     @pytest.mark.asyncio
     async def test_literature_corpus_search(self, literature_corpus):
         """Test searching in literature corpus."""
-        search = await Search.from_corpus(
-            corpus_name=literature_corpus.corpus_name,
-            semantic=False
-        )
+        search = await Search.from_corpus(corpus_name=literature_corpus.corpus_name, semantic=False)
 
         # Search for common words
         results = await search.search_with_mode("times", mode=SearchMode.SMART)
@@ -639,10 +692,7 @@ class TestEdgeCases:
         manager = CorpusManager()
         saved = await manager.save_corpus(corpus)
 
-        search = await Search.from_corpus(
-            corpus_name=saved.corpus_name,
-            semantic=False
-        )
+        search = await Search.from_corpus(corpus_name=saved.corpus_name, semantic=False)
 
         results = await search.search_with_mode("test", mode=SearchMode.SMART)
         assert len(results) == 0
@@ -651,8 +701,7 @@ class TestEdgeCases:
     async def test_special_character_search(self, multilingual_corpus):
         """Test searching with special characters."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         # Search with various special characters
@@ -673,8 +722,7 @@ class TestEdgeCases:
     async def test_very_long_query(self, multilingual_corpus):
         """Test searching with very long query."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         # Create very long query
@@ -687,8 +735,7 @@ class TestEdgeCases:
     async def test_unicode_search(self, multilingual_corpus):
         """Test searching with various Unicode characters."""
         search = await Search.from_corpus(
-            corpus_name=multilingual_corpus.corpus_name,
-            semantic=False
+            corpus_name=multilingual_corpus.corpus_name, semantic=False
         )
 
         # Test various Unicode characters

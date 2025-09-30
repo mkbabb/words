@@ -323,20 +323,26 @@ async def get_database() -> AsyncIOMotorDatabase[Any]:
 
 
 async def get_synthesized_entry(word_text: str) -> DictionaryEntry | None:
-    """Get synthesized dictionary entry by word text."""
-    try:
-        await _ensure_initialized()
-        # First find the word
-        word = await Word.find_one(Word.text == word_text)
-        if not word:
-            return None
-        # Then find the synthesized entry
-        return await DictionaryEntry.find_one(
-            DictionaryEntry.word_id == word.id,
-            DictionaryEntry.provider == "synthesis",
-        )
-    except Exception:
+    """Get synthesized dictionary entry by word text.
+
+    Returns:
+        DictionaryEntry if found, None if word doesn't exist or no synthesis exists
+
+    Raises:
+        Exception: Database errors propagate to caller for proper error handling
+    """
+    await _ensure_initialized()
+
+    # First find the word
+    word = await Word.find_one(Word.text == word_text)
+    if not word:
         return None
+
+    # Then find the synthesized entry
+    return await DictionaryEntry.find_one(
+        DictionaryEntry.word_id == word.id,
+        DictionaryEntry.provider == "synthesis",
+    )
 
 
 async def save_synthesized_entry(entry: DictionaryEntry) -> None:

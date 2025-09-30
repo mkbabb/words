@@ -1,285 +1,290 @@
-"""Simplified corpus REST API with TTL cache.
-
-Provides streamlined corpus creation and search with automatic cleanup.
-"""
+"""Corpus management endpoints."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from beanie import PydanticObjectId
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
-from ...corpus.manager import get_corpus_manager
+from ...corpus.core import Corpus
+from ...corpus.manager import get_tree_corpus_manager
+from ...corpus.models import CorpusType
+from ...models.base import Language
+from ...models.parameters import CorpusCreateParams, CorpusListParams, PaginationParams
+from ...models.responses import CorpusListResponse, CorpusResponse
 from ...utils.logging import get_logger
-from ..core import ListResponse, PaginationParams, get_pagination
-from ..repositories.corpus_repository import CorpusCreate, CorpusRepository, CorpusSearchParams
 
 logger = get_logger(__name__)
 router = APIRouter()
 
 
-def get_corpus_repo() -> CorpusRepository:
-    """Dependency to get corpus repository."""
-    return CorpusRepository()
+def parse_corpus_list_params(
+    language: str | None = None,
+    source_type: str | None = None,
+    include_stats: bool = True,
+) -> CorpusListParams:
+    """Parse corpus list parameters."""
+    language_enum = None
+    if language:
+        try:
+            language_enum = Language(language.lower())
+        except ValueError:
+            pass
 
-
-class CorpusSearchQueryParams(BaseModel):
-    """Query parameters for corpus search."""
-
-    query: str = Field(..., min_length=1, description="Search query")
-    max_results: int = Field(default=20, ge=1, le=100, description="Maximum results to return")
-    min_score: float = Field(default=0.6, ge=0.0, le=1.0, description="Minimum relevance score")
-    semantic: bool = Field(default=True, description="Enable semantic search")
-    semantic_weight: float = Field(
-        default=0.7,
-        ge=0.0,
-        le=1.0,
-        description="Weight for semantic results",
+    return CorpusListParams(
+        language=language_enum,
+        source_type=source_type,
+        include_stats=include_stats,
     )
 
 
-class CreateCorpusRequest(BaseModel):
-    """Request model for creating a corpus."""
-
-    words: list[str] = Field(..., min_length=1, description="List of words to include")
-    phrases: list[str] = Field(default_factory=list, description="Optional phrases")
-    name: str = Field(default="", description="Optional corpus name")
-    ttl_hours: float = Field(default=1.0, gt=0, le=24, description="Time to live in hours")
-
-
-class CreateCorpusResponse(BaseModel):
-    """Response model for corpus creation."""
-
-    corpus_id: str = Field(..., description="Unique corpus identifier")
-    vocabulary_size: int = Field(..., description="Total vocabulary size")
+def parse_pagination_params(
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+) -> PaginationParams:
+    """Parse pagination parameters."""
+    return PaginationParams(offset=offset, limit=limit)
 
 
-class SearchCorpusResponse(BaseModel):
-    """Response model for corpus search."""
-
-    results: list[dict[str, Any]] = Field(..., description="Search results")
-    metadata: dict[str, Any] = Field(..., description="Search metadata")
-
-
-class CorpusInfoResponse(BaseModel):
-    """Response model for corpus metadata."""
-
-    corpus_id: str = Field(..., description="Unique corpus identifier")
-    name: str = Field(..., description="Corpus name")
-    created_at: str = Field(..., description="Creation timestamp")
-    expires_at: str = Field(..., description="Expiration timestamp")
-    word_count: int = Field(..., description="Number of words")
-    phrase_count: int = Field(..., description="Number of phrases")
-    search_count: int = Field(..., description="Number of searches performed")
-    last_accessed: str = Field(..., description="Last access timestamp")
-
-
-# ListCorporaResponse removed - using ListResponse[CorpusInfoResponse] instead
-
-
-class CacheStatsResponse(BaseModel):
-    """Response model for cache statistics."""
-
-    status: str = Field(..., description="Cache status")
-    cache: dict[str, Any] = Field(..., description="Cache statistics")
-    message: str = Field(..., description="Status message")
-
-
-@router.post("/corpus", response_model=CreateCorpusResponse, status_code=201)
-async def create_corpus(
-    request: CreateCorpusRequest,
-    repo: CorpusRepository = Depends(get_corpus_repo),
-) -> CreateCorpusResponse:
-    """Create a new searchable corpus.
-
-    Creates an in-memory corpus with TTL-based auto-cleanup.
-    Returns a unique ID for subsequent search operations.
-    """
-    try:
-        # Combine words and phrases into vocabulary
-        vocabulary = request.words + request.phrases
-
-        data = CorpusCreate(
-            vocabulary=vocabulary,
-            name=request.name,
-        )
-
-        result = await repo.create(data)
-
-        return CreateCorpusResponse(
-            corpus_id=result["corpus_id"],
-            vocabulary_size=result["vocabulary_size"],
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to create corpus: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to create corpus: {e}")
-
-
-@router.get("/corpus/stats", response_model=CacheStatsResponse)
-async def get_cache_stats(
-    repo: CorpusRepository = Depends(get_corpus_repo),
-) -> CacheStatsResponse:
-    """Get cache statistics.
-
-    Returns overall cache usage and performance metrics.
-    """
-    try:
-        stats = await repo.get_stats()
-
-        return CacheStatsResponse(
-            status="active",
-            cache=stats,
-            message="Simplified corpus cache is active",
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to get cache stats: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get cache stats")
-
-
-@router.get("/corpus", response_model=ListResponse[CorpusInfoResponse])
+@router.get("/corpus", response_model=CorpusListResponse)
 async def list_corpora(
-    repo: CorpusRepository = Depends(get_corpus_repo),
-    pagination: PaginationParams = Depends(get_pagination),
-) -> ListResponse[CorpusInfoResponse]:
-    """List all active corpora with pagination.
+    params: CorpusListParams = Depends(parse_corpus_list_params),
+    pagination: PaginationParams = Depends(parse_pagination_params),
+) -> CorpusListResponse:
+    """List all corpora with optional filtering.
 
-    Returns summary of all non-expired corpora with basic metadata.
+    Supports filtering by:
+    - Language
+    - Source type (custom, language, literature, wordlist)
+    - Statistics inclusion
     """
     try:
-        corpora_data = await repo.list_all()
+        # Build filter query
+        filter_query: dict[str, Any] = {}
+        if params.language:
+            filter_query["language"] = params.language.value
+        if params.source_type:
+            filter_query["corpus_type"] = params.source_type
+
+        # Get corpus metadata documents
+        from ...corpus.core import Corpus
+
+        query = Corpus.Metadata.find(filter_query)
+
+        # Get total count
+        total = await query.count()
 
         # Apply pagination
-        total = len(corpora_data)
-        start = pagination.offset
-        end = start + pagination.limit
-        paginated_data = corpora_data[start:end]
+        corpus_docs = await query.skip(pagination.offset).limit(pagination.limit).to_list()
 
-        return ListResponse(
-            items=[CorpusInfoResponse(**corpus) for corpus in paginated_data],
+        # Load full corpus objects
+        corpus_list = []
+        for doc in corpus_docs:
+            try:
+                corpus = await Corpus.get(corpus_id=doc.id)
+                if corpus:
+                    corpus_data = {
+                        "id": str(doc.id),
+                        "name": corpus.corpus_name,
+                        "language": corpus.language,
+                        "corpus_type": corpus.corpus_type.value if corpus.corpus_type else "custom",
+                        "vocabulary_size": len(corpus.vocabulary),
+                        "unique_words": corpus.unique_word_count,
+                        "has_semantic": corpus.semantic_index_id is not None,
+                        "created_at": doc.created_at,
+                        "updated_at": doc.last_updated,
+                        "description": None,
+                        "statistics": {
+                            "vocabulary_hash": corpus.vocabulary_hash,
+                            "is_master": corpus.is_master,
+                            "child_count": len(corpus.child_corpus_ids),
+                        }
+                        if params.include_stats
+                        else {},
+                    }
+                    corpus_list.append(CorpusResponse(**corpus_data))
+            except Exception as e:
+                logger.warning(f"Failed to load corpus {doc.id}: {e}")
+                continue
+
+        return CorpusListResponse(
+            items=corpus_list,
             total=total,
             offset=pagination.offset,
             limit=pagination.limit,
+            has_more=(pagination.offset + len(corpus_list)) < total,
         )
 
     except Exception as e:
         logger.error(f"Failed to list corpora: {e}")
-        raise HTTPException(status_code=500, detail="Failed to list corpora")
+        raise HTTPException(status_code=500, detail=f"Failed to list corpora: {e!s}")
 
 
-@router.post("/corpus/{corpus_id}/search", response_model=SearchCorpusResponse)
-async def search_corpus(
-    corpus_id: str,
-    params: CorpusSearchQueryParams = Depends(),
-    repo: CorpusRepository = Depends(get_corpus_repo),
-) -> SearchCorpusResponse:
-    """Search within a corpus.
-
-    Performs multi-method search (exact, prefix, fuzzy, and optionally semantic) within the specified corpus.
-    Returns error if corpus doesn't exist or has expired.
-    """
+@router.get("/corpus/{corpus_id}", response_model=CorpusResponse)
+async def get_corpus(
+    corpus_id: str = Path(..., description="Corpus ID"),
+    include_stats: bool = Query(default=True, description="Include statistics"),
+) -> CorpusResponse:
+    """Get a specific corpus by ID."""
     try:
-        search_params = CorpusSearchParams(
-            query=params.query,
-            max_results=params.max_results,
-            min_score=params.min_score,
-            semantic=params.semantic,
-            semantic_weight=params.semantic_weight,
-        )
+        # Parse ObjectId
+        try:
+            obj_id = PydanticObjectId(corpus_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid corpus ID format")
 
-        search_results = await repo.search(corpus_id, search_params)
-        return SearchCorpusResponse(**search_results)
+        # Load corpus
+        corpus = await Corpus.get(corpus_id=obj_id)
+        if not corpus:
+            raise HTTPException(status_code=404, detail=f"Corpus not found: {corpus_id}")
 
-    except ValueError as e:
-        # Corpus not found or expired
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error(f"Failed to search corpus {corpus_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Search failed: {e}")
-
-
-@router.get("/corpus/{corpus_id}", response_model=CorpusInfoResponse)
-async def get_corpus_info(
-    corpus_id: str,
-    repo: CorpusRepository = Depends(get_corpus_repo),
-) -> CorpusInfoResponse:
-    """Get corpus metadata and statistics.
-
-    Returns corpus information including creation time, expiration, and usage stats.
-    """
-    try:
-        metadata = await repo.get(corpus_id)
+        # Get metadata
+        metadata = await Corpus.Metadata.get(obj_id)
         if not metadata:
-            raise HTTPException(status_code=404, detail=f"Corpus {corpus_id} not found or expired")
+            raise HTTPException(status_code=404, detail=f"Corpus metadata not found: {corpus_id}")
 
-        return CorpusInfoResponse(**metadata)
+        corpus_data = {
+            "id": corpus_id,
+            "name": corpus.corpus_name,
+            "language": corpus.language,
+            "corpus_type": corpus.corpus_type.value if corpus.corpus_type else "custom",
+            "vocabulary_size": len(corpus.vocabulary),
+            "unique_words": corpus.unique_word_count,
+            "has_semantic": corpus.semantic_index_id is not None,
+            "created_at": metadata.created_at,
+            "updated_at": metadata.last_updated,
+            "description": None,
+            "statistics": {
+                "vocabulary_hash": corpus.vocabulary_hash,
+                "is_master": corpus.is_master,
+                "child_count": len(corpus.child_corpus_ids),
+                "parent_id": str(corpus.parent_corpus_id) if corpus.parent_corpus_id else None,
+                "has_trie": corpus.trie_index_id is not None,
+            }
+            if include_stats
+            else {},
+        }
+
+        return CorpusResponse(**corpus_data)
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get corpus info: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get corpus info")
+        logger.error(f"Failed to get corpus {corpus_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get corpus: {e!s}")
 
 
-class InvalidateCorpusRequest(BaseModel):
-    """Request for invalidating corpus caches."""
+@router.post("/corpus", response_model=CorpusResponse)
+async def create_corpus(
+    params: CorpusCreateParams,
+) -> CorpusResponse:
+    """Create a new corpus.
 
-    specific_corpus_id: str | None = Field(None, description="Specific corpus ID to invalidate")
-    invalidate_all: bool = Field(default=False, description="Invalidate all corpus caches")
-
-
-class InvalidateCorpusResponse(BaseModel):
-    """Response for corpus cache invalidation."""
-
-    status: str = Field(..., description="Operation status")
-    total_invalidated: int = Field(..., description="Total number of entries invalidated")
-    message: str = Field(..., description="Status message")
-
-
-@router.post("/corpus/invalidate", response_model=InvalidateCorpusResponse)
-async def invalidate_corpus(
-    request: InvalidateCorpusRequest = InvalidateCorpusRequest(
-        specific_corpus_id=None,
-        invalidate_all=False,
-    ),
-) -> InvalidateCorpusResponse:
-    """Invalidate corpus caches.
-
-    Allows invalidating a specific corpus by ID or all corpus caches.
+    Supports:
+    - Custom vocabulary
+    - Language-specific corpus
+    - Literature-based corpus
+    - Optional semantic indexing
     """
-    logger.info(
-        f"Corpus invalidation: specific={request.specific_corpus_id}, all={request.invalidate_all}",
-    )
-
     try:
-        corpus_manager = get_corpus_manager()
-        total_invalidated = 0
+        manager = get_tree_corpus_manager()
 
-        if request.specific_corpus_id:
-            # Invalidate specific corpus by name
-            success = await corpus_manager.invalidate_corpus(request.specific_corpus_id)
-            total_invalidated = 1 if success else 0
-            message = (
-                f"Invalidated corpus '{request.specific_corpus_id}'"
-                if success
-                else "Corpus not found"
-            )
-        elif request.invalidate_all:
-            # Invalidate all corpora
-            result = await corpus_manager.invalidate_all_corpora()
-            total_invalidated = result.get("total", 0)
-            message = f"Invalidated {total_invalidated} corpus entries"
-        else:
-            message = "No invalidation action specified"
+        # Parse corpus type
+        corpus_type_map = {
+            "custom": CorpusType.CUSTOM,
+            "language": CorpusType.LANGUAGE,
+            "literature": CorpusType.LITERATURE,
+            "wordlist": CorpusType.WORDLIST,
+        }
+        corpus_type = corpus_type_map.get(params.source_type.lower(), CorpusType.CUSTOM)
 
-        return InvalidateCorpusResponse(
-            status="success" if total_invalidated > 0 else "no_action",
-            total_invalidated=total_invalidated,
-            message=message,
+        # Create corpus
+        corpus = await Corpus.create(
+            vocabulary=params.vocabulary,
+            corpus_name=params.name,
+            language=params.language,
+            corpus_type=corpus_type,
+            semantic=params.enable_semantic,
         )
 
+        # Save corpus
+        corpus = await manager.save_corpus(corpus)
+
+        if not corpus.corpus_id:
+            raise HTTPException(status_code=500, detail="Failed to save corpus")
+
+        # Get metadata
+        metadata = await Corpus.Metadata.get(corpus.corpus_id)
+        if not metadata:
+            raise HTTPException(status_code=500, detail="Failed to retrieve corpus metadata")
+
+        corpus_data = {
+            "id": str(corpus.corpus_id),
+            "name": corpus.corpus_name,
+            "language": corpus.language,
+            "corpus_type": corpus.corpus_type.value if corpus.corpus_type else "custom",
+            "vocabulary_size": len(corpus.vocabulary),
+            "unique_words": corpus.unique_word_count,
+            "has_semantic": corpus.semantic_index_id is not None,
+            "created_at": metadata.created_at,
+            "updated_at": metadata.last_updated,
+            "description": params.description,
+            "statistics": {
+                "vocabulary_hash": corpus.vocabulary_hash,
+                "is_master": corpus.is_master,
+            },
+        }
+
+        return CorpusResponse(**corpus_data)
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Failed to invalidate corpus caches: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to invalidate corpus caches: {e!s}")
+        logger.error(f"Failed to create corpus: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create corpus: {e!s}")
+
+
+@router.delete("/corpus/{corpus_id}")
+async def delete_corpus(
+    corpus_id: str = Path(..., description="Corpus ID"),
+    cascade: bool = Query(default=False, description="Delete child corpora"),
+) -> dict[str, Any]:
+    """Delete a corpus.
+
+    Use cascade=true to also delete child corpora.
+    """
+    try:
+        manager = get_tree_corpus_manager()
+
+        # Parse ObjectId
+        try:
+            obj_id = PydanticObjectId(corpus_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid corpus ID format")
+
+        # Check if corpus exists
+        corpus = await Corpus.get(corpus_id=obj_id)
+        if not corpus:
+            raise HTTPException(status_code=404, detail=f"Corpus not found: {corpus_id}")
+
+        # Delete corpus
+        success = await manager.delete_corpus(
+            corpus_id=obj_id,
+            cascade=cascade,
+        )
+
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete corpus")
+
+        return {
+            "status": "success",
+            "message": f"Corpus {corpus_id} deleted successfully",
+            "cascade": cascade,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete corpus {corpus_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete corpus: {e!s}")

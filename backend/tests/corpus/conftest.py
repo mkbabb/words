@@ -1,66 +1,18 @@
 """Test configuration for corpus tests with real MongoDB."""
 
 import asyncio
-import time
-import uuid
-from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
-from beanie import init_beanie
-from motor.motor_asyncio import AsyncIOMotorClient
 
 from floridify.caching.models import CacheNamespace, ResourceType, VersionInfo
 from floridify.corpus.core import Corpus
 from floridify.corpus.manager import TreeCorpusManager
 from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
-from floridify.providers.dictionary.models import DictionaryProviderEntry
-from floridify.providers.language.models import LanguageEntry
-from floridify.providers.literature.models import LiteratureEntry
-from floridify.search.models import SearchIndex, TrieIndex
-from floridify.search.semantic.models import SemanticIndex
 
-
-@pytest_asyncio.fixture(scope="function")
-async def motor_client(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClient, None]:
-    """Create a MongoDB client for testing."""
-    client = AsyncIOMotorClient(mongodb_server, serverSelectionTimeoutMS=500)
-    try:
-        # Test connection
-        await client.admin.command("ping")
-        yield client
-    except Exception as e:
-        pytest.skip(f"MongoDB not available: {e}")
-    finally:
-        client.close()
-
-
-@pytest_asyncio.fixture(scope="function")
-async def test_db(motor_client: AsyncIOMotorClient):
-    """Initialize test database and clean up after each test."""
-    # Use a unique test database for each test
-    db_name = f"test_floridify_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
-    db = motor_client[db_name]
-
-    # Initialize Beanie with all document models
-    await init_beanie(
-        database=db,
-        document_models=[
-            Corpus.Metadata,
-            DictionaryProviderEntry.Metadata,
-            LanguageEntry.Metadata,
-            LiteratureEntry.Metadata,
-            SearchIndex.Metadata,
-            SemanticIndex.Metadata,
-            TrieIndex.Metadata,
-        ],
-    )
-
-    yield db
-
-    # Clean up - drop the entire database after test
-    await motor_client.drop_database(db_name)
+# MongoDB fixtures are now imported from the main conftest.py
+# No need for duplicate setup - using mongodb_client and test_db from parent
 
 
 @pytest_asyncio.fixture

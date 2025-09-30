@@ -17,13 +17,27 @@ async def fuzzy_corpus(test_db):
     """Create corpus for fuzzy search testing."""
     vocabulary = [
         # Similar words for fuzzy matching
-        "apple", "apples", "aple", "appel",
-        "banana", "bananna", "bannana",
-        "orange", "orang", "oranges",  # Added orange to match test expectations
-        "strawberry", "strawbery", "stawberry",
-        "watermelon", "watermellon", "watermelen",
+        "apple",
+        "apples",
+        "aple",
+        "appel",
+        "banana",
+        "bananna",
+        "bannana",
+        "orange",
+        "orang",
+        "oranges",  # Added orange to match test expectations
+        "strawberry",
+        "strawbery",
+        "stawberry",
+        "watermelon",
+        "watermellon",
+        "watermelen",
         # Some distinct words
-        "grape", "cherry", "peach", "plum",
+        "grape",
+        "cherry",
+        "peach",
+        "plum",
     ]
 
     corpus = await Corpus.create(
@@ -81,14 +95,14 @@ class TestFuzzySearch:
             "aple",  # Typo of apple
             corpus=fuzzy_corpus,
             max_results=5,
-            min_score=0.5
+            min_score=0.5,
         )
 
         results_banana = fuzzy_search.search(
             "bananna",  # Alternative spelling in corpus
             corpus=fuzzy_corpus,
             max_results=5,
-            min_score=0.5
+            min_score=0.5,
         )
 
         # Both should find related words
@@ -126,23 +140,13 @@ class TestFuzzySearch:
     async def test_similarity_threshold(self, fuzzy_search, fuzzy_corpus):
         """Test minimum similarity threshold."""
         # High threshold - should only find very similar words
-        results = fuzzy_search.search(
-            "apple",
-            corpus=fuzzy_corpus,
-            max_results=10,
-            min_score=0.9
-        )
+        results = fuzzy_search.search("apple", corpus=fuzzy_corpus, max_results=10, min_score=0.9)
 
         # All results should have high similarity
         assert all(r.score >= 0.9 for r in results)
 
         # Low threshold - should find more distant matches
-        results = fuzzy_search.search(
-            "apple",
-            corpus=fuzzy_corpus,
-            max_results=10,
-            min_score=0.5
-        )
+        results = fuzzy_search.search("apple", corpus=fuzzy_corpus, max_results=10, min_score=0.5)
 
         # Should find more results
         assert len(results) > 0
@@ -181,11 +185,13 @@ class TestFuzzySearch:
         # Generate large vocabulary
         large_vocab = []
         for i in range(1000):
-            large_vocab.extend([
-                f"word{i}",
-                f"term{i}",
-                f"text{i}",
-            ])
+            large_vocab.extend(
+                [
+                    f"word{i}",
+                    f"term{i}",
+                    f"text{i}",
+                ]
+            )
 
         corpus = Corpus(
             corpus_name="large_fuzzy_corpus",
@@ -202,6 +208,7 @@ class TestFuzzySearch:
 
         # Should complete search quickly even with large vocabulary
         import time
+
         start = time.time()
         results = search.search("word500", corpus=saved_corpus, max_results=5)
         elapsed = time.time() - start

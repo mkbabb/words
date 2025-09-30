@@ -168,8 +168,10 @@ def parse_github_api(content: str, language: Language) -> ParseResult:
             decoded_content = base64.b64decode(data["content"]).decode("utf-8")
             # Delegate to JSON array parser
             return parse_json_array(decoded_content, language)
-    except Exception:
-        pass
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in GitHub API response: {e}")
+    except Exception as e:
+        raise ValueError(f"Failed to parse GitHub API response: {e}")
     return [], []
 
 

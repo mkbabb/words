@@ -18,28 +18,84 @@ async def language_corpus(test_db):
     # Mix of different word forms and languages concepts
     vocabulary = [
         # English words
-        "run", "running", "ran", "runner", "runs",
-        "jump", "jumping", "jumped", "jumper", "jumps",
-        "speak", "speaking", "spoke", "spoken", "speaker",
+        "run",
+        "running",
+        "ran",
+        "runner",
+        "runs",
+        "jump",
+        "jumping",
+        "jumped",
+        "jumper",
+        "jumps",
+        "speak",
+        "speaking",
+        "spoke",
+        "spoken",
+        "speaker",
         # Language terms
-        "language", "languages", "linguistic", "linguistics", "linguist",
-        "grammar", "grammars", "grammatical", "grammatically",
-        "syntax", "syntactic", "syntactical", "syntactically",
+        "language",
+        "languages",
+        "linguistic",
+        "linguistics",
+        "linguist",
+        "grammar",
+        "grammars",
+        "grammatical",
+        "grammatically",
+        "syntax",
+        "syntactic",
+        "syntactical",
+        "syntactically",
         # Multilingual concepts
-        "translate", "translation", "translator", "translating",
-        "interpret", "interpretation", "interpreter", "interpreting",
+        "translate",
+        "translation",
+        "translator",
+        "translating",
+        "interpret",
+        "interpretation",
+        "interpreter",
+        "interpreting",
     ]
 
     lemmatized = [
         # Lemmatized forms
-        "run", "run", "run", "runner", "run",
-        "jump", "jump", "jump", "jumper", "jump",
-        "speak", "speak", "speak", "speak", "speaker",
-        "language", "language", "linguistic", "linguistics", "linguist",
-        "grammar", "grammar", "grammatical", "grammatically",
-        "syntax", "syntactic", "syntactical", "syntactically",
-        "translate", "translation", "translator", "translate",
-        "interpret", "interpretation", "interpreter", "interpret",
+        "run",
+        "run",
+        "run",
+        "runner",
+        "run",
+        "jump",
+        "jump",
+        "jump",
+        "jumper",
+        "jump",
+        "speak",
+        "speak",
+        "speak",
+        "speak",
+        "speaker",
+        "language",
+        "language",
+        "linguistic",
+        "linguistics",
+        "linguist",
+        "grammar",
+        "grammar",
+        "grammatical",
+        "grammatically",
+        "syntax",
+        "syntactic",
+        "syntactical",
+        "syntactically",
+        "translate",
+        "translation",
+        "translator",
+        "translate",
+        "interpret",
+        "interpretation",
+        "interpreter",
+        "interpret",
     ]
 
     # Create corpus with properly built indices
@@ -77,14 +133,11 @@ async def language_search(language_corpus):
     # Create the main search engine from the corpus
     search_engine = await Search.from_corpus(
         corpus_name=language_corpus.corpus_name,
-        semantic=False  # Disable semantic for simplicity
+        semantic=False,  # Disable semantic for simplicity
     )
 
     # Create language search wrapper
-    search = LanguageSearch(
-        languages=[Language.ENGLISH],
-        search_engine=search_engine
-    )
+    search = LanguageSearch(languages=[Language.ENGLISH], search_engine=search_engine)
     return search
 
 
@@ -108,6 +161,7 @@ class TestLanguageSearch:
         """Test finding different inflections of words."""
         # Search for inflected form should find base form
         from floridify.search.constants import SearchMode
+
         results = await language_search.search_with_mode("jumping", mode=SearchMode.SMART)
 
         words = [r.word for r in results]
@@ -119,6 +173,7 @@ class TestLanguageSearch:
         """Test morphological word analysis."""
         # Search for word with common morphological root
         from floridify.search.constants import SearchMode
+
         results = await language_search.search_with_mode("linguistic", mode=SearchMode.SMART)
 
         words = [r.word for r in results]
@@ -134,6 +189,7 @@ class TestLanguageSearch:
         """Test searching for compound words."""
         # Search for parts of compound concepts using fuzzy search
         from floridify.search.constants import SearchMode
+
         results = await language_search.search_with_mode("gram", mode=SearchMode.FUZZY)
 
         # Fuzzy search may find words containing "gram"
@@ -145,6 +201,7 @@ class TestLanguageSearch:
         """Test language-specific text normalization."""
         # Test case normalization
         from floridify.search.constants import SearchMode
+
         results = await language_search.search_with_mode("LANGUAGE", mode=SearchMode.SMART)
         assert len(results) > 0
         assert any("language" in r.word.lower() for r in results)
@@ -157,6 +214,7 @@ class TestLanguageSearch:
     async def test_multilingual_concepts(self, language_search):
         """Test searching for multilingual/translation concepts."""
         from floridify.search.constants import SearchMode
+
         results = await language_search.search_with_mode("translate", mode=SearchMode.SMART)
 
         words = [r.word for r in results]
@@ -166,6 +224,7 @@ class TestLanguageSearch:
     async def test_linguistic_term_search(self, language_search):
         """Test searching for linguistic terminology."""
         from floridify.search.constants import SearchMode
+
         results = await language_search.search_with_mode("syntax", mode=SearchMode.SMART)
 
         words = [r.word for r in results]
@@ -181,6 +240,7 @@ class TestLanguageSearch:
     async def test_empty_query_handling(self, language_search):
         """Test handling empty queries."""
         from floridify.search.constants import SearchMode
+
         results = await language_search.search_with_mode("", mode=SearchMode.SMART)
         assert len(results) == 0
 
@@ -188,6 +248,7 @@ class TestLanguageSearch:
     async def test_nonexistent_word(self, language_search):
         """Test searching for nonexistent words."""
         from floridify.search.constants import SearchMode
+
         results = await language_search.search_with_mode("xyzabc", mode=SearchMode.SMART)
         # Cascade might find fuzzy matches
         assert isinstance(results, list)
@@ -196,7 +257,10 @@ class TestLanguageSearch:
     async def test_search_with_limit(self, language_search):
         """Test limiting search results."""
         from floridify.search.constants import SearchMode
-        results = await language_search.search_with_mode("lang", mode=SearchMode.FUZZY, max_results=2)
+
+        results = await language_search.search_with_mode(
+            "lang", mode=SearchMode.FUZZY, max_results=2
+        )
         assert len(results) <= 2
 
     @pytest.mark.asyncio
@@ -218,10 +282,11 @@ class TestLanguageSearch:
     async def test_result_scoring(self, language_search):
         """Test result scoring and ranking."""
         from floridify.search.constants import SearchMode
+
         results = await language_search.search_with_mode("language", mode=SearchMode.SMART)
 
         # Results should be scored
-        assert all(hasattr(r, 'score') for r in results)
+        assert all(hasattr(r, "score") for r in results)
         assert all(0 <= r.score <= 1.0 for r in results)
 
         # Results should be sorted by score
@@ -232,6 +297,7 @@ class TestLanguageSearch:
     async def test_search_metadata(self, language_search):
         """Test metadata in search results."""
         from floridify.search.constants import SearchMode
+
         results = await language_search.search_with_mode("grammar", mode=SearchMode.SMART)
 
         for result in results:
@@ -276,16 +342,13 @@ class TestLanguageSearch:
 
         # Create search engine from corpus
         search_engine = await Search.from_corpus(
-            corpus_name=saved_corpus.corpus_name,
-            semantic=False
+            corpus_name=saved_corpus.corpus_name, semantic=False
         )
 
-        search = LanguageSearch(
-            languages=[Language.ENGLISH],
-            search_engine=search_engine
-        )
+        search = LanguageSearch(languages=[Language.ENGLISH], search_engine=search_engine)
 
         # Should still work with literature corpus
         from floridify.search.constants import SearchMode
+
         results = await search.search_with_mode("word1", mode=SearchMode.SMART)
         assert len(results) >= 0

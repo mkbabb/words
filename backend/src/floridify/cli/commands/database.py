@@ -15,7 +15,10 @@ from ...models.dictionary import (
     Word,
 )
 from ...storage.mongodb import MongoDBStorage
-from ..utils.formatting import format_error
+from ...utils.logging import get_logger
+from ..utils.formatting import format_error, format_warning
+
+logger = get_logger(__name__)
 
 console = Console()
 
@@ -72,10 +75,11 @@ def connect_database(host: str, port: int, database: str) -> None:
 
     Tests connection and displays database information.
     """
-    console.print("[bold blue]Connecting to MongoDB...[/bold blue]")
-    console.print(f"Host: {host}:{port}")
-    console.print(f"Database: {database}")
-    console.print("[dim]Database connection not yet implemented.[/dim]")
+    raise click.UsageError(
+        "Database connection command is not implemented. "
+        "The application automatically connects to MongoDB on startup. "
+        "Use 'floridify database status' to check the connection."
+    )
 
 
 @database_group.command("stats")
@@ -166,7 +170,9 @@ async def _get_provider_coverage() -> dict[str, int]:
         results = await Word.aggregate(pipeline).to_list()
         return {item["_id"]: item["count"] for item in results}
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Failed to get provider coverage: {e}")
+        console.print(format_warning(f"Could not retrieve provider coverage: {e}"))
         return {}
 
 
@@ -207,7 +213,9 @@ async def _get_quality_metrics() -> dict[str, str]:
 
         return metrics
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Failed to get quality metrics: {e}")
+        console.print(format_warning(f"Could not retrieve quality metrics: {e}"))
         return {}
 
 
@@ -306,13 +314,11 @@ def restore_database(backup_file: str, confirm: bool) -> None:
 
     BACKUP_FILE: Path to the backup file
     """
-    if not confirm:
-        if not click.confirm("This will overwrite existing data. Continue?"):
-            console.print("Operation cancelled.")
-            return
-
-    console.print(f"[bold blue]Restoring database from: {backup_file}[/bold blue]")
-    console.print("[dim]Database restore not yet implemented.[/dim]")
+    raise click.UsageError(
+        "Database restore is not implemented. "
+        "Please use MongoDB tools directly:\n"
+        "  mongorestore --db floridify --archive=<backup_file>"
+    )
 
 
 @database_group.command("cleanup")
@@ -394,13 +400,11 @@ async def _cleanup_database_async(dry_run: bool, older_than: int, confirm: bool)
 @click.option("--confirm", is_flag=True, help="Skip confirmation prompt")
 def reindex_database(confirm: bool) -> None:
     """Rebuild database indexes for optimal performance."""
-    if not confirm:
-        if not click.confirm("Reindexing may take several minutes. Continue?"):
-            console.print("Operation cancelled.")
-            return
-
-    console.print("[bold blue]Rebuilding database indexes...[/bold blue]")
-    console.print("[dim]Database reindexing not yet implemented.[/dim]")
+    raise click.UsageError(
+        "Database reindexing is not implemented. "
+        "Indexes are automatically created on application startup. "
+        "To rebuild indexes manually, use MongoDB tools or restart the application."
+    )
 
 
 @database_group.command("export")
@@ -429,15 +433,11 @@ def export_data(
 
     Exports dictionary entries or cache data in various formats.
     """
-    if output is None:
-        output = f"floridify_{collection}.{export_format}"
-
-    console.print(f"[bold blue]Exporting {collection} data...[/bold blue]")
-    console.print(f"Format: {export_format}")
-    console.print(f"Output: {output}")
-    if filter_query:
-        console.print(f"Filter: {filter_query}")
-    console.print("[dim]Database export not yet implemented.[/dim]")
+    raise click.UsageError(
+        "Database export is not implemented. "
+        "Please use MongoDB tools directly:\n"
+        "  mongoexport --db floridify --collection words --out words.json"
+    )
 
 
 @database_group.command("import")
@@ -455,12 +455,11 @@ def import_data(input_file: str, import_format: str | None, collection: str, ups
 
     INPUT_FILE: File containing data to import
     """
-    console.print(f"[bold blue]Importing data from: {input_file}[/bold blue]")
-    console.print(f"Target collection: {collection}")
-    console.print(f"Upsert mode: {upsert}")
-    if import_format:
-        console.print(f"Format: {import_format}")
-    console.print("[dim]Database import not yet implemented.[/dim]")
+    raise click.UsageError(
+        "Database import is not implemented. "
+        "Please use MongoDB tools directly:\n"
+        "  mongoimport --db floridify --collection words --file words.json"
+    )
 
 
 @database_group.group("clear")

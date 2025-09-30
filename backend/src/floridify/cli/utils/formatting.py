@@ -164,16 +164,6 @@ def format_meaning_cluster_name(meaning_id: str) -> str:
 console = Console()
 
 
-def format_word_display(
-    entry: DictionaryEntry,
-    show_examples: bool = True,
-    show_synonyms: bool = True,
-) -> Panel:
-    """Create a beautiful display panel for a dictionary entry."""
-    # TODO: Implement word display formatting
-    return Panel(Text("Not implemented"), title="Word Display")
-
-
 def format_search_results(results: list[tuple[float, str]], title: str = "Search Results") -> Table:
     """Format search results in a beautiful table."""
     table = Table(title=title, show_header=True, header_style="bold blue")

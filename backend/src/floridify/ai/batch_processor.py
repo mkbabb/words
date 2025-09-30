@@ -85,7 +85,7 @@ class BatchCollector:
                     "method": "POST",
                     "url": "/v1/chat/completions",
                     "body": {
-                        "model": req.kwargs.get("model", "gpt-4o-mini"),
+                        "model": req.kwargs.get("model", "gpt-5-nano"),
                         "messages": messages,
                         "max_tokens": req.kwargs.get("max_tokens", 500),
                         "temperature": req.kwargs.get("temperature", 0.7),

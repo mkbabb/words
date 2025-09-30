@@ -70,6 +70,9 @@ class SemanticIndex(BaseModel):
 
         corpus_id: PydanticObjectId
         model_name: str
+        vocabulary_hash: str = ""
+        embedding_dimension: int = 0
+        index_type: str = "flat"
         resource_type: ResourceType = ResourceType.SEMANTIC
         namespace: CacheNamespace = CacheNamespace.SEMANTIC
 
@@ -155,7 +158,9 @@ class SemanticIndex(BaseModel):
             batch_size = batch_sizes.get(model_name, DEFAULT_BATCH_SIZE)
 
         return cls(
-            corpus_id=corpus.id if hasattr(corpus, "id") else PydanticObjectId(),
+            corpus_id=corpus.corpus_id
+            if (hasattr(corpus, "corpus_id") and corpus.corpus_id)
+            else PydanticObjectId(),
             corpus_name=corpus.corpus_name,
             vocabulary_hash=corpus.vocabulary_hash,
             model_name=model_name,
@@ -206,7 +211,9 @@ class SemanticIndex(BaseModel):
         )
 
         # Save the new index
-        await index.save(config, corpus_id=corpus.id if hasattr(corpus, 'id') else None)
+        await index.save(
+            config, corpus_id=corpus.corpus_id if hasattr(corpus, "corpus_id") else None
+        )
         return index
 
     async def save(
@@ -244,7 +251,7 @@ class SemanticIndex(BaseModel):
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Serialize index to dictionary for caching."""
-        kwargs['exclude_none'] = True
+        kwargs["exclude_none"] = True
         return super().model_dump(**kwargs)
 
     @classmethod

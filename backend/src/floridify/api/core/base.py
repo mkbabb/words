@@ -14,7 +14,6 @@ from beanie.odm.enums import SortDirection
 from beanie.operators import In
 from fastapi import Request, Response
 from pydantic import BaseModel, ConfigDict, Field
-from pydantic.generics import GenericModel
 
 from .exceptions import ErrorResponse, NotFoundException, VersionConflictException
 from .protocols import (
@@ -74,7 +73,7 @@ UpdateSchema = TypeVar("UpdateSchema", bound=BaseModel)
 ListT = TypeVar("ListT")
 
 
-class ListResponse(GenericModel, Generic[ListT]):  # noqa: UP046
+class ListResponse(BaseModel, Generic[ListT]):  # noqa: UP046
     """Standard list response with pagination metadata."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

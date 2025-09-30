@@ -200,6 +200,11 @@ class Search:
             logger.error(f"Failed to initialize semantic search: {e}")
             self._semantic_ready = False
 
+    async def await_semantic_ready(self) -> None:
+        """Wait for semantic search to be ready (useful for tests)."""
+        if self._semantic_init_task and not self._semantic_ready:
+            await self._semantic_init_task
+
     async def _get_current_vocab_hash(self) -> str | None:
         """Get current vocabulary hash from corpus."""
         if not self.index:
@@ -311,14 +316,16 @@ class Search:
                 if result:
                     # Map back to original form with diacritics if available
                     original = self._get_original_word(result)
-                    return [SearchResult(
-                        word=original,
-                        score=1.0,
-                        method=SearchMethod.EXACT,
-                        lemmatized_word=None,
-                        language=self.corpus.language if self.corpus else None,
-                        metadata=None
-                    )]
+                    return [
+                        SearchResult(
+                            word=original,
+                            score=1.0,
+                            method=SearchMethod.EXACT,
+                            lemmatized_word=None,
+                            language=self.corpus.language if self.corpus else None,
+                            metadata=None,
+                        )
+                    ]
                 return []
             elif method == SearchMethod.PREFIX and self.trie_search:
                 matches = self.trie_search.search_prefix(query, max_results=max_results)
@@ -326,14 +333,16 @@ class Search:
                 results = []
                 for match in matches:
                     original = self._get_original_word(match)
-                    results.append(SearchResult(
-                        word=original,
-                        score=1.0,
-                        method=SearchMethod.PREFIX,
-                        lemmatized_word=None,
-                        language=self.corpus.language if self.corpus else None,
-                        metadata=None
-                    ))
+                    results.append(
+                        SearchResult(
+                            word=original,
+                            score=1.0,
+                            method=SearchMethod.PREFIX,
+                            lemmatized_word=None,
+                            language=self.corpus.language if self.corpus else None,
+                            metadata=None,
+                        )
+                    )
                 return results
             elif method == SearchMethod.FUZZY and self.fuzzy_search and self.corpus:
                 results = self.fuzzy_search.search(query, self.corpus)
@@ -398,6 +407,10 @@ class Search:
         elif mode == SearchMode.FUZZY:
             results = self.search_fuzzy(normalized_query, max_results, min_score)
         elif mode == SearchMode.SEMANTIC:
+            # Wait for semantic search to be ready if it's being initialized
+            if self._semantic_init_task and not self._semantic_ready:
+                await self._semantic_init_task
+
             if not self.semantic_search:
                 raise ValueError("Semantic search is not enabled for this SearchEngine instance")
 
@@ -555,12 +568,17 @@ class Search:
 
         # 3. Semantic search - adaptive threshold based on fuzzy quality
         semantic_results = []
-        if semantic and self.semantic_search:
-            # If fuzzy found good results, be more selective with semantic
-            semantic_limit = (
-                max_results // 2 if len(fuzzy_results) >= max_results // 2 else max_results
-            )
-            semantic_results = self.search_semantic(query, semantic_limit, min_score)
+        if semantic:
+            # Wait for semantic search to be ready if it's being initialized
+            if self._semantic_init_task and not self._semantic_ready:
+                await self._semantic_init_task
+
+            if self.semantic_search:
+                # If fuzzy found good results, be more selective with semantic
+                semantic_limit = (
+                    max_results // 2 if len(fuzzy_results) >= max_results // 2 else max_results
+                )
+                semantic_results = self.search_semantic(query, semantic_limit, min_score)
 
         # 4. Merge and deduplicate with memory-efficient generators
         fuzzy_gen = (r for r in fuzzy_results if r.score >= min_score)

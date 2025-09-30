@@ -65,7 +65,7 @@ async def test_fetch_returns_entry(
     assert isinstance(entry, DictionaryProviderEntry)
     assert entry.word == "test"
     assert entry.pronunciation == "/tɛst/"
-    assert entry.definitions[0]["definition"] == "an act of testing"
+    assert entry.definitions[0]["text"] == "an act of testing"
     assert entry.examples == ["a spelling test"]
 
     cached = await instance.get("test")

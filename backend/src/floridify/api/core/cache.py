@@ -41,17 +41,10 @@ def generate_cache_key(request: Request, config: APICacheConfig, prefix: str = "
 
     if config.include_body and request.method in ["POST", "PUT", "PATCH"]:
         # Include body hash for write operations
-        # Access request body through public API
-        body_bytes = b""
-        try:
-            # Try to get body through public method if available
-            body_bytes = await request.body() if callable(getattr(request, "body", None)) else b""
-        except Exception:
-            # Fallback to empty if body not accessible
-            body_bytes = b""
-        if body_bytes:
-            body_hash = hashlib.md5(body_bytes).hexdigest()[:8]
-            parts.append(body_hash)
+        # Note: Cannot access async body() in sync function
+        # Body hashing should be handled at the async decorator level
+        # For now, skip body hashing in sync key generation
+        pass
 
     if config.vary_by_user:
         # Add user identifier if authentication is implemented

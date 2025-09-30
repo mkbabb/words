@@ -9,6 +9,7 @@ from enum import Enum
 from typing import Any, TypeVar
 
 from beanie import PydanticObjectId
+from pymongo.errors import OperationFailure
 
 from ..models.registry import get_model_class as get_versioned_model_class
 from ..utils.logging import get_logger
@@ -35,7 +36,120 @@ class VersionedDataManager:
         self.cache: GlobalCacheManager[FilesystemBackend] | None = (
             None  # Will be initialized lazily (GlobalCacheManager)
         )
-        self.lock = asyncio.Lock()
+        self._lock: asyncio.Lock | None = None
+
+    @property
+    def lock(self) -> asyncio.Lock:
+        """Get or create lock for the current event loop."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No event loop running, create a new lock
+            self._lock = asyncio.Lock()
+            return self._lock
+
+        # Check if we need to create a new lock for this event loop
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        else:
+            # Check if the lock is bound to a different event loop
+            try:
+                # Try to use the lock's internal _loop attribute
+                if hasattr(self._lock, "_loop") and self._lock._loop != loop:
+                    self._lock = asyncio.Lock()
+            except (AttributeError, RuntimeError):
+                # If there's any issue, create a new lock
+                self._lock = asyncio.Lock()
+
+        return self._lock
+
+    async def _save_with_transaction(
+        self,
+        versioned: BaseVersionedData,
+        resource_id: str,
+        resource_type: ResourceType,
+    ) -> None:
+        """Save version and update chain using MongoDB transaction if available.
+
+        This method provides distributed locking via MongoDB transactions to prevent
+        race conditions when multiple processes update version chains concurrently.
+        Falls back to local asyncio lock if transactions are not supported.
+
+        Args:
+            versioned: The versioned data object to save
+            resource_id: Resource identifier
+            resource_type: Type of resource being saved
+
+        """
+        model_class = self._get_model_class(resource_type)
+
+        # Try to get MongoDB client from the model
+        try:
+            # Access the underlying motor database from Beanie
+            db = model_class.get_motor_collection().database
+            client = db.client
+
+            # Try to use transactions (requires replica set)
+            async with await client.start_session() as session:
+                async with session.start_transaction():
+                    # Save new version
+                    await versioned.insert(session=session)
+
+                    # Update version chain
+                    if versioned.version_info.is_latest:
+                        # Find and update other latest versions atomically
+                        other_latest = await model_class.find(
+                            {
+                                "resource_id": resource_id,
+                                "version_info.is_latest": True,
+                                "_id": {"$ne": versioned.id},
+                            },
+                            session=session,
+                        ).to_list()
+
+                        for other_version in other_latest:
+                            other_version.version_info.is_latest = False
+                            other_version.version_info.superseded_by = versioned.id
+                            await other_version.save(session=session)
+
+                        logger.debug(
+                            f"[Transaction] Updated {len(other_latest)} previous versions to not be latest"
+                        )
+
+                    # Transaction commits automatically on context exit
+                    logger.debug(
+                        f"[Transaction] Saved {resource_type.value} '{resource_id}' atomically"
+                    )
+
+        except (OperationFailure, AttributeError) as e:
+            # Transactions not supported (single node or old MongoDB version)
+            # Fall back to local lock approach
+            logger.debug(
+                f"MongoDB transactions not available ({e.__class__.__name__}), "
+                "using local lock (safe for single-process deployments)"
+            )
+
+            # Save new version first
+            await versioned.save()
+
+            # Update version chain with local lock
+            if versioned.version_info.is_latest:
+                other_latest = await model_class.find(
+                    {
+                        "resource_id": resource_id,
+                        "version_info.is_latest": True,
+                        "_id": {"$ne": versioned.id},
+                    }
+                ).to_list()
+
+                for other_version in other_latest:
+                    other_version.version_info.is_latest = False
+                    other_version.version_info.superseded_by = versioned.id
+                    await other_version.save()
+
+                logger.debug(
+                    f"[Local] Updated {len(other_latest)} previous versions to not be latest"
+                )
 
     async def save(
         self,
@@ -65,7 +179,9 @@ class VersionedDataManager:
                     if field in metadata:
                         # Type-safe metadata comparison
                         # Access metadata through model_dump
-                        existing_data = existing.model_dump() if hasattr(existing, "model_dump") else {}
+                        existing_data = (
+                            existing.model_dump() if hasattr(existing, "model_dump") else {}
+                        )
                         existing_value = existing_data.get("metadata", {}).get(field)
                         new_value = metadata.get(field)
                         if existing_value != new_value:
@@ -154,6 +270,22 @@ class VersionedDataManager:
                 constructor_params["model_name"] = combined_metadata.pop("model_name")
             # Remaining metadata goes to generic metadata
             generic_metadata = combined_metadata
+        elif resource_type == ResourceType.SEARCH:
+            # For search models, extract all required fields
+            search_fields = [
+                "corpus_id",
+                "vocabulary_hash",
+                "has_trie",
+                "has_fuzzy",
+                "has_semantic",
+                "trie_index_id",
+                "semantic_index_id",
+            ]
+            for field in search_fields:
+                if field in combined_metadata:
+                    constructor_params[field] = combined_metadata.pop(field)
+            # Remaining metadata goes to generic metadata
+            generic_metadata = combined_metadata
         else:
             # For other resource types, all metadata is generic
             generic_metadata = combined_metadata
@@ -165,20 +297,13 @@ class VersionedDataManager:
         # Set content with automatic storage strategy
         await set_versioned_content(versioned, content)
 
-        # Atomic save with version chain update
+        # Atomic save with version chain update using transactions or local lock
         async with self.lock:
-            # Save new version first to ensure it exists
-            await versioned.save()
-
-            # Then update previous version to point to it
-            # If this fails, we still have a valid new version
-            if latest and config.increment_version:
-                try:
-                    latest.version_info.is_latest = False
-                    latest.version_info.superseded_by = versioned.id
-                    await latest.save()
-                except Exception as e:
-                    logger.warning(f"Failed to update previous version chain: {e}")
+            try:
+                await self._save_with_transaction(versioned, resource_id, resource_type)
+            except Exception as e:
+                logger.error(f"Failed to save version chain: {e}", exc_info=True)
+                raise
 
             # Tree structures handled by TreeCorpusManager for corpus types
 
@@ -219,8 +344,32 @@ class VersionedDataManager:
                 self.cache = await get_global_cache()
             cached = await self.cache.get(namespace, cache_key)
             if cached:
-                logger.debug(f"Cache hit for {cache_key}")
-                return cached  # type: ignore[no-any-return]
+                # For latest version queries, validate that the cached document still exists
+                # This handles cases where documents are deleted outside the version manager
+                if not config.version:
+                    model_class = self._get_model_class(resource_type)
+                    try:
+                        # Quick existence check - if document doesn't exist, cache is stale
+                        exists = await model_class.get(cached.id)
+                        if exists is None:
+                            # Cached document was deleted, invalidate cache and continue to DB query
+                            logger.debug(
+                                f"Cached document for {cache_key} no longer exists, invalidating cache"
+                            )
+                            await self.cache.delete(namespace, cache_key)
+                        else:
+                            logger.debug(f"Cache hit for {cache_key}")
+                            return cached  # type: ignore[no-any-return]
+                    except Exception as e:
+                        # If we can't validate, assume cache is stale and continue to DB query
+                        logger.debug(
+                            f"Failed to validate cached document for {cache_key}: {e}, invalidating cache"
+                        )
+                        await self.cache.delete(namespace, cache_key)
+                else:
+                    # For specific version queries, we can trust the cache more
+                    logger.debug(f"Cache hit for {cache_key}")
+                    return cached  # type: ignore[no-any-return]
 
         # Query database
         model_class = self._get_model_class(resource_type)
@@ -262,11 +411,121 @@ class VersionedDataManager:
         config = VersionConfig(version=version, use_cache=use_cache)
         return await self.get_latest(resource_id, resource_type, use_cache, config)
 
-    async def list_versions(self, resource_id: str, resource_type: ResourceType) -> list[str]:
+    async def list_versions(
+        self, resource_id: str, resource_type: ResourceType
+    ) -> list[BaseVersionedData]:
         """List all versions of a resource."""
         model_class = self._get_model_class(resource_type)
         results = await model_class.find({"resource_id": resource_id}).to_list()
-        return [r.version_info.version for r in results]
+        return results
+
+    # ============================================================================
+    # WRAPPER METHODS FOR TEST COMPATIBILITY
+    # ============================================================================
+
+    async def save_versioned_data(self, metadata_obj: BaseVersionedData) -> BaseVersionedData:
+        """Save metadata object directly using Beanie.
+
+        This method handles the metadata object as a complete Beanie document,
+        managing version chains and content storage automatically.
+
+        Args:
+            metadata_obj: Any metadata object inheriting from BaseVersionedData
+
+        Returns:
+            Saved metadata object with ID populated
+        """
+        resource_id = metadata_obj.resource_id
+        resource_type = metadata_obj.resource_type
+
+        # Handle content storage if present
+        content = getattr(metadata_obj, "content_inline", None)
+        if content is not None:
+            await set_versioned_content(metadata_obj, content)
+
+        # Handle version chain management with proper atomic operations
+        async with self.lock:
+            # Always save the object first
+            await metadata_obj.save()
+
+            # If this version claims to be latest, ensure only one version can be latest
+            if metadata_obj.version_info.is_latest:
+                try:
+                    model_class = self._get_model_class(resource_type)
+                    collection = model_class.get_pymongo_collection()
+
+                    # Use update_many to atomically mark all other versions as not latest
+                    update_result = await collection.update_many(
+                        {
+                            "resource_id": resource_id,
+                            "version_info.is_latest": True,
+                            "_id": {"$ne": metadata_obj.id},  # Exclude this version
+                        },
+                        {
+                            "$set": {
+                                "version_info.is_latest": False,
+                                "version_info.superseded_by": metadata_obj.id,
+                            }
+                        },
+                    )
+
+                    logger.debug(
+                        f"Updated {update_result.modified_count} previous versions to not be latest"
+                    )
+
+                except Exception as e:
+                    logger.error(f"Failed to update previous version chain: {e}")
+                    # Version chain corruption - this is critical, must raise
+                    raise RuntimeError(
+                        f"Version chain update failed for resource {resource_id}. "
+                        f"Multiple versions may be marked as latest. Error: {e}"
+                    ) from e
+
+        # Don't query individual document state immediately after concurrent operations
+        # The atomic database operations will resolve the race condition, and querying
+        # immediately might return stale state before all concurrent updates complete.
+        # The database itself will have the correct final state.
+
+        return metadata_obj
+
+    async def get_latest_version(
+        self, resource_id: str, resource_type: ResourceType
+    ) -> BaseVersionedData | None:
+        """Get latest version by resource_id and resource_type.
+
+        Args:
+            resource_id: Resource identifier
+            resource_type: Type of resource
+
+        Returns:
+            Latest metadata object or None
+        """
+        return await self.get_latest(
+            resource_id=resource_id,
+            resource_type=resource_type,
+            use_cache=True,
+            config=VersionConfig(),
+        )
+
+    async def get_version(
+        self, resource_id: str, resource_type: ResourceType, version: str
+    ) -> BaseVersionedData | None:
+        """Get specific version by resource_id, resource_type, and version.
+
+        Args:
+            resource_id: Resource identifier
+            resource_type: Type of resource
+            version: Specific version string
+
+        Returns:
+            Metadata object for specified version or None
+        """
+        return await self.get_by_version(
+            resource_id=resource_id,
+            resource_type=resource_type,
+            version=version,
+            use_cache=True,
+        )
 
     async def delete_version(
         self,
@@ -298,12 +557,19 @@ class VersionedDataManager:
 
             await result.delete()
 
-            # Clear cache
+            # Clear cache for both specific version and latest version
             namespace = self._get_namespace(resource_type)
-            cache_key = f"{resource_type.value}:{resource_id}:v{version}"
             if self.cache is None:
                 self.cache = await get_global_cache()
-            await self.cache.delete(namespace, cache_key)
+
+            # Clear specific version cache
+            version_cache_key = f"{resource_type.value}:{resource_id}:v{version}"
+            await self.cache.delete(namespace, version_cache_key)
+
+            # Clear latest version cache if this was marked as latest
+            if result.version_info.is_latest:
+                latest_cache_key = f"{resource_type.value}:{resource_id}"
+                await self.cache.delete(namespace, latest_cache_key)
 
             logger.info(f"Deleted {resource_type.value} '{resource_id}' v{version}")
             return True

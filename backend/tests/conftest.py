@@ -140,6 +140,20 @@ async def mongodb_client(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClie
         client.close()
 
 
+@pytest_asyncio.fixture(scope="session")
+async def mongodb_client_session(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClient, None]:
+    """Create session-scoped MongoDB client for expensive setup (like semantic indices)."""
+    client = AsyncIOMotorClient(mongodb_server, serverSelectionTimeoutMS=500)
+    try:
+        # Test connection
+        await client.admin.command("ping")
+        yield client
+    except Exception as e:
+        pytest.skip(f"MongoDB not available: {e}")
+    finally:
+        client.close()
+
+
 @pytest_asyncio.fixture(scope="function")
 async def test_db(mongodb_client: AsyncIOMotorClient):
     """Create isolated test database with Beanie initialization."""
@@ -157,6 +171,31 @@ async def test_db(mongodb_client: AsyncIOMotorClient):
 
     # Clean up - drop database after test
     await mongodb_client.drop_database(db_name)
+
+
+@pytest_asyncio.fixture(scope="session")
+async def test_db_session(mongodb_client_session: AsyncIOMotorClient):
+    """Create session-scoped test database for expensive setup (like semantic indices).
+
+    This database persists for the entire test session to enable:
+    - Pre-warming semantic indices once
+    - Reusing expensive corpus builds
+    - Sharing test data across tests
+    """
+    # Use unique database name for this session
+    db_name = f"{TEST_DATABASE_NAME}_session_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
+    db = mongodb_client_session[db_name]
+
+    # Initialize Beanie with document models
+    await init_beanie(
+        database=db,
+        document_models=get_document_models(),
+    )
+
+    yield db
+
+    # Clean up - drop database after entire session
+    await mongodb_client_session.drop_database(db_name)
 
 
 @pytest.fixture

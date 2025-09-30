@@ -22,7 +22,7 @@ from ..corpus.core import Corpus
 from ..corpus.utils import get_vocabulary_hash
 from ..models.base import Language
 from ..utils.logging import get_logger
-from .constants import SearchMethod
+from .constants import DEFAULT_MIN_SCORE, SearchMethod
 
 logger = get_logger(__name__)
 
@@ -94,6 +94,7 @@ class TrieIndex(BaseModel):
         """Minimal trie metadata for versioning."""
 
         corpus_id: PydanticObjectId
+        vocabulary_hash: str = ""
         resource_type: ResourceType = ResourceType.TRIE
         namespace: CacheNamespace = CacheNamespace.TRIE
 
@@ -278,7 +279,7 @@ class SearchIndex(BaseModel):
     vocabulary_hash: str
 
     # Search configuration
-    min_score: float = 0.75
+    min_score: float = DEFAULT_MIN_SCORE
     semantic_enabled: bool = True
     semantic_model: str = "BAAI/bge-m3"  # Default semantic model
 
@@ -298,6 +299,13 @@ class SearchIndex(BaseModel):
     class Metadata(BaseVersionedData):
         """Minimal search metadata for versioning."""
 
+        corpus_id: PydanticObjectId
+        vocabulary_hash: str = ""
+        has_trie: bool = False
+        has_fuzzy: bool = False
+        has_semantic: bool = False
+        trie_index_id: PydanticObjectId | None = None
+        semantic_index_id: PydanticObjectId | None = None
         resource_type: ResourceType = ResourceType.SEARCH
         namespace: CacheNamespace = CacheNamespace.SEARCH
 
@@ -449,7 +457,13 @@ class SearchIndex(BaseModel):
             content=self.model_dump(mode="json"),
             config=config or VersionConfig(),
             metadata={
-                "vocabulary_size": self.vocabulary_size,
+                "corpus_id": self.corpus_id,
+                "vocabulary_hash": self.vocabulary_hash,
+                "has_trie": self.has_trie,
+                "has_fuzzy": self.has_fuzzy,
+                "has_semantic": self.has_semantic,
+                "trie_index_id": self.trie_index_id,
+                "semantic_index_id": self.semantic_index_id,
             },
         )
 

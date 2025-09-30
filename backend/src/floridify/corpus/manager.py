@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import coolname
 from beanie import PydanticObjectId
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from ..caching.core import get_versioned_content
 from ..caching.models import CacheNamespace, ResourceType, VersionConfig
@@ -139,6 +139,7 @@ class TreeCorpusManager:
         # save_corpus should NOT accept Metadata objects
         # Check if corpus is a Metadata object by type
         from ..caching.models import BaseVersionedData
+
         if corpus and isinstance(corpus, BaseVersionedData):
             logger.error(
                 "save_corpus called with Metadata object - use save_metadata() or get_corpus() first"
@@ -150,6 +151,11 @@ class TreeCorpusManager:
         if corpus:
             corpus_id = corpus_id if corpus_id is not None else corpus.corpus_id
             corpus_name = corpus_name or corpus.corpus_name
+
+            # Ensure indices are built if we have vocabulary but no indices
+            if corpus.vocabulary and not corpus.vocabulary_to_index:
+                await corpus._rebuild_indices()
+
             content = content if content is not None else corpus.model_dump(mode="json")
             corpus_type = corpus_type if corpus_type != CorpusType.LEXICON else corpus.corpus_type
             language = language if language != Language.ENGLISH else corpus.language
@@ -248,7 +254,12 @@ class TreeCorpusManager:
         # Auto-update parent's child_corpus_ids if parent_corpus_id is provided
         # BUT ONLY if we're creating a NEW corpus (not updating existing)
         # AND we're not explicitly managing child_corpus_ids
-        if parent_corpus_id and saved and not corpus_id and child_corpus_ids is None:
+        if (
+            parent_corpus_id
+            and saved
+            and not corpus_id
+            and (child_corpus_ids is None or not child_corpus_ids)
+        ):
             child_id = saved.id
             if child_id:
                 # Get the parent
@@ -446,7 +457,10 @@ class TreeCorpusManager:
                     if corpus.vocabulary and not corpus.vocabulary_to_index:
                         await corpus._rebuild_indices()
                     corpora.append(corpus)
-            except Exception as e:
+            except ValidationError as e:
+                logger.warning(f"Failed to validate corpus data for {metadata.id}: {e}")
+                continue
+            except (KeyError, TypeError) as e:
                 logger.warning(f"Failed to convert metadata {metadata.id} to corpus: {e}")
                 continue
 
@@ -649,11 +663,19 @@ class TreeCorpusManager:
         elif isinstance(parent_id, dict) and "corpus_id" in parent_id:
             parent_id = parent_id["corpus_id"]
 
+        # Ensure parent_id is PydanticObjectId
+        if not isinstance(parent_id, PydanticObjectId):
+            parent_id = PydanticObjectId(str(parent_id))
+
         # Convert to ID if it's an object
         if isinstance(child_id, BaseModel) and hasattr(child_id, "id"):
             child_id = child_id.id
         elif isinstance(child_id, dict) and "corpus_id" in child_id:
             child_id = child_id["corpus_id"]
+
+        # Ensure child_id is PydanticObjectId
+        if not isinstance(child_id, PydanticObjectId):
+            child_id = PydanticObjectId(str(child_id))
 
         # Prevent self-reference
         if parent_id == child_id:
@@ -821,8 +843,10 @@ class TreeCorpusManager:
             return False
 
         # Handle cascade deletion
-        if cascade:
-            for child_id in corpus.child_corpus_ids:
+        if cascade and corpus.child_corpus_ids:
+            # Make a copy to avoid modification during iteration and handle potential None values
+            children_to_delete = list(corpus.child_corpus_ids) if corpus.child_corpus_ids else []
+            for child_id in children_to_delete:
                 await self.delete_corpus(corpus_id=child_id, cascade=True, config=config)
 
         # Remove from parent if it has one
@@ -952,10 +976,12 @@ class TreeCorpusManager:
         tree = corpus.model_dump(mode="json")
         tree["children"] = []
 
-        for child_id in corpus.child_corpus_ids:
-            child_tree = await self.get_tree(child_id, config)
-            if child_tree:
-                tree["children"].append(child_tree)
+        # Safely iterate over children, handling potential None values
+        if corpus.child_corpus_ids:
+            for child_id in corpus.child_corpus_ids:
+                child_tree = await self.get_tree(child_id, config)
+                if child_tree:
+                    tree["children"].append(child_tree)
 
         return tree
 
@@ -976,6 +1002,61 @@ class TreeCorpusManager:
         """
         aggregated = await self.aggregate_vocabularies(corpus_id, config)
         return len(aggregated) > 0
+
+    async def aggregate_from_children(
+        self,
+        parent_corpus_id: PydanticObjectId,
+        config: VersionConfig | None = None,
+    ) -> Corpus | None:
+        """Aggregate vocabularies from parent and all children into a new corpus.
+
+        Args:
+            parent_corpus_id: Parent corpus ID to aggregate from
+            config: Version configuration
+
+        Returns:
+            Corpus object with aggregated vocabulary from parent and children
+
+        """
+        # Get the parent corpus
+        parent = await self.get_corpus(corpus_id=parent_corpus_id, config=config)
+        if not parent:
+            return None
+
+        # Collect vocabularies from parent and children
+        vocabulary = set()
+
+        # Add parent's vocabulary if it exists
+        if parent.vocabulary:
+            vocabulary.update(parent.vocabulary)
+
+        # Get child vocabularies recursively using existing aggregate_vocabularies method
+        child_ids = parent.child_corpus_ids or []
+        for child_id in child_ids:
+            child_vocab = await self.aggregate_vocabularies(child_id, config, update_parent=False)
+            vocabulary.update(child_vocab)
+
+        # Create a new corpus with the aggregated vocabulary
+        aggregated_vocab = sorted(vocabulary)
+
+        # Create a copy of the parent corpus with the aggregated vocabulary
+        aggregated_corpus_data = parent.model_dump()
+        aggregated_corpus_data["vocabulary"] = aggregated_vocab
+        aggregated_corpus_data["unique_word_count"] = len(aggregated_vocab)
+        aggregated_corpus_data["total_word_count"] = len(aggregated_vocab)
+
+        # Rebuild vocabulary index
+        aggregated_corpus_data["vocabulary_to_index"] = {
+            word: idx for idx, word in enumerate(aggregated_vocab)
+        }
+
+        # Update vocabulary stats
+        if "vocabulary_stats" not in aggregated_corpus_data:
+            aggregated_corpus_data["vocabulary_stats"] = {}
+        aggregated_corpus_data["vocabulary_stats"]["unique_words"] = len(aggregated_vocab)
+        aggregated_corpus_data["vocabulary_stats"]["total_words"] = len(aggregated_vocab)
+
+        return Corpus.model_validate(aggregated_corpus_data)
 
     async def _would_create_cycle(
         self,
@@ -1044,10 +1125,12 @@ class TreeCorpusManager:
             return []
 
         children = []
-        for child_id in parent.child_corpus_ids:
-            child = await self.get_corpus(corpus_id=child_id, config=config)
-            if child:
-                children.append(child)
+        # Safely iterate over children, handling potential None values
+        if parent.child_corpus_ids:
+            for child_id in parent.child_corpus_ids:
+                child = await self.get_corpus(corpus_id=child_id, config=config)
+                if child:
+                    children.append(child)
 
         return children
 

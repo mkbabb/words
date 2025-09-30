@@ -17,11 +17,16 @@ from .middleware import CacheHeadersMiddleware, LoggingMiddleware
 from .routers import (
     ai,
     audio,
+    cache,
+    config,
+    corpus,
+    database,
     definitions,
     examples,
     health,
     images,
     lookup,
+    providers,
     search,
     suggestions,
     # wordlist_reviews,
@@ -98,22 +103,21 @@ API_V1_PREFIX = "/api/v1"
 # Include routers with versioned API prefix
 app.include_router(lookup, prefix=API_V1_PREFIX, tags=["lookup"])
 app.include_router(search, prefix=API_V1_PREFIX, tags=["search"])
-# app.include_router(corpus, prefix=API_V1_PREFIX, tags=["corpus"])  # disabled
-# Old synonyms endpoint removed - now handled by /ai/synthesize/synonyms
+# Note: Old synonyms endpoint removed - now handled by /ai/synthesize/synonyms
 app.include_router(suggestions, prefix=API_V1_PREFIX, tags=["suggestions"])
 app.include_router(ai, prefix=API_V1_PREFIX, tags=["ai"])
-# app.include_router(corpus, prefix=API_V1_PREFIX, tags=["corpus"])  # disabled
 app.include_router(definitions, prefix=f"{API_V1_PREFIX}/definitions", tags=["definitions"])
 app.include_router(examples, prefix=API_V1_PREFIX, tags=["examples"])
 app.include_router(words, prefix=f"{API_V1_PREFIX}/words", tags=["words"])
-# app.include_router(wordlists, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
-# app.include_router(wordlist_words, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-words"])
-# app.include_router(wordlist_reviews, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-reviews"])
-# app.include_router(wordlist_search, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlist-search"])
-# app.include_router(wotd_main, prefix=f"{API_V1_PREFIX}/wotd", tags=["wotd"])
-# app.include_router(wotd_ml, prefix=f"{API_V1_PREFIX}/wotd", tags=["wotd-ml"])
 app.include_router(audio, prefix=API_V1_PREFIX, tags=["audio"])
 app.include_router(images, prefix=f"{API_V1_PREFIX}/images", tags=["images"])
+
+# New comprehensive routers for isomorphism with CLI
+app.include_router(database, prefix=API_V1_PREFIX, tags=["database"])
+app.include_router(providers, prefix=API_V1_PREFIX, tags=["providers"])
+app.include_router(corpus, prefix=API_V1_PREFIX, tags=["corpus"])
+app.include_router(cache, prefix=API_V1_PREFIX, tags=["cache"])
+app.include_router(config, prefix=API_V1_PREFIX, tags=["config"])
 
 # Health check remains at root for monitoring
 app.include_router(health, prefix="", tags=["health"])

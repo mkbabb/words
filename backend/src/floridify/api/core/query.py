@@ -77,10 +77,15 @@ class QueryOptimizer:
         return recommendations
 
     async def create_optimal_indexes(self, model: type[Document]) -> list[str]:
-        """Create optimal indexes for a model based on common queries."""
+        """Create optimal indexes for a model based on common queries.
+
+        Raises:
+            RuntimeError: If critical indexes fail to create
+        """
         db = await self._get_db()
         collection = db[model.get_collection_name()]
         created = []
+        failed = []
 
         # Model-specific indexes
         if model.__name__ == "Word":
@@ -125,7 +130,17 @@ class QueryOptimizer:
                 created.append(index_name)
                 logger.info(f"Created index {index_name} on {model.__name__}")
             except Exception as e:
-                logger.warning(f"Failed to create index on {model.__name__}: {e}")
+                index_name = str(keys)
+                failed.append((index_name, str(e)))
+                logger.error(f"Failed to create index {index_name} on {model.__name__}: {e}")
+
+        # If any indexes failed, raise - database may be misconfigured
+        if failed:
+            failure_msg = "\n".join(f"  - {name}: {err}" for name, err in failed)
+            raise RuntimeError(
+                f"Failed to create {len(failed)} index(es) on {model.__name__}:\n{failure_msg}\n"
+                f"Database may be misconfigured or indexes may already exist with different options."
+            )
 
         return created
 

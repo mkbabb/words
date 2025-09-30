@@ -5,6 +5,8 @@ Provides a wrapper around the core Search class with language-specific corpus ma
 
 from __future__ import annotations
 
+from typing import Any
+
 from ..corpus.core import Corpus
 from ..models.base import Language
 from ..utils.logging import get_logger
@@ -67,6 +69,15 @@ class LanguageSearch:
     async def find_best_match(self, word: str) -> SearchResult | None:
         """Find single best matching word."""
         return await self.search_engine.find_best_match(word)
+
+    def get_stats(self) -> dict[str, Any]:
+        """Get search engine statistics."""
+        return self.search_engine.get_stats()
+
+    @property
+    def _initialized(self) -> bool:
+        """Check if search engine is initialized."""
+        return self.search_engine._initialized
 
 
 async def get_language_search(

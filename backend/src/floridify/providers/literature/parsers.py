@@ -85,24 +85,97 @@ def parse_html(content: str | dict[str, Any]) -> str:
     return text
 
 
-def parse_epub(content: str | dict[str, Any]) -> str:
+def parse_epub(content: bytes | str | dict[str, Any]) -> str:
     """Parse EPUB content to plain text.
 
-    Stub implementation - full version would extract from EPUB structure.
+    Extracts text from all chapters in the EPUB document.
+
+    Args:
+        content: EPUB content as bytes, or text/dict for fallback
+
+    Returns:
+        Clean text extracted from EPUB chapters
+
     """
-    # For now, just use plain text parser
-    # Full implementation would unzip EPUB and extract chapters
-    return parse_text(content)
+    # Handle dict/string input - fallback to text parser
+    if isinstance(content, dict):
+        if "content" in content:
+            content = content["content"]
+        else:
+            return parse_text(content)
+
+    if isinstance(content, str):
+        return parse_text(content)
+
+    # Parse EPUB from bytes
+    try:
+        import io
+
+        import ebooklib
+        from bs4 import BeautifulSoup
+        from ebooklib import epub
+
+        book = epub.read_epub(io.BytesIO(content))
+        text_parts = []
+
+        # Extract text from all document items (chapters)
+        for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
+            soup = BeautifulSoup(item.get_content(), "html.parser")
+            text = soup.get_text()
+            if text.strip():
+                text_parts.append(text)
+
+        full_text = "\n\n".join(text_parts)
+        return parse_text(full_text)  # Clean using existing logic
+
+    except Exception:
+        # Fall back to text parser on any error
+        return parse_text(str(content))
 
 
-def parse_pdf(content: str | dict[str, Any]) -> str:
+def parse_pdf(content: bytes | str | dict[str, Any]) -> str:
     """Parse PDF content to plain text.
 
-    Stub implementation - full version would use PyPDF2 or similar.
+    Extracts text from all pages in the PDF document.
+
+    Args:
+        content: PDF content as bytes, or text/dict for fallback
+
+    Returns:
+        Clean text extracted from PDF pages
+
     """
-    # For now, just use plain text parser
-    # Full implementation would extract text from PDF
-    return parse_text(content)
+    # Handle dict/string input - fallback to text parser
+    if isinstance(content, dict):
+        if "content" in content:
+            content = content["content"]
+        else:
+            return parse_text(content)
+
+    if isinstance(content, str):
+        return parse_text(content)
+
+    # Parse PDF from bytes
+    try:
+        import io
+
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(content))
+        text_parts = []
+
+        # Extract text from all pages
+        for page in reader.pages:
+            text = page.extract_text()
+            if text.strip():
+                text_parts.append(text)
+
+        full_text = "\n\n".join(text_parts)
+        return parse_text(full_text)  # Clean using existing logic
+
+    except Exception:
+        # Fall back to text parser on any error
+        return parse_text(str(content))
 
 
 def extract_metadata(content: str | dict[str, Any]) -> dict[str, Any]:

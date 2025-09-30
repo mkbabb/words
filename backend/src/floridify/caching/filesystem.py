@@ -62,7 +62,7 @@ class FilesystemBackend:
 
     async def get(self, key: str) -> Any | None:
         """Get with minimal deserialization overhead."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         def _get() -> Any | None:
             data = self.cache.get(key)
@@ -82,7 +82,7 @@ class FilesystemBackend:
 
     async def set(self, key: str, value: Any, ttl: timedelta | None = None) -> None:
         """Set with optimized serialization."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         def _set() -> None:
             # Serialize complex types with pickle for performance
@@ -104,23 +104,23 @@ class FilesystemBackend:
 
     async def delete(self, key: str) -> bool:
         """Remove key from cache."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.cache.delete, key)
 
     async def exists(self, key: str) -> bool:
         """Check if key exists."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda: key in self.cache)
 
     async def clear_pattern(self, pattern: str) -> int:
         """Clear keys matching pattern."""
         import fnmatch
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         def _clear() -> int:
             count = 0
-            for key in list(self.cache.iterkeys()):
+            for key in list(self.cache.keys()):
                 if fnmatch.fnmatch(key, pattern):
                     del self.cache[key]
                     count += 1
@@ -130,7 +130,7 @@ class FilesystemBackend:
 
     async def clear_all(self) -> None:
         """Clear all cached items."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.cache.clear)
 
     async def clear(self) -> None:
@@ -139,7 +139,7 @@ class FilesystemBackend:
 
     async def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         def _stats() -> dict[str, Any]:
             return {

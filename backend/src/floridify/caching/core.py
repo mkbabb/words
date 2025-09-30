@@ -423,11 +423,13 @@ async def get_versioned_content(versioned_data: Any) -> dict[str, Any] | None:
         location = versioned_data.content_location
         if location.cache_key and location.cache_namespace:
             cache = await get_global_cache()
-            content = await cache.get(namespace=location.cache_namespace, key=location.cache_key)
+            cached_content = await cache.get(
+                namespace=location.cache_namespace, key=location.cache_key
+            )
             # Cast to expected return type
-            if isinstance(content, dict):
-                return content
-            return None if content is None else dict(content)
+            if isinstance(cached_content, dict):
+                return cached_content
+            return None if cached_content is None else dict(cached_content)
 
     return None
 
@@ -590,3 +592,8 @@ async def store_external_content(
         size_compressed=len(compressed) if compression else None,
         checksum=hashlib.sha256(serialized).hexdigest(),
     )
+
+
+# ============================================================================
+# REMOVED: Deprecated CacheManager - use get_global_cache() instead
+# ============================================================================

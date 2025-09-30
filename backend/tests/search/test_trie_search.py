@@ -15,10 +15,27 @@ from floridify.search.trie import TrieSearch
 async def trie_corpus(test_db):
     """Create corpus for trie search testing."""
     vocabulary = [
-        "apple", "apples", "application", "apply", "applied", "applying",
-        "banana", "bananas", "band", "bandage", "bandwidth",
-        "cat", "cats", "catch", "catching", "catfish",
-        "dog", "dogs", "dodge", "dodging", "dogma",
+        "apple",
+        "apples",
+        "application",
+        "apply",
+        "applied",
+        "applying",
+        "banana",
+        "bananas",
+        "band",
+        "bandage",
+        "bandwidth",
+        "cat",
+        "cats",
+        "catch",
+        "catching",
+        "catfish",
+        "dog",
+        "dogs",
+        "dodge",
+        "dodging",
+        "dogma",
     ]
 
     corpus = Corpus(
@@ -89,6 +106,7 @@ class TestTrieSearch:
 
         # Load new trie
         from marisa_trie import Trie
+
         loaded_trie = Trie()
         loaded_trie.load(str(trie_path))
 

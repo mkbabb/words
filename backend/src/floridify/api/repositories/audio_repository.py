@@ -130,6 +130,7 @@ class AudioRepository(BaseRepository[AudioMedia, AudioCreate, AudioUpdate]):
 
         # Update fields using TypedFieldUpdater
         from ..core.protocols import TypedFieldUpdater
+
         update_data = data.model_dump(exclude_unset=True)
         TypedFieldUpdater.update_fields(audio, update_data)
 

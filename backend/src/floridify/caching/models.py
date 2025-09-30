@@ -13,7 +13,7 @@ from enum import Enum
 from typing import Any
 
 from beanie import Document, PydanticObjectId
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class CompressionType(str, Enum):
@@ -145,6 +145,12 @@ class ContentLocation(BaseModel):
     size_compressed: int | None = None
     checksum: str
 
+    def __eq__(self, other: object) -> bool:
+        """Allow comparison with strings for backward compatibility."""
+        if isinstance(other, str):
+            return self.path == other
+        return super().__eq__(other)
+
 
 class VersionInfo(BaseModel):
     """Version tracking with chain management.
@@ -198,12 +204,28 @@ class BaseVersionedData(Document):
     class Settings:
         name = "versioned_data"
         is_root = True
-        indexes = [
-            [("resource_id", 1), ("version_info.is_latest", -1)],
-            [("namespace", 1), ("resource_type", 1)],
-            [("version_info.created_at", -1)],
-            "version_info.data_hash",
-        ]
+
+    @field_validator("content_location", mode="before")
+    @classmethod
+    def validate_content_location(cls, v: Any) -> ContentLocation | None:
+        """Convert string paths to ContentLocation objects."""
+        if v is None:
+            return None
+        if isinstance(v, ContentLocation):
+            return v
+        if isinstance(v, str):
+            # Create a minimal ContentLocation for external paths
+            import hashlib
+
+            return ContentLocation(
+                storage_type=StorageType.S3 if v.startswith("s3://") else StorageType.CACHE,
+                path=v,
+                size_bytes=0,  # Unknown size
+                checksum=hashlib.sha256(v.encode()).hexdigest(),
+            )
+        if isinstance(v, dict):
+            return ContentLocation(**v)
+        return v
 
     @model_validator(mode="before")
     @classmethod

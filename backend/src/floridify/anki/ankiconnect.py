@@ -210,9 +210,12 @@ class AnkiConnectInterface:
             logger.info(f"📦 Imported package: {apkg_path.name}")
             return True
 
-        except Exception as e:
-            logger.error(f"Failed to import package {apkg_path}: {e}")
-            return False
+        except OSError as e:
+            logger.error(f"Failed to read package file {apkg_path}: {e}")
+            raise
+        except AnkiConnectError as e:
+            logger.error(f"AnkiConnect failed to import package {apkg_path}: {e}")
+            raise
 
     def sync(self) -> bool:
         """Trigger Anki sync."""
@@ -353,7 +356,7 @@ class AnkiDirectIntegration:
                     else:
                         failed_cards += 1
 
-                except Exception as e:
+                except AnkiConnectError as e:
                     logger.warning(f"Failed to add card {i + 1}: {e}")
                     failed_cards += 1
 
@@ -373,9 +376,12 @@ class AnkiDirectIntegration:
             )
             return successful_cards > 0
 
-        except Exception as e:
-            logger.error(f"💥 Direct export failed: {e}")
-            return False
+        except AnkiConnectError as e:
+            logger.error(f"💥 Direct export failed (AnkiConnect error): {e}")
+            raise
+        except (ValueError, TypeError) as e:
+            logger.error(f"💥 Direct export failed (data error): {e}")
+            raise
 
     def _ensure_model_exists(self, card: Any, model_name: str) -> bool:
         """Ensure a model exists for the given card type."""

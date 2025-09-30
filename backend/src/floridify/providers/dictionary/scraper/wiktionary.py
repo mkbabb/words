@@ -306,8 +306,6 @@ class WiktionaryConnector(DictionaryConnector):
             etymology = self._extract_etymology(english_section)
             pronunciation = self._extract_pronunciation(english_section, word_obj.id)
 
-            # Removed unused extraction methods - see git history if needed
-
             # Extract synonyms from the dedicated section and add to definitions
             section_synonyms = self._extract_section_synonyms(english_section)
 

@@ -38,10 +38,10 @@ async def search_engine(test_db, sample_words):
     # Create search engine from corpus
     engine = await Search.from_corpus(
         corpus_name=saved_corpus.corpus_name,
-        semantic=False  # Disable semantic for basic tests
+        semantic=False,  # Disable semantic for basic tests
     )
     yield engine
-    if hasattr(engine, 'close'):
+    if hasattr(engine, "close"):
         await engine.close()
 
 
@@ -104,7 +104,6 @@ class TestSearch:
         assert apple_results[0].method == SearchMethod.FUZZY
         assert apple_results[0].score > 0.7
 
-
     @pytest.mark.asyncio
     async def test_prefix_search(self, search_engine: Search, sample_words, test_db):
         """Test prefix matching."""
@@ -113,7 +112,6 @@ class TestSearch:
         assert len(results) >= 3  # apple, application, apply
         words = [r.word for r in results]
         assert all(w.startswith("app") for w in words)
-
 
     @pytest.mark.asyncio
     async def test_cascade_search(self, search_engine: Search, sample_words, test_db):
@@ -174,17 +172,14 @@ class TestSearch:
 
         # Build necessary indices
         corpus.vocabulary_to_index = {word: i for i, word in enumerate(normalized_vocabulary)}
-        corpus.normalized_to_original_indices = {
-            i: [i] for i in range(len(normalized_vocabulary))
-        }
+        corpus.normalized_to_original_indices = {i: [i] for i in range(len(normalized_vocabulary))}
         corpus._build_signature_index()
 
         # Save and create search engine
         manager = CorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
         search_engine = await Search.from_corpus(
-            corpus_name=saved_corpus.corpus_name,
-            semantic=False
+            corpus_name=saved_corpus.corpus_name, semantic=False
         )
 
         # Test searching with diacritics - should normalize and find

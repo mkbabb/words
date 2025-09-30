@@ -18,7 +18,7 @@ from ...caching.models import CacheNamespace
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...core.state_tracker import Stages, StateTracker
 from ...core.streaming import create_streaming_response
-from ...models.dictionary import DictionaryProvider, Language
+from ...models.parameters import LookupParams
 from ...storage.mongodb import get_synthesized_entry
 from ...utils.logging import get_logger
 from ...utils.sanitization import validate_word_input
@@ -63,53 +63,18 @@ class DictionaryEntryResponse(BaseModel):
     )
 
 
-class LookupParams(BaseModel):
-    """Parameters for word lookup endpoint."""
-
-    force_refresh: bool = Field(default=False, description="Force refresh of cached data")
-    providers: list[DictionaryProvider] = Field(
-        default=[DictionaryProvider.WIKTIONARY],
-        description="Dictionary providers to use",
-    )
-    languages: list[Language] = Field(default=[Language.ENGLISH], description="Languages to query")
-    no_ai: bool = Field(default=False, description="Skip AI synthesis")
-
-
 def parse_lookup_params(
     force_refresh: bool = Query(default=False, description="Force refresh of cached data"),
     providers: list[str] = Query(default=["wiktionary"], description="Dictionary providers"),
     languages: list[str] = Query(default=["en"], description="Languages to query"),
     no_ai: bool = Query(default=False, description="Skip AI synthesis"),
 ) -> LookupParams:
-    """Parse and validate lookup parameters."""
-    # Convert string providers to enum
-    provider_enums = []
-    for provider_str in providers:
-        try:
-            provider_enums.append(DictionaryProvider(provider_str.lower()))
-        except ValueError:
-            # Skip invalid providers
-            logger.warning(f"Invalid provider: {provider_str}")
-
-    if not provider_enums:
-        provider_enums = [DictionaryProvider.WIKTIONARY]
-
-    # Convert string languages to enum
-    language_enums = []
-    for language_str in languages:
-        try:
-            language_enums.append(Language(language_str.lower()))
-        except ValueError:
-            # Skip invalid languages
-            logger.warning(f"Invalid language: {language_str}")
-
-    if not language_enums:
-        language_enums = [Language.ENGLISH]
-
+    """Parse and validate lookup parameters using shared model."""
+    # Use the shared model's validators to parse the parameters
     return LookupParams(
         force_refresh=force_refresh,
-        providers=provider_enums,
-        languages=language_enums,
+        providers=providers,  # validators handle conversion
+        languages=languages,  # validators handle conversion
         no_ai=no_ai,
     )
 

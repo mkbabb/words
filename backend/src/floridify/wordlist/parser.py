@@ -419,22 +419,30 @@ def parse_json_file(path: Path) -> ParsedWordList:
     return ParsedWordList(words=words, metadata=metadata, source_file=str(path))
 
 
-# Excel and Word parsers would require additional dependencies
-# For now, we'll create stubs that can be implemented later
+# Excel and Word parsers require additional dependencies
 
 
 def parse_excel_file(path: Path) -> ParsedWordList:
-    """Parse an Excel file (requires openpyxl)."""
-    logger.warning("Excel parsing not yet implemented - treating as text")
-    # Fallback to text parsing for now
-    return parse_text_file(path)
+    """Parse an Excel file (requires openpyxl).
+
+    Raises:
+        NotImplementedError: Excel parsing not yet implemented
+    """
+    raise NotImplementedError(
+        "Excel file parsing not implemented. Install openpyxl to add support: pip install openpyxl"
+    )
 
 
 def parse_word_file(path: Path) -> ParsedWordList:
-    """Parse a Word document (requires python-docx)."""
-    logger.warning("Word document parsing not yet implemented - treating as text")
-    # Fallback to text parsing for now
-    return parse_text_file(path)
+    """Parse a Word document (requires python-docx).
+
+    Raises:
+        NotImplementedError: Word document parsing not yet implemented
+    """
+    raise NotImplementedError(
+        "Word document parsing not implemented. "
+        "Install python-docx to add support: pip install python-docx"
+    )
 
 
 # Parser registry

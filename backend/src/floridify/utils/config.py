@@ -30,6 +30,13 @@ class OxfordConfig:
 
 
 @dataclass
+class MerriamWebsterConfig:
+    """Merriam-Webster Dictionary API configuration."""
+
+    api_key: str
+
+
+@dataclass
 class RateLimits:
     """Rate limiting configuration."""
 
@@ -113,6 +120,7 @@ class Config:
     database: DatabaseConfig
     rate_limits: RateLimits
     processing: ProcessingConfig
+    merriam_webster: MerriamWebsterConfig | None = None
     google_cloud: GoogleCloudConfig | None = None
 
     @classmethod
@@ -165,6 +173,13 @@ class Config:
             api_key=data.get("oxford", {}).get("api_key", ""),
         )
 
+        # Load Merriam-Webster config if present
+        merriam_webster_config = None
+        if "merriam_webster" in data:
+            mw_data = data["merriam_webster"]
+            if "api_key" in mw_data:
+                merriam_webster_config = MerriamWebsterConfig(api_key=mw_data["api_key"])
+
         db_data = data.get("database", {})
         database_config = DatabaseConfig(
             production_url=db_data.get("production_url", ""),
@@ -212,6 +227,7 @@ class Config:
         config = cls(
             openai=openai_config,
             oxford=oxford_config,
+            merriam_webster=merriam_webster_config,
             database=database_config,
             rate_limits=rate_limits,
             processing=processing,

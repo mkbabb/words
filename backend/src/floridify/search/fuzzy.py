@@ -5,6 +5,8 @@ Streamlined fuzzy search using TheFuzz backend with direct corpus vocabulary acc
 
 from __future__ import annotations
 
+import random
+
 from rapidfuzz import fuzz, process
 
 from ..corpus.core import Corpus
@@ -31,6 +33,72 @@ class FuzzySearch:
         """
         self.min_score = min_score
 
+    def _get_frequency_weighted_sample(
+        self,
+        corpus: Corpus,
+        sample_size: int = 1000,
+    ) -> list[str]:
+        """Get frequency-weighted sample from corpus vocabulary.
+
+        For large corpora, samples words based on their frequency rather than
+        taking the first N words. This ensures common words are more likely to
+        be included in fuzzy search candidates.
+
+        Args:
+            corpus: Corpus to sample from
+            sample_size: Number of words to sample
+
+        Returns:
+            List of sampled words
+
+        """
+        vocabulary = corpus.vocabulary
+
+        # If corpus has frequency data, use weighted sampling
+        if corpus.word_frequencies and len(corpus.word_frequencies) > 0:
+            # Get frequencies for vocabulary words
+            words_with_freq = []
+            for word in vocabulary[
+                : min(len(vocabulary), sample_size * 3)
+            ]:  # Check 3x sample size for efficiency
+                freq = corpus.word_frequencies.get(word, 1)  # Default freq=1 for unknown
+                if freq > 0:  # Only include words with positive frequency
+                    words_with_freq.append((word, freq))
+
+            # If we got enough words with frequencies, do weighted sampling
+            if len(words_with_freq) >= sample_size:
+                words, freqs = zip(*words_with_freq)
+
+                # Normalize frequencies to probabilities
+                total_freq = sum(freqs)
+                if total_freq > 0:
+                    probabilities = [f / total_freq for f in freqs]
+
+                    # Sample without replacement using frequency weights
+                    try:
+                        sampled_words = random.choices(
+                            words, weights=probabilities, k=min(sample_size, len(words))
+                        )
+                        # Remove duplicates while preserving frequency bias
+                        seen = set()
+                        result = []
+                        for word in sampled_words:
+                            if word not in seen:
+                                seen.add(word)
+                                result.append(word)
+
+                        logger.debug(
+                            f"Frequency-weighted sampling: selected {len(result)} words "
+                            f"from {len(words_with_freq)} candidates"
+                        )
+                        return result
+                    except (ValueError, IndexError) as e:
+                        logger.debug(f"Weighted sampling failed: {e}, falling back to top-N")
+
+        # Fallback: if no frequency data or sampling failed, use first N words
+        logger.debug(f"Using first {sample_size} words (no frequency data available)")
+        return vocabulary[:sample_size]
+
     def search(
         self,
         query: str,
@@ -52,7 +120,9 @@ class FuzzySearch:
         if not vocabulary and " " in query:
             all_candidates = set()
             for word in query.split():
-                word_candidates = corpus.get_candidates(word.lower(), max_results=max_candidates // 2)
+                word_candidates = corpus.get_candidates(
+                    word.lower(), max_results=max_candidates // 2
+                )
                 all_candidates.update(word_candidates)
 
             if all_candidates:
@@ -60,12 +130,14 @@ class FuzzySearch:
 
         # If still no vocabulary, use a reasonable subset of the corpus
         if not vocabulary:
-            # Fall back to full vocabulary for fuzzy matching on small corpora
-            # or first N words for large corpora
+            # Fall back to full vocabulary for small corpora, or
+            # frequency-weighted sampling for large corpora
             if len(corpus.vocabulary) <= 1000:
                 vocabulary = corpus.vocabulary
             else:
-                vocabulary = corpus.vocabulary[:1000]
+                # Use frequency-weighted sampling for large corpora
+                # This prioritizes common words over arbitrary first-N cutoff
+                vocabulary = self._get_frequency_weighted_sample(corpus, sample_size=1000)
 
             if not vocabulary:
                 return []
@@ -78,12 +150,18 @@ class FuzzySearch:
         normalized_query = query.lower()
 
         # Primary scorer: WRatio for general accuracy
-        # Lower cutoff for multi-word queries
-        primary_cutoff = min_score_threshold * 50 if " " in query else min_score_threshold * 75
+        # Lower cutoff for multi-word queries and improved limits for better quality
+        primary_cutoff = (
+            min_score_threshold * 45 if " " in query else min_score_threshold * 50
+        )  # Further lowered for better typo tolerance
+        # Increase limit multiplier to ensure we get enough high-quality candidates
+        limit_multiplier = (
+            5 if len(vocabulary) > 200 else 3
+        )  # More candidates for large vocabularies
         primary_results = process.extract(
             normalized_query,
             vocabulary,
-            limit=max_results * 3,
+            limit=max_results * limit_multiplier,
             scorer=fuzz.WRatio,
             score_cutoff=primary_cutoff,
         )
@@ -97,12 +175,16 @@ class FuzzySearch:
 
         # Secondary scorer: Token set ratio for phrase matching
         if " " in query or len(query) >= 8:
-            # Even lower cutoff for multi-word queries
-            secondary_cutoff = min_score_threshold * 40 if " " in query else min_score_threshold * 65
+            # Even lower cutoff for multi-word queries, aligned with primary scorer improvements
+            secondary_cutoff = (
+                min_score_threshold * 35
+                if " " in query
+                else min_score_threshold * 45  # Further lowered for better typo tolerance
+            )
             secondary_results = process.extract(
                 normalized_query,
                 vocabulary,
-                limit=max_results * 2,
+                limit=max_results * limit_multiplier,  # Use same multiplier as primary
                 scorer=fuzz.token_set_ratio,
                 score_cutoff=secondary_cutoff,
             )

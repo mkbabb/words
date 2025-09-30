@@ -1,12 +1,15 @@
 """WOTD ML Pipeline - Core business logic for Word of the Day machine learning system."""
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 from ..utils.paths import get_cache_directory
 from ..wotd import WOTDPipeline
 from ..wotd.inference import create_pipeline
+
+logger = logging.getLogger(__name__)
 
 # Global pipeline instance cache
 _pipeline_cache: WOTDPipeline | None = None
@@ -149,8 +152,12 @@ def check_wotd_models_status() -> dict[str, Any]:
         try:
             with open(metadata_path) as f:
                 training_info = json.load(f)
-        except Exception:
-            pass
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse training metadata: {e}")
+            raise ValueError(f"Invalid training metadata JSON: {e}")
+        except OSError as e:
+            logger.error(f"Failed to read training metadata file: {e}")
+            raise ValueError(f"Cannot read training metadata: {e}")
 
     # Check if pipeline is loaded in memory
     global _pipeline_cache

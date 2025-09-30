@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime
 from pathlib import Path
@@ -34,6 +35,8 @@ from ...repositories import (
     AudioRepository,
     AudioUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/audio", tags=["audio"])
 
@@ -381,9 +384,9 @@ async def delete_audio(
             file_path = Path(audio.url)
             if file_path.exists():
                 os.remove(file_path)
-        except Exception:
-            # Log but don't fail if file deletion fails
-            pass
+        except OSError as e:
+            logger.error(f"Failed to delete audio file {file_path}: {e}")
+            raise ValueError(f"Failed to delete audio file from disk: {e}")
 
 
 @router.get("/cache/{subdir}/{filename}")
@@ -408,16 +411,19 @@ async def get_cached_audio(subdir: str, filename: str) -> FileResponse:
     file_path = cache_dir / subdir / filename
 
     # Security check - ensure we're not accessing files outside cache
+    # Resolve paths - catch only path resolution errors
     try:
         file_path = file_path.resolve()
         cache_dir = cache_dir.resolve()
-        if not str(file_path).startswith(str(cache_dir)):
-            raise ForbiddenException(
-                message="Cannot access files outside audio cache",
-                resource="audio cache",
-            )
-    except Exception:
-        raise NotFoundException(resource="File path", identifier=str(file_path))
+    except (OSError, ValueError) as e:
+        raise NotFoundException(resource="File path", identifier=str(file_path)) from e
+
+    # Security check - MUST NOT be caught
+    if not str(file_path).startswith(str(cache_dir)):
+        raise ForbiddenException(
+            message="Cannot access files outside audio cache",
+            resource="audio cache",
+        )
 
     # Verify the file exists
     if not file_path.exists():

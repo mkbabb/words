@@ -281,8 +281,8 @@ class GutenbergConnector(LiteratureConnector):
                 text = downloads_elem.get_text()
                 match = re.search(r"(\d+)", text)
                 return int(match.group(1)) if match else 0
-        except Exception:
-            pass
+        except (AttributeError, ValueError) as e:
+            logger.debug(f"Failed to extract download count: {e}")
         return 0
 
     def _extract_from_zip(self, zip_content: bytes) -> str | None:

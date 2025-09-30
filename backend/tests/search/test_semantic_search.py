@@ -39,9 +39,7 @@ async def semantic_engine(test_db, words_with_definitions):
     saved_corpus = await manager.save_corpus(corpus)
 
     # Create semantic search engine from corpus
-    engine = await SemanticSearch.from_corpus(
-        corpus=saved_corpus
-    )
+    engine = await SemanticSearch.from_corpus(corpus=saved_corpus)
 
     yield engine
 
@@ -186,9 +184,7 @@ class TestSemanticSearch:
         await semantic_engine.initialize()
 
         # Create a new engine from the same corpus (should use cached index)
-        new_engine = await SemanticSearch.from_corpus(
-            corpus=semantic_engine.corpus
-        )
+        new_engine = await SemanticSearch.from_corpus(corpus=semantic_engine.corpus)
 
         # Both should give same results
         results1 = semantic_engine.search("happy", max_results=3)
@@ -231,8 +227,8 @@ class TestSemanticSearch:
 
         # Verify result structure
         for result in results:
-            assert hasattr(result, 'word')
-            assert hasattr(result, 'score')
+            assert hasattr(result, "word")
+            assert hasattr(result, "score")
             assert 0 <= result.score <= 1.0
             assert result.word in semantic_engine.corpus.vocabulary
 

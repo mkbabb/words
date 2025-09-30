@@ -36,7 +36,7 @@ MODEL_BATCH_SIZES = {
 DEFAULT_BATCH_SIZE = 32
 
 # Optimization Configuration
-USE_ONNX_BACKEND = True  # Enable ONNX backend for 2x speedup
+USE_ONNX_BACKEND = False  # Disable ONNX backend (macOS compatibility issue)
 USE_MIXED_PRECISION = True  # Enable FP16 for 1.88x speedup and memory reduction
 ENABLE_GPU_ACCELERATION = True  # Enable GPU acceleration when available
 MEMORY_MAP_EMBEDDINGS = True  # Use memory-mapped storage for zero-copy access

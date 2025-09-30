@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -19,11 +18,28 @@ async def language_corpus_small(test_db):
     """Create a small language corpus for testing."""
     # Small set of words for basic testing
     vocabulary = [
-        "apple", "apples", "application", "apply", "applied",
-        "banana", "bananas", "band", "bandage",
-        "cat", "cats", "catch", "catching", "caught",
-        "dog", "dogs", "dodge", "dodging",
-        "elephant", "elephants", "elegant", "elegance"
+        "apple",
+        "apples",
+        "application",
+        "apply",
+        "applied",
+        "banana",
+        "bananas",
+        "band",
+        "bandage",
+        "cat",
+        "cats",
+        "catch",
+        "catching",
+        "caught",
+        "dog",
+        "dogs",
+        "dodge",
+        "dodging",
+        "elephant",
+        "elephants",
+        "elegant",
+        "elegance",
     ]
 
     corpus = Corpus(
@@ -40,6 +56,7 @@ async def language_corpus_small(test_db):
 
     # Save corpus to database
     from floridify.corpus.manager import CorpusManager
+
     manager = CorpusManager()
     saved = await manager.save_corpus(corpus)
 
@@ -50,7 +67,18 @@ async def language_corpus_small(test_db):
 async def language_corpus_large(test_db):
     """Create a large language corpus for performance testing."""
     # Generate larger vocabulary for performance testing
-    base_words = ["test", "word", "search", "find", "query", "match", "result", "language", "corpus", "index"]
+    base_words = [
+        "test",
+        "word",
+        "search",
+        "find",
+        "query",
+        "match",
+        "result",
+        "language",
+        "corpus",
+        "index",
+    ]
     vocabulary = []
 
     for base in base_words:
@@ -73,6 +101,7 @@ async def language_corpus_large(test_db):
     corpus._build_signature_index()
 
     from floridify.corpus.manager import CorpusManager
+
     manager = CorpusManager()
     saved = await manager.save_corpus(corpus)
 
@@ -93,7 +122,7 @@ async def literature_corpus(test_db):
     # Simple word extraction
     words = []
     for word in sample_text.lower().split():
-        cleaned = ''.join(c for c in word if c.isalnum())
+        cleaned = "".join(c for c in word if c.isalnum())
         if cleaned:
             words.append(cleaned)
 
@@ -112,6 +141,7 @@ async def literature_corpus(test_db):
     corpus._build_signature_index()
 
     from floridify.corpus.manager import CorpusManager
+
     manager = CorpusManager()
     saved = await manager.save_corpus(corpus)
 
@@ -123,10 +153,10 @@ async def search_engine_small(language_corpus_small):
     """Create search engine with small language corpus."""
     engine = await Search.from_corpus(
         corpus_name=language_corpus_small.corpus_name,
-        semantic=False  # Disable semantic for faster tests
+        semantic=False,  # Disable semantic for faster tests
     )
     yield engine
-    if hasattr(engine, 'close'):
+    if hasattr(engine, "close"):
         await engine.close()
 
 
@@ -135,42 +165,37 @@ async def search_engine_large(language_corpus_large):
     """Create search engine with large language corpus."""
     engine = await Search.from_corpus(
         corpus_name=language_corpus_large.corpus_name,
-        semantic=False  # Disable semantic for performance testing
+        semantic=False,  # Disable semantic for performance testing
     )
     yield engine
-    if hasattr(engine, 'close'):
+    if hasattr(engine, "close"):
         await engine.close()
 
 
 @pytest_asyncio.fixture
 async def search_engine_literature(literature_corpus):
     """Create search engine with literature corpus."""
-    engine = await Search.from_corpus(
-        corpus_name=literature_corpus.corpus_name,
-        semantic=False
-    )
+    engine = await Search.from_corpus(corpus_name=literature_corpus.corpus_name, semantic=False)
     yield engine
-    if hasattr(engine, 'close'):
+    if hasattr(engine, "close"):
         await engine.close()
 
 
 @pytest_asyncio.fixture
 async def search_engine_with_semantic(language_corpus_small):
     """Create search engine with semantic search enabled."""
-    with patch('floridify.search.semantic.core.SemanticSearch') as mock_semantic:
-        # Mock semantic search to avoid heavy dependencies in tests
-        mock_instance = AsyncMock()
-        mock_instance.initialize = AsyncMock()
-        mock_instance.search = AsyncMock(return_value=[])
-        mock_semantic.from_corpus = AsyncMock(return_value=mock_instance)
+    engine = await Search.from_corpus(
+        corpus_name=language_corpus_small.corpus_name, semantic=True
+    )
 
-        engine = await Search.from_corpus(
-            corpus_name=language_corpus_small.corpus_name,
-            semantic=True
-        )
-        yield engine
-        if hasattr(engine, 'close'):
-            await engine.close()
+    # Wait for semantic initialization to complete
+    if engine.semantic_search and hasattr(engine, "_semantic_init_task"):
+        if engine._semantic_init_task and not engine._semantic_init_task.done():
+            await engine._semantic_init_task
+
+    yield engine
+    if hasattr(engine, "close"):
+        await engine.close()
 
 
 class TestSearchWithSmallCorpus:
@@ -265,7 +290,9 @@ class TestSearchWithLargeCorpus:
         import time
 
         start = time.perf_counter()
-        results = await search_engine_large.search("word", method=SearchMethod.PREFIX, max_results=200)
+        results = await search_engine_large.search(
+            "word", method=SearchMethod.PREFIX, max_results=200
+        )
         elapsed = time.perf_counter() - start
 
         assert len(results) > 0
@@ -280,10 +307,9 @@ class TestSearchWithLargeCorpus:
         queries = [f"test{i}" for i in range(10)]
 
         # Run concurrent searches
-        results = await asyncio.gather(*[
-            search_engine_large.search(q, method=SearchMethod.PREFIX)
-            for q in queries
-        ])
+        results = await asyncio.gather(
+            *[search_engine_large.search(q, method=SearchMethod.PREFIX) for q in queries]
+        )
 
         # All should return results
         assert all(len(r) > 0 for r in results)
@@ -328,19 +354,16 @@ class TestSearchWithSemantic:
         """Test that semantic search can be enabled."""
         assert search_engine_with_semantic.index.semantic_enabled
 
-        # Mock semantic results
-        if search_engine_with_semantic.semantic_search:
-            search_engine_with_semantic.semantic_search.search = AsyncMock(
-                return_value=[
-                    {"word": "happy", "score": 0.9},
-                    {"word": "joyful", "score": 0.85}
-                ]
-            )
+        # Wait for semantic search to be ready
+        if hasattr(search_engine_with_semantic, "await_semantic_ready"):
+            await search_engine_with_semantic.await_semantic_ready()
 
-        # Should attempt semantic search
-        results = await search_engine_with_semantic.search("cheerful")
-        # Results depend on mock configuration
+        # Test real semantic search
+        results = await search_engine_with_semantic.search("cat")
         assert isinstance(results, list)
+        # Should find words in vocabulary
+        if len(results) > 0:
+            assert all(r.word in search_engine_with_semantic.corpus.vocabulary for r in results)
 
 
 class TestSearchEdgeCases:
@@ -382,15 +405,13 @@ class TestSearchInitialization:
     @pytest.mark.asyncio
     async def test_from_corpus_initialization(self, language_corpus_small):
         """Test creating search engine from corpus."""
-        engine = await Search.from_corpus(
-            corpus_name=language_corpus_small.corpus_name
-        )
+        engine = await Search.from_corpus(corpus_name=language_corpus_small.corpus_name)
 
         assert engine is not None
         assert engine.index is not None
         assert engine.index.corpus_name == language_corpus_small.corpus_name
 
-        if hasattr(engine, 'close'):
+        if hasattr(engine, "close"):
             await engine.close()
 
     @pytest.mark.asyncio
@@ -398,12 +419,10 @@ class TestSearchInitialization:
         """Test search index is properly created."""
         from floridify.corpus.utils import get_vocabulary_hash
 
-        engine = await Search.from_corpus(
-            corpus_name=language_corpus_small.corpus_name
-        )
+        engine = await Search.from_corpus(corpus_name=language_corpus_small.corpus_name)
 
         assert engine.index.vocabulary_hash == get_vocabulary_hash(language_corpus_small.vocabulary)
         assert engine.index.vocabulary_size == len(language_corpus_small.vocabulary)
 
-        if hasattr(engine, 'close'):
+        if hasattr(engine, "close"):
             await engine.close()

@@ -7,8 +7,12 @@ import asyncio
 import click
 from rich.console import Console
 
+from ...api.services.loaders import DictionaryEntryLoader
 from ...core.lookup_pipeline import lookup_word_pipeline
 from ...models.dictionary import Definition, DictionaryProvider, Language
+from ...models.parameters import LookupParams
+from ...models.responses import LookupResponse
+from ...utils.json_output import print_json
 from ...utils.logging import get_logger
 from ..utils.formatting import (
     format_error,
@@ -47,9 +51,16 @@ logger = get_logger(__name__)
     help="Skip AI synthesis",
 )
 @click.option(
+    "--force-refresh",
     "--force",
     is_flag=True,
     help="Force refresh all caches (bypass cache)",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output as JSON (matches API response format)",
 )
 def lookup(
     word: str,
@@ -57,13 +68,16 @@ def lookup(
     language: tuple[str, ...],
     semantic: bool,
     no_ai: bool,
-    force: bool,
+    force_refresh: bool,
+    output_json: bool,
 ) -> None:
     """Look up word definitions with AI enhancement.
 
     WORD: The word to look up
+
+    Use --json for machine-readable output that matches the API response format.
     """
-    asyncio.run(_lookup_async(word, provider, language, semantic, no_ai, force))
+    asyncio.run(_lookup_async(word, provider, language, semantic, no_ai, force_refresh, output_json))
 
 
 async def _lookup_async(
@@ -72,47 +86,70 @@ async def _lookup_async(
     language: tuple[str, ...],
     semantic: bool,
     no_ai: bool,
-    force: bool,
+    force_refresh: bool,
+    output_json: bool,
 ) -> None:
     """Async implementation of word lookup."""
     logger.info(f"Looking up word: '{word}' with providers: {', '.join(provider)}")
 
     try:
-        # Convert to enums
-        languages = [Language(lang) for lang in language]
-        providers = [DictionaryProvider(p) for p in provider]
+        # Initialize storage
+        from ...storage.mongodb import get_storage
+
+        await get_storage()
+
+        # Use shared parameter model for consistency with API
+        params = LookupParams(
+            providers=list(provider),
+            languages=list(language),
+            force_refresh=force_refresh,
+            no_ai=no_ai,
+        )
 
         # Use the shared lookup pipeline
         result = await lookup_word_pipeline(
             word=word,
-            providers=providers,
-            languages=languages,
+            providers=params.providers,
+            languages=params.languages,
             semantic=semantic,
-            no_ai=no_ai,
-            force_refresh=force,
+            no_ai=params.no_ai,
+            force_refresh=params.force_refresh,
         )
 
         if result:
-            # Group definitions by meaning cluster for display
-            meaning_groups: dict[str, list[Definition]] = {}
+            # JSON output mode - matches API response format exactly
+            if output_json:
+                # Convert to API-compatible response using shared loader
+                response_dict = await DictionaryEntryLoader.load_as_lookup_response(entry=result)
+                response = LookupResponse(**response_dict)
+                print_json(response)
+            else:
+                # Rich terminal output
+                # Group definitions by meaning cluster for display
+                meaning_groups: dict[str, list[Definition]] = {}
 
-            for definition in result.definitions:
-                # Get meaning cluster safely
-                cluster = "general"
-                if hasattr(definition, "meaning_cluster") and definition.meaning_cluster:
-                    cluster = definition.meaning_cluster
-                if cluster not in meaning_groups:
-                    meaning_groups[cluster] = []
-                meaning_groups[cluster].append(definition)
+                for definition in result.definitions:
+                    # Get meaning cluster safely
+                    cluster = "general"
+                    if hasattr(definition, "meaning_cluster") and definition.meaning_cluster:
+                        cluster = definition.meaning_cluster
+                    if cluster not in meaning_groups:
+                        meaning_groups[cluster] = []
+                    meaning_groups[cluster].append(definition)
 
-            # Display the synthesized entry
-            console.print(
-                format_meaning_based_definition(result, languages, providers, meaning_groups),
-            )
+                # Display the synthesized entry
+                console.print(
+                    format_meaning_based_definition(result, params.languages, params.providers, meaning_groups),
+                )
         else:
-            console.print(format_warning(f"No definition found for '{word}'"))
-            if not no_ai:
-                console.print("Consider checking the spelling or trying a different word.")
+            if output_json:
+                # JSON error format
+                error_response = {"error": "Not found", "word": word}
+                print_json(error_response)
+            else:
+                console.print(format_warning(f"No definition found for '{word}'"))
+                if not no_ai:
+                    console.print("Consider checking the spelling or trying a different word.")
 
     except Exception as e:
         logger.error(f"Lookup failed: {e}")

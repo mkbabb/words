@@ -141,6 +141,7 @@ class ImageRepository(BaseRepository[ImageMedia, ImageCreate, ImageUpdate]):
 
         # Update fields using TypedFieldUpdater
         from ..core.protocols import TypedFieldUpdater
+
         update_data = data.model_dump(exclude_unset=True)
         TypedFieldUpdater.update_fields(image, update_data)
 

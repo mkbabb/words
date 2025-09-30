@@ -21,7 +21,7 @@ timeout = 30
 max_pool_size = 100
 
 [models]
-openai_model = "gpt-4o"
+openai_model = "gpt-5"
 reasoning_effort = "high"
 embedding_model = "text-embedding-3-large"
 

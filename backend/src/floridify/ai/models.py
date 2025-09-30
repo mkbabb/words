@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.base import AIResponseBase
 from ..models.dictionary import DictionaryProvider
@@ -381,7 +381,7 @@ class WordFormResponse(AIResponseBase):
 class RegisterClassificationResponse(AIResponseBase):
     """Response for register classification."""
 
-    model_config = {"populate_by_name": True}  # Accept both field name and alias
+    model_config = ConfigDict(populate_by_field_name=True)  # Accept both field name and alias
 
     language_register: str = Field(
         alias="register",
@@ -413,7 +413,7 @@ class RegionalVariantResponse(AIResponseBase):
 class EnhancedDefinitionResponse(AIResponseBase):
     """Complete enhanced definition with all fields."""
 
-    model_config = {"populate_by_name": True}  # Accept both field name and alias
+    model_config = ConfigDict(populate_by_field_name=True)  # Accept both field name and alias
 
     definition: DefinitionResponse
     antonyms: list[str]

@@ -33,11 +33,6 @@ NON_ALPHABETIC_PATTERN = re.compile(r"[^a-zA-Z\-'\s]")
 # Combined cleanup pattern for single-pass optimization
 COMBINED_CLEANUP_PATTERN = re.compile(r"[^\w\s\'-]+|\s+")
 
-# Whitespace normalization (already defined above but documenting usage)
-# WHITESPACE_PATTERN = re.compile(r"\s+")
-# PUNCTUATION_PATTERN = re.compile(r"[^\w\s\'-]", re.UNICODE)
-# MULTIPLE_SPACE_PATTERN = re.compile(r"\s{2,}")
-
 # Character translation tables
 UNICODE_TO_ASCII = str.maketrans(
     {

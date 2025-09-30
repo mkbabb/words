@@ -36,4 +36,4 @@ class FuzzySearchMethod(Enum):
 
 
 # Search scoring constants
-DEFAULT_MIN_SCORE = 0.4  # Default minimum score threshold - lowered for better typo tolerance
+DEFAULT_MIN_SCORE = 0.3  # Default minimum score threshold - lowered for better typo tolerance

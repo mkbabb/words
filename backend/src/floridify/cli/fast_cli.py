@@ -99,16 +99,20 @@ semantic search, and Anki flashcard generation.[/dim]
         ],
     ),
     multiple=True,
+    default=["wiktionary"],
     help="Dictionary providers to use",
 )
-@click.option("--language", "-l", default="en", help="Language code")
+@click.option("--language", "-l", multiple=True, default=["en"], help="Language code")
 @click.option("--no-ai", is_flag=True, help="Disable AI synthesis")
-@click.option("--force-refresh", is_flag=True, help="Force refresh from providers")
-def lookup(word: str, **kwargs: Any) -> None:
+@click.option("--force", is_flag=True, help="Force refresh from providers")
+@click.option("--semantic", is_flag=True, help="Use semantic search")
+def lookup(word: str, provider: tuple[str, ...], language: tuple[str, ...], no_ai: bool, force: bool, semantic: bool) -> None:
     """Look up word definitions with AI enhancement."""
-    from .commands.lookup import lookup_word_command
+    import asyncio
 
-    lookup_word_command(word, **kwargs)
+    from .commands.lookup import _lookup_async
+
+    asyncio.run(_lookup_async(word, provider, language, semantic, no_ai, force))
 
 
 @cli.group(invoke_without_command=True)
@@ -278,13 +282,132 @@ def cleanup() -> None:
     cleanup_sessions()
 
 
-@cli.command()
-@click.argument("query")
-def search(query: str) -> None:
+@cli.group(invoke_without_command=True)
+@click.pass_context
+def search(ctx: click.Context) -> None:
     """🔎 Search functionality - find words across lexicons."""
-    from .commands.search import search_command
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
 
-    search_command(query)
+
+# Register search subcommands
+@search.command("word")
+@click.argument("query")
+@click.option(
+    "--language",
+    type=click.Choice(["en", "fr", "es", "de"], case_sensitive=False),
+    multiple=True,
+    default=["en"],
+    help="Lexicon languages to search",
+)
+@click.option(
+    "--mode",
+    type=click.Choice(["smart", "exact", "fuzzy", "semantic"], case_sensitive=False),
+    default="smart",
+    help="Search mode: smart (default), exact, fuzzy, semantic",
+)
+@click.option(
+    "--min-score",
+    type=float,
+    help="Minimum relevance score (0.0-1.0)",
+)
+@click.option(
+    "--force-rebuild",
+    is_flag=True,
+    help="Force rebuild of search indices",
+)
+@click.option(
+    "--max-results",
+    type=int,
+    default=20,
+    help="Maximum number of results to show",
+)
+@click.option(
+    "--corpus-id",
+    type=str,
+    help="Specific corpus ID to search (overrides --language)",
+)
+@click.option(
+    "--corpus-name",
+    type=str,
+    help="Specific corpus name to search (overrides --language)",
+)
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    help="Output as JSON (matches API response format)",
+)
+def search_word(
+    query: str,
+    language: tuple[str, ...],
+    mode: str,
+    max_results: int,
+    min_score: float | None,
+    force_rebuild: bool,
+    corpus_id: str | None,
+    corpus_name: str | None,
+    output_json: bool,
+) -> None:
+    """Search for words in lexicons."""
+    import asyncio
+
+    from .commands.search import _search_word_async
+
+    asyncio.run(
+        _search_word_async(
+            query,
+            language,
+            mode,
+            max_results,
+            min_score,
+            force_rebuild,
+            corpus_id,
+            corpus_name,
+            output_json,
+        )
+    )
+
+
+@search.command("similar")
+@click.argument("word")
+@click.option(
+    "--language",
+    type=click.Choice(["en", "fr", "es", "de"], case_sensitive=False),
+    multiple=True,
+    default=["en"],
+    help="Lexicon languages to search",
+)
+@click.option(
+    "--max-results",
+    type=int,
+    default=10,
+    help="Maximum number of similar words to show",
+)
+def search_similar(word: str, language: tuple[str, ...], max_results: int) -> None:
+    """Find words similar to the given word using semantic search."""
+    import asyncio
+
+    from .commands.search import _search_similar_async
+
+    asyncio.run(_search_similar_async(word, language, max_results))
+
+
+@search.command("stats")
+@click.option(
+    "--language",
+    type=click.Choice(["en", "fr", "es", "de"], case_sensitive=False),
+    multiple=True,
+    default=["en"],
+    help="Lexicon languages to show stats for",
+)
+def search_stats(language: tuple[str, ...]) -> None:
+    """Show search engine statistics."""
+    import asyncio
+
+    from .commands.search import _search_stats_async
+
+    asyncio.run(_search_stats_async(language))
 
 
 @cli.command()

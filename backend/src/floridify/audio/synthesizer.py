@@ -211,7 +211,7 @@ class AudioSynthesizer:
             )
 
             # Make the request
-            response = await asyncio.get_event_loop().run_in_executor(
+            response = await asyncio.get_running_loop().run_in_executor(
                 None,
                 lambda: self.client.synthesize_speech(
                     input=synthesis_input,
@@ -317,7 +317,7 @@ class AudioSynthesizer:
             )
 
             # Make the request
-            response = await asyncio.get_event_loop().run_in_executor(
+            response = await asyncio.get_running_loop().run_in_executor(
                 None,
                 lambda: self.client.synthesize_speech(
                     input=synthesis_input,

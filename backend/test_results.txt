@@ -1,0 +1,14 @@
+=== CLI/API Isomorphism Test Suite ===
+
+Testing: Search - fuzzy mode... [0;32m✓ PASS[0m
+Testing: Search - exact mode... [0;32m✓ PASS[0m
+Testing: Search - smart mode... [0;32m✓ PASS[0m
+Testing: Search - semantic mode... [0;32m✓ PASS[0m
+Testing: Search - max results... [0;32m✓ PASS[0m
+Testing: Search - min score 0.5... [0;32m✓ PASS[0m
+Testing: Search - no results... [0;32m✓ PASS[0m
+
+=== Results ===
+[0;32mPassed: 7[0m
+[0;31mFailed: 0[0m
+[0;32m✓ All tests passed![0m
