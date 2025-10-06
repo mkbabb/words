@@ -107,13 +107,15 @@ class LiteratureEntry(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    class Metadata(BaseVersionedData):
+    class Metadata(
+        BaseVersionedData,
+        default_resource_type=ResourceType.LITERATURE,
+        default_namespace=CacheNamespace.LITERATURE,
+    ):
         """Minimal literature metadata for versioning."""
 
         provider: LiteratureProvider | None = None
         work_id: str | None = None
-        resource_type: ResourceType = ResourceType.LITERATURE
-        namespace: CacheNamespace = CacheNamespace.LITERATURE
 
         class Settings:
             """Beanie settings."""

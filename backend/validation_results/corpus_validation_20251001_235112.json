@@ -1,0 +1,65 @@
+{
+  "test_corpus": {
+    "total": 4.402752293999583,
+    "vocabulary_size": 9886
+  },
+  "crud_operations": {
+    "create": {
+      "time_ms": 240.88495900105045,
+      "vocabulary_size": 5
+    },
+    "read": {
+      "time_ms": 49.352125000950764
+    },
+    "update": {
+      "time_ms": 310.53316699944844,
+      "words_added": 3
+    },
+    "delete": {
+      "time_ms": 82.45262499985984
+    }
+  },
+  "tree_operations": {
+    "create_parent": 0.22629762500037032,
+    "create_children": 2.4025720419995196,
+    "aggregate": 0.1590717079998285,
+    "cleanup": 1.0570562920001976
+  },
+  "api_endpoints": {
+    "list": {
+      "status": 200,
+      "time_ms": 434.7182500005147,
+      "count": 14
+    },
+    "get": {
+      "status": 500,
+      "time_ms": 87.69304199995531
+    },
+    "create": {
+      "status": 500,
+      "time_ms": 45.41166700073518
+    }
+  },
+  "benchmarks": {
+    "100": {
+      "create_time_s": 0.16323329199985892,
+      "read_time_ms": 41.194833000190556,
+      "throughput_words_per_sec": 612.6201265369716
+    },
+    "1000": {
+      "create_time_s": 0.17448458300168568,
+      "read_time_ms": 25.664999999207794,
+      "throughput_words_per_sec": 5731.165371729943
+    },
+    "5000": {
+      "create_time_s": 0.2487818760000664,
+      "read_time_ms": 40.1226250014588,
+      "throughput_words_per_sec": 20097.927069247864
+    },
+    "10000": {
+      "create_time_s": 2.9141633340004773,
+      "read_time_ms": 32.72395899875846,
+      "throughput_words_per_sec": 3431.516649505124
+    }
+  }
+}

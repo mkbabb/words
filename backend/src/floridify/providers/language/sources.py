@@ -32,25 +32,32 @@ LANGUAGE_CORPUS_SOURCES = [
     ),
     # English - Idioms and Phrases
     LanguageSource(
-        name="wikipedia_idioms",
-        url="https://raw.githubusercontent.com/saikatbsk/English-Idioms-Dataset/master/data/idioms.json",
+        name="american_idioms",
+        url="https://raw.githubusercontent.com/yuxiaojian/most-common-american-idioms-with-synonyms/main/idioms.json",
         parser=ParserType.CUSTOM,
         language=Language.ENGLISH,
-        description="English idioms and their meanings from Wikipedia",
+        description="Most common American idioms with synonyms and examples",
     ),
     LanguageSource(
         name="phrasal_verbs",
-        url="https://gist.githubusercontent.com/Xeoncross/4379626/raw/phrasal_verbs.json",
+        url="https://raw.githubusercontent.com/Semigradsky/phrasal-verbs/master/common.json",
         parser=ParserType.CUSTOM,
         language=Language.ENGLISH,
-        description="Common English phrasal verbs",
+        description="Common English phrasal verbs with definitions and examples",
     ),
     LanguageSource(
         name="common_phrases",
-        url="https://raw.githubusercontent.com/alvations/pyphraselist/master/EN/common_phrases.txt",
+        url="https://gist.githubusercontent.com/maziyarpanahi/876f1d35b06a36992e38bb4b1a05f2f4/raw",
         parser=ParserType.TEXT_LINES,
         language=Language.ENGLISH,
-        description="Common English phrases and expressions",
+        description="Top 500 common English phrases from Wikipedia corpus",
+    ),
+    LanguageSource(
+        name="proverbs",
+        url="https://raw.githubusercontent.com/dariusk/corpora/master/data/words/proverbs.json",
+        parser=ParserType.CUSTOM,
+        language=Language.ENGLISH,
+        description="English proverbs and sayings by category",
     ),
     # French - Core Vocabulary
     LanguageSource(
@@ -67,15 +74,17 @@ LANGUAGE_CORPUS_SOURCES = [
         language=Language.FRENCH,
         description="50,000 most frequent French words with frequencies",
     ),
-    # French - Expressions and Idioms
+    # French expressions used IN ENGLISH - should be part of English corpus
     LanguageSource(
         name="french_expressions",
-        url="https://fr.wikipedia.org/wiki/Liste_de_proverbes_français",
+        url="https://en.wikipedia.org/wiki/Glossary_of_French_words_and_expressions_in_English",
         parser=ParserType.CUSTOM,
-        language=Language.FRENCH,
-        description="French proverbs and expressions from Wikipedia",
+        language=Language.ENGLISH,  # These are French words used IN English
+        description="French words and expressions used in English from Wikipedia glossary",
         scraper=ScraperType.FRENCH_EXPRESSIONS,  # Custom scraper for Wikipedia
     ),
+    # Pure French sources below
+    # French - Expressions and Idioms
     # Spanish - Core Vocabulary
     LanguageSource(
         name="spanish_word_list",

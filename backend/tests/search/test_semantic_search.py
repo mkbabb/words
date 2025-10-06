@@ -117,7 +117,7 @@ class TestSemanticSearch:
         await semantic_engine.initialize()
 
         # Search for semantically similar words
-        results = semantic_engine.search("joyful", max_results=5)
+        results = await semantic_engine.search("joyful", max_results=5)
 
         assert len(results) > 0
         # "happy" should be in top results due to semantic similarity
@@ -146,7 +146,7 @@ class TestSemanticSearch:
         await semantic_engine.initialize()
 
         # Search with high threshold
-        results = semantic_engine.search("joyful", max_results=10, min_score=0.8)
+        results = await semantic_engine.search("joyful", max_results=10, min_score=0.8)
 
         # All results should have high similarity
         assert all(r.score >= 0.8 for r in results)
@@ -173,7 +173,7 @@ class TestSemanticSearch:
         engine = await SemanticSearch.from_corpus(corpus=saved_corpus)
 
         # Search should return empty results
-        results = engine.search("test")
+        results = await engine.search("test")
         assert len(results) == 0
 
     @pytest.mark.asyncio
@@ -187,8 +187,8 @@ class TestSemanticSearch:
         new_engine = await SemanticSearch.from_corpus(corpus=semantic_engine.corpus)
 
         # Both should give same results
-        results1 = semantic_engine.search("happy", max_results=3)
-        results2 = new_engine.search("happy", max_results=3)
+        results1 = await semantic_engine.search("happy", max_results=3)
+        results2 = await new_engine.search("happy", max_results=3)
 
         # Check that we get consistent results
         assert len(results1) == len(results2)
@@ -223,7 +223,7 @@ class TestSemanticSearch:
         await semantic_engine.initialize()
 
         # Do a real search
-        results = semantic_engine.search("joyful", max_results=5)
+        results = await semantic_engine.search("joyful", max_results=5)
 
         # Verify result structure
         for result in results:
@@ -247,10 +247,9 @@ class TestSemanticSearch:
 
         queries = ["joyful", "sorrowful", "peaceful", "furious"]
 
-        # Run searches concurrently (search is sync, so use loop.run_in_executor)
-        loop = asyncio.get_event_loop()
+        # Run searches concurrently (search is async)
         results = await asyncio.gather(
-            *[loop.run_in_executor(None, semantic_engine.search, q, 3) for q in queries]
+            *[semantic_engine.search(q, max_results=3) for q in queries]
         )
 
         # Each search should return results
@@ -293,7 +292,7 @@ class TestSemanticSearch:
             mock_embed.return_value = np.array([[0.1] * 512])  # Wrong size
 
             # Search should handle gracefully
-            results = semantic_engine.search("test")
+            results = await semantic_engine.search("test")
             assert isinstance(results, list)  # Should return list (possibly empty)
 
     @pytest.mark.asyncio
@@ -304,10 +303,10 @@ class TestSemanticSearch:
         await semantic_engine.initialize()
 
         # Empty query should return empty results or raise an error
-        results = semantic_engine.search("")
+        results = await semantic_engine.search("")
         assert isinstance(results, list)
         assert len(results) == 0
 
-        results = semantic_engine.search("   ")
+        results = await semantic_engine.search("   ")
         assert isinstance(results, list)
         assert len(results) == 0

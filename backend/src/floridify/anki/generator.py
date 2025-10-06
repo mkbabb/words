@@ -510,7 +510,7 @@ class AnkiCardGenerator:
             logger.error(f"💥 Error exporting cards to .apkg: {e}")
             return None
 
-    def export_directly_to_anki(
+    async def export_directly_to_anki(
         self,
         cards: list[AnkiCard],
         deck_name: str,
@@ -534,46 +534,50 @@ class AnkiCardGenerator:
 
         logger.info(f"🚀 Attempting direct export of {len(cards)} cards to Anki deck '{deck_name}'")
 
-        # Try direct export first
-        if self.direct_integration.is_available():
-            success = self.direct_integration.export_cards_directly(cards, deck_name)
+        try:
+            # Try direct export first
+            if await self.direct_integration.is_available():
+                success = await self.direct_integration.export_cards_directly(cards, deck_name)
 
-            if success:
-                total_time = time.time() - start_time
-                logger.success(f"✅ Cards exported directly to Anki in {total_time:.2f}s")
-                return True, None
-            logger.warning("⚠️ Direct export failed, falling back to .apkg")
-        else:
-            logger.info("📦 AnkiConnect not available, using .apkg export")
-
-        # Fallback to .apkg export
-        if fallback_to_apkg:
-            if output_path is None:
-                output_path = Path.cwd() / f"{deck_name.replace(' ', '_')}"
-
-            apkg_path = self.export_to_apkg(cards, deck_name, output_path)
-
-            if apkg_path is None:
-                logger.error("💥 .apkg export also failed")
-                return False, None
-
-            # If AnkiConnect is available, try to import the .apkg directly
-            if self.direct_integration.is_available():
-                logger.info("🔄 Attempting to import .apkg directly into Anki")
-                import_success = self.direct_integration.import_apkg_directly(str(apkg_path))
-
-                if import_success:
+                if success:
                     total_time = time.time() - start_time
-                    logger.success(f"✅ .apkg imported directly to Anki in {total_time:.2f}s")
-                    return True, apkg_path
-                logger.warning("⚠️ Direct .apkg import failed")
+                    logger.success(f"✅ Cards exported directly to Anki in {total_time:.2f}s")
+                    return True, None
+                logger.warning("⚠️ Direct export failed, falling back to .apkg")
+            else:
+                logger.info("📦 AnkiConnect not available, using .apkg export")
 
-            total_time = time.time() - start_time
-            logger.info(f"📦 Created .apkg file in {total_time:.2f}s: {apkg_path}")
-            return False, apkg_path
+            # Fallback to .apkg export
+            if fallback_to_apkg:
+                if output_path is None:
+                    output_path = Path.cwd() / f"{deck_name.replace(' ', '_')}"
 
-        logger.error("💥 All export methods failed")
-        return False, None
+                apkg_path = self.export_to_apkg(cards, deck_name, output_path)
+
+                if apkg_path is None:
+                    logger.error("💥 .apkg export also failed")
+                    return False, None
+
+                # If AnkiConnect is available, try to import the .apkg directly
+                if await self.direct_integration.is_available():
+                    logger.info("🔄 Attempting to import .apkg directly into Anki")
+                    import_success = await self.direct_integration.import_apkg_directly(str(apkg_path))
+
+                    if import_success:
+                        total_time = time.time() - start_time
+                        logger.success(f"✅ .apkg imported directly to Anki in {total_time:.2f}s")
+                        return True, apkg_path
+                    logger.warning("⚠️ Direct .apkg import failed")
+
+                total_time = time.time() - start_time
+                logger.info(f"📦 Created .apkg file in {total_time:.2f}s: {apkg_path}")
+                return False, apkg_path
+
+            logger.error("💥 All export methods failed")
+            return False, None
+        finally:
+            # Clean up HTTP client
+            await self.direct_integration.ankiconnect.close()
 
     def _generate_html_preview(self, cards: list[AnkiCard], deck_name: str) -> str:
         """Generate HTML preview of the cards."""

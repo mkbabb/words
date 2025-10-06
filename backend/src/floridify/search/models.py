@@ -90,13 +90,15 @@ class TrieIndex(BaseModel):
     max_frequency: int = 0
     build_time_seconds: float = 0.0
 
-    class Metadata(BaseVersionedData):
+    class Metadata(
+        BaseVersionedData,
+        default_resource_type=ResourceType.TRIE,
+        default_namespace=CacheNamespace.TRIE,
+    ):
         """Minimal trie metadata for versioning."""
 
         corpus_id: PydanticObjectId
         vocabulary_hash: str = ""
-        resource_type: ResourceType = ResourceType.TRIE
-        namespace: CacheNamespace = CacheNamespace.TRIE
 
     @classmethod
     async def get(
@@ -242,28 +244,49 @@ class TrieIndex(BaseModel):
         self,
         config: VersionConfig | None = None,
     ) -> None:
-        """Save trie index to versioned storage.
+        """Save trie index to versioned storage with verification.
 
         Args:
             config: Version configuration
 
+        Raises:
+            RuntimeError: If save fails or verification fails
+
         """
         manager = get_version_manager()
-        resource_id = f"{self.corpus_name}:trie"
+        resource_id = f"{self.corpus_id!s}:trie"
 
-        # Save using version manager - convert ObjectIds to strings for JSON
-        await manager.save(
-            resource_id=resource_id,
-            resource_type=ResourceType.TRIE,
-            namespace=manager._get_namespace(ResourceType.TRIE),
-            content=self.model_dump(mode="json"),
-            config=config or VersionConfig(),
-            metadata={
-                "corpus_id": self.corpus_id,
-            },
-        )
+        try:
+            # Save using version manager - convert ObjectIds to strings for JSON
+            await manager.save(
+                resource_id=resource_id,
+                resource_type=ResourceType.TRIE,
+                namespace=manager._get_namespace(ResourceType.TRIE),
+                content=self.model_dump(mode="json"),
+                config=config or VersionConfig(),
+                metadata={
+                    "corpus_id": self.corpus_id,
+                },
+            )
 
-        logger.debug(f"Saved trie index for {resource_id}")
+            # Verify save succeeded
+            saved = await self.get(corpus_id=self.corpus_id, config=config)
+            if not saved:
+                raise ValueError("Could not retrieve saved trie index")
+            if saved.vocabulary_hash != self.vocabulary_hash:
+                raise ValueError(
+                    f"Vocabulary hash mismatch after save: "
+                    f"expected {self.vocabulary_hash}, got {saved.vocabulary_hash}"
+                )
+
+            logger.info(f"Successfully saved and verified trie index for {resource_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to save trie index {resource_id}: {e}")
+            raise RuntimeError(
+                f"Trie index persistence failed for corpus {self.corpus_id}. "
+                f"Index may be corrupted. Error: {e}"
+            ) from e
 
 
 class SearchIndex(BaseModel):
@@ -296,7 +319,11 @@ class SearchIndex(BaseModel):
     vocabulary_size: int = 0
     total_indices: int = 0
 
-    class Metadata(BaseVersionedData):
+    class Metadata(
+        BaseVersionedData,
+        default_resource_type=ResourceType.SEARCH,
+        default_namespace=CacheNamespace.SEARCH,
+    ):
         """Minimal search metadata for versioning."""
 
         corpus_id: PydanticObjectId
@@ -306,8 +333,6 @@ class SearchIndex(BaseModel):
         has_semantic: bool = False
         trie_index_id: PydanticObjectId | None = None
         semantic_index_id: PydanticObjectId | None = None
-        resource_type: ResourceType = ResourceType.SEARCH
-        namespace: CacheNamespace = CacheNamespace.SEARCH
 
     @classmethod
     async def get(
@@ -332,11 +357,18 @@ class SearchIndex(BaseModel):
 
         manager = get_version_manager()
 
-        # Build resource ID based on what we have
-        if corpus_id:
-            resource_id = f"{corpus_id!s}:search"
-        else:
-            resource_id = f"{corpus_name}:search"
+        # Build resource ID - always use corpus_id for consistency
+        # If only corpus_name provided, look up corpus_id first
+        if not corpus_id and corpus_name:
+            from floridify.corpus.core import Corpus
+
+            corpus = await Corpus.get(corpus_name=corpus_name, config=config)
+            if not corpus:
+                logger.warning(f"Corpus '{corpus_name}' not found")
+                return None
+            corpus_id = corpus.corpus_id
+
+        resource_id = f"{corpus_id!s}:search"
 
         # Get the latest search index metadata
         metadata: SearchIndex.Metadata | None = await manager.get_latest(
@@ -440,34 +472,61 @@ class SearchIndex(BaseModel):
         self,
         config: VersionConfig | None = None,
     ) -> None:
-        """Save search index to versioned storage.
+        """Save search index to versioned storage with verification.
 
         Args:
             config: Version configuration
 
+        Raises:
+            RuntimeError: If save fails or verification fails
+
         """
         manager = get_version_manager()
-        resource_id = f"{self.corpus_name}:search"
+        resource_id = f"{self.corpus_id!s}:search"
 
-        # Save using version manager - convert ObjectIds to strings for JSON
-        await manager.save(
-            resource_id=resource_id,
-            resource_type=ResourceType.SEARCH,
-            namespace=manager._get_namespace(ResourceType.SEARCH),
-            content=self.model_dump(mode="json"),
-            config=config or VersionConfig(),
-            metadata={
-                "corpus_id": self.corpus_id,
-                "vocabulary_hash": self.vocabulary_hash,
-                "has_trie": self.has_trie,
-                "has_fuzzy": self.has_fuzzy,
-                "has_semantic": self.has_semantic,
-                "trie_index_id": self.trie_index_id,
-                "semantic_index_id": self.semantic_index_id,
-            },
-        )
+        try:
+            # Save using version manager - convert ObjectIds to strings for JSON
+            await manager.save(
+                resource_id=resource_id,
+                resource_type=ResourceType.SEARCH,
+                namespace=manager._get_namespace(ResourceType.SEARCH),
+                content=self.model_dump(mode="json"),
+                config=config or VersionConfig(),
+                metadata={
+                    "corpus_id": self.corpus_id,
+                    "vocabulary_hash": self.vocabulary_hash,
+                    "has_trie": self.has_trie,
+                    "has_fuzzy": self.has_fuzzy,
+                    "has_semantic": self.has_semantic,
+                    "trie_index_id": self.trie_index_id,
+                    "semantic_index_id": self.semantic_index_id,
+                },
+            )
 
-        logger.debug(f"Saved search index for {resource_id}")
+            # Verify save succeeded
+            saved = await self.get(corpus_id=self.corpus_id, config=config)
+            if not saved:
+                raise ValueError("Could not retrieve saved search index")
+            if saved.vocabulary_hash != self.vocabulary_hash:
+                raise ValueError(
+                    f"Vocabulary hash mismatch after save: "
+                    f"expected {self.vocabulary_hash}, got {saved.vocabulary_hash}"
+                )
+
+            # Verify component references are intact
+            if self.has_trie and saved.trie_index_id != self.trie_index_id:
+                raise ValueError("Trie index reference mismatch after save")
+            if self.has_semantic and saved.semantic_index_id != self.semantic_index_id:
+                raise ValueError("Semantic index reference mismatch after save")
+
+            logger.info(f"Successfully saved and verified search index for {resource_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to save search index {resource_id}: {e}")
+            raise RuntimeError(
+                f"Search index persistence failed for corpus {self.corpus_id}. "
+                f"Index references may be corrupted. Error: {e}"
+            ) from e
 
 
 __all__ = [

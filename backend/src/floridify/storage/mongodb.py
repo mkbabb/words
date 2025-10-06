@@ -57,8 +57,10 @@ class MongoDBStorage:
 
     async def connect(self) -> None:
         """Connect to MongoDB and initialize Beanie with optimized connection pool."""
-        # Detect if connecting to localhost (no TLS needed)
-        is_localhost = "localhost:27017" in self.connection_string
+        # Detect if connecting to localhost or Docker internal MongoDB (no TLS needed)
+        is_localhost = any(
+            host in self.connection_string for host in ["localhost:27017", "mongodb:27017", "127.0.0.1:27017"]
+        )
 
         # Build connection kwargs
         connection_kwargs = {
@@ -86,6 +88,10 @@ class MongoDBStorage:
         )
         database: Any = self.client[self.database_name]
 
+        # Import search metadata classes first
+        from ..search.models import SearchIndex, TrieIndex
+        from ..search.semantic.models import SemanticIndex
+
         # Initialize Beanie with all document models
         await init_beanie(
             database=database,
@@ -100,13 +106,15 @@ class MongoDBStorage:
                 ImageMedia,
                 WordRelationship,
                 WordList,
-                # Versioning models
+                # Versioning models - base class first
                 BaseVersionedData,
                 DictionaryEntry,
                 BatchOperation,
-                # Cache models
-                # CorpusCacheEntry removed - using unified caching
+                # Cache models - all versioned metadata classes
                 Corpus.Metadata,
+                SearchIndex.Metadata,
+                TrieIndex.Metadata,
+                SemanticIndex.Metadata,
             ],
         )
 

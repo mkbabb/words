@@ -206,8 +206,9 @@ class RespectfulHttpClient:
     async def __aenter__(self) -> RespectfulHttpClient:
         """Async context manager entry."""
         limits = httpx.Limits(
-            max_connections=self.max_connections,
-            max_keepalive_connections=max(2, self.max_connections // 2),
+            max_connections=max(20, self.max_connections),  # Min 20 connections
+            max_keepalive_connections=max(10, self.max_connections // 2),  # Min 10 keepalive
+            keepalive_expiry=30.0,  # 30s keepalive window
         )
 
         headers = {
@@ -221,6 +222,7 @@ class RespectfulHttpClient:
         }
 
         self._session = httpx.AsyncClient(
+            http2=True,  # Enable HTTP/2 for multiplexing
             timeout=self.timeout,
             limits=limits,
             headers=headers,

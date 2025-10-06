@@ -204,6 +204,41 @@ class BaseVersionedData(Document):
     class Settings:
         name = "versioned_data"
         is_root = True
+        indexes = [
+            # PRIMARY: Latest version lookup (most frequent query)
+            # Covers: resource_id + is_latest filter + _id sort
+            [("resource_id", 1), ("version_info.is_latest", 1), ("_id", -1)],
+
+            # Specific version lookup
+            # Covers: resource_id + exact version query
+            [("resource_id", 1), ("version_info.version", 1)],
+
+            # Content hash deduplication
+            # Covers: resource_id + hash-based dedup during save
+            [("resource_id", 1), ("version_info.data_hash", 1)],
+        ]
+
+    def __init_subclass__(
+        cls,
+        default_resource_type: ResourceType | None = None,
+        default_namespace: CacheNamespace | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Set field defaults for child classes to avoid field shadowing warnings.
+
+        Child classes can specify their resource_type and namespace like:
+            class MyMetadata(BaseVersionedData,
+                           default_resource_type=ResourceType.CORPUS,
+                           default_namespace=CacheNamespace.CORPUS):
+                pass
+        """
+        super().__init_subclass__(**kwargs)
+
+        # Set field defaults at class creation time
+        if default_resource_type is not None:
+            cls.model_fields['resource_type'].default = default_resource_type
+        if default_namespace is not None:
+            cls.model_fields['namespace'].default = default_namespace
 
     @field_validator("content_location", mode="before")
     @classmethod

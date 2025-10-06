@@ -2,7 +2,18 @@
 
 from __future__ import annotations
 
+# Fix for pytest segfault on Apple Silicon with GTE-Qwen2 model and OpenMP threading
 import os
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+
+import torch
+torch.set_default_device("cpu")
 import shutil
 import subprocess
 import time

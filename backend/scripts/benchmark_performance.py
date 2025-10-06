@@ -72,7 +72,14 @@ async def benchmark_search_type(search_type: str, iterations: int = 50) -> dict:
 
     console.print(f"\n[cyan]Benchmarking {search_type} search...[/cyan]")
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(
+        timeout=30.0,
+        limits=httpx.Limits(
+            max_keepalive_connections=20,
+            max_connections=100,
+            keepalive_expiry=10.0,
+        ),
+    ) as client:
         for i in range(iterations):
             # Select random query type and query
             query_type = random.choice(list(TEST_QUERIES.keys()))
@@ -136,7 +143,14 @@ async def benchmark_cache_performance(iterations: int = 20) -> dict:
 
     console.print("\n[cyan]Benchmarking cache performance...[/cyan]")
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(
+        timeout=30.0,
+        limits=httpx.Limits(
+            max_keepalive_connections=20,
+            max_connections=100,
+            keepalive_expiry=10.0,
+        ),
+    ) as client:
         # Warm up cache
         console.print("  Warming up cache...")
         for query in cache_queries:
@@ -183,7 +197,14 @@ async def benchmark_concurrent_load(
 
     async def make_requests():
         nonlocal errors
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(
+        timeout=30.0,
+        limits=httpx.Limits(
+            max_keepalive_connections=20,
+            max_connections=100,
+            keepalive_expiry=10.0,
+        ),
+    ) as client:
             while time.time() < end_time:
                 query = random.choice(random.choice(list(TEST_QUERIES.values())))
                 try:

@@ -45,7 +45,10 @@ class LanguageCorpus(Corpus):
 
         # Fetch vocabulary using connector
         connector = connector or URLLanguageConnector()
-        result = await connector.fetch_source(source)
+        # Always force rebuild for corpus building to avoid stale cache
+        from ...caching.models import VersionConfig
+
+        result = await connector.fetch_source(source, config=VersionConfig(force_rebuild=True))
 
         if not result:
             logger.warning(f"No vocabulary fetched for source: {source.name}")
@@ -58,8 +61,9 @@ class LanguageCorpus(Corpus):
             return None
 
         # Create child corpus from source vocabulary
+        # Use just the source name - parent-child relationship is via IDs
         child = await Corpus.create(
-            corpus_name=f"{self.corpus_name}_{source.name}",
+            corpus_name=source.name,
             vocabulary=vocabulary,
             language=source.language,
             semantic=self.metadata.get("semantic_enabled", False),
@@ -186,13 +190,23 @@ class LanguageCorpus(Corpus):
 
         logger.info(f"Adding {len(sources)} sources for {language.value}")
 
-        # Add all sources
-        for source in sources:
+        # Add all sources in parallel
+        async def add_source_safe(source: LanguageSource) -> bool:
+            """Add source with error handling."""
             try:
                 await corpus.add_language_source(source)
+                return True
             except Exception as e:
                 logger.error(f"Failed to add source {source.name}: {e}")
-                continue
+                return False
+
+        # Process all sources concurrently
+        import asyncio
+        tasks = [add_source_safe(source) for source in sources]
+        results = await asyncio.gather(*tasks, return_exceptions=False)
+
+        successful = sum(1 for r in results if r is True)
+        logger.info(f"Successfully added {successful}/{len(sources)} sources")
 
         # Final save with aggregated vocabulary
         await corpus.save()
@@ -211,7 +225,8 @@ class LanguageCorpus(Corpus):
         manager = get_tree_corpus_manager()
 
         # Find child corpus with matching name from parent's children
-        child_name = f"{self.corpus_name}_{source_name}"
+        # Child corpora use just the source name
+        child_name = source_name
         logger.info(f"Looking for child corpus named: {child_name}")
 
         # Ensure we have the latest parent state with children

@@ -75,8 +75,12 @@ class URLLanguageConnector(LanguageConnector):
             # Determine parser to use and parse content
             parser_type = source.parser or ParserType.TEXT_LINES
             if isinstance(content, dict):
-                # Structured data from custom scraper
-                words, phrases = parse_scraped_data(content, source.language)
+                # Structured data from custom scraper - use JSON parser which handles
+                # various structures including {"data": [...]} from French expressions
+                if parser_type in (ParserType.CUSTOM, ParserType.JSON_VOCABULARY):
+                    words, phrases = parse_json_vocabulary(content, source.language)
+                else:
+                    words, phrases = parse_scraped_data(content, source.language)
             # Text data - use configured parser
             elif parser_type == ParserType.JSON_VOCABULARY:
                 words, phrases = parse_json_vocabulary(content, source.language)

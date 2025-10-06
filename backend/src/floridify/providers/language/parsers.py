@@ -106,6 +106,7 @@ def parse_json_vocabulary(content: str | dict[str, Any], language: Language) -> 
                     or item.get("text")
                     or item.get("idiom")
                     or item.get("phrase")
+                    or item.get("verb")  # Phrasal verbs
                     or item.get("term")
                     or item.get("name")  # GitHub files
                     or ""
@@ -120,6 +121,33 @@ def parse_json_vocabulary(content: str | dict[str, Any], language: Language) -> 
 
     # Handle dictionary
     elif isinstance(data, dict):
+        # Handle scraped data with "data" key (e.g., French expressions)
+        if "data" in data and isinstance(data["data"], list):
+            for item in data["data"]:
+                if isinstance(item, dict):
+                    # Extract expression or other text fields
+                    text = (
+                        item.get("expression")
+                        or item.get("word")
+                        or item.get("text")
+                        or item.get("phrase")
+                        or ""
+                    )
+                    if text:
+                        normalized = normalize(text)
+                        if normalized:
+                            if is_phrase(normalized):
+                                phrases.append(normalized)
+                            else:
+                                words.append(normalized)
+                elif isinstance(item, str):
+                    normalized = normalize(item)
+                    if normalized:
+                        if is_phrase(normalized):
+                            phrases.append(normalized)
+                        else:
+                            words.append(normalized)
+
         # Extract from specific keys
         for key in ["words", "vocabulary", "vocab", "terms"]:
             if key in data and isinstance(data[key], list):
@@ -145,6 +173,7 @@ def parse_json_vocabulary(content: str | dict[str, Any], language: Language) -> 
                         text = (
                             item.get("idiom")
                             or item.get("phrase")
+                            or item.get("verb")  # Phrasal verbs
                             or item.get("text")
                             or item.get("expression")
                             or ""
@@ -153,6 +182,19 @@ def parse_json_vocabulary(content: str | dict[str, Any], language: Language) -> 
                             normalized = normalize(text)
                             if normalized:
                                 phrases.append(normalized)
+
+        # Extract proverbs from nested category structure
+        # Format: {"proverbs": [{"Category": ["proverb1", "proverb2"]}, ...]}
+        if "proverbs" in data and isinstance(data["proverbs"], list):
+            for category_dict in data["proverbs"]:
+                if isinstance(category_dict, dict):
+                    for category_name, proverb_list in category_dict.items():
+                        if isinstance(proverb_list, list):
+                            for proverb in proverb_list:
+                                if isinstance(proverb, str):
+                                    normalized = normalize(proverb)
+                                    if normalized:
+                                        phrases.append(normalized)
 
         # Extract idioms as vocabulary items (they're multi-word expressions)
         if "idioms" in data and isinstance(data["idioms"], list):

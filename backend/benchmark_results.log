@@ -1,0 +1,56 @@
+Floridify Search Performance Benchmark
+==================================================
+
+Benchmarking exact search...
+  Progress: 10/30
+  Progress: 20/30
+  Progress: 30/30
+
+Benchmarking fuzzy search...
+  Progress: 10/30
+  Progress: 20/30
+  Progress: 30/30
+
+Benchmarking semantic search...
+  Progress: 10/30
+  Progress: 20/30
+  Progress: 30/30
+
+Benchmarking combined search...
+  Progress: 10/30
+  Progress: 20/30
+  Progress: 30/30
+
+Benchmarking cache performance...
+  Warming up cache...
+
+Benchmarking concurrent load (10 concurrent requests)...
+
+
+                      Search Performance Benchmark Results                      
+┏━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━┓
+┃             ┃        ┃ Mean   ┃ Median ┃ P95    ┃ P99     ┃ Min    ┃ Max     ┃
+┃ Search Type ┃ Itera… ┃ (ms)   ┃ (ms)   ┃ (ms)   ┃ (ms)    ┃ (ms)   ┃ (ms)    ┃
+┡━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━┩
+│ exact       │ 30     │ 4.00   │ 3.85   │ 4.60   │ 5.37    │ 3.16   │ 5.68    │
+│ fuzzy       │ 30     │ 3.95   │ 3.76   │ 4.69   │ 5.09    │ 3.40   │ 5.25    │
+│ semantic    │ 30     │ 4.22   │ 4.21   │ 4.94   │ 5.18    │ 3.44   │ 5.22    │
+│ combined    │ 30     │ 4.16   │ 4.07   │ 4.95   │ 5.35    │ 3.43   │ 5.45    │
+│ cache       │ 20     │ 4.09   │ 4.03   │ 4.93   │ 0.00    │ 3.29   │ 5.31    │
+│ concurrent  │ -      │ 9.42   │ 7.05   │ 24.97  │ 54.77   │ 0.00   │ 0.00    │
+└─────────────┴────────┴────────┴────────┴────────┴─────────┴────────┴─────────┘
+
+Concurrent Load Test Details:
+  Total Requests: 458
+  Successful: 458
+  Errors: 0 (0.0%)
+  Throughput: 90.02 QPS
+
+Performance Assessment:
+  ❌ exact: P95 = 4.60ms (target: <1.0ms)
+  ✅ fuzzy: P95 = 4.69ms (target: <5.0ms)
+  ✅ semantic: P95 = 4.94ms (target: <10.0ms)
+  ✅ combined: P95 = 4.95ms (target: <10.0ms)
+  ❌ cache: P95 = 4.93ms (target: <0.5ms)
+
+Results saved to: benchmark_results/2025-10-02_17-12-55_search_benchmark.json

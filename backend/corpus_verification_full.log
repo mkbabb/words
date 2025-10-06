@@ -1,0 +1,31 @@
+
+🏗️  Building Language-Level Corpus
+================================================================================
+[32m2025-10-02 14:17:53[0m | [1mINFO    [0m | "[36m/Users/mkbabb/Programming/words/backend/src/floridify/storage/mongodb.py[0m", line [36m302[0m in [36m_ensure_initialized[0m(): [1mInitializing MongoDB: floridify at mongodb://localhost:27017/floridify...[0m
+
+📚 Step 1: Creating language corpus with parallel source fetching...
+
+❌ Error: LanguageCorpus.create_from_language() got an unexpected keyword 
+argument 'build_semantic_index'
+[32m2025-10-02 14:17:53[0m | [1mINFO    [0m | "[36m/Users/mkbabb/Programming/words/backend/src/floridify/storage/mongodb.py[0m", line [36m122[0m in [36mconnect[0m(): [1mMongoDB connection established with optimized pool settings[0m
+[32m2025-10-02 14:17:53[0m | [1mINFO    [0m | "[36m/Users/mkbabb/Programming/words/backend/src/floridify/storage/mongodb.py[0m", line [36m310[0m in [36m_ensure_initialized[0m(): [1mMongoDB initialized successfully[0m
+[32m2025-10-02 14:17:53[0m | [31m[1mERROR   [0m | "[36m/Users/mkbabb/Programming/words/backend/scripts/build_and_verify_corpus.py[0m", line [36m187[0m in [36mmain[0m(): [31m[1mBuild failed[0m
+Traceback (most recent call last):
+  File "/Users/mkbabb/Programming/words/backend/scripts/build_and_verify_corpus.py", line 192, in <module>
+    asyncio.run(main())
+  File "/opt/homebrew/Cellar/python@3.12/3.12.11/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.11/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.11/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mkbabb/Programming/words/backend/scripts/build_and_verify_corpus.py", line 167, in main
+    corpus = await build_language_corpus()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mkbabb/Programming/words/backend/scripts/build_and_verify_corpus.py", line 36, in build_language_corpus
+    corpus = await LanguageCorpus.create_from_language(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: LanguageCorpus.create_from_language() got an unexpected keyword argument 'build_semantic_index'

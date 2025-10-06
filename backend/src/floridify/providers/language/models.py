@@ -95,11 +95,12 @@ class LanguageEntry(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    class Metadata(BaseVersionedData):
+    class Metadata(
+        BaseVersionedData,
+        default_resource_type=ResourceType.LANGUAGE,
+        default_namespace=CacheNamespace.LANGUAGE,
+    ):
         """Minimal language metadata for versioning."""
-
-        resource_type: ResourceType = ResourceType.LANGUAGE
-        namespace: CacheNamespace = CacheNamespace.LANGUAGE
 
         class Settings:
             """Beanie settings."""

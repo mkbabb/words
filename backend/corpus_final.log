@@ -1,0 +1,36 @@
+[32m2025-10-02 11:11:17[0m | [1mINFO    [0m | "[36m/Users/mkbabb/Programming/words/backend/src/floridify/storage/mongodb.py[0m", line [36m308[0m in [36m_ensure_initialized[0m(): [1mInitializing MongoDB: floridify at mongodb://localhost:27017/floridify...[0m
+[32m2025-10-02 11:11:17[0m | [31m[1mERROR   [0m | "[36m/Users/mkbabb/Programming/words/backend/src/floridify/storage/mongodb.py[0m", line [36m318[0m in [36m_ensure_initialized[0m(): [31m[1mMongoDB initialization failed: AttributeError: get_motor_collection[0m
+[32m2025-10-02 11:11:17[0m | [31m[1mERROR   [0m | "[36m/Users/mkbabb/Programming/words/backend/src/floridify/storage/mongodb.py[0m", line [36m319[0m in [36m_ensure_initialized[0m(): [31m[1mStack trace:[0m
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    ENGLISH LANGUAGE CORPUS BUILDER                          ║
+║                         Comprehensive Test Suite                             ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Started: 2025-10-02 11:11:17
+
+🔌 Initializing database connection...
+Traceback (most recent call last):
+  File "/Users/mkbabb/Programming/words/backend/scripts/build_english_corpus.py", line 250, in <module>
+    asyncio.run(main())
+  File "/opt/homebrew/Cellar/python@3.12/3.12.11/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.11/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.11/Frameworks/Python.framework/Versions/3.12/lib/python3.12/asyncio/base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/mkbabb/Programming/words/backend/scripts/build_english_corpus.py", line 223, in main
+    await get_storage()
+  File "/Users/mkbabb/Programming/words/backend/src/floridify/storage/mongodb.py", line 326, in get_storage
+    await _ensure_initialized()
+  File "/Users/mkbabb/Programming/words/backend/src/floridify/storage/mongodb.py", line 315, in _ensure_initialized
+    await _storage.connect()
+  File "/Users/mkbabb/Programming/words/backend/src/floridify/storage/mongodb.py", line 125, in connect
+    await metadata_class.get_motor_collection()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mkbabb/Programming/words/backend/.venv/lib/python3.12/site-packages/pydantic/_internal/_model_construction.py", line 271, in __getattr__
+    raise AttributeError(item)
+AttributeError: get_motor_collection. Did you mean: 'get_pymongo_collection'?

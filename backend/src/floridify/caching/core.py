@@ -407,7 +407,9 @@ async def get_versioned_content(versioned_data: Any) -> dict[str, Any] | None:
 
     """
     # Check if it's a versioned data object with content
-    if not isinstance(versioned_data, VersionedContent):
+    # Accept both VersionedContent and BaseVersionedData subclasses
+    from .models import BaseVersionedData
+    if not isinstance(versioned_data, (VersionedContent, BaseVersionedData)):
         return None
 
     # Inline content takes precedence

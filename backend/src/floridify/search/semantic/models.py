@@ -42,9 +42,9 @@ class SemanticIndex(BaseModel):
     batch_size: int = 32
     device: str = "cpu"
 
-    # Index data (base64 encoded for JSON serialization)
-    index_data: str = ""  # Base64 encoded FAISS index
-    embeddings: str = ""  # Base64 encoded numpy embeddings
+    # Index data - stored externally via content_location, not inline
+    # These fields are removed to prevent double storage and MongoDB size issues
+    # Data is accessed via get_versioned_content() from the metadata object
 
     # Vocabulary and mappings
     vocabulary: list[str] = Field(default_factory=list)
@@ -65,7 +65,11 @@ class SemanticIndex(BaseModel):
     memory_usage_mb: float = 0.0
     embeddings_per_second: float = 0.0
 
-    class Metadata(BaseVersionedData):
+    class Metadata(
+        BaseVersionedData,
+        default_resource_type=ResourceType.SEMANTIC,
+        default_namespace=CacheNamespace.SEMANTIC,
+    ):
         """Minimal semantic metadata for versioning."""
 
         corpus_id: PydanticObjectId
@@ -73,8 +77,6 @@ class SemanticIndex(BaseModel):
         vocabulary_hash: str = ""
         embedding_dimension: int = 0
         index_type: str = "flat"
-        resource_type: ResourceType = ResourceType.SEMANTIC
-        namespace: CacheNamespace = CacheNamespace.SEMANTIC
 
     @classmethod
     async def get(
@@ -102,11 +104,18 @@ class SemanticIndex(BaseModel):
         model_name = model_name or "all-MiniLM-L6-v2"
         manager = get_version_manager()
 
-        # Build resource ID based on what we have
-        if corpus_id:
-            resource_id = f"{corpus_id!s}:semantic:{model_name}"
-        else:
-            resource_id = f"{corpus_name}:semantic:{model_name}"
+        # Build resource ID - always use corpus_id for consistency
+        # If only corpus_name provided, look up corpus_id first
+        if not corpus_id and corpus_name:
+            from floridify.corpus.core import Corpus
+
+            corpus = await Corpus.get(corpus_name=corpus_name, config=config)
+            if not corpus:
+                logger.warning(f"Corpus '{corpus_name}' not found")
+                return None
+            corpus_id = corpus.corpus_id
+
+        resource_id = f"{corpus_id!s}:semantic:{model_name}"
 
         # Get the latest semantic index metadata
         metadata: SemanticIndex.Metadata | None = await manager.get_latest(
@@ -220,34 +229,66 @@ class SemanticIndex(BaseModel):
         self,
         config: VersionConfig | None = None,
         corpus_id: PydanticObjectId | None = None,
+        binary_data: dict[str, str] | None = None,
     ) -> None:
         """Save semantic index to versioned storage.
+
+        Large binary data (embeddings, FAISS index) is automatically stored
+        externally via the filesystem cache for indices > 16MB.
 
         Args:
             config: Version configuration
             corpus_id: ID of the associated corpus
+            binary_data: Optional dict with 'embeddings' and 'index_data' keys
+                        containing base64-encoded binary data
 
         """
         manager = get_version_manager()
-        resource_id = f"{self.corpus_name}:semantic:{self.model_name}"
+        # Use corpus_id for consistency with get() method
+        cid = corpus_id or self.corpus_id
+        resource_id = f"{cid!s}:semantic:{self.model_name}"
 
-        # Save using version manager
-        await manager.save(
-            resource_id=resource_id,
-            resource_type=ResourceType.SEMANTIC,
-            namespace=manager._get_namespace(ResourceType.SEMANTIC),
-            content=self.model_dump(exclude_none=True),
-            config=config or VersionConfig(),
-            metadata={
-                "vocabulary_hash": self.vocabulary_hash,
-                "model_name": self.model_name,
-                "corpus_id": corpus_id,
-                "num_embeddings": self.num_embeddings,
-                "embedding_dimension": self.embedding_dimension,
-            },
-        )
+        # Prepare content - exclude binary data from inline storage
+        content = self.model_dump(exclude_none=True)
 
-        logger.debug(f"Saved semantic index for {resource_id}")
+        # If binary data provided, merge it for external storage
+        if binary_data:
+            content["binary_data"] = binary_data
+
+        try:
+            # Save using version manager - large content automatically goes to filesystem
+            await manager.save(
+                resource_id=resource_id,
+                resource_type=ResourceType.SEMANTIC,
+                namespace=manager._get_namespace(ResourceType.SEMANTIC),
+                content=content,
+                config=config or VersionConfig(),
+                metadata={
+                    "corpus_id": corpus_id or self.corpus_id,
+                    "model_name": self.model_name,
+                    "vocabulary_hash": self.vocabulary_hash,
+                    "embedding_dimension": self.embedding_dimension,
+                    "index_type": self.index_type,
+                    # Extra metadata (not in Metadata model)
+                    "num_embeddings": self.num_embeddings,
+                },
+            )
+
+            # Verify save succeeded by attempting to retrieve
+            saved = await self.get(corpus_id=cid, model_name=self.model_name, config=config)
+            if not saved:
+                raise RuntimeError(
+                    f"Verification failed: Could not retrieve saved semantic index {resource_id}"
+                )
+
+            logger.info(f"Successfully saved and verified semantic index for {resource_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to save semantic index {resource_id}: {e}")
+            raise RuntimeError(
+                f"Semantic index persistence failed for {resource_id}. "
+                f"Index may be corrupted or too large. Error: {e}"
+            ) from e
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Serialize index to dictionary for caching."""

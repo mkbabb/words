@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
-import urllib.request
 from pathlib import Path
 from typing import Any
+
+import httpx
 
 from ..utils.logging import get_logger
 
@@ -29,14 +31,27 @@ class AnkiConnectInterface:
         """
         self.url = url
         self._is_available: bool | None = None
+        self._client: httpx.AsyncClient | None = None
 
-    def is_available(self) -> bool:
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Get or create the HTTP client."""
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=30.0)
+        return self._client
+
+    async def close(self) -> None:
+        """Close the HTTP client."""
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
+
+    async def is_available(self) -> bool:
         """Check if AnkiConnect is available and Anki is running."""
         if self._is_available is not None:
             return self._is_available
 
         try:
-            result = self.invoke("version")
+            result = await self.invoke("version")
             self._is_available = result is not None
             if self._is_available:
                 logger.info(f"🔌 AnkiConnect available (version: {result})")
@@ -46,7 +61,7 @@ class AnkiConnectInterface:
             self._is_available = False
             return False
 
-    def invoke(self, action: str, **params: Any) -> Any:
+    async def invoke(self, action: str, **params: Any) -> Any:
         """Send command to AnkiConnect.
 
         Args:
@@ -67,12 +82,14 @@ class AnkiConnectInterface:
         request_data = {"action": action, "params": params, "version": 6}
 
         try:
-            request_json = json.dumps(request_data).encode("utf-8")
-            request = urllib.request.Request(self.url, request_json)
-            request.add_header("Content-Type", "application/json")
-
-            with urllib.request.urlopen(request, timeout=30) as response:
-                response_data = json.load(response)
+            client = await self._get_client()
+            response = await client.post(
+                self.url,
+                json=request_data,
+                headers={"Content-Type": "application/json"},
+            )
+            response.raise_for_status()
+            response_data = response.json()
 
             elapsed = time.time() - start_time
             logger.debug(f"🔌 AnkiConnect {action} completed in {elapsed:.3f}s")
@@ -82,18 +99,18 @@ class AnkiConnectInterface:
 
             return response_data.get("result")
 
-        except urllib.error.URLError as e:
+        except httpx.HTTPError as e:
             raise AnkiConnectError(f"Failed to connect to AnkiConnect: {e}")
         except json.JSONDecodeError as e:
             raise AnkiConnectError(f"Invalid JSON response from AnkiConnect: {e}")
         except Exception as e:
             raise AnkiConnectError(f"AnkiConnect request failed: {e}")
 
-    def get_deck_names(self) -> list[str]:
+    async def get_deck_names(self) -> list[str]:
         """Get all deck names from Anki."""
-        return self.invoke("deckNames")  # type: ignore[no-any-return]
+        return await self.invoke("deckNames")  # type: ignore[no-any-return]
 
-    def create_deck(self, deck_name: str) -> bool:
+    async def create_deck(self, deck_name: str) -> bool:
         """Create a new deck in Anki.
 
         Args:
@@ -104,14 +121,14 @@ class AnkiConnectInterface:
 
         """
         try:
-            self.invoke("createDeck", deck=deck_name)
+            await self.invoke("createDeck", deck=deck_name)
             logger.debug(f"📁 Created deck: '{deck_name}'")
             return True
         except AnkiConnectError:
             # Deck might already exist
             return False
 
-    def add_note(
+    async def add_note(
         self,
         deck_name: str,
         model_name: str,
@@ -138,18 +155,18 @@ class AnkiConnectInterface:
         }
 
         try:
-            note_id = self.invoke("addNote", note=note_data)
+            note_id = await self.invoke("addNote", note=note_data)
             logger.debug(f"📝 Added note {note_id} to deck '{deck_name}'")
             return note_id  # type: ignore[no-any-return]
         except AnkiConnectError as e:
             # If duplicate, try to find and update existing note
             if "duplicate" in str(e).lower():
                 logger.debug(f"🔄 Attempting to update duplicate note in '{deck_name}'")
-                return self._handle_duplicate_note(deck_name, model_name, fields, tags)
+                return await self._handle_duplicate_note(deck_name, model_name, fields, tags)
             logger.warning(f"Failed to add note to '{deck_name}': {e}")
             return None
 
-    def _handle_duplicate_note(
+    async def _handle_duplicate_note(
         self,
         deck_name: str,
         model_name: str,
@@ -164,16 +181,16 @@ class AnkiConnectInterface:
 
             # Use AnkiConnect's findNotes to search for existing notes
             query = f'deck:"{deck_name}" {first_field_value}'
-            note_ids = self.invoke("findNotes", query=query)
+            note_ids = await self.invoke("findNotes", query=query)
 
             if note_ids:
                 # Update the first matching note
                 note_id = note_ids[0]
-                self.invoke("updateNoteFields", note={"id": note_id, "fields": fields})
+                await self.invoke("updateNoteFields", note={"id": note_id, "fields": fields})
 
                 # Update tags if provided
                 if tags:
-                    self.invoke("updateNoteTags", note=note_id, tags=" ".join(tags))
+                    await self.invoke("updateNoteTags", note=note_id, tags=" ".join(tags))
 
                 logger.debug(f"🔄 Updated existing note {note_id} in deck '{deck_name}'")
                 return note_id  # type: ignore[no-any-return]
@@ -184,7 +201,7 @@ class AnkiConnectInterface:
             logger.warning(f"Failed to handle duplicate note in '{deck_name}': {e}")
             return None
 
-    def import_package(self, apkg_path: str | Path) -> bool:
+    async def import_package(self, apkg_path: str | Path) -> bool:
         """Import an .apkg file directly into Anki.
 
         Args:
@@ -200,13 +217,13 @@ class AnkiConnectInterface:
             return False
 
         try:
-            with open(apkg_path, "rb") as f:
-                deck_data = f.read()
+            # Read file in thread to avoid blocking
+            deck_data = await asyncio.to_thread(lambda: apkg_path.read_bytes())
 
             # Convert to base64 for transport
             deck_b64 = base64.b64encode(deck_data).decode("utf-8")
 
-            self.invoke("importPackage", path=deck_b64)
+            await self.invoke("importPackage", path=deck_b64)
             logger.info(f"📦 Imported package: {apkg_path.name}")
             return True
 
@@ -217,21 +234,21 @@ class AnkiConnectInterface:
             logger.error(f"AnkiConnect failed to import package {apkg_path}: {e}")
             raise
 
-    def sync(self) -> bool:
+    async def sync(self) -> bool:
         """Trigger Anki sync."""
         try:
-            self.invoke("sync")
+            await self.invoke("sync")
             logger.debug("🔄 Triggered Anki sync")
             return True
         except AnkiConnectError as e:
             logger.warning(f"Sync failed: {e}")
             return False
 
-    def get_model_names(self) -> list[str]:
+    async def get_model_names(self) -> list[str]:
         """Get all note type/model names."""
-        return self.invoke("modelNames")  # type: ignore[no-any-return]
+        return await self.invoke("modelNames")  # type: ignore[no-any-return]
 
-    def create_model(
+    async def create_model(
         self,
         model_name: str,
         fields: list[str],
@@ -260,7 +277,7 @@ class AnkiConnectInterface:
         }
 
         try:
-            self.invoke("createModel", model=model_data)
+            await self.invoke("createModel", model=model_data)
             logger.debug(f"🎨 Created model: '{model_name}'")
             return True
         except AnkiConnectError as e:
@@ -276,10 +293,10 @@ class AnkiDirectIntegration:
         self.ankiconnect = AnkiConnectInterface()
         self._availability_checked = False
 
-    def is_available(self) -> bool:
+    async def is_available(self) -> bool:
         """Check if direct Anki integration is available."""
         if not self._availability_checked:
-            available = self.ankiconnect.is_available()
+            available = await self.ankiconnect.is_available()
             self._availability_checked = True
 
             if available:
@@ -287,9 +304,9 @@ class AnkiDirectIntegration:
             else:
                 logger.info("📦 Direct integration unavailable - will use .apkg export")
 
-        return self.ankiconnect.is_available()
+        return await self.ankiconnect.is_available()
 
-    def export_cards_directly(self, cards: list[Any], deck_name: str) -> bool:
+    async def export_cards_directly(self, cards: list[Any], deck_name: str) -> bool:
         """Export cards directly to running Anki instance.
 
         Args:
@@ -300,7 +317,7 @@ class AnkiDirectIntegration:
             True if all cards were added successfully
 
         """
-        if not self.is_available():
+        if not await self.is_available():
             return False
 
         import time
@@ -311,9 +328,9 @@ class AnkiDirectIntegration:
 
         try:
             # Ensure deck exists
-            existing_decks = self.ankiconnect.get_deck_names()
+            existing_decks = await self.ankiconnect.get_deck_names()
             if deck_name not in existing_decks:
-                self.ankiconnect.create_deck(deck_name)
+                await self.ankiconnect.create_deck(deck_name)
                 logger.info(f"📁 Created new deck: '{deck_name}'")
 
             # Create models for each card type if needed
@@ -321,7 +338,7 @@ class AnkiDirectIntegration:
             for card in cards:
                 model_name = f"Floridify {card.card_type.value.title()}"
                 if model_name not in created_models:
-                    if self._ensure_model_exists(card, model_name):
+                    if await self._ensure_model_exists(card, model_name):
                         created_models.add(model_name)
 
             # Add cards to Anki
@@ -342,7 +359,7 @@ class AnkiDirectIntegration:
                         else:
                             string_fields[field_name] = str(field_value) if field_value else ""
 
-                    note_id = self.ankiconnect.add_note(
+                    note_id = await self.ankiconnect.add_note(
                         deck_name=deck_name,
                         model_name=model_name,
                         fields=string_fields,
@@ -362,7 +379,7 @@ class AnkiDirectIntegration:
 
             # Trigger sync
             if successful_cards > 0:
-                self.ankiconnect.sync()
+                await self.ankiconnect.sync()
 
             total_time = time.time() - start_time
 
@@ -383,15 +400,15 @@ class AnkiDirectIntegration:
             logger.error(f"💥 Direct export failed (data error): {e}")
             raise
 
-    def _ensure_model_exists(self, card: Any, model_name: str) -> bool:
+    async def _ensure_model_exists(self, card: Any, model_name: str) -> bool:
         """Ensure a model exists for the given card type."""
         try:
-            existing_models = self.ankiconnect.get_model_names()
+            existing_models = await self.ankiconnect.get_model_names()
             if model_name in existing_models:
                 return True
 
             # Create model with card template
-            success = self.ankiconnect.create_model(
+            success = await self.ankiconnect.create_model(
                 model_name=model_name,
                 fields=card.template.fields,
                 css=card.template.css_styles,
@@ -408,7 +425,7 @@ class AnkiDirectIntegration:
             logger.warning(f"Failed to ensure model '{model_name}' exists: {e}")
             return False
 
-    def import_apkg_directly(self, apkg_path: str | Path) -> bool:
+    async def import_apkg_directly(self, apkg_path: str | Path) -> bool:
         """Import an .apkg file directly into Anki.
 
         Args:
@@ -418,7 +435,7 @@ class AnkiDirectIntegration:
             True if import successful
 
         """
-        if not self.is_available():
+        if not await self.is_available():
             return False
 
-        return self.ankiconnect.import_package(apkg_path)
+        return await self.ankiconnect.import_package(apkg_path)

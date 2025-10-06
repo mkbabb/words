@@ -280,7 +280,7 @@ class TestSearchPipelineComprehensive:
         )
 
         # Test semantic similarity
-        results = engine.search_semantic("cheerful", max_results=5)
+        results = await engine.search_semantic("cheerful", max_results=5)
         if results:  # Semantic might not work on very small corpus
             words = [r.word for r in results]
             # Should find emotionally related words

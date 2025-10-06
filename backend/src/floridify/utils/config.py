@@ -51,6 +51,7 @@ class DatabaseConfig:
 
     production_url: str = ""
     development_url: str = ""
+    docker_development_url: str = ""  # Docker with SSH tunnel
     local_mongodb_url: str = ""
     native_local_url: str = ""
     name: str = "floridify"
@@ -67,10 +68,11 @@ class DatabaseConfig:
         if is_production:
             url = self.production_url
         elif is_docker:
-            # Running in Docker - use Docker-specific URLs
-            url = self.local_mongodb_url or self.development_url
+            # Running in Docker - use development_url (SSH tunnel on host.docker.internal:27018)
+            # Fallback order: docker_development_url → development_url → local_mongodb_url
+            url = self.docker_development_url or self.development_url or self.local_mongodb_url
         else:
-            # Running natively outside Docker - use native local MongoDB
+            # Running natively outside Docker - use native local MongoDB or development URL
             url = self.native_local_url or self.development_url
 
         if not url:
@@ -112,6 +114,16 @@ class ProcessingConfig:
 
 
 @dataclass
+class SemanticSearchConfig:
+    """Semantic search optimization configuration."""
+
+    use_hnsw: bool = True  # Enable HNSW for MASSIVE corpus tier
+    hnsw_m: int = 32  # HNSW connections per node
+    hnsw_ef_construction: int = 200  # HNSW build-time search depth
+    hnsw_ef_search: int = 64  # HNSW query-time search depth
+
+
+@dataclass
 class Config:
     """Main configuration class."""
 
@@ -122,6 +134,7 @@ class Config:
     processing: ProcessingConfig
     merriam_webster: MerriamWebsterConfig | None = None
     google_cloud: GoogleCloudConfig | None = None
+    semantic_search: SemanticSearchConfig | None = None
 
     @classmethod
     def from_file(cls, config_path: str | Path | None = None) -> Config:
@@ -184,6 +197,7 @@ class Config:
         database_config = DatabaseConfig(
             production_url=db_data.get("production_url", ""),
             development_url=db_data.get("development_url", ""),
+            docker_development_url=db_data.get("docker_development_url", ""),
             local_mongodb_url=db_data.get("local_mongodb_url", ""),
             native_local_url=db_data.get("native_local_url", ""),
             name=db_data.get("name", "floridify"),
@@ -224,6 +238,17 @@ class Config:
                 tts_british_voice_female=gc_data.get("tts_british_voice_female", "en-GB-Wavenet-A"),
             )
 
+        # Load Semantic Search config if present
+        semantic_search = None
+        if "semantic_search" in data:
+            ss_data = data["semantic_search"]
+            semantic_search = SemanticSearchConfig(
+                use_hnsw=ss_data.get("use_hnsw", True),
+                hnsw_m=ss_data.get("hnsw_m", 32),
+                hnsw_ef_construction=ss_data.get("hnsw_ef_construction", 200),
+                hnsw_ef_search=ss_data.get("hnsw_ef_search", 64),
+            )
+
         config = cls(
             openai=openai_config,
             oxford=oxford_config,
@@ -232,6 +257,7 @@ class Config:
             rate_limits=rate_limits,
             processing=processing,
             google_cloud=google_cloud,
+            semantic_search=semantic_search,
         )
 
         # Validate required fields

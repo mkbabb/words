@@ -269,22 +269,32 @@ class BaseConnector(ABC):
 
     @property
     def scraper_session(self) -> httpx.AsyncClient:
-        """Get or create scraper session."""
+        """Get or create scraper session with HTTP/2 support."""
         if self._scraper_session is None:
             self._scraper_session = httpx.AsyncClient(
+                http2=True,  # Enable HTTP/2 for connection reuse
                 timeout=httpx.Timeout(60.0),
-                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                limits=httpx.Limits(
+                    max_keepalive_connections=50,  # Increased for parallel ops
+                    max_connections=200,  # Increased for burst traffic
+                    keepalive_expiry=30.0,  # 30s matches batch operation duration
+                ),
                 headers={"User-Agent": self.config.user_agent},
             )
         return self._scraper_session
 
     @property
     def api_client(self) -> httpx.AsyncClient:
-        """Get or create API client."""
+        """Get or create API client with HTTP/2 support."""
         if self._api_client is None:
             self._api_client = httpx.AsyncClient(
+                http2=True,  # Enable HTTP/2 for connection reuse
                 timeout=httpx.Timeout(30.0),
-                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                limits=httpx.Limits(
+                    max_keepalive_connections=50,  # Increased for parallel ops
+                    max_connections=200,  # Increased for burst traffic
+                    keepalive_expiry=30.0,  # 30s matches batch operation duration
+                ),
             )
         return self._api_client
 

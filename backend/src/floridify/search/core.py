@@ -309,10 +309,13 @@ class Search:
             method: Optional specific search method to use
 
         """
+        # Normalize query once at entry point
+        normalized_query = normalize(query)
+
         # If specific method requested, use it
         if method:
             if method == SearchMethod.EXACT and self.trie_search:
-                result = self.trie_search.search_exact(query)
+                result = self.trie_search.search_exact(normalized_query)
                 if result:
                     # Map back to original form with diacritics if available
                     original = self._get_original_word(result)
@@ -328,7 +331,7 @@ class Search:
                     ]
                 return []
             elif method == SearchMethod.PREFIX and self.trie_search:
-                matches = self.trie_search.search_prefix(query, max_results=max_results)
+                matches = self.trie_search.search_prefix(normalized_query, max_results=max_results)
                 # Map back to original forms with diacritics
                 results = []
                 for match in matches:
@@ -345,13 +348,19 @@ class Search:
                     )
                 return results
             elif method == SearchMethod.FUZZY and self.fuzzy_search and self.corpus:
-                results = self.fuzzy_search.search(query, self.corpus)
+                results = self.fuzzy_search.search(normalized_query, self.corpus)
                 if min_score is not None:
                     results = [r for r in results if r.score >= min_score]
-                # Fuzzy search already handles diacritic mapping internally
+                # Restore diacritics
+                for result in results:
+                    result.word = self._get_original_word(result.word)
                 return results[:max_results]
             elif method == SearchMethod.SEMANTIC and self.semantic_search:
-                return self.semantic_search.search(query, max_results=max_results)
+                results = await self.semantic_search.search(normalized_query, max_results=max_results)
+                # Restore diacritics
+                for result in results:
+                    result.word = self._get_original_word(result.word)
+                return results
 
         # Otherwise use smart mode
         return await self.search_with_mode(
@@ -414,7 +423,7 @@ class Search:
             if not self.semantic_search:
                 raise ValueError("Semantic search is not enabled for this SearchEngine instance")
 
-            results = self.search_semantic(normalized_query, max_results, min_score)
+            results = await self.search_semantic(normalized_query, max_results, min_score)
         else:
             raise ValueError(f"Unsupported search mode: {mode}")
 
@@ -427,14 +436,15 @@ class Search:
         """Search using only exact matching.
 
         Args:
-            query: Normalized search query
-            max_results: Maximum results to return
+            query: Search query (will be normalized)
 
         """
         if self.trie_search is None:
             return []
 
-        match = self.trie_search.search_exact(query)
+        # Normalize at entry point
+        normalized_query = normalize(query)
+        match = self.trie_search.search_exact(normalized_query)
 
         if match is None:
             return []
@@ -459,7 +469,7 @@ class Search:
         """Search using only fuzzy matching.
 
         Args:
-            query: Normalized search query
+            query: Search query (will be normalized)
             max_results: Maximum results to return
             min_score: Minimum score threshold
 
@@ -468,8 +478,10 @@ class Search:
             return []
 
         try:
+            # Normalize at entry point
+            normalized_query = normalize(query)
             matches = self.fuzzy_search.search(
-                query=query,
+                query=normalized_query,
                 corpus=self.corpus,
                 max_results=max_results,
                 min_score=min_score,
@@ -485,7 +497,7 @@ class Search:
             logger.warning(f"Fuzzy search failed: {e}")
             return []
 
-    def search_semantic(
+    async def search_semantic(
         self,
         query: str,
         max_results: int = 20,
@@ -494,7 +506,7 @@ class Search:
         """Search using only semantic matching.
 
         Args:
-            query: Normalized search query
+            query: Search query (will be normalized)
             max_results: Maximum results to return
             min_score: Minimum score threshold
 
@@ -506,7 +518,13 @@ class Search:
 
         # Perform semantic search
         try:
-            return self.semantic_search.search(query, max_results, min_score)
+            # Normalize at entry point
+            normalized_query = normalize(query)
+            results = await self.semantic_search.search(normalized_query, max_results, min_score)
+            # Restore diacritics in semantic results
+            for result in results:
+                result.word = self._get_original_word(result.word)
+            return results
         except Exception as e:
             logger.warning(f"Semantic search failed: {e}")
             return []
@@ -566,7 +584,7 @@ class Search:
         # 2. Fuzzy search (most comprehensive for misspellings)
         fuzzy_results = self.search_fuzzy(query, max_results, min_score)
 
-        # 3. Semantic search - adaptive threshold based on fuzzy quality
+        # 3. Semantic search - quality-based gating for optimal performance
         semantic_results = []
         if semantic:
             # Wait for semantic search to be ready if it's being initialized
@@ -574,11 +592,27 @@ class Search:
                 await self._semantic_init_task
 
             if self.semantic_search:
-                # If fuzzy found good results, be more selective with semantic
-                semantic_limit = (
-                    max_results // 2 if len(fuzzy_results) >= max_results // 2 else max_results
-                )
-                semantic_results = self.search_semantic(query, semantic_limit, min_score)
+                # Quality-based gating: skip semantic if fuzzy found high-quality results
+                high_quality_fuzzy = [r for r in fuzzy_results if r.score >= 0.7]
+                sufficient_high_quality = len(high_quality_fuzzy) >= max_results // 3
+
+                if sufficient_high_quality:
+                    # Skip semantic - fuzzy found enough high-quality matches
+                    logger.debug(
+                        f"Skipping semantic search: {len(high_quality_fuzzy)} high-quality fuzzy matches (≥0.7 score)"
+                    )
+                elif len(fuzzy_results) >= max_results // 2:
+                    # Fuzzy found results but lower quality - supplement with semantic
+                    semantic_limit = max_results // 2
+                    semantic_results = await self.search_semantic(query, semantic_limit, min_score)
+                    logger.debug(f"Supplementing {len(fuzzy_results)} fuzzy results with semantic search")
+                else:
+                    # Fuzzy struggled - rely on semantic
+                    semantic_limit = max_results
+                    semantic_results = await self.search_semantic(query, semantic_limit, min_score)
+                    logger.debug(
+                        f"Fuzzy found only {len(fuzzy_results)} results, using full semantic search"
+                    )
 
         # 4. Merge and deduplicate with memory-efficient generators
         fuzzy_gen = (r for r in fuzzy_results if r.score >= min_score)
@@ -598,7 +632,15 @@ class Search:
         return results[0] if results else None
 
     def _get_original_word(self, normalized_word: str) -> str:
-        """Convert normalized word to original word with diacritics preserved."""
+        """Convert normalized word to original word with diacritics preserved.
+
+        Args:
+            normalized_word: The normalized word from search results
+
+        Returns:
+            Original word with diacritics if available
+
+        """
         if not self.corpus:
             return normalized_word
 

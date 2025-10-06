@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Users/mkbabb/Programming/words/backend/scripts/build_and_verify_corpus.py", line 17, in <module>
+    from floridify.storage.mongodb import initialize_database
+ImportError: cannot import name 'initialize_database' from 'floridify.storage.mongodb' (/Users/mkbabb/Programming/words/backend/src/floridify/storage/mongodb.py)

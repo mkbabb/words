@@ -564,13 +564,23 @@ class TreeCorpusManager:
 
         # For master corpora, only aggregate children's vocabularies
         # Don't include the parent's own vocabulary since it's just an aggregate container
-        vocabulary = set()
+        vocabulary: set[str] = set()
 
-        # Get child vocabularies recursively
+        # Get child vocabularies recursively in parallel
         child_ids = corpus.child_corpus_ids or []
-        for child_id in child_ids:
-            child_vocab = await self.aggregate_vocabularies(child_id, config, update_parent=False)
-            vocabulary.update(child_vocab)
+        if child_ids:
+            import asyncio
+            # Fetch all child vocabularies concurrently
+            child_vocabs = await asyncio.gather(
+                *[self.aggregate_vocabularies(cid, config, update_parent=False) for cid in child_ids],
+                return_exceptions=True
+            )
+            # Merge successful vocabularies
+            for i, child_vocab in enumerate(child_vocabs):
+                if isinstance(child_vocab, Exception):
+                    logger.error(f"Failed to aggregate vocabulary for child {child_ids[i]}: {child_vocab}")
+                elif child_vocab:  # Ensure we have a valid vocabulary list
+                    vocabulary.update(child_vocab)
 
         # Determine whether to include the corpus's own vocabulary
         if corpus.is_master:

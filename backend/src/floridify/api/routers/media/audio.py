@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from datetime import datetime
@@ -169,7 +170,7 @@ async def upload_audio(
     # Save file to disk
     # Create audio cache directory if not exists
     cache_dir = get_project_root() / "data" / "audio_cache" / "uploads"
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    await asyncio.to_thread(cache_dir.mkdir, parents=True, exist_ok=True)
 
     # Generate filename
     import uuid
@@ -178,9 +179,8 @@ async def upload_audio(
     filename = f"{uuid.uuid4()}.{file_ext}"
     file_path = cache_dir / filename
 
-    # Write file
-    with open(file_path, "wb") as f:
-        f.write(data)
+    # Write file in thread to avoid blocking
+    await asyncio.to_thread(file_path.write_bytes, data)
 
     # Get audio duration (simplified - in real app use audio library)
     # For now, estimate based on file size and format

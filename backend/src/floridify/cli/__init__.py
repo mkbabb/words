@@ -1,6 +1,5 @@
-"""Floridify CLI - Modern command-line interface with fast startup."""
+"""Floridify CLI - Modern command-line interface."""
 
-# Import the fast CLI implementation
-from .fast_cli import cli
+from .cli import cli
 
 __all__ = ["cli"]

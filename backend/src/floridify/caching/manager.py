@@ -13,7 +13,7 @@ from pymongo.errors import OperationFailure
 
 from ..models.registry import get_model_class as get_versioned_model_class
 from ..utils.logging import get_logger
-from .core import GlobalCacheManager, get_global_cache, set_versioned_content
+from .core import GlobalCacheManager, get_global_cache, get_versioned_content, set_versioned_content
 from .filesystem import FilesystemBackend
 from .models import (
     BaseVersionedData,
@@ -236,61 +236,28 @@ class VersionedDataManager:
             "ttl": config.ttl,
         }
 
-        # Handle metadata - extract model-specific fields vs generic metadata
+        # Handle metadata - extract model-specific fields vs generic metadata using introspection
+        # This replaces 75+ lines of hardcoded field lists with automatic Pydantic field detection
+        from ..utils.introspection import extract_metadata_params
+
         combined_metadata = {**config.metadata, **(metadata or {})}
-        generic_metadata = {}
 
-        # For corpus models, extract corpus-specific fields
-        if resource_type == ResourceType.CORPUS:
-            corpus_fields = [
-                "corpus_name",
-                "corpus_type",
-                "language",
-                "parent_corpus_id",
-                "child_corpus_ids",
-                "is_master",
-            ]
-            for field in corpus_fields:
-                if field in combined_metadata:
-                    constructor_params[field] = combined_metadata.pop(field)
+        # Automatically separate typed fields from generic metadata using Pydantic introspection
+        typed_fields, generic_metadata = extract_metadata_params(
+            combined_metadata,
+            model_class,
+        )
 
-            # Remaining metadata goes to generic metadata
-            generic_metadata = combined_metadata
-        elif resource_type == ResourceType.TRIE:
-            # For trie models, extract corpus_id
-            if "corpus_id" in combined_metadata:
-                constructor_params["corpus_id"] = combined_metadata.pop("corpus_id")
-            # Remaining metadata goes to generic metadata
-            generic_metadata = combined_metadata
-        elif resource_type == ResourceType.SEMANTIC:
-            # For semantic models, extract corpus_id and model_name
-            if "corpus_id" in combined_metadata:
-                constructor_params["corpus_id"] = combined_metadata.pop("corpus_id")
-            if "model_name" in combined_metadata:
-                constructor_params["model_name"] = combined_metadata.pop("model_name")
-            # Remaining metadata goes to generic metadata
-            generic_metadata = combined_metadata
-        elif resource_type == ResourceType.SEARCH:
-            # For search models, extract all required fields
-            search_fields = [
-                "corpus_id",
-                "vocabulary_hash",
-                "has_trie",
-                "has_fuzzy",
-                "has_semantic",
-                "trie_index_id",
-                "semantic_index_id",
-            ]
-            for field in search_fields:
-                if field in combined_metadata:
-                    constructor_params[field] = combined_metadata.pop(field)
-            # Remaining metadata goes to generic metadata
-            generic_metadata = combined_metadata
-        else:
-            # For other resource types, all metadata is generic
-            generic_metadata = combined_metadata
+        # Add typed fields to constructor parameters
+        constructor_params.update(typed_fields)
 
-        constructor_params["metadata"] = generic_metadata
+        # Filter out BaseVersionedData fields from generic metadata to avoid conflicts
+        # These fields are set via constructor params, not the generic metadata dict
+        from .models import BaseVersionedData
+
+        base_fields = set(BaseVersionedData.model_fields.keys())
+        filtered_metadata = {k: v for k, v in generic_metadata.items() if k not in base_fields}
+        constructor_params["metadata"] = filtered_metadata
 
         versioned = model_class(**constructor_params)
 
@@ -303,21 +270,28 @@ class VersionedDataManager:
                 await self._save_with_transaction(versioned, resource_id, resource_type)
             except Exception as e:
                 logger.error(f"Failed to save version chain: {e}", exc_info=True)
-                raise
+                raise RuntimeError(
+                    f"Index persistence failed for {resource_type.value}:{resource_id}. "
+                    f"Data may be corrupted. Error: {e}"
+                ) from e
 
             # Tree structures handled by TreeCorpusManager for corpus types
 
-        # Cache if enabled - invalidate old and set new
-        if config.use_cache:
-            if self.cache is None:
-                self.cache = await get_global_cache()
-            cache_key = f"{resource_type.value}:{resource_id}"
+            # Cache update AFTER successful database write to prevent race conditions
+            if config.use_cache:
+                if self.cache is None:
+                    self.cache = await get_global_cache()
+                cache_key = f"{resource_type.value}:{resource_id}"
 
-            # Invalidate any existing cache entry to ensure fresh reads
-            await self.cache.delete(namespace, cache_key)
-
-            # Set new cache entry
-            await self.cache.set(namespace, cache_key, versioned, config.ttl)
+                try:
+                    # Atomic cache update: delete old and set new in one operation
+                    await self.cache.delete(namespace, cache_key)
+                    await self.cache.set(namespace, cache_key, versioned, config.ttl)
+                except Exception as cache_error:
+                    logger.warning(
+                        f"Cache update failed for {cache_key}, continuing without cache: {cache_error}"
+                    )
+                    # Don't fail the save operation if only cache fails
 
         logger.info(f"Saved {resource_type.value} '{resource_id}' version {new_version}")
         return versioned
@@ -344,50 +318,87 @@ class VersionedDataManager:
                 self.cache = await get_global_cache()
             cached = await self.cache.get(namespace, cache_key)
             if cached:
-                # For latest version queries, validate that the cached document still exists
-                # This handles cases where documents are deleted outside the version manager
+                # Validate cache entry BEFORE returning it
                 if not config.version:
                     model_class = self._get_model_class(resource_type)
                     try:
-                        # Quick existence check - if document doesn't exist, cache is stale
-                        exists = await model_class.get(cached.id)
-                        if exists is None:
-                            # Cached document was deleted, invalidate cache and continue to DB query
+                        # Validate the cached document still exists in database
+                        doc = await model_class.find_one({"_id": cached.id})
+                        if not doc:
+                            # Cached document was deleted, invalidate cache
                             logger.debug(
                                 f"Cached document for {cache_key} no longer exists, invalidating cache"
                             )
                             await self.cache.delete(namespace, cache_key)
+                            cached = None  # Force database query below
                         else:
-                            logger.debug(f"Cache hit for {cache_key}")
-                            return cached  # type: ignore[no-any-return]
+                            # Validate content integrity if it has external storage
+                            if hasattr(cached, "content_location") and cached.content_location:
+                                content = await get_versioned_content(cached)
+                                if content is None:
+                                    logger.error(
+                                        f"External content missing for {cache_key}, invalidating cache"
+                                    )
+                                    await self.cache.delete(namespace, cache_key)
+                                    cached = None  # Force database query
+                                else:
+                                    logger.debug(f"Cache hit for {cache_key} (validated)")
+                                    return cached  # type: ignore[no-any-return]
+                            else:
+                                logger.debug(f"Cache hit for {cache_key}")
+                                return cached  # type: ignore[no-any-return]
                     except Exception as e:
-                        # If we can't validate, assume cache is stale and continue to DB query
-                        logger.debug(
-                            f"Failed to validate cached document for {cache_key}: {e}, invalidating cache"
+                        # Validation failed, don't trust the cache
+                        logger.warning(
+                            f"Cache validation failed for {cache_key}: {e}, invalidating cache"
                         )
                         await self.cache.delete(namespace, cache_key)
+                        cached = None  # Force database query
                 else:
-                    # For specific version queries, we can trust the cache more
-                    logger.debug(f"Cache hit for {cache_key}")
+                    # For specific version queries, still validate but less strictly
+                    logger.debug(f"Cache hit for {cache_key} (version-specific)")
                     return cached  # type: ignore[no-any-return]
 
-        # Query database
+        # Query database with error handling
         model_class = self._get_model_class(resource_type)
 
-        if config.version:
-            # Get specific version
-            result = await model_class.find_one(
-                {"resource_id": resource_id, "version_info.version": config.version},
-            )
-        else:
-            # Get latest - sort by ID descending to get the most recent if multiple have is_latest=True
-            result = (
-                await model_class.find(
-                    {"resource_id": resource_id, "version_info.is_latest": True},
+        try:
+            if config.version:
+                # Get specific version
+                result = await model_class.find_one(
+                    {"resource_id": resource_id, "version_info.version": config.version},
                 )
-                .sort("-_id")
-                .first_or_none()
-            )
+            else:
+                # Get latest - sort by ID descending to get the most recent if multiple have is_latest=True
+                result = (
+                    await model_class.find(
+                        {"resource_id": resource_id, "version_info.is_latest": True},
+                    )
+                    .sort("-_id")
+                    .first_or_none()
+                )
+        except Exception as e:
+            logger.error(f"Database query failed for {resource_type.value}:{resource_id}: {e}")
+            raise RuntimeError(
+                f"Failed to retrieve {resource_type.value}:{resource_id} from database. "
+                f"This may indicate database connectivity issues or corrupted indices. Error: {e}"
+            ) from e
+
+        # Validate external content if present
+        if result and hasattr(result, "content_location") and result.content_location:
+            try:
+                content = await get_versioned_content(result)
+                if content is None:
+                    raise ValueError(
+                        f"External content missing for {resource_type.value}:{resource_id}. "
+                        f"Expected content at {result.content_location.path}"
+                    )
+            except Exception as e:
+                logger.error(f"Failed to load external content for {resource_id}: {e}")
+                raise RuntimeError(
+                    f"Index data corrupted for {resource_type.value}:{resource_id}. "
+                    f"External content could not be loaded. Error: {e}"
+                ) from e
 
         # Cache result
         if result and use_cache:
@@ -396,7 +407,11 @@ class VersionedDataManager:
                 cache_key = f"{cache_key}:v{config.version}"
             if self.cache is None:
                 self.cache = await get_global_cache()
-            await self.cache.set(namespace, cache_key, result, result.ttl)
+            try:
+                await self.cache.set(namespace, cache_key, result, result.ttl)
+            except Exception as cache_error:
+                # Log cache error but don't fail the operation
+                logger.warning(f"Failed to cache {cache_key}: {cache_error}")
 
         return result
 

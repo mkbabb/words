@@ -242,11 +242,13 @@ async def _export_async(
 
         if direct:
             # Try direct export to Anki
-            success, apkg_path = card_generator.export_directly_to_anki(
-                all_cards,
-                deck_name,
-                fallback_to_apkg=apkg_fallback,
-                output_path=output_path,
+            success, apkg_path = asyncio.run(
+                card_generator.export_directly_to_anki(
+                    all_cards,
+                    deck_name,
+                    fallback_to_apkg=apkg_fallback,
+                    output_path=output_path,
+                )
             )
 
             if success and apkg_path is None:
@@ -292,18 +294,23 @@ async def _export_async(
 @anki_command.command()
 def status() -> None:
     """Check AnkiConnect availability and status."""
+    asyncio.run(_status_async())
+
+
+async def _status_async() -> None:
+    """Async implementation of status command."""
     from ...anki.ankiconnect import AnkiDirectIntegration
 
     console.print("Checking AnkiConnect status...")
 
     integration = AnkiDirectIntegration()
 
-    if integration.is_available():
+    if await integration.is_available():
         try:
             # Get additional info
-            version = integration.ankiconnect.invoke("version")
-            deck_names = integration.ankiconnect.get_deck_names()
-            model_names = integration.ankiconnect.get_model_names()
+            version = await integration.ankiconnect.invoke("version")
+            deck_names = await integration.ankiconnect.get_deck_names()
+            model_names = await integration.ankiconnect.get_model_names()
 
             console.print("[green]✅ AnkiConnect is available![/green]")
             console.print(f"  Version: {version}")
@@ -321,6 +328,9 @@ def status() -> None:
 
         except Exception as e:
             console.print(f"[yellow]⚠️ AnkiConnect responding but with errors:[/yellow] {e}")
+        finally:
+            # Clean up HTTP client
+            await integration.ankiconnect.close()
     else:
         console.print("[red]❌ AnkiConnect not available[/red]")
         console.print("\\n[dim]To enable direct Anki export:[/dim]")
@@ -331,6 +341,8 @@ def status() -> None:
         console.print(
             "\\n[dim]Without AnkiConnect, .apkg files will be created for manual import.[/dim]",
         )
+        # Clean up HTTP client
+        await integration.ankiconnect.close()
 
 
 @anki_command.command()

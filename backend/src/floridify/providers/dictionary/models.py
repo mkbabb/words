@@ -32,8 +32,10 @@ class DictionaryProviderEntry(BaseModel):
     raw_data: dict[str, Any] = Field(default_factory=dict)
     provider_metadata: dict[str, Any] = Field(default_factory=dict)
 
-    class Metadata(BaseVersionedData):
+    class Metadata(
+        BaseVersionedData,
+        default_resource_type=ResourceType.DICTIONARY,
+        default_namespace=CacheNamespace.DICTIONARY,
+    ):
         """Minimal dictionary metadata for versioning."""
-
-        resource_type: ResourceType = ResourceType.DICTIONARY
-        namespace: CacheNamespace = CacheNamespace.DICTIONARY
+        pass

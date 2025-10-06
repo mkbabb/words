@@ -88,7 +88,11 @@ class Corpus(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    class Metadata(BaseVersionedData):
+    class Metadata(
+        BaseVersionedData,
+        default_resource_type=ResourceType.CORPUS,
+        default_namespace=CacheNamespace.CORPUS,
+    ):
         """Corpus metadata for versioned persistence.
 
         Note: This Metadata class serves as the persistence layer for corpus versioning.
@@ -113,8 +117,6 @@ class Corpus(BaseModel):
 
         # Storage configuration
         content_location: ContentLocation | None = None
-        resource_type: ResourceType = ResourceType.CORPUS
-        namespace: CacheNamespace = CacheNamespace.CORPUS
 
     def model_post_init(self, __context: Any) -> None:
         """Post-initialization to inject slug name if needed."""
@@ -169,6 +171,11 @@ class Corpus(BaseModel):
 
         # Build normalized_to_original_indices AFTER sorting
         # Maps from index in sorted vocabulary to indices in original_vocabulary
+        # Sort indices by preference: diacritics > ASCII
+        def has_diacritics(word: str) -> bool:
+            """Check if word contains non-ASCII characters (diacritics)."""
+            return any(ord(c) > 127 for c in word)
+
         normalized_to_original_indices: dict[int, list[int]] = {}
         for orig_idx, (orig_word, norm_word) in enumerate(
             zip(vocabulary, normalized_vocabulary, strict=False)
@@ -178,6 +185,14 @@ class Corpus(BaseModel):
                 if sorted_idx not in normalized_to_original_indices:
                     normalized_to_original_indices[sorted_idx] = []
                 normalized_to_original_indices[sorted_idx].append(orig_idx)
+
+        # Sort each list of indices by preference: words with diacritics first
+        for sorted_idx, orig_indices in normalized_to_original_indices.items():
+            if len(orig_indices) > 1:
+                # Sort by: has_diacritics (True first), then by original index
+                orig_indices.sort(
+                    key=lambda idx: (not has_diacritics(vocabulary[idx]), idx)
+                )
 
         # Create the corpus instance
         corpus = cls(
@@ -200,9 +215,10 @@ class Corpus(BaseModel):
 
         # Create semantic index if requested
         if semantic:
+            from ..search.semantic.constants import DEFAULT_SENTENCE_MODEL
             from ..search.semantic.models import SemanticIndex
 
-            model_name = model_name or "all-MiniLM-L6-v2"
+            model_name = model_name or DEFAULT_SENTENCE_MODEL
             logger.info(f"Creating semantic index with model {model_name}")
 
             try:
@@ -224,6 +240,10 @@ class Corpus(BaseModel):
 
         # Rebuild normalized_to_original_indices if needed
         if self.original_vocabulary and not self.normalized_to_original_indices:
+            def has_diacritics(word: str) -> bool:
+                """Check if word contains non-ASCII characters (diacritics)."""
+                return any(ord(c) > 127 for c in word)
+
             self.normalized_to_original_indices = {}
             normalized_orig = batch_normalize(self.original_vocabulary)
             for orig_idx, norm_word in enumerate(normalized_orig):
@@ -232,6 +252,16 @@ class Corpus(BaseModel):
                     if sorted_idx not in self.normalized_to_original_indices:
                         self.normalized_to_original_indices[sorted_idx] = []
                     self.normalized_to_original_indices[sorted_idx].append(orig_idx)
+
+            # Sort each list by preference: words with diacritics first
+            for sorted_idx, orig_indices in self.normalized_to_original_indices.items():
+                if len(orig_indices) > 1:
+                    orig_indices.sort(
+                        key=lambda idx: (
+                            not has_diacritics(self.original_vocabulary[idx]),
+                            idx,
+                        )
+                    )
 
         # Rebuild signature index
         self._build_signature_index()
@@ -401,7 +431,10 @@ class Corpus(BaseModel):
         return self.vocabulary[index] if 0 <= index < len(self.vocabulary) else None
 
     def get_original_word_by_index(self, normalized_index: int) -> str | None:
-        """Get the first original form of a word by its normalized index.
+        """Get original form of a word by its normalized index.
+
+        When multiple original forms exist, returns the first (preferred) form.
+        The indices are pre-sorted to prefer diacritics over ASCII equivalents.
 
         Args:
             normalized_index: Index in the normalized vocabulary
@@ -411,7 +444,7 @@ class Corpus(BaseModel):
 
         """
         if original_indices := self.normalized_to_original_indices.get(normalized_index):
-            # Return the first original form
+            # Return the first original form (pre-sorted by preference)
             return self.original_vocabulary[original_indices[0]]
         # If no mapping exists, return the normalized word itself
         return self.get_word_by_index(normalized_index)

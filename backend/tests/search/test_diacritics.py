@@ -48,14 +48,13 @@ class TestDiacriticsPreservation:
             "resume",
         ]
 
-        corpus = Corpus(
+        # Use Corpus.create() which properly normalizes vocabulary
+        corpus = await Corpus.create(
             corpus_name="test_diacritics",
-            corpus_type=CorpusType.CUSTOM,
+            vocabulary=vocabulary,
             language=Language.ENGLISH,
-            vocabulary=sorted(vocabulary),
-            original_vocabulary=sorted(vocabulary),
         )
-        await corpus._rebuild_indices()
+        corpus.corpus_type = CorpusType.CUSTOM
 
         manager = CorpusManager()
         return await manager.save_corpus(corpus)
@@ -68,19 +67,17 @@ class TestDiacriticsPreservation:
             semantic=False,
         )
 
-        # Verify corpus has diacritic words
-        assert "café" in diacritics_corpus.vocabulary, "café should be in vocabulary"
-        assert "café" in diacritics_corpus.vocabulary_to_index, "café should be indexed"
+        # Verify corpus has diacritic words in original vocabulary
+        assert "café" in diacritics_corpus.original_vocabulary, "café should be in original_vocabulary"
+        # And normalized form in normalized vocabulary
+        assert "cafe" in diacritics_corpus.vocabulary, "cafe should be in vocabulary"
 
         # Search for word with diacritics
         results = engine.search_exact("café")
 
-        # If exact search doesn't find it, try fuzzy search (may normalize)
-        if not results:
-            results = engine.search_fuzzy("café", max_results=5)
-
-        # Should find SOMETHING related to café
+        # Should find results and return original form with diacritics
         assert len(results) > 0, "Should find results for café"
+        assert results[0].word == "café", f"Should return 'café', got '{results[0].word}'"
 
     @pytest.mark.asyncio
     async def test_fuzzy_search_handles_diacritics(self, diacritics_corpus, test_db):
@@ -124,21 +121,22 @@ class TestDiacriticsPreservation:
     @pytest.mark.asyncio
     async def test_corpus_preserves_diacritics_in_indices(self, diacritics_corpus, test_db):
         """Test that corpus indices preserve diacritics."""
-        # Check vocabulary
-        assert "café" in diacritics_corpus.vocabulary
-        assert "niño" in diacritics_corpus.vocabulary
-        assert "Björk" in diacritics_corpus.vocabulary
+        # Check original_vocabulary has diacritic forms
+        assert "café" in diacritics_corpus.original_vocabulary
+        assert "niño" in diacritics_corpus.original_vocabulary
+        assert "Björk" in diacritics_corpus.original_vocabulary
 
-        # Check that words are indexed correctly
-        assert "café" in diacritics_corpus.vocabulary_to_index
-        assert "Björk" in diacritics_corpus.vocabulary_to_index
+        # Check vocabulary has normalized forms
+        assert "cafe" in diacritics_corpus.vocabulary_to_index
+        assert "bjork" in diacritics_corpus.vocabulary_to_index
 
-        # Verify indices are consistent
-        for word in ["café", "niño", "Björk", "résumé"]:
-            if word in diacritics_corpus.vocabulary:
-                idx = diacritics_corpus.vocabulary_to_index[word]
-                assert idx >= 0
-                assert diacritics_corpus.vocabulary[idx] == word
+        # Verify indices are consistent - check normalized forms map back to originals
+        test_pairs = [("cafe", "café"), ("nino", "niño"), ("bjork", "Björk"), ("resume", "résumé")]
+        for normalized, original in test_pairs:
+            if normalized in diacritics_corpus.vocabulary_to_index:
+                idx = diacritics_corpus.vocabulary_to_index[normalized]
+                restored = diacritics_corpus.get_original_word_by_index(idx)
+                assert restored == original, f"Expected '{original}' but got '{restored}'"
 
     @pytest.mark.asyncio
     async def test_normalization_preserves_essential_diacritics(self, diacritics_corpus, test_db):
