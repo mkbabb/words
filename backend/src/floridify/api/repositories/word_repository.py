@@ -17,6 +17,7 @@ from ...models.dictionary import (
     Pronunciation,
     Word,
 )
+from ...models.relationships import WordRelationship
 from ..core.base import BaseRepository
 
 
@@ -117,7 +118,9 @@ class WordRepository(BaseRepository[Word, WordCreate, WordUpdate]):
             Fact.find({"word_id": word_id_str}).delete(),
             Pronunciation.find({"word_id": word_id_str}).delete(),
             DictionaryEntry.find({"word_id": word_id_str}).delete(),
-            DictionaryEntry.find({"word_id": word_id_str}).delete(),
+            # Delete relationships where word is source or target
+            WordRelationship.find({"from_word_id": word.id}).delete(),
+            WordRelationship.find({"to_word_id": word.id}).delete(),
         )
 
     async def get_with_counts(self, id: PydanticObjectId) -> dict[str, Any]:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import pickle
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -71,10 +70,9 @@ class FilesystemBackend:
 
             # For bytes, attempt pickle deserialization (most performant)
             if isinstance(data, bytes):
-                # Check for pickle magic bytes (protocol 4 or 5)
-                if data[:2] in (b"\x80\x04", b"\x80\x05"):
-                    return pickle.loads(data)
-                # Otherwise it's likely compressed or JSON
+                import pickle
+
+                return pickle.loads(data)
 
             return data
 
@@ -94,7 +92,9 @@ class FilesystemBackend:
                 # Keep JSON types as-is for diskcache's native handling
                 data = value
             else:
-                # Use pickle for all complex objects (Pydantic models, etc.)
+                # Use pickle for everything else (handles Pydantic, ObjectIds, etc.)
+                import pickle
+
                 data = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
 
             expire = ttl.total_seconds() if ttl else self.default_ttl.total_seconds()

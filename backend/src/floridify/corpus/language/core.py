@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from beanie import PydanticObjectId
 
+from ...caching.models import VersionConfig
 from ...models.base import Language
 from ...providers.language.models import LanguageSource
 from ...providers.language.scraper.url import URLLanguageConnector
@@ -31,6 +32,7 @@ class LanguageCorpus(Corpus):
         self,
         source: LanguageSource,
         connector: URLLanguageConnector | None = None,
+        aggregate: bool = True,
     ) -> PydanticObjectId | None:
         """Add a language source as child corpus.
 
@@ -46,8 +48,6 @@ class LanguageCorpus(Corpus):
         # Fetch vocabulary using connector
         connector = connector or URLLanguageConnector()
         # Always force rebuild for corpus building to avoid stale cache
-        from ...caching.models import VersionConfig
-
         result = await connector.fetch_source(source, config=VersionConfig(force_rebuild=True))
 
         if not result:
@@ -92,7 +92,6 @@ class LanguageCorpus(Corpus):
             await manager.update_parent(self.corpus_id, child.corpus_id)
 
             # Refresh parent to get updated children list
-            from ...caching.models import VersionConfig
 
             fresh_parent = await manager.get_corpus(
                 corpus_id=self.corpus_id,
@@ -101,8 +100,9 @@ class LanguageCorpus(Corpus):
             if fresh_parent:
                 self.child_corpus_ids = fresh_parent.child_corpus_ids
 
-        # Aggregate vocabularies into parent
-        if self.corpus_id and child.corpus_id:
+        # Aggregate vocabularies into parent (only if requested)
+        # This allows batching aggregations when adding multiple sources
+        if aggregate and self.corpus_id and child.corpus_id:
             # Note: update_parent already adds the child to parent's child_corpus_ids
             # aggregate_vocabularies aggregates from the corpus and its children automatically
             await manager.aggregate_vocabularies(self.corpus_id)
@@ -190,11 +190,13 @@ class LanguageCorpus(Corpus):
 
         logger.info(f"Adding {len(sources)} sources for {language.value}")
 
-        # Add all sources in parallel
+        # Add all sources in parallel WITHOUT aggregation
+        # This prevents redundant aggregations - we'll do one final aggregation at the end
         async def add_source_safe(source: LanguageSource) -> bool:
             """Add source with error handling."""
             try:
-                await corpus.add_language_source(source)
+                # FIX: aggregate=False to prevent redundant aggregations
+                await corpus.add_language_source(source, aggregate=False)
                 return True
             except Exception as e:
                 logger.error(f"Failed to add source {source.name}: {e}")
@@ -202,16 +204,32 @@ class LanguageCorpus(Corpus):
 
         # Process all sources concurrently
         import asyncio
+
         tasks = [add_source_safe(source) for source in sources]
         results = await asyncio.gather(*tasks, return_exceptions=False)
 
         successful = sum(1 for r in results if r is True)
         logger.info(f"Successfully added {successful}/{len(sources)} sources")
 
-        # Final save with aggregated vocabulary
-        await corpus.save()
+        # FIX: Aggregate ONCE after all sources are added
+        from ...caching.models import VersionConfig
 
-        logger.info(f"Created language corpus with {len(corpus.vocabulary)} unique words")
+        manager = get_tree_corpus_manager()
+
+        if corpus.corpus_id and successful > 0:
+            logger.info(f"Aggregating vocabularies from {successful} sources...")
+            await manager.aggregate_vocabularies(corpus.corpus_id)
+
+        # Reload corpus to get aggregated vocabulary
+        reloaded = await manager.get_corpus(
+            corpus_id=corpus.corpus_id, config=VersionConfig(use_cache=False)
+        )
+
+        if reloaded:
+            corpus = reloaded
+            logger.info(f"✅ Created language corpus with {len(corpus.vocabulary):,} unique words")
+        else:
+            logger.warning("Failed to reload corpus after aggregation")
 
         return corpus
 
@@ -231,8 +249,6 @@ class LanguageCorpus(Corpus):
 
         # Ensure we have the latest parent state with children
         if self.corpus_id:
-            from ...caching.models import VersionConfig
-
             fresh_parent = await manager.get_corpus(
                 corpus_id=self.corpus_id,
                 config=VersionConfig(use_cache=False),
@@ -287,7 +303,6 @@ class LanguageCorpus(Corpus):
                 await manager.aggregate_vocabularies(self.corpus_id)
 
                 # Sync local state with database state - force fresh read
-                from ...caching.models import VersionConfig
 
                 updated_corpus = await manager.get_corpus(
                     corpus_id=self.corpus_id,

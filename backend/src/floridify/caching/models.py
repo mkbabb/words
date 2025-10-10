@@ -14,13 +14,14 @@ from typing import Any
 
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field, field_validator, model_validator
+from pymongo import IndexModel
 
 
 class CompressionType(str, Enum):
     """Compression algorithms for cache data.
 
     Algorithm selection is automatic based on content size:
-    - < 1KB: No compression
+    - < 1KB: No compression (None)
     - 1KB-10MB: ZSTD (best balance of speed and ratio)
     - > 10MB: GZIP (maximum compression)
     """
@@ -28,18 +29,6 @@ class CompressionType(str, Enum):
     ZSTD = "zstd"  # Zstandard - fast with good compression
     LZ4 = "lz4"  # LZ4 - extremely fast, moderate compression
     GZIP = "gzip"  # GZIP - slower but maximum compression
-    NONE = "none"  # No compression
-    ZLIB = "zlib"  # Standard zlib compression (legacy)
-
-
-class QuantizationType(str, Enum):
-    """Quantization types for semantic embeddings."""
-
-    FLOAT32 = "float32"  # Full precision (default)
-    FLOAT16 = "float16"  # Half precision (2x space savings)
-    INT8 = "int8"  # 8-bit quantization (4x space savings, some accuracy loss)
-    UINT8 = "uint8"  # Unsigned 8-bit (4x space savings, positive values only)
-    BINARY = "binary"  # Binary quantization (8x space savings, high accuracy loss)
 
 
 class CacheNamespace(str, Enum):
@@ -120,6 +109,11 @@ class VersionConfig(BaseModel):
     # Version control
     version: str | None = None  # Fetch specific version (None = latest)
     increment_version: bool = True  # Auto-increment version on save
+
+    # Metadata versioning control
+    metadata_comparison_fields: list[str] | None = (
+        None  # Fields that trigger new version if changed
+    )
 
     # Storage options
     ttl: timedelta | None = None
@@ -208,14 +202,18 @@ class BaseVersionedData(Document):
             # PRIMARY: Latest version lookup (most frequent query)
             # Covers: resource_id + is_latest filter + _id sort
             [("resource_id", 1), ("version_info.is_latest", 1), ("_id", -1)],
-
             # Specific version lookup
             # Covers: resource_id + exact version query
             [("resource_id", 1), ("version_info.version", 1)],
-
             # Content hash deduplication
             # Covers: resource_id + hash-based dedup during save
             [("resource_id", 1), ("version_info.data_hash", 1)],
+            # Corpus.Metadata indices (sparse - only for Corpus documents)
+            IndexModel([("corpus_name", 1)], sparse=True, name="corpus_name_sparse"),
+            IndexModel([("vocabulary_hash", 1)], sparse=True, name="vocabulary_hash_sparse"),
+            IndexModel([("parent_corpus_id", 1)], sparse=True, name="parent_corpus_id_sparse"),
+            # Index metadata indices (sparse - for TrieIndex, SearchIndex, SemanticIndex)
+            IndexModel([("corpus_id", 1)], sparse=True, name="corpus_id_sparse"),
         ]
 
     def __init_subclass__(
@@ -236,9 +234,9 @@ class BaseVersionedData(Document):
 
         # Set field defaults at class creation time
         if default_resource_type is not None:
-            cls.model_fields['resource_type'].default = default_resource_type
+            cls.model_fields["resource_type"].default = default_resource_type
         if default_namespace is not None:
-            cls.model_fields['namespace'].default = default_namespace
+            cls.model_fields["namespace"].default = default_namespace
 
     @field_validator("content_location", mode="before")
     @classmethod

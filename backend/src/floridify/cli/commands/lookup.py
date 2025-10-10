@@ -77,7 +77,9 @@ def lookup(
 
     Use --json for machine-readable output that matches the API response format.
     """
-    asyncio.run(_lookup_async(word, provider, language, semantic, no_ai, force_refresh, output_json))
+    asyncio.run(
+        _lookup_async(word, provider, language, semantic, no_ai, force_refresh, output_json)
+    )
 
 
 async def _lookup_async(
@@ -139,7 +141,9 @@ async def _lookup_async(
 
                 # Display the synthesized entry
                 console.print(
-                    format_meaning_based_definition(result, params.languages, params.providers, meaning_groups),
+                    format_meaning_based_definition(
+                        result, params.languages, params.providers, meaning_groups
+                    ),
                 )
         else:
             if output_json:

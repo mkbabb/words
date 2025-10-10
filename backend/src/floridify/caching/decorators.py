@@ -9,12 +9,12 @@ import inspect
 import time
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
+from enum import Enum
 from typing import Any, ParamSpec, TypeVar, cast
 
 from ..utils.logging import get_logger
 from .core import get_global_cache
 from .models import CacheNamespace
-from .protocols import is_request_with_headers, serialize_cache_value
 
 # Modern type parameters using ParamSpec
 P = ParamSpec("P")
@@ -34,6 +34,27 @@ CACHE_NAMESPACE_MAP: dict[str, CacheNamespace] = {
 }
 
 
+def _serialize_cache_value(value: Any) -> str | int | float | tuple[Any, ...] | None:
+    """Type-safe value serialization for cache keys."""
+    # Handle basic types
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+
+    # Handle enums
+    if isinstance(value, Enum):
+        return value.value
+
+    # Handle small lists and tuples
+    if isinstance(value, list | tuple) and len(value) < 10:
+        return tuple(value) if isinstance(value, list) else value
+
+    # Fallback to hash for complex objects
+    try:
+        return str(hash(value))
+    except TypeError:
+        return str(id(value))
+
+
 def _efficient_cache_key_parts(
     func: Any,
     args: tuple[Any, ...],
@@ -45,12 +66,12 @@ def _efficient_cache_key_parts(
     # Process kwargs efficiently without sorting
     if len(kwargs) <= 3:  # Fast path for simple kwargs (most API calls)
         for key, value in kwargs.items():
-            serialized = serialize_cache_value(value)
+            serialized = _serialize_cache_value(value)
             key_parts.append((key, serialized))
     else:  # Fallback with sorting only for complex cases
         for key in sorted(kwargs.keys()):
             value = kwargs[key]
-            serialized = serialize_cache_value(value)
+            serialized = _serialize_cache_value(value)
             key_parts.append((key, serialized))
 
     return tuple(key_parts)
@@ -93,7 +114,7 @@ def cached_api_call(
             headers = None
             if include_headers:
                 request = kwargs.get("request")
-                if request and is_request_with_headers(request):
+                if request and hasattr(request, "headers"):
                     # Include select headers that might affect response
                     relevant_headers = {"accept-language", "accept-encoding"}
                     headers = {
@@ -375,7 +396,7 @@ def cached_api_call_with_dedup(
             headers = None
             if include_headers:
                 request = kwargs.get("request")
-                if request and is_request_with_headers(request):
+                if request and hasattr(request, "headers"):
                     # Include select headers that might affect response
                     relevant_headers = {"accept-language", "accept-encoding"}
                     headers = {

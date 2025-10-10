@@ -16,14 +16,12 @@ from .decorators import (
 from .models import (
     CacheNamespace,
     CompressionType,
-    QuantizationType,
 )
 
 __all__ = [
     "CacheNamespace",
     "CompressionType",
     "GlobalCacheManager",
-    "QuantizationType",
     "cached_api_call",
     "cached_api_call_with_dedup",
     "cached_computation",

@@ -262,7 +262,6 @@ class TestCompressionAndStorage:
         assert CompressionType.ZSTD == "zstd"
         assert CompressionType.LZ4 == "lz4"
         assert CompressionType.GZIP == "gzip"
-        assert CompressionType.NONE == "none"
 
     def test_storage_type_enum(self):
         """Test storage type enumeration."""

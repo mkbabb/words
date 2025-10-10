@@ -23,27 +23,27 @@ def compress_data(data: Any, compression: CompressionType | None = None) -> byte
         Compressed bytes
 
     """
-    # Serialize first if needed
+    # Serialize with pickle if needed
     if isinstance(data, bytes):
         serialized = data
     else:
-        # Use pickle for all non-bytes (fastest for complex objects)
+        # Pickle handles everything: Pydantic models, ObjectIds, etc.
         serialized = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
 
     # Apply compression
     if compression == CompressionType.ZSTD:
         cctx = zstd.ZstdCompressor(level=3)
         return cctx.compress(serialized)
-    if compression == CompressionType.LZ4:
+    elif compression == CompressionType.LZ4:
         return lz4.frame.compress(serialized, compression_level=0)
-    if compression == CompressionType.GZIP:
+    elif compression == CompressionType.GZIP:
         return gzip.compress(serialized, compresslevel=6)
-
-    return serialized
+    else:
+        return serialized
 
 
 def decompress_data(data: bytes, compression: CompressionType | None = None) -> Any:
-    """Decompress and deserialize data.
+    """Decompress and deserialize data using pickle.
 
     Args:
         data: Compressed bytes
@@ -64,26 +64,5 @@ def decompress_data(data: bytes, compression: CompressionType | None = None) -> 
     else:
         decompressed = data
 
-    # Deserialize - check for pickle magic bytes
-    if len(decompressed) >= 2 and decompressed[:2] in (b"\x80\x04", b"\x80\x05"):
-        return pickle.loads(decompressed)
-
-    # Return raw bytes if not pickled
-    return decompressed
-
-
-def auto_select_compression(size_bytes: int) -> CompressionType | None:
-    """Automatically select compression based on data size.
-
-    Args:
-        size_bytes: Size of data in bytes
-
-    Returns:
-        Optimal compression type or None for no compression
-
-    """
-    if size_bytes < 1024:  # < 1KB
-        return None
-    if size_bytes < 10_000_000:  # < 10MB
-        return CompressionType.ZSTD  # Best balance
-    return CompressionType.GZIP  # Best for large files
+    # Deserialize with pickle
+    return pickle.loads(decompressed)

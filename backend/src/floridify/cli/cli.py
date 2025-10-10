@@ -107,7 +107,15 @@ semantic search, and Anki flashcard generation.[/dim]
 @click.option("--force", is_flag=True, help="Force refresh from providers")
 @click.option("--semantic", is_flag=True, help="Use semantic search")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
-def lookup(word: str, provider: tuple[str, ...], language: tuple[str, ...], no_ai: bool, force: bool, semantic: bool, output_json: bool) -> None:
+def lookup(
+    word: str,
+    provider: tuple[str, ...],
+    language: tuple[str, ...],
+    no_ai: bool,
+    force: bool,
+    semantic: bool,
+    output_json: bool,
+) -> None:
     """Look up word definitions with AI enhancement."""
     import asyncio
 

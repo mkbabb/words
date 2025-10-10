@@ -43,7 +43,9 @@ async def get_cache_stats(
             try:
                 namespace_enum = CacheNamespace(params.namespace.lower())
             except ValueError:
-                raise HTTPException(status_code=400, detail=f"Invalid namespace: {params.namespace}")
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid namespace: {params.namespace}"
+                )
 
             namespace_stats = cache.get_stats(namespace_enum)
 
@@ -151,7 +153,9 @@ async def clear_cache(
                 try:
                     namespace_enum = CacheNamespace(params.namespace.lower())
                 except ValueError:
-                    raise HTTPException(status_code=400, detail=f"Invalid namespace: {params.namespace}")
+                    raise HTTPException(
+                        status_code=400, detail=f"Invalid namespace: {params.namespace}"
+                    )
 
                 namespace_stats = cache.get_stats(namespace_enum)
                 count = namespace_stats.get("memory_items", 0)
@@ -177,7 +181,9 @@ async def clear_cache(
             try:
                 namespace_enum = CacheNamespace(params.namespace.lower())
             except ValueError:
-                raise HTTPException(status_code=400, detail=f"Invalid namespace: {params.namespace}")
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid namespace: {params.namespace}"
+                )
 
             await cache.clear_namespace(namespace_enum)
             return SuccessResponse(

@@ -134,9 +134,15 @@ async def _get_provider_status(
         rate_limits_map = {
             DictionaryProvider.WIKTIONARY: {"requests_per_second": 5.0, "type": "API_STANDARD"},
             DictionaryProvider.OXFORD: {"requests_per_second": 2.0, "type": "API_CONSERVATIVE"},
-            DictionaryProvider.MERRIAM_WEBSTER: {"requests_per_second": 2.0, "type": "API_CONSERVATIVE"},
+            DictionaryProvider.MERRIAM_WEBSTER: {
+                "requests_per_second": 2.0,
+                "type": "API_CONSERVATIVE",
+            },
             DictionaryProvider.FREE_DICTIONARY: {"requests_per_second": 10.0, "type": "API_FAST"},
-            DictionaryProvider.WORDHIPPO: {"requests_per_second": 1.0, "type": "SCRAPER_RESPECTFUL"},
+            DictionaryProvider.WORDHIPPO: {
+                "requests_per_second": 1.0,
+                "type": "SCRAPER_RESPECTFUL",
+            },
             DictionaryProvider.APPLE_DICTIONARY: {"requests_per_second": 100.0, "type": "LOCAL"},
         }
         rate_limit = rate_limits_map.get(provider, {"requests_per_second": 1.0, "type": "UNKNOWN"})

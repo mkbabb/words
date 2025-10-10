@@ -71,7 +71,9 @@ async def get_database_stats(
             async for result in Definition.aggregate(pipeline):
                 provider_results.append(result)
             provider_coverage = {
-                str(result["_id"]): result["count"] for result in provider_results if result.get("_id")
+                str(result["_id"]): result["count"]
+                for result in provider_results
+                if result.get("_id")
             }
 
         # Quality metrics

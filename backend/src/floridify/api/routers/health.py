@@ -94,17 +94,32 @@ async def health_check() -> HealthResponse:
 
     # Check cache system
     cache_hit_rate = 0.0
+    cache_status = "unknown"
     try:
         cache = await get_global_cache()
-        stats = await cache.get_stats()
+        # IMPORTANT: get_stats() is NOT async - don't await it!
+        stats = cache.get_stats()
 
-        # Get cache statistics
-        total_entries = stats.get("total_entries", 0)
-        if total_entries > 0:
-            # diskcache doesn't track hit rate by default, so we'll use a simple metric
-            cache_hit_rate = 0.5  # Default to 50% for now
+        # Calculate hit rate from actual stats
+        hits = stats.get("hits", 0)
+        misses = stats.get("misses", 0)
+        total_requests = hits + misses
+
+        if total_requests > 0:
+            cache_hit_rate = hits / total_requests
+            cache_status = "healthy"
+        else:
+            # No cache activity yet - this is normal on startup
+            cache_hit_rate = 0.0
+            cache_status = "healthy"  # Change from "degraded" - zero activity is OK
+
+        logger.debug(
+            f"Cache stats: hits={hits}, misses={misses}, "
+            f"hit_rate={cache_hit_rate:.2%}, entries={stats.get('memory_count', 0)}"
+        )
     except Exception as e:
-        logger.warning(f"Cache health check failed: {e}")
+        logger.error(f"Cache health check failed: {e}", exc_info=True)
+        cache_status = "error"
 
     # Calculate uptime
     uptime_seconds = int(time.perf_counter() - _start_time)
@@ -121,7 +136,7 @@ async def health_check() -> HealthResponse:
         services={
             "database": database_status,
             "search_engine": search_status,
-            "cache": "healthy" if cache_hit_rate > 0 else "degraded",
+            "cache": cache_status,
         },
         metrics={
             "cache_hit_rate": cache_hit_rate,

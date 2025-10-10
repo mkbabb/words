@@ -15,7 +15,9 @@ SemanticModel = Literal[
 # Model Configurations
 BGE_M3_MODEL: SemanticModel = "BAAI/bge-m3"  # 1024D, 100+ languages, cross-lingual
 MINI_LM_MODEL: SemanticModel = "sentence-transformers/all-MiniLM-L6-v2"  # 384D, English-only, fast
-GTE_QWEN2_MODEL: SemanticModel = "Alibaba-NLP/gte-Qwen2-1.5B-instruct"  # 1536D, QWEN2-based, multilingual, 67.16 MTEB
+GTE_QWEN2_MODEL: SemanticModel = (
+    "Alibaba-NLP/gte-Qwen2-1.5B-instruct"  # 1536D, QWEN2-based, multilingual, 67.16 MTEB
+)
 
 # Default model - GTE-Qwen2 for best QWEN-based multilingual support
 DEFAULT_SENTENCE_MODEL: SemanticModel = "Alibaba-NLP/gte-Qwen2-1.5B-instruct"
@@ -30,12 +32,12 @@ MODEL_DIMENSIONS = {
 # FAISS Configuration
 L2_DISTANCE_NORMALIZATION = 2  # Divisor for L2 distance to similarity conversion
 
-# Corpus Size Thresholds - Optimized for 1536D GTE-Qwen2
-SMALL_CORPUS_THRESHOLD = 5000  # IndexFlatL2 (exact search, ~29MB)
-MEDIUM_CORPUS_THRESHOLD = 15000  # IVF-Flat (3-5x speedup, ~88MB)
-LARGE_CORPUS_THRESHOLD = 40000  # IVF-PQ (5-8ms latency, ~40MB)
-PQ_CORPUS_THRESHOLD = 40000  # Product Quantization threshold
-MASSIVE_CORPUS_THRESHOLD = 150000  # OPQ+IVF-PQ (aggressive compression)
+# Corpus Size Thresholds - Optimized for 1024D BGE-M3 and large corpora
+SMALL_CORPUS_THRESHOLD = 10000  # IndexFlatL2 (exact search, fast for <10k)
+MEDIUM_CORPUS_THRESHOLD = 50000  # IVF-Flat (3-5x speedup, good accuracy)
+LARGE_CORPUS_THRESHOLD = 100000  # IVF-PQ (balanced speed/accuracy)
+PQ_CORPUS_THRESHOLD = 100000  # Product Quantization threshold
+MASSIVE_CORPUS_THRESHOLD = 200000  # OPQ+IVF-PQ (for 200k+ lemmas)
 
 # Batch Processing - Model-aware
 MODEL_BATCH_SIZES = {

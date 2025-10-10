@@ -222,7 +222,9 @@ async def _search_word_async(
 
                 for result in results:
                     word_type = "entry"
-                    table.add_row(result.word, f"{result.score:.3f}", result.method.value, word_type)
+                    table.add_row(
+                        result.word, f"{result.score:.3f}", result.method.value, word_type
+                    )
 
                 console.print(table)
                 console.print(f"\n✅ Found {len(results)} result(s)")

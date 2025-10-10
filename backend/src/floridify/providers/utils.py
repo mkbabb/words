@@ -20,6 +20,8 @@ import httpx
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 
+from ..caching.core import get_global_cache
+from ..caching.models import CacheNamespace
 from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -283,8 +285,6 @@ class SessionManager:
     async def _get_cache(self) -> Any:
         """Get global cache instance."""
         if self._cache is None:
-            from ..caching.core import get_global_cache
-
             self._cache = await get_global_cache()
         return self._cache
 
@@ -296,8 +296,6 @@ class SessionManager:
     async def save_session(self, session: ScrapingSession) -> None:
         """Save session state to global cache."""
         from datetime import timedelta
-
-        from ..caching.models import CacheNamespace
 
         cache = await self._get_cache()
         cache_key = self._get_cache_key(session.session_id)
@@ -317,7 +315,6 @@ class SessionManager:
 
     async def load_session(self, session_id: str) -> ScrapingSession | None:
         """Load session state from global cache."""
-        from ..caching.models import CacheNamespace
 
         cache = await self._get_cache()
         cache_key = self._get_cache_key(session_id)
@@ -343,7 +340,6 @@ class SessionManager:
 
     async def delete_session(self, session_id: str) -> None:
         """Delete session from cache."""
-        from ..caching.models import CacheNamespace
 
         cache = await self._get_cache()
         cache_key = self._get_cache_key(session_id)

@@ -38,4 +38,5 @@ class DictionaryProviderEntry(BaseModel):
         default_namespace=CacheNamespace.DICTIONARY,
     ):
         """Minimal dictionary metadata for versioning."""
+
         pass

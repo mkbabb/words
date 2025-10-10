@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import pickle
 import time
 from collections.abc import Callable
 from datetime import timedelta
@@ -25,7 +24,6 @@ from .models import (
     ContentLocation,
     StorageType,
 )
-from .protocols import VersionedContent
 
 logger = get_logger(__name__)
 
@@ -71,6 +69,47 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         self.l2_backend = l2_backend
         self.l1_caches: dict[CacheNamespace, NamespaceConfig] = {}
         self._init_default_namespaces()
+
+    @staticmethod
+    def _make_backend_key(namespace: CacheNamespace, key: str) -> str:
+        """Construct backend cache key from namespace and key.
+
+        Args:
+            namespace: Cache namespace
+            key: Cache key
+
+        Returns:
+            Formatted backend key string
+        """
+        return f"{namespace.value}:{key}"
+
+    def _evict_lru(self, ns: NamespaceConfig, count: int = 1) -> int:
+        """Evict least recently used items from namespace.
+
+        Args:
+            ns: Namespace configuration
+            count: Number of items to evict (default: 1, None = evict until under limit)
+
+        Returns:
+            Number of items evicted
+        """
+        evictions = 0
+        if count is None:
+            # Evict until under limit
+            while len(ns.memory_cache) >= ns.memory_limit:
+                first_key = next(iter(ns.memory_cache))
+                del ns.memory_cache[first_key]
+                ns.stats["evictions"] += 1
+                evictions += 1
+        else:
+            # Evict exact count
+            for _ in range(count):
+                if ns.memory_cache:
+                    first_key = next(iter(ns.memory_cache))
+                    del ns.memory_cache[first_key]
+                    ns.stats["evictions"] += 1
+                    evictions += 1
+        return evictions
 
     async def initialize(self) -> None:
         """Initialize the cache manager.
@@ -183,7 +222,10 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         """Two-tier get with optional loader."""
         ns = self.namespaces.get(namespace)
         if not ns:
+            logger.warning(f"Unknown namespace: {namespace}")
             return None
+
+        start_time = time.perf_counter()
 
         # L1: Memory cache
         async with ns.lock:
@@ -196,37 +238,53 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
                     if age > ns.memory_ttl.total_seconds():
                         del ns.memory_cache[key]
                         ns.stats["evictions"] += 1
+                        logger.debug(f"L1 cache expired: {namespace.value}:{key} (age={age:.2f}s)")
                     else:
                         # Move to end for LRU (dict preserves order)
                         del ns.memory_cache[key]
                         ns.memory_cache[key] = entry
                         ns.stats["hits"] += 1
+                        elapsed = (time.perf_counter() - start_time) * 1000
+                        logger.debug(f"L1 cache HIT: {namespace.value}:{key} ({elapsed:.2f}ms)")
                         return entry["data"]
                 else:
                     ns.stats["hits"] += 1
+                    elapsed = (time.perf_counter() - start_time) * 1000
+                    logger.debug(f"L1 cache HIT: {namespace.value}:{key} ({elapsed:.2f}ms)")
                     return entry["data"]
 
         # L2: Filesystem cache
-        backend_key = f"{namespace.value}:{key}"
-        data = await self.l2_backend.get(backend_key)
+        backend_key = self._make_backend_key(namespace, key)
+        try:
+            data = await self.l2_backend.get(backend_key)
 
-        if data is not None:
-            # Decompress if needed
-            if ns.compression and isinstance(data, bytes):
-                data = await self._decompress_data(data, ns.compression)
+            if data is not None:
+                # Decompress if needed
+                if ns.compression and isinstance(data, bytes):
+                    data = await self._decompress_data(data, ns.compression)
 
-            # Promote to L1
-            await self._promote_to_memory(ns, key, data)
-            return data
+                # Promote to L1
+                await self._promote_to_memory(ns, key, data)
+                elapsed = (time.perf_counter() - start_time) * 1000
+                logger.debug(f"L2 cache HIT: {namespace.value}:{key} ({elapsed:.2f}ms)")
+                return data
+        except Exception as e:
+            logger.error(f"L2 cache error for {namespace.value}:{key}: {e}", exc_info=True)
 
         ns.stats["misses"] += 1
+        elapsed = (time.perf_counter() - start_time) * 1000
+        logger.debug(f"Cache MISS: {namespace.value}:{key} ({elapsed:.2f}ms)")
 
         # Cache miss - use loader
         if loader:
-            data = await loader()
-            if data is not None:
-                await self.set(namespace, key, data)
-            return data
+            try:
+                data = await loader()
+                if data is not None:
+                    await self.set(namespace, key, data)
+                return data
+            except Exception as e:
+                logger.error(f"Cache loader failed for {namespace.value}:{key}: {e}", exc_info=True)
+                return None
 
         return None
 
@@ -240,29 +298,39 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         """Store in both tiers efficiently."""
         ns = self.namespaces.get(namespace)
         if not ns:
+            logger.warning(f"Unknown namespace: {namespace}")
             return
+
+        start_time = time.perf_counter()
 
         # L1: Memory cache
         async with ns.lock:
             # LRU eviction
-            while len(ns.memory_cache) >= ns.memory_limit:
-                # Remove first item (oldest)
-                first_key = next(iter(ns.memory_cache))
-                del ns.memory_cache[first_key]
-                ns.stats["evictions"] += 1
+            evictions = self._evict_lru(ns, count=None)
+            if evictions > 0:
+                logger.debug(f"L1 evicted {evictions} items from {namespace.value}")
 
             ns.memory_cache[key] = {"data": value, "timestamp": time.time()}
 
         # L2: Filesystem with compression
-        backend_key = f"{namespace.value}:{key}"
+        backend_key = self._make_backend_key(namespace, key)
         ttl = ttl_override or ns.disk_ttl
 
-        # Compress if configured
-        store_value = value
-        if ns.compression:
-            store_value = await self._compress_data(value, ns.compression)
+        try:
+            # Compress if configured
+            store_value = value
+            if ns.compression:
+                store_value = await self._compress_data(value, ns.compression)
 
-        await self.l2_backend.set(backend_key, store_value, ttl)
+            await self.l2_backend.set(backend_key, store_value, ttl)
+
+            elapsed = (time.perf_counter() - start_time) * 1000
+            logger.debug(
+                f"Cache SET: {namespace.value}:{key} ({elapsed:.2f}ms, "
+                f"compressed={ns.compression is not None})"
+            )
+        except Exception as e:
+            logger.error(f"Failed to set cache {namespace.value}:{key}: {e}", exc_info=True)
 
     async def delete(self, namespace: CacheNamespace, key: str) -> bool:
         """Delete from both tiers."""
@@ -276,7 +344,7 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
                 del ns.memory_cache[key]
 
         # Remove from L2
-        backend_key = f"{namespace.value}:{key}"
+        backend_key = self._make_backend_key(namespace, key)
         return await self.l2_backend.delete(backend_key)
 
     async def clear_namespace(self, namespace: CacheNamespace) -> None:
@@ -407,9 +475,7 @@ async def get_versioned_content(versioned_data: Any) -> dict[str, Any] | None:
 
     """
     # Check if it's a versioned data object with content
-    # Accept both VersionedContent and BaseVersionedData subclasses
-    from .models import BaseVersionedData
-    if not isinstance(versioned_data, (VersionedContent, BaseVersionedData)):
+    if not isinstance(versioned_data, BaseVersionedData):
         return None
 
     # Inline content takes precedence
@@ -519,13 +585,11 @@ async def load_external_content(location: ContentLocation) -> Any:
     if location.compression and isinstance(data, bytes):
         data = decompress_data(data, location.compression)
 
-    # Deserialize based on content type hint
+    # Deserialize if bytes
     if isinstance(data, bytes):
-        # Check pickle magic bytes for fast path
-        if len(data) >= 2 and data[:2] in (b"\x80\x04", b"\x80\x05"):
-            return pickle.loads(data)
-        # Otherwise assume JSON
-        return json.loads(data.decode("utf-8"))
+        import pickle
+
+        return pickle.loads(data)
 
     return data
 
@@ -558,8 +622,10 @@ async def store_external_content(
         # JSON-serializable types
         serialized = json.dumps(content, sort_keys=True).encode()
     else:
-        # Everything else: use pickle (fastest for complex objects)
-        serialized = pickle.dumps(content, protocol=pickle.HIGHEST_PROTOCOL)
+        # Use proper serialization that handles pydantic models
+        from .serialization import serialize_content
+
+        serialized = serialize_content(content)
 
     size_bytes = len(serialized)
 

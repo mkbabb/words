@@ -96,6 +96,7 @@ class Pronunciation(Document, BaseMetadata):
 
     class Settings:
         name = "pronunciations"
+        indexes = ["word_id"]  # FK lookup
 
 
 class LiteratureSourceExample(BaseModel):
@@ -123,6 +124,10 @@ class Example(Document, BaseMetadata):
 
     class Settings:
         name = "examples"
+        indexes = [
+            "definition_id",  # FK lookup
+            "type",  # Example type filtering
+        ]
 
 
 class Fact(Document, BaseMetadata):
@@ -136,6 +141,10 @@ class Fact(Document, BaseMetadata):
 
     class Settings:
         name = "facts"
+        indexes = [
+            "word_id",  # FK lookup
+            "category",  # Fact category filtering
+        ]
 
 
 class Etymology(BaseModel):
@@ -215,6 +224,15 @@ class DictionaryEntry(Document, BaseMetadata):
 
     # Synthesis metadata (populated for synthesized entries)
     model_info: ModelInfo | None = None  # AI model info for synthesized entries
+
+    class Settings:
+        name = "dictionary_entries"
+        indexes = [
+            "word_id",  # FK lookup
+            "provider",  # Provider filtering
+            "language",  # Language filtering
+            [("word_id", 1), ("provider", 1)],  # Combined lookup
+        ]
 
 
 # Explicit exports

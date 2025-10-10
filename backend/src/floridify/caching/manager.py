@@ -12,6 +12,7 @@ from beanie import PydanticObjectId
 from pymongo.errors import OperationFailure
 
 from ..models.registry import get_model_class as get_versioned_model_class
+from ..utils.introspection import extract_metadata_params
 from ..utils.logging import get_logger
 from .core import GlobalCacheManager, get_global_cache, get_versioned_content, set_versioned_content
 from .filesystem import FilesystemBackend
@@ -42,7 +43,7 @@ class VersionedDataManager:
     def lock(self) -> asyncio.Lock:
         """Get or create lock for the current event loop."""
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
         except RuntimeError:
             # No event loop running, create a new lock
             self._lock = asyncio.Lock()
@@ -53,12 +54,12 @@ class VersionedDataManager:
             self._lock = asyncio.Lock()
         else:
             # Check if the lock is bound to a different event loop
+            # Simply recreate lock to be safe - locks are lightweight
             try:
-                # Try to use the lock's internal _loop attribute
-                if hasattr(self._lock, "_loop") and self._lock._loop != loop:
-                    self._lock = asyncio.Lock()
-            except (AttributeError, RuntimeError):
-                # If there's any issue, create a new lock
+                # Test if lock is still valid for current loop
+                _ = self._lock.locked()
+            except RuntimeError:
+                # Lock is from different event loop, create new one
                 self._lock = asyncio.Lock()
 
         return self._lock
@@ -81,12 +82,11 @@ class VersionedDataManager:
             resource_type: Type of resource being saved
 
         """
-        model_class = self._get_model_class(resource_type)
-
         # Try to get MongoDB client from the model
         try:
             # Access the underlying motor database from Beanie
-            db = model_class.get_motor_collection().database
+            # Use BaseVersionedData collection since that's what's registered
+            db = BaseVersionedData.get_pymongo_collection().database
             client = db.client
 
             # Try to use transactions (requires replica set)
@@ -98,9 +98,12 @@ class VersionedDataManager:
                     # Update version chain
                     if versioned.version_info.is_latest:
                         # Find and update other latest versions atomically
+                        # Use the specific model class for polymorphic queries
+                        model_class = self._get_model_class(resource_type)
                         other_latest = await model_class.find(
                             {
                                 "resource_id": resource_id,
+                                "resource_type": resource_type.value,
                                 "version_info.is_latest": True,
                                 "_id": {"$ne": versioned.id},
                             },
@@ -121,7 +124,7 @@ class VersionedDataManager:
                         f"[Transaction] Saved {resource_type.value} '{resource_id}' atomically"
                     )
 
-        except (OperationFailure, AttributeError) as e:
+        except (OperationFailure, AttributeError, Exception) as e:
             # Transactions not supported (single node or old MongoDB version)
             # Fall back to local lock approach
             logger.debug(
@@ -129,26 +132,34 @@ class VersionedDataManager:
                 "using local lock (safe for single-process deployments)"
             )
 
-            # Save new version first
-            await versioned.save()
+            # Save new version using Beanie's insert (handles _class_id correctly)
+            await versioned.insert()
+            # Ensure ID is always PydanticObjectId
+            if versioned.id and not isinstance(versioned.id, PydanticObjectId):
+                versioned.id = PydanticObjectId(versioned.id)
 
             # Update version chain with local lock
             if versioned.version_info.is_latest:
-                other_latest = await model_class.find(
+                # Update previous versions directly with pymongo
+                # Use BaseVersionedData collection since subclasses share it
+                collection = BaseVersionedData.get_pymongo_collection()
+                await collection.update_many(
                     {
                         "resource_id": resource_id,
+                        "resource_type": resource_type.value,
                         "version_info.is_latest": True,
                         "_id": {"$ne": versioned.id},
-                    }
-                ).to_list()
-
-                for other_version in other_latest:
-                    other_version.version_info.is_latest = False
-                    other_version.version_info.superseded_by = versioned.id
-                    await other_version.save()
+                    },
+                    {
+                        "$set": {
+                            "version_info.is_latest": False,
+                            "version_info.superseded_by": versioned.id,
+                        }
+                    },
+                )
 
                 logger.debug(
-                    f"[Local] Updated {len(other_latest)} previous versions to not be latest"
+                    f"[Local] Updated previous versions to not be latest for {resource_id}"
                 )
 
     async def save(
@@ -166,22 +177,16 @@ class VersionedDataManager:
         content_str = json.dumps(content, sort_keys=True, default=self._json_encoder)
         content_hash = hashlib.sha256(content_str.encode()).hexdigest()
 
-        # Check for duplicate content
-        # But we need to check if metadata has changed for corpus resources
+        # Check for duplicate content with optional metadata comparison
         if not config.force_rebuild:
-            existing = await self._find_by_hash(resource_id, content_hash)
-            if existing and resource_type == ResourceType.CORPUS and metadata:
-                # For corpus resources, check if critical metadata fields have changed
-                critical_fields = ["child_corpus_ids", "parent_corpus_id", "is_master"]
+            existing = await self._find_by_hash(resource_id, resource_type, content_hash)
+            if existing and config.metadata_comparison_fields and metadata:
+                # Check if specified metadata fields have changed
                 metadata_changed = False
+                existing_data = existing.model_dump()
 
-                for field in critical_fields:
+                for field in config.metadata_comparison_fields:
                     if field in metadata:
-                        # Type-safe metadata comparison
-                        # Access metadata through model_dump
-                        existing_data = (
-                            existing.model_dump() if hasattr(existing, "model_dump") else {}
-                        )
                         existing_value = existing_data.get("metadata", {}).get(field)
                         new_value = metadata.get(field)
                         if existing_value != new_value:
@@ -195,22 +200,35 @@ class VersionedDataManager:
                     logger.debug(
                         f"Found existing version for {resource_id} with same content and metadata"
                     )
+                    # Ensure ID is always PydanticObjectId for consistency
+                    if existing.id and not isinstance(existing.id, PydanticObjectId):
+                        existing.id = PydanticObjectId(existing.id)
                     return existing
                 logger.info(
                     f"Content matches but metadata changed for {resource_id}, creating new version"
                 )
             elif existing:
                 logger.debug(f"Found existing version for {resource_id} with same content")
+                # Ensure ID is always PydanticObjectId for consistency
+                if existing.id and not isinstance(existing.id, PydanticObjectId):
+                    existing.id = PydanticObjectId(existing.id)
                 return existing
 
         # Get latest for version increment
         latest = None
         if config.increment_version:
-            latest = await self.get_latest(
-                resource_id,
-                resource_type,
-                use_cache=not config.force_rebuild,
-            )
+            try:
+                latest = await self.get_latest(
+                    resource_id,
+                    resource_type,
+                    use_cache=True,
+                )
+            except RuntimeError as e:
+                # Handle corrupted metadata gracefully during rebuild
+                logger.warning(
+                    f"Could not load existing version during save (likely corrupted): {e}"
+                )
+                latest = None
 
         new_version = config.version or (
             self._increment_version(latest.version_info.version)
@@ -238,8 +256,6 @@ class VersionedDataManager:
 
         # Handle metadata - extract model-specific fields vs generic metadata using introspection
         # This replaces 75+ lines of hardcoded field lists with automatic Pydantic field detection
-        from ..utils.introspection import extract_metadata_params
-
         combined_metadata = {**config.metadata, **(metadata or {})}
 
         # Automatically separate typed fields from generic metadata using Pydantic introspection
@@ -253,11 +269,15 @@ class VersionedDataManager:
 
         # Filter out BaseVersionedData fields from generic metadata to avoid conflicts
         # These fields are set via constructor params, not the generic metadata dict
-        from .models import BaseVersionedData
-
         base_fields = set(BaseVersionedData.model_fields.keys())
         filtered_metadata = {k: v for k, v in generic_metadata.items() if k not in base_fields}
         constructor_params["metadata"] = filtered_metadata
+
+        # Create instance using regular instantiation (not model_construct)
+        # This ensures Beanie's polymorphism logic works correctly
+        # Generate ID first to avoid Beanie auto-generating it
+        if "id" not in constructor_params or constructor_params["id"] is None:
+            constructor_params["id"] = PydanticObjectId()
 
         versioned = model_class(**constructor_params)
 
@@ -322,7 +342,13 @@ class VersionedDataManager:
                 if not config.version:
                     model_class = self._get_model_class(resource_type)
                     try:
+                        # Handle both dict (from JSON deserialization) and model instances
+                        if isinstance(cached, dict):
+                            # Cached as dict - reconstruct to model for validation
+                            cached = model_class.model_validate(cached)
+
                         # Validate the cached document still exists in database
+                        # Use the specific model class for polymorphic queries
                         doc = await model_class.find_one({"_id": cached.id})
                         if not doc:
                             # Cached document was deleted, invalidate cache
@@ -333,7 +359,7 @@ class VersionedDataManager:
                             cached = None  # Force database query below
                         else:
                             # Validate content integrity if it has external storage
-                            if hasattr(cached, "content_location") and cached.content_location:
+                            if cached.content_location is not None:
                                 content = await get_versioned_content(cached)
                                 if content is None:
                                     logger.error(
@@ -350,7 +376,8 @@ class VersionedDataManager:
                     except Exception as e:
                         # Validation failed, don't trust the cache
                         logger.warning(
-                            f"Cache validation failed for {cache_key}: {e}, invalidating cache"
+                            f"Cache validation failed for {cache_key}: {e}, invalidating cache",
+                            exc_info=True,
                         )
                         await self.cache.delete(namespace, cache_key)
                         cached = None  # Force database query
@@ -360,19 +387,29 @@ class VersionedDataManager:
                     return cached  # type: ignore[no-any-return]
 
         # Query database with error handling
+        # Use the specific model class for polymorphic queries (not BaseVersionedData)
+        # After fixing _class_id, each subclass needs to query using its own class
         model_class = self._get_model_class(resource_type)
 
         try:
             if config.version:
                 # Get specific version
                 result = await model_class.find_one(
-                    {"resource_id": resource_id, "version_info.version": config.version},
+                    {
+                        "resource_id": resource_id,
+                        "resource_type": resource_type.value,
+                        "version_info.version": config.version,
+                    },
                 )
             else:
                 # Get latest - sort by ID descending to get the most recent if multiple have is_latest=True
                 result = (
                     await model_class.find(
-                        {"resource_id": resource_id, "version_info.is_latest": True},
+                        {
+                            "resource_id": resource_id,
+                            "resource_type": resource_type.value,
+                            "version_info.is_latest": True,
+                        },
                     )
                     .sort("-_id")
                     .first_or_none()
@@ -385,7 +422,7 @@ class VersionedDataManager:
             ) from e
 
         # Validate external content if present
-        if result and hasattr(result, "content_location") and result.content_location:
+        if result and result.content_location is not None:
             try:
                 content = await get_versioned_content(result)
                 if content is None:
@@ -430,8 +467,11 @@ class VersionedDataManager:
         self, resource_id: str, resource_type: ResourceType
     ) -> list[BaseVersionedData]:
         """List all versions of a resource."""
+        # Use the specific model class for polymorphic queries
         model_class = self._get_model_class(resource_type)
-        results = await model_class.find({"resource_id": resource_id}).to_list()
+        results = await model_class.find(
+            {"resource_id": resource_id, "resource_type": resource_type.value}
+        ).to_list()
         return results
 
     # ============================================================================
@@ -454,8 +494,8 @@ class VersionedDataManager:
         resource_type = metadata_obj.resource_type
 
         # Handle content storage if present
-        content = getattr(metadata_obj, "content_inline", None)
-        if content is not None:
+        if metadata_obj.content_inline is not None:
+            content = metadata_obj.content_inline
             await set_versioned_content(metadata_obj, content)
 
         # Handle version chain management with proper atomic operations
@@ -549,9 +589,14 @@ class VersionedDataManager:
         version: str,
     ) -> bool:
         """Delete a specific version."""
+        # Use the specific model class for polymorphic queries
         model_class = self._get_model_class(resource_type)
         result = await model_class.find_one(
-            {"resource_id": resource_id, "version_info.version": version},
+            {
+                "resource_id": resource_id,
+                "resource_type": resource_type.value,
+                "version_info.version": version,
+            },
         )
 
         if result:
@@ -591,25 +636,21 @@ class VersionedDataManager:
 
         return False
 
-    async def _find_by_hash(self, resource_id: str, content_hash: str) -> BaseVersionedData | None:
+    async def _find_by_hash(
+        self, resource_id: str, resource_type: ResourceType, content_hash: str
+    ) -> BaseVersionedData | None:
         """Find existing version with same content hash."""
-        # Check all resource types for deduplication, but skip uninitialized collections
-        for resource_type in ResourceType:
-            try:
-                model_class = self._get_model_class(resource_type)
-                # Check if the collection is initialized
-                collection = model_class.get_pymongo_collection()
-                if collection is None:
-                    continue  # Skip uninitialized collections
-
-                result = await model_class.find_one(
-                    {"resource_id": resource_id, "version_info.data_hash": content_hash},
-                )
-                if result:
-                    return result
-            except Exception:
-                # Skip resource types that can't be queried
-                continue
+        # Use the specific model class for polymorphic queries
+        model_class = self._get_model_class(resource_type)
+        try:
+            result = await model_class.find_one(
+                {"resource_id": resource_id, "version_info.data_hash": content_hash},
+            )
+            if result:
+                return result
+        except Exception as e:
+            logger.debug(f"Error finding version by hash: {e}")
+            return None
         return None
 
     def _get_model_class(self, resource_type: ResourceType) -> type[BaseVersionedData]:

@@ -54,7 +54,11 @@ class LiteratureCorpus(Corpus):
             connector = GutenbergConnector()
 
         # Fetch work content
-        entry = await connector.fetch_source(source)
+        try:
+            entry = await connector.fetch_source(source)
+        except Exception as e:
+            logger.error(f"Provider {connector.__class__.__name__} failed for '{source.name}': {e}")
+            return None
 
         if not entry:
             logger.warning(f"Failed to fetch work: {source.name}")

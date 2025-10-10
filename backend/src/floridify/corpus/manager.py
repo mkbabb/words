@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 import coolname
 from beanie import PydanticObjectId
 from pydantic import BaseModel, ValidationError
 
-from ..caching.core import get_versioned_content
-from ..caching.models import CacheNamespace, ResourceType, VersionConfig
+from ..caching.core import get_global_cache, get_versioned_content
+from ..caching.manager import get_version_manager
+from ..caching.models import BaseVersionedData, CacheNamespace, ResourceType, VersionConfig
 from ..models.base import Language
 from ..utils.logging import get_logger
 from .core import Corpus
@@ -32,8 +34,6 @@ class TreeCorpusManager:
         if vm is not None:
             self.vm = vm
         else:
-            from ..caching.manager import get_version_manager
-
             self.vm = get_version_manager()
 
     async def save_corpus_simple(
@@ -138,7 +138,6 @@ class TreeCorpusManager:
         """
         # save_corpus should NOT accept Metadata objects
         # Check if corpus is a Metadata object by type
-        from ..caching.models import BaseVersionedData
 
         if corpus and isinstance(corpus, BaseVersionedData):
             logger.error(
@@ -209,8 +208,10 @@ class TreeCorpusManager:
             "corpus_name": corpus_name or "",
             "corpus_type": corpus_type_value,
             "language": language_value,
-            "parent_corpus_id": parent_corpus_id,
-            "child_corpus_ids": child_corpus_ids if child_corpus_ids is not None else [],
+            "parent_corpus_id": parent_corpus_id,  # Keep as PydanticObjectId for typed field
+            "child_corpus_ids": child_corpus_ids
+            if child_corpus_ids is not None
+            else [],  # Keep as list[PydanticObjectId]
             "is_master": is_master if is_master is not None else False,  # Default to False if None
             **(metadata or {}),
         }
@@ -328,6 +329,10 @@ class TreeCorpusManager:
         config: VersionConfig | None = None,
     ) -> Corpus | None:
         """Simple corpus retrieval by ID or name - always returns latest version."""
+        # Skip cache entirely if force_rebuild is requested
+        if config and config.force_rebuild:
+            return None
+
         if corpus_id:
             # Get metadata to find resource_id, then get LATEST version
             temp_meta = await Corpus.Metadata.get(corpus_id)
@@ -363,12 +368,21 @@ class TreeCorpusManager:
 
         # Ensure all required fields from metadata
         # Corpus-specific fields should come from metadata attributes, not content
+        # Defensive: convert enums to values (in case old data has enum objects)
         content.update(
             {
                 "corpus_id": metadata.id,
                 "corpus_name": metadata.resource_id,
-                "corpus_type": metadata.corpus_type,
-                "language": metadata.language,
+                "corpus_type": (
+                    metadata.corpus_type.value
+                    if isinstance(metadata.corpus_type, CorpusType)
+                    else metadata.corpus_type
+                ),
+                "language": (
+                    metadata.language.value
+                    if isinstance(metadata.language, Language)
+                    else metadata.language
+                ),
                 "parent_corpus_id": metadata.parent_corpus_id,
                 "child_corpus_ids": metadata.child_corpus_ids or [],
                 "is_master": metadata.is_master,
@@ -398,9 +412,20 @@ class TreeCorpusManager:
                 word: idx for idx, word in enumerate(content["vocabulary"])
             }
 
-        # Ensure version info
+        # Ensure lemmatization indices exist (needed for semantic search)
+        if content.get("vocabulary") and not content.get("lemmatized_vocabulary"):
+            logger.info(f"Rebuilding lemmatization for loaded corpus {corpus_name or corpus_id}")
+            # Pydantic v2 model_validate() handles both enum objects and strings automatically
+            corpus = Corpus.model_validate(content)
+            await corpus._create_unified_indices()
+            # Update content with rebuilt indices
+            content["lemmatized_vocabulary"] = corpus.lemmatized_vocabulary
+            content["word_to_lemma_indices"] = corpus.word_to_lemma_indices
+            content["lemma_to_word_indices"] = corpus.lemma_to_word_indices
+
+        # Ensure version info - convert to dict for Pydantic validation
         if metadata.version_info:
-            content["version_info"] = metadata.version_info
+            content["version_info"] = metadata.version_info.model_dump(mode="json")
 
         # Create and return the Corpus
         return Corpus.model_validate(content)
@@ -441,12 +466,21 @@ class TreeCorpusManager:
                     # Add the ID from metadata
                     content["corpus_id"] = metadata.id
                     # Extract corpus-specific fields from metadata object
+                    # Defensive: convert enums to values (in case old data has enum objects)
                     content["child_corpus_ids"] = metadata.child_corpus_ids
                     content["parent_corpus_id"] = metadata.parent_corpus_id
                     content["is_master"] = metadata.is_master
                     content["corpus_name"] = metadata.corpus_name
-                    content["corpus_type"] = metadata.corpus_type
-                    content["language"] = metadata.language
+                    content["corpus_type"] = (
+                        metadata.corpus_type.value
+                        if isinstance(metadata.corpus_type, CorpusType)
+                        else metadata.corpus_type
+                    )
+                    content["language"] = (
+                        metadata.language.value
+                        if isinstance(metadata.language, Language)
+                        else metadata.language
+                    )
                     # Add version information
                     if metadata.version_info:
                         content["version_info"] = metadata.version_info
@@ -570,15 +604,21 @@ class TreeCorpusManager:
         child_ids = corpus.child_corpus_ids or []
         if child_ids:
             import asyncio
+
             # Fetch all child vocabularies concurrently
             child_vocabs = await asyncio.gather(
-                *[self.aggregate_vocabularies(cid, config, update_parent=False) for cid in child_ids],
-                return_exceptions=True
+                *[
+                    self.aggregate_vocabularies(cid, config, update_parent=False)
+                    for cid in child_ids
+                ],
+                return_exceptions=True,
             )
             # Merge successful vocabularies
             for i, child_vocab in enumerate(child_vocabs):
                 if isinstance(child_vocab, Exception):
-                    logger.error(f"Failed to aggregate vocabulary for child {child_ids[i]}: {child_vocab}")
+                    logger.error(
+                        f"Failed to aggregate vocabulary for child {child_ids[i]}: {child_vocab}"
+                    )
                 elif child_vocab:  # Ensure we have a valid vocabulary list
                     vocabulary.update(child_vocab)
 
@@ -606,17 +646,19 @@ class TreeCorpusManager:
             corpus.vocabulary_stats["unique_words"] = len(aggregated)
             corpus.vocabulary_stats["total_words"] = len(aggregated)
 
-            # Update the corpus without creating a new version
-            # This preserves child_corpus_ids relationships
-            updated = await self.update_corpus(
-                corpus_id=corpus_id,
-                content={"vocabulary": aggregated},
-                metadata={"vocabulary_size": len(aggregated)},
+            # Rebuild unified indices (lemmatization, etc.) for the aggregated vocabulary
+            logger.info(f"Rebuilding indices for aggregated corpus {corpus_id}")
+            await corpus._create_unified_indices()
+            corpus._build_signature_index()
+
+            # Save the entire corpus with all rebuilt indices
+            # This ensures lemmatization, signatures, etc. are persisted
+            logger.info(f"Saving aggregated corpus {corpus_id} with all indices")
+            await self.save_corpus(
+                corpus=corpus,
                 config=config,
             )
-            logger.info(
-                f"Updated corpus {corpus_id} with vocabulary of size {len(aggregated)}, result: {updated is not None}"
-            )
+            logger.info(f"Saved corpus {corpus_id} with vocabulary of size {len(aggregated)}")
 
         return aggregated
 
@@ -718,7 +760,7 @@ class TreeCorpusManager:
             await self.save_corpus(
                 corpus_id=parent_id,
                 corpus_name=parent.corpus_name,
-                content=parent.model_dump(),
+                content=parent.model_dump(mode="json"),
                 corpus_type=parent.corpus_type,  # CRITICAL: preserve corpus type
                 language=parent.language,  # CRITICAL: preserve language
                 parent_corpus_id=parent.parent_corpus_id,  # preserve parent
@@ -739,7 +781,7 @@ class TreeCorpusManager:
             await self.save_corpus(
                 corpus_id=child_id,
                 corpus_name=child.corpus_name,
-                content=child.model_dump(),
+                content=child.model_dump(mode="json"),
                 corpus_type=child.corpus_type,  # CRITICAL: preserve corpus type
                 language=child.language,  # CRITICAL: preserve language
                 parent_corpus_id=parent_id,
@@ -872,6 +914,24 @@ class TreeCorpusManager:
         corpus_name_to_clear = corpus.corpus_name
         corpus_id_to_delete = corpus.corpus_id
 
+        # Delete associated search indices
+        if corpus_id_to_delete:
+            from ..search.models import SearchIndex, TrieIndex
+            from ..search.semantic.models import SemanticIndex
+
+            # Delete all versioned metadata for this corpus
+            # These are stored in BaseVersionedData collection
+            await asyncio.gather(
+                # Delete TrieIndex metadata
+                TrieIndex.Metadata.find({"corpus_id": corpus_id_to_delete}).delete(),
+                # Delete SearchIndex metadata
+                SearchIndex.Metadata.find({"corpus_id": corpus_id_to_delete}).delete(),
+                # Delete SemanticIndex metadata
+                SemanticIndex.Metadata.find({"corpus_id": corpus_id_to_delete}).delete(),
+                return_exceptions=True,
+            )
+            logger.info(f"Deleted search indices for corpus {corpus_name_to_clear}")
+
         # Delete the metadata document directly from MongoDB
         # This prevents get_corpus from finding it
         if corpus_id_to_delete:
@@ -887,8 +947,6 @@ class TreeCorpusManager:
 
         # Clear cache entries for this corpus
         if corpus_name_to_clear:
-            from ..caching.core import get_global_cache
-
             cache = await get_global_cache()
 
             # Clear the general cache key for this resource
@@ -909,7 +967,6 @@ class TreeCorpusManager:
         """
         try:
             # Clear cache entries for this corpus
-            from ..caching.core import get_global_cache
 
             cache = await get_global_cache()
 
@@ -955,7 +1012,6 @@ class TreeCorpusManager:
                     count += 1
 
             # Clear the entire corpus namespace as well
-            from ..caching.core import get_global_cache
 
             cache = await get_global_cache()
             await cache.clear_namespace(CacheNamespace.CORPUS)
@@ -1181,7 +1237,7 @@ class TreeCorpusManager:
             saved_parent = await self.save_corpus(
                 corpus_id=parent.corpus_id,
                 corpus_name=parent.corpus_name,
-                content=parent.model_dump(),
+                content=parent.model_dump(mode="json"),
                 child_corpus_ids=parent.child_corpus_ids,
                 parent_corpus_id=parent.parent_corpus_id,
                 is_master=parent.is_master,
@@ -1201,7 +1257,7 @@ class TreeCorpusManager:
                 await self.save_corpus(
                     corpus_id=child.corpus_id,
                     corpus_name=child.corpus_name,
-                    content=child.model_dump(),
+                    content=child.model_dump(mode="json"),
                     child_corpus_ids=child.child_corpus_ids,
                     parent_corpus_id=None,
                     is_master=child.is_master,

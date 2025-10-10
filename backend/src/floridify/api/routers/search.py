@@ -150,7 +150,9 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
     """Cached search implementation."""
     # Convert string mode to enum
     mode_enum = SearchMode(params.mode)
-    logger.info(f"Searching for '{query}' in {[lang.value for lang in params.languages]} (mode={mode_enum.value})")
+    logger.info(
+        f"Searching for '{query}' in {[lang.value for lang in params.languages]} (mode={mode_enum.value})"
+    )
 
     try:
         # Get language search instance
@@ -262,6 +264,63 @@ async def get_search_suggestions(
     except Exception as e:
         logger.error(f"Suggestions failed for '{query}': {e}")
         raise HTTPException(status_code=500, detail=f"Internal error during suggestions: {e!s}")
+
+
+class SemanticStatusResponse(BaseModel):
+    """Response model for semantic search status."""
+
+    enabled: bool = Field(..., description="Whether semantic search is enabled")
+    ready: bool = Field(..., description="Whether semantic search is ready to use")
+    building: bool = Field(..., description="Whether semantic search is currently building")
+    languages: list[Language] = Field(..., description="Languages configured")
+    model_name: str | None = Field(None, description="Semantic model being used")
+    vocabulary_size: int = Field(0, description="Number of words in vocabulary")
+    message: str = Field(..., description="Human-readable status message")
+
+
+@router.get("/search/semantic/status", response_model=SemanticStatusResponse)
+async def get_semantic_status(
+    params: SearchParams = Depends(parse_search_params),
+) -> SemanticStatusResponse:
+    """Get status of semantic search initialization.
+
+    This endpoint allows clients to check if semantic search is ready to use,
+    or if it's still building in the background. Useful for showing loading
+    states in the UI.
+    """
+    try:
+        # Get the current search engine
+        language_search = await get_language_search(languages=params.languages)
+        stats = language_search.get_stats()
+
+        # Check semantic status
+        enabled = stats.get("semantic_enabled", False)
+        ready = language_search.is_semantic_ready()
+        building = language_search.is_semantic_building()
+
+        # Generate human-readable message
+        if not enabled:
+            message = "Semantic search is disabled"
+        elif ready:
+            message = "Semantic search is ready"
+        elif building:
+            message = "Semantic search is building in background (search still works with exact/fuzzy)"
+        else:
+            message = "Semantic search is not initialized"
+
+        return SemanticStatusResponse(
+            enabled=enabled,
+            ready=ready,
+            building=building,
+            languages=params.languages,
+            model_name=stats.get("semantic_model"),
+            vocabulary_size=stats.get("vocabulary_size", 0),
+            message=message,
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get semantic status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get semantic status: {e!s}")
 
 
 @router.post("/search/rebuild", response_model=RebuildIndexResponse)

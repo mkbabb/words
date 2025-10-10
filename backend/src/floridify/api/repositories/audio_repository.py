@@ -139,12 +139,16 @@ class AudioRepository(BaseRepository[AudioMedia, AudioCreate, AudioUpdate]):
 
         return audio
 
-    async def delete(self, item_id: PydanticObjectId, cascade: bool = False) -> bool:
-        """Delete audio entry."""
+    async def delete(self, item_id: PydanticObjectId, cascade: bool = True) -> bool:
+        """Delete audio with automatic reference cleanup."""
         audio = await self.get(item_id, raise_on_missing=True)
         assert audio is not None
 
-        # Note: cascade not applicable for audio, but keeping for consistency
+        if cascade:
+            from ..services.cleanup_service import CleanupService
+
+            await CleanupService.cleanup_audio_references(item_id)
+
         await audio.delete()
         return True
 
@@ -157,6 +161,6 @@ class AudioRepository(BaseRepository[AudioMedia, AudioCreate, AudioUpdate]):
         return await self.model.find(AudioMedia.accent == accent).to_list()
 
     async def _cascade_delete(self, doc: AudioMedia) -> None:
-        """Handle cascade deletion of related documents."""
-        # For audio files, no cascade deletion is needed
-        # But we could clean up references in other documents if needed
+        """Handle cascade deletion - implemented via CleanupService in delete method."""
+        # This method is required by BaseRepository but we handle cascading
+        # in the delete method using CleanupService for better separation of concerns

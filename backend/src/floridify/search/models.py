@@ -5,7 +5,7 @@ Unified models for corpus storage, caching, and semantic indexing.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from beanie import PydanticObjectId
 from pydantic import BaseModel, ConfigDict, Field
@@ -97,6 +97,9 @@ class TrieIndex(BaseModel):
     ):
         """Minimal trie metadata for versioning."""
 
+        # CRITICAL: Override Beanie's default _class_id for polymorphism
+        _class_id: ClassVar[str] = "TrieIndex.Metadata"
+
         corpus_id: PydanticObjectId
         vocabulary_hash: str = ""
 
@@ -118,6 +121,10 @@ class TrieIndex(BaseModel):
             TrieIndex instance or None if not found
 
         """
+        # Skip cache entirely if force_rebuild is requested
+        if config and config.force_rebuild:
+            return None
+
         if not corpus_id and not corpus_name:
             raise ValueError("Either corpus_id or corpus_name must be provided")
 
@@ -265,7 +272,7 @@ class TrieIndex(BaseModel):
                 content=self.model_dump(mode="json"),
                 config=config or VersionConfig(),
                 metadata={
-                    "corpus_id": self.corpus_id,
+                    "corpus_id": str(self.corpus_id) if self.corpus_id else None,
                 },
             )
 
@@ -287,6 +294,43 @@ class TrieIndex(BaseModel):
                 f"Trie index persistence failed for corpus {self.corpus_id}. "
                 f"Index may be corrupted. Error: {e}"
             ) from e
+
+    async def delete(self) -> None:
+        """Delete trie index from versioned storage.
+
+        Raises:
+            ValueError: If corpus_id is not set
+        """
+        if not self.corpus_id:
+            logger.warning("Cannot delete trie index without corpus_id")
+            raise ValueError("Cannot delete trie index without corpus_id")
+
+        logger.info(f"Deleting TrieIndex for corpus {self.corpus_name} (ID: {self.corpus_id})")
+
+        manager = get_version_manager()
+        resource_id = f"{self.corpus_id!s}:trie"
+
+        try:
+            # Get the latest version to delete
+            metadata = await manager.get_latest(
+                resource_id=resource_id,
+                resource_type=ResourceType.TRIE,
+            )
+
+            if metadata and metadata.version_info:
+                await manager.delete_version(
+                    resource_id=resource_id,
+                    resource_type=ResourceType.TRIE,
+                    version=metadata.version_info.version,
+                )
+                logger.info(
+                    f"Successfully deleted TrieIndex for corpus {self.corpus_name} (ID: {self.corpus_id})"
+                )
+            else:
+                logger.warning(f"No metadata found for TrieIndex {resource_id}, may already be deleted")
+        except Exception as e:
+            logger.error(f"Failed to delete TrieIndex {resource_id}: {e}")
+            raise RuntimeError(f"TrieIndex deletion failed for {resource_id}: {e}") from e
 
 
 class SearchIndex(BaseModel):
@@ -326,6 +370,9 @@ class SearchIndex(BaseModel):
     ):
         """Minimal search metadata for versioning."""
 
+        # CRITICAL: Override Beanie's default _class_id for polymorphism
+        _class_id: ClassVar[str] = "SearchIndex.Metadata"
+
         corpus_id: PydanticObjectId
         vocabulary_hash: str = ""
         has_trie: bool = False
@@ -352,6 +399,10 @@ class SearchIndex(BaseModel):
             SearchIndex instance or None if not found
 
         """
+        # Skip cache entirely if force_rebuild is requested
+        if config and config.force_rebuild:
+            return None
+
         if not corpus_id and not corpus_name:
             raise ValueError("Either corpus_id or corpus_name must be provided")
 
@@ -448,13 +499,17 @@ class SearchIndex(BaseModel):
 
         """
         # Try to get existing using corpus ID if available, otherwise name
-        existing = await cls.get(
-            corpus_id=corpus.corpus_id,
-            corpus_name=corpus.corpus_name,
-            config=config,
-        )
-        if existing and existing.vocabulary_hash == get_vocabulary_hash(corpus.vocabulary):
-            return existing
+        try:
+            existing = await cls.get(
+                corpus_id=corpus.corpus_id,
+                corpus_name=corpus.corpus_name,
+                config=config,
+            )
+            if existing and existing.vocabulary_hash == get_vocabulary_hash(corpus.vocabulary):
+                return existing
+        except RuntimeError as e:
+            # Handle corrupted data gracefully - proceed to create new
+            logger.warning(f"Could not load existing search index (likely corrupted): {e}")
 
         # Create new
         index = await cls.create(
@@ -493,13 +548,13 @@ class SearchIndex(BaseModel):
                 content=self.model_dump(mode="json"),
                 config=config or VersionConfig(),
                 metadata={
-                    "corpus_id": self.corpus_id,
+                    "corpus_id": str(self.corpus_id) if self.corpus_id else None,
                     "vocabulary_hash": self.vocabulary_hash,
                     "has_trie": self.has_trie,
                     "has_fuzzy": self.has_fuzzy,
                     "has_semantic": self.has_semantic,
-                    "trie_index_id": self.trie_index_id,
-                    "semantic_index_id": self.semantic_index_id,
+                    "trie_index_id": str(self.trie_index_id) if self.trie_index_id else None,
+                    "semantic_index_id": str(self.semantic_index_id) if self.semantic_index_id else None,
                 },
             )
 
@@ -527,6 +582,87 @@ class SearchIndex(BaseModel):
                 f"Search index persistence failed for corpus {self.corpus_id}. "
                 f"Index references may be corrupted. Error: {e}"
             ) from e
+
+    async def delete(self) -> None:
+        """Delete search index from storage with cascade deletion of dependent indices.
+
+        Deletion order:
+        1. Delete TrieIndex if it exists
+        2. Delete SemanticIndex if it exists
+        3. Delete the SearchIndex document itself
+
+        Raises:
+            ValueError: If corpus_id is not set
+        """
+        if not self.corpus_id:
+            logger.warning("Cannot delete search index without corpus_id")
+            raise ValueError("Cannot delete search index without corpus_id")
+
+        logger.info(
+            f"Starting cascade deletion for SearchIndex of corpus {self.corpus_name} (ID: {self.corpus_id})"
+        )
+
+        # Step 1: Delete TrieIndex if it exists
+        if self.has_trie and self.trie_index_id:
+            try:
+                logger.info(f"Deleting TrieIndex {self.trie_index_id}...")
+                trie_index = await TrieIndex.get(corpus_id=self.corpus_id)
+                if trie_index:
+                    await trie_index.delete()
+                else:
+                    logger.debug(f"TrieIndex {self.trie_index_id} not found, may already be deleted")
+            except Exception as e:
+                logger.error(f"Error deleting TrieIndex {self.trie_index_id}: {e}")
+                # Continue with deletion even if TrieIndex deletion fails
+
+        # Step 2: Delete SemanticIndex if it exists
+        if self.has_semantic and self.semantic_index_id:
+            try:
+                logger.info(f"Deleting SemanticIndex {self.semantic_index_id}...")
+                from ..search.semantic.models import SemanticIndex
+
+                # SemanticIndex requires model_name, use the stored one
+                semantic_index = await SemanticIndex.get(
+                    corpus_id=self.corpus_id,
+                    model_name=self.semantic_model,
+                )
+                if semantic_index:
+                    await semantic_index.delete()
+                else:
+                    logger.debug(
+                        f"SemanticIndex {self.semantic_index_id} not found, may already be deleted"
+                    )
+            except Exception as e:
+                logger.error(f"Error deleting SemanticIndex {self.semantic_index_id}: {e}")
+                # Continue with deletion even if SemanticIndex deletion fails
+
+        # Step 3: Delete the SearchIndex itself through version manager
+        manager = get_version_manager()
+        resource_id = f"{self.corpus_id!s}:search"
+
+        try:
+            # Get the latest version to delete
+            metadata = await manager.get_latest(
+                resource_id=resource_id,
+                resource_type=ResourceType.SEARCH,
+            )
+
+            if metadata and metadata.version_info:
+                await manager.delete_version(
+                    resource_id=resource_id,
+                    resource_type=ResourceType.SEARCH,
+                    version=metadata.version_info.version,
+                )
+                logger.info(
+                    f"Successfully deleted SearchIndex for corpus {self.corpus_name} (ID: {self.corpus_id})"
+                )
+            else:
+                logger.warning(
+                    f"No metadata found for SearchIndex {resource_id}, may already be deleted"
+                )
+        except Exception as e:
+            logger.error(f"Failed to delete SearchIndex {resource_id}: {e}")
+            raise RuntimeError(f"SearchIndex deletion failed for {resource_id}: {e}") from e
 
 
 __all__ = [

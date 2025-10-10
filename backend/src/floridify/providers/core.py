@@ -14,6 +14,8 @@ from typing import Any, Self, TypeVar
 import httpx
 from pydantic import BaseModel, Field
 
+from ..caching.core import get_versioned_content
+from ..caching.manager import get_version_manager
 from ..caching.models import CacheNamespace, ResourceType, VersionConfig
 from ..core.state_tracker import StateTracker
 from ..utils.logging import get_logger
@@ -179,8 +181,6 @@ class BaseConnector(ABC):
         config: VersionConfig | None = None,
     ) -> Any | None:
         """Get resource from versioned storage."""
-        from ..caching.core import get_versioned_content
-        from ..caching.manager import get_version_manager
 
         manager = get_version_manager()
         full_resource_id = f"{resource_id}_{self.get_cache_key_suffix()}"
@@ -212,7 +212,6 @@ class BaseConnector(ABC):
         config: VersionConfig | None = None,
     ) -> None:
         """Save resource to versioned storage."""
-        from ..caching.manager import get_version_manager
 
         manager = get_version_manager()
         full_resource_id = f"{resource_id}_{self.get_cache_key_suffix()}"

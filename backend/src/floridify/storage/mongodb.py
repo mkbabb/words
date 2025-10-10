@@ -10,7 +10,6 @@ from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from ..caching.models import BaseVersionedData
-from ..corpus.core import Corpus
 from ..models.base import AudioMedia, ImageMedia
 from ..models.dictionary import (
     Definition,
@@ -59,7 +58,8 @@ class MongoDBStorage:
         """Connect to MongoDB and initialize Beanie with optimized connection pool."""
         # Detect if connecting to localhost or Docker internal MongoDB (no TLS needed)
         is_localhost = any(
-            host in self.connection_string for host in ["localhost:27017", "mongodb:27017", "127.0.0.1:27017"]
+            host in self.connection_string
+            for host in ["localhost:27017", "mongodb:27017", "127.0.0.1:27017"]
         )
 
         # Build connection kwargs
@@ -88,7 +88,12 @@ class MongoDBStorage:
         )
         database: Any = self.client[self.database_name]
 
-        # Import search metadata classes first
+        # Import all Metadata subclasses for polymorphic Beanie deserialization
+        # These must be registered with Beanie for proper _class_id handling
+        from ..corpus.core import Corpus
+        from ..providers.dictionary.models import DictionaryProviderEntry
+        from ..providers.language.models import LanguageEntry
+        from ..providers.literature.models import LiteratureEntry
         from ..search.models import SearchIndex, TrieIndex
         from ..search.semantic.models import SemanticIndex
 
@@ -106,15 +111,21 @@ class MongoDBStorage:
                 ImageMedia,
                 WordRelationship,
                 WordList,
-                # Versioning models - base class first
+                # Versioning models - Base class provides collection, subclasses inherit
                 BaseVersionedData,
-                DictionaryEntry,
-                BatchOperation,
-                # Cache models - all versioned metadata classes
+                # CRITICAL: All Metadata subclasses must be registered for polymorphic deserialization
+                # BaseVersionedData owns the "versioned_data" collection with is_root=True
+                # All subclasses share this collection and need proper _class_id handling
                 Corpus.Metadata,
+                DictionaryProviderEntry.Metadata,
+                LanguageEntry.Metadata,
+                LiteratureEntry.Metadata,
                 SearchIndex.Metadata,
                 TrieIndex.Metadata,
                 SemanticIndex.Metadata,
+                # Legacy models (backward compatibility)
+                DictionaryEntry,
+                BatchOperation,
             ],
         )
 

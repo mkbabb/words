@@ -6,12 +6,13 @@ Contains the actual vocabulary processing and storage logic and base corpus sour
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, ClassVar
 
 import coolname
 from beanie import PydanticObjectId
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from ..caching.manager import get_version_manager
 from ..caching.models import (
     BaseVersionedData,
     CacheNamespace,
@@ -40,6 +41,26 @@ class Corpus(BaseModel):
     corpus_name: str = ""  # Optional name, will be generated if empty
     corpus_type: CorpusType = CorpusType.LEXICON
     language: Language = Language.ENGLISH
+
+    @field_validator("corpus_type", mode="before")
+    @classmethod
+    def validate_corpus_type(cls, v):
+        """Handle both enum objects and string values."""
+        if isinstance(v, CorpusType):
+            return v  # Already an enum, return as-is
+        if isinstance(v, str):
+            return CorpusType(v)  # Convert string to enum
+        return v
+
+    @field_validator("language", mode="before")
+    @classmethod
+    def validate_language(cls, v):
+        """Handle both enum objects and string values."""
+        if isinstance(v, Language):
+            return v  # Already an enum, return as-is
+        if isinstance(v, str):
+            return Language(v)  # Convert string to enum
+        return v
 
     # Core vocabulary data - sorted normalized vocabulary
     vocabulary: list[str]
@@ -86,7 +107,11 @@ class Corpus(BaseModel):
     version_info: VersionInfo | None = None
     _metadata_id: PydanticObjectId | None = None  # Internal reference to metadata document
 
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "use_enum_values": True,
+        "ser_json_inf_nan": "constants",
+    }
 
     class Metadata(
         BaseVersionedData,
@@ -100,6 +125,10 @@ class Corpus(BaseModel):
         the corpus state from storage. This is different from pure cache validation
         metadata in other classes like TrieIndex.Metadata.
         """
+
+        # CRITICAL: Override Beanie's default _class_id to use the correct nested class name
+        # Beanie incorrectly uses "BaseVersionedData.Metadata" for all Metadata subclasses
+        _class_id: ClassVar[str] = "Corpus.Metadata"
 
         # Corpus identification (needed for persistence)
         corpus_name: str = ""
@@ -190,9 +219,7 @@ class Corpus(BaseModel):
         for sorted_idx, orig_indices in normalized_to_original_indices.items():
             if len(orig_indices) > 1:
                 # Sort by: has_diacritics (True first), then by original index
-                orig_indices.sort(
-                    key=lambda idx: (not has_diacritics(vocabulary[idx]), idx)
-                )
+                orig_indices.sort(key=lambda idx: (not has_diacritics(vocabulary[idx]), idx))
 
         # Create the corpus instance
         corpus = cls(
@@ -240,6 +267,7 @@ class Corpus(BaseModel):
 
         # Rebuild normalized_to_original_indices if needed
         if self.original_vocabulary and not self.normalized_to_original_indices:
+
             def has_diacritics(word: str) -> bool:
                 """Check if word contains non-ASCII characters (diacritics)."""
                 return any(ord(c) > 127 for c in word)
@@ -341,7 +369,6 @@ class Corpus(BaseModel):
         original_unique_count = len(self.vocabulary)
 
         # Add to original_vocabulary
-        start_idx = len(self.original_vocabulary)
         self.original_vocabulary.extend(words)
 
         # Merge with existing vocabulary (set-based deduplication)
@@ -401,8 +428,7 @@ class Corpus(BaseModel):
         # This is trickier - we need to track which original words map to removed normalized words
         normalized_orig = batch_normalize(self.original_vocabulary)
         keep_indices = [
-            i for i, norm_word in enumerate(normalized_orig)
-            if norm_word not in normalized_remove
+            i for i, norm_word in enumerate(normalized_orig) if norm_word not in normalized_remove
         ]
         self.original_vocabulary = [self.original_vocabulary[i] for i in keep_indices]
 
@@ -771,15 +797,46 @@ class Corpus(BaseModel):
             self._change_description = change_description
 
     async def delete(self) -> None:
-        """Delete corpus from storage."""
+        """Delete corpus from storage with cascade deletion of dependent indices.
+
+        Deletion order:
+        1. Find all SearchIndex documents for this corpus
+        2. For each SearchIndex, delete its dependent TrieIndex and SemanticIndex
+        3. Delete all SearchIndex documents
+        4. Delete the Corpus document itself
+
+        Raises:
+            ValueError: If corpus_id is not set
+        """
         if not self.corpus_id:
             logger.warning("Cannot delete corpus without ID")
-            return
+            raise ValueError("Cannot delete corpus without corpus_id")
 
-        # Delete through version manager
-        from ..caching.manager import get_version_manager
-        from ..caching.models import ResourceType
+        logger.info(
+            f"Starting cascade deletion for corpus {self.corpus_name} (ID: {self.corpus_id})"
+        )
 
+        # Step 1: Delete all dependent SearchIndex documents (which will cascade to their indices)
+        from ..search.models import SearchIndex
+
+        try:
+            # Get the SearchIndex for this corpus
+            search_index = await SearchIndex.get(
+                corpus_id=self.corpus_id,
+                corpus_name=self.corpus_name,
+            )
+
+            if search_index:
+                logger.info(f"Found SearchIndex for corpus {self.corpus_name}, deleting...")
+                await search_index.delete()
+            else:
+                logger.debug(f"No SearchIndex found for corpus {self.corpus_name}")
+
+        except Exception as e:
+            logger.error(f"Error deleting SearchIndex for corpus {self.corpus_name}: {e}")
+            # Continue with corpus deletion even if SearchIndex deletion fails
+
+        # Step 2: Delete the corpus itself through version manager
         vm = get_version_manager()
 
         # Get the latest version to delete
@@ -794,5 +851,8 @@ class Corpus(BaseModel):
                 resource_type=ResourceType.CORPUS,
                 version=metadata.version_info.version,
             )
-
-        logger.info(f"Deleted corpus {self.corpus_name} (ID: {self.corpus_id})")
+            logger.info(f"Successfully deleted corpus {self.corpus_name} (ID: {self.corpus_id})")
+        else:
+            logger.warning(
+                f"No metadata found for corpus {self.corpus_name}, may already be deleted"
+            )

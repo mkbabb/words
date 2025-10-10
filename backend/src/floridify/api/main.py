@@ -51,9 +51,9 @@ async def lifespan(app: FastAPI) -> Any:
         await get_storage()
         print("✅ MongoDB storage initialized successfully")
 
-        # Initialize language search engine with semantic search enabled - use cache for fast startup
-        await get_language_search([Language.ENGLISH], force_rebuild=False, semantic=True)
-        print("✅ Language search engine initialized successfully with semantic support")
+        # TEMP: Skip search initialization on startup to avoid Beanie issues
+        # await get_language_search([Language.ENGLISH], force_rebuild=False, semantic=True)
+        print("⚠️  Language search NOT initialized - will lazy-load on first request")
 
         # Initialize AI components (singletons)
         get_openai_connector()

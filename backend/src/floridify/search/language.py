@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..caching.models import VersionConfig
 from ..corpus.core import Corpus
 from ..models.base import Language
 from ..utils.logging import get_logger
@@ -79,6 +80,21 @@ class LanguageSearch:
         """Check if search engine is initialized."""
         return self.search_engine._initialized
 
+    def is_semantic_ready(self) -> bool:
+        """Check if semantic search is ready."""
+        return self.search_engine._semantic_ready
+
+    def is_semantic_building(self) -> bool:
+        """Check if semantic search is currently building."""
+        return (
+            self.search_engine._semantic_init_task is not None
+            and not self.search_engine._semantic_init_task.done()
+        )
+
+    async def await_semantic_ready(self) -> None:
+        """Wait for semantic search to be ready."""
+        await self.search_engine.await_semantic_ready()
+
 
 async def get_language_search(
     languages: list[Language],
@@ -108,6 +124,11 @@ async def get_language_search(
 
     logger.info(f"Creating language search for {[lang.value for lang in languages]}")
 
+    # Ensure storage is initialized before accessing database
+    from floridify.storage.mongodb import get_storage
+
+    await get_storage()
+
     # Get or create corpus for these languages
     corpus_names = []
     for language in languages:
@@ -124,21 +145,41 @@ async def get_language_search(
 
     # For now, use the first corpus (typically English)
     corpus_name = corpus_names[0]
+    language = languages[0] if languages else Language.ENGLISH
 
     try:
-        # Get or create the corpus
-        corpus = await Corpus.get_or_create(
-            corpus_name=corpus_name,
-            language=languages[0] if languages else Language.ENGLISH,
-        )
+        # Create version config with force_rebuild flag
+        config = VersionConfig(force_rebuild=force_rebuild)
+
+        # First, try to get existing corpus
+        from ..corpus.language.core import LanguageCorpus
+        corpus = await Corpus.get(corpus_name=corpus_name, config=config)
+
+        # If not found or forcing rebuild, create a new LanguageCorpus with sources
+        if not corpus or force_rebuild:
+            logger.info(f"Creating new language corpus '{corpus_name}' with sources for {language.value}")
+            corpus = await LanguageCorpus.create_from_language(
+                corpus_name=corpus_name,
+                language=language,
+                semantic=semantic,
+                model_name="all-MiniLM-L6-v2",  # Default semantic model
+            )
+
         if not corpus:
             raise ValueError(f"Failed to get or create corpus '{corpus_name}'")
 
         # Create search engine from corpus
-        search_engine = await Search.from_corpus(
-            corpus_name=corpus_name,
+        # When force_rebuild=True, we can't use from_corpus because it will skip loading
+        # Instead, manually create the index and search engine with the corpus object we have
+        from floridify.search.models import SearchIndex
+
+        index_config = VersionConfig(force_rebuild=force_rebuild)
+        index = await SearchIndex.get_or_create(
+            corpus=corpus,
             semantic=semantic,
+            config=index_config,
         )
+        search_engine = Search(index=index, corpus=corpus)
 
         # Create language search wrapper
         language_search = LanguageSearch(

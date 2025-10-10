@@ -561,7 +561,9 @@ class AnkiCardGenerator:
                 # If AnkiConnect is available, try to import the .apkg directly
                 if await self.direct_integration.is_available():
                     logger.info("🔄 Attempting to import .apkg directly into Anki")
-                    import_success = await self.direct_integration.import_apkg_directly(str(apkg_path))
+                    import_success = await self.direct_integration.import_apkg_directly(
+                        str(apkg_path)
+                    )
 
                     if import_success:
                         total_time = time.time() - start_time

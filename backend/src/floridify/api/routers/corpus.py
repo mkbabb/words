@@ -204,9 +204,11 @@ async def create_corpus(
             vocabulary=params.vocabulary,
             corpus_name=params.name,
             language=params.language,
-            corpus_type=corpus_type,
             semantic=params.enable_semantic,
         )
+
+        # Set corpus type after creation
+        corpus.corpus_type = corpus_type
 
         # Save corpus
         corpus = await manager.save_corpus(corpus)

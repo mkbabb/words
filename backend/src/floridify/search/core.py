@@ -136,16 +136,18 @@ class Search:
             f"Initializing SearchEngine for corpus '{self.index.corpus_name}' (hash: {self.index.vocabulary_hash[:8]})",
         )
 
-        # Load corpus if not already loaded
+        # Load corpus if not already loaded - try both corpus_id and corpus_name for robustness
         if not self.corpus:
             self.corpus = await Corpus.get(
+                corpus_id=self.index.corpus_id,
                 corpus_name=self.index.corpus_name,
                 config=VersionConfig(),
             )
 
             if not self.corpus:
                 raise ValueError(
-                    f"Corpus '{self.index.corpus_name}' not found. It should have been created by LanguageSearch.initialize() or via get_or_create_corpus().",
+                    f"Corpus '{self.index.corpus_name}' (ID: {self.index.corpus_id}) not found. "
+                    f"It should have been created by LanguageSearch.initialize() or via get_or_create_corpus()."
                 )
 
         combined_vocab = self.corpus.vocabulary
@@ -176,29 +178,61 @@ class Search:
         """Initialize semantic search in background without blocking."""
         try:
             if not self.corpus or not self.index:
-                logger.warning("Cannot initialize semantic search without corpus and index")
+                error_msg = (
+                    f"Cannot initialize semantic search: "
+                    f"corpus={'present' if self.corpus else 'missing'}, "
+                    f"index={'present' if self.index else 'missing'}"
+                )
+                logger.error(error_msg)
+                self._semantic_ready = False
                 return
 
             logger.info(
-                f"Starting background semantic initialization for '{self.index.corpus_name}'",
+                f"Starting background semantic initialization for '{self.index.corpus_name}' "
+                f"with model '{self.index.semantic_model}'"
             )
 
-            # Create semantic search using from_corpus
-            logger.info(
-                f"Creating semantic search for corpus '{self.index.corpus_name}' with {self.index.semantic_model} (background)",
-            )
+            # Create semantic search using from_corpus (this now ensures embeddings are built)
             self.semantic_search = await SemanticSearch.from_corpus(
                 corpus=self.corpus,
                 model_name=self.index.semantic_model,  # type: ignore[arg-type]
                 config=VersionConfig(),
             )
 
+            # FIX: Verify embeddings were actually built
+            # Use `is None` instead of `not` to avoid NumPy array truth value ambiguity
+            if (
+                self.semantic_search.sentence_embeddings is None
+                or self.semantic_search.sentence_embeddings.size == 0
+            ):
+                raise RuntimeError(
+                    f"Semantic search initialization completed but no embeddings generated "
+                    f"for '{self.index.corpus_name}'"
+                )
+
+            if not self.semantic_search.sentence_index:
+                raise RuntimeError(
+                    f"Semantic search initialization completed but no FAISS index created "
+                    f"for '{self.index.corpus_name}'"
+                )
+
             self._semantic_ready = True
-            logger.info(f"✅ Semantic search ready for '{self.index.corpus_name}'")
+            logger.info(
+                f"✅ Semantic search ready for '{self.index.corpus_name}' "
+                f"({self.semantic_search.index.num_embeddings:,} embeddings, "
+                f"{self.semantic_search.index.embedding_dimension}D)"
+            )
 
         except Exception as e:
-            logger.error(f"Failed to initialize semantic search: {e}")
+            corpus_name = self.index.corpus_name if self.index else "unknown"
+            logger.error(
+                f"Failed to initialize semantic search for '{corpus_name}': {e}",
+                exc_info=True,  # FIX: Include full traceback for debugging
+            )
             self._semantic_ready = False
+            # Store error for debugging (useful for status endpoints)
+            if not hasattr(self, "_semantic_init_error"):
+                self._semantic_init_error = str(e)
 
     async def await_semantic_ready(self) -> None:
         """Wait for semantic search to be ready (useful for tests)."""
@@ -211,12 +245,15 @@ class Search:
             return None
 
         try:
+            # Try with corpus_id first (more reliable), fallback to corpus_name
             corpus = await Corpus.get(
+                corpus_id=self.index.corpus_id,
                 corpus_name=self.index.corpus_name,
                 config=VersionConfig(),
             )
             return corpus.vocabulary_hash if corpus else None
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to get current vocab hash for '{self.index.corpus_name}': {e}")
             return None
 
     async def update_corpus(self) -> None:
@@ -236,14 +273,18 @@ class Search:
             f"Corpus vocabulary changed for '{self.index.corpus_name}': {self.index.vocabulary_hash[:8]} -> {current_vocab_hash[:8] if current_vocab_hash else 'none'}",
         )
 
-        # Get updated corpus
+        # Get updated corpus - try with both corpus_id and corpus_name for robustness
         updated_corpus = await Corpus.get(
+            corpus_id=self.index.corpus_id,
             corpus_name=self.index.corpus_name,
             config=VersionConfig(),
         )
 
         if not updated_corpus:
-            logger.error(f"Failed to get updated corpus '{self.index.corpus_name}'")
+            logger.error(
+                f"Failed to get updated corpus '{self.index.corpus_name}' (ID: {self.index.corpus_id}). "
+                f"Corpus may have been deleted or cache is stale."
+            )
             return
 
         # Update corpus and index hash
@@ -356,7 +397,9 @@ class Search:
                     result.word = self._get_original_word(result.word)
                 return results[:max_results]
             elif method == SearchMethod.SEMANTIC and self.semantic_search:
-                results = await self.semantic_search.search(normalized_query, max_results=max_results)
+                results = await self.semantic_search.search(
+                    normalized_query, max_results=max_results
+                )
                 # Restore diacritics
                 for result in results:
                     result.word = self._get_original_word(result.word)
@@ -389,8 +432,9 @@ class Search:
         # Ensure initialization
         await self.initialize()
 
-        # Check if corpus has changed and update if needed
-        await self.update_corpus()
+        # OPTIMIZATION: Removed update_corpus() from hot path
+        # The corpus hash is checked during initialization only
+        # This saves ~0.5-1ms per search by avoiding redundant DB queries
 
         # Normalize query using global normalize function
         normalized_query = normalize(query)
@@ -435,6 +479,9 @@ class Search:
     ) -> list[SearchResult]:
         """Search using only exact matching.
 
+        PERFORMANCE OPTIMIZED: This is the hot path for exact searches.
+        Every microsecond counts here.
+
         Args:
             query: Search query (will be normalized)
 
@@ -442,16 +489,30 @@ class Search:
         if self.trie_search is None:
             return []
 
-        # Normalize at entry point
+        # Normalize at entry point (cached via LRU)
         normalized_query = normalize(query)
+
+        # Fast path: marisa-trie lookup (O(m) where m = query length)
         match = self.trie_search.search_exact(normalized_query)
 
         if match is None:
             return []
 
+        # Inline _get_original_word for performance (avoid function call overhead)
+        # This is the second hottest path after trie lookup
+        original_word = match  # Default to normalized word
+        if self.corpus:
+            # O(1) dict lookup - pre-built index
+            idx = self.corpus.vocabulary_to_index.get(match)
+            if idx is not None:
+                # Get original form with diacritics (O(1) list access + dict lookup)
+                if original_indices := self.corpus.normalized_to_original_indices.get(idx):
+                    original_word = self.corpus.original_vocabulary[original_indices[0]]
+
+        # Construct result inline to avoid function call
         return [
             SearchResult(
-                word=self._get_original_word(match),  # Return original word with diacritics
+                word=original_word,
                 lemmatized_word=None,
                 score=1.0,
                 method=SearchMethod.EXACT,
@@ -605,7 +666,9 @@ class Search:
                     # Fuzzy found results but lower quality - supplement with semantic
                     semantic_limit = max_results // 2
                     semantic_results = await self.search_semantic(query, semantic_limit, min_score)
-                    logger.debug(f"Supplementing {len(fuzzy_results)} fuzzy results with semantic search")
+                    logger.debug(
+                        f"Supplementing {len(fuzzy_results)} fuzzy results with semantic search"
+                    )
                 else:
                     # Fuzzy struggled - rely on semantic
                     semantic_limit = max_results

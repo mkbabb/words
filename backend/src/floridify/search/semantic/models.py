@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
@@ -72,6 +72,10 @@ class SemanticIndex(BaseModel):
     ):
         """Minimal semantic metadata for versioning."""
 
+        # CRITICAL: Override Beanie's default _class_id for polymorphism
+        # Without this, Beanie uses "BaseVersionedData.Metadata" for all subclasses
+        _class_id: ClassVar[str] = "SemanticIndex.Metadata"
+
         corpus_id: PydanticObjectId
         model_name: str
         vocabulary_hash: str = ""
@@ -98,6 +102,10 @@ class SemanticIndex(BaseModel):
             SemanticIndex instance or None if not found
 
         """
+        # Skip cache entirely if force_rebuild is requested
+        if config and config.force_rebuild:
+            return None
+
         if not corpus_id and not corpus_name:
             raise ValueError("Either corpus_id or corpus_name must be provided")
 
@@ -134,6 +142,12 @@ class SemanticIndex(BaseModel):
             return None
 
         index = cls.model_validate(content)
+
+        # FIX: Preserve binary_data from external storage
+        # This is critical for loading embeddings and FAISS indices
+        if "binary_data" in content:
+            object.__setattr__(index, "binary_data", content["binary_data"])
+
         # Ensure the index ID is set from metadata
         if metadata.id:
             index.index_id = metadata.id
@@ -205,24 +219,36 @@ class SemanticIndex(BaseModel):
             model_name=model_name,
             config=config,
         )
-        if existing and existing.vocabulary_hash == corpus.vocabulary_hash:
+
+        # FIX: Check if embeddings actually exist before returning cached
+        # Reject cached indices with 0 embeddings (corrupted/incomplete builds)
+        if (
+            existing
+            and existing.vocabulary_hash == corpus.vocabulary_hash
+            and existing.num_embeddings > 0
+        ):
             logger.debug(
-                f"Using cached semantic index for corpus '{corpus.corpus_name}' with model '{model_name}'",
+                f"Using cached semantic index for corpus '{corpus.corpus_name}' "
+                f"with model '{model_name}' ({existing.num_embeddings:,} embeddings)"
             )
             return existing
 
-        # Create new
-        logger.info(f"Building new semantic index for corpus '{corpus.corpus_name}'")
+        if existing and existing.num_embeddings == 0:
+            logger.warning(
+                f"Found cached semantic index for '{corpus.corpus_name}' but it has 0 embeddings. "
+                f"Will rebuild."
+            )
+
+        # Create new (but DON'T save yet - let caller save after building embeddings)
+        logger.info(f"Creating new semantic index for corpus '{corpus.corpus_name}'")
         index = await cls.create(
             corpus=corpus,
             model_name=model_name,
             batch_size=batch_size,
         )
 
-        # Save the new index
-        await index.save(
-            config, corpus_id=corpus.corpus_id if hasattr(corpus, "corpus_id") else None
-        )
+        # NOTE: Not saving here - caller must save after building embeddings
+        # This prevents saving empty indices to the cache
         return index
 
     async def save(
@@ -264,7 +290,7 @@ class SemanticIndex(BaseModel):
                 content=content,
                 config=config or VersionConfig(),
                 metadata={
-                    "corpus_id": corpus_id or self.corpus_id,
+                    "corpus_id": str(corpus_id or self.corpus_id) if (corpus_id or self.corpus_id) else None,
                     "model_name": self.model_name,
                     "vocabulary_hash": self.vocabulary_hash,
                     "embedding_dimension": self.embedding_dimension,
@@ -289,6 +315,47 @@ class SemanticIndex(BaseModel):
                 f"Semantic index persistence failed for {resource_id}. "
                 f"Index may be corrupted or too large. Error: {e}"
             ) from e
+
+    async def delete(self) -> None:
+        """Delete semantic index from versioned storage.
+
+        Raises:
+            ValueError: If corpus_id is not set
+        """
+        if not self.corpus_id:
+            logger.warning("Cannot delete semantic index without corpus_id")
+            raise ValueError("Cannot delete semantic index without corpus_id")
+
+        logger.info(
+            f"Deleting SemanticIndex for corpus {self.corpus_name} (ID: {self.corpus_id}) with model {self.model_name}"
+        )
+
+        manager = get_version_manager()
+        resource_id = f"{self.corpus_id!s}:semantic:{self.model_name}"
+
+        try:
+            # Get the latest version to delete
+            metadata = await manager.get_latest(
+                resource_id=resource_id,
+                resource_type=ResourceType.SEMANTIC,
+            )
+
+            if metadata and metadata.version_info:
+                await manager.delete_version(
+                    resource_id=resource_id,
+                    resource_type=ResourceType.SEMANTIC,
+                    version=metadata.version_info.version,
+                )
+                logger.info(
+                    f"Successfully deleted SemanticIndex for corpus {self.corpus_name} (ID: {self.corpus_id})"
+                )
+            else:
+                logger.warning(
+                    f"No metadata found for SemanticIndex {resource_id}, may already be deleted"
+                )
+        except Exception as e:
+            logger.error(f"Failed to delete SemanticIndex {resource_id}: {e}")
+            raise RuntimeError(f"SemanticIndex deletion failed for {resource_id}: {e}") from e
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Serialize index to dictionary for caching."""

@@ -163,7 +163,9 @@ class Embedder:
 
         # Load model with careful device and precision handling
         try:
-            self.model = SentenceTransformer(self.model_name, device=self.device, trust_remote_code=True)
+            self.model = SentenceTransformer(
+                self.model_name, device=self.device, trust_remote_code=True
+            )
 
             # Only use fp16 on CUDA devices
             if self.use_fp16 and hasattr(self.model, "half"):
@@ -177,7 +179,9 @@ class Embedder:
                 logger.info("🔄 Falling back to CPU device")
                 self.device = "cpu"
                 self.use_fp16 = False
-                self.model = SentenceTransformer(self.model_name, device="cpu", trust_remote_code=True)
+                self.model = SentenceTransformer(
+                    self.model_name, device="cpu", trust_remote_code=True
+                )
                 logger.info(f"✅ Loaded {self.model_name} ({self.full_dim}D) on CPU (fallback)")
             else:
                 raise

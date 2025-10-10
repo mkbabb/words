@@ -73,3 +73,33 @@ class CleanupService:
             f"Completed cleanup: removed image {image_id} from {total_cleaned} documents",
         )
         return total_cleaned
+
+    @staticmethod
+    async def cleanup_audio_references(audio_id: PydanticObjectId) -> int:
+        """Clean up audio references from all collections that reference audio.
+
+        Args:
+            audio_id: The ID of the audio being deleted
+
+        Returns:
+            Total number of documents that had their audio_file_ids arrays updated
+
+        """
+        # Import models here to avoid circular imports
+        from ...models.dictionary import Pronunciation
+
+        collections = [
+            Pronunciation.get_pymongo_collection(),
+        ]
+
+        logger.warning(f"Starting cleanup of audio references for audio {audio_id}")
+        total_cleaned = await CleanupService.remove_object_id_from_arrays(
+            collections,  # type: ignore[arg-type]
+            "audio_file_ids",
+            audio_id,
+        )
+
+        logger.warning(
+            f"Completed cleanup: removed audio {audio_id} from {total_cleaned} documents",
+        )
+        return total_cleaned

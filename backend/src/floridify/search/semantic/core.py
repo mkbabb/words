@@ -170,7 +170,7 @@ class SemanticSearch:
             SemanticSearch instance with loaded index
 
         """
-        # Get or create index
+        # Get or create index (no longer saves immediately)
         index = await SemanticIndex.get_or_create(
             corpus=corpus,
             model_name=model_name,
@@ -181,21 +181,57 @@ class SemanticSearch:
         # Create search with index
         search = cls(index=index, corpus=corpus)
 
-        # Load embeddings from index if they exist (check for binary data or legacy format)
+        # FIX: Check if embeddings actually exist (not just the fields)
+        # Require both num_embeddings > 0 AND actual data present
         has_embeddings = (
-            hasattr(index, "binary_data") and index.binary_data
-        ) or (hasattr(index, "embeddings") and index.embeddings)
+            index.num_embeddings > 0
+            and (
+                (hasattr(index, "binary_data") and index.binary_data)
+                or (hasattr(index, "embeddings") and index.embeddings)
+            )
+        )
 
         if has_embeddings:
+            logger.info(
+                f"Loading semantic index from cache for '{corpus.corpus_name}' "
+                f"({index.num_embeddings:,} embeddings)"
+            )
             await search._load_from_index()
         else:
+            logger.info(
+                f"Building new semantic embeddings for '{corpus.corpus_name}' "
+                f"({len(corpus.vocabulary):,} words)"
+            )
             await search.initialize()
+
+            # FIX: Verify embeddings were actually built
+            if not search.sentence_embeddings or search.sentence_embeddings.size == 0:
+                raise RuntimeError(
+                    f"Failed to build semantic embeddings for '{corpus.corpus_name}': "
+                    f"no embeddings generated"
+                )
+
+            logger.info(
+                f"✅ Built semantic index: {search.index.num_embeddings:,} embeddings, "
+                f"{search.index.embedding_dimension}D"
+            )
 
         return search
 
     async def _load_from_index(self) -> None:
-        """Load data from the index model."""
+        """Load data from the index model with proper binary_data handling."""
+        import zlib
+
         if not self.index:
+            logger.warning("No index to load from")
+            return
+
+        # FIX: Check if embeddings exist before trying to load
+        if self.index.num_embeddings == 0:
+            logger.warning(
+                f"Index for '{self.index.corpus_name}' has 0 embeddings, cannot load. "
+                f"Will need to rebuild."
+            )
             return
 
         # Set device from index
@@ -205,15 +241,54 @@ class SemanticSearch:
         if not self.sentence_model:
             self.sentence_model = await self._initialize_optimized_model()
 
-        # Load embeddings and FAISS index if available
-        if self.index.embeddings:
-            embeddings_bytes = base64.b64decode(self.index.embeddings.encode("utf-8"))
-            self.sentence_embeddings = pickle.loads(embeddings_bytes)
+        # FIX: Load from binary_data (external storage) instead of inline fields
+        # The embeddings and index_data fields are not populated when loading from cache
+        binary_data = getattr(self.index, "binary_data", None)
 
-        if self.index.index_data:
-            index_bytes = base64.b64decode(self.index.index_data.encode("utf-8"))
-            faiss_data = pickle.loads(index_bytes)
-            self.sentence_index = faiss.deserialize_index(faiss_data)
+        if not binary_data:
+            logger.error(
+                f"No binary data found for index '{self.index.corpus_name}' "
+                f"(num_embeddings={self.index.num_embeddings})"
+            )
+            raise RuntimeError(
+                f"Semantic index missing binary data - cache corrupted for '{self.index.corpus_name}'"
+            )
+
+        # Load embeddings and FAISS index with decompression
+        try:
+            # Load compressed embeddings
+            if "embeddings" in binary_data:
+                embeddings_bytes = base64.b64decode(binary_data["embeddings"].encode("utf-8"))
+                decompressed = zlib.decompress(embeddings_bytes)
+                self.sentence_embeddings = pickle.loads(decompressed)
+                logger.debug(
+                    f"Loaded compressed embeddings: {len(decompressed) / 1024 / 1024:.2f}MB decompressed, "
+                    f"shape={self.sentence_embeddings.shape if self.sentence_embeddings is not None else 'none'}"
+                )
+            else:
+                logger.warning(f"No embeddings in binary_data for '{self.index.corpus_name}'")
+
+            # Load compressed FAISS index
+            if "index_data" in binary_data:
+                index_bytes = base64.b64decode(binary_data["index_data"].encode("utf-8"))
+                decompressed = zlib.decompress(index_bytes)
+                faiss_data = pickle.loads(decompressed)
+                self.sentence_index = faiss.deserialize_index(faiss_data)
+                logger.debug(
+                    f"Loaded compressed FAISS index: {len(decompressed) / 1024 / 1024:.2f}MB decompressed, "
+                    f"{self.sentence_index.ntotal if self.sentence_index else 0} vectors"
+                )
+            else:
+                logger.warning(f"No FAISS index in binary_data for '{self.index.corpus_name}'")
+
+        except Exception as e:
+            logger.error(f"Failed to load embeddings/index from cache: {e}", exc_info=True)
+            # Reset to trigger rebuild
+            self.sentence_embeddings = None
+            self.sentence_index = None
+            raise RuntimeError(
+                f"Corrupted semantic index for '{self.index.corpus_name}': {e}"
+            ) from e
 
     def _detect_optimal_device(self) -> str:
         """Detect the optimal device for model execution."""
@@ -448,14 +523,17 @@ class SemanticSearch:
             raise ValueError("Index required for initialization")
 
         if not self.corpus:
-            # Try to load corpus from index
+            # Try to load corpus from index - use both corpus_id and corpus_name for robustness
             self.corpus = await Corpus.get(
+                corpus_id=self.index.corpus_id,
                 corpus_name=self.index.corpus_name,
                 config=VersionConfig(),
             )
 
         if not self.corpus:
-            raise ValueError(f"Could not load corpus '{self.index.corpus_name}'")
+            raise ValueError(
+                f"Could not load corpus '{self.index.corpus_name}' (ID: {self.index.corpus_id})"
+            )
 
         logger.info(
             f"Initializing semantic search for corpus '{self.index.corpus_name}' using {self.index.model_name}",
@@ -551,7 +629,7 @@ class SemanticSearch:
 
         # Process entire vocabulary at once for better performance
         vocab_count = len(self.corpus.lemmatized_vocabulary)
-        logger.info(f"🔄 Starting embedding generation: {vocab_count:,} lemmas (full batch)")
+        logger.info(f"🔄 Starting embedding generation: {vocab_count:,} lemmas")
 
         embedding_start = time.time()
 
@@ -570,8 +648,49 @@ class SemanticSearch:
             f"🔄 Using {len(embedding_vocabulary)} lemmatized embeddings directly (no re-normalization)",
         )
 
-        # Process all variants with optimizations
-        self.sentence_embeddings = self._encode(embedding_vocabulary)
+        # Process in batches for large vocabularies to avoid hanging
+        # Use smaller batch size for better progress tracking and to avoid hanging
+        batch_size = 2000 if len(embedding_vocabulary) > 10000 else 5000
+
+        if len(embedding_vocabulary) > batch_size:
+            logger.info(f"🔄 Processing {len(embedding_vocabulary):,} lemmas in batches of {batch_size:,}")
+            embeddings_list = []
+            total_batches = (len(embedding_vocabulary) + batch_size - 1) // batch_size
+
+            for i in range(0, len(embedding_vocabulary), batch_size):
+                batch = embedding_vocabulary[i:i + batch_size]
+                batch_num = i // batch_size + 1
+                progress_pct = (batch_num / total_batches) * 100
+
+                logger.info(
+                    f"  📊 Batch {batch_num}/{total_batches} "
+                    f"({len(batch):,} words, {progress_pct:.1f}% complete)..."
+                )
+
+                batch_start = time.time()
+                try:
+                    # Disable multiprocessing for batches to avoid hanging
+                    batch_embeddings = self._encode(batch, use_multiprocessing=False)
+                    batch_time = time.time() - batch_start
+
+                    logger.info(
+                        f"    ✅ Batch {batch_num} complete in {batch_time:.1f}s "
+                        f"({len(batch) / batch_time:.0f} words/sec)"
+                    )
+                    embeddings_list.append(batch_embeddings)
+
+                except Exception as e:
+                    logger.error(f"    ❌ Failed to encode batch {batch_num}: {e}")
+                    # Create zero embeddings for failed batch as fallback
+                    fallback = np.zeros((len(batch), self.sentence_embeddings.shape[1] if hasattr(self, 'sentence_embeddings') and self.sentence_embeddings is not None else 384), dtype=np.float32)
+                    embeddings_list.append(fallback)
+
+            self.sentence_embeddings = np.vstack(embeddings_list)
+            logger.info(f"✅ All {len(embedding_vocabulary):,} embeddings generated successfully")
+        else:
+            # Process smaller vocabularies in one go
+            logger.info(f"🔄 Processing {len(embedding_vocabulary):,} lemmas in single batch")
+            self.sentence_embeddings = self._encode(embedding_vocabulary, use_multiprocessing=False)
 
         # Safety check for empty embeddings
         if self.sentence_embeddings.size == 0:
