@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import gzip
+import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import click
 from rich.console import Console
@@ -17,9 +20,6 @@ from ...models.dictionary import (
 from ...storage.mongodb import MongoDBStorage
 from ...utils.logging import get_logger
 from ..utils.formatting import format_error, format_warning
-from pathlib import Path
-import gzip
-import json
 
 logger = get_logger(__name__)
 
@@ -49,11 +49,16 @@ async def _database_status_async() -> None:
 
         console.print("[bold]Connection:[/bold] [green]✓ Connected[/green]")
 
-        # Just verify we can get storage without error
-        if hasattr(storage, "database_name"):
-            console.print(f"[bold]Database:[/bold] {storage.database_name}")
-        if hasattr(storage, "connection_string"):
-            console.print(f"[bold]Connection String:[/bold] {storage.connection_string}")
+        # Display storage metadata if available
+        try:
+            console.print(f"[bold]Database:[/bold] {storage.database_name}")  # type: ignore[attr-defined]
+        except AttributeError:
+            pass  # Storage doesn't have database_name attribute
+
+        try:
+            console.print(f"[bold]Connection String:[/bold] {storage.connection_string}")  # type: ignore[attr-defined]
+        except AttributeError:
+            pass  # Storage doesn't have connection_string attribute
 
         # Get basic counts
         word_count = await Word.count()

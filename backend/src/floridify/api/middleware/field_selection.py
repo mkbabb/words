@@ -90,8 +90,11 @@ async def load_related_fields(obj: Document, fields: set[str], depth: int = 1) -
         if field_name.endswith("_id") and field_name[:-3] in fields:
             # Load related document
             related_field = field_name[:-3]
-            # Type-safe field access using model_dump
-            obj_data = obj.model_dump() if hasattr(obj, "model_dump") else {}
+            # Type-safe field access using model_dump (Pydantic v2)
+            try:
+                obj_data = obj.model_dump()
+            except AttributeError:
+                obj_data = {}  # Not a Pydantic model
             fk_value = obj_data.get(field_name)
 
             if fk_value:

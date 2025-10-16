@@ -153,9 +153,10 @@ class SearchParams(BaseModel):
                 return mode
             return "smart"
         # Handle enum if passed
-        if hasattr(v, "value"):
+        try:
             return str(v.value)
-        return "smart"
+        except AttributeError:
+            return "smart"
 
 
 class WordlistCreateParams(BaseModel):
