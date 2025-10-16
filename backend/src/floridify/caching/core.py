@@ -15,7 +15,9 @@ from beanie import PydanticObjectId
 
 from ..utils.logging import get_logger
 from .compression import compress_data, decompress_data
+from .config import DEFAULT_CONFIGS
 from .filesystem import FilesystemBackend
+from .keys import generate_content_cache_key, generate_resource_key
 from .models import (
     BaseVersionedData,
     CacheNamespace,
@@ -23,6 +25,7 @@ from .models import (
     ContentLocation,
     StorageType,
 )
+from .utils import json_encoder, normalize_namespace
 
 logger = get_logger(__name__)
 
@@ -123,97 +126,21 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         logger.info("GlobalCacheManager initialized")
 
     def _init_default_namespaces(self) -> None:
-        """Initialize namespaces with optimized configs."""
-        configs = [
-            NamespaceConfig(
-                CacheNamespace.DEFAULT,
-                memory_limit=200,
-                memory_ttl=timedelta(hours=6),
-                disk_ttl=timedelta(days=1),
-            ),
-            NamespaceConfig(
-                CacheNamespace.DICTIONARY,
-                memory_limit=500,
-                memory_ttl=timedelta(hours=24),
-                disk_ttl=timedelta(days=7),
-            ),
-            NamespaceConfig(
-                CacheNamespace.CORPUS,
-                memory_limit=100,
-                memory_ttl=timedelta(days=30),
-                disk_ttl=timedelta(days=90),
-                compression=CompressionType.ZSTD,
-            ),
-            NamespaceConfig(
-                CacheNamespace.SEMANTIC,
-                memory_limit=50,
-                memory_ttl=timedelta(days=7),
-                disk_ttl=timedelta(days=30),
-            ),
-            NamespaceConfig(
-                CacheNamespace.SEARCH,
-                memory_limit=300,
-                memory_ttl=timedelta(hours=1),
-                disk_ttl=timedelta(hours=6),
-            ),
-            NamespaceConfig(
-                CacheNamespace.TRIE,
-                memory_limit=50,
-                memory_ttl=timedelta(days=7),
-                disk_ttl=timedelta(days=30),
-                compression=CompressionType.LZ4,
-            ),
-            NamespaceConfig(
-                CacheNamespace.LITERATURE,
-                memory_limit=50,
-                memory_ttl=timedelta(days=30),
-                disk_ttl=timedelta(days=90),
-                compression=CompressionType.GZIP,
-            ),
-            NamespaceConfig(
-                CacheNamespace.SCRAPING,
-                memory_limit=100,
-                memory_ttl=timedelta(hours=1),
-                disk_ttl=timedelta(hours=24),
-                compression=CompressionType.ZSTD,
-            ),
-            # Add commonly used namespaces that might not be explicitly configured
-            NamespaceConfig(
-                CacheNamespace.API,
-                memory_limit=100,
-                memory_ttl=timedelta(hours=1),
-                disk_ttl=timedelta(hours=12),
-            ),
-            NamespaceConfig(
-                CacheNamespace.LANGUAGE,
-                memory_limit=100,
-                memory_ttl=timedelta(days=7),
-                disk_ttl=timedelta(days=30),
-                compression=CompressionType.ZSTD,
-            ),
-            NamespaceConfig(
-                CacheNamespace.OPENAI,
-                memory_limit=200,
-                memory_ttl=timedelta(hours=24),
-                disk_ttl=timedelta(days=7),
-                compression=CompressionType.ZSTD,
-            ),
-            NamespaceConfig(
-                CacheNamespace.LEXICON,
-                memory_limit=100,
-                memory_ttl=timedelta(days=7),
-                disk_ttl=timedelta(days=30),
-            ),
-            NamespaceConfig(
-                CacheNamespace.WOTD,
-                memory_limit=50,
-                memory_ttl=timedelta(days=1),
-                disk_ttl=timedelta(days=7),
-            ),
-        ]
+        """Initialize namespaces from centralized config.
 
-        for config in configs:
-            self.namespaces[config.name] = config
+        Uses immutable configuration from config.py (DEFAULT_CONFIGS).
+        Creates mutable NamespaceConfig wrapper for each namespace.
+        """
+        for namespace, frozen_config in DEFAULT_CONFIGS.items():
+            # Create mutable state wrapper from immutable config
+            ns_config = NamespaceConfig(
+                name=frozen_config.namespace,
+                memory_limit=frozen_config.memory_limit,
+                memory_ttl=frozen_config.memory_ttl,
+                disk_ttl=frozen_config.disk_ttl,
+                compression=frozen_config.compression,
+            )
+            self.namespaces[namespace] = ns_config
 
     async def get(
         self,
@@ -527,11 +454,8 @@ async def set_versioned_content(
     if force_external:
         # Store externally without size check
         cache = await get_global_cache()
-        # CRITICAL FIX #8: Use consistent hashing for cache keys
-        # Import the helper function from manager module
-        from ..caching.manager import _generate_cache_key
-
-        cache_key = _generate_cache_key(
+        # Use pure function from keys module
+        cache_key = generate_resource_key(
             versioned_data.resource_type,
             versioned_data.resource_id,
             "content",
@@ -588,11 +512,8 @@ async def set_versioned_content(
         return
 
     cache = await get_global_cache()
-    # CRITICAL FIX #8: Use consistent hashing for cache keys
-    # Import the helper function from manager module
-    from ..caching.manager import _generate_cache_key
-
-    cache_key = _generate_cache_key(
+    # Use pure function from keys module
+    cache_key = generate_resource_key(
         versioned_data.resource_type,
         versioned_data.resource_id,
         "content",

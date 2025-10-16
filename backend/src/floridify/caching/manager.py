@@ -12,11 +12,12 @@ from typing import Any, TypeVar
 from beanie import PydanticObjectId
 from pymongo.errors import OperationFailure
 
-from ..models.registry import get_model_class as get_versioned_model_class
 from ..utils.introspection import extract_metadata_params
 from ..utils.logging import get_logger
+from .config import RESOURCE_TYPE_MAP
 from .core import GlobalCacheManager, get_global_cache, get_versioned_content, set_versioned_content
 from .filesystem import FilesystemBackend
+from .keys import generate_resource_key as _generate_cache_key
 from .models import (
     BaseVersionedData,
     CacheNamespace,
@@ -28,39 +29,6 @@ from .models import (
 logger = get_logger(__name__)
 
 T = TypeVar("T", bound=BaseVersionedData)
-
-
-def _generate_cache_key(*key_parts: Any) -> str:
-    """Generate consistent cache key from parts using SHA256 hashing.
-
-    CRITICAL FIX: Prevents cache key collisions from special characters,
-    unicode normalization issues, or unexpected input formats.
-
-    Uses same approach as caching/decorators.py for consistency.
-
-    Args:
-        *key_parts: Parts to combine into cache key (resource_type, resource_id, version, etc.)
-
-    Returns:
-        SHA256 hash of key parts as hex string
-
-    Examples:
-        >>> _generate_cache_key("corpus", "abc123")
-        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
-        >>> _generate_cache_key("corpus", "abc123", "v", "1.0.0")
-        'a1b2c3d4e5f6...'
-    """
-    # Convert all parts to strings and handle enums
-    str_parts = []
-    for part in key_parts:
-        if isinstance(part, Enum):
-            str_parts.append(part.value)
-        else:
-            str_parts.append(str(part))
-
-    # Combine with separator and hash
-    key_string = ":".join(str_parts)
-    return hashlib.sha256(key_string.encode()).hexdigest()
 
 
 class VersionedDataManager:
@@ -747,20 +715,14 @@ class VersionedDataManager:
 
     def _get_model_class(self, resource_type: ResourceType) -> type[BaseVersionedData]:
         """Map resource type enum to model class using registry pattern."""
+        # Deferred import to avoid circular dependency
+        from ..models.registry import get_model_class as get_versioned_model_class
+
         return get_versioned_model_class(resource_type)
 
     def _get_namespace(self, resource_type: ResourceType) -> CacheNamespace:
-        """Map resource type enum to namespace."""
-        mapping = {
-            ResourceType.DICTIONARY: CacheNamespace.DICTIONARY,
-            ResourceType.CORPUS: CacheNamespace.CORPUS,
-            ResourceType.LANGUAGE: CacheNamespace.LANGUAGE,
-            ResourceType.SEMANTIC: CacheNamespace.SEMANTIC,
-            ResourceType.LITERATURE: CacheNamespace.LITERATURE,
-            ResourceType.TRIE: CacheNamespace.TRIE,
-            ResourceType.SEARCH: CacheNamespace.SEARCH,
-        }
-        return mapping[resource_type]
+        """Map resource type enum to namespace using centralized config."""
+        return RESOURCE_TYPE_MAP[resource_type]
 
     def _increment_version(self, version: str) -> str:
         """Increment patch version."""

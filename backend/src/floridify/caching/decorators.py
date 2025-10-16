@@ -13,7 +13,9 @@ from enum import Enum
 from typing import Any, ParamSpec, TypeVar, cast
 
 from ..utils.logging import get_logger
+from .config import NAMESPACE_MAP as CACHE_NAMESPACE_MAP
 from .core import get_global_cache
+from .keys import generate_cache_key as _generate_cache_key
 from .models import CacheNamespace
 
 # Modern type parameters using ParamSpec
@@ -21,17 +23,6 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 logger = get_logger(__name__)
-
-# Cache namespace mapping - DRY principle
-CACHE_NAMESPACE_MAP: dict[str, CacheNamespace] = {
-    "api": CacheNamespace.API,
-    "search": CacheNamespace.SEARCH,
-    "dictionary": CacheNamespace.DICTIONARY,
-    "corpus": CacheNamespace.CORPUS,
-    "semantic": CacheNamespace.SEMANTIC,
-    "scraping": CacheNamespace.SCRAPING,
-    "compute": CacheNamespace.SEARCH,  # Map compute to SEARCH for backward compatibility
-}
 
 
 def _serialize_cache_value(value: Any) -> str | int | float | tuple[Any, ...] | None:
@@ -75,11 +66,6 @@ def _efficient_cache_key_parts(
             key_parts.append((key, serialized))
 
     return tuple(key_parts)
-
-
-def _generate_cache_key(key_parts: tuple[Any, ...]) -> str:
-    """Generate a stable cache key from parts."""
-    return hashlib.sha256(str(key_parts).encode()).hexdigest()
 
 
 # Global deduplication state (thread-safe via GIL)
