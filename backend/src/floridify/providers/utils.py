@@ -353,7 +353,7 @@ async def respectful_scraper(
     source: str,
     rate_config: RateLimitConfig | None = None,
     **client_kwargs: Any,
-) -> AsyncGenerator[RespectfulHttpClient, None]:
+) -> AsyncGenerator[RespectfulHttpClient]:
     """Context manager for respectful scraping sessions."""
     rate_config = rate_config or RateLimitConfig(base_requests_per_second=2.0)
     rate_limiter = AdaptiveRateLimiter(rate_config)

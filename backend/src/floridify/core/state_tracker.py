@@ -423,7 +423,7 @@ class StateTracker:
             progress = self._progress_map[stage]
         await self.update(stage=stage, progress=progress, error=error, is_complete=True)
 
-    async def get_states(self) -> AsyncGenerator[PipelineState, None]:
+    async def get_states(self) -> AsyncGenerator[PipelineState]:
         """Get state updates as they occur."""
         while True:
             state = await self._queue.get()
@@ -432,7 +432,7 @@ class StateTracker:
                 break
 
     @asynccontextmanager
-    async def subscribe(self) -> AsyncGenerator[asyncio.Queue[PipelineState], None]:
+    async def subscribe(self) -> AsyncGenerator[asyncio.Queue[PipelineState]]:
         """Subscribe to state updates with a dedicated queue."""
         subscriber_queue: asyncio.Queue[PipelineState] = asyncio.Queue(maxsize=100)
         self._subscribers.add(subscriber_queue)

@@ -13,7 +13,7 @@ from .state_tracker import StateTracker
 logger = get_logger(__name__)
 
 
-def _send_chunked_completion(result_data: dict[str, Any]) -> Generator[str, None, None]:
+def _send_chunked_completion(result_data: dict[str, Any]) -> Generator[str]:
     """Send large completion data in manageable chunks."""
     # Split the result into logical chunks (definitions, examples, etc.)
 
@@ -103,7 +103,7 @@ class StreamingProgressHandler:
         *,
         include_stage_definitions: bool = True,
         include_completion_data: bool = True,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Stream progress updates from a StateTracker during process execution.
 
         Args:
@@ -228,7 +228,7 @@ async def create_streaming_response(
 
     """
 
-    async def event_generator() -> AsyncGenerator[str, None]:
+    async def event_generator() -> AsyncGenerator[str]:
         """Generate SSE events by monitoring state tracker and running process."""
         try:
             # Send initial configuration if requested
@@ -248,7 +248,7 @@ async def create_streaming_response(
             state_tracker.reset()
 
             # Start progress monitoring and process execution concurrently
-            async def monitor_and_yield() -> AsyncGenerator[str, None]:
+            async def monitor_and_yield() -> AsyncGenerator[str]:
                 """Monitor state tracker and yield progress events."""
                 async with state_tracker.subscribe() as queue:
                     while True:
@@ -326,7 +326,7 @@ async def create_streaming_response(
             yield error_event.format()
 
     # Simplified event generator that works with the existing pattern
-    async def simple_generator() -> AsyncGenerator[str, None]:
+    async def simple_generator() -> AsyncGenerator[str]:
         """Simplified generator that follows the existing SSE pattern."""
         try:
             # Send initial stage configuration
