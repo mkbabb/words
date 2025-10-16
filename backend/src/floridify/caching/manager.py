@@ -26,6 +26,9 @@ from .models import (
     VersionConfig,
     VersionInfo,
 )
+from .serialize import encode_for_json
+from .validation import should_create_new_version
+from .version_chains import increment_version
 
 logger = get_logger(__name__)
 
@@ -188,39 +191,28 @@ class VersionedDataManager:
     ) -> BaseVersionedData:
         """Save with versioning and optimal serialization."""
         # Single serialization with sorted keys and ObjectId handling
-        content_str = json.dumps(content, sort_keys=True, default=self._json_encoder)
+        content_str = json.dumps(content, sort_keys=True, default=encode_for_json)
         content_hash = hashlib.sha256(content_str.encode()).hexdigest()
 
-        # Check for duplicate content with optional metadata comparison
-        if not config.force_rebuild:
-            existing = await self._find_by_hash(resource_id, resource_type, content_hash)
-            if existing and config.metadata_comparison_fields and metadata:
-                # Check if specified metadata fields have changed
-                metadata_changed = False
-                existing_data = existing.model_dump()
+        # Check for duplicate content using pure validation function
+        existing = None if config.force_rebuild else await self._find_by_hash(
+            resource_id, resource_type, content_hash
+        )
 
-                for field in config.metadata_comparison_fields:
-                    if field in metadata:
-                        existing_value = existing_data.get("metadata", {}).get(field)
-                        new_value = metadata.get(field)
-                        if existing_value != new_value:
-                            metadata_changed = True
-                            logger.debug(
-                                f"Metadata field {field} changed: {existing_value} -> {new_value}"
-                            )
-                            break
+        create_new, reason = should_create_new_version(
+            existing,
+            content_hash,
+            metadata,
+            config.metadata_comparison_fields,
+            config.force_rebuild,
+        )
 
-                if not metadata_changed:
-                    logger.debug(
-                        f"Found existing version for {resource_id} with same content and metadata"
-                    )
-                    return existing
-                logger.info(
-                    f"Content matches but metadata changed for {resource_id}, creating new version"
-                )
-            elif existing:
-                logger.debug(f"Found existing version for {resource_id} with same content")
-                return existing
+        if not create_new:
+            logger.debug(f"Reusing existing version for {resource_id}: {reason}")
+            return existing  # type: ignore[return-value]
+
+        if existing and "metadata_changed" in reason:
+            logger.info(f"Content matches but metadata changed for {resource_id}: {reason}")
 
         # Get latest for version increment and stable_id preservation
         latest = None
@@ -239,7 +231,7 @@ class VersionedDataManager:
                 latest = None
 
         new_version = config.version or (
-            self._increment_version(latest.version_info.version)
+            increment_version(latest.version_info.version, "patch")
             if latest and config.increment_version
             else "1.0.0"
         )
@@ -735,23 +727,6 @@ class VersionedDataManager:
     def _get_namespace(self, resource_type: ResourceType) -> CacheNamespace:
         """Map resource type enum to namespace using centralized config."""
         return RESOURCE_TYPE_MAP[resource_type]
-
-    def _increment_version(self, version: str) -> str:
-        """Increment patch version."""
-        major, minor, patch = version.split(".")
-
-        return f"{major}.{minor}.{int(patch) + 1}"
-
-    def _json_encoder(self, obj: Any) -> str:
-        """Custom JSON encoder for complex objects like PydanticObjectId."""
-
-        if isinstance(obj, PydanticObjectId):
-            return str(obj)
-        if isinstance(obj, Enum):
-            return str(obj.value)
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
 # Global singleton instance

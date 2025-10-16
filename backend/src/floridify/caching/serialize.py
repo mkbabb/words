@@ -8,17 +8,96 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import datetime
+from enum import Enum
 from typing import Any
+
+from beanie import PydanticObjectId
 
 from .utils import json_encoder
 
 __all__ = [
     "SerializedContent",
+    "CacheStats",
     "serialize_content",
     "compute_content_hash",
     "estimate_binary_size",
+    "encode_for_json",
 ]
+
+
+def encode_for_json(obj: Any) -> str:
+    """Custom JSON encoder for complex objects.
+
+    Pure function for encoding non-JSON-serializable types.
+    Handles PydanticObjectId, Enum, datetime.
+
+    Args:
+        obj: Object to encode
+
+    Returns:
+        String representation for JSON encoding
+
+    Raises:
+        TypeError: If object type is not supported
+
+    Examples:
+        >>> from datetime import datetime
+        >>> encode_for_json(datetime(2025, 1, 1))
+        '2025-01-01T00:00:00'
+    """
+    if isinstance(obj, PydanticObjectId):
+        return str(obj)
+    if isinstance(obj, Enum):
+        return str(obj.value)
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
+@dataclass(frozen=True)
+class CacheStats:
+    """Immutable cache statistics.
+
+    Uses frozen dataclass for immutability and functional updates.
+    All mutations create new instances via dataclasses.replace().
+
+    Attributes:
+        hits: Number of cache hits
+        misses: Number of cache misses
+        evictions: Number of cache evictions
+
+    Examples:
+        >>> stats = CacheStats(hits=10, misses=5, evictions=2)
+        >>> stats.hits
+        10
+        >>> new_stats = stats.increment_hits()
+        >>> new_stats.hits
+        11
+        >>> stats.hits  # Original unchanged
+        10
+    """
+
+    hits: int = 0
+    misses: int = 0
+    evictions: int = 0
+
+    def increment_hits(self) -> CacheStats:
+        """Create new stats with hits incremented by 1."""
+        return replace(self, hits=self.hits + 1)
+
+    def increment_misses(self) -> CacheStats:
+        """Create new stats with misses incremented by 1."""
+        return replace(self, misses=self.misses + 1)
+
+    def increment_evictions(self, count: int = 1) -> CacheStats:
+        """Create new stats with evictions incremented by count."""
+        return replace(self, evictions=self.evictions + count)
+
+    def to_dict(self) -> dict[str, int]:
+        """Convert to dictionary for compatibility."""
+        return {"hits": self.hits, "misses": self.misses, "evictions": self.evictions}
 
 
 @dataclass(frozen=True)

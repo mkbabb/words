@@ -21,7 +21,7 @@ from .models import (
     ContentLocation,
     StorageType,
 )
-from .serialize import estimate_binary_size, serialize_content
+from .serialize import CacheStats, estimate_binary_size, serialize_content
 from .utils import json_encoder, normalize_namespace
 
 logger = get_logger(__name__)
@@ -53,7 +53,8 @@ class NamespaceConfig:
         # OrderedDict for O(1) LRU operations via move_to_end()
         self.memory_cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self.lock = asyncio.Lock()
-        self.stats = {"hits": 0, "misses": 0, "evictions": 0}
+        # Immutable cache stats for functional updates
+        self.stats = CacheStats()
 
 
 class GlobalCacheManager(Generic[T]):  # noqa: UP046
@@ -108,7 +109,7 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
             while len(ns.memory_cache) >= ns.memory_limit:
                 # popitem(last=False) removes and returns oldest (first) item in O(1)
                 ns.memory_cache.popitem(last=False)
-                ns.stats["evictions"] += 1
+                ns.stats = ns.stats.increment_evictions()
                 evictions += 1
         else:
             # Evict exact count
@@ -116,7 +117,7 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
                 if ns.memory_cache:
                     # popitem(last=False) removes and returns oldest (first) item in O(1)
                     ns.memory_cache.popitem(last=False)
-                    ns.stats["evictions"] += 1
+                    ns.stats = ns.stats.increment_evictions()
                     evictions += 1
         return evictions
 
@@ -170,19 +171,19 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
                     age = time.time() - entry["timestamp"]
                     if age > ns.memory_ttl.total_seconds():
                         del ns.memory_cache[key]
-                        ns.stats["evictions"] += 1
+                        ns.stats = ns.stats.increment_evictions()
                         logger.debug(f"L1 cache expired: {namespace.value}:{key} (age={age:.2f}s)")
                     else:
                         # Move to end for LRU using OrderedDict.move_to_end() - O(1)
                         ns.memory_cache.move_to_end(key)
-                        ns.stats["hits"] += 1
+                        ns.stats = ns.stats.increment_hits()
                         elapsed = (time.perf_counter() - start_time) * 1000
                         logger.debug(f"L1 cache HIT: {namespace.value}:{key} ({elapsed:.2f}ms)")
                         return entry["data"]
                 else:
                     # Move to end for LRU using OrderedDict.move_to_end() - O(1)
                     ns.memory_cache.move_to_end(key)
-                    ns.stats["hits"] += 1
+                    ns.stats = ns.stats.increment_hits()
                     elapsed = (time.perf_counter() - start_time) * 1000
                     logger.debug(f"L1 cache HIT: {namespace.value}:{key} ({elapsed:.2f}ms)")
                     return entry["data"]
@@ -205,7 +206,7 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         except Exception as e:
             logger.error(f"L2 cache error for {namespace.value}:{key}: {e}", exc_info=True)
 
-        ns.stats["misses"] += 1
+        ns.stats = ns.stats.increment_misses()
         elapsed = (time.perf_counter() - start_time) * 1000
         logger.debug(f"Cache MISS: {namespace.value}:{key} ({elapsed:.2f}ms)")
 
@@ -304,7 +305,7 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         for ns in self.namespaces.values():
             async with ns.lock:
                 ns.memory_cache.clear()
-                ns.stats = {"hits": 0, "misses": 0, "evictions": 0}
+                ns.stats = CacheStats()  # Reset to zero
 
         # Clear L2 backend
         await self.l2_backend.clear_all()
@@ -318,7 +319,7 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
             # LRU eviction if needed - popitem(last=False) removes oldest in O(1)
             while len(ns.memory_cache) >= ns.memory_limit:
                 ns.memory_cache.popitem(last=False)
-                ns.stats["evictions"] += 1
+                ns.stats = ns.stats.increment_evictions()
 
             ns.memory_cache[key] = {"data": data, "timestamp": time.time()}
 
@@ -338,15 +339,15 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
                 return {
                     "namespace": namespace.value,
                     "memory_count": len(ns.memory_cache),
-                    "stats": ns.stats.copy(),
+                    "stats": ns.stats.to_dict(),
                 }
 
-        # Aggregate stats
+        # Aggregate stats using functional approach
         total_stats = {"hits": 0, "misses": 0, "evictions": 0, "memory_count": 0}
         for ns in self.namespaces.values():
-            total_stats["hits"] += ns.stats["hits"]
-            total_stats["misses"] += ns.stats["misses"]
-            total_stats["evictions"] += ns.stats["evictions"]
+            total_stats["hits"] += ns.stats.hits
+            total_stats["misses"] += ns.stats.misses
+            total_stats["evictions"] += ns.stats.evictions
             total_stats["memory_count"] += len(ns.memory_cache)
 
         return total_stats
