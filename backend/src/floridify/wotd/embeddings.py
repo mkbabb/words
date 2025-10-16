@@ -28,6 +28,7 @@ Supported Models:
 
 from __future__ import annotations
 
+import multiprocessing
 import os
 import platform
 from enum import Enum
@@ -67,13 +68,13 @@ except ImportError as e:
         "Install with: pip install sentence-transformers",
     ) from e
 
+
 from ..utils.logging import get_logger
 from .constants import (
     DEFAULT_EMBEDDING_MODEL,
     MATRYOSHKA_MODELS,
     MODEL_DIMENSIONS,
 )
-import multiprocessing
 
 # from .storage import get_wotd_storage  # Import lazily to avoid circular imports
 
@@ -133,11 +134,15 @@ class Embedder:
         # Smart device selection
         if device == "cpu" or not torch.cuda.is_available():
             # On Apple Silicon, check for MPS availability
-            if (
-                platform.machine() == "arm64"
-                and hasattr(torch.backends, "mps")
-                and torch.backends.mps.is_available()
-            ):
+            mps_available = False
+            if platform.machine() == "arm64":
+                try:
+                    mps_available = torch.backends.mps.is_available()
+                except AttributeError:
+                    # MPS not available on this PyTorch version
+                    pass
+
+            if mps_available:
                 self.device = "mps"  # Use Metal Performance Shaders on Apple Silicon
                 logger.info("🍎 Using Apple Silicon MPS acceleration")
             else:
@@ -168,8 +173,11 @@ class Embedder:
             )
 
             # Only use fp16 on CUDA devices
-            if self.use_fp16 and hasattr(self.model, "half"):
-                self.model = self.model.half()
+            if self.use_fp16:
+                try:
+                    self.model = self.model.half()
+                except (AttributeError, RuntimeError) as e:
+                    logger.warning(f"Half precision not supported: {e}")
 
             logger.info(f"✅ Loaded {self.model_name} ({self.full_dim}D) on {self.device}")
         except Exception as e:
@@ -492,9 +500,13 @@ class Embedder:
             )
             # Return the original embeddings, not the CPU copy
             return embeddings.contiguous() if not embeddings.is_contiguous() else embeddings
+        try:
+            embeddings_list = embeddings.tolist()
+        except AttributeError:
+            embeddings_list = list(embeddings)
         await storage.cache_embeddings(
             cache_key,
-            embeddings.tolist() if hasattr(embeddings, "tolist") else list(embeddings),
+            embeddings_list,
             ttl_hours=48,
         )
         # Convert to properly aligned tensor

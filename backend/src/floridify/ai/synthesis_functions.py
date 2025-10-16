@@ -1076,15 +1076,13 @@ async def enhance_synthesized_entry(
     task_types: list[SynthesisComponent] = []  # Track the type of each task
 
     if SynthesisComponent.PRONUNCIATION in components and (not entry.pronunciation_id or force):
-        # TODO: Load provider data for pronunciation
-        pron_provider_data: list[dict[str, Any]] = []
-        word_tasks.append(synthesize_pronunciation(word, pron_provider_data, ai, state_tracker))
+        # Use the entry itself as provider data (it's a DictionaryEntry)
+        word_tasks.append(synthesize_pronunciation(word.text, [entry], ai, state_tracker))
         task_types.append(SynthesisComponent.PRONUNCIATION)
 
     if SynthesisComponent.ETYMOLOGY in components and (not entry.etymology or force):
-        # TODO: Load provider data for etymology
-        etym_provider_data: list[dict[str, Any]] = []
-        word_tasks.append(synthesize_etymology(word, etym_provider_data, ai, state_tracker))
+        # Use the entry itself as provider data (it's a DictionaryEntry)
+        word_tasks.append(synthesize_etymology(word, [entry], ai, state_tracker))
         task_types.append(SynthesisComponent.ETYMOLOGY)
 
     if SynthesisComponent.FACTS in components and (not entry.fact_ids or force):

@@ -84,6 +84,13 @@ async def list_corpora(
             try:
                 corpus = await Corpus.get(corpus_id=doc.id)
                 if corpus:
+                    # Query SearchIndex to get actual index status
+                    from ...search.models import SearchIndex
+
+                    search_index = None
+                    if corpus.corpus_uuid:
+                        search_index = await SearchIndex.get(corpus_uuid=corpus.corpus_uuid)
+
                     corpus_data = {
                         "id": str(doc.id),
                         "name": corpus.corpus_name,
@@ -91,7 +98,7 @@ async def list_corpora(
                         "corpus_type": corpus.corpus_type.value if corpus.corpus_type else "custom",
                         "vocabulary_size": len(corpus.vocabulary),
                         "unique_words": corpus.unique_word_count,
-                        "has_semantic": False,  # TODO: Query SemanticIndex for this corpus
+                        "has_semantic": search_index.has_semantic if search_index else False,
                         "created_at": doc.version_info.created_at,
                         "updated_at": doc.version_info.created_at,  # Use created_at for both until we add updated_at
                         "description": None,
@@ -144,6 +151,13 @@ async def get_corpus(
         if not metadata:
             raise HTTPException(status_code=404, detail=f"Corpus metadata not found: {corpus_id}")
 
+        # Query SearchIndex to get actual index status
+        from ...search.models import SearchIndex
+
+        search_index = None
+        if corpus.corpus_uuid:
+            search_index = await SearchIndex.get(corpus_uuid=corpus.corpus_uuid)
+
         corpus_data = {
             "id": corpus_id,
             "name": corpus.corpus_name,
@@ -151,7 +165,7 @@ async def get_corpus(
             "corpus_type": corpus.corpus_type.value if corpus.corpus_type else "custom",
             "vocabulary_size": len(corpus.vocabulary),
             "unique_words": corpus.unique_word_count,
-            "has_semantic": False,  # TODO: Query SemanticIndex for this corpus
+            "has_semantic": search_index.has_semantic if search_index else False,
             "created_at": metadata.version_info.created_at,
             "updated_at": metadata.version_info.created_at,  # Use created_at for both until we add updated_at
             "description": None,
@@ -160,7 +174,7 @@ async def get_corpus(
                 "is_master": corpus.is_master,
                 "child_count": len(corpus.child_uuids),
                 "parent_id": corpus.parent_uuid,
-                "has_trie": False,  # TODO: Query TrieIndex for this corpus
+                "has_trie": search_index.has_trie if search_index else False,
             }
             if include_stats
             else {},
@@ -221,6 +235,13 @@ async def create_corpus(
         if not metadata:
             raise HTTPException(status_code=500, detail="Failed to retrieve corpus metadata")
 
+        # Query SearchIndex to get actual index status
+        from ...search.models import SearchIndex
+
+        search_index = None
+        if corpus.corpus_uuid:
+            search_index = await SearchIndex.get(corpus_uuid=corpus.corpus_uuid)
+
         corpus_data = {
             "id": str(corpus.corpus_id),
             "name": corpus.corpus_name,
@@ -228,7 +249,7 @@ async def create_corpus(
             "corpus_type": corpus.corpus_type.value if corpus.corpus_type else "custom",
             "vocabulary_size": len(corpus.vocabulary),
             "unique_words": corpus.unique_word_count,
-            "has_semantic": False,  # TODO: Query SemanticIndex for this corpus
+            "has_semantic": search_index.has_semantic if search_index else False,
             "created_at": metadata.version_info.created_at,
             "updated_at": metadata.version_info.created_at,  # Use created_at for both until we add updated_at
             "description": params.description,
