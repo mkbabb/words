@@ -181,20 +181,24 @@ class OpenAIConnector:
                 )
                 api_duration = time.perf_counter() - api_start
 
-                # Extract token usage
+                # Extract token usage from response
                 token_usage = {}
                 prompt_tokens = None
                 completion_tokens = None
                 total_tokens = None
-                if hasattr(response, "usage") and response.usage:
-                    prompt_tokens = response.usage.prompt_tokens
-                    completion_tokens = response.usage.completion_tokens
-                    total_tokens = response.usage.total_tokens
-                    token_usage = {
-                        "prompt_tokens": prompt_tokens,
-                        "completion_tokens": completion_tokens,
-                        "total_tokens": total_tokens,
-                    }
+                try:
+                    if response.usage:
+                        prompt_tokens = response.usage.prompt_tokens
+                        completion_tokens = response.usage.completion_tokens
+                        total_tokens = response.usage.total_tokens
+                        token_usage = {
+                            "prompt_tokens": prompt_tokens,
+                            "completion_tokens": completion_tokens,
+                            "total_tokens": total_tokens,
+                        }
+                except AttributeError:
+                    # Response doesn't have usage field
+                    pass
 
                 # Log successful API call
                 log_metrics(
@@ -211,15 +215,25 @@ class OpenAIConnector:
                 content = response.choices[0].message.content
                 if content:
                     result = response_model.model_validate_json(content)
-                    # Store token usage on the result if it has that attribute
-                    if hasattr(result, "token_usage"):
-                        result.token_usage = token_usage
-                    # Store the actual model used on the result if it has model_info
-                    if hasattr(result, "model_info") and result.model_info:
-                        result.model_info.name = active_model
-                    # Store the model name for tracking
-                    if hasattr(result, "_model_used"):
-                        result._model_used = active_model
+
+                    # Try to store token usage on the result if field exists
+                    try:
+                        result.token_usage = token_usage  # type: ignore[attr-defined]
+                    except (AttributeError, ValueError):
+                        pass  # Model doesn't have token_usage field
+
+                    # Try to update model_info.name if field exists
+                    try:
+                        if result.model_info:  # type: ignore[attr-defined]
+                            result.model_info.name = active_model  # type: ignore[attr-defined]
+                    except AttributeError:
+                        pass  # Model doesn't have model_info field
+
+                    # Try to store internal tracking attribute
+                    try:
+                        object.__setattr__(result, "_model_used", active_model)
+                    except (AttributeError, ValueError):
+                        pass  # Model is frozen or doesn't allow attribute
                 else:
                     raise ValueError("No content in response")
 

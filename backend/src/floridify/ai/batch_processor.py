@@ -93,14 +93,19 @@ class BatchCollector:
                 }
 
                 # Add response format if using structured output
-                if hasattr(req.response_model, "model_json_schema"):
+                # Check if response_model is a Pydantic BaseModel class
+                try:
+                    schema = req.response_model.model_json_schema()
                     batch_entry["body"]["response_format"] = {
                         "type": "json_schema",
                         "json_schema": {
                             "name": req.response_model.__name__,
-                            "schema": req.response_model.model_json_schema(),
+                            "schema": schema,
                         },
                     }
+                except (AttributeError, TypeError):
+                    # Not a Pydantic model or schema generation failed
+                    pass
 
                 f.write(json.dumps(batch_entry) + "\n")
 
@@ -287,11 +292,12 @@ class BatchContext:
                         # Extract content from response
                         content = result["response"]["body"]["choices"][0]["message"]["content"]
 
-                        # Parse JSON if using structured output
-                        if hasattr(request.response_model, "model_validate_json"):
+                        # Parse JSON if using structured output (Pydantic models)
+                        try:
                             parsed = request.response_model.model_validate_json(content)
                             request.future.set_result(parsed)
-                        else:
+                        except AttributeError:
+                            # Not a Pydantic model, return raw content
                             request.future.set_result(content)
                     except Exception as e:
                         logger.error(f"Failed to parse result for {request.custom_id}: {e}")
