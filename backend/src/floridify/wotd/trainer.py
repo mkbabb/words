@@ -42,6 +42,9 @@ Mathematical Foundation:
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
 import time
 from pathlib import Path
 
@@ -73,11 +76,6 @@ from .encoders import get_semantic_encoder
 from .generator import generate_training_data
 from .literature import LiteratureCorpusBuilder
 from .storage import get_wotd_storage
-from pathlib import Path
-import asyncio
-import hashlib
-import json
-import time
 
 logger = get_logger(__name__)
 

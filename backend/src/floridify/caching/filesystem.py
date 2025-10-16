@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import fnmatch
+import pickle
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -11,8 +13,6 @@ import diskcache as dc  # type: ignore[import-untyped]
 
 from ..utils.logging import get_logger
 from ..utils.paths import get_cache_directory
-import fnmatch
-import pickle
 
 logger = get_logger(__name__)
 

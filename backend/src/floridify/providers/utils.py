@@ -12,7 +12,7 @@ import hashlib
 import random
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
 
@@ -23,7 +23,6 @@ from pydantic import BaseModel, Field
 from ..caching.core import get_global_cache
 from ..caching.models import CacheNamespace
 from ..utils.logging import get_logger
-from datetime import timedelta
 
 logger = get_logger(__name__)
 

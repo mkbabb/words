@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from datetime import datetime
 from enum import Enum
 from typing import Any, TypeVar
 
@@ -23,7 +24,6 @@ from .models import (
     VersionConfig,
     VersionInfo,
 )
-from datetime import datetime
 
 logger = get_logger(__name__)
 

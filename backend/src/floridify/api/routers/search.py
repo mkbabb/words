@@ -160,9 +160,9 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
             )
 
             # Get the corpus manager
+            from ...caching.models import VersionConfig
             from ...corpus.manager import get_corpus_manager
             from ...search.core import Search
-            from ...caching.models import VersionConfig
 
             corpus_manager = get_corpus_manager()
 

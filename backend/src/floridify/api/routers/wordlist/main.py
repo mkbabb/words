@@ -30,7 +30,6 @@ from ...repositories import (
     WordListRepository,
     WordListUpdate,
 )
-from datetime import datetime
 
 router = APIRouter()
 

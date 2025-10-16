@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,6 @@ from botocore.exceptions import ClientError
 
 from ..utils.logging import get_logger
 from .core import TrainingConfig
-import json
 
 logger = get_logger(__name__)
 

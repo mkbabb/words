@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 import coolname
 from beanie import PydanticObjectId
-from pydantic import ValidationError
 
 from ..caching.core import get_global_cache, get_versioned_content
 from ..caching.manager import get_version_manager
@@ -14,7 +13,6 @@ from ..models.base import Language
 from ..utils.logging import get_logger
 from .core import Corpus
 from .models import CorpusType
-import asyncio
 
 logger = get_logger(__name__)
 

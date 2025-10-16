@@ -212,7 +212,7 @@ class LanguageCorpus(Corpus):
             # Filter to only get the french_expressions source for testing
             all_sources = LANGUAGE_CORPUS_SOURCES_BY_LANGUAGE.get(language, [])
             sources = [s for s in all_sources if s.name == "french_expressions"]
-            logger.info(f"TEMP: Using only french_expressions source for English testing")
+            logger.info("TEMP: Using only french_expressions source for English testing")
         else:
             # Get all sources for other languages
             sources = LANGUAGE_CORPUS_SOURCES_BY_LANGUAGE.get(language, [])

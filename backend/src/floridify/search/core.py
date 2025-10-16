@@ -168,7 +168,6 @@ class Search:
             )
             # Preserve semantic settings before rebuild
             semantic_was_enabled = self.index.semantic_enabled
-            semantic_model = self.index.semantic_model
 
             # Trigger automatic rebuild
             await self.build_indices()

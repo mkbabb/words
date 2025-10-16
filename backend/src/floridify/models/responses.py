@@ -13,13 +13,12 @@ Design Principles:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from .base import Language
-from datetime import timedelta
 
 if TYPE_CHECKING:
     pass

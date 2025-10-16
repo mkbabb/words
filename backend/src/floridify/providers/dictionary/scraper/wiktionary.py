@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import html
+import json
 import re
 from typing import Any
 
@@ -29,7 +30,6 @@ from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ..core import DictionaryConnector
 from ..models import DictionaryProviderEntry
-import json
 
 logger = get_logger(__name__)
 

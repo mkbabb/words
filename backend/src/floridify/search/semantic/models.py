@@ -17,7 +17,6 @@ from ...caching.models import (
 )
 from ...corpus.core import Corpus
 from ...utils.logging import get_logger
-import hashlib
 
 logger = get_logger(__name__)
 

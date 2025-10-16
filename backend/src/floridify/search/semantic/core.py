@@ -11,14 +11,13 @@ import multiprocessing
 import os
 import pickle
 import time
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 import faiss
 import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 
-from ...caching.core import set_versioned_content
 from ...caching.models import VersionConfig
 from ...corpus.core import Corpus
 from ...utils.logging import get_logger
@@ -295,7 +294,7 @@ class SemanticSearch:
             if "index_compressed_bytes" in binary_data:
                 # New format: compressed bytes stored directly (no base64)
                 compressed_bytes = binary_data["index_compressed_bytes"]
-                logger.debug(f"Decompressing gzip FAISS index")
+                logger.debug("Decompressing gzip FAISS index")
                 index_bytes = gzip.decompress(compressed_bytes)
                 faiss_data = pickle.loads(index_bytes)
                 self.sentence_index = faiss.deserialize_index(faiss_data)
@@ -309,7 +308,7 @@ class SemanticSearch:
 
                 # Check if index was compressed
                 if binary_data.get("index_compressed") == "gzip":
-                    logger.debug(f"Decompressing gzip FAISS index")
+                    logger.debug("Decompressing gzip FAISS index")
                     index_bytes = gzip.decompress(index_bytes)
 
                 faiss_data = pickle.loads(index_bytes)

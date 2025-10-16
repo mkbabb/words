@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import bz2
 import gzip
+import hashlib
 import json
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -25,8 +27,6 @@ from ...batch import BatchOperation
 from ...core import ConnectorConfig
 from ...utils import RateLimitConfig
 from ..core import DictionaryConnector
-from collections.abc import Callable
-import hashlib
 
 logger = get_logger(__name__)
 

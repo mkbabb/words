@@ -18,7 +18,6 @@ from ...providers.batch import BatchOperation, BatchStatus
 from ...providers.config import ProviderConfiguration
 from ...utils.logging import get_logger
 from ..core.base import BaseRepository
-from datetime import timedelta
 
 logger = get_logger(__name__)
 

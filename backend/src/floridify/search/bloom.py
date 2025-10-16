@@ -10,10 +10,10 @@ Perfect for pre-filtering vocabulary lookups before expensive trie searches.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 
 import xxhash  # Fast xxHash implementation (already in dependencies)
-import math
 
 
 class BloomFilter:

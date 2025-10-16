@@ -5,6 +5,7 @@ Unified models for corpus storage, caching, and semantic indexing.
 
 from __future__ import annotations
 
+import time
 from typing import Any, ClassVar
 
 from beanie import PydanticObjectId
@@ -23,7 +24,6 @@ from ..corpus.utils import get_vocabulary_hash
 from ..models.base import Language
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod
-import time
 
 logger = get_logger(__name__)
 

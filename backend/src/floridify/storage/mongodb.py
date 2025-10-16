@@ -10,6 +10,11 @@ from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from ..caching.models import BaseVersionedData
+
+# PATHOLOGICAL REMOVAL: Move ALL imports to top level - NO nested imports
+from ..corpus.core import Corpus
+from ..corpus.language.core import LanguageCorpus
+from ..corpus.literature.core import LiteratureCorpus
 from ..models.base import AudioMedia, ImageMedia
 from ..models.dictionary import (
     Definition,
@@ -22,19 +27,14 @@ from ..models.dictionary import (
 )
 from ..models.relationships import WordRelationship
 from ..providers.batch import BatchOperation
-from ..utils.config import Config
-from ..utils.logging import get_logger
-from ..wordlist.models import WordList
-
-# PATHOLOGICAL REMOVAL: Move ALL imports to top level - NO nested imports
-from ..corpus.core import Corpus
-from ..corpus.language.core import LanguageCorpus
-from ..corpus.literature.core import LiteratureCorpus
 from ..providers.dictionary.models import DictionaryProviderEntry
 from ..providers.language.models import LanguageEntry
 from ..providers.literature.models import LiteratureEntry
 from ..search.models import SearchIndex, TrieIndex
 from ..search.semantic.models import SemanticIndex
+from ..utils.config import Config
+from ..utils.logging import get_logger
+from ..wordlist.models import WordList
 
 logger = get_logger(__name__)
 

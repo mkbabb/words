@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -36,7 +37,6 @@ from ...repositories import (
     AudioRepository,
     AudioUpdate,
 )
-import uuid
 
 logger = logging.getLogger(__name__)
 

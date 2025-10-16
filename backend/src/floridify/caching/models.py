@@ -11,12 +11,11 @@ import json
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
+from uuid import uuid4
 
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pymongo import IndexModel
-from uuid import uuid4
-import hashlib
 
 
 class CompressionType(str, Enum):

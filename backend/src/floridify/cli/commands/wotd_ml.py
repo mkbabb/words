@@ -10,6 +10,7 @@ Commands for training and using the WOTD ML system with:
 from __future__ import annotations
 
 import asyncio
+import time
 
 import click
 from rich.console import Console
@@ -31,7 +32,6 @@ from ...wotd.constants import (
 from ...wotd.core import TrainingConfig
 from ...wotd.generator import SyntheticGenerator
 from ...wotd.trainer import train_from_literature, train_wotd_pipeline
-import time
 
 console = Console()
 logger = get_logger(__name__)

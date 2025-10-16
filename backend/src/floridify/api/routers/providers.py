@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import platform
+
 from fastapi import APIRouter, Depends, HTTPException, Path
 
 from ...caching.core import CacheNamespace, get_global_cache
@@ -9,7 +11,6 @@ from ...models.dictionary import DictionaryProvider
 from ...models.parameters import ProviderStatusParams
 from ...models.responses import ProviderListResponse, ProviderStatusResponse
 from ...utils.logging import get_logger
-import platform
 
 logger = get_logger(__name__)
 router = APIRouter()

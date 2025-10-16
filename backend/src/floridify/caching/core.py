@@ -12,7 +12,6 @@ from enum import Enum
 from typing import Any, Generic, TypeVar
 
 from beanie import PydanticObjectId
-from pydantic import BaseModel
 
 from ..utils.logging import get_logger
 from .compression import compress_data, decompress_data
@@ -24,7 +23,6 @@ from .models import (
     ContentLocation,
     StorageType,
 )
-import pickle
 
 logger = get_logger(__name__)
 
@@ -499,9 +497,7 @@ async def get_versioned_content(versioned_data: Any) -> dict[str, Any] | None:
             namespace = location.cache_namespace
             if isinstance(namespace, str):
                 namespace = CacheNamespace(namespace)
-            cached_content = await cache.get(
-                namespace=namespace, key=location.cache_key
-            )
+            cached_content = await cache.get(namespace=namespace, key=location.cache_key)
             # Cast to expected return type
             if isinstance(cached_content, dict):
                 return cached_content
@@ -539,7 +535,7 @@ async def set_versioned_content(
             versioned_data.resource_type,
             versioned_data.resource_id,
             "content",
-            versioned_data.version_info.data_hash[:8]
+            versioned_data.version_info.data_hash[:8],
         )
 
         # Ensure namespace is CacheNamespace enum (handle string from MongoDB)
@@ -558,7 +554,9 @@ async def set_versioned_content(
         # For large binary data, we can estimate size without full JSON encoding
         if isinstance(content, dict) and "binary_data" in content:
             # Rough estimate: sum of binary_data string lengths
-            binary_size = sum(len(v) for v in content.get("binary_data", {}).values() if isinstance(v, str))
+            binary_size = sum(
+                len(v) for v in content.get("binary_data", {}).values() if isinstance(v, str)
+            )
             # Add overhead for JSON structure (rough estimate)
             content_size = binary_size + 1000
             checksum = "skip-large-content"  # Skip checksum for very large data
@@ -598,7 +596,7 @@ async def set_versioned_content(
         versioned_data.resource_type,
         versioned_data.resource_id,
         "content",
-        versioned_data.version_info.data_hash[:8]
+        versioned_data.version_info.data_hash[:8],
     )
 
     # Ensure namespace is CacheNamespace enum (handle string from MongoDB)
@@ -621,118 +619,3 @@ async def set_versioned_content(
         checksum=hashlib.sha256(content_str.encode()).hexdigest(),
     )
     versioned_data.content_inline = None
-
-
-# ============================================================================
-# EXTERNAL CONTENT STORAGE - Moved from models/storage.py
-# ============================================================================
-
-
-async def load_external_content(location: ContentLocation) -> Any:
-    """Load content from external storage location.
-
-    Handles decompression and deserialization efficiently.
-
-    Args:
-        location: ContentLocation object with storage metadata
-
-    Returns:
-        Deserialized content from external storage
-
-    """
-    if location.storage_type == StorageType.CACHE:
-        # Load from cache backend
-        cache = await get_global_cache()
-        backend_key = f"{location.cache_namespace}:{location.cache_key}"
-        data = await cache.l2_backend.get(backend_key)
-
-    elif location.storage_type == StorageType.S3:
-        # Load from S3 (implement when needed)
-        raise NotImplementedError("S3 backend not yet implemented")
-
-    else:
-        raise ValueError(f"Unsupported storage type: {location.storage_type}")
-
-    # Decompress if needed
-    if location.compression and isinstance(data, bytes):
-        data = decompress_data(data, location.compression)
-
-    # Deserialize if bytes
-    if isinstance(data, bytes):
-
-        return pickle.loads(data)
-
-    return data
-
-
-async def store_external_content(
-    content: Any,
-    namespace: CacheNamespace,
-    key: str,
-    compression: CompressionType | None = None,
-) -> ContentLocation:
-    """Store content externally with optimal serialization.
-
-    Returns ContentLocation metadata for retrieval.
-
-    Args:
-        content: Content to store
-        namespace: Cache namespace for organization
-        key: Unique key for the content
-        compression: Optional compression type (auto-selected if None)
-
-    Returns:
-        ContentLocation object with storage metadata
-
-    """
-    # Serialize efficiently based on type
-    if isinstance(content, BaseModel):
-        # Pydantic models: use model_dump for dict conversion
-        serialized = json.dumps(content.model_dump(), sort_keys=True).encode()
-    elif isinstance(content, dict | list):
-        # JSON-serializable types
-        serialized = json.dumps(content, sort_keys=True).encode()
-    else:
-        # Use proper serialization that handles pydantic models
-        from .serialization import serialize_content
-
-        serialized = serialize_content(content)
-
-    size_bytes = len(serialized)
-
-    # Auto-select compression if not specified
-    if compression is None:
-        # If the content is below 1KB, no compression (fastest)
-        if size_bytes < 1024:
-            compression = None
-        # If the content is below 10MB, use ZSTD (faster)
-        elif size_bytes < 10_000_000:
-            compression = CompressionType.ZSTD
-        # Else, use GZIP (slowest)
-        else:
-            compression = CompressionType.GZIP
-
-    # Compress
-    compressed = compress_data(serialized, compression) if compression else serialized
-
-    # Store in cache backend
-    cache = await get_global_cache()
-
-    backend_key = f"{namespace.value}:{key}"
-
-    await cache.l2_backend.set(backend_key, compressed)
-
-    return ContentLocation(
-        storage_type=StorageType.CACHE,
-        cache_namespace=namespace,
-        cache_key=key,
-        compression=compression,
-        size_bytes=size_bytes,
-        size_compressed=len(compressed) if compression else None,
-        checksum=hashlib.sha256(serialized).hexdigest(),
-    )
-
-
-# ============================================================================
-# REMOVED: Deprecated CacheManager - use get_global_cache() instead
-# ============================================================================

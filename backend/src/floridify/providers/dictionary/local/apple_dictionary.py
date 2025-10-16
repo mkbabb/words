@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import platform
 import re
+import traceback
 from typing import Any
 
 from beanie import PydanticObjectId
@@ -20,7 +21,6 @@ from ....models.dictionary import (
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ..core import DictionaryConnector
-import traceback
 
 logger = get_logger(__name__)
 

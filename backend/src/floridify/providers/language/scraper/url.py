@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from ....core.state_tracker import StateTracker
@@ -16,7 +17,6 @@ from ..parsers import (
     parse_text_lines,
 )
 from .scrapers import default_scraper, scrape_french_expressions
-import json
 
 logger = get_logger(__name__)
 
