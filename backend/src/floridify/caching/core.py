@@ -3,15 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import json
 import time
+from collections import OrderedDict
 from collections.abc import Callable
 from datetime import timedelta
-from enum import Enum
 from typing import Any, Generic, TypeVar
-
-from beanie import PydanticObjectId
 
 from ..utils.logging import get_logger
 from .compression import compress_data, decompress_data
@@ -25,6 +21,7 @@ from .models import (
     ContentLocation,
     StorageType,
 )
+from .serialize import estimate_binary_size, serialize_content
 from .utils import json_encoder, normalize_namespace
 
 logger = get_logger(__name__)
@@ -34,7 +31,11 @@ T = TypeVar("T", bound=FilesystemBackend)
 
 
 class NamespaceConfig:
-    """Configuration for a cache namespace."""
+    """Configuration for a cache namespace.
+
+    Uses OrderedDict for LRU cache with O(1) move_to_end operations.
+    Oldest items are at the front, newest at the back.
+    """
 
     def __init__(
         self,
@@ -49,7 +50,8 @@ class NamespaceConfig:
         self.memory_ttl = memory_ttl
         self.disk_ttl = disk_ttl
         self.compression = compression
-        self.memory_cache: dict[str, dict[str, Any]] = {}
+        # OrderedDict for O(1) LRU operations via move_to_end()
+        self.memory_cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self.lock = asyncio.Lock()
         self.stats = {"hits": 0, "misses": 0, "evictions": 0}
 
@@ -91,6 +93,8 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
     def _evict_lru(self, ns: NamespaceConfig, count: int = 1) -> int:
         """Evict least recently used items from namespace.
 
+        Uses OrderedDict.popitem(last=False) for O(1) eviction of oldest items.
+
         Args:
             ns: Namespace configuration
             count: Number of items to evict (default: 1, None = evict until under limit)
@@ -102,16 +106,16 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         if count is None:
             # Evict until under limit
             while len(ns.memory_cache) >= ns.memory_limit:
-                first_key = next(iter(ns.memory_cache))
-                del ns.memory_cache[first_key]
+                # popitem(last=False) removes and returns oldest (first) item in O(1)
+                ns.memory_cache.popitem(last=False)
                 ns.stats["evictions"] += 1
                 evictions += 1
         else:
             # Evict exact count
             for _ in range(count):
                 if ns.memory_cache:
-                    first_key = next(iter(ns.memory_cache))
-                    del ns.memory_cache[first_key]
+                    # popitem(last=False) removes and returns oldest (first) item in O(1)
+                    ns.memory_cache.popitem(last=False)
                     ns.stats["evictions"] += 1
                     evictions += 1
         return evictions
@@ -169,14 +173,15 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
                         ns.stats["evictions"] += 1
                         logger.debug(f"L1 cache expired: {namespace.value}:{key} (age={age:.2f}s)")
                     else:
-                        # Move to end for LRU (dict preserves order)
-                        del ns.memory_cache[key]
-                        ns.memory_cache[key] = entry
+                        # Move to end for LRU using OrderedDict.move_to_end() - O(1)
+                        ns.memory_cache.move_to_end(key)
                         ns.stats["hits"] += 1
                         elapsed = (time.perf_counter() - start_time) * 1000
                         logger.debug(f"L1 cache HIT: {namespace.value}:{key} ({elapsed:.2f}ms)")
                         return entry["data"]
                 else:
+                    # Move to end for LRU using OrderedDict.move_to_end() - O(1)
+                    ns.memory_cache.move_to_end(key)
                     ns.stats["hits"] += 1
                     elapsed = (time.perf_counter() - start_time) * 1000
                     logger.debug(f"L1 cache HIT: {namespace.value}:{key} ({elapsed:.2f}ms)")
@@ -305,12 +310,14 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         await self.l2_backend.clear_all()
 
     async def _promote_to_memory(self, ns: NamespaceConfig, key: str, data: Any) -> None:
-        """Promote data from L2 to L1."""
+        """Promote data from L2 to L1 with LRU eviction.
+
+        Uses OrderedDict.popitem(last=False) for O(1) eviction.
+        """
         async with ns.lock:
-            # LRU eviction if needed
+            # LRU eviction if needed - popitem(last=False) removes oldest in O(1)
             while len(ns.memory_cache) >= ns.memory_limit:
-                first_key = next(iter(ns.memory_cache))
-                del ns.memory_cache[first_key]
+                ns.memory_cache.popitem(last=False)
                 ns.stats["evictions"] += 1
 
             ns.memory_cache[key] = {"data": data, "timestamp": time.time()}
@@ -433,15 +440,6 @@ async def get_versioned_content(versioned_data: Any) -> dict[str, Any] | None:
     return None
 
 
-def _json_default(obj: Any) -> str:
-    """Serialize enums and Pydantic types in a stable way."""
-    if isinstance(obj, PydanticObjectId):
-        return str(obj)
-    if isinstance(obj, Enum):
-        return str(obj.value)
-    return str(obj)
-
-
 async def set_versioned_content(
     versioned_data: BaseVersionedData,
     content: Any,
@@ -474,21 +472,9 @@ async def set_versioned_content(
             ttl_override=versioned_data.ttl,
         )
 
-        # Calculate size for metadata (estimate if JSON encoding would be too slow)
-        # For large binary data, we can estimate size without full JSON encoding
-        if isinstance(content, dict) and "binary_data" in content:
-            # Rough estimate: sum of binary_data string lengths
-            binary_size = sum(
-                len(v) for v in content.get("binary_data", {}).values() if isinstance(v, str)
-            )
-            # Add overhead for JSON structure (rough estimate)
-            content_size = binary_size + 1000
-            checksum = "skip-large-content"  # Skip checksum for very large data
-        else:
-            # Small enough to JSON encode
-            content_str = json.dumps(content, sort_keys=True, default=_json_default)
-            content_size = len(content_str.encode())
-            checksum = hashlib.sha256(content_str.encode()).hexdigest()
+        # Calculate size and checksum efficiently using pure functions
+        # For large binary data, estimate without full JSON encoding
+        content_size, checksum = estimate_binary_size(content)
 
         versioned_data.content_location = ContentLocation(
             cache_namespace=versioned_data.namespace,
@@ -500,13 +486,12 @@ async def set_versioned_content(
         versioned_data.content_inline = None
         return
 
-    # Normal path: calculate size and decide storage strategy
-    content_str = json.dumps(content, sort_keys=True, default=_json_default)
-    content_size = len(content_str.encode())
+    # Normal path: serialize once and decide storage strategy
+    serialized = serialize_content(content)
 
     inline_threshold = 16 * 1024
 
-    if content_size < inline_threshold:
+    if serialized.size_bytes < inline_threshold:
         versioned_data.content_inline = content
         versioned_data.content_location = None
         return
@@ -536,7 +521,7 @@ async def set_versioned_content(
         cache_namespace=versioned_data.namespace,
         cache_key=cache_key,
         storage_type=StorageType.CACHE,
-        size_bytes=content_size,
-        checksum=hashlib.sha256(content_str.encode()).hexdigest(),
+        size_bytes=serialized.size_bytes,
+        checksum=serialized.content_hash,
     )
     versioned_data.content_inline = None
