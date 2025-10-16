@@ -13,7 +13,7 @@ from ..utils.logging import get_logger
 from .compression import compress_data, decompress_data
 from .config import DEFAULT_CONFIGS
 from .filesystem import FilesystemBackend
-from .keys import generate_content_cache_key, generate_resource_key
+from .keys import generate_resource_key
 from .models import (
     BaseVersionedData,
     CacheNamespace,
@@ -22,7 +22,6 @@ from .models import (
     StorageType,
 )
 from .serialize import CacheStats, estimate_binary_size, serialize_content
-from .utils import json_encoder, normalize_namespace
 
 logger = get_logger(__name__)
 

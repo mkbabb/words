@@ -10,10 +10,10 @@ import re
 from typing import NamedTuple
 
 __all__ = [
+    "VersionParts",
+    "compare_versions",
     "increment_version",
     "parse_version",
-    "compare_versions",
-    "VersionParts",
 ]
 
 

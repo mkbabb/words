@@ -11,9 +11,9 @@ from typing import Any
 from .models import BaseVersionedData
 
 __all__ = [
-    "validate_metadata_changed",
-    "validate_content_match",
     "should_create_new_version",
+    "validate_content_match",
+    "validate_metadata_changed",
 ]
 
 
