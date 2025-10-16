@@ -58,17 +58,27 @@ class TypedFieldUpdater:
         Raises:
             ValueError: If field is not allowed or value is invalid
         """
-        # Get allowed fields from the document's model (Pydantic v2 only)
-        if not hasattr(doc, "model_fields"):
-            raise ValueError(f"Document {type(doc).__name__} must be a Pydantic v2 model")
+        # PATHOLOGICAL REMOVAL: No hasattr, no setattr - require proper types
+        # Document must be a Beanie Document which has model_fields
+        if not isinstance(doc, Document):
+            raise ValueError(f"Document {type(doc).__name__} must be a Beanie Document")
+
+        # Beanie Documents are Pydantic models with model_fields
         allowed_fields = set(doc.model_fields.keys())
 
+        # Direct validation and update using Pydantic's model_validate
         for field, value in update_data.items():
             if field not in allowed_fields:
                 raise ValueError(f"Field '{field}' not allowed for {type(doc).__name__}")
 
-            # Set the validated value
-            setattr(doc, field, value)
+        # Use Pydantic's built-in validation instead of setattr
+        updated_data = doc.model_dump()
+        updated_data.update(update_data)
+        validated = type(doc).model_validate(updated_data)
+
+        # Copy validated fields back to the document
+        for field, value in update_data.items():
+            doc.__dict__[field] = validated.__dict__[field]
 
 
 def serialize_for_response(data: Any) -> dict[str, Any]:

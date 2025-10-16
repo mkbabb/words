@@ -10,8 +10,10 @@ Perfect for pre-filtering vocabulary lookups before expensive trie searches.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 import xxhash  # Fast xxHash implementation (already in dependencies)
-from typing import Iterable
+import math
 
 
 class BloomFilter:
@@ -42,7 +44,6 @@ class BloomFilter:
         """
         # Calculate optimal bit array size and hash function count
         # Based on: m = -n*ln(p) / (ln(2)^2) and k = m/n * ln(2)
-        import math
 
         self.capacity = capacity
         self.error_rate = error_rate
@@ -171,10 +172,11 @@ class BloomFilter:
 
         # Estimate actual false positive rate based on fill
         # p_fp ≈ (1 - e^(-k*n/m))^k
-        import math
 
         if self.item_count > 0:
-            estimated_fp_rate = (1 - math.exp(-self.hash_count * self.item_count / self.bit_count)) ** self.hash_count
+            estimated_fp_rate = (
+                1 - math.exp(-self.hash_count * self.item_count / self.bit_count)
+            ) ** self.hash_count
         else:
             estimated_fp_rate = 0.0
 

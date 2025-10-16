@@ -54,7 +54,7 @@ async def corpus_tree(
         corpus_type=CorpusType.LANGUAGE,
         language=Language.ENGLISH,
         is_master=True,
-        child_corpus_ids=[],
+        child_uuids=[],
         content_inline={"vocabulary": sample_vocabularies["small"]},
         vocabulary_size=3,
         vocabulary_hash="test_hash",
@@ -73,8 +73,8 @@ async def corpus_tree(
         ),
         corpus_type=CorpusType.LITERATURE,
         language=Language.ENGLISH,
-        parent_corpus_id=language_corpus.id,
-        child_corpus_ids=[],
+        parent_uuid=language_corpus.uuid,
+        child_uuids=[],
         content_inline={"vocabulary": ["thou", "thee", "thy"]},
         vocabulary_size=3,
         vocabulary_hash="test_hash_1",
@@ -92,8 +92,8 @@ async def corpus_tree(
         ),
         corpus_type=CorpusType.LITERATURE,
         language=Language.ENGLISH,
-        parent_corpus_id=language_corpus.id,
-        child_corpus_ids=[],
+        parent_uuid=language_corpus.uuid,
+        child_uuids=[],
         content_inline={"vocabulary": ["internet", "smartphone", "app"]},
         vocabulary_size=3,
         vocabulary_hash="test_hash_2",
@@ -112,7 +112,7 @@ async def corpus_tree(
         ),
         corpus_type=CorpusType.LITERATURE,
         language=Language.ENGLISH,
-        parent_corpus_id=work1.id,
+        parent_uuid=work1.uuid,
         content_inline={"vocabulary": ["to", "be", "or", "not"]},
         vocabulary_size=4,
         vocabulary_hash="test_hash_3",
@@ -120,10 +120,10 @@ async def corpus_tree(
     await chapter1.save()
 
     # Update parent references
-    language_corpus.child_corpus_ids = [work1.id, work2.id]
+    language_corpus.child_uuids = [work1.uuid, work2.uuid]
     await language_corpus.save()
 
-    work1.child_corpus_ids = [chapter1.id]
+    work1.child_uuids = [chapter1.uuid]
     await work1.save()
 
     return {
@@ -161,8 +161,8 @@ def assert_helpers():
         @staticmethod
         def assert_parent_child_linked(parent: Corpus.Metadata, child: Corpus.Metadata):
             """Verify parent-child relationship is properly linked."""
-            assert child.id in parent.child_corpus_ids
-            assert parent.id == child.parent_corpus_id
+            assert child.uuid in parent.child_uuids
+            assert parent.uuid == child.parent_uuid
 
         @staticmethod
         def assert_vocabulary_contains(corpus: Corpus.Metadata, expected_words: list[str]):
@@ -176,14 +176,14 @@ def assert_helpers():
             visited = set()
 
             def check_node(node: Corpus.Metadata):
-                if node.id in visited:
+                if node.uuid in visited:
                     raise ValueError(f"Circular reference detected at {node.resource_id}")
-                visited.add(node.id)
+                visited.add(node.uuid)
 
-                for child_id in node.child_corpus_ids:
-                    child = next((n for n in all_nodes.values() if n.id == child_id), None)
+                for child_uuid in node.child_uuids:
+                    child = next((n for n in all_nodes.values() if n.uuid == child_uuid), None)
                     if child:
-                        assert child.parent_corpus_id == node.id
+                        assert child.parent_uuid == node.uuid
                         check_node(child)
 
             check_node(root)

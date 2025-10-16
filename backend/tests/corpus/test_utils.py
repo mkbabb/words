@@ -101,23 +101,23 @@ def verify_tree_consistency(
     """
     # Check all children reference parent
     for child in children:
-        assert child.parent_corpus_id == parent.id, (
+        assert child.parent_uuid == parent.uuid, (
             f"Child {child.corpus_name} doesn't reference parent {parent.corpus_name}"
         )
 
     # Check parent references all children
-    child_ids = {child.id for child in children}
-    parent_child_ids = set(parent.child_corpus_ids)
+    child_uuids = {child.uuid for child in children}
+    parent_child_uuids = set(parent.child_uuids)
 
-    assert child_ids == parent_child_ids, "Parent's child_corpus_ids doesn't match actual children"
+    assert child_uuids == parent_child_uuids, "Parent's child_uuids doesn't match actual children"
 
     # Check no circular references
-    assert parent.id not in parent.child_corpus_ids, (
+    assert parent.uuid not in parent.child_uuids, (
         f"Parent {parent.corpus_name} references itself as child"
     )
 
     for child in children:
-        assert child.id != parent.id, "Child has same ID as parent"
+        assert child.uuid != parent.uuid, "Child has same UUID as parent"
 
     return True
 
@@ -168,17 +168,17 @@ def create_corpus_tree(
     tree = {}
     counter = 0
 
-    def create_node(level: int, parent_id: str | None = None) -> Corpus.Metadata:
+    def create_node(level: int, parent_uuid: str | None = None) -> Corpus.Metadata:
         nonlocal counter
         counter += 1
 
-        is_root = parent_id is None
+        is_root = parent_uuid is None
         corpus = Corpus.Metadata(
             corpus_name=f"Corpus_L{level}_N{counter}",
             corpus_type="LANGUAGE" if is_root else "LITERATURE",
             is_master=is_root,
-            parent_corpus_id=parent_id,
-            child_corpus_ids=[],
+            parent_uuid=parent_uuid,
+            child_uuids=[],
             content_inline={
                 "vocabulary": create_test_vocabulary(vocab_size, unicode_ratio=0.1, seed=counter),
             },
@@ -189,8 +189,8 @@ def create_corpus_tree(
         # Create children recursively
         if level < depth - 1:
             for _ in range(branching_factor):
-                child = create_node(level + 1, corpus.id)
-                corpus.child_corpus_ids.append(child.id)
+                child = create_node(level + 1, corpus.uuid)
+                corpus.child_uuids.append(child.uuid)
 
         return corpus
 
@@ -229,15 +229,15 @@ def calculate_tree_stats(root: Corpus.Metadata, all_nodes: dict[str, Corpus.Meta
         stats["total_vocabulary"].update(vocab)
 
         # Count children
-        child_count = len(node.child_corpus_ids)
+        child_count = len(node.child_uuids)
         stats["max_children"] = max(stats["max_children"], child_count)
 
         if child_count == 0:
             stats["leaf_count"] += 1
 
         # Traverse children
-        for child_id in node.child_corpus_ids:
-            child = next((n for n in all_nodes.values() if n.id == child_id), None)
+        for child_uuid in node.child_uuids:
+            child = next((n for n in all_nodes.values() if n.uuid == child_uuid), None)
             if child:
                 traverse(child, depth + 1)
 
@@ -246,7 +246,7 @@ def calculate_tree_stats(root: Corpus.Metadata, all_nodes: dict[str, Corpus.Meta
     # Calculate average children
     non_leaf_count = stats["total_nodes"] - stats["leaf_count"]
     if non_leaf_count > 0:
-        total_children = sum(len(n.child_corpus_ids) for n in all_nodes.values())
+        total_children = sum(len(n.child_uuids) for n in all_nodes.values())
         stats["avg_children_per_node"] = total_children / non_leaf_count
 
     stats["unique_vocabulary_count"] = len(stats["total_vocabulary"])

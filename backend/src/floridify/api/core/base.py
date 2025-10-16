@@ -12,6 +12,7 @@ from typing import Any, Generic, TypeVar
 from beanie import Document, PydanticObjectId
 from beanie.odm.enums import SortDirection
 from beanie.operators import In
+from bson.errors import InvalidId
 from fastapi import Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,6 +24,55 @@ from .protocols import (
     format_datetime,
     serialize_for_response,
 )
+
+
+def safe_parse_objectid(id_str: str, field_name: str = "id") -> PydanticObjectId:
+    """Safely parse an ObjectId string with validation.
+
+    CRITICAL FIX #9: Prevents InvalidId errors from malformed ObjectId strings.
+    Validates format before attempting to construct PydanticObjectId.
+
+    Args:
+        id_str: String to parse as ObjectId
+        field_name: Name of the field for error messages
+
+    Returns:
+        Valid PydanticObjectId
+
+    Raises:
+        ValueError: If the string is not a valid ObjectId format
+
+    Examples:
+        >>> safe_parse_objectid("507f1f77bcf86cd799439011")
+        PydanticObjectId('507f1f77bcf86cd799439011')
+        >>> safe_parse_objectid("invalid")
+        ValueError: Invalid ObjectId format for field 'id': 'invalid'
+    """
+    if not id_str:
+        raise ValueError(f"Empty value for {field_name}, expected valid ObjectId")
+
+    # Check basic format requirements (24 hex characters)
+    if not isinstance(id_str, str) or len(id_str) != 24:
+        raise ValueError(
+            f"Invalid ObjectId format for field '{field_name}': '{id_str}'. "
+            f"Expected 24 hexadecimal characters."
+        )
+
+    # Check if all characters are valid hex
+    if not all(c in "0123456789abcdefABCDEF" for c in id_str):
+        raise ValueError(
+            f"Invalid ObjectId format for field '{field_name}': '{id_str}'. "
+            f"Contains non-hexadecimal characters."
+        )
+
+    # Attempt to construct ObjectId with exception handling
+    try:
+        return PydanticObjectId(id_str)
+    except (InvalidId, ValueError) as e:
+        raise ValueError(
+            f"Failed to parse ObjectId for field '{field_name}': '{id_str}'. "
+            f"Error: {e}"
+        ) from e
 
 
 class PaginationParams(BaseModel):
@@ -189,8 +239,8 @@ class BaseRepository(ABC, Generic[T, CreateSchema, UpdateSchema]):  # noqa: UP04
 
     async def get_many(self, ids: builtins.list[PydanticObjectId | str]) -> builtins.list[T]:
         """Get multiple documents by IDs efficiently."""
-        # Convert string IDs to ObjectId
-        object_ids = [PydanticObjectId(id) if isinstance(id, str) else id for id in ids]
+        # CRITICAL FIX #9: Use safe ObjectId parsing to prevent InvalidId errors
+        object_ids = [safe_parse_objectid(id, "id") if isinstance(id, str) else id for id in ids]
 
         # Fetch all documents in one query
         docs = await self.model.find(In(self.model.id, object_ids)).to_list()

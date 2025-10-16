@@ -42,7 +42,6 @@ if platform.machine() == "arm64" and platform.system() == "Darwin":
     os.environ["OPENBLAS_NUM_THREADS"] = "1"  # Not used on Apple Silicon
 else:
     # Intel/AMD: Standard multi-threading
-    import multiprocessing
 
     num_cores = multiprocessing.cpu_count()
     os.environ["OMP_NUM_THREADS"] = str(min(4, num_cores))  # Cap at 4 for stability
@@ -74,6 +73,7 @@ from .constants import (
     MATRYOSHKA_MODELS,
     MODEL_DIMENSIONS,
 )
+import multiprocessing
 
 # from .storage import get_wotd_storage  # Import lazily to avoid circular imports
 

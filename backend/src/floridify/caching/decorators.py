@@ -114,7 +114,9 @@ def cached_api_call(
             headers = None
             if include_headers:
                 request = kwargs.get("request")
-                if request and hasattr(request, "headers"):
+                # PATHOLOGICAL REMOVAL: No hasattr - direct attribute access
+                # FastAPI Request always has headers attribute
+                if request:
                     # Include select headers that might affect response
                     relevant_headers = {"accept-language", "accept-encoding"}
                     headers = {
@@ -396,7 +398,9 @@ def cached_api_call_with_dedup(
             headers = None
             if include_headers:
                 request = kwargs.get("request")
-                if request and hasattr(request, "headers"):
+                # PATHOLOGICAL REMOVAL: No hasattr - direct attribute access
+                # FastAPI Request always has headers attribute
+                if request:
                     # Include select headers that might affect response
                     relevant_headers = {"accept-language", "accept-encoding"}
                     headers = {

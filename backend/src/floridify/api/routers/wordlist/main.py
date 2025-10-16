@@ -30,6 +30,7 @@ from ...repositories import (
     WordListRepository,
     WordListUpdate,
 )
+from datetime import datetime
 
 router = APIRouter()
 
@@ -155,7 +156,6 @@ async def generate_wordlist_slug() -> dict[str, str]:
         return {"name": slug_name}
     except Exception:
         # Fallback to a simple timestamp-based name if generation fails
-        from datetime import datetime
 
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         return {"name": f"wordlist-{timestamp}"}

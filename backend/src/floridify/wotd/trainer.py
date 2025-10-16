@@ -73,6 +73,11 @@ from .encoders import get_semantic_encoder
 from .generator import generate_training_data
 from .literature import LiteratureCorpusBuilder
 from .storage import get_wotd_storage
+from pathlib import Path
+import asyncio
+import hashlib
+import json
+import time
 
 logger = get_logger(__name__)
 
@@ -548,7 +553,6 @@ class WOTDTrainer:
                         targets.append([style_idx, complexity_idx, era_idx, variation_idx])
                     except (ValueError, IndexError):
                         # Fallback to random but consistent targets
-                        import hashlib
 
                         h = int(hashlib.md5(corpus_id.encode()).hexdigest()[:8], 16)
                         targets.append([h % 8, (h >> 3) % 8, (h >> 6) % 8, (h >> 9) % 5])
@@ -715,7 +719,6 @@ class WOTDTrainer:
 
         # Save semantic IDs as JSON
         semantic_ids_path = models_dir / self.SEMANTIC_IDS_FILE
-        import json
 
         with open(semantic_ids_path, "w") as f:
             # Convert tuples to lists for JSON serialization
@@ -944,7 +947,6 @@ class WOTDTrainer:
         ]
 
         # Process variations in batches for efficiency
-        import asyncio
 
         from ..ai.models import LiteratureAugmentationRequest
 
@@ -1172,9 +1174,6 @@ class WOTDTrainer:
         output_dir: str,
     ) -> TrainingResults:
         """Train complete pipeline from provided corpora."""
-        import json
-        import time
-        from pathlib import Path
 
         start_time = time.time()
 

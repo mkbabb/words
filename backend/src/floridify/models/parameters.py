@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 from .base import Language
 from .dictionary import DictionaryProvider
@@ -323,6 +323,7 @@ class CorpusCreateParams(BaseModel):
     vocabulary: list[str] = Field(
         default_factory=list,
         description="Initial vocabulary words",
+        validation_alias=AliasChoices("vocabulary", "words"),  # Backward compatibility
     )
     enable_semantic: bool = Field(
         default=False,

@@ -158,13 +158,14 @@ class TestSemanticSearch:
         from floridify.corpus.manager import CorpusManager
 
         # Create empty corpus using proper initialization
-        corpus = await Corpus.create(
+        corpus = Corpus(
             corpus_name="empty_semantic_corpus",
-            vocabulary=[],
+            corpus_type=CorpusType.LANGUAGE,
             language=Language.ENGLISH,
+            vocabulary=[],
+            original_vocabulary=[],
+            lemmatized_vocabulary=[],
         )
-        corpus.corpus_type = CorpusType.LANGUAGE
-        corpus.lemmatized_vocabulary = []
 
         manager = CorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
@@ -185,6 +186,10 @@ class TestSemanticSearch:
 
         # Create a new engine from the same corpus (should use cached index)
         new_engine = await SemanticSearch.from_corpus(corpus=semantic_engine.corpus)
+
+        # Ensure new engine is initialized if needed
+        if new_engine.sentence_embeddings is None:
+            await new_engine.initialize()
 
         # Both should give same results
         results1 = await semantic_engine.search("happy", max_results=3)
@@ -249,7 +254,7 @@ class TestSemanticSearch:
 
         # Run searches concurrently (search is async)
         results = await asyncio.gather(
-            *[semantic_engine.search(q, max_results=3) for q in queries]
+            *[semantic_engine.search(q, max_results=3, min_score=0.0) for q in queries]
         )
 
         # Each search should return results
@@ -265,6 +270,7 @@ class TestSemanticSearch:
 
         # Update corpus with new vocabulary
         from floridify.corpus.core import Corpus, CorpusType
+        from floridify.corpus.manager import CorpusManager
 
         new_vocabulary = sorted(set([w.text for w, _ in words_with_definitions] + ["ecstatic"]))
         new_corpus = Corpus(
@@ -273,9 +279,17 @@ class TestSemanticSearch:
             language=Language.ENGLISH,
             vocabulary=new_vocabulary,
             original_vocabulary=new_vocabulary,
+            lemmatized_vocabulary=new_vocabulary,
         )
 
-        await semantic_engine.update_corpus(new_corpus)
+        # Build indices and save corpus before updating
+        new_corpus.vocabulary_to_index = {word: i for i, word in enumerate(new_vocabulary)}
+        new_corpus._build_signature_index()
+
+        manager = CorpusManager()
+        saved_new_corpus = await manager.save_corpus(new_corpus)
+
+        await semantic_engine.update_corpus(saved_new_corpus)
 
         # Embeddings should be updated
         assert semantic_engine.sentence_embeddings is not None

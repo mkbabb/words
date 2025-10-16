@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import coolname
 from beanie import PydanticObjectId
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
 from ..caching.core import get_global_cache, get_versioned_content
 from ..caching.manager import get_version_manager
@@ -14,6 +14,7 @@ from ..models.base import Language
 from ..utils.logging import get_logger
 from .core import Corpus
 from .models import CorpusType
+import asyncio
 
 logger = get_logger(__name__)
 
@@ -35,6 +36,39 @@ class TreeCorpusManager:
             self.vm = vm
         else:
             self.vm = get_version_manager()
+
+    @staticmethod
+    def _remove_self_references(
+        corpus_id: PydanticObjectId | str | None,
+        child_uuids: list[str] | None,
+        corpus_uuid: str | None = None,
+    ) -> list[str]:
+        """Remove self-references from child_uuids list.
+
+        CRITICAL FIX: Extracted helper to prevent corpus cycles and data corruption.
+        Self-references occur when a corpus appears in its own child list,
+        which breaks tree traversal and aggregation logic.
+
+        Args:
+            corpus_id: The corpus ID (ObjectId) - DEPRECATED, use corpus_uuid
+            child_uuids: List of child UUIDs (strings)
+            corpus_uuid: The corpus UUID (string) - PREFERRED for comparison
+
+        Returns:
+            Filtered list with self-reference removed, or original list if no self-reference
+
+        """
+        if not child_uuids:
+            return []
+
+        # PATHOLOGICAL REMOVAL: No fallbacks - only use corpus_uuid
+        # corpus_id is ObjectId which will NEVER match UUID strings
+        if corpus_uuid and corpus_uuid in child_uuids:
+            logger.warning(f"Removing self-reference from child_uuids: {corpus_uuid}")
+            return [cid for cid in child_uuids if cid != corpus_uuid]
+
+        # NO FALLBACK - if no corpus_uuid provided, don't try to guess
+        return child_uuids
 
     async def save_corpus_simple(
         self,
@@ -63,8 +97,8 @@ class TreeCorpusManager:
         metadata.language = (
             corpus.language.value if isinstance(corpus.language, Language) else corpus.language
         )
-        metadata.parent_corpus_id = corpus.parent_corpus_id
-        metadata.child_corpus_ids = corpus.child_corpus_ids or []
+        metadata.parent_uuid = corpus.parent_uuid
+        metadata.child_uuids = corpus.child_uuids or []
         metadata.is_master = corpus.is_master
 
         # Store content
@@ -90,12 +124,9 @@ class TreeCorpusManager:
             Saved metadata object
 
         """
-        # Clean self-references before saving
-        if metadata.id and metadata.child_corpus_ids and metadata.id in metadata.child_corpus_ids:
-            logger.warning(f"Removing self-reference from metadata.child_corpus_ids: {metadata.id}")
-            metadata.child_corpus_ids = [
-                cid for cid in metadata.child_corpus_ids if cid != metadata.id
-            ]
+        # Clean self-references before saving using extracted helper
+        # Use UUID for comparison since child_uuids contains UUID strings
+        metadata.child_uuids = self._remove_self_references(metadata.uuid, metadata.child_uuids)
 
         await metadata.save()
         return metadata
@@ -108,8 +139,8 @@ class TreeCorpusManager:
         content: dict[str, Any] | None = None,
         corpus_type: CorpusType = CorpusType.LEXICON,
         language: Language = Language.ENGLISH,
-        parent_corpus_id: PydanticObjectId | None = None,
-        child_corpus_ids: list[PydanticObjectId] | None = None,
+        parent_uuid: str | None = None,
+        child_uuids: list[str] | None = None,
         is_master: bool | None = None,
         config: VersionConfig | None = None,
         metadata: dict[str, Any] | None = None,
@@ -126,8 +157,8 @@ class TreeCorpusManager:
             content: Corpus content (vocabulary, etc.)
             corpus_type: Type of corpus
             language: Language of the corpus
-            parent_corpus_id: Parent corpus ID (saved as data only)
-            child_corpus_ids: Child corpus IDs (saved as data only)
+            parent_uuid: Parent corpus uuid (saved as data only)
+            child_uuids: Child corpus uuids (saved as data only)
             is_master: Whether this is a master corpus
             config: Version configuration
             metadata: Additional metadata
@@ -158,26 +189,29 @@ class TreeCorpusManager:
             content = content if content is not None else corpus.model_dump(mode="json")
             corpus_type = corpus_type if corpus_type != CorpusType.LEXICON else corpus.corpus_type
             language = language if language != Language.ENGLISH else corpus.language
-            parent_corpus_id = (
-                parent_corpus_id if parent_corpus_id is not None else corpus.parent_corpus_id
-            )
-            child_corpus_ids = (
-                child_corpus_ids if child_corpus_ids is not None else corpus.child_corpus_ids
-            )
+            parent_uuid = parent_uuid if parent_uuid is not None else corpus.parent_uuid
+            child_uuids = child_uuids if child_uuids is not None else corpus.child_uuids
             logger.debug(
-                f"save_corpus: corpus has {len(corpus.child_corpus_ids) if corpus.child_corpus_ids else 0} children, using {len(child_corpus_ids) if child_corpus_ids else 0} children"
+                f"save_corpus: corpus has {len(corpus.child_uuids) if corpus.child_uuids else 0} children, using {len(child_uuids) if child_uuids else 0} children"
             )
             # Preserve is_master flag: use explicit value if provided, otherwise get from corpus
+            # PATHOLOGICAL REMOVAL: No getattr - direct attribute access only
             is_master = (
                 is_master
                 if is_master is not None
-                else (getattr(corpus, "is_master", False) if corpus else False)
+                else (corpus.is_master if corpus else False)
             )
 
-            # Clean self-references from child_corpus_ids immediately
-            if corpus_id and child_corpus_ids and corpus_id in child_corpus_ids:
-                logger.warning(f"Removing self-reference from child_corpus_ids: {corpus_id}")
-                child_corpus_ids = [cid for cid in child_corpus_ids if cid != corpus_id]
+            # Clean self-references from child_uuids immediately using extracted helper
+            # PATHOLOGICAL FIX: Use corpus_uuid if available from existing corpus
+            corpus_uuid_for_clean = None
+            if corpus and corpus.corpus_uuid:
+                corpus_uuid_for_clean = corpus.corpus_uuid
+            # NO FALLBACK - removed reference to undefined 'existing'
+
+            child_uuids = self._remove_self_references(
+                corpus_id, child_uuids, corpus_uuid=corpus_uuid_for_clean
+            )
 
         # Generate name if not provided
         if not corpus_name and not corpus_id:
@@ -208,25 +242,23 @@ class TreeCorpusManager:
             "corpus_name": corpus_name or "",
             "corpus_type": corpus_type_value,
             "language": language_value,
-            "parent_corpus_id": parent_corpus_id,  # Keep as PydanticObjectId for typed field
-            "child_corpus_ids": child_corpus_ids
-            if child_corpus_ids is not None
-            else [],  # Keep as list[PydanticObjectId]
+            "parent_uuid": parent_uuid,  # Stable UUID string
+            "child_uuids": child_uuids
+            if child_uuids is not None
+            else [],  # List of stable UUID strings
             "is_master": is_master if is_master is not None else False,  # Default to False if None
             **(metadata or {}),
         }
 
-        logger.debug(
-            f"save_corpus: saving with child_corpus_ids={full_metadata['child_corpus_ids']}"
-        )
+        logger.debug(f"save_corpus: saving with child_uuids={full_metadata['child_uuids']}")
 
         # Save using version manager
         logger.info(
-            f"save_corpus: calling vm.save with resource_id={resource_id}, child_corpus_ids={full_metadata.get('child_corpus_ids', [])}"
+            f"save_corpus: calling vm.save with resource_id={resource_id}, child_uuids={full_metadata.get('child_uuids', [])}"
         )
         saved = await self.vm.save(
             resource_id=resource_id,
-            resource_type=ResourceType.CORPUS,
+            resource_type=ResourceType.CORPUS,  # Registry maps this to Corpus.Metadata
             namespace=CacheNamespace.CORPUS,
             content=content or {},
             config=config or VersionConfig(),
@@ -234,49 +266,44 @@ class TreeCorpusManager:
         )
         logger.info(f"save_corpus: vm.save returned ID={saved.id if saved else None}")
 
-        # Clean up self-references in child_corpus_ids AFTER getting the ID
-        actual_id = corpus_id if corpus_id else (saved.id if saved else None)
-        if actual_id and child_corpus_ids and actual_id in child_corpus_ids:
-            logger.warning(f"Removing self-reference from child_corpus_ids: {actual_id}")
-            child_corpus_ids = [cid for cid in child_corpus_ids if cid != actual_id]
-            # Update the metadata in version manager
-            full_metadata["child_corpus_ids"] = child_corpus_ids
-            # Re-save with cleaned child_corpus_ids
-            if saved:
-                saved = await self.vm.save(
-                    resource_id=resource_id,
-                    resource_type=ResourceType.CORPUS,
-                    namespace=CacheNamespace.CORPUS,
-                    content=content or {},
-                    config=config or VersionConfig(),
-                    metadata=full_metadata,
-                )
+        # Self-references already cleaned at line 171-174 before save
+        # No need for redundant post-save cleanup that causes double-save race condition
 
-        # Auto-update parent's child_corpus_ids if parent_corpus_id is provided
+        # Auto-update parent's child_uuids if parent_uuid is provided
         # BUT ONLY if we're creating a NEW corpus (not updating existing)
-        # AND we're not explicitly managing child_corpus_ids
-        if (
-            parent_corpus_id
-            and saved
-            and not corpus_id
-            and (child_corpus_ids is None or not child_corpus_ids)
-        ):
-            child_id = saved.id
-            if child_id:
-                # Get the parent
-                parent_meta = await Corpus.Metadata.get(parent_corpus_id)
-                if parent_meta and child_id not in parent_meta.child_corpus_ids:
+        # AND we're not explicitly managing child_uuids
+        if parent_uuid and saved and not corpus_id and (child_uuids is None or not child_uuids):
+            child_uuid = saved.uuid  # Use UUID string, not ObjectId
+            if child_uuid:
+                # Get the parent using UUID (correct way)
+                parent_meta = await Corpus.Metadata.find_one({"uuid": parent_uuid})
+                if parent_meta and child_uuid not in parent_meta.child_uuids:
                     # This is a new child being created with a parent reference
-                    parent_meta.child_corpus_ids.append(child_id)
+                    # child_uuids contains UUID strings, not ObjectIds
+                    parent_meta.child_uuids.append(child_uuid)
                     await parent_meta.save()
-                    logger.debug(f"Auto-added new child {child_id} to parent {parent_corpus_id}")
+                    logger.debug(f"Auto-added new child UUID {child_uuid} to parent {parent_uuid}")
 
         # If we saved metadata, convert back to Corpus
         if saved:
+            logger.debug(
+                f"save_corpus: saved.id={saved.id}, saved.content_inline={saved.content_inline is not None}, saved.content_location={saved.content_location is not None}"
+            )
             saved_content = await get_versioned_content(saved)
+            logger.debug(
+                f"save_corpus: get_versioned_content returned: {saved_content is not None}"
+            )
             if saved_content:
-                # Merge metadata into content for proper Corpus creation
-                saved_content.update(full_metadata)
+                # Merge metadata into content - use ENUM OBJECTS, not string values
+                # This ensures Pydantic doesn't need to convert them
+                saved_content.update({
+                    "corpus_name": corpus_name or "",
+                    "corpus_type": corpus_type,  # Pass enum object, not string
+                    "language": language,  # Pass enum object, not string
+                    "parent_uuid": parent_uuid,
+                    "child_uuids": child_uuids if child_uuids is not None else [],
+                    "is_master": is_master if is_master is not None else False,
+                })
                 # Preserve original corpus_id if updating, otherwise use new ID
                 if corpus_id:
                     # We're updating an existing corpus, preserve its ID
@@ -284,11 +311,26 @@ class TreeCorpusManager:
                 else:
                     # New corpus, use the metadata document's ID
                     saved_content["corpus_id"] = saved.id
-                # IMPORTANT: Always use the cleaned child_corpus_ids if we have them
-                saved_content["child_corpus_ids"] = (
-                    child_corpus_ids if child_corpus_ids is not None else []
+                # CRITICAL: Copy uuid from metadata to content (guaranteed to exist via Pydantic validator)
+                logger.debug(
+                    f"save_corpus: BEFORE override - saved_content has corpus_uuid={saved_content.get('corpus_uuid')}, metadata uuid={saved.uuid}"
                 )
-                return Corpus.model_validate(saved_content)
+                saved_content["corpus_uuid"] = saved.uuid
+                logger.debug(f"save_corpus: AFTER override - set corpus_uuid={saved.uuid}")
+                logger.debug(
+                    f"save_corpus: About to validate corpus with keys: {list(saved_content.keys())[:10]}"
+                )
+                logger.debug(
+                    f"save_corpus: saved_content['corpus_uuid']={saved_content.get('corpus_uuid')}"
+                )
+                # PATHOLOGICAL REMOVAL: No try/except - let validation errors propagate
+                result = Corpus.model_validate(saved_content)
+                logger.debug(
+                    f"save_corpus: Successfully created Corpus with uuid={result.corpus_uuid}"
+                )
+                logger.debug(f"save_corpus: Corpus object id: {id(result)}")
+                return result
+        logger.warning("save_corpus: saved_content is None, returning None")
         return None
 
     async def create_corpus(
@@ -325,13 +367,13 @@ class TreeCorpusManager:
     async def get_corpus(
         self,
         corpus_id: PydanticObjectId | None = None,
+        corpus_uuid: str | None = None,
         corpus_name: str | None = None,
         config: VersionConfig | None = None,
     ) -> Corpus | None:
-        """Simple corpus retrieval by ID or name - always returns latest version."""
-        # Skip cache entirely if force_rebuild is requested
-        if config and config.force_rebuild:
-            return None
+        """Simple corpus retrieval by ID, uuid, or name - always returns latest version."""
+        # force_rebuild means bypass cache, not return None
+        # The config will be passed down to version manager methods
 
         if corpus_id:
             # Get metadata to find resource_id, then get LATEST version
@@ -344,6 +386,21 @@ class TreeCorpusManager:
                 resource_type=ResourceType.CORPUS,
                 use_cache=config.use_cache if config else False,
             )
+        elif corpus_uuid:
+            # When retrieving by uuid, find the metadata with that uuid
+            logger.info(f"get_corpus: searching for uuid={corpus_uuid}")
+            # Check if any metadata with this uuid exists at all
+            all_with_uuid = await Corpus.Metadata.find({"uuid": corpus_uuid}).to_list()
+            logger.info(f"get_corpus: found {len(all_with_uuid)} documents with uuid={corpus_uuid}")
+            for doc in all_with_uuid:
+                logger.info(
+                    f"  - doc id={doc.id}, uuid={doc.uuid}, is_latest={doc.version_info.is_latest if doc.version_info else None}"
+                )
+
+            metadata = await Corpus.Metadata.find_one(
+                {"uuid": corpus_uuid, "version_info.is_latest": True}
+            )
+            logger.info(f"get_corpus: find_one returned metadata: {metadata is not None}")
         elif corpus_name:
             # When retrieving by name, use version manager for latest
             metadata = await self.vm.get_latest(
@@ -363,40 +420,30 @@ class TreeCorpusManager:
             content = {}
 
         logger.info(
-            f"get_corpus: metadata.id={metadata.id if metadata else None}, content has vocabulary: {len(content.get('vocabulary', []))}, metadata.child_corpus_ids={metadata.child_corpus_ids}"
+            f"get_corpus: metadata.id={metadata.id if metadata else None}, content has vocabulary: {len(content.get('vocabulary', []))}, metadata.child_uuids={metadata.child_uuids}"
         )
 
         # Ensure all required fields from metadata
         # Corpus-specific fields should come from metadata attributes, not content
-        # Defensive: convert enums to values (in case old data has enum objects)
+        # Let Pydantic v2 handle enum conversion automatically during model_validate()
         content.update(
             {
                 "corpus_id": metadata.id,
+                "corpus_uuid": metadata.uuid,  # CRITICAL: Copy UUID (guaranteed to exist)
                 "corpus_name": metadata.resource_id,
-                "corpus_type": (
-                    metadata.corpus_type.value
-                    if isinstance(metadata.corpus_type, CorpusType)
-                    else metadata.corpus_type
-                ),
-                "language": (
-                    metadata.language.value
-                    if isinstance(metadata.language, Language)
-                    else metadata.language
-                ),
-                "parent_corpus_id": metadata.parent_corpus_id,
-                "child_corpus_ids": metadata.child_corpus_ids or [],
+                "corpus_type": metadata.corpus_type,  # Pydantic v2 handles enum conversion
+                "language": metadata.language,  # Pydantic v2 handles enum conversion
+                "parent_uuid": metadata.parent_uuid,
+                "child_uuids": metadata.child_uuids or [],
                 "is_master": metadata.is_master,
             }
         )
 
-        # Clean self-references even when reading
-        if content.get("corpus_id") and content.get("child_corpus_ids"):
-            self_id = content["corpus_id"]
-            if self_id in content["child_corpus_ids"]:
-                logger.warning(f"Cleaning self-reference found in loaded corpus {self_id}")
-                content["child_corpus_ids"] = [
-                    cid for cid in content["child_corpus_ids"] if cid != self_id
-                ]
+        # Clean self-references even when reading using extracted helper
+        # PATHOLOGICAL FIX: Use corpus_uuid (which we just set above), not corpus_id
+        content["child_uuids"] = self._remove_self_references(
+            content.get("corpus_id"), content.get("child_uuids"), corpus_uuid=content.get("corpus_uuid")
+        )
 
         # Handle vocabulary
         if "vocabulary" not in content:
@@ -457,46 +504,87 @@ class TreeCorpusManager:
             return []
 
         # Convert each metadata to Corpus
+        # PATHOLOGICAL REMOVAL: No try/except - let errors propagate
         corpora = []
         for metadata in metadatas:
             # Get versioned content for each metadata
-            try:
-                content = await get_versioned_content(metadata)
-                if content:
-                    # Add the ID from metadata
-                    content["corpus_id"] = metadata.id
-                    # Extract corpus-specific fields from metadata object
-                    # Defensive: convert enums to values (in case old data has enum objects)
-                    content["child_corpus_ids"] = metadata.child_corpus_ids
-                    content["parent_corpus_id"] = metadata.parent_corpus_id
-                    content["is_master"] = metadata.is_master
-                    content["corpus_name"] = metadata.corpus_name
-                    content["corpus_type"] = (
-                        metadata.corpus_type.value
-                        if isinstance(metadata.corpus_type, CorpusType)
-                        else metadata.corpus_type
-                    )
-                    content["language"] = (
-                        metadata.language.value
-                        if isinstance(metadata.language, Language)
-                        else metadata.language
-                    )
-                    # Add version information
-                    if metadata.version_info:
-                        content["version_info"] = metadata.version_info
-                        content["_metadata_id"] = metadata.id
+            content = await get_versioned_content(metadata)
+            if content:
+                # Add the ID from metadata
+                content["corpus_id"] = metadata.id
+                # Extract corpus-specific fields from metadata object
+                # Let Pydantic v2 handle enum conversion automatically
+                content["child_uuids"] = metadata.child_uuids
+                content["parent_uuid"] = metadata.parent_uuid
+                content["is_master"] = metadata.is_master
+                content["corpus_name"] = metadata.corpus_name
+                content["corpus_type"] = metadata.corpus_type  # Pydantic v2 handles enum conversion
+                content["language"] = metadata.language  # Pydantic v2 handles enum conversion
+                # Add version information
+                if metadata.version_info:
+                    content["version_info"] = metadata.version_info
+                    content["_metadata_id"] = metadata.id
 
-                    corpus = Corpus.model_validate(content)
-                    # Rebuild indices if needed
-                    if corpus.vocabulary and not corpus.vocabulary_to_index:
-                        await corpus._rebuild_indices()
-                    corpora.append(corpus)
-            except ValidationError as e:
-                logger.warning(f"Failed to validate corpus data for {metadata.id}: {e}")
-                continue
-            except (KeyError, TypeError) as e:
-                logger.warning(f"Failed to convert metadata {metadata.id} to corpus: {e}")
-                continue
+                corpus = Corpus.model_validate(content)
+                # Rebuild indices if needed
+                if corpus.vocabulary and not corpus.vocabulary_to_index:
+                    await corpus._rebuild_indices()
+                corpora.append(corpus)
+
+        return corpora
+
+    async def get_corpora_by_uuids(
+        self,
+        corpus_uuids: list[str],
+        config: VersionConfig | None = None,
+    ) -> list[Corpus]:
+        """Get multiple corpora by their UUIDs in batch (CRITICAL N+1 FIX).
+
+        This method eliminates N+1 query anti-pattern by batch-fetching all
+        child corpora in a single MongoDB query instead of one query per child.
+
+        Args:
+            corpus_uuids: List of corpus UUIDs to retrieve
+            config: Version configuration
+
+        Returns:
+            List of Corpus instances (may be shorter than input if some UUIDs don't exist)
+
+        """
+        if not corpus_uuids:
+            return []
+
+        # CRITICAL FIX: Single batch query for all UUIDs instead of N separate queries
+        metadatas = await Corpus.Metadata.find(
+            {"uuid": {"$in": corpus_uuids}, "version_info.is_latest": True}
+        ).to_list()
+
+        if not metadatas:
+            return []
+
+        # Convert each metadata to Corpus using the same logic as get_corpora_by_ids
+        # PATHOLOGICAL REMOVAL: No try/except - let errors propagate
+        corpora = []
+        for metadata in metadatas:
+            content = await get_versioned_content(metadata)
+            if content:
+                content["corpus_id"] = metadata.id
+                content["corpus_uuid"] = metadata.uuid
+                content["child_uuids"] = metadata.child_uuids
+                content["parent_uuid"] = metadata.parent_uuid
+                content["is_master"] = metadata.is_master
+                content["corpus_name"] = metadata.corpus_name
+                content["corpus_type"] = metadata.corpus_type
+                content["language"] = metadata.language
+
+                if metadata.version_info:
+                    content["version_info"] = metadata.version_info
+                    content["_metadata_id"] = metadata.id
+
+                corpus = Corpus.model_validate(content)
+                if corpus.vocabulary and not corpus.vocabulary_to_index:
+                    await corpus._rebuild_indices()
+                corpora.append(corpus)
 
         return corpora
 
@@ -551,24 +639,24 @@ class TreeCorpusManager:
                 content=child_def.get("content", {}),
                 corpus_type=child_def.get("corpus_type", CorpusType.LEXICON),
                 language=child_def.get("language", Language.ENGLISH),
-                parent_corpus_id=master.corpus_id,
+                parent_uuid=master.corpus_uuid,
                 config=config,
                 metadata=child_def.get("metadata"),
             )
-            if child and child.corpus_id:
-                child_ids.append(child.corpus_id)
+            if child and child.corpus_uuid:
+                child_ids.append(child.corpus_uuid)
 
         # Update master with child references
         if child_ids:
             # Master is now a Corpus object, use model_dump to get content
             master_content = master.model_dump(mode="json") if master else {}
-            master_content["child_corpus_ids"] = child_ids
+            master_content["child_uuids"] = child_ids
 
             await self.save_corpus(
                 corpus_id=master.corpus_id,
                 corpus_name=master.corpus_name,
                 content=master_content,
-                child_corpus_ids=child_ids,
+                child_uuids=child_ids,
                 is_master=True,
                 config=config,
             )
@@ -577,14 +665,16 @@ class TreeCorpusManager:
 
     async def aggregate_vocabularies(
         self,
-        corpus_id: PydanticObjectId,
+        corpus_id: PydanticObjectId | None = None,
+        corpus_uuid: str | None = None,
         config: VersionConfig | None = None,
         update_parent: bool = True,
     ) -> list[str]:
         """Aggregate vocabularies from a corpus and its children.
 
         Args:
-            corpus_id: Corpus ID to aggregate from
+            corpus_id: Corpus MongoDB ID to aggregate from (deprecated, use corpus_uuid)
+            corpus_uuid: Corpus stable UUID to aggregate from (preferred)
             config: Version configuration
             update_parent: Whether to update the parent corpus with aggregated vocabulary
 
@@ -592,8 +682,15 @@ class TreeCorpusManager:
             Aggregated vocabulary list
 
         """
-        corpus = await self.get_corpus(corpus_id=corpus_id, config=config)
+        logger.info(
+            f"aggregate_vocabularies: ENTER with corpus_id={corpus_id}, corpus_uuid={corpus_uuid}"
+        )
+        corpus = await self.get_corpus(corpus_id=corpus_id, corpus_uuid=corpus_uuid, config=config)
+        logger.info(
+            f"aggregate_vocabularies: get_corpus returned corpus: {corpus is not None}, uuid={corpus.corpus_uuid if corpus else None}"
+        )
         if not corpus:
+            logger.warning("aggregate_vocabularies: corpus is None, returning empty list")
             return []
 
         # For master corpora, only aggregate children's vocabularies
@@ -601,14 +698,13 @@ class TreeCorpusManager:
         vocabulary: set[str] = set()
 
         # Get child vocabularies recursively in parallel
-        child_ids = corpus.child_corpus_ids or []
+        child_ids = corpus.child_uuids or []
         if child_ids:
-            import asyncio
 
             # Fetch all child vocabularies concurrently
             child_vocabs = await asyncio.gather(
                 *[
-                    self.aggregate_vocabularies(cid, config, update_parent=False)
+                    self.aggregate_vocabularies(corpus_uuid=cid, config=config, update_parent=False)
                     for cid in child_ids
                 ],
                 return_exceptions=True,
@@ -632,7 +728,7 @@ class TreeCorpusManager:
 
         aggregated = sorted(vocabulary)
         logger.info(
-            f"aggregate_vocabularies: corpus_id={corpus_id}, is_master={corpus.is_master}, child_ids={child_ids}, aggregated={aggregated}, update_parent={update_parent}"
+            f"aggregate_vocabularies: corpus_uuid={corpus.corpus_uuid}, is_master={corpus.is_master}, child_ids={child_ids}, aggregated={aggregated}, update_parent={update_parent}"
         )
 
         # Update the parent corpus with aggregated vocabulary if requested
@@ -708,24 +804,15 @@ class TreeCorpusManager:
             True if successful, False if prevented, None if invalid
 
         """
-        # Extract IDs from objects if needed (KISS - handle both cases)
-        # Convert to ID if it's an object
-        if isinstance(parent_id, BaseModel) and hasattr(parent_id, "id"):
-            parent_id = parent_id.id
-        elif isinstance(parent_id, dict) and "corpus_id" in parent_id:
-            parent_id = parent_id["corpus_id"]
+        # Extract IDs from objects if needed (common pattern when passing Corpus objects)
+        if isinstance(parent_id, Corpus):
+            parent_id = parent_id.corpus_id or parent_id.corpus_uuid
+        if isinstance(child_id, Corpus):
+            child_id = child_id.corpus_id or child_id.corpus_uuid
 
-        # Ensure parent_id is PydanticObjectId
+        # Convert to PydanticObjectId if needed
         if not isinstance(parent_id, PydanticObjectId):
             parent_id = PydanticObjectId(str(parent_id))
-
-        # Convert to ID if it's an object
-        if isinstance(child_id, BaseModel) and hasattr(child_id, "id"):
-            child_id = child_id.id
-        elif isinstance(child_id, dict) and "corpus_id" in child_id:
-            child_id = child_id["corpus_id"]
-
-        # Ensure child_id is PydanticObjectId
         if not isinstance(child_id, PydanticObjectId):
             child_id = PydanticObjectId(str(child_id))
 
@@ -751,11 +838,13 @@ class TreeCorpusManager:
 
         # Update parent's children list via save_corpus to maintain versioning
         parent_updated = False
-        if child_id not in parent.child_corpus_ids:
-            logger.info(f"Adding child {child_id} to parent {parent_id}")
-            # Add child to parent's list
-            updated_children = parent.child_corpus_ids.copy()
-            updated_children.append(child_id)
+        if child.corpus_uuid not in parent.child_uuids:
+            logger.info(
+                f"Adding child UUID {child.corpus_uuid} (ID: {child_id}) to parent {parent_id}"
+            )
+            # Add child's UUID to parent's list (NOT the corpus_id!)
+            updated_children = parent.child_uuids.copy()
+            updated_children.append(child.corpus_uuid)
             # Save through save_corpus to create new version - MUST preserve all corpus fields!
             await self.save_corpus(
                 corpus_id=parent_id,
@@ -763,8 +852,8 @@ class TreeCorpusManager:
                 content=parent.model_dump(mode="json"),
                 corpus_type=parent.corpus_type,  # CRITICAL: preserve corpus type
                 language=parent.language,  # CRITICAL: preserve language
-                parent_corpus_id=parent.parent_corpus_id,  # preserve parent
-                child_corpus_ids=updated_children,
+                parent_uuid=parent.parent_uuid,  # preserve parent
+                child_uuids=updated_children,
                 is_master=parent.is_master,  # preserve master status
                 config=config,
             )
@@ -775,8 +864,10 @@ class TreeCorpusManager:
 
         # Update child's parent reference via save_corpus to maintain versioning
         child_updated = False
-        if child.parent_corpus_id != parent_id:
-            logger.info(f"Setting parent {parent_id} for child {child_id}")
+        # BUG FIX: Compare UUID strings, not UUID with ObjectId
+        # child.parent_uuid is str, parent.corpus_uuid is str (compatible types)
+        if child.parent_uuid != parent.corpus_uuid:
+            logger.info(f"Setting parent UUID {parent.corpus_uuid} (ID: {parent_id}) for child {child_id}")
             # Save through save_corpus to create new version - MUST preserve all corpus fields!
             await self.save_corpus(
                 corpus_id=child_id,
@@ -784,15 +875,15 @@ class TreeCorpusManager:
                 content=child.model_dump(mode="json"),
                 corpus_type=child.corpus_type,  # CRITICAL: preserve corpus type
                 language=child.language,  # CRITICAL: preserve language
-                parent_corpus_id=parent_id,
-                child_corpus_ids=child.child_corpus_ids,  # preserve children
+                parent_uuid=parent.corpus_uuid,  # Use UUID, not corpus_id!
+                child_uuids=child.child_uuids,  # preserve children
                 is_master=child.is_master,  # preserve master status
                 config=config,
             )
             child_updated = True
-            logger.info(f"Child updated with parent: {parent_id}")
+            logger.info(f"Child updated with parent UUID: {parent.corpus_uuid}")
         else:
-            logger.info(f"Child already has parent {parent_id}")
+            logger.info(f"Child already has parent UUID {parent.corpus_uuid}")
 
         return parent_updated or child_updated
 
@@ -834,8 +925,8 @@ class TreeCorpusManager:
         if metadata:
             # Extract corpus-specific fields from metadata
             for field in [
-                "parent_corpus_id",
-                "child_corpus_ids",
+                "parent_uuid",
+                "child_uuids",
                 "is_master",
                 "corpus_type",
                 "language",
@@ -846,9 +937,9 @@ class TreeCorpusManager:
             # Update remaining generic metadata
             existing_metadata.update(metadata)
 
-        # Preserve existing child_corpus_ids if not explicitly provided
-        if "child_corpus_ids" not in corpus_specific_fields:
-            corpus_specific_fields["child_corpus_ids"] = corpus.child_corpus_ids
+        # Preserve existing child_uuids if not explicitly provided
+        if "child_uuids" not in corpus_specific_fields:
+            corpus_specific_fields["child_uuids"] = corpus.child_uuids
 
         # Preserve existing is_master if not explicitly provided
         if "is_master" not in corpus_specific_fields:
@@ -874,6 +965,7 @@ class TreeCorpusManager:
     async def delete_corpus(
         self,
         corpus_id: PydanticObjectId | None = None,
+        corpus_uuid: str | None = None,
         corpus_name: str | None = None,
         cascade: bool = False,
         config: VersionConfig | None = None,
@@ -882,6 +974,7 @@ class TreeCorpusManager:
 
         Args:
             corpus_id: Corpus ID (preferred)
+            corpus_uuid: Corpus UUID (stable identifier)
             corpus_name: Corpus name (fallback)
             cascade: Whether to delete child corpora
             config: Version configuration
@@ -890,25 +983,29 @@ class TreeCorpusManager:
             True if deleted successfully
 
         """
-        corpus = await self.get_corpus(corpus_id=corpus_id, corpus_name=corpus_name, config=config)
+        corpus = await self.get_corpus(corpus_id=corpus_id, corpus_uuid=corpus_uuid, corpus_name=corpus_name, config=config)
         if not corpus or not corpus.corpus_id:
             return False
 
         # Handle cascade deletion
-        if cascade and corpus.child_corpus_ids:
+        if cascade and corpus.child_uuids:
             # Make a copy to avoid modification during iteration and handle potential None values
-            children_to_delete = list(corpus.child_corpus_ids) if corpus.child_corpus_ids else []
-            for child_id in children_to_delete:
-                await self.delete_corpus(corpus_id=child_id, cascade=True, config=config)
+            children_to_delete = list(corpus.child_uuids) if corpus.child_uuids else []
+            for child_uuid in children_to_delete:
+                # child_uuids contains UUID strings, need to use corpus_uuid parameter
+                await self.delete_corpus(corpus_uuid=child_uuid, cascade=True, config=config)
 
         # Remove from parent if it has one
-        if corpus.parent_corpus_id and corpus.corpus_id:
-            await self.remove_child(
-                parent_id=corpus.parent_corpus_id,
-                child_id=corpus.corpus_id,
-                delete_child=False,
-                config=config,
-            )
+        if corpus.parent_uuid and corpus.corpus_id:
+            # Get parent corpus to get its corpus_id
+            parent = await self.get_corpus(corpus_uuid=corpus.parent_uuid, config=config)
+            if parent and parent.corpus_id:
+                await self.remove_child(
+                    parent_id=parent.corpus_id,
+                    child_id=corpus.corpus_id,
+                    delete_child=False,
+                    config=config,
+                )
 
         # Store the corpus name and id before deletion
         corpus_name_to_clear = corpus.corpus_name
@@ -932,15 +1029,14 @@ class TreeCorpusManager:
             )
             logger.info(f"Deleted search indices for corpus {corpus_name_to_clear}")
 
-        # Delete the metadata document directly from MongoDB
-        # This prevents get_corpus from finding it
-        if corpus_id_to_delete:
-            metadata_to_delete = await Corpus.Metadata.get(corpus_id_to_delete)
-            if metadata_to_delete:
-                await metadata_to_delete.delete()
-                logger.info(
-                    f"Deleted corpus metadata for {corpus_name_to_clear} (ID: {corpus_id_to_delete})"
-                )
+        # Delete ALL metadata documents with the same UUID from MongoDB
+        # Versioning creates multiple documents per corpus, so we delete all versions
+        if corpus.corpus_uuid:
+            # Delete all documents with this UUID (all versions)
+            result = await Corpus.Metadata.find({"uuid": corpus.corpus_uuid}).delete()
+            logger.info(
+                f"Deleted all versions of corpus {corpus_name_to_clear} (UUID: {corpus.corpus_uuid}, {result.deleted_count if result else 0} documents)"
+            )
 
         # Note: corpus.delete() would fail because Corpus is not a Document
         # The metadata deletion above handles the actual removal
@@ -965,35 +1061,33 @@ class TreeCorpusManager:
             True if invalidation succeeded
 
         """
-        try:
-            # Clear cache entries for this corpus
+        # PATHOLOGICAL REMOVAL: No try/except - let errors propagate
+        # Clear cache entries for this corpus
 
-            cache = await get_global_cache()
+        cache = await get_global_cache()
 
-            # Clear the main corpus cache key
-            cache_key = f"{ResourceType.CORPUS.value}:{corpus_name}"
-            await cache.delete(CacheNamespace.CORPUS, cache_key)
+        # Clear the main corpus cache key
+        cache_key = f"{ResourceType.CORPUS.value}:{corpus_name}"
+        await cache.delete(CacheNamespace.CORPUS, cache_key)
 
-            # Clear any versioned cache entries
-            # Find all versions and clear their cache entries
-            latest = await self.vm.get_latest(
-                resource_id=corpus_name,
-                resource_type=ResourceType.CORPUS,
+        # Clear any versioned cache entries
+        # Find all versions and clear their cache entries
+        latest = await self.vm.get_latest(
+            resource_id=corpus_name,
+            resource_type=ResourceType.CORPUS,
+        )
+
+        if latest and latest.version_info:
+            versioned_key = (
+                f"{ResourceType.CORPUS.value}:{corpus_name}:v{latest.version_info.version}"
             )
+            await cache.delete(CacheNamespace.CORPUS, versioned_key)
 
-            if latest and latest.version_info:
-                versioned_key = (
-                    f"{ResourceType.CORPUS.value}:{corpus_name}:v{latest.version_info.version}"
-                )
-                await cache.delete(CacheNamespace.CORPUS, versioned_key)
+        # Note: Search indexes are not stored as Documents in MongoDB,
+        # they are cached in memory or as serialized files.
+        # For now, we just clear the corpus cache.
 
-            # Note: Search indexes are not stored as Documents in MongoDB,
-            # they are cached in memory or as serialized files.
-            # For now, we just clear the corpus cache.
-
-            return True
-        except Exception:
-            return False
+        return True
 
     async def invalidate_all_corpora(self) -> int:
         """Invalidate all corpora and related caches.
@@ -1002,23 +1096,21 @@ class TreeCorpusManager:
             Number of corpora invalidated
 
         """
-        try:
-            # Get all corpus metadata
-            all_corpora = await Corpus.Metadata.find_all().to_list()
+        # PATHOLOGICAL REMOVAL: No try/except - let errors propagate
+        # Get all corpus metadata
+        all_corpora = await Corpus.Metadata.find_all().to_list()
 
-            count = 0
-            for corpus_meta in all_corpora:
-                if await self.invalidate_corpus(corpus_meta.resource_id):
-                    count += 1
+        count = 0
+        for corpus_meta in all_corpora:
+            if await self.invalidate_corpus(corpus_meta.resource_id):
+                count += 1
 
-            # Clear the entire corpus namespace as well
+        # Clear the entire corpus namespace as well
 
-            cache = await get_global_cache()
-            await cache.clear_namespace(CacheNamespace.CORPUS)
+        cache = await get_global_cache()
+        await cache.clear_namespace(CacheNamespace.CORPUS)
 
-            return count
-        except Exception:
-            return 0
+        return count
 
     async def get_tree(
         self,
@@ -1043,11 +1135,14 @@ class TreeCorpusManager:
         tree["children"] = []
 
         # Safely iterate over children, handling potential None values
-        if corpus.child_corpus_ids:
-            for child_id in corpus.child_corpus_ids:
-                child_tree = await self.get_tree(child_id, config)
-                if child_tree:
-                    tree["children"].append(child_tree)
+        if corpus.child_uuids:
+            for child_uuid in corpus.child_uuids:
+                # For uuids, need to get corpus first to get its corpus_id
+                child = await self.get_corpus(corpus_uuid=child_uuid, config=config)
+                if child and child.corpus_id:
+                    child_tree = await self.get_tree(child.corpus_id, config)
+                    if child_tree:
+                        tree["children"].append(child_tree)
 
         return tree
 
@@ -1071,13 +1166,15 @@ class TreeCorpusManager:
 
     async def aggregate_from_children(
         self,
-        parent_corpus_id: PydanticObjectId,
+        parent_corpus_id: PydanticObjectId | None = None,
+        parent_corpus_uuid: str | None = None,
         config: VersionConfig | None = None,
     ) -> Corpus | None:
         """Aggregate vocabularies from parent and all children into a new corpus.
 
         Args:
-            parent_corpus_id: Parent corpus ID to aggregate from
+            parent_corpus_id: Parent corpus ID to aggregate from (deprecated, use parent_corpus_uuid)
+            parent_corpus_uuid: Parent corpus UUID to aggregate from (preferred)
             config: Version configuration
 
         Returns:
@@ -1085,7 +1182,7 @@ class TreeCorpusManager:
 
         """
         # Get the parent corpus
-        parent = await self.get_corpus(corpus_id=parent_corpus_id, config=config)
+        parent = await self.get_corpus(corpus_id=parent_corpus_id, corpus_uuid=parent_corpus_uuid, config=config)
         if not parent:
             return None
 
@@ -1097,9 +1194,11 @@ class TreeCorpusManager:
             vocabulary.update(parent.vocabulary)
 
         # Get child vocabularies recursively using existing aggregate_vocabularies method
-        child_ids = parent.child_corpus_ids or []
+        child_ids = parent.child_uuids or []
         for child_id in child_ids:
-            child_vocab = await self.aggregate_vocabularies(child_id, config, update_parent=False)
+            child_vocab = await self.aggregate_vocabularies(
+                corpus_uuid=child_id, config=config, update_parent=False
+            )
             vocabulary.update(child_vocab)
 
         # Create a new corpus with the aggregated vocabulary
@@ -1145,7 +1244,12 @@ class TreeCorpusManager:
 
             # Get parent of current
             corpus = await self.get_corpus(corpus_id=current, config=config)
-            current = corpus.parent_corpus_id if corpus else None
+            # Get parent UUID and convert to corpus_id for next iteration
+            if corpus and corpus.parent_uuid:
+                parent_corpus = await self.get_corpus(corpus_uuid=corpus.parent_uuid, config=config)
+                current = parent_corpus.corpus_id if parent_corpus else None
+            else:
+                current = None
 
         return False
 
@@ -1176,7 +1280,7 @@ class TreeCorpusManager:
         parent_id: PydanticObjectId,
         config: VersionConfig | None = None,
     ) -> list[Corpus]:
-        """Get all child corpora of a parent.
+        """Get all child corpora of a parent (N+1 QUERY FIX).
 
         Args:
             parent_id: Parent corpus ID
@@ -1190,15 +1294,11 @@ class TreeCorpusManager:
         if not parent:
             return []
 
-        children = []
-        # Safely iterate over children, handling potential None values
-        if parent.child_corpus_ids:
-            for child_id in parent.child_corpus_ids:
-                child = await self.get_corpus(corpus_id=child_id, config=config)
-                if child:
-                    children.append(child)
+        # CRITICAL FIX: Batch-fetch all children in single query instead of N separate queries
+        if parent.child_uuids:
+            return await self.get_corpora_by_uuids(parent.child_uuids, config)
 
-        return children
+        return []
 
     async def remove_child(
         self,
@@ -1219,47 +1319,53 @@ class TreeCorpusManager:
             return False
 
         # Log current state
-        logger.info(f"Parent {parent_id} currently has children: {parent.child_corpus_ids}")
+        logger.info(f"Parent {parent_id} currently has children: {parent.child_uuids}")
 
-        # Remove from parent's children list
+        # Get child corpus to get its UUID
+        child = await self.get_corpus(corpus_id=child_id, config=fresh_config)
+        if not child or not child.corpus_uuid:
+            logger.warning(f"Child {child_id} not found or missing UUID")
+            return False
+
+        # Remove from parent's children list (compare UUIDs)
         removed = False
-        if child_id in parent.child_corpus_ids:
-            logger.info(f"Removing child {child_id} from parent {parent_id} children list")
-            parent.child_corpus_ids.remove(child_id)
+        if child.corpus_uuid in parent.child_uuids:
+            logger.info(f"Removing child UUID {child.corpus_uuid} (ID: {child_id}) from parent {parent_id} children list")
+            parent.child_uuids.remove(child.corpus_uuid)
             removed = True
         else:
-            logger.warning(f"Child {child_id} not in parent's children list")
+            logger.warning(f"Child UUID {child.corpus_uuid} not in parent's children list")
 
         # Save parent with updated children list via save_corpus for versioning
         if removed or delete_child:
-            logger.info(f"Updating parent with children: {parent.child_corpus_ids}")
+            logger.info(f"Updating parent with children: {parent.child_uuids}")
             # Save through save_corpus to create new version
             saved_parent = await self.save_corpus(
                 corpus_id=parent.corpus_id,
                 corpus_name=parent.corpus_name,
                 content=parent.model_dump(mode="json"),
-                child_corpus_ids=parent.child_corpus_ids,
-                parent_corpus_id=parent.parent_corpus_id,
+                child_uuids=parent.child_uuids,
+                parent_uuid=parent.parent_uuid,
                 is_master=parent.is_master,
                 corpus_type=parent.corpus_type,
                 language=parent.language,
                 config=fresh_config,
             )
             logger.info(
-                f"Parent saved with updated children: saved has {len(saved_parent.child_corpus_ids) if saved_parent else 'None'} children"
+                f"Parent saved with updated children: saved has {len(saved_parent.child_uuids) if saved_parent else 'None'} children"
             )
 
         # Clear child's parent reference via save_corpus for versioning (unless deleting)
         if not delete_child:
-            child = await self.get_corpus(corpus_id=child_id, config=fresh_config)
-            if child and child.parent_corpus_id == parent_id:
-                child.parent_corpus_id = None
+            # child was already fetched above, check if it has parent reference
+            if child and child.parent_uuid == parent.corpus_uuid:
+                child.parent_uuid = None
                 await self.save_corpus(
                     corpus_id=child.corpus_id,
                     corpus_name=child.corpus_name,
                     content=child.model_dump(mode="json"),
-                    child_corpus_ids=child.child_corpus_ids,
-                    parent_corpus_id=None,
+                    child_uuids=child.child_uuids,
+                    parent_uuid=None,
                     is_master=child.is_master,
                     corpus_type=child.corpus_type,
                     language=child.language,

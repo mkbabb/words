@@ -9,6 +9,7 @@ import pytest_asyncio
 from floridify.corpus.core import Corpus, CorpusType
 from floridify.corpus.manager import CorpusManager
 from floridify.models.base import Language
+from floridify.search.semantic.constants import DEFAULT_SENTENCE_MODEL
 from floridify.search.semantic.core import SemanticSearch
 
 
@@ -142,7 +143,7 @@ class TestSemanticSearchIntegration:
         # Create semantic search engine
         engine = await SemanticSearch.from_corpus(
             corpus=small_corpus,
-            model_name="sentence-transformers/all-MiniLM-L6-v2",  # Fast, small model
+            model_name=DEFAULT_SENTENCE_MODEL,
         )
 
         # Initialize if needed
@@ -163,14 +164,14 @@ class TestSemanticSearchIntegration:
     async def test_semantic_similarity_emotions(self, small_corpus: Corpus, test_db):
         """Test semantic similarity for emotion words."""
         engine = await SemanticSearch.from_corpus(
-            corpus=small_corpus, model_name="sentence-transformers/all-MiniLM-L6-v2"
+            corpus=small_corpus, model_name=DEFAULT_SENTENCE_MODEL
         )
 
         if engine.sentence_embeddings is None:
             await engine.initialize()
 
         # Search for "joyful" - should find similar emotion words
-        results = engine.search("joyful", max_results=5)
+        results = await engine.search("joyful", max_results=5)
 
         assert len(results) > 0
         words = [r.word for r in results]
@@ -184,14 +185,14 @@ class TestSemanticSearchIntegration:
     async def test_semantic_similarity_fruits(self, small_corpus: Corpus, test_db):
         """Test semantic similarity for fruit words."""
         engine = await SemanticSearch.from_corpus(
-            corpus=small_corpus, model_name="sentence-transformers/all-MiniLM-L6-v2"
+            corpus=small_corpus, model_name=DEFAULT_SENTENCE_MODEL
         )
 
         if engine.sentence_embeddings is None:
             await engine.initialize()
 
         # Search for "apple" - should find other fruits
-        results = engine.search("apple", max_results=5)
+        results = await engine.search("apple", max_results=5)
 
         assert len(results) > 0
         words = [r.word for r in results]
@@ -205,7 +206,7 @@ class TestSemanticSearchIntegration:
     async def test_faiss_index_creation(self, small_corpus: Corpus, test_db):
         """Test FAISS index is properly created."""
         engine = await SemanticSearch.from_corpus(
-            corpus=small_corpus, model_name="sentence-transformers/all-MiniLM-L6-v2"
+            corpus=small_corpus, model_name=DEFAULT_SENTENCE_MODEL
         )
 
         if engine.sentence_index is None:
@@ -221,7 +222,7 @@ class TestSemanticSearchIntegration:
         """Test that semantic index can be saved and loaded."""
         # Create and initialize first engine
         engine1 = await SemanticSearch.from_corpus(
-            corpus=small_corpus, model_name="sentence-transformers/all-MiniLM-L6-v2"
+            corpus=small_corpus, model_name=DEFAULT_SENTENCE_MODEL
         )
 
         if engine1.sentence_embeddings is None:
@@ -232,7 +233,7 @@ class TestSemanticSearchIntegration:
 
         # Create second engine from saved index
         engine2 = await SemanticSearch.from_corpus(
-            corpus=small_corpus, model_name="sentence-transformers/all-MiniLM-L6-v2"
+            corpus=small_corpus, model_name=DEFAULT_SENTENCE_MODEL
         )
 
         # Should load from cache without regenerating
@@ -240,8 +241,8 @@ class TestSemanticSearchIntegration:
         assert engine2.sentence_embeddings.shape == engine1.sentence_embeddings.shape
 
         # Results should be the same
-        results1 = engine1.search("happy", max_results=3)
-        results2 = engine2.search("happy", max_results=3)
+        results1 = await engine1.search("happy", max_results=3)
+        results2 = await engine2.search("happy", max_results=3)
 
         assert len(results1) == len(results2)
         for r1, r2 in zip(results1, results2):
@@ -274,7 +275,7 @@ class TestSemanticSearchIntegration:
         assert engine.sentence_embeddings.shape[0] == 0
 
         # Search should return empty results
-        results = engine.search("test", max_results=5)
+        results = await engine.search("test", max_results=5)
         assert len(results) == 0
 
     @pytest.mark.asyncio
@@ -282,7 +283,7 @@ class TestSemanticSearchIntegration:
         """Test batch processing of embeddings."""
         engine = await SemanticSearch.from_corpus(
             corpus=language_corpus,
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_name=DEFAULT_SENTENCE_MODEL,
             batch_size=8,  # Small batch size for testing
         )
 
@@ -299,21 +300,22 @@ class TestSemanticSearchIntegration:
     @pytest.mark.asyncio
     async def test_search_with_different_models(self, small_corpus: Corpus, test_db):
         """Test search with different sentence transformer models."""
-        # Test with a different model (smaller/faster for testing)
+        # Test with default model
         engine = await SemanticSearch.from_corpus(
             corpus=small_corpus,
-            model_name="sentence-transformers/all-MiniLM-L6-v2",  # Different model
+            model_name=DEFAULT_SENTENCE_MODEL,
         )
 
         if engine.sentence_embeddings is None:
             await engine.initialize()
 
         # Should still work
-        results = engine.search("happy", max_results=3)
+        results = await engine.search("happy", max_results=3)
         assert len(results) > 0
 
         # Verify model name is stored
-        assert engine.index.model_name == "sentence-transformers/all-MiniLM-L6-v2"
+        assert engine.index is not None
+        assert engine.index.model_name == DEFAULT_SENTENCE_MODEL
 
     @pytest.mark.asyncio
     async def test_concurrent_searches(self, small_corpus: Corpus, test_db):
@@ -321,7 +323,7 @@ class TestSemanticSearchIntegration:
         import asyncio
 
         engine = await SemanticSearch.from_corpus(
-            corpus=small_corpus, model_name="sentence-transformers/all-MiniLM-L6-v2"
+            corpus=small_corpus, model_name=DEFAULT_SENTENCE_MODEL
         )
 
         if engine.sentence_embeddings is None:
@@ -329,9 +331,7 @@ class TestSemanticSearchIntegration:
 
         # Run multiple searches concurrently
         queries = ["happy", "apple", "dog", "computer", "calm"]
-        tasks = [
-            asyncio.create_task(asyncio.to_thread(engine.search, query, 3)) for query in queries
-        ]
+        tasks = [engine.search(query, max_results=3) for query in queries]
 
         results_list = await asyncio.gather(*tasks)
 

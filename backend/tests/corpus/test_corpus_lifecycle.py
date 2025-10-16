@@ -51,7 +51,7 @@ class TestCorpusLifecycle:
         # Save corpus (should trigger normalization)
         saved = await tree_manager.save_corpus(corpus)
 
-        assert saved.corpus_id is not None
+        assert saved.corpus_uuid is not None
         assert saved.vocabulary is not None
 
         # Verify normalization occurred
@@ -91,16 +91,16 @@ class TestCorpusLifecycle:
             language=Language.ENGLISH,
             vocabulary=["child", "word"],
             original_vocabulary=["child", "word"],
-            parent_corpus_id=saved_parent.corpus_id,
+            parent_uuid=saved_parent.corpus_uuid,
         )
         saved_child = await tree_manager.save_corpus(child)
 
         # Verify bidirectional linking
-        assert saved_child.parent_corpus_id == saved_parent.corpus_id
+        assert saved_child.parent_uuid == saved_parent.corpus_uuid
 
         # Reload parent to verify child was added
-        reloaded_parent = await tree_manager.get_corpus(corpus_id=saved_parent.corpus_id)
-        assert saved_child.corpus_id in reloaded_parent.child_corpus_ids
+        reloaded_parent = await tree_manager.get_corpus(corpus_uuid=saved_parent.corpus_uuid)
+        assert saved_child.corpus_uuid in reloaded_parent.child_uuids
 
         # Create another child
         child2 = Corpus(
@@ -109,15 +109,15 @@ class TestCorpusLifecycle:
             language=Language.ENGLISH,
             vocabulary=["another", "child"],
             original_vocabulary=["another", "child"],
-            parent_corpus_id=saved_parent.corpus_id,
+            parent_uuid=saved_parent.corpus_uuid,
         )
         saved_child2 = await tree_manager.save_corpus(child2)
 
         # Reload parent again
-        reloaded_parent = await tree_manager.get_corpus(corpus_id=saved_parent.corpus_id)
-        assert len(reloaded_parent.child_corpus_ids) == 2
-        assert saved_child.corpus_id in reloaded_parent.child_corpus_ids
-        assert saved_child2.corpus_id in reloaded_parent.child_corpus_ids
+        reloaded_parent = await tree_manager.get_corpus(corpus_uuid=saved_parent.corpus_uuid)
+        assert len(reloaded_parent.child_uuids) == 2
+        assert saved_child.corpus_uuid in reloaded_parent.child_uuids
+        assert saved_child2.corpus_uuid in reloaded_parent.child_uuids
 
     @pytest.mark.asyncio
     async def test_corpus_cycle_detection(self, tree_manager: TreeCorpusManager, test_db):
@@ -140,7 +140,7 @@ class TestCorpusLifecycle:
                 language=Language.ENGLISH,
                 vocabulary=["b"],
                 original_vocabulary=["b"],
-                parent_corpus_id=corpus_a.corpus_id,
+                parent_uuid=corpus_a.corpus_uuid,
             )
         )
 
@@ -151,7 +151,7 @@ class TestCorpusLifecycle:
                 language=Language.ENGLISH,
                 vocabulary=["c"],
                 original_vocabulary=["c"],
-                parent_corpus_id=corpus_b.corpus_id,
+                parent_uuid=corpus_b.corpus_uuid,
             )
         )
 
@@ -238,7 +238,7 @@ class TestCorpusLifecycle:
                 language=Language.ENGLISH,
                 vocabulary=["child1"],
                 original_vocabulary=["child1"],
-                parent_corpus_id=parent.corpus_id,
+                parent_uuid=parent.corpus_uuid,
             )
         )
 
@@ -249,7 +249,7 @@ class TestCorpusLifecycle:
                 language=Language.ENGLISH,
                 vocabulary=["child2"],
                 original_vocabulary=["child2"],
-                parent_corpus_id=parent.corpus_id,
+                parent_uuid=parent.corpus_uuid,
             )
         )
 
@@ -260,18 +260,18 @@ class TestCorpusLifecycle:
                 language=Language.ENGLISH,
                 vocabulary=["grandchild"],
                 original_vocabulary=["grandchild"],
-                parent_corpus_id=child1.corpus_id,
+                parent_uuid=child1.corpus_uuid,
             )
         )
 
         # Delete parent with cascade
-        await tree_manager.delete_corpus(parent.corpus_id, cascade=True)
+        await tree_manager.delete_corpus(corpus_uuid=parent.corpus_uuid, cascade=True)
 
         # Verify all are deleted
-        assert await tree_manager.get_corpus(corpus_id=parent.corpus_id) is None
-        assert await tree_manager.get_corpus(corpus_id=child1.corpus_id) is None
-        assert await tree_manager.get_corpus(corpus_id=child2.corpus_id) is None
-        assert await tree_manager.get_corpus(corpus_id=grandchild.corpus_id) is None
+        assert await tree_manager.get_corpus(corpus_uuid=parent.corpus_uuid) is None
+        assert await tree_manager.get_corpus(corpus_uuid=child1.corpus_uuid) is None
+        assert await tree_manager.get_corpus(corpus_uuid=child2.corpus_uuid) is None
+        assert await tree_manager.get_corpus(corpus_uuid=grandchild.corpus_uuid) is None
 
     @pytest.mark.asyncio
     async def test_corpus_update_triggers_version(self, tree_manager: TreeCorpusManager, test_db):
@@ -287,7 +287,7 @@ class TestCorpusLifecycle:
             )
         )
 
-        initial_id = corpus.corpus_id
+        initial_id = corpus.corpus_uuid
         initial_hash = corpus.vocabulary_hash
 
         # Update corpus vocabulary
@@ -297,10 +297,10 @@ class TestCorpusLifecycle:
         # Force rebuild of indices for the update
         await corpus._rebuild_indices()
 
-        updated = await tree_manager.save_corpus(corpus, corpus_id=initial_id)
+        updated = await tree_manager.save_corpus(corpus)
 
-        # Should have same ID but different vocabulary hash
-        assert updated.corpus_id == initial_id
+        # Should have same UUID but different vocabulary hash
+        assert updated.corpus_uuid == initial_id
         assert updated.vocabulary_hash != initial_hash
         assert len(updated.vocabulary) == 3
 
@@ -406,7 +406,7 @@ class TestCorpusLifecycle:
                 language=Language.ENGLISH,
                 vocabulary=[f"child_{index}"],
                 original_vocabulary=[f"child_{index}"],
-                parent_corpus_id=base_corpus.corpus_id,
+                parent_uuid=base_corpus.corpus_uuid,
             )
             return await tree_manager.save_corpus(child)
 
@@ -420,8 +420,8 @@ class TestCorpusLifecycle:
         assert len(successful_children) >= 3  # At least some should succeed
 
         # Reload parent and check children
-        reloaded = await tree_manager.get_corpus(corpus_id=base_corpus.corpus_id)
-        assert len(reloaded.child_corpus_ids) == len(successful_children)
+        reloaded = await tree_manager.get_corpus(corpus_uuid=base_corpus.corpus_uuid)
+        assert len(reloaded.child_uuids) == len(successful_children)
 
     @pytest.mark.asyncio
     async def test_small_bespoke_corpus(self, tree_manager: TreeCorpusManager, test_db):
@@ -514,12 +514,12 @@ class TestCorpusLifecycle:
                 language=Language.ENGLISH,
                 vocabulary=vocabulary,
                 original_vocabulary=vocabulary,
-                parent_corpus_id=parent.corpus_id,
+                parent_uuid=parent.corpus_uuid,
             )
         )
 
         assert corpus.corpus_type == CorpusType.LITERATURE
-        assert corpus.parent_corpus_id == parent.corpus_id
+        assert corpus.parent_uuid == parent.corpus_uuid
         assert all(word in corpus.vocabulary for word in vocabulary)
 
     @pytest.mark.asyncio
@@ -544,7 +544,7 @@ class TestCorpusLifecycle:
                 language=Language.ENGLISH,
                 vocabulary=["child1", "unique1"],
                 original_vocabulary=["child1", "unique1"],
-                parent_corpus_id=parent.corpus_id,
+                parent_uuid=parent.corpus_uuid,
             )
         )
 
@@ -555,12 +555,12 @@ class TestCorpusLifecycle:
                 language=Language.ENGLISH,
                 vocabulary=["child2", "unique2"],
                 original_vocabulary=["child2", "unique2"],
-                parent_corpus_id=parent.corpus_id,
+                parent_uuid=parent.corpus_uuid,
             )
         )
 
         # Aggregate vocabulary from children
-        aggregated = await tree_manager.aggregate_from_children(parent.corpus_id)
+        aggregated = await tree_manager.aggregate_from_children(parent_corpus_uuid=parent.corpus_uuid)
         assert aggregated is not None
 
         # Should include vocabularies from all children

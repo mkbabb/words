@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from ..caching.core import get_global_cache
 from ..caching.models import CacheNamespace
 from ..utils.logging import get_logger
+from datetime import timedelta
 
 logger = get_logger(__name__)
 
@@ -295,7 +296,6 @@ class SessionManager:
 
     async def save_session(self, session: ScrapingSession) -> None:
         """Save session state to global cache."""
-        from datetime import timedelta
 
         cache = await self._get_cache()
         cache_key = self._get_cache_key(session.session_id)

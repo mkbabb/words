@@ -14,6 +14,7 @@ from ..models.base import AudioMedia, ImageMedia
 from ..models.dictionary import (
     Definition,
     DictionaryEntry,
+    DictionaryProvider,
     Example,
     Fact,
     Pronunciation,
@@ -24,6 +25,16 @@ from ..providers.batch import BatchOperation
 from ..utils.config import Config
 from ..utils.logging import get_logger
 from ..wordlist.models import WordList
+
+# PATHOLOGICAL REMOVAL: Move ALL imports to top level - NO nested imports
+from ..corpus.core import Corpus
+from ..corpus.language.core import LanguageCorpus
+from ..corpus.literature.core import LiteratureCorpus
+from ..providers.dictionary.models import DictionaryProviderEntry
+from ..providers.language.models import LanguageEntry
+from ..providers.literature.models import LiteratureEntry
+from ..search.models import SearchIndex, TrieIndex
+from ..search.semantic.models import SemanticIndex
 
 logger = get_logger(__name__)
 
@@ -59,7 +70,7 @@ class MongoDBStorage:
         # Detect if connecting to localhost or Docker internal MongoDB (no TLS needed)
         is_localhost = any(
             host in self.connection_string
-            for host in ["localhost:27017", "mongodb:27017", "127.0.0.1:27017"]
+            for host in ["localhost:27017", "mongodb:27017", "127.0.0.1:27017", "host.docker.internal:27017", "floridify-mongodb:27017"]
         )
 
         # Build connection kwargs
@@ -88,15 +99,7 @@ class MongoDBStorage:
         )
         database: Any = self.client[self.database_name]
 
-        # Import all Metadata subclasses for polymorphic Beanie deserialization
-        # These must be registered with Beanie for proper _class_id handling
-        from ..corpus.core import Corpus
-        from ..providers.dictionary.models import DictionaryProviderEntry
-        from ..providers.language.models import LanguageEntry
-        from ..providers.literature.models import LiteratureEntry
-        from ..search.models import SearchIndex, TrieIndex
-        from ..search.semantic.models import SemanticIndex
-
+        # PATHOLOGICAL REMOVAL: No nested imports - all moved to module level
         # Initialize Beanie with all document models
         await init_beanie(
             database=database,
@@ -117,6 +120,8 @@ class MongoDBStorage:
                 # BaseVersionedData owns the "versioned_data" collection with is_root=True
                 # All subclasses share this collection and need proper _class_id handling
                 Corpus.Metadata,
+                LanguageCorpus.Metadata,  # DISCRIMINATOR FIX: Register LanguageCorpus.Metadata
+                LiteratureCorpus.Metadata,  # DISCRIMINATOR FIX: Register LiteratureCorpus.Metadata
                 DictionaryProviderEntry.Metadata,
                 LanguageEntry.Metadata,
                 LiteratureEntry.Metadata,
@@ -171,26 +176,13 @@ class MongoDBStorage:
         if not self.client:
             return {"status": "disconnected"}
 
-        try:
-            # Basic stats that should be available
-            stats = {
-                "status": "connected",
-                "initialized": self._initialized,
-                "database_name": self.database_name,
-            }
-
-            # Try to get pool options if available
-            if hasattr(self.client, "options") and hasattr(self.client.options, "pool_options"):
-                pool_options = self.client.options.pool_options
-                if hasattr(pool_options, "max_pool_size"):
-                    stats["max_pool_size"] = pool_options.max_pool_size
-                if hasattr(pool_options, "min_pool_size"):
-                    stats["min_pool_size"] = pool_options.min_pool_size
-
-            return stats
-        except Exception as e:
-            logger.debug(f"Could not get full pool stats: {e}")
-            return {"status": "connected", "initialized": self._initialized}
+        # PATHOLOGICAL REMOVAL: No hasattr - just return basic stats
+        # Pool stats are not critical - if they don't exist, we don't care
+        return {
+            "status": "connected",
+            "initialized": self._initialized,
+            "database_name": self.database_name,
+        }
 
     async def disconnect(self) -> None:
         """Disconnect from MongoDB."""
@@ -360,7 +352,7 @@ async def get_synthesized_entry(word_text: str) -> DictionaryEntry | None:
     # Then find the synthesized entry
     return await DictionaryEntry.find_one(
         DictionaryEntry.word_id == word.id,
-        DictionaryEntry.provider == "synthesis",
+        DictionaryEntry.provider == DictionaryProvider.SYNTHESIS,
     )
 
 
@@ -370,7 +362,7 @@ async def save_synthesized_entry(entry: DictionaryEntry) -> None:
         await _ensure_initialized()
         existing = await DictionaryEntry.find_one(
             DictionaryEntry.word_id == entry.word_id,
-            DictionaryEntry.provider == "synthesis",
+            DictionaryEntry.provider == DictionaryProvider.SYNTHESIS,
         )
 
         if existing:

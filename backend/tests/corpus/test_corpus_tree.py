@@ -14,7 +14,7 @@ def create_test_corpus(
     corpus_type: CorpusType = CorpusType.LITERATURE,
     is_master: bool = False,
     vocabulary: list[str] | None = None,
-    parent_id: PydanticObjectId | None = None,
+    parent_uuid: str | None = None,
 ) -> Corpus.Metadata:
     """Helper to create a test corpus with required fields."""
     vocabulary = vocabulary or []
@@ -29,7 +29,7 @@ def create_test_corpus(
         ),
         corpus_type=corpus_type,
         is_master=is_master,
-        parent_corpus_id=parent_id,
+        parent_uuid=parent_uuid,
         content_inline={"vocabulary": vocabulary} if vocabulary else None,
         language=Language.ENGLISH,
         vocabulary_size=len(vocabulary),
@@ -42,38 +42,38 @@ class TestTreeStructure:
 
     @pytest.mark.asyncio
     async def test_add_child_to_parent(self, test_db, corpus_tree, assert_helpers):
-        """Test adding a child updates parent.child_corpus_ids."""
+        """Test adding a child updates parent.child_uuids."""
         parent = corpus_tree["master"]
         new_child = create_test_corpus(
             "New_Work",
             corpus_type=CorpusType.LITERATURE,
             vocabulary=["new", "words"],
-            parent_id=parent.id,
+            parent_uuid=parent.uuid,
         )
         await new_child.save()
 
         # Add child to parent
-        parent.child_corpus_ids.append(new_child.id)
+        parent.child_uuids.append(new_child.uuid)
         await parent.save()
 
         # Verify relationship
         assert_helpers.assert_parent_child_linked(parent, new_child)
-        assert new_child.id in parent.child_corpus_ids
+        assert new_child.uuid in parent.child_uuids
 
     @pytest.mark.asyncio
     async def test_remove_child_from_parent(self, test_db, corpus_tree):
-        """Test removing child from parent.child_corpus_ids."""
+        """Test removing child from parent.child_uuids."""
         parent = corpus_tree["master"]
         child = corpus_tree["work1"]
 
         # Remove child
-        original_count = len(parent.child_corpus_ids)
-        parent.child_corpus_ids.remove(child.id)
+        original_count = len(parent.child_uuids)
+        parent.child_uuids.remove(child.uuid)
         await parent.save()
 
         # Verify removal
-        assert child.id not in parent.child_corpus_ids
-        assert len(parent.child_corpus_ids) == original_count - 1
+        assert child.uuid not in parent.child_uuids
+        assert len(parent.child_uuids) == original_count - 1
 
     @pytest.mark.asyncio
     async def test_circular_reference_prevention(self, test_db, corpus_tree):
@@ -85,29 +85,29 @@ class TestTreeStructure:
         child = corpus_tree["work1"]
 
         # Test 1: Can't make parent its own child
-        parent.child_corpus_ids.append(parent.id)
+        parent.child_uuids.append(parent.uuid)
 
         # Should detect circular reference when saving metadata directly
         saved = await manager.save_metadata(parent)
         # Manager should have cleaned the circular reference
-        assert parent.id not in saved.child_corpus_ids
+        assert parent.uuid not in saved.child_uuids
 
         # Test 2: Can't create circular parent-child relationship
-        # Try to make child the parent of its own parent
-        result = await manager.update_parent(parent, child.id)
+        # Try to make child the parent of its own parent (should be rejected)
+        result = await manager.update_parent(parent.id, child.id)
         # Should reject (return False) or None
         assert result in (None, False)
 
         # Test 3: Verify tree remains consistent after operations
         # Reload to ensure consistency
-        reloaded_parent = await manager.get_corpus(corpus_id=parent.id)
-        reloaded_child = await manager.get_corpus(corpus_id=child.id)
+        reloaded_parent = await manager.get_corpus(corpus_uuid=parent.uuid)
+        reloaded_child = await manager.get_corpus(corpus_uuid=child.uuid)
 
         # Parent should not be in its own children
-        assert reloaded_parent.corpus_id not in reloaded_parent.child_corpus_ids
+        assert reloaded_parent.corpus_uuid not in reloaded_parent.child_uuids
         # Child's parent should not create a cycle
-        if reloaded_child.parent_corpus_id:
-            assert reloaded_child.parent_corpus_id != reloaded_child.corpus_id
+        if reloaded_child.parent_uuid:
+            assert reloaded_child.parent_uuid != reloaded_child.corpus_uuid
 
     @pytest.mark.asyncio
     async def test_orphan_detection(self, test_db, corpus_tree):
@@ -115,7 +115,7 @@ class TestTreeStructure:
         all_corpora = list(corpus_tree.values())
 
         # Find orphans (should only be master)
-        orphans = [c for c in all_corpora if c.parent_corpus_id is None]
+        orphans = [c for c in all_corpora if c.parent_uuid is None]
 
         assert len(orphans) == 1
         assert orphans[0].resource_id == "English"
@@ -129,9 +129,9 @@ class TestTreeStructure:
             """Calculate depth from root."""
             depth = 0
             current = corpus
-            while current.parent_corpus_id:
+            while current.parent_uuid:
                 depth += 1
-                parent = await Corpus.Metadata.get(current.parent_corpus_id)
+                parent = await Corpus.Metadata.find_one({"uuid": current.parent_uuid})
                 if not parent:
                     break
                 current = parent
@@ -167,13 +167,13 @@ class TestTreeStructure:
         child = create_test_corpus(
             "Child",
             corpus_type=CorpusType.LITERATURE,
-            parent_id=parent1.id,
+            parent_uuid=parent1.uuid,
         )
         await child.save()
 
         # Child already has parent1, setting parent2 should be validated
-        assert child.parent_corpus_id == parent1.id
-        # In real implementation, setting new parent should update old parent's child_corpus_ids
+        assert child.parent_uuid == parent1.uuid
+        # In real implementation, setting new parent should update old parent's child_uuids
 
     @pytest.mark.asyncio
     async def test_master_corpus_properties(self, test_db, corpus_tree):
@@ -182,15 +182,15 @@ class TestTreeStructure:
 
         assert master.is_master is True
         # Compare the enum value (string) since Beanie serializes enums
-        assert master.corpus_type == CorpusType.LANGUAGE
-        assert master.parent_corpus_id is None
-        assert len(master.child_corpus_ids) > 0
+        assert master.corpus_type == CorpusType.LANGUAGE.value
+        assert master.parent_uuid is None
+        assert len(master.child_uuids) > 0
 
     @pytest.mark.asyncio
     async def test_leaf_node_properties(self, test_db, corpus_tree):
         """Test that leaf nodes have no children."""
         chapter = corpus_tree["chapter1"]
 
-        assert len(chapter.child_corpus_ids) == 0
-        assert chapter.parent_corpus_id is not None
+        assert len(chapter.child_uuids) == 0
+        assert chapter.parent_uuid is not None
         assert chapter.is_master is False

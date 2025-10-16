@@ -9,54 +9,38 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..caching.models import ResourceType
+from ..corpus.core import Corpus
+from ..providers.dictionary.models import DictionaryProviderEntry
+from ..providers.language.models import LanguageEntry
+from ..providers.literature.models import LiteratureEntry
+from ..search.models import SearchIndex, TrieIndex
+from ..search.semantic.models import SemanticIndex
 
 if TYPE_CHECKING:
     from ..caching.models import BaseVersionedData
 
+# Pre-built registry mapping - all imports at module level
+_MODEL_CLASS_REGISTRY: dict[ResourceType, type[BaseVersionedData]] = {
+    ResourceType.CORPUS: Corpus.Metadata,
+    ResourceType.DICTIONARY: DictionaryProviderEntry.Metadata,
+    ResourceType.LANGUAGE: LanguageEntry.Metadata,
+    ResourceType.LITERATURE: LiteratureEntry.Metadata,
+    ResourceType.SEARCH: SearchIndex.Metadata,
+    ResourceType.TRIE: TrieIndex.Metadata,
+    ResourceType.SEMANTIC: SemanticIndex.Metadata,
+}
+
 
 def get_model_class(resource_type: ResourceType) -> type[BaseVersionedData]:
-    """Get model class for a resource type using lazy imports.
+    """Get model class for a resource type.
 
     This approach:
-    1. Avoids circular imports by importing only when needed
+    1. Uses explicit mapping dictionary with all imports at module level
     2. Eliminates decorators and auto-discovery complexity
     3. Makes the mapping explicit and easy to understand
-    4. Follows KISS - just a simple switch statement
+    4. Follows KISS - just a simple dictionary lookup
     """
-    # Lazy imports to avoid circular dependencies
-    if resource_type == ResourceType.CORPUS:
-        from ..corpus.core import Corpus
+    if resource_type not in _MODEL_CLASS_REGISTRY:
+        raise ValueError(f"Unknown resource type: {resource_type}")
 
-        return Corpus.Metadata
-
-    if resource_type == ResourceType.DICTIONARY:
-        from ..providers.dictionary.models import DictionaryProviderEntry
-
-        return DictionaryProviderEntry.Metadata
-
-    if resource_type == ResourceType.LANGUAGE:
-        from ..providers.language.models import LanguageEntry
-
-        return LanguageEntry.Metadata
-
-    if resource_type == ResourceType.LITERATURE:
-        from ..providers.literature.models import LiteratureEntry
-
-        return LiteratureEntry.Metadata
-
-    if resource_type == ResourceType.SEARCH:
-        from ..search.models import SearchIndex
-
-        return SearchIndex.Metadata
-
-    if resource_type == ResourceType.TRIE:
-        from ..search.models import TrieIndex
-
-        return TrieIndex.Metadata
-
-    if resource_type == ResourceType.SEMANTIC:
-        from ..search.semantic.models import SemanticIndex
-
-        return SemanticIndex.Metadata
-
-    raise ValueError(f"Unknown resource type: {resource_type}")
+    return _MODEL_CLASS_REGISTRY[resource_type]

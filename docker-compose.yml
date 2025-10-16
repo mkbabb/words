@@ -20,6 +20,17 @@ services:
       # Cache directory inside container
       FLORIDIFY_CACHE_DIR: /app/cache
       # Database configuration handled by auth/config.toml
+      # Threading configuration for FAISS and numerical libraries
+      # Optimized for sentence-transformers + FAISS without conflicts
+      OMP_NUM_THREADS: 4
+      MKL_NUM_THREADS: 4
+      NUMEXPR_NUM_THREADS: 4
+      OPENBLAS_NUM_THREADS: 4
+      VECLIB_MAXIMUM_THREADS: 4
+      # Enable tokenizer parallelism (works with reduced thread count)
+      TOKENIZERS_PARALLELISM: "true"
+      # Set multiprocessing start method for Docker compatibility
+      MULTIPROCESSING_START_METHOD: "spawn"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

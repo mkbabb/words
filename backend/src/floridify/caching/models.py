@@ -15,6 +15,8 @@ from typing import Any
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pymongo import IndexModel
+from uuid import uuid4
+import hashlib
 
 
 class CompressionType(str, Enum):
@@ -179,6 +181,9 @@ class BaseVersionedData(Document):
     """
 
     # Identification
+    # uuid: Immutable UUID that never changes across versions
+    # CRITICAL: Required field, auto-generated if not provided via validator
+    uuid: str = Field(description="Immutable UUID that persists across versions")
     resource_id: str
     resource_type: ResourceType
     namespace: CacheNamespace
@@ -195,10 +200,23 @@ class BaseVersionedData(Document):
     tags: list[str] = Field(default_factory=list)
     ttl: timedelta | None = None
 
+    # Pydantic configuration for MongoDB storage
+    # CRITICAL: use_enum_values=True ensures enums are stored as strings in MongoDB
+    # (MongoDB doesn't support Python enum objects natively)
+    model_config = {
+        "use_enum_values": True,  # Store enums as strings for MongoDB compatibility
+        "arbitrary_types_allowed": True,
+    }
+
     class Settings:
         name = "versioned_data"
         is_root = True
         indexes = [
+            # UUID: Primary identifier that never changes across versions
+            # Covers: uuid lookups (most common after migration)
+            IndexModel([("uuid", 1)], unique=False, name="uuid_idx"),
+            # UUID + Latest: Fast lookup of latest version by UUID
+            IndexModel([("uuid", 1), ("version_info.is_latest", 1)], name="uuid_latest_idx"),
             # PRIMARY: Latest version lookup (most frequent query)
             # Covers: resource_id + is_latest filter + _id sort
             [("resource_id", 1), ("version_info.is_latest", 1), ("_id", -1)],
@@ -238,6 +256,34 @@ class BaseVersionedData(Document):
         if default_namespace is not None:
             cls.model_fields["namespace"].default = default_namespace
 
+        # Ensure polymorphic class identifier is unique per subclass
+        # Only set _class_id if not explicitly annotated IN THIS CLASS (not inherited)
+        # Note: All classes in Python 3.10+ have __annotations__ dict by default
+        if "_class_id" not in cls.__annotations__:
+            cls._class_id = cls.__qualname__
+
+        # Keep Beanie's settings in sync so writes persist the correct discriminator
+        try:
+            settings = cls.get_settings()
+            settings.class_id = "_class_id"
+        except Exception:
+            # get_settings may fail before Beanie initialization; best-effort update only
+            pass
+
+    @field_validator("namespace", mode="before")
+    @classmethod
+    def validate_namespace(cls, v: Any) -> CacheNamespace:
+        """Convert string namespace back to enum when loading from MongoDB.
+
+        MongoDB stores enums as strings due to use_enum_values=True.
+        This validator ensures they're converted back to enums on load.
+        """
+        if isinstance(v, CacheNamespace):
+            return v
+        if isinstance(v, str):
+            return CacheNamespace(v)
+        return v
+
     @field_validator("content_location", mode="before")
     @classmethod
     def validate_content_location(cls, v: Any) -> ContentLocation | None:
@@ -248,7 +294,6 @@ class BaseVersionedData(Document):
             return v
         if isinstance(v, str):
             # Create a minimal ContentLocation for external paths
-            import hashlib
 
             return ContentLocation(
                 storage_type=StorageType.S3 if v.startswith("s3://") else StorageType.CACHE,
@@ -263,9 +308,16 @@ class BaseVersionedData(Document):
     @model_validator(mode="before")
     @classmethod
     def _apply_defaults(cls, values: Any) -> Any:
-        """Populate missing defaults for new metadata documents."""
+        """Populate missing defaults for new metadata documents.
+
+        CRITICAL: Ensures uuid is ALWAYS present. This prevents all hasattr/getattr hacks.
+        """
         if not isinstance(values, dict):
             return values
+
+        # CRITICAL FIX: Ensure uuid is always set
+        if "uuid" not in values or not values["uuid"]:
+            values["uuid"] = str(uuid4())
 
         if "version_info" not in values:
             content = values.get("content_inline") or {}

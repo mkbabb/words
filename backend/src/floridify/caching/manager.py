@@ -23,10 +23,44 @@ from .models import (
     VersionConfig,
     VersionInfo,
 )
+from datetime import datetime
 
 logger = get_logger(__name__)
 
 T = TypeVar("T", bound=BaseVersionedData)
+
+
+def _generate_cache_key(*key_parts: Any) -> str:
+    """Generate consistent cache key from parts using SHA256 hashing.
+
+    CRITICAL FIX: Prevents cache key collisions from special characters,
+    unicode normalization issues, or unexpected input formats.
+
+    Uses same approach as caching/decorators.py for consistency.
+
+    Args:
+        *key_parts: Parts to combine into cache key (resource_type, resource_id, version, etc.)
+
+    Returns:
+        SHA256 hash of key parts as hex string
+
+    Examples:
+        >>> _generate_cache_key("corpus", "abc123")
+        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+        >>> _generate_cache_key("corpus", "abc123", "v", "1.0.0")
+        'a1b2c3d4e5f6...'
+    """
+    # Convert all parts to strings and handle enums
+    str_parts = []
+    for part in key_parts:
+        if isinstance(part, Enum):
+            str_parts.append(part.value)
+        else:
+            str_parts.append(str(part))
+
+    # Combine with separator and hash
+    key_string = ":".join(str_parts)
+    return hashlib.sha256(key_string.encode()).hexdigest()
 
 
 class VersionedDataManager:
@@ -38,29 +72,31 @@ class VersionedDataManager:
             None  # Will be initialized lazily (GlobalCacheManager)
         )
         self._lock: asyncio.Lock | None = None
+        self._lock_loop_id: int | None = None  # Track which event loop owns the lock
 
     @property
     def lock(self) -> asyncio.Lock:
-        """Get or create lock for the current event loop."""
+        """Get or create lock for the current event loop.
+
+        CRITICAL FIX: Store event loop ID to prevent creating new locks on every access.
+        Previous implementation used .locked() test which doesn't detect event loop changes,
+        causing race conditions in concurrent save operations.
+        """
         try:
-            asyncio.get_running_loop()
+            loop = asyncio.get_running_loop()
+            loop_id = id(loop)
         except RuntimeError:
-            # No event loop running, create a new lock
-            self._lock = asyncio.Lock()
+            # No event loop running - return existing lock or create one
+            if self._lock is None:
+                self._lock = asyncio.Lock()
+                self._lock_loop_id = None
             return self._lock
 
         # Check if we need to create a new lock for this event loop
-        if self._lock is None:
+        if self._lock is None or self._lock_loop_id != loop_id:
             self._lock = asyncio.Lock()
-        else:
-            # Check if the lock is bound to a different event loop
-            # Simply recreate lock to be safe - locks are lightweight
-            try:
-                # Test if lock is still valid for current loop
-                _ = self._lock.locked()
-            except RuntimeError:
-                # Lock is from different event loop, create new one
-                self._lock = asyncio.Lock()
+            self._lock_loop_id = loop_id
+            logger.debug(f"Created new lock for event loop {loop_id}")
 
         return self._lock
 
@@ -134,9 +170,7 @@ class VersionedDataManager:
 
             # Save new version using Beanie's insert (handles _class_id correctly)
             await versioned.insert()
-            # Ensure ID is always PydanticObjectId
-            if versioned.id and not isinstance(versioned.id, PydanticObjectId):
-                versioned.id = PydanticObjectId(versioned.id)
+            # Beanie handles ObjectId conversion automatically via field type
 
             # Update version chain with local lock
             if versioned.version_info.is_latest:
@@ -200,21 +234,15 @@ class VersionedDataManager:
                     logger.debug(
                         f"Found existing version for {resource_id} with same content and metadata"
                     )
-                    # Ensure ID is always PydanticObjectId for consistency
-                    if existing.id and not isinstance(existing.id, PydanticObjectId):
-                        existing.id = PydanticObjectId(existing.id)
                     return existing
                 logger.info(
                     f"Content matches but metadata changed for {resource_id}, creating new version"
                 )
             elif existing:
                 logger.debug(f"Found existing version for {resource_id} with same content")
-                # Ensure ID is always PydanticObjectId for consistency
-                if existing.id and not isinstance(existing.id, PydanticObjectId):
-                    existing.id = PydanticObjectId(existing.id)
                 return existing
 
-        # Get latest for version increment
+        # Get latest for version increment and stable_id preservation
         latest = None
         if config.increment_version:
             try:
@@ -254,6 +282,16 @@ class VersionedDataManager:
             "ttl": config.ttl,
         }
 
+        # Preserve uuid across versions (CRITICAL for relationship integrity)
+        # uuid is now guaranteed to exist via Pydantic validator
+        if latest:
+            constructor_params["uuid"] = latest.uuid
+            logger.info(f"Preserving uuid={latest.uuid} from previous version")
+        else:
+            # No latest version - uuid will be auto-generated by Pydantic validator
+            # Don't set it here, let the model handle it
+            logger.info("First version - uuid will be auto-generated")
+
         # Handle metadata - extract model-specific fields vs generic metadata using introspection
         # This replaces 75+ lines of hardcoded field lists with automatic Pydantic field detection
         combined_metadata = {**config.metadata, **(metadata or {})}
@@ -280,6 +318,7 @@ class VersionedDataManager:
             constructor_params["id"] = PydanticObjectId()
 
         versioned = model_class(**constructor_params)
+        logger.info(f"Created {model_class.__name__} instance with uuid={versioned.uuid}")
 
         # Set content with automatic storage strategy
         await set_versioned_content(versioned, content)
@@ -288,6 +327,13 @@ class VersionedDataManager:
         async with self.lock:
             try:
                 await self._save_with_transaction(versioned, resource_id, resource_type)
+                # Verify uuid was actually saved to MongoDB
+                if versioned.id:
+                    saved_doc = await model_class.get(versioned.id)
+                    if saved_doc:
+                        logger.info(f"VERIFY: MongoDB document has uuid={saved_doc.uuid}")
+                    else:
+                        logger.error(f"VERIFY: Could not retrieve just-saved document {versioned.id}!")
             except Exception as e:
                 logger.error(f"Failed to save version chain: {e}", exc_info=True)
                 raise RuntimeError(
@@ -297,16 +343,18 @@ class VersionedDataManager:
 
             # Tree structures handled by TreeCorpusManager for corpus types
 
-            # Cache update AFTER successful database write to prevent race conditions
+            # CRITICAL FIX: Cache update INSIDE lock for atomicity
+            # Use single set() operation which overwrites - no need for delete()
             if config.use_cache:
                 if self.cache is None:
                     self.cache = await get_global_cache()
-                cache_key = f"{resource_type.value}:{resource_id}"
+                # CRITICAL FIX #8: Use consistent hashing for cache keys
+                cache_key = _generate_cache_key(resource_type, resource_id)
 
                 try:
-                    # Atomic cache update: delete old and set new in one operation
-                    await self.cache.delete(namespace, cache_key)
+                    # Atomic cache update: set() overwrites old value in single operation
                     await self.cache.set(namespace, cache_key, versioned, config.ttl)
+                    logger.debug(f"Cache updated atomically for {cache_key[:16]}... inside lock")
                 except Exception as cache_error:
                     logger.warning(
                         f"Cache update failed for {cache_key}, continuing without cache: {cache_error}"
@@ -328,92 +376,91 @@ class VersionedDataManager:
 
         # Check cache unless forced
         if use_cache and not config.force_rebuild:
-            cache_key = f"{resource_type.value}:{resource_id}"
-
-            # Handle specific version request
+            # CRITICAL FIX #8: Use consistent hashing for cache keys
             if config.version:
-                cache_key = f"{cache_key}:v{config.version}"
+                cache_key = _generate_cache_key(resource_type, resource_id, "v", config.version)
+            else:
+                cache_key = _generate_cache_key(resource_type, resource_id)
 
             if self.cache is None:
                 self.cache = await get_global_cache()
             cached = await self.cache.get(namespace, cache_key)
             if cached:
-                # Validate cache entry BEFORE returning it
-                if not config.version:
-                    model_class = self._get_model_class(resource_type)
-                    try:
-                        # Handle both dict (from JSON deserialization) and model instances
-                        if isinstance(cached, dict):
-                            # Cached as dict - reconstruct to model for validation
-                            cached = model_class.model_validate(cached)
+                model_class = self._get_model_class(resource_type)
+                cached_obj: BaseVersionedData | None = None
+                try:
+                    if isinstance(cached, dict):
+                        cached_obj = model_class.model_validate(cached)
+                    elif isinstance(cached, model_class):
+                        cached_obj = cached  # type: ignore[assignment]
+                    elif isinstance(cached, BaseVersionedData):
+                        cached_obj = model_class.model_validate(cached.model_dump())
+                    else:
+                        raise TypeError(
+                            f"Unexpected cache entry type {type(cached).__name__} for {cache_key}"
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"Cache entry for {cache_key} could not be coerced to {model_class.__name__}: {e}",
+                        exc_info=True,
+                    )
+                    await self.cache.delete(namespace, cache_key)
+                    cached_obj = None
 
-                        # Validate the cached document still exists in database
-                        # Use the specific model class for polymorphic queries
-                        doc = await model_class.find_one({"_id": cached.id})
-                        if not doc:
-                            # Cached document was deleted, invalidate cache
-                            logger.debug(
-                                f"Cached document for {cache_key} no longer exists, invalidating cache"
+                if cached_obj:
+                    if not config.version:
+                        try:
+                            doc = await model_class.find_one({"_id": cached_obj.id})
+                            if not doc:
+                                logger.debug(
+                                    f"Cached document for {cache_key} no longer exists, invalidating cache"
+                                )
+                                await self.cache.delete(namespace, cache_key)
+                            else:
+                                if cached_obj.content_location is not None:
+                                    content = await get_versioned_content(cached_obj)
+                                    if content is None:
+                                        logger.error(
+                                            f"External content missing for {cache_key}, invalidating cache"
+                                        )
+                                        await self.cache.delete(namespace, cache_key)
+                                    else:
+                                        logger.debug(f"Cache hit for {cache_key} (validated)")
+                                        return cached_obj  # type: ignore[no-any-return]
+                                else:
+                                    logger.debug(f"Cache hit for {cache_key}")
+                                    return cached_obj  # type: ignore[no-any-return]
+                        except Exception as e:
+                            logger.warning(
+                                f"Cache validation failed for {cache_key}: {e}, invalidating cache",
+                                exc_info=True,
                             )
                             await self.cache.delete(namespace, cache_key)
-                            cached = None  # Force database query below
-                        else:
-                            # Validate content integrity if it has external storage
-                            if cached.content_location is not None:
-                                content = await get_versioned_content(cached)
-                                if content is None:
-                                    logger.error(
-                                        f"External content missing for {cache_key}, invalidating cache"
-                                    )
-                                    await self.cache.delete(namespace, cache_key)
-                                    cached = None  # Force database query
-                                else:
-                                    logger.debug(f"Cache hit for {cache_key} (validated)")
-                                    return cached  # type: ignore[no-any-return]
-                            else:
-                                logger.debug(f"Cache hit for {cache_key}")
-                                return cached  # type: ignore[no-any-return]
-                    except Exception as e:
-                        # Validation failed, don't trust the cache
-                        logger.warning(
-                            f"Cache validation failed for {cache_key}: {e}, invalidating cache",
-                            exc_info=True,
-                        )
-                        await self.cache.delete(namespace, cache_key)
-                        cached = None  # Force database query
-                else:
-                    # For specific version queries, still validate but less strictly
-                    logger.debug(f"Cache hit for {cache_key} (version-specific)")
-                    return cached  # type: ignore[no-any-return]
+                    else:
+                        logger.debug(f"Cache hit for {cache_key} (version-specific)")
+                        return cached_obj  # type: ignore[no-any-return]
 
         # Query database with error handling
         # Use the specific model class for polymorphic queries (not BaseVersionedData)
         # After fixing _class_id, each subclass needs to query using its own class
         model_class = self._get_model_class(resource_type)
+        collection = model_class.get_pymongo_collection()
 
         try:
             if config.version:
-                # Get specific version
-                result = await model_class.find_one(
-                    {
-                        "resource_id": resource_id,
-                        "resource_type": resource_type.value,
-                        "version_info.version": config.version,
-                    },
-                )
+                query = {
+                    "resource_id": resource_id,
+                    "resource_type": resource_type.value,
+                    "version_info.version": config.version,
+                }
+                result = await model_class.find_one(query)
             else:
-                # Get latest - sort by ID descending to get the most recent if multiple have is_latest=True
-                result = (
-                    await model_class.find(
-                        {
-                            "resource_id": resource_id,
-                            "resource_type": resource_type.value,
-                            "version_info.is_latest": True,
-                        },
-                    )
-                    .sort("-_id")
-                    .first_or_none()
-                )
+                query = {
+                    "resource_id": resource_id,
+                    "resource_type": resource_type.value,
+                    "version_info.is_latest": True,
+                }
+                result = await model_class.find(query).sort("-_id").first_or_none()
         except Exception as e:
             logger.error(f"Database query failed for {resource_type.value}:{resource_id}: {e}")
             raise RuntimeError(
@@ -431,17 +478,61 @@ class VersionedDataManager:
                         f"Expected content at {result.content_location.path}"
                     )
             except Exception as e:
-                logger.error(f"Failed to load external content for {resource_id}: {e}")
+                logger.error(
+                    f"Failed to load external content for {resource_type.value}:{resource_id}: {e}"
+                )
+
+                # Mark corrupted entry so future lookups rebuild instead of looping
+                if result.id:
+                    try:
+                        await collection.update_one(
+                            {"_id": result.id},
+                            {
+                                "$set": {
+                                    "version_info.is_latest": False,
+                                },
+                                "$addToSet": {"tags": "corrupt:missing_content"},
+                            },
+                        )
+                    except Exception as update_error:
+                        logger.warning(
+                            f"Failed to flag corrupted {resource_type.value}:{resource_id}: {update_error}",
+                            exc_info=True,
+                        )
+
+                # Best effort cache cleanup so new versions do not collide with stale entries
+                # content_location is a defined field on BaseVersionedData, always exists
+                cache_location = result.content_location
+                if cache_location and cache_location.cache_namespace and cache_location.cache_key:
+                    try:
+                        if self.cache is None:
+                            self.cache = await get_global_cache()
+                        namespace = cache_location.cache_namespace
+                        if isinstance(namespace, str):
+                            try:
+                                namespace = CacheNamespace(namespace)
+                            except ValueError:
+                                namespace = None
+                        if namespace:
+                            await self.cache.delete(namespace, cache_location.cache_key)
+                    except Exception as cache_error:
+                        logger.debug(
+                            f"Failed to purge corrupted cache entry {cache_location.cache_key}: {cache_error}",
+                            exc_info=True,
+                        )
+
+                # After cleanup, raise RuntimeError so caller knows operation failed
                 raise RuntimeError(
-                    f"Index data corrupted for {resource_type.value}:{resource_id}. "
-                    f"External content could not be loaded. Error: {e}"
+                    f"Index data corrupted for {resource_type.value}:{resource_id}. {e}"
                 ) from e
 
         # Cache result
         if result and use_cache:
-            cache_key = f"{resource_type.value}:{resource_id}"
+            # CRITICAL FIX #8: Use consistent hashing for cache keys
             if config.version:
-                cache_key = f"{cache_key}:v{config.version}"
+                cache_key = _generate_cache_key(resource_type, resource_id, "v", config.version)
+            else:
+                cache_key = _generate_cache_key(resource_type, resource_id)
             if self.cache is None:
                 self.cache = await get_global_cache()
             try:
@@ -622,13 +713,14 @@ class VersionedDataManager:
             if self.cache is None:
                 self.cache = await get_global_cache()
 
+            # CRITICAL FIX #8: Use consistent hashing for cache keys
             # Clear specific version cache
-            version_cache_key = f"{resource_type.value}:{resource_id}:v{version}"
+            version_cache_key = _generate_cache_key(resource_type, resource_id, "v", version)
             await self.cache.delete(namespace, version_cache_key)
 
             # Clear latest version cache if this was marked as latest
             if result.version_info.is_latest:
-                latest_cache_key = f"{resource_type.value}:{resource_id}"
+                latest_cache_key = _generate_cache_key(resource_type, resource_id)
                 await self.cache.delete(namespace, latest_cache_key)
 
             logger.info(f"Deleted {resource_type.value} '{resource_id}' v{version}")
@@ -678,7 +770,6 @@ class VersionedDataManager:
 
     def _json_encoder(self, obj: Any) -> str:
         """Custom JSON encoder for complex objects like PydanticObjectId."""
-        from datetime import datetime
 
         if isinstance(obj, PydanticObjectId):
             return str(obj)

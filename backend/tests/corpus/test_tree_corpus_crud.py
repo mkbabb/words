@@ -52,7 +52,7 @@ class TestTreeCorpusCRUD:
             corpus_name="child1",
             vocabulary=["child", "one"],
             language=Language.ENGLISH,
-            parent_corpus_id=saved_master.corpus_id,
+            parent_uuid=saved_master.corpus_uuid,
         )
         saved_child1 = await manager.save_corpus(child1)
 
@@ -60,7 +60,7 @@ class TestTreeCorpusCRUD:
             corpus_name="child2",
             vocabulary=["child", "two"],
             language=Language.ENGLISH,
-            parent_corpus_id=saved_master.corpus_id,
+            parent_uuid=saved_master.corpus_uuid,
         )
         saved_child2 = await manager.save_corpus(child2)
 
@@ -69,15 +69,15 @@ class TestTreeCorpusCRUD:
             corpus_name="grandchild",
             vocabulary=["grand", "child"],
             language=Language.ENGLISH,
-            parent_corpus_id=saved_child1.corpus_id,
+            parent_uuid=saved_child1.corpus_uuid,
         )
         saved_grandchild = await manager.save_corpus(grandchild)
 
         # Verify relationships
-        assert saved_child1.parent_corpus_id == saved_master.corpus_id
-        assert saved_child2.parent_corpus_id == saved_master.corpus_id
+        assert saved_child1.parent_uuid == saved_master.corpus_uuid
+        assert saved_child2.parent_uuid == saved_master.corpus_uuid
         assert saved_grandchild is not None
-        assert saved_grandchild.parent_corpus_id == saved_child1.corpus_id
+        assert saved_grandchild.parent_uuid == saved_child1.corpus_uuid
 
     async def test_read_corpus(self, test_db):
         """Test reading corpus by ID and name."""
@@ -163,7 +163,7 @@ class TestTreeCorpusCRUD:
             corpus_name="cascade-child",
             vocabulary=["child"],
             language=Language.ENGLISH,
-            parent_corpus_id=saved_master.corpus_id,
+            parent_uuid=saved_master.corpus_uuid,
         )
         saved_child = await manager.save_corpus(child)
 
@@ -171,7 +171,7 @@ class TestTreeCorpusCRUD:
             corpus_name="cascade-grandchild",
             vocabulary=["grandchild"],
             language=Language.ENGLISH,
-            parent_corpus_id=saved_child.corpus_id,
+            parent_uuid=saved_child.corpus_uuid,
         )
         await manager.save_corpus(grandchild)
 
@@ -249,7 +249,7 @@ class TestTreeCorpusCRUD:
             corpus_name="movable-child",
             vocabulary=["child"],
             language=Language.ENGLISH,
-            parent_corpus_id=saved_parent1.corpus_id,
+            parent_uuid=saved_parent1.corpus_uuid,
         )
         saved_child = await manager.save_corpus(child)
 
@@ -261,7 +261,7 @@ class TestTreeCorpusCRUD:
 
         # Verify move
         moved_child = await manager.get_corpus(corpus_id=saved_child.corpus_id)
-        assert moved_child.parent_corpus_id == saved_parent2.corpus_id
+        assert moved_child.parent_uuid == saved_parent2.corpus_uuid
 
     async def test_remove_child(self, test_db):
         """Test removing child from parent without deletion."""
@@ -279,12 +279,12 @@ class TestTreeCorpusCRUD:
             corpus_name="removable-child",
             vocabulary=["child"],
             language=Language.ENGLISH,
-            parent_corpus_id=saved_parent.corpus_id,
+            parent_uuid=saved_parent.corpus_uuid,
         )
         saved_child = await manager.save_corpus(child)
 
         # Update parent to track child
-        saved_parent.child_corpus_ids = [saved_child.corpus_id]
+        saved_parent.child_uuids = [saved_child.corpus_uuid]
         await manager.save_corpus(saved_parent)
 
         # Remove child from parent (but don't delete)
@@ -298,11 +298,11 @@ class TestTreeCorpusCRUD:
         # Child should still exist but without parent
         orphan = await manager.get_corpus(corpus_id=saved_child.corpus_id)
         assert orphan is not None
-        assert orphan.parent_corpus_id is None
+        assert orphan.parent_uuid is None
 
         # Parent should not have child
         parent_after = await manager.get_corpus(corpus_id=saved_parent.corpus_id)
-        assert saved_child.corpus_id not in parent_after.child_corpus_ids
+        assert saved_child.corpus_uuid not in parent_after.child_uuids
 
     async def test_cache_invalidation(self, test_db):
         """Test cache invalidation on corpus changes."""

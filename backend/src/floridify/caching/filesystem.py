@@ -11,6 +11,8 @@ import diskcache as dc  # type: ignore[import-untyped]
 
 from ..utils.logging import get_logger
 from ..utils.paths import get_cache_directory
+import fnmatch
+import pickle
 
 logger = get_logger(__name__)
 
@@ -70,7 +72,6 @@ class FilesystemBackend:
 
             # For bytes, attempt pickle deserialization (most performant)
             if isinstance(data, bytes):
-                import pickle
 
                 return pickle.loads(data)
 
@@ -93,7 +94,6 @@ class FilesystemBackend:
                 data = value
             else:
                 # Use pickle for everything else (handles Pydantic, ObjectIds, etc.)
-                import pickle
 
                 data = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -114,13 +114,14 @@ class FilesystemBackend:
 
     async def clear_pattern(self, pattern: str) -> int:
         """Clear keys matching pattern."""
-        import fnmatch
 
         loop = asyncio.get_running_loop()
 
         def _clear() -> int:
             count = 0
-            for key in list(self.cache.keys()):
+            iter_keys = getattr(self.cache, "iterkeys", None)
+            keys = list(iter_keys()) if iter_keys else list(self.cache)
+            for key in keys:
                 if fnmatch.fnmatch(key, pattern):
                     del self.cache[key]
                     count += 1

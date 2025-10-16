@@ -16,6 +16,7 @@ from ..parsers import (
     parse_text_lines,
 )
 from .scrapers import default_scraper, scrape_french_expressions
+import json
 
 logger = get_logger(__name__)
 
@@ -96,7 +97,6 @@ class URLLanguageConnector(LanguageConnector):
             # Extract idioms from parsed JSON data
             if parser_type == ParserType.JSON_VOCABULARY and isinstance(content, str):
                 try:
-                    import json
 
                     json_data = json.loads(content)
                     if isinstance(json_data, dict) and "idioms" in json_data:

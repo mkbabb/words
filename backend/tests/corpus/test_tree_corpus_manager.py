@@ -47,22 +47,22 @@ async def test_child_relationships(manager: TreeCorpusManager) -> None:
         language=Language.ENGLISH,
         is_master=True,
     )
-    assert parent and parent.corpus_id
+    assert parent and parent.corpus_uuid
 
     child = await manager.save_corpus(
         corpus_name="child",
         content={"vocabulary": ["leaf"]},
         corpus_type=CorpusType.LEXICON,
         language=Language.ENGLISH,
-        parent_corpus_id=parent.corpus_id,
+        parent_uuid=parent.corpus_uuid,
     )
-    assert child and child.corpus_id
+    assert child and child.corpus_uuid
 
-    updated_parent = await manager.get_corpus(corpus_id=parent.corpus_id)
+    updated_parent = await manager.get_corpus(corpus_uuid=parent.corpus_uuid)
     assert updated_parent is not None
-    assert child.corpus_id in updated_parent.child_corpus_ids
+    assert child.corpus_uuid in updated_parent.child_uuids
 
-    aggregated = await manager.aggregate_vocabularies(parent.corpus_id)
+    aggregated = await manager.aggregate_vocabularies(corpus_uuid=parent.corpus_uuid)
     # Master corpora are containers - only children's vocabulary is aggregated
     assert aggregated == sorted({"leaf"})
 

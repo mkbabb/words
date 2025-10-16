@@ -91,14 +91,14 @@ async def list_corpora(
                         "corpus_type": corpus.corpus_type.value if corpus.corpus_type else "custom",
                         "vocabulary_size": len(corpus.vocabulary),
                         "unique_words": corpus.unique_word_count,
-                        "has_semantic": corpus.semantic_index_id is not None,
-                        "created_at": doc.created_at,
-                        "updated_at": doc.last_updated,
+                        "has_semantic": False,  # TODO: Query SemanticIndex for this corpus
+                        "created_at": doc.version_info.created_at,
+                        "updated_at": doc.version_info.created_at,  # Use created_at for both until we add updated_at
                         "description": None,
                         "statistics": {
                             "vocabulary_hash": corpus.vocabulary_hash,
                             "is_master": corpus.is_master,
-                            "child_count": len(corpus.child_corpus_ids),
+                            "child_count": len(corpus.child_uuids),
                         }
                         if params.include_stats
                         else {},
@@ -151,16 +151,16 @@ async def get_corpus(
             "corpus_type": corpus.corpus_type.value if corpus.corpus_type else "custom",
             "vocabulary_size": len(corpus.vocabulary),
             "unique_words": corpus.unique_word_count,
-            "has_semantic": corpus.semantic_index_id is not None,
-            "created_at": metadata.created_at,
-            "updated_at": metadata.last_updated,
+            "has_semantic": False,  # TODO: Query SemanticIndex for this corpus
+            "created_at": metadata.version_info.created_at,
+            "updated_at": metadata.version_info.created_at,  # Use created_at for both until we add updated_at
             "description": None,
             "statistics": {
                 "vocabulary_hash": corpus.vocabulary_hash,
                 "is_master": corpus.is_master,
-                "child_count": len(corpus.child_corpus_ids),
-                "parent_id": str(corpus.parent_corpus_id) if corpus.parent_corpus_id else None,
-                "has_trie": corpus.trie_index_id is not None,
+                "child_count": len(corpus.child_uuids),
+                "parent_id": corpus.parent_uuid,
+                "has_trie": False,  # TODO: Query TrieIndex for this corpus
             }
             if include_stats
             else {},
@@ -175,7 +175,7 @@ async def get_corpus(
         raise HTTPException(status_code=500, detail=f"Failed to get corpus: {e!s}")
 
 
-@router.post("/corpus", response_model=CorpusResponse)
+@router.post("/corpus", response_model=CorpusResponse, status_code=201)
 async def create_corpus(
     params: CorpusCreateParams,
 ) -> CorpusResponse:
@@ -228,9 +228,9 @@ async def create_corpus(
             "corpus_type": corpus.corpus_type.value if corpus.corpus_type else "custom",
             "vocabulary_size": len(corpus.vocabulary),
             "unique_words": corpus.unique_word_count,
-            "has_semantic": corpus.semantic_index_id is not None,
-            "created_at": metadata.created_at,
-            "updated_at": metadata.last_updated,
+            "has_semantic": False,  # TODO: Query SemanticIndex for this corpus
+            "created_at": metadata.version_info.created_at,
+            "updated_at": metadata.version_info.created_at,  # Use created_at for both until we add updated_at
             "description": params.description,
             "statistics": {
                 "vocabulary_hash": corpus.vocabulary_hash,

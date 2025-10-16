@@ -53,15 +53,15 @@ class TestCascadeDeletion:
         await search_index.save()
 
         # Verify SearchIndex exists
-        retrieved_search = await SearchIndex.get(corpus_id=test_corpus.corpus_id)
+        retrieved_search = await SearchIndex.get(corpus_uuid=test_corpus.corpus_uuid)
         assert retrieved_search is not None
-        assert retrieved_search.corpus_id == test_corpus.corpus_id
+        assert retrieved_search.corpus_uuid == test_corpus.corpus_uuid
 
         # Delete the corpus (should cascade to SearchIndex)
         await test_corpus.delete()
 
         # Verify SearchIndex is deleted
-        deleted_search = await SearchIndex.get(corpus_id=test_corpus.corpus_id)
+        deleted_search = await SearchIndex.get(corpus_uuid=test_corpus.corpus_uuid)
         assert deleted_search is None
 
     @pytest.mark.asyncio
@@ -80,20 +80,20 @@ class TestCascadeDeletion:
         await search_index.save()
 
         # Verify both exist
-        retrieved_trie = await TrieIndex.get(corpus_id=test_corpus.corpus_id)
+        retrieved_trie = await TrieIndex.get(corpus_uuid=test_corpus.corpus_uuid)
         assert retrieved_trie is not None
 
-        retrieved_search = await SearchIndex.get(corpus_id=test_corpus.corpus_id)
+        retrieved_search = await SearchIndex.get(corpus_uuid=test_corpus.corpus_uuid)
         assert retrieved_search is not None
 
         # Delete SearchIndex (should cascade to TrieIndex)
         await search_index.delete()
 
         # Verify both are deleted
-        deleted_trie = await TrieIndex.get(corpus_id=test_corpus.corpus_id)
+        deleted_trie = await TrieIndex.get(corpus_uuid=test_corpus.corpus_uuid)
         assert deleted_trie is None
 
-        deleted_search = await SearchIndex.get(corpus_id=test_corpus.corpus_id)
+        deleted_search = await SearchIndex.get(corpus_uuid=test_corpus.corpus_uuid)
         assert deleted_search is None
 
     @pytest.mark.asyncio
@@ -120,12 +120,12 @@ class TestCascadeDeletion:
 
         # Verify both exist
         retrieved_semantic = await SemanticIndex.get(
-            corpus_id=test_corpus.corpus_id,
+            corpus_uuid=test_corpus.corpus_uuid,
             model_name="all-MiniLM-L6-v2",
         )
         assert retrieved_semantic is not None
 
-        retrieved_search = await SearchIndex.get(corpus_id=test_corpus.corpus_id)
+        retrieved_search = await SearchIndex.get(corpus_uuid=test_corpus.corpus_uuid)
         assert retrieved_search is not None
 
         # Delete SearchIndex (should cascade to SemanticIndex)
@@ -133,12 +133,12 @@ class TestCascadeDeletion:
 
         # Verify both are deleted
         deleted_semantic = await SemanticIndex.get(
-            corpus_id=test_corpus.corpus_id,
+            corpus_uuid=test_corpus.corpus_uuid,
             model_name="all-MiniLM-L6-v2",
         )
         assert deleted_semantic is None
 
-        deleted_search = await SearchIndex.get(corpus_id=test_corpus.corpus_id)
+        deleted_search = await SearchIndex.get(corpus_uuid=test_corpus.corpus_uuid)
         assert deleted_search is None
 
     @pytest.mark.asyncio
@@ -170,29 +170,29 @@ class TestCascadeDeletion:
         await search_index.save()
 
         # Verify all exist
-        assert await TrieIndex.get(corpus_id=test_corpus.corpus_id) is not None
+        assert await TrieIndex.get(corpus_uuid=test_corpus.corpus_uuid) is not None
         assert (
             await SemanticIndex.get(
-                corpus_id=test_corpus.corpus_id,
+                corpus_uuid=test_corpus.corpus_uuid,
                 model_name="all-MiniLM-L6-v2",
             )
             is not None
         )
-        assert await SearchIndex.get(corpus_id=test_corpus.corpus_id) is not None
+        assert await SearchIndex.get(corpus_uuid=test_corpus.corpus_uuid) is not None
 
         # Delete the corpus (should cascade to all indices)
         await test_corpus.delete()
 
         # Verify all are deleted
-        assert await TrieIndex.get(corpus_id=test_corpus.corpus_id) is None
+        assert await TrieIndex.get(corpus_uuid=test_corpus.corpus_uuid) is None
         assert (
             await SemanticIndex.get(
-                corpus_id=test_corpus.corpus_id,
+                corpus_uuid=test_corpus.corpus_uuid,
                 model_name="all-MiniLM-L6-v2",
             )
             is None
         )
-        assert await SearchIndex.get(corpus_id=test_corpus.corpus_id) is None
+        assert await SearchIndex.get(corpus_uuid=test_corpus.corpus_uuid) is None
 
     @pytest.mark.asyncio
     async def test_trie_index_deletion_standalone(
@@ -204,15 +204,15 @@ class TestCascadeDeletion:
         await trie_index.save()
 
         # Verify it exists
-        retrieved = await TrieIndex.get(corpus_id=test_corpus.corpus_id)
+        retrieved = await TrieIndex.get(corpus_uuid=test_corpus.corpus_uuid)
         assert retrieved is not None
-        assert retrieved.corpus_id == test_corpus.corpus_id
+        assert retrieved.corpus_uuid == test_corpus.corpus_uuid
 
         # Delete it
         await trie_index.delete()
 
         # Verify it's deleted
-        deleted = await TrieIndex.get(corpus_id=test_corpus.corpus_id)
+        deleted = await TrieIndex.get(corpus_uuid=test_corpus.corpus_uuid)
         assert deleted is None
 
     @pytest.mark.asyncio
@@ -229,18 +229,18 @@ class TestCascadeDeletion:
 
         # Verify it exists
         retrieved = await SemanticIndex.get(
-            corpus_id=test_corpus.corpus_id,
+            corpus_uuid=test_corpus.corpus_uuid,
             model_name="all-MiniLM-L6-v2",
         )
         assert retrieved is not None
-        assert retrieved.corpus_id == test_corpus.corpus_id
+        assert retrieved.corpus_uuid == test_corpus.corpus_uuid
 
         # Delete it
         await semantic_index.delete()
 
         # Verify it's deleted
         deleted = await SemanticIndex.get(
-            corpus_id=test_corpus.corpus_id,
+            corpus_uuid=test_corpus.corpus_uuid,
             model_name="all-MiniLM-L6-v2",
         )
         assert deleted is None
@@ -251,16 +251,18 @@ class TestCascadeDeletion:
     ):
         """Test deletion when TrieIndex reference exists but index is missing."""
         # Create SearchIndex with trie reference but no actual TrieIndex
+        from beanie import PydanticObjectId
+
         search_index = await SearchIndex.create(corpus=test_corpus, semantic=False)
         search_index.has_trie = True
-        search_index.trie_index_id = test_corpus.corpus_id  # Fake reference
+        search_index.trie_index_id = PydanticObjectId()  # Fake reference
         await search_index.save()
 
         # Delete should succeed even though TrieIndex doesn't exist
         await search_index.delete()
 
         # Verify SearchIndex is deleted
-        deleted = await SearchIndex.get(corpus_id=test_corpus.corpus_id)
+        deleted = await SearchIndex.get(corpus_uuid=test_corpus.corpus_uuid)
         assert deleted is None
 
     @pytest.mark.asyncio
@@ -269,20 +271,22 @@ class TestCascadeDeletion:
     ):
         """Test deletion when SemanticIndex reference exists but index is missing."""
         # Create SearchIndex with semantic reference but no actual SemanticIndex
+        from beanie import PydanticObjectId
+
         search_index = await SearchIndex.create(
             corpus=test_corpus,
             semantic=True,
             semantic_model="all-MiniLM-L6-v2",
         )
         search_index.has_semantic = True
-        search_index.semantic_index_id = test_corpus.corpus_id  # Fake reference
+        search_index.semantic_index_id = PydanticObjectId()  # Fake reference
         await search_index.save()
 
         # Delete should succeed even though SemanticIndex doesn't exist
         await search_index.delete()
 
         # Verify SearchIndex is deleted
-        deleted = await SearchIndex.get(corpus_id=test_corpus.corpus_id)
+        deleted = await SearchIndex.get(corpus_uuid=test_corpus.corpus_uuid)
         assert deleted is None
 
     @pytest.mark.asyncio
@@ -382,14 +386,14 @@ class TestCascadeDeletion:
         from beanie import PydanticObjectId
 
         search_index = SearchIndex(
-            corpus_id=PydanticObjectId(),  # Invalid ID
+            corpus_uuid="invalid-uuid",
             corpus_name="invalid",
             vocabulary_hash="",
         )
-        search_index.corpus_id = None  # type: ignore
+        search_index.corpus_uuid = None  # type: ignore
 
         # Should raise ValueError
-        with pytest.raises(ValueError, match="corpus_id"):
+        with pytest.raises(ValueError, match="corpus_uuid"):
             await search_index.delete()
 
     @pytest.mark.asyncio
@@ -425,12 +429,12 @@ class TestCascadeDeletion:
         await corpus1.delete()
 
         # Verify corpus1 and its index are deleted
-        assert await Corpus.get(corpus_id=corpus1.corpus_id) is None
-        assert await SearchIndex.get(corpus_id=corpus1.corpus_id) is None
+        assert await Corpus.get(corpus_uuid=corpus1.corpus_uuid) is None
+        assert await SearchIndex.get(corpus_uuid=corpus1.corpus_uuid) is None
 
         # Verify corpus2 and its index still exist
-        assert await Corpus.get(corpus_id=corpus2.corpus_id) is not None
-        assert await SearchIndex.get(corpus_id=corpus2.corpus_id) is not None
+        assert await Corpus.get(corpus_uuid=corpus2.corpus_uuid) is not None
+        assert await SearchIndex.get(corpus_uuid=corpus2.corpus_uuid) is not None
 
         # Clean up
         await corpus2.delete()

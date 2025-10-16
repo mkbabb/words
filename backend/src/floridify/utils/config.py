@@ -173,27 +173,51 @@ class Config:
 
         data = toml.load(config_path)
 
-        # Load configurations with defaults
+        # Validate required sections exist
+        if "openai" not in data:
+            raise ValueError(
+                f"Missing [openai] section in {config_path}\n"
+                f"Please add OpenAI configuration with api_key field.",
+            )
+
+        # Load OpenAI config with explicit validation
+        openai_data = data["openai"]
+        if "api_key" not in openai_data or not openai_data["api_key"]:
+            raise ValueError(
+                f"OpenAI API key missing in {config_path}\n"
+                f"Please set 'api_key' in the [openai] section.",
+            )
+
+        models_data = data.get("models", {})
         openai_config = OpenAIConfig(
-            api_key=data.get("openai", {}).get("api_key", ""),
-            model=data.get("models", {}).get("openai_model", "gpt-4o"),
-            reasoning_effort=data.get("models", {}).get("reasoning_effort", "high"),
-            embedding_model=data.get("models", {}).get("embedding_model", "text-embedding-3-large"),
+            api_key=openai_data["api_key"],
+            model=models_data.get("openai_model", "gpt-4o"),
+            reasoning_effort=models_data.get("reasoning_effort", "high"),
+            embedding_model=models_data.get("embedding_model", "text-embedding-3-large"),
         )
 
+        # Load Oxford config (optional for some features)
+        oxford_data = data.get("oxford", {})
         oxford_config = OxfordConfig(
-            app_id=data.get("oxford", {}).get("app_id", ""),
-            api_key=data.get("oxford", {}).get("api_key", ""),
+            app_id=oxford_data.get("app_id", ""),
+            api_key=oxford_data.get("api_key", ""),
         )
 
-        # Load Merriam-Webster config if present
+        # Load Merriam-Webster config (optional)
         merriam_webster_config = None
         if "merriam_webster" in data:
             mw_data = data["merriam_webster"]
-            if "api_key" in mw_data:
+            if "api_key" in mw_data and mw_data["api_key"]:
                 merriam_webster_config = MerriamWebsterConfig(api_key=mw_data["api_key"])
 
-        db_data = data.get("database", {})
+        # Load database config with validation
+        if "database" not in data:
+            raise ValueError(
+                f"Missing [database] section in {config_path}\n"
+                f"Please add database configuration.",
+            )
+
+        db_data = data["database"]
         database_config = DatabaseConfig(
             production_url=db_data.get("production_url", ""),
             development_url=db_data.get("development_url", ""),
@@ -205,24 +229,25 @@ class Config:
             max_pool_size=db_data.get("max_pool_size", 100),
         )
 
+        # Load rate limits with explicit defaults (not silent fallbacks)
+        rate_limits_data = data.get("rate_limits", {})
         rate_limits = RateLimits(
-            oxford_rps=data.get("rate_limits", {}).get("oxford_rps", 10.0),
-            wiktionary_rps=data.get("rate_limits", {}).get("wiktionary_rps", 50.0),
-            openai_bulk_max_concurrent=data.get("rate_limits", {}).get(
-                "openai_bulk_max_concurrent",
-                5,
-            ),
+            oxford_rps=rate_limits_data.get("oxford_rps", 10.0),
+            wiktionary_rps=rate_limits_data.get("wiktionary_rps", 50.0),
+            openai_bulk_max_concurrent=rate_limits_data.get("openai_bulk_max_concurrent", 5),
         )
 
+        # Load processing config with explicit defaults
+        processing_data = data.get("processing", {})
         processing = ProcessingConfig(
-            max_concurrent_words=data.get("processing", {}).get("max_concurrent_words", 100),
-            batch_size=data.get("processing", {}).get("batch_size", 50),
-            retry_attempts=data.get("processing", {}).get("retry_attempts", 3),
-            cache_ttl_hours=data.get("processing", {}).get("cache_ttl_hours", 24),
-            verbose=data.get("processing", {}).get("verbose", False),
+            max_concurrent_words=processing_data.get("max_concurrent_words", 100),
+            batch_size=processing_data.get("batch_size", 50),
+            retry_attempts=processing_data.get("retry_attempts", 3),
+            cache_ttl_hours=processing_data.get("cache_ttl_hours", 24),
+            verbose=processing_data.get("verbose", False),
         )
 
-        # Load Google Cloud config if present
+        # Load Google Cloud config (optional)
         google_cloud = None
         if "google_cloud" in data:
             gc_data = data["google_cloud"]
@@ -231,14 +256,11 @@ class Config:
                 project_id=gc_data.get("project_id"),
                 tts_american_voice=gc_data.get("tts_american_voice", "en-US-Wavenet-D"),
                 tts_british_voice=gc_data.get("tts_british_voice", "en-GB-Wavenet-B"),
-                tts_american_voice_female=gc_data.get(
-                    "tts_american_voice_female",
-                    "en-US-Wavenet-F",
-                ),
+                tts_american_voice_female=gc_data.get("tts_american_voice_female", "en-US-Wavenet-F"),
                 tts_british_voice_female=gc_data.get("tts_british_voice_female", "en-GB-Wavenet-A"),
             )
 
-        # Load Semantic Search config if present
+        # Load Semantic Search config (optional)
         semantic_search = None
         if "semantic_search" in data:
             ss_data = data["semantic_search"]
@@ -249,7 +271,7 @@ class Config:
                 hnsw_ef_search=ss_data.get("hnsw_ef_search", 64),
             )
 
-        config = cls(
+        return cls(
             openai=openai_config,
             oxford=oxford_config,
             merriam_webster=merriam_webster_config,
@@ -259,12 +281,3 @@ class Config:
             google_cloud=google_cloud,
             semantic_search=semantic_search,
         )
-
-        # Validate required fields
-        if not config.openai.api_key:
-            raise ValueError(
-                f"OpenAI API key missing in {config_path}\n"
-                f"Please update the 'api_key' field in the [openai] section.",
-            )
-
-        return config

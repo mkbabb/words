@@ -7,13 +7,17 @@ from __future__ import annotations
 
 from typing import Any
 
+from floridify.storage.mongodb import get_storage
+
 from ..caching.models import VersionConfig
 from ..corpus.core import Corpus
+from ..corpus.language.core import LanguageCorpus
 from ..models.base import Language
 from ..utils.logging import get_logger
 from .constants import SearchMode
 from .core import Search
-from .models import SearchResult
+from .models import SearchIndex, SearchResult
+from .semantic.constants import DEFAULT_SENTENCE_MODEL
 
 logger = get_logger(__name__)
 
@@ -125,8 +129,6 @@ async def get_language_search(
     logger.info(f"Creating language search for {[lang.value for lang in languages]}")
 
     # Ensure storage is initialized before accessing database
-    from floridify.storage.mongodb import get_storage
-
     await get_storage()
 
     # Get or create corpus for these languages
@@ -152,17 +154,18 @@ async def get_language_search(
         config = VersionConfig(force_rebuild=force_rebuild)
 
         # First, try to get existing corpus
-        from ..corpus.language.core import LanguageCorpus
         corpus = await Corpus.get(corpus_name=corpus_name, config=config)
 
         # If not found or forcing rebuild, create a new LanguageCorpus with sources
         if not corpus or force_rebuild:
-            logger.info(f"Creating new language corpus '{corpus_name}' with sources for {language.value}")
+            logger.info(
+                f"Creating new language corpus '{corpus_name}' with sources for {language.value}"
+            )
             corpus = await LanguageCorpus.create_from_language(
                 corpus_name=corpus_name,
                 language=language,
                 semantic=semantic,
-                model_name="all-MiniLM-L6-v2",  # Default semantic model
+                model_name=DEFAULT_SENTENCE_MODEL,  # Use constant for model
             )
 
         if not corpus:
@@ -171,8 +174,6 @@ async def get_language_search(
         # Create search engine from corpus
         # When force_rebuild=True, we can't use from_corpus because it will skip loading
         # Instead, manually create the index and search engine with the corpus object we have
-        from floridify.search.models import SearchIndex
-
         index_config = VersionConfig(force_rebuild=force_rebuild)
         index = await SearchIndex.get_or_create(
             corpus=corpus,

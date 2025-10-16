@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 
 from ..utils.logging import get_logger
+import time
 
 logger = get_logger(__name__)
 
@@ -75,7 +76,6 @@ class AnkiConnectInterface:
             AnkiConnectError: If the request fails or returns an error
 
         """
-        import time
 
         start_time = time.time()
 
@@ -320,7 +320,6 @@ class AnkiDirectIntegration:
         if not await self.is_available():
             return False
 
-        import time
 
         start_time = time.time()
 

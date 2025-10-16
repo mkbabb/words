@@ -6,6 +6,7 @@ Provides comprehensive and fast normalization for different use cases.
 from __future__ import annotations
 
 import functools
+import multiprocessing as mp
 import os
 import unicodedata
 from collections.abc import Callable
@@ -13,6 +14,8 @@ from concurrent.futures import ProcessPoolExecutor
 
 import contractions  # type: ignore[import-untyped]
 import ftfy
+import nltk  # type: ignore[import-untyped]
+from nltk.stem import WordNetLemmatizer  # type: ignore[import-untyped]
 
 from ..utils.logging import get_logger
 from .constants import (
@@ -29,40 +32,34 @@ from .constants import (
 
 logger = get_logger(__name__)
 
-# Lazy NLTK lemmatizer initialization (saves ~1.1s on import)
-# OPTIMIZATION: NLTK and scipy are only imported when lemmatization is actually used
-_nltk_lemmatizer = None
+# Download NLTK data at module import time
+try:
+    nltk.data.find("corpora/wordnet")
+    nltk.data.find("taggers/averaged_perceptron_tagger")
+except LookupError:
+    try:
+        nltk.download("wordnet", quiet=True)
+        nltk.download("averaged_perceptron_tagger", quiet=True)
+        nltk.download("omw-1.4", quiet=True)
+    except Exception as e:
+        raise RuntimeError(
+            "Failed to download required NLTK data. "
+            "Please install NLTK data manually with: "
+            "python -m nltk.downloader wordnet averaged_perceptron_tagger omw-1.4"
+        ) from e
+
+# Lazy NLTK lemmatizer initialization
+_nltk_lemmatizer: WordNetLemmatizer | None = None
 
 
-def _get_lemmatizer():
-    """Get or create the NLTK lemmatizer singleton.
-
-    OPTIMIZATION: Lazy initialization reduces CLI boot time by ~1.1s (32% reduction).
-    NLTK imports scipy which is expensive, so we defer this until actually needed.
-    """
+def _get_lemmatizer() -> WordNetLemmatizer:
+    """Get or create the NLTK lemmatizer singleton."""
     global _nltk_lemmatizer
 
-    if _nltk_lemmatizer is not None:
-        return _nltk_lemmatizer
+    if _nltk_lemmatizer is None:
+        _nltk_lemmatizer = WordNetLemmatizer()
+        logger.debug("NLTK lemmatizer initialized")
 
-    # Lazy imports
-    import nltk  # type: ignore[import-untyped]
-    from nltk.stem import WordNetLemmatizer  # type: ignore[import-untyped]
-
-    # Download NLTK data if missing (only on first use)
-    try:
-        nltk.data.find("corpora/wordnet")
-        nltk.data.find("taggers/averaged_perceptron_tagger")
-    except LookupError:
-        try:
-            nltk.download("wordnet", quiet=True)
-            nltk.download("averaged_perceptron_tagger", quiet=True)
-            nltk.download("omw-1.4", quiet=True)
-        except Exception:
-            logger.error("Failed to download NLTK data")
-
-    _nltk_lemmatizer = WordNetLemmatizer()
-    logger.debug("NLTK lemmatizer initialized (lazy)")
     return _nltk_lemmatizer
 
 
@@ -335,9 +332,6 @@ def lemmatize_basic(word: str) -> str:
 def _get_wordnet_pos(word: str) -> str:
     """Convert POS tag to WordNet format for better lemmatization."""
     try:
-        # Lazy import
-        import nltk  # type: ignore[import-untyped]
-
         # Get POS tag
         pos_tag = nltk.pos_tag([word])[0][1]
 
@@ -415,11 +409,6 @@ def _lemmatize_chunk(chunk: list[str]) -> list[str]:
     Helper function that reinitializes NLTK in each process.
     """
     # Each process needs its own NLTK lemmatizer
-
-    # Initialize lemmatizer for this process (lazy import in worker)
-    import nltk  # type: ignore[import-untyped]
-    from nltk.stem import WordNetLemmatizer  # type: ignore[import-untyped]
-
     process_lemmatizer = WordNetLemmatizer()
 
     lemmas = []
@@ -511,9 +500,6 @@ def batch_lemmatize(
     if len(words) < 10000:
         lemmas = [lemmatize_comprehensive(word) if word else "" for word in words]
         return _build_lemma_indices(lemmas)
-
-    import multiprocessing as mp
-    import os
 
     # Determine optimal process count
     if n_processes is None:

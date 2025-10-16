@@ -12,6 +12,7 @@ from botocore.exceptions import ClientError
 
 from ..utils.logging import get_logger
 from .core import TrainingConfig
+import json
 
 logger = get_logger(__name__)
 
@@ -261,7 +262,6 @@ class SageMakerDeployer:
         }
 
         config_path = output_path / self.DEPLOYMENT_CONFIG_FILE
-        import json
 
         with open(config_path, "w") as f:
             json.dump(deployment_config, f, indent=2)

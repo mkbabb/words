@@ -245,7 +245,7 @@ class TestSemanticSearchEndToEnd:
         await engine.initialize()
 
         # Search for words similar to "happy"
-        results = engine.search("happy", max_results=5)
+        results = await engine.search("happy", max_results=5)
 
         assert len(results) > 0
         words = [r.word for r in results]
@@ -267,7 +267,7 @@ class TestSemanticSearchEndToEnd:
         await engine.initialize()
 
         # Search for words similar to "dog"
-        results = engine.search("dog", max_results=5)
+        results = await engine.search("dog", max_results=5)
 
         assert len(results) > 0
         words = [r.word for r in results]
@@ -295,12 +295,12 @@ class TestSemanticSearchEndToEnd:
         )
 
         # Verify version metadata exists
-        assert engine1.semantic_index is not None
-        assert engine2.semantic_index is not None
+        assert engine1.index is not None
+        assert engine2.index is not None
 
         # Both should have same vocabulary hash
-        if hasattr(engine1.semantic_index, "vocabulary_hash"):
-            assert engine1.semantic_index.vocabulary_hash == engine2.semantic_index.vocabulary_hash
+        if hasattr(engine1.index, "vocabulary_hash"):
+            assert engine1.index.vocabulary_hash == engine2.index.vocabulary_hash
 
     @pytest.mark.asyncio
     async def test_search_with_threshold(self, small_corpus: Corpus, test_db):
@@ -309,10 +309,10 @@ class TestSemanticSearchEndToEnd:
         await engine.initialize()
 
         # Search with high threshold
-        results_high = engine.search("happy", max_results=10, min_score=0.6)
+        results_high = await engine.search("happy", max_results=10, min_score=0.6)
 
         # Search with low threshold
-        results_low = engine.search("happy", max_results=10, min_score=0.1)
+        results_low = await engine.search("happy", max_results=10, min_score=0.1)
 
         # High threshold should have fewer results
         assert len(results_high) <= len(results_low)
@@ -328,7 +328,7 @@ class TestSemanticSearchEndToEnd:
         await engine.initialize()
 
         # Search for writing-related words
-        results = engine.search("writing", max_results=10)
+        results = await engine.search("writing", max_results=10)
 
         assert len(results) > 0
         words = [r.word for r in results]
@@ -346,13 +346,13 @@ class TestSemanticSearchEndToEnd:
         await engine.initialize()
 
         # Search for Shakespearean words
-        results = engine.search("shakespeare", max_results=10)
+        results = await engine.search("shakespeare", max_results=10)
         words = [r.word for r in results]
 
         # Even if "shakespeare" isn't in vocab, should find related archaic words
 
         # Search for actual vocab word
-        results = engine.search("thou", max_results=5)
+        results = await engine.search("thou", max_results=5)
         words = [r.word for r in results]
 
         # Should find other archaic pronouns
@@ -404,7 +404,7 @@ class TestSemanticSearchEndToEnd:
         await engine.initialize()
 
         # Search for technical term
-        results = engine.search("computer", max_results=5)
+        results = await engine.search("computer", max_results=5)
         words = [r.word for r in results]
 
         # Should find other technical terms first
@@ -419,9 +419,9 @@ class TestSemanticSearchEndToEnd:
         await engine.initialize()
 
         # Check index has model info
-        assert engine.semantic_index is not None
-        assert hasattr(engine.semantic_index, "model_name")
-        assert engine.semantic_index.model_name is not None
+        assert engine.index is not None
+        assert hasattr(engine.index, "model_name")
+        assert engine.index.model_name is not None
 
         # Verify embeddings match expected dimensions for the model
         expected_dim = engine._get_embedding_dimension()
@@ -474,17 +474,17 @@ class TestSemanticSearchEndToEnd:
         await engine.initialize()
 
         # Empty string
-        results = engine.search("")
+        results = await engine.search("")
         assert isinstance(results, list)
         assert len(results) == 0
 
         # Whitespace only
-        results = engine.search("   ")
+        results = await engine.search("   ")
         assert isinstance(results, list)
         assert len(results) == 0
 
         # None should be handled
-        results = engine.search(None)
+        results = await engine.search(None)
         assert isinstance(results, list)
         assert len(results) == 0
 
@@ -495,15 +495,15 @@ class TestSemanticSearchEndToEnd:
         await engine.initialize()
 
         # Query with punctuation
-        results = engine.search("happy!", max_results=5)
+        results = await engine.search("happy!", max_results=5)
         assert len(results) > 0
 
         # Query with numbers
-        results = engine.search("happy123", max_results=5)
+        results = await engine.search("happy123", max_results=5)
         assert len(results) >= 0  # Should handle gracefully
 
         # Query with unicode
-        results = engine.search("happy😀", max_results=5)
+        results = await engine.search("happy😀", max_results=5)
         assert len(results) >= 0  # Should handle gracefully
 
     @pytest.mark.asyncio
@@ -539,5 +539,5 @@ class TestSemanticSearchEndToEnd:
             assert engine.sentence_embeddings is not None
 
             # Should handle search properly regardless of strategy
-            results = engine.search("word_5", max_results=5)
+            results = await engine.search("word_5", max_results=5)
             assert len(results) > 0

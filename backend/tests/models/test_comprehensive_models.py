@@ -142,7 +142,7 @@ class TestModelValidation:
         """Test SearchIndex validation."""
         # Valid index
         valid_index = SearchIndex(
-            corpus_id=PydanticObjectId(),
+            corpus_uuid="test-corpus-uuid",
             corpus_name="test-corpus",
             vocabulary_hash="test-hash-123",
         )
@@ -152,7 +152,7 @@ class TestModelValidation:
         # Invalid - missing required fields
         with pytest.raises(ValidationError):
             SearchIndex(
-                corpus_id=PydanticObjectId(),
+                corpus_uuid="test-corpus-uuid",
                 # Missing required corpus_name and vocabulary_hash
             )
 
@@ -201,22 +201,22 @@ class TestModelRelationships:
             corpus_name="child-corpus",
             vocabulary=["child"],
             language=Language.ENGLISH,
-            parent_corpus_id=parent.corpus_id,  # Use parent directly, not saved_parent
+            parent_uuid=parent.corpus_id,  # Use parent directly, not saved_parent
         )
         child_save_result = await child.save()
         assert child_save_result is True
 
         # Verify relationship exists in the objects
-        assert child.parent_corpus_id == parent.corpus_id
+        assert child.parent_uuid == parent.corpus_id
 
         # Update parent's children list
-        parent.child_corpus_ids.append(child.corpus_id)
+        parent.child_uuids.append(child.corpus_id)
         await parent.save()
 
         # Test basic relationship data (since retrieval may not be implemented)
         assert parent.corpus_id is not None
         assert child.corpus_id is not None
-        assert child.parent_corpus_id == parent.corpus_id
+        assert child.parent_uuid == parent.corpus_id
 
     async def test_corpus_tree_hierarchy(self, test_db):
         """Test multi-level corpus hierarchy."""
@@ -234,7 +234,7 @@ class TestModelRelationships:
             corpus_name="child1",
             vocabulary=["child1"],
             language=Language.ENGLISH,
-            parent_corpus_id=master.corpus_id,
+            parent_uuid=master.corpus_id,
         )
         child1_saved = await child1.save()
         assert child1_saved is True
@@ -243,15 +243,15 @@ class TestModelRelationships:
             corpus_name="grandchild",
             vocabulary=["grandchild"],
             language=Language.ENGLISH,
-            parent_corpus_id=child1.corpus_id,
+            parent_uuid=child1.corpus_id,
         )
         grandchild_saved = await grandchild.save()
         assert grandchild_saved is True
 
         # Verify hierarchy
-        assert grandchild.parent_corpus_id == child1.corpus_id
-        assert child1.parent_corpus_id == master.corpus_id
-        assert master.parent_corpus_id is None
+        assert grandchild.parent_uuid == child1.corpus_id
+        assert child1.parent_uuid == master.corpus_id
+        assert master.parent_uuid is None
 
 
 @pytest.mark.asyncio
@@ -440,7 +440,7 @@ class TestMongoDBIntegration:
         assert result is True
 
         # Retrieve fresh copy and verify updates
-        retrieved = await Corpus.get(corpus_id=corpus_id)
+        retrieved = await Corpus.get(corpus_uuid=corpus.corpus_uuid)
         assert retrieved is not None
         assert "initial" in retrieved.vocabulary
         assert "updated" in retrieved.vocabulary
@@ -463,7 +463,7 @@ class TestMongoDBIntegration:
         await corpus.delete()
 
         # Verify deletion
-        deleted = await Corpus.get(corpus_id=corpus_id)
+        deleted = await Corpus.get(corpus_uuid=corpus.corpus_uuid)
         assert deleted is None
 
     async def test_bulk_operations(self, test_db):

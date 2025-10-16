@@ -20,6 +20,7 @@ from floridify.corpus.core import Corpus
 from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
 from floridify.search.models import SearchIndex, TrieIndex
+from floridify.search.semantic.constants import DEFAULT_SENTENCE_MODEL
 from floridify.search.semantic.models import SemanticIndex
 
 
@@ -235,7 +236,7 @@ class TestMongoDBVersioning:
                     is_latest=True,
                 ),
                 vocabulary_hash="vocab_hash_1",  # Same as corpus
-                corpus_id=corpus.id,
+                corpus_uuid=corpus.uuid,
                 content_inline={"trie_data": ["apple", "banana"]},
             )
         )
@@ -251,7 +252,7 @@ class TestMongoDBVersioning:
                     is_latest=True,
                 ),
                 vocabulary_hash="vocab_hash_1",  # Same as corpus
-                corpus_id=corpus.id,
+                corpus_uuid=corpus.uuid,
                 model_name="test-model",
                 content_inline={"embeddings": "base64_embeddings"},
             )
@@ -318,7 +319,7 @@ class TestMongoDBVersioning:
                     is_latest=True,
                 ),
                 vocabulary_hash="vocab_hash",
-                corpus_id=corpus.id,
+                corpus_uuid=corpus.uuid,
                 content_inline={"trie_data": ["test"]},
             )
         )
@@ -334,7 +335,7 @@ class TestMongoDBVersioning:
                     is_latest=True,
                 ),
                 vocabulary_hash="vocab_hash",
-                corpus_id=corpus.id,
+                corpus_uuid=corpus.uuid,
                 has_trie=True,
                 has_fuzzy=True,
                 has_semantic=False,
@@ -389,8 +390,8 @@ class TestMongoDBVersioning:
                     is_latest=True,
                 ),
                 vocabulary_hash="vocab_hash",
-                corpus_id=PydanticObjectId(),
-                model_name="sentence-transformers/all-MiniLM-L6-v2",
+                corpus_uuid="test-semantic-corpus-uuid",
+                model_name=DEFAULT_SENTENCE_MODEL,
                 embedding_dimension=384,
                 index_type="flat",
                 content_location="cache://semantic_test_v1",  # External storage
@@ -406,7 +407,7 @@ class TestMongoDBVersioning:
         # Load and verify
         loaded = await SemanticIndex.Metadata.get(semantic.id)
         assert loaded is not None
-        assert loaded.model_name == "sentence-transformers/all-MiniLM-L6-v2"
+        assert loaded.model_name == DEFAULT_SENTENCE_MODEL
         assert loaded.embedding_dimension == 384
         assert loaded.content_location == "cache://semantic_test_v1"
 
@@ -431,7 +432,7 @@ class TestMongoDBVersioning:
                         supersedes=prev_id,
                     ),
                     vocabulary_hash=f"vocab_hash_{i}",
-                    corpus_id=PydanticObjectId(),
+                    corpus_uuid="test-trie-versioned-corpus-uuid",
                     content_inline={
                         "trie_data": [f"word_{j}" for j in range(i + 1)],
                         "word_frequencies": {f"word_{j}": j + 1 for j in range(i + 1)},
@@ -461,7 +462,7 @@ class TestMongoDBVersioning:
         self, version_manager: VersionedDataManager, test_db
     ):
         """Test SearchIndex with versioned component references."""
-        corpus_id = PydanticObjectId()
+        corpus_uuid = "test-search-composite-corpus-uuid"
 
         # Create SearchIndex with component references
         search = await version_manager.save_versioned_data(
@@ -475,7 +476,7 @@ class TestMongoDBVersioning:
                     is_latest=True,
                 ),
                 vocabulary_hash="vocab_hash",
-                corpus_id=corpus_id,
+                corpus_uuid=corpus_uuid,
                 has_trie=True,
                 has_fuzzy=True,
                 has_semantic=True,
@@ -507,7 +508,7 @@ class TestMongoDBVersioning:
                     supersedes=search.id,
                 ),
                 vocabulary_hash="vocab_hash_2",
-                corpus_id=corpus_id,
+                corpus_uuid=corpus_uuid,
                 has_trie=True,
                 has_fuzzy=True,
                 has_semantic=True,

@@ -17,6 +17,9 @@ from ...models.dictionary import (
 from ...storage.mongodb import MongoDBStorage
 from ...utils.logging import get_logger
 from ..utils.formatting import format_error, format_warning
+from pathlib import Path
+import gzip
+import json
 
 logger = get_logger(__name__)
 
@@ -239,9 +242,6 @@ def backup_database(output: str | None, backup_format: str, compress: bool) -> N
 
 async def _backup_database_async(output: str | None, backup_format: str, compress: bool) -> None:
     """Async implementation of database backup."""
-    import gzip
-    import json
-    from pathlib import Path
 
     from rich.progress import Progress, SpinnerColumn, TextColumn
 

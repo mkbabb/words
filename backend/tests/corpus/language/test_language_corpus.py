@@ -63,9 +63,10 @@ async def test_add_language_source_builds_child(connector: StubConnector, test_d
     child_id = await corpus.add_language_source(source, connector=connector)
     assert child_id is not None
 
-    refreshed = await TreeCorpusManager().get_corpus(corpus_id=corpus.corpus_id)
+    # Use corpus_name (stable across versions) instead of corpus_id (changes with each version)
+    refreshed = await TreeCorpusManager().get_corpus(corpus_name=corpus.corpus_name)
     assert refreshed is not None
-    assert len(refreshed.child_corpus_ids) == 1
+    assert len(refreshed.child_uuids) == 1
     assert sorted(refreshed.vocabulary) == ["alpha", "alpha beta", "beta"]
 
 
@@ -88,19 +89,23 @@ async def test_remove_language_source(connector: StubConnector, test_db) -> None
     )
     child_id = await corpus.add_language_source(source, connector=connector)
     assert child_id is not None
-    assert child_id in corpus.child_corpus_ids
+    # Get the child to check its UUID is in parent's child_uuids
+    child = await TreeCorpusManager().get_corpus(corpus_id=child_id)
+    assert child is not None
+    assert child.corpus_uuid in corpus.child_uuids
 
     await corpus.remove_source("secondary")
 
     # Force fresh read from database, bypassing cache
     from floridify.caching.models import VersionConfig
 
+    # Use corpus_name (stable across versions) instead of corpus_id (changes with each version)
     updated = await TreeCorpusManager().get_corpus(
-        corpus_id=corpus.corpus_id,
+        corpus_name=corpus.corpus_name,
         config=VersionConfig(use_cache=False),
     )
     assert updated is not None
-    assert updated.child_corpus_ids == []
+    assert updated.child_uuids == []
     assert updated.vocabulary == []
 
 
@@ -138,5 +143,5 @@ async def test_create_from_language_uses_all_sources(
     )
 
     assert corpus.is_master is True
-    assert len(corpus.child_corpus_ids) == len(sources)
+    assert len(corpus.child_uuids) == len(sources)
     assert all(source.name in "".join(corpus.vocabulary) for source in sources)

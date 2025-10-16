@@ -23,6 +23,7 @@ from ..corpus.utils import get_vocabulary_hash
 from ..models.base import Language
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod
+import time
 
 logger = get_logger(__name__)
 
@@ -71,7 +72,7 @@ class TrieIndex(BaseModel):
 
     # Index identification
     index_id: PydanticObjectId = Field(default_factory=PydanticObjectId)
-    corpus_id: PydanticObjectId
+    corpus_uuid: str  # Stable UUID reference to corpus
     corpus_name: str
     vocabulary_hash: str
 
@@ -100,20 +101,23 @@ class TrieIndex(BaseModel):
         # CRITICAL: Override Beanie's default _class_id for polymorphism
         _class_id: ClassVar[str] = "TrieIndex.Metadata"
 
-        corpus_id: PydanticObjectId
+        class Settings(BaseVersionedData.Settings):
+            class_id = "_class_id"
+
+        corpus_uuid: str
         vocabulary_hash: str = ""
 
     @classmethod
     async def get(
         cls,
-        corpus_id: PydanticObjectId | None = None,
+        corpus_uuid: str | None = None,
         corpus_name: str | None = None,
         config: VersionConfig | None = None,
     ) -> TrieIndex | None:
-        """Get trie index from versioned storage by ID or name.
+        """Get trie index from versioned storage by stable ID or name.
 
         Args:
-            corpus_id: Corpus ObjectId (preferred)
+            corpus_uuid: Corpus stable UUID (preferred)
             corpus_name: Name of the corpus (fallback)
             config: Version configuration
 
@@ -121,20 +125,26 @@ class TrieIndex(BaseModel):
             TrieIndex instance or None if not found
 
         """
-        # Skip cache entirely if force_rebuild is requested
-        if config and config.force_rebuild:
-            return None
+        effective_config = config or VersionConfig()
+        if effective_config.force_rebuild:
+            effective_config = effective_config.model_copy()
+            effective_config.force_rebuild = False
+            effective_config.use_cache = False
 
-        if not corpus_id and not corpus_name:
-            raise ValueError("Either corpus_id or corpus_name must be provided")
+        if not corpus_uuid and not corpus_name:
+            raise ValueError("Either corpus_uuid or corpus_name must be provided")
 
         manager = get_version_manager()
 
-        # Build resource ID based on what we have
-        if corpus_id:
-            resource_id = f"{corpus_id!s}:trie"
+        # Build resource ID using uuid (always stable across versions)
+        if corpus_uuid:
+            resource_id = f"{corpus_uuid}:trie"
         else:
-            resource_id = f"{corpus_name}:trie"
+            # Lookup uuid from corpus_name
+            corpus = await Corpus.get(corpus_name=corpus_name, config=effective_config)
+            if not corpus or not corpus.corpus_uuid:
+                return None
+            resource_id = f"{corpus.corpus_uuid}:trie"
 
         # Get the latest trie index metadata
         metadata: TrieIndex.Metadata | None = await manager.get_latest(
@@ -172,7 +182,6 @@ class TrieIndex(BaseModel):
             TrieIndex instance with built trie data
 
         """
-        import time
 
         from .utils import calculate_default_frequency
 
@@ -181,7 +190,8 @@ class TrieIndex(BaseModel):
         # Build frequency map
         word_frequencies = {}
         max_frequency = 0
-        frequencies = getattr(corpus, "word_frequencies", None)
+        # word_frequencies is typed as dict[str, int] with default_factory in Corpus
+        frequencies = corpus.word_frequencies
 
         for word in corpus.vocabulary:
             if frequencies:
@@ -200,8 +210,11 @@ class TrieIndex(BaseModel):
 
         build_time = time.perf_counter() - start_time
 
+        if not corpus.corpus_uuid:
+            raise ValueError("Corpus must have corpus_uuid set")
+
         return cls(
-            corpus_id=corpus.corpus_id if corpus.corpus_id else PydanticObjectId(),
+            corpus_uuid=corpus.corpus_uuid,
             corpus_name=corpus.corpus_name,
             vocabulary_hash=corpus.vocabulary_hash,
             trie_data=sorted(corpus.vocabulary),  # Sorted for marisa-trie
@@ -229,9 +242,9 @@ class TrieIndex(BaseModel):
             TrieIndex instance
 
         """
-        # Try to get existing using corpus ID if available, otherwise name
+        # Try to get existing using corpus uuid if available, otherwise name
         existing = await cls.get(
-            corpus_id=corpus.corpus_id,
+            corpus_uuid=corpus.corpus_uuid,
             corpus_name=corpus.corpus_name,
             config=config,
         )
@@ -261,7 +274,7 @@ class TrieIndex(BaseModel):
 
         """
         manager = get_version_manager()
-        resource_id = f"{self.corpus_id!s}:trie"
+        resource_id = f"{self.corpus_uuid}:trie"
 
         try:
             # Save using version manager - convert ObjectIds to strings for JSON
@@ -272,12 +285,13 @@ class TrieIndex(BaseModel):
                 content=self.model_dump(mode="json"),
                 config=config or VersionConfig(),
                 metadata={
-                    "corpus_id": str(self.corpus_id) if self.corpus_id else None,
+                    "corpus_uuid": self.corpus_uuid,
                 },
             )
 
             # Verify save succeeded
-            saved = await self.get(corpus_id=self.corpus_id, config=config)
+            verify_config = VersionConfig(use_cache=False)
+            saved = await self.get(corpus_uuid=self.corpus_uuid, config=verify_config)
             if not saved:
                 raise ValueError("Could not retrieve saved trie index")
             if saved.vocabulary_hash != self.vocabulary_hash:
@@ -291,7 +305,7 @@ class TrieIndex(BaseModel):
         except Exception as e:
             logger.error(f"Failed to save trie index {resource_id}: {e}")
             raise RuntimeError(
-                f"Trie index persistence failed for corpus {self.corpus_id}. "
+                f"Trie index persistence failed for corpus {self.corpus_uuid}. "
                 f"Index may be corrupted. Error: {e}"
             ) from e
 
@@ -299,16 +313,16 @@ class TrieIndex(BaseModel):
         """Delete trie index from versioned storage.
 
         Raises:
-            ValueError: If corpus_id is not set
+            ValueError: If corpus_uuid is not set
         """
-        if not self.corpus_id:
-            logger.warning("Cannot delete trie index without corpus_id")
-            raise ValueError("Cannot delete trie index without corpus_id")
+        if not self.corpus_uuid:
+            logger.warning("Cannot delete trie index without corpus_uuid")
+            raise ValueError("Cannot delete trie index without corpus_uuid")
 
-        logger.info(f"Deleting TrieIndex for corpus {self.corpus_name} (ID: {self.corpus_id})")
+        logger.info(f"Deleting TrieIndex for corpus {self.corpus_name} (uuid: {self.corpus_uuid})")
 
         manager = get_version_manager()
-        resource_id = f"{self.corpus_id!s}:trie"
+        resource_id = f"{self.corpus_uuid}:trie"
 
         try:
             # Get the latest version to delete
@@ -324,10 +338,12 @@ class TrieIndex(BaseModel):
                     version=metadata.version_info.version,
                 )
                 logger.info(
-                    f"Successfully deleted TrieIndex for corpus {self.corpus_name} (ID: {self.corpus_id})"
+                    f"Successfully deleted TrieIndex for corpus {self.corpus_name} (uuid: {self.corpus_uuid})"
                 )
             else:
-                logger.warning(f"No metadata found for TrieIndex {resource_id}, may already be deleted")
+                logger.warning(
+                    f"No metadata found for TrieIndex {resource_id}, may already be deleted"
+                )
         except Exception as e:
             logger.error(f"Failed to delete TrieIndex {resource_id}: {e}")
             raise RuntimeError(f"TrieIndex deletion failed for {resource_id}: {e}") from e
@@ -341,7 +357,7 @@ class SearchIndex(BaseModel):
 
     # Index identification
     index_id: PydanticObjectId = Field(default_factory=PydanticObjectId)
-    corpus_id: PydanticObjectId
+    corpus_uuid: str  # Stable UUID reference to corpus
     corpus_name: str
     vocabulary_hash: str
 
@@ -373,7 +389,10 @@ class SearchIndex(BaseModel):
         # CRITICAL: Override Beanie's default _class_id for polymorphism
         _class_id: ClassVar[str] = "SearchIndex.Metadata"
 
-        corpus_id: PydanticObjectId
+        class Settings(BaseVersionedData.Settings):
+            class_id = "_class_id"
+
+        corpus_uuid: str
         vocabulary_hash: str = ""
         has_trie: bool = False
         has_fuzzy: bool = False
@@ -384,14 +403,14 @@ class SearchIndex(BaseModel):
     @classmethod
     async def get(
         cls,
-        corpus_id: PydanticObjectId | None = None,
+        corpus_uuid: str | None = None,
         corpus_name: str | None = None,
         config: VersionConfig | None = None,
     ) -> SearchIndex | None:
         """Get search index from versioned storage by ID or name.
 
         Args:
-            corpus_id: Corpus ObjectId (preferred)
+            corpus_uuid: Corpus stable UUID (preferred)
             corpus_name: Name of the corpus (fallback)
             config: Version configuration
 
@@ -399,34 +418,34 @@ class SearchIndex(BaseModel):
             SearchIndex instance or None if not found
 
         """
-        # Skip cache entirely if force_rebuild is requested
-        if config and config.force_rebuild:
-            return None
+        effective_config = config or VersionConfig()
+        if effective_config.force_rebuild:
+            effective_config = effective_config.model_copy()
+            effective_config.force_rebuild = False
+            effective_config.use_cache = False
 
-        if not corpus_id and not corpus_name:
-            raise ValueError("Either corpus_id or corpus_name must be provided")
+        if not corpus_uuid and not corpus_name:
+            raise ValueError("Either corpus_uuid or corpus_name must be provided")
 
         manager = get_version_manager()
 
-        # Build resource ID - always use corpus_id for consistency
-        # If only corpus_name provided, look up corpus_id first
-        if not corpus_id and corpus_name:
-            from floridify.corpus.core import Corpus
-
-            corpus = await Corpus.get(corpus_name=corpus_name, config=config)
-            if not corpus:
-                logger.warning(f"Corpus '{corpus_name}' not found")
+        # Build resource ID using uuid (always stable across versions)
+        if corpus_uuid:
+            resource_id = f"{corpus_uuid}:search"
+        else:
+            # Lookup uuid from corpus_name
+            corpus = await Corpus.get(corpus_name=corpus_name, config=effective_config)
+            if not corpus or not corpus.corpus_uuid:
+                logger.warning(f"Corpus '{corpus_name}' not found or missing uuid")
                 return None
-            corpus_id = corpus.corpus_id
-
-        resource_id = f"{corpus_id!s}:search"
+            resource_id = f"{corpus.corpus_uuid}:search"
 
         # Get the latest search index metadata
         metadata: SearchIndex.Metadata | None = await manager.get_latest(
             resource_id=resource_id,
             resource_type=ResourceType.SEARCH,
-            use_cache=config.use_cache if config else True,
-            config=config or VersionConfig(),
+            use_cache=effective_config.use_cache,
+            config=effective_config,
         )
 
         if not metadata:
@@ -463,8 +482,11 @@ class SearchIndex(BaseModel):
             SearchIndex instance with initialized configuration
 
         """
+        if not corpus.corpus_uuid:
+            raise ValueError("Corpus must have corpus_uuid set")
+
         return cls(
-            corpus_id=corpus.corpus_id if corpus.corpus_id else PydanticObjectId(),
+            corpus_uuid=corpus.corpus_uuid,
             corpus_name=corpus.corpus_name,
             vocabulary_hash=get_vocabulary_hash(corpus.vocabulary),
             min_score=min_score,
@@ -501,7 +523,7 @@ class SearchIndex(BaseModel):
         # Try to get existing using corpus ID if available, otherwise name
         try:
             existing = await cls.get(
-                corpus_id=corpus.corpus_id,
+                corpus_uuid=corpus.corpus_uuid,
                 corpus_name=corpus.corpus_name,
                 config=config,
             )
@@ -537,7 +559,7 @@ class SearchIndex(BaseModel):
 
         """
         manager = get_version_manager()
-        resource_id = f"{self.corpus_id!s}:search"
+        resource_id = f"{self.corpus_uuid}:search"
 
         try:
             # Save using version manager - convert ObjectIds to strings for JSON
@@ -548,18 +570,20 @@ class SearchIndex(BaseModel):
                 content=self.model_dump(mode="json"),
                 config=config or VersionConfig(),
                 metadata={
-                    "corpus_id": str(self.corpus_id) if self.corpus_id else None,
+                    "corpus_uuid": self.corpus_uuid,
                     "vocabulary_hash": self.vocabulary_hash,
                     "has_trie": self.has_trie,
                     "has_fuzzy": self.has_fuzzy,
                     "has_semantic": self.has_semantic,
                     "trie_index_id": str(self.trie_index_id) if self.trie_index_id else None,
-                    "semantic_index_id": str(self.semantic_index_id) if self.semantic_index_id else None,
+                    "semantic_index_id": str(self.semantic_index_id)
+                    if self.semantic_index_id
+                    else None,
                 },
             )
 
             # Verify save succeeded
-            saved = await self.get(corpus_id=self.corpus_id, config=config)
+            saved = await self.get(corpus_uuid=self.corpus_uuid, config=config)
             if not saved:
                 raise ValueError("Could not retrieve saved search index")
             if saved.vocabulary_hash != self.vocabulary_hash:
@@ -579,7 +603,7 @@ class SearchIndex(BaseModel):
         except Exception as e:
             logger.error(f"Failed to save search index {resource_id}: {e}")
             raise RuntimeError(
-                f"Search index persistence failed for corpus {self.corpus_id}. "
+                f"Search index persistence failed for corpus {self.corpus_uuid}. "
                 f"Index references may be corrupted. Error: {e}"
             ) from e
 
@@ -592,25 +616,27 @@ class SearchIndex(BaseModel):
         3. Delete the SearchIndex document itself
 
         Raises:
-            ValueError: If corpus_id is not set
+            ValueError: If corpus_uuid is not set
         """
-        if not self.corpus_id:
-            logger.warning("Cannot delete search index without corpus_id")
-            raise ValueError("Cannot delete search index without corpus_id")
+        if not self.corpus_uuid:
+            logger.warning("Cannot delete search index without corpus_uuid")
+            raise ValueError("Cannot delete search index without corpus_uuid")
 
         logger.info(
-            f"Starting cascade deletion for SearchIndex of corpus {self.corpus_name} (ID: {self.corpus_id})"
+            f"Starting cascade deletion for SearchIndex of corpus {self.corpus_name} (uuid: {self.corpus_uuid})"
         )
 
         # Step 1: Delete TrieIndex if it exists
         if self.has_trie and self.trie_index_id:
             try:
                 logger.info(f"Deleting TrieIndex {self.trie_index_id}...")
-                trie_index = await TrieIndex.get(corpus_id=self.corpus_id)
+                trie_index = await TrieIndex.get(corpus_uuid=self.corpus_uuid)
                 if trie_index:
                     await trie_index.delete()
                 else:
-                    logger.debug(f"TrieIndex {self.trie_index_id} not found, may already be deleted")
+                    logger.debug(
+                        f"TrieIndex {self.trie_index_id} not found, may already be deleted"
+                    )
             except Exception as e:
                 logger.error(f"Error deleting TrieIndex {self.trie_index_id}: {e}")
                 # Continue with deletion even if TrieIndex deletion fails
@@ -623,7 +649,7 @@ class SearchIndex(BaseModel):
 
                 # SemanticIndex requires model_name, use the stored one
                 semantic_index = await SemanticIndex.get(
-                    corpus_id=self.corpus_id,
+                    corpus_uuid=self.corpus_uuid,
                     model_name=self.semantic_model,
                 )
                 if semantic_index:
@@ -638,7 +664,7 @@ class SearchIndex(BaseModel):
 
         # Step 3: Delete the SearchIndex itself through version manager
         manager = get_version_manager()
-        resource_id = f"{self.corpus_id!s}:search"
+        resource_id = f"{self.corpus_uuid}:search"
 
         try:
             # Get the latest version to delete
@@ -654,7 +680,7 @@ class SearchIndex(BaseModel):
                     version=metadata.version_info.version,
                 )
                 logger.info(
-                    f"Successfully deleted SearchIndex for corpus {self.corpus_name} (ID: {self.corpus_id})"
+                    f"Successfully deleted SearchIndex for corpus {self.corpus_name} (uuid: {self.corpus_uuid})"
                 )
             else:
                 logger.warning(
@@ -670,3 +696,4 @@ __all__ = [
     "SearchResult",
     "TrieIndex",
 ]
+

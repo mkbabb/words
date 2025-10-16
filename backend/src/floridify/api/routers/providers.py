@@ -9,6 +9,7 @@ from ...models.dictionary import DictionaryProvider
 from ...models.parameters import ProviderStatusParams
 from ...models.responses import ProviderListResponse, ProviderStatusResponse
 from ...utils.logging import get_logger
+import platform
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -104,7 +105,6 @@ async def _get_provider_status(
     available = True
     if provider == DictionaryProvider.APPLE_DICTIONARY:
         # macOS only
-        import platform
 
         available = platform.system() == "Darwin"
 

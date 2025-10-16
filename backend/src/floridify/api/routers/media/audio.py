@@ -36,6 +36,7 @@ from ...repositories import (
     AudioRepository,
     AudioUpdate,
 )
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +174,6 @@ async def upload_audio(
     await asyncio.to_thread(cache_dir.mkdir, parents=True, exist_ok=True)
 
     # Generate filename
-    import uuid
 
     file_ext = file.filename.split(".")[-1] if file.filename else "mp3"
     filename = f"{uuid.uuid4()}.{file_ext}"

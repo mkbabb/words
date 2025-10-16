@@ -95,9 +95,10 @@ class Corpus(BaseModel):
     last_updated: float = Field(default_factory=time.time)
 
     # Tree structure references
-    corpus_id: PydanticObjectId | None = None  # Primary key
-    parent_corpus_id: PydanticObjectId | None = None
-    child_corpus_ids: list[PydanticObjectId] = Field(default_factory=list)
+    corpus_id: PydanticObjectId | None = None  # MongoDB _id (changes with versions)
+    corpus_uuid: str | None = None  # Immutable UUID that never changes
+    parent_uuid: str | None = None  # Parent's UUID
+    child_uuids: list[str] = Field(default_factory=list)  # Children's UUIDs
     is_master: bool = False
 
     # Word frequency data
@@ -109,8 +110,9 @@ class Corpus(BaseModel):
 
     model_config = {
         "arbitrary_types_allowed": True,
-        "use_enum_values": True,
         "ser_json_inf_nan": "constants",
+        # "use_enum_values": True,  # REMOVED: Let Pydantic keep enum objects
+        # Field validators (lines 45-63) handle enum/string conversion as needed
     }
 
     class Metadata(
@@ -130,14 +132,17 @@ class Corpus(BaseModel):
         # Beanie incorrectly uses "BaseVersionedData.Metadata" for all Metadata subclasses
         _class_id: ClassVar[str] = "Corpus.Metadata"
 
+        class Settings(BaseVersionedData.Settings):
+            class_id = "_class_id"
+
         # Corpus identification (needed for persistence)
         corpus_name: str = ""
         corpus_type: CorpusType = CorpusType.LEXICON
         language: Language = Language.ENGLISH
 
-        # Tree structure (part of versioned state)
-        parent_corpus_id: PydanticObjectId | None = None
-        child_corpus_ids: list[PydanticObjectId] = Field(default_factory=list)
+        # Tree structure using UUIDs (stable across versions)
+        parent_uuid: str | None = None
+        child_uuids: list[str] = Field(default_factory=list)
         is_master: bool = False
 
         # Vocabulary metadata (versioning)
@@ -148,13 +153,17 @@ class Corpus(BaseModel):
         content_location: ContentLocation | None = None
 
     def model_post_init(self, __context: Any) -> None:
-        """Post-initialization to inject slug name if needed."""
+        """Post-initialization to inject slug name and compute vocabulary_hash."""
         super().model_post_init(__context)
 
         # Generate slug name if not provided
         if not self.corpus_name:
             self.corpus_name = coolname.generate_slug(2)
             logger.info(f"Generated corpus slug name: {self.corpus_name}")
+
+        # Compute vocabulary_hash if not set and vocabulary exists
+        if not self.vocabulary_hash and self.vocabulary:
+            self.vocabulary_hash = get_vocabulary_hash(self.vocabulary)
 
     @classmethod
     async def create(
@@ -180,6 +189,15 @@ class Corpus(BaseModel):
         """
         if not vocabulary:
             vocabulary = []
+
+        # CRITICAL FIX #9: Validate vocabulary size to prevent OOM
+        max_vocabulary_size = 1_000_000  # 1 million words
+        if len(vocabulary) > max_vocabulary_size:
+            raise ValueError(
+                f"Vocabulary size ({len(vocabulary):,} words) exceeds maximum allowed "
+                f"({max_vocabulary_size:,} words). This prevents potential out-of-memory errors. "
+                f"Consider splitting into multiple corpora or filtering the vocabulary."
+            )
 
         # Log incoming vocabulary
         logger.info(
@@ -594,8 +612,19 @@ class Corpus(BaseModel):
         )
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
-        """Dump model to dict, handling special fields."""
-        return super().model_dump(exclude={"vocabulary_indices"}, **kwargs)
+        """Dump model to dict, handling special fields.
+
+        BACKWARD COMPATIBILITY: Ensures both corpus_id and corpus_uuid are in responses.
+        The corpus_id may be None for unsaved corpora, while corpus_uuid is always set.
+        """
+        data = super().model_dump(exclude={"vocabulary_indices"}, **kwargs)
+
+        # Ensure corpus_id is present for backward compatibility with tests/API consumers
+        # If corpus_id is None but corpus_uuid exists, keep both fields in response
+        if "corpus_uuid" in data and "corpus_id" not in data:
+            data["corpus_id"] = self.corpus_id  # Will be None for unsaved corpora
+
+        return data
 
     @classmethod
     def model_load(cls, data: dict[str, Any]) -> Corpus:
@@ -614,13 +643,15 @@ class Corpus(BaseModel):
     async def get(
         cls,
         corpus_id: PydanticObjectId | None = None,
+        corpus_uuid: str | None = None,
         corpus_name: str | None = None,
         config: VersionConfig | None = None,
     ) -> Corpus | None:
-        """Get corpus from versioned storage by ID or name.
+        """Get corpus from versioned storage by ID, UUID, or name.
 
         Args:
-            corpus_id: ObjectId of the corpus (preferred)
+            corpus_id: ObjectId of the corpus (changes with versions)
+            corpus_uuid: Immutable UUID of the corpus (stable across versions)
             corpus_name: Name of the corpus (fallback)
             config: Version configuration
 
@@ -628,8 +659,8 @@ class Corpus(BaseModel):
             Corpus instance or None if not found
 
         """
-        if not corpus_id and not corpus_name:
-            raise ValueError("Either corpus_id or corpus_name must be provided")
+        if not corpus_id and not corpus_uuid and not corpus_name:
+            raise ValueError("Either corpus_id, corpus_uuid, or corpus_name must be provided")
 
         from .manager import get_tree_corpus_manager
 
@@ -639,6 +670,7 @@ class Corpus(BaseModel):
         # The manager already returns a Corpus object, not metadata
         corpus = await manager.get_corpus(
             corpus_id=corpus_id,
+            corpus_uuid=corpus_uuid,
             corpus_name=corpus_name,
             config=config,
         )
@@ -744,7 +776,7 @@ class Corpus(BaseModel):
         # Version updates should be handled through explicit config params
         # No more private attribute magic
 
-        # Save through manager (which will set the corpus_id)
+        # Save through manager (which will set the corpus_id and corpus_uuid)
         saved = await manager.save_corpus(
             corpus_id=self.corpus_id,
             corpus_name=self.corpus_name,
@@ -752,13 +784,16 @@ class Corpus(BaseModel):
             language=self.language,
             content=self.model_dump(),
             config=config,
-            parent_corpus_id=self.parent_corpus_id,
-            child_corpus_ids=self.child_corpus_ids,
+            parent_uuid=self.parent_uuid,
+            child_uuids=self.child_uuids,
             is_master=self.is_master,
         )
 
-        if saved and saved.corpus_id:
-            self.corpus_id = saved.corpus_id
+        if saved:
+            if saved.corpus_id:
+                self.corpus_id = saved.corpus_id
+            if saved.corpus_uuid:
+                self.corpus_uuid = saved.corpus_uuid
 
             # Update version info from the saved metadata
             # We need to get the metadata to access version_info
@@ -770,6 +805,8 @@ class Corpus(BaseModel):
                 if metadata and metadata.version_info:
                     self.version_info = metadata.version_info
                     self._metadata_id = metadata.id
+                    # Also update uuid from metadata (guaranteed to exist)
+                    self.corpus_uuid = metadata.uuid
             except Exception as e:
                 logger.warning(f"Failed to update version info: {e}")
 
@@ -822,7 +859,7 @@ class Corpus(BaseModel):
         try:
             # Get the SearchIndex for this corpus
             search_index = await SearchIndex.get(
-                corpus_id=self.corpus_id,
+                corpus_uuid=self.corpus_uuid,
                 corpus_name=self.corpus_name,
             )
 

@@ -25,6 +25,8 @@ from ...batch import BatchOperation
 from ...core import ConnectorConfig
 from ...utils import RateLimitConfig
 from ..core import DictionaryConnector
+from collections.abc import Callable
+import hashlib
 
 logger = get_logger(__name__)
 
@@ -184,7 +186,6 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
         logger.info(f"Importing Wiktionary dump from {data_file}")
 
         # Determine file type and open appropriately
-        from collections.abc import Callable
 
         open_func: Callable[..., Any]
         if data_file.suffix == ".bz2":
@@ -341,7 +342,6 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
             parsed_data = self._parse_wikitext(content)
 
             # Compute data hash
-            import hashlib
 
             data_str = json.dumps(parsed_data, sort_keys=True)
             data_hash = hashlib.sha256(data_str.encode()).hexdigest()

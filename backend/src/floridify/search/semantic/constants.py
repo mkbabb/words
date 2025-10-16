@@ -10,6 +10,10 @@ SemanticModel = Literal[
     "BAAI/bge-m3",
     "sentence-transformers/all-MiniLM-L6-v2",
     "Alibaba-NLP/gte-Qwen2-1.5B-instruct",
+    # Latest Qwen3-Embedding models (2025) with Matryoshka support
+    "Qwen/Qwen3-Embedding-8B",  # 8B params, #1 MTEB, 32-4096D MRL
+    "Qwen/Qwen3-Embedding-4B",  # 4B params, balanced, 32-2560D MRL
+    "Qwen/Qwen3-Embedding-0.6B",  # 0.6B params, lightweight, 32-1024D MRL
 ]
 
 # Model Configurations
@@ -19,14 +23,31 @@ GTE_QWEN2_MODEL: SemanticModel = (
     "Alibaba-NLP/gte-Qwen2-1.5B-instruct"  # 1536D, QWEN2-based, multilingual, 67.16 MTEB
 )
 
-# Default model - GTE-Qwen2 for best QWEN-based multilingual support
-DEFAULT_SENTENCE_MODEL: SemanticModel = "Alibaba-NLP/gte-Qwen2-1.5B-instruct"
+# Latest Qwen3-Embedding models (October 2025) - State-of-the-art
+QWEN3_8B_MODEL: SemanticModel = "Qwen/Qwen3-Embedding-8B"  # 8B, MTEB #1: 70.58, max 4096D
+QWEN3_4B_MODEL: SemanticModel = "Qwen/Qwen3-Embedding-4B"  # 4B, MTEB: 69.45, max 2560D
+QWEN3_0_6B_MODEL: SemanticModel = "Qwen/Qwen3-Embedding-0.6B"  # 0.6B, MTEB: 64.33, max 1024D
 
-# Model dimensions
+# Default model - Qwen3-0.6B for balanced performance and multilingual support
+# 0.6B parameters, MTEB: 64.33, excellent cross-lingual capabilities
+DEFAULT_SENTENCE_MODEL: SemanticModel = QWEN3_0_6B_MODEL
+
+# Model dimensions (using default/max dimensions)
 MODEL_DIMENSIONS = {
     BGE_M3_MODEL: 1024,
     MINI_LM_MODEL: 384,
     GTE_QWEN2_MODEL: 1536,
+    QWEN3_8B_MODEL: 4096,  # Matryoshka: 32-4096
+    QWEN3_4B_MODEL: 2560,  # Matryoshka: 32-2560
+    QWEN3_0_6B_MODEL: 1024,  # Matryoshka: 32-1024
+}
+
+# Matryoshka dimension support for Qwen3 models
+# Can use any dimension from min to max for flexible performance/memory tradeoff
+MATRYOSHKA_DIMENSIONS = {
+    QWEN3_8B_MODEL: [32, 64, 128, 256, 512, 1024, 2048, 4096],
+    QWEN3_4B_MODEL: [32, 64, 128, 256, 512, 1024, 2048, 2560],
+    QWEN3_0_6B_MODEL: [32, 64, 128, 256, 512, 1024],
 }
 
 # FAISS Configuration
@@ -44,8 +65,11 @@ MODEL_BATCH_SIZES = {
     BGE_M3_MODEL: 32,  # Smaller batch for 1024D embeddings
     MINI_LM_MODEL: 64,  # Larger batch for 384D embeddings
     GTE_QWEN2_MODEL: 24,  # Smaller batch for 1536D embeddings
+    QWEN3_8B_MODEL: 8,   # Small batch for 8B model, 4096D embeddings
+    QWEN3_4B_MODEL: 16,  # Medium batch for 4B model, 2560D embeddings
+    QWEN3_0_6B_MODEL: 32,  # Larger batch for 0.6B model, 1024D embeddings
 }
-DEFAULT_BATCH_SIZE = 24
+DEFAULT_BATCH_SIZE = 16  # Updated for Qwen3-4B default
 
 # Optimization Configuration
 USE_ONNX_BACKEND = False  # Disable ONNX backend (macOS compatibility issue)

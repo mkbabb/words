@@ -29,6 +29,7 @@ from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ..core import DictionaryConnector
 from ..models import DictionaryProviderEntry
+import json
 
 logger = get_logger(__name__)
 
@@ -237,7 +238,6 @@ class WiktionaryConnector(DictionaryConnector):
             response_text = await self._cached_get(self.base_url, params)
 
             # Parse JSON response
-            import json
 
             data = json.loads(response_text)
 

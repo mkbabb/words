@@ -24,6 +24,7 @@ from .models import (
     ContentLocation,
     StorageType,
 )
+import pickle
 
 logger = get_logger(__name__)
 
@@ -75,12 +76,15 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         """Construct backend cache key from namespace and key.
 
         Args:
-            namespace: Cache namespace
+            namespace: Cache namespace (enum or string from MongoDB)
             key: Cache key
 
         Returns:
             Formatted backend key string
         """
+        # Handle both enum and string (from MongoDB serialization)
+        if isinstance(namespace, str):
+            return f"{namespace}:{key}"
         return f"{namespace.value}:{key}"
 
     def _evict_lru(self, ns: NamespaceConfig, count: int = 1) -> int:
@@ -491,8 +495,12 @@ async def get_versioned_content(versioned_data: Any) -> dict[str, Any] | None:
         location = versioned_data.content_location
         if location.cache_key and location.cache_namespace:
             cache = await get_global_cache()
+            # Ensure namespace is CacheNamespace enum (handle string from MongoDB)
+            namespace = location.cache_namespace
+            if isinstance(namespace, str):
+                namespace = CacheNamespace(namespace)
             cached_content = await cache.get(
-                namespace=location.cache_namespace, key=location.cache_key
+                namespace=namespace, key=location.cache_key
             )
             # Cast to expected return type
             if isinstance(cached_content, dict):
@@ -518,24 +526,88 @@ async def set_versioned_content(
     force_external: bool = False,
 ) -> None:
     """Store versioned content using inline or external storage."""
+    # CRITICAL FIX: Skip expensive JSON encoding when force_external=True
+    # This prevents hanging on large binary data (e.g., 1290MB embeddings)
+    if force_external:
+        # Store externally without size check
+        cache = await get_global_cache()
+        # CRITICAL FIX #8: Use consistent hashing for cache keys
+        # Import the helper function from manager module
+        from ..caching.manager import _generate_cache_key
+
+        cache_key = _generate_cache_key(
+            versioned_data.resource_type,
+            versioned_data.resource_id,
+            "content",
+            versioned_data.version_info.data_hash[:8]
+        )
+
+        # Ensure namespace is CacheNamespace enum (handle string from MongoDB)
+        namespace = versioned_data.namespace
+        if isinstance(namespace, str):
+            namespace = CacheNamespace(namespace)
+
+        await cache.set(
+            namespace=namespace,
+            key=cache_key,
+            value=content,
+            ttl_override=versioned_data.ttl,
+        )
+
+        # Calculate size for metadata (estimate if JSON encoding would be too slow)
+        # For large binary data, we can estimate size without full JSON encoding
+        if isinstance(content, dict) and "binary_data" in content:
+            # Rough estimate: sum of binary_data string lengths
+            binary_size = sum(len(v) for v in content.get("binary_data", {}).values() if isinstance(v, str))
+            # Add overhead for JSON structure (rough estimate)
+            content_size = binary_size + 1000
+            checksum = "skip-large-content"  # Skip checksum for very large data
+        else:
+            # Small enough to JSON encode
+            content_str = json.dumps(content, sort_keys=True, default=_json_default)
+            content_size = len(content_str.encode())
+            checksum = hashlib.sha256(content_str.encode()).hexdigest()
+
+        versioned_data.content_location = ContentLocation(
+            cache_namespace=versioned_data.namespace,
+            cache_key=cache_key,
+            storage_type=StorageType.CACHE,
+            size_bytes=content_size,
+            checksum=checksum,
+        )
+        versioned_data.content_inline = None
+        return
+
+    # Normal path: calculate size and decide storage strategy
     content_str = json.dumps(content, sort_keys=True, default=_json_default)
     content_size = len(content_str.encode())
 
     inline_threshold = 16 * 1024
 
-    if not force_external and content_size < inline_threshold:
+    if content_size < inline_threshold:
         versioned_data.content_inline = content
         versioned_data.content_location = None
         return
 
     cache = await get_global_cache()
-    cache_key = (
-        f"{versioned_data.resource_type.value}:{versioned_data.resource_id}:"
-        f"content:{versioned_data.version_info.data_hash[:8]}"
+    # CRITICAL FIX #8: Use consistent hashing for cache keys
+    # Import the helper function from manager module
+    from ..caching.manager import _generate_cache_key
+
+    cache_key = _generate_cache_key(
+        versioned_data.resource_type,
+        versioned_data.resource_id,
+        "content",
+        versioned_data.version_info.data_hash[:8]
     )
 
+    # Ensure namespace is CacheNamespace enum (handle string from MongoDB)
+    namespace = versioned_data.namespace
+    if isinstance(namespace, str):
+        namespace = CacheNamespace(namespace)
+
     await cache.set(
-        namespace=versioned_data.namespace,
+        namespace=namespace,
         key=cache_key,
         value=content,
         ttl_override=versioned_data.ttl,
@@ -587,7 +659,6 @@ async def load_external_content(location: ContentLocation) -> Any:
 
     # Deserialize if bytes
     if isinstance(data, bytes):
-        import pickle
 
         return pickle.loads(data)
 

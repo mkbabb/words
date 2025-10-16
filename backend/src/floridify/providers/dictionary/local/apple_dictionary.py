@@ -20,6 +20,7 @@ from ....models.dictionary import (
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ..core import DictionaryConnector
+import traceback
 
 logger = get_logger(__name__)
 
@@ -332,7 +333,6 @@ class AppleDictionaryConnector(DictionaryConnector):
             return provider_data
 
         except Exception as e:
-            import traceback
 
             error_msg = f"Apple Dictionary lookup failed for '{word}': {e!s}"
             logger.error(error_msg)

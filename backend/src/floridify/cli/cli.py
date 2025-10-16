@@ -2,11 +2,32 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 from typing import Any
 
 import click
 from rich.console import Console
+
+# PATHOLOGICAL REMOVAL: Move ALL nested imports to module level - NO nested imports allowed
+from .commands.config import config_group
+from .commands.database import database_group
+from .commands.lookup import _lookup_async
+from .commands.scrape import (
+    cleanup_sessions,
+    delete_session,
+    list_sessions,
+    resume_session,
+    scrape_apple_dictionary,
+    scrape_free_dictionary,
+    scrape_wiktionary_wholesale,
+    scrape_wordhippo,
+    show_status,
+)
+from .commands.search import _search_similar_async, _search_stats_async, _search_word_async
+from .commands.wordlist import wordlist_command
+from .commands.wotd_ml import wotd_ml_command
+from .completion import generate_zsh_completion
 
 console = Console()
 
@@ -19,15 +40,20 @@ class LazyGroup(click.Group):
         self.import_name = import_name
 
     def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
+        # PATHOLOGICAL REMOVAL: No hasattr/getattr - use explicit command registry
         # Import the actual command module only when the command is invoked
         try:
             module = importlib.import_module(self.import_name)
-            # Get the command group from the module
-            if hasattr(module, f"{cmd_name}_command"):
-                return getattr(module, f"{cmd_name}_command")
-            if hasattr(module, f"{cmd_name}_group"):
-                return getattr(module, f"{cmd_name}_group")
-            return None
+            # Direct attribute access - let it fail if attribute doesn't exist
+            # Check for command attribute first
+            try:
+                return module.__dict__[f"{cmd_name}_command"]
+            except KeyError:
+                # Try group attribute
+                try:
+                    return module.__dict__[f"{cmd_name}_group"]
+                except KeyError:
+                    return None
         except ImportError:
             return None
 
@@ -117,10 +143,7 @@ def lookup(
     output_json: bool,
 ) -> None:
     """Look up word definitions with AI enhancement."""
-    import asyncio
-
-    from .commands.lookup import _lookup_async
-
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level imports
     asyncio.run(_lookup_async(word, provider, language, semantic, no_ai, force, output_json))
 
 
@@ -166,7 +189,7 @@ def scrape(ctx: click.Context) -> None:
 )
 def apple_dictionary(**kwargs: Any) -> None:
     """Bulk scrape Apple Dictionary (macOS) for local definitions."""
-    from .commands.scrape import scrape_apple_dictionary
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import scrape_apple_dictionary
 
     scrape_apple_dictionary(**kwargs)
 
@@ -191,7 +214,7 @@ def apple_dictionary(**kwargs: Any) -> None:
 )
 def wordhippo(**kwargs: Any) -> None:
     """Bulk scrape WordHippo for comprehensive synonym/antonym/example data."""
-    from .commands.scrape import scrape_wordhippo
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import scrape_wordhippo
 
     scrape_wordhippo(**kwargs)
 
@@ -216,7 +239,7 @@ def wordhippo(**kwargs: Any) -> None:
 )
 def free_dictionary(**kwargs: Any) -> None:
     """Bulk scrape FreeDictionary API for comprehensive coverage."""
-    from .commands.scrape import scrape_free_dictionary
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import scrape_free_dictionary
 
     scrape_free_dictionary(**kwargs)
 
@@ -241,7 +264,7 @@ def free_dictionary(**kwargs: Any) -> None:
 )
 def wiktionary_wholesale(**kwargs: Any) -> None:
     """Download and process complete Wiktionary dumps."""
-    from .commands.scrape import scrape_wiktionary_wholesale
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import scrape_wiktionary_wholesale
 
     scrape_wiktionary_wholesale(**kwargs)
 
@@ -249,7 +272,7 @@ def wiktionary_wholesale(**kwargs: Any) -> None:
 @scrape.command()
 def sessions() -> None:
     """List all scraping sessions."""
-    from .commands.scrape import list_sessions
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import list_sessions
 
     list_sessions()
 
@@ -258,7 +281,7 @@ def sessions() -> None:
 @click.argument("session_id", required=False)
 def status(session_id: str | None = None) -> None:
     """Show scraping status or details for a specific session."""
-    from .commands.scrape import show_status
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import show_status
 
     show_status(session_id)
 
@@ -267,7 +290,7 @@ def status(session_id: str | None = None) -> None:
 @click.argument("session_id")
 def resume(session_id: str) -> None:
     """Resume a scraping session by ID."""
-    from .commands.scrape import resume_session
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import resume_session
 
     resume_session(session_id)
 
@@ -277,7 +300,7 @@ def resume(session_id: str) -> None:
 @click.confirmation_option(prompt="Are you sure you want to delete this session?")
 def delete(session_id: str) -> None:
     """Delete a scraping session."""
-    from .commands.scrape import delete_session
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import delete_session
 
     delete_session(session_id)
 
@@ -286,7 +309,7 @@ def delete(session_id: str) -> None:
 @click.confirmation_option(prompt="Are you sure you want to clean up old sessions?")
 def cleanup() -> None:
     """Clean up old scraping sessions."""
-    from .commands.scrape import cleanup_sessions
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import cleanup_sessions
 
     cleanup_sessions()
 
@@ -359,9 +382,9 @@ def search_word(
     output_json: bool,
 ) -> None:
     """Search for words in lexicons."""
-    import asyncio
+    # PATHOLOGICAL REMOVAL: No nested imports - asyncio imported at module level
 
-    from .commands.search import _search_word_async
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import _search_word_async
 
     asyncio.run(
         _search_word_async(
@@ -395,9 +418,9 @@ def search_word(
 )
 def search_similar(word: str, language: tuple[str, ...], max_results: int) -> None:
     """Find words similar to the given word using semantic search."""
-    import asyncio
+    # PATHOLOGICAL REMOVAL: No nested imports - asyncio imported at module level
 
-    from .commands.search import _search_similar_async
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import _search_similar_async
 
     asyncio.run(_search_similar_async(word, language, max_results))
 
@@ -412,9 +435,9 @@ def search_similar(word: str, language: tuple[str, ...], max_results: int) -> No
 )
 def search_stats(language: tuple[str, ...]) -> None:
     """Show search engine statistics."""
-    import asyncio
+    # PATHOLOGICAL REMOVAL: No nested imports - asyncio imported at module level
 
-    from .commands.search import _search_stats_async
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import _search_stats_async
 
     asyncio.run(_search_stats_async(language))
 
@@ -423,8 +446,7 @@ def search_stats(language: tuple[str, ...]) -> None:
 @click.argument("file_path")
 def wordlist(file_path: str) -> None:
     """Manage word lists with dictionary lookup and storage."""
-    from .commands.wordlist import wordlist_command
-
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import
     wordlist_command(file_path)
 
 
@@ -433,8 +455,7 @@ def wordlist(file_path: str) -> None:
 def config(ctx: click.Context) -> None:
     """⚙️ Manage configuration and API keys."""
     if ctx.invoked_subcommand is None:
-        from .commands.config import config_group
-
+        # PATHOLOGICAL REMOVAL: No nested imports - use module-level import
         ctx.invoke(config_group)
 
 
@@ -443,16 +464,14 @@ def config(ctx: click.Context) -> None:
 def database(ctx: click.Context) -> None:
     """💾 Database operations and statistics."""
     if ctx.invoked_subcommand is None:
-        from .commands.database import database_group
-
+        # PATHOLOGICAL REMOVAL: No nested imports - use module-level import
         ctx.invoke(database_group)
 
 
 @cli.command()
 def wotd_ml() -> None:
     """🚀 WOTD ML with multi-model support."""
-    from .commands.wotd_ml import wotd_ml_command
-
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import
     wotd_ml_command()
 
 
@@ -465,8 +484,7 @@ def wotd_ml() -> None:
 )
 def completion(shell: str) -> None:
     """Generate shell completion script for floridify."""
-    from .completion import generate_zsh_completion
-
+    # PATHOLOGICAL REMOVAL: No nested imports - use module-level import
     if shell == "zsh":
         completion_script = generate_zsh_completion()
         click.echo(completion_script)

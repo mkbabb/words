@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from beanie import PydanticObjectId
 
@@ -31,6 +31,29 @@ class LiteratureCorpus(Corpus):
     Inherits all fields and functionality from Corpus.
     Adds literature-specific source management via TreeCorpusManager.
     """
+
+    class Metadata(Corpus.Metadata):
+        """LiteratureCorpus-specific metadata with discriminator and typed fields.
+
+        CRITICAL: Unique _class_id discriminator prevents Beanie from confusing
+        LiteratureCorpus.Metadata with Corpus.Metadata or LanguageCorpus.Metadata.
+        This allows polymorphic queries and proper document type resolution.
+
+        Adds typed fields for literature-specific metadata that were previously
+        stored in the generic metadata dict (title, author, genre, period).
+        """
+
+        _class_id: ClassVar[str] = "LiteratureCorpus.Metadata"
+
+        class Settings(Corpus.Metadata.Settings):
+            class_id = "_class_id"
+
+        # Literature-specific typed fields (replaces generic metadata dict usage)
+        title: str | None = None
+        author: str | None = None
+        genre: str | None = None  # Genre enum value
+        period: str | None = None  # Period enum value
+        file_path: str | None = None  # For file-based works
 
     async def add_literature_source(
         self,
@@ -127,26 +150,26 @@ class LiteratureCorpus(Corpus):
         if self.corpus_id:
             await manager.update_parent(self.corpus_id, child.corpus_id)
 
-            # Refresh parent to get updated child_corpus_ids
+            # Refresh parent to get updated child_uuids
             fresh_parent = await manager.get_corpus(corpus_id=self.corpus_id)
             if fresh_parent:
-                logger.debug(f"Before refresh: self.child_corpus_ids = {self.child_corpus_ids}")
-                logger.debug(f"Fresh parent has: {fresh_parent.child_corpus_ids}")
-                self.child_corpus_ids = fresh_parent.child_corpus_ids
-                logger.debug(f"After refresh: self.child_corpus_ids = {self.child_corpus_ids}")
+                logger.debug(f"Before refresh: self.child_uuids = {self.child_uuids}")
+                logger.debug(f"Fresh parent has: {fresh_parent.child_uuids}")
+                self.child_uuids = fresh_parent.child_uuids
+                logger.debug(f"After refresh: self.child_uuids = {self.child_uuids}")
 
         # Aggregate vocabularies into parent
         if self.corpus_id and child.corpus_id:
-            # Note: update_parent already added child to parent's child_corpus_ids
+            # Note: update_parent already added child to parent's child_uuids
             # aggregate_vocabularies aggregates from the corpus and its children automatically
-            logger.debug(f"Before aggregate: self.child_corpus_ids = {self.child_corpus_ids}")
+            logger.debug(f"Before aggregate: self.child_uuids = {self.child_uuids}")
             await manager.aggregate_vocabularies(self.corpus_id)
 
             # Refresh again after aggregate to ensure we have latest state
             fresh_parent2 = await manager.get_corpus(corpus_id=self.corpus_id)
             if fresh_parent2:
-                self.child_corpus_ids = fresh_parent2.child_corpus_ids
-                logger.debug(f"After aggregate: self.child_corpus_ids = {self.child_corpus_ids}")
+                self.child_uuids = fresh_parent2.child_uuids
+                logger.debug(f"After aggregate: self.child_uuids = {self.child_uuids}")
 
         logger.info(f"Added work '{source.name}' with {len(vocabulary)} unique words")
 
@@ -276,7 +299,7 @@ class LiteratureCorpus(Corpus):
 
             if self.corpus_id:
                 await manager.update_parent(self.corpus_id, child.corpus_id)
-                self.child_corpus_ids.append(child.corpus_id)
+                self.child_uuids.append(child.corpus_uuid)
                 # Note: aggregate_vocabularies aggregates from the corpus and its children automatically
                 await manager.aggregate_vocabularies(self.corpus_id)
 
@@ -310,9 +333,9 @@ class LiteratureCorpus(Corpus):
                 delete_child=True,  # Delete the child corpus
             )
 
-            # Update local child_corpus_ids list
-            if child_meta.corpus_id in self.child_corpus_ids:
-                self.child_corpus_ids.remove(child_meta.corpus_id)
+            # Update local child_uuids list
+            if child_meta.corpus_uuid in self.child_uuids:
+                self.child_uuids.remove(child_meta.corpus_uuid)
 
         logger.info(f"Removed work: {work_name}")
 

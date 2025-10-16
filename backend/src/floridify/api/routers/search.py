@@ -150,33 +150,93 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
     """Cached search implementation."""
     # Convert string mode to enum
     mode_enum = SearchMode(params.mode)
-    logger.info(
-        f"Searching for '{query}' in {[lang.value for lang in params.languages]} (mode={mode_enum.value})"
-    )
 
     try:
-        # Get language search instance
-        language_search = await get_language_search(languages=params.languages)
+        # CRITICAL FIX: Check if searching specific corpus by ID or name
+        if params.corpus_id or params.corpus_name:
+            # Search within specific corpus
+            logger.info(
+                f"Searching for '{query}' in corpus_id={params.corpus_id} corpus_name={params.corpus_name} (mode={mode_enum.value})"
+            )
 
-        # Perform search with specified mode
-        results = await language_search.search_with_mode(
-            query=query,
-            mode=mode_enum,
-            max_results=params.max_results,
-            min_score=params.min_score,
-        )
+            # Get the corpus manager
+            from ...corpus.manager import get_corpus_manager
+            from ...search.core import Search
+            from ...caching.models import VersionConfig
 
-        # Results are already in SearchResult format
-        response_items = results
+            corpus_manager = get_corpus_manager()
 
-        return SearchResponse(
-            query=query,
-            results=response_items,
-            total_found=len(results),
-            languages=params.languages,
-            mode=params.mode,
-            metadata={},
-        )
+            # Get the corpus by ID or name
+            corpus = await corpus_manager.get_corpus(
+                corpus_id=params.corpus_id,
+                corpus_name=params.corpus_name,
+                config=VersionConfig(use_cache=True)
+            )
+
+            if not corpus:
+                logger.warning(f"Corpus not found: id={params.corpus_id}, name={params.corpus_name}")
+                return SearchResponse(
+                    query=query,
+                    results=[],
+                    total_found=0,
+                    languages=params.languages,
+                    mode=params.mode,
+                    metadata={"error": "Corpus not found"},
+                )
+
+            # Create search instance for this specific corpus
+            search_engine = Search(corpus=corpus)
+            await search_engine.build_indices()  # Build basic indices
+
+            # Perform search
+            results = await search_engine.search_with_mode(
+                query=query,
+                mode=mode_enum,
+                max_results=params.max_results,
+                min_score=params.min_score,
+            )
+
+            # Set language from corpus in results
+            for result in results:
+                if not result.language:
+                    result.language = corpus.language
+
+            return SearchResponse(
+                query=query,
+                results=results,
+                total_found=len(results),
+                languages=[corpus.language] if corpus.language else params.languages,
+                mode=params.mode,
+                metadata={"corpus_id": str(corpus.corpus_id), "corpus_name": corpus.corpus_name},
+            )
+        else:
+            # Original behavior: search by language
+            logger.info(
+                f"Searching for '{query}' in {[lang.value for lang in params.languages]} (mode={mode_enum.value})"
+            )
+
+            # Get language search instance
+            language_search = await get_language_search(languages=params.languages)
+
+            # Perform search with specified mode
+            results = await language_search.search_with_mode(
+                query=query,
+                mode=mode_enum,
+                max_results=params.max_results,
+                min_score=params.min_score,
+            )
+
+            # Results are already in SearchResult format
+            response_items = results
+
+            return SearchResponse(
+                query=query,
+                results=response_items,
+                total_found=len(results),
+                languages=params.languages,
+                mode=params.mode,
+                metadata={},
+            )
 
     except Exception as e:
         logger.error(f"Failed to search for '{query}': {e}")
@@ -304,7 +364,9 @@ async def get_semantic_status(
         elif ready:
             message = "Semantic search is ready"
         elif building:
-            message = "Semantic search is building in background (search still works with exact/fuzzy)"
+            message = (
+                "Semantic search is building in background (search still works with exact/fuzzy)"
+            )
         else:
             message = "Semantic search is not initialized"
 

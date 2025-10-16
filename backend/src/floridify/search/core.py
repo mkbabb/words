@@ -9,8 +9,6 @@ import asyncio
 import itertools
 from typing import Any
 
-from beanie import PydanticObjectId
-
 from ..caching.models import VersionConfig
 from ..corpus.core import Corpus
 from ..text import normalize
@@ -59,9 +57,11 @@ class Search:
         self.fuzzy_search: FuzzySearch | None = None
         self.semantic_search: SemanticSearch | None = None
 
-        # Track semantic initialization separately
+        # Track semantic initialization separately with proper synchronization
         self._semantic_ready = False
         self._semantic_init_task: asyncio.Task[None] | None = None
+        self._semantic_init_lock: asyncio.Lock = asyncio.Lock()  # CRITICAL FIX: Prevent race conditions
+        self._semantic_init_error: str | None = None  # Track initialization errors
 
         self._initialized = False
 
@@ -136,19 +136,62 @@ class Search:
             f"Initializing SearchEngine for corpus '{self.index.corpus_name}' (hash: {self.index.vocabulary_hash[:8]})",
         )
 
-        # Load corpus if not already loaded - try both corpus_id and corpus_name for robustness
+        # Load corpus if not already loaded - use corpus_uuid for lookup
         if not self.corpus:
             self.corpus = await Corpus.get(
-                corpus_id=self.index.corpus_id,
+                corpus_uuid=self.index.corpus_uuid,
                 corpus_name=self.index.corpus_name,
                 config=VersionConfig(),
             )
 
             if not self.corpus:
                 raise ValueError(
-                    f"Corpus '{self.index.corpus_name}' (ID: {self.index.corpus_id}) not found. "
+                    f"Corpus '{self.index.corpus_name}' (UUID: {self.index.corpus_uuid}) not found. "
                     f"It should have been created by LanguageSearch.initialize() or via get_or_create_corpus()."
                 )
+
+        # CRITICAL FIX: Validate UUID consistency between index and corpus
+        if self.corpus.corpus_uuid != self.index.corpus_uuid:
+            raise ValueError(
+                f"UUID MISMATCH: SearchIndex references corpus_uuid={self.index.corpus_uuid}, "
+                f"but loaded corpus has corpus_uuid={self.corpus.corpus_uuid}. "
+                f"This indicates index corruption or stale cache. "
+                f"Solution: Rebuild search index for corpus '{self.corpus.corpus_name}'."
+            )
+
+        # CRITICAL FIX: Validate vocabulary hash consistency - auto-rebuild if stale
+        if self.corpus.vocabulary_hash != self.index.vocabulary_hash:
+            logger.warning(
+                f"VOCABULARY HASH MISMATCH: SearchIndex has hash {self.index.vocabulary_hash[:8]}, "
+                f"but corpus has hash {self.corpus.vocabulary_hash[:8]}. "
+                f"Index will be rebuilt automatically."
+            )
+            # Preserve semantic settings before rebuild
+            semantic_was_enabled = self.index.semantic_enabled
+            semantic_model = self.index.semantic_model
+
+            # Trigger automatic rebuild
+            await self.build_indices()
+            self.index.vocabulary_hash = self.corpus.vocabulary_hash
+
+            # Restore semantic settings after rebuild
+            self.index.semantic_enabled = semantic_was_enabled
+            self.index.has_semantic = semantic_was_enabled
+
+            # Save updated index
+            # PATHOLOGICAL REMOVAL: No hasattr - direct method call
+            # SearchIndex always has save() method
+            await self.index.save()
+            logger.info(f"✅ Search indices rebuilt for corpus '{self.corpus.corpus_name}'")
+
+            # CRITICAL: Initialize semantic search if it was enabled
+            if semantic_was_enabled and not self._semantic_ready:
+                logger.info("Re-initializing semantic search after vocabulary rebuild")
+                async with self._semantic_init_lock:
+                    if not self._semantic_ready and self._semantic_init_task is None:
+                        self._semantic_init_task = asyncio.create_task(self._initialize_semantic_background())
+
+            return  # Skip rest of initialization since build_indices() already did it
 
         combined_vocab = self.corpus.vocabulary
         logger.debug(f"Corpus loaded with {len(combined_vocab)} vocabulary items")
@@ -165,8 +208,11 @@ class Search:
         # Initialize semantic search if enabled - non-blocking background task
         if self.index.semantic_enabled and not self._semantic_ready:
             logger.debug("Semantic search enabled - initializing in background")
-            # Fire and forget - semantic search initializes in background
-            self._semantic_init_task = asyncio.create_task(self._initialize_semantic_background())
+            # CRITICAL FIX: Use lock to prevent duplicate initialization tasks
+            async with self._semantic_init_lock:
+                # Double-check after acquiring lock
+                if not self._semantic_ready and self._semantic_init_task is None:
+                    self._semantic_init_task = asyncio.create_task(self._initialize_semantic_background())
 
         self._initialized = True
 
@@ -175,7 +221,10 @@ class Search:
         )
 
     async def _initialize_semantic_background(self) -> None:
-        """Initialize semantic search in background without blocking."""
+        """Initialize semantic search in background without blocking.
+
+        CRITICAL FIX: Uses lock to ensure thread safety and proper error state management.
+        """
         try:
             if not self.corpus or not self.index:
                 error_msg = (
@@ -184,7 +233,9 @@ class Search:
                     f"index={'present' if self.index else 'missing'}"
                 )
                 logger.error(error_msg)
-                self._semantic_ready = False
+                async with self._semantic_init_lock:
+                    self._semantic_ready = False
+                    self._semantic_init_error = error_msg
                 return
 
             logger.info(
@@ -193,7 +244,7 @@ class Search:
             )
 
             # Create semantic search using from_corpus (this now ensures embeddings are built)
-            self.semantic_search = await SemanticSearch.from_corpus(
+            semantic_search = await SemanticSearch.from_corpus(
                 corpus=self.corpus,
                 model_name=self.index.semantic_model,  # type: ignore[arg-type]
                 config=VersionConfig(),
@@ -202,25 +253,30 @@ class Search:
             # FIX: Verify embeddings were actually built
             # Use `is None` instead of `not` to avoid NumPy array truth value ambiguity
             if (
-                self.semantic_search.sentence_embeddings is None
-                or self.semantic_search.sentence_embeddings.size == 0
+                semantic_search.sentence_embeddings is None
+                or semantic_search.sentence_embeddings.size == 0
             ):
                 raise RuntimeError(
                     f"Semantic search initialization completed but no embeddings generated "
                     f"for '{self.index.corpus_name}'"
                 )
 
-            if not self.semantic_search.sentence_index:
+            if semantic_search.sentence_index is None:
                 raise RuntimeError(
                     f"Semantic search initialization completed but no FAISS index created "
                     f"for '{self.index.corpus_name}'"
                 )
 
-            self._semantic_ready = True
+            # Atomically update state with lock
+            async with self._semantic_init_lock:
+                self.semantic_search = semantic_search
+                self._semantic_ready = True
+                self._semantic_init_error = None
+
             logger.info(
                 f"✅ Semantic search ready for '{self.index.corpus_name}' "
-                f"({self.semantic_search.index.num_embeddings:,} embeddings, "
-                f"{self.semantic_search.index.embedding_dimension}D)"
+                f"({semantic_search.index.num_embeddings:,} embeddings, "
+                f"{semantic_search.index.embedding_dimension}D)"
             )
 
         except Exception as e:
@@ -229,15 +285,25 @@ class Search:
                 f"Failed to initialize semantic search for '{corpus_name}': {e}",
                 exc_info=True,  # FIX: Include full traceback for debugging
             )
-            self._semantic_ready = False
-            # Store error for debugging (useful for status endpoints)
-            if not hasattr(self, "_semantic_init_error"):
+            # Atomically update error state with lock
+            async with self._semantic_init_lock:
+                self._semantic_ready = False
                 self._semantic_init_error = str(e)
 
     async def await_semantic_ready(self) -> None:
-        """Wait for semantic search to be ready (useful for tests)."""
-        if self._semantic_init_task and not self._semantic_ready:
-            await self._semantic_init_task
+        """Wait for semantic search to be ready (useful for tests).
+
+        CRITICAL FIX: Properly checks task state with lock to avoid race conditions.
+        """
+        # Check if initialization is needed
+        async with self._semantic_init_lock:
+            if self._semantic_ready:
+                return  # Already ready
+            task = self._semantic_init_task
+
+        # Wait for task outside of lock to avoid deadlock
+        if task and not task.done():
+            await task
 
     async def _get_current_vocab_hash(self) -> str | None:
         """Get current vocabulary hash from corpus."""
@@ -245,9 +311,9 @@ class Search:
             return None
 
         try:
-            # Try with corpus_id first (more reliable), fallback to corpus_name
+            # Try with corpus_uuid first, fallback to corpus_name
             corpus = await Corpus.get(
-                corpus_id=self.index.corpus_id,
+                corpus_uuid=self.index.corpus_uuid,
                 corpus_name=self.index.corpus_name,
                 config=VersionConfig(),
             )
@@ -273,16 +339,16 @@ class Search:
             f"Corpus vocabulary changed for '{self.index.corpus_name}': {self.index.vocabulary_hash[:8]} -> {current_vocab_hash[:8] if current_vocab_hash else 'none'}",
         )
 
-        # Get updated corpus - try with both corpus_id and corpus_name for robustness
+        # Get updated corpus - use corpus_uuid and corpus_name
         updated_corpus = await Corpus.get(
-            corpus_id=self.index.corpus_id,
+            corpus_uuid=self.index.corpus_uuid,
             corpus_name=self.index.corpus_name,
             config=VersionConfig(),
         )
 
         if not updated_corpus:
             logger.error(
-                f"Failed to get updated corpus '{self.index.corpus_name}' (ID: {self.index.corpus_id}). "
+                f"Failed to get updated corpus '{self.index.corpus_name}' (UUID: {self.index.corpus_uuid}). "
                 f"Corpus may have been deleted or cache is stale."
             )
             return
@@ -314,7 +380,7 @@ class Search:
 
             self.index = SearchIndex(
                 corpus_name=self.corpus.corpus_name,
-                corpus_id=self.corpus.corpus_id or PydanticObjectId(),  # Use empty ID if None
+                corpus_uuid=self.corpus.corpus_uuid or "",  # Use empty string if None
                 vocabulary_hash=self.corpus.vocabulary_hash,
                 min_score=DEFAULT_MIN_SCORE,
                 has_trie=True,
@@ -461,8 +527,8 @@ class Search:
             results = self.search_fuzzy(normalized_query, max_results, min_score)
         elif mode == SearchMode.SEMANTIC:
             # Wait for semantic search to be ready if it's being initialized
-            if self._semantic_init_task and not self._semantic_ready:
-                await self._semantic_init_task
+            # CRITICAL FIX: Use await_semantic_ready for proper synchronization
+            await self.await_semantic_ready()
 
             if not self.semantic_search:
                 raise ValueError("Semantic search is not enabled for this SearchEngine instance")
@@ -558,6 +624,31 @@ class Search:
             logger.warning(f"Fuzzy search failed: {e}")
             return []
 
+    def search_prefix(
+        self,
+        prefix: str,
+        max_results: int = 20,
+    ) -> list[str]:
+        """Search for words starting with the given prefix.
+
+        Args:
+            prefix: Prefix to search for
+            max_results: Maximum results to return
+
+        Returns:
+            List of words starting with prefix (plain strings, not SearchResults)
+
+        """
+        if self.trie_search is None:
+            return []
+
+        # Normalize at entry point
+        normalized_prefix = normalize(prefix)
+        matches = self.trie_search.search_prefix(normalized_prefix, max_results=max_results)
+
+        # Return original words with diacritics
+        return [self._get_original_word(match) for match in matches]
+
     async def search_semantic(
         self,
         query: str,
@@ -648,11 +739,10 @@ class Search:
         # 3. Semantic search - quality-based gating for optimal performance
         semantic_results = []
         if semantic:
-            # Wait for semantic search to be ready if it's being initialized
-            if self._semantic_init_task and not self._semantic_ready:
-                await self._semantic_init_task
-
-            if self.semantic_search:
+            # CRITICAL FIX: In SMART mode, only use semantic if already ready - don't block!
+            # This allows search to return immediately with exact/fuzzy results
+            # while semantic builds in background
+            if self._semantic_ready and self.semantic_search:
                 # Quality-based gating: skip semantic if fuzzy found high-quality results
                 high_quality_fuzzy = [r for r in fuzzy_results if r.score >= 0.7]
                 sufficient_high_quality = len(high_quality_fuzzy) >= max_results // 3

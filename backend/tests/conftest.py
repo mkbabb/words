@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-# Fix for pytest segfault on Apple Silicon with GTE-Qwen2 model and OpenMP threading
+# Set OpenMP threading limits BEFORE any library imports to prevent conflicts
+# These settings work universally (local development and Docker)
 import os
-os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-import torch
-torch.set_default_device("cpu")
 import shutil
 import subprocess
 import time
@@ -458,29 +455,261 @@ async def mock_openai_client():
     """Mock OpenAI client for API tests."""
     from unittest.mock import AsyncMock, MagicMock, patch
 
-    mock_client = AsyncMock()
-    mock_response = MagicMock()
+    # Import all response models we need to mock
+    from floridify.ai.models import (
+        AntonymCandidate,
+        AntonymResponse,
+        CEFRLevelResponse,
+        Collocation,
+        CollocationResponse,
+        ExampleGenerationResponse,
+        FactGenerationResponse,
+        FrequencyBandResponse,
+        GrammarPatternResponse,
+        PronunciationResponse,
+        QueryValidationResponse,
+        RegionalVariantResponse,
+        RegisterClassificationResponse,
+        Suggestion,
+        SuggestionsResponse,
+        SynonymCandidate,
+        SynonymGenerationResponse,
+        UsageNote,
+        UsageNoteResponse,
+        WordForm,
+        WordFormResponse,
+        WordSuggestion,
+        WordSuggestionResponse,
+    )
 
-    # Setup ChatCompletion response
-    mock_response.choices = [
-        MagicMock(
-            message=MagicMock(
-                content="This is a synthesized definition for the word.",
-            ),
-        ),
-    ]
+    # Create mock connector instance with properly typed methods
+    mock_connector = MagicMock()
 
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    # Mock the last_model_used property to return a string
+    type(mock_connector).last_model_used = property(lambda self: "gpt-4")
 
-    # Setup embeddings response
-    mock_embedding_response = MagicMock()
-    mock_embedding_response.data = [
-        MagicMock(embedding=[0.1] * 768),  # Standard embedding dimension
-    ]
-    mock_client.embeddings.create = AsyncMock(return_value=mock_embedding_response)
+    # Mock pronunciation method
+    mock_connector.pronunciation = AsyncMock(
+        return_value=PronunciationResponse(phonetic="BYOO-tuh-fuhl", ipa="/ˈbjuːtəfəl/")
+    )
 
-    with patch("floridify.ai.connector.OpenAIConnector", return_value=mock_client):
-        yield mock_client
+    # Mock synonym generation
+    mock_connector.synthesize_synonyms = AsyncMock(
+        return_value=SynonymGenerationResponse(
+            synonyms=[
+                SynonymCandidate(
+                    word="joyful",
+                    language="English",
+                    relevance=0.9,
+                    efflorescence=0.85,
+                    explanation="Expresses happiness with energy",
+                ),
+                SynonymCandidate(
+                    word="content",
+                    language="English",
+                    relevance=0.85,
+                    efflorescence=0.8,
+                    explanation="Gentle satisfaction",
+                ),
+                SynonymCandidate(
+                    word="pleased",
+                    language="English",
+                    relevance=0.8,
+                    efflorescence=0.75,
+                    explanation="Simple satisfaction",
+                ),
+            ],
+            confidence=0.9,
+        )
+    )
+
+    # Mock antonym generation
+    mock_connector.synthesize_antonyms = AsyncMock(
+        return_value=AntonymResponse(
+            antonyms=[
+                AntonymCandidate(
+                    word="sad",
+                    language="English",
+                    relevance=0.9,
+                    efflorescence=0.8,
+                    explanation="Direct opposite of happiness",
+                ),
+                AntonymCandidate(
+                    word="unhappy",
+                    language="English",
+                    relevance=0.85,
+                    efflorescence=0.75,
+                    explanation="Lacking happiness",
+                ),
+                AntonymCandidate(
+                    word="miserable",
+                    language="English",
+                    relevance=0.8,
+                    efflorescence=0.85,
+                    explanation="Deeply unhappy state",
+                ),
+            ],
+            confidence=0.9,
+        )
+    )
+
+    # Mock example generation
+    mock_connector.generate_examples = AsyncMock(
+        return_value=ExampleGenerationResponse(
+            example_sentences=[
+                "She gave an elaborate explanation of the process.",
+                "The artist created an elaborate mural.",
+                "They planned an elaborate celebration.",
+            ],
+            confidence=0.9,
+        )
+    )
+
+    # Mock fact generation
+    mock_connector.generate_facts = AsyncMock(
+        return_value=FactGenerationResponse(
+            facts=[
+                "The word originates from Latin",
+                "It entered English in the 15th century",
+                "It has multiple related forms",
+            ],
+            confidence=0.85,
+            categories=["etymology", "history"],
+        )
+    )
+
+    # Mock suggestions
+    mock_connector.suggestions = AsyncMock(
+        return_value=SuggestionsResponse(
+            suggestions=[
+                Suggestion(
+                    word="refined",
+                    reasoning="Cultured elegance",
+                    difficulty_level=3,
+                    semantic_category="elegance",
+                ),
+                Suggestion(
+                    word="cultured",
+                    reasoning="Sophisticated taste",
+                    difficulty_level=3,
+                    semantic_category="elegance",
+                ),
+                Suggestion(
+                    word="polished",
+                    reasoning="Smooth sophistication",
+                    difficulty_level=2,
+                    semantic_category="elegance",
+                ),
+                Suggestion(
+                    word="graceful",
+                    reasoning="Elegant movement",
+                    difficulty_level=2,
+                    semantic_category="elegance",
+                ),
+            ],
+            input_analysis="Words suggesting elegance and sophistication",
+            confidence=0.88,
+        )
+    )
+
+    # Mock CEFR assessment
+    mock_connector.assess_cefr_level = AsyncMock(
+        return_value=CEFRLevelResponse(level="C1", reasoning="Advanced vocabulary", confidence=0.85)
+    )
+
+    # Mock frequency assessment
+    mock_connector.assess_frequency_band = AsyncMock(
+        return_value=FrequencyBandResponse(band=3, reasoning="Moderately common", confidence=0.8)
+    )
+
+    # Mock register classification
+    mock_connector.classify_register = AsyncMock(
+        return_value=RegisterClassificationResponse(
+            register="formal", reasoning="Academic language style", confidence=0.85
+        )
+    )
+
+    # Mock word forms
+    mock_connector.identify_word_forms = AsyncMock(
+        return_value=WordFormResponse(
+            forms=[
+                WordForm(type="plural", text="beauties"),
+                WordForm(type="adverb", text="beautifully"),
+            ]
+        )
+    )
+
+    # Mock collocations
+    mock_connector.assess_collocations = AsyncMock(
+        return_value=CollocationResponse(
+            collocations=[
+                Collocation(type="verb+noun", phrase="make a decision", frequency=0.9),
+                Collocation(type="verb+noun", phrase="take action", frequency=0.85),
+                Collocation(type="verb+noun", phrase="have an effect", frequency=0.8),
+            ]
+        )
+    )
+
+    # Mock grammar patterns
+    mock_connector.assess_grammar_patterns = AsyncMock(
+        return_value=GrammarPatternResponse(
+            patterns=["[Tn]", "[Tn.pr]"],
+            descriptions=["Takes direct object", "Takes object with preposition"],
+        )
+    )
+
+    # Mock usage notes
+    mock_connector.usage_note_generation = AsyncMock(
+        return_value=UsageNoteResponse(
+            notes=[
+                UsageNote(type="confusion", text="Often confused with 'effect'"),
+                UsageNote(type="register", text="Used in formal contexts"),
+            ]
+        )
+    )
+
+    # Mock regional variants
+    mock_connector.assess_regional_variants = AsyncMock(
+        return_value=RegionalVariantResponse(regions=["UK", "US"])
+    )
+
+    # Mock query validation
+    mock_connector.validate_query = AsyncMock(
+        return_value=QueryValidationResponse(
+            is_valid=True, reason="Query seeks word suggestions", is_word_suggestion_request=True
+        )
+    )
+
+    # Mock word suggestions
+    mock_connector.suggest_words = AsyncMock(
+        return_value=WordSuggestionResponse(
+            suggestions=[
+                WordSuggestion(
+                    word="intelligent",
+                    confidence=0.9,
+                    efflorescence=0.85,
+                    reasoning="Having mental capacity",
+                    example_usage="She is an intelligent person.",
+                ),
+                WordSuggestion(
+                    word="clever",
+                    confidence=0.85,
+                    efflorescence=0.8,
+                    reasoning="Quick to understand",
+                    example_usage="He solved the puzzle with a clever approach.",
+                ),
+            ],
+            query_type="descriptive",
+            original_query="words that describe someone who is very intelligent",
+        )
+    )
+
+    # Patch both the class and get_openai_connector function
+    with (
+        patch("floridify.ai.connector.OpenAIConnector", return_value=mock_connector),
+        patch("floridify.ai.connector.get_openai_connector", return_value=mock_connector),
+    ):
+        yield mock_connector
 
 
 @pytest.fixture
