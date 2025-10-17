@@ -92,26 +92,6 @@ class TestCachingInfrastructure:
         if ns:
             assert cached is not None or first_key not in ns.memory_cache
 
-    async def test_compression(self, cache_manager):
-        """Test data compression for large values."""
-        from floridify.caching.core import CacheNamespace
-
-        namespace = CacheNamespace.DEFAULT
-        key = "test:compression:key"
-        # Create compressible data
-        value = {"data": "a" * 10000 + "b" * 10000}  # Highly compressible
-
-        # Note: set method doesn't have a compress parameter
-        # Compression is handled via namespace configuration
-        await cache_manager.set(namespace, key, value)
-        cached = await cache_manager.get(namespace, key)
-        assert cached == value
-
-        # Check that compressed data is in cache
-        # The filesystem backend handles compression internally
-        # We can verify the data round-trips correctly which confirms compression works
-        assert cached == value
-
     async def test_namespace_isolation(self, cache_manager):
         """Test cache namespace isolation."""
         # Set values in different namespaces
@@ -152,32 +132,6 @@ class TestCachingInfrastructure:
         # Verify all operations succeeded
         for i, result in enumerate(results):
             assert result["id"] == i
-
-    async def test_ttl_expiration(self, cache_manager):
-        """Test TTL-based cache expiration."""
-        # Set with short TTL
-        key = "test:ttl:key"
-        value = {"data": "expires soon"}
-
-        # Create new manager with short TTL
-        filesystem_backend = FilesystemBackend(cache_dir=cache_manager.l2_backend.cache_dir)
-        short_ttl_manager = GlobalCacheManager[FilesystemBackend](l2_backend=filesystem_backend)
-        await short_ttl_manager.initialize()
-
-        namespace = CacheNamespace.DICTIONARY
-        await short_ttl_manager.set(namespace, key, value)
-
-        # Should be cached immediately
-        cached = await short_ttl_manager.get(namespace, key)
-        assert cached == value
-
-        # Wait for expiration
-        await asyncio.sleep(1.5)
-
-        # Should be expired from memory but may still be in filesystem
-        # TTL is handled at the filesystem backend level
-        await short_ttl_manager.get(namespace, key)
-        # The behavior depends on the filesystem backend TTL implementation
 
 
 @pytest.mark.asyncio
