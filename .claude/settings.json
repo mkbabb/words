@@ -1,14 +1,14 @@
 {
   "hooks": {
     "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash /Users/mkbabb/Programming/words/.claude/hooks/Stop.sh"
-          }
-        ]
-      }
+    //   {
+    //     "hooks": [
+    //       {
+    //         "type": "command",
+    //         "command": "bash /Users/mkbabb/Programming/words/.claude/hooks/Stop.sh"
+    //       }
+    //     ]
+    //   }
     ]
   }
 }

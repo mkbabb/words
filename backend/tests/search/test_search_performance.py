@@ -154,17 +154,19 @@ class TestSearchPerformance:
         assert len(results) > 0
 
     @pytest.mark.asyncio
-    async def test_semantic_search_small_corpus(self, benchmark, small_corpus, test_db):
-        """Benchmark semantic search on small corpus."""
+    async def test_semantic_search_small_corpus(self, small_corpus, test_db):
+        """Test semantic search on small corpus (manual timing due to async)."""
         semantic_engine = await SemanticSearch.from_corpus(corpus=small_corpus)
         await semantic_engine.initialize()
 
-        def search_semantic():
-            return semantic_engine.search("fruit", max_results=10)
+        # Manually time async operation (pytest-benchmark doesn't support async well in async tests)
+        start = time.perf_counter()
+        result = await semantic_engine.search("fruit", max_results=10)
+        elapsed = time.perf_counter() - start
 
-        # Use benchmark.pedantic for async-friendly benchmarking
-        result = benchmark.pedantic(search_semantic, rounds=10, iterations=5)
         assert isinstance(result, list)
+        assert len(result) > 0
+        print(f"\nSemantic search took {elapsed*1000:.2f}ms")
 
     @pytest.mark.asyncio
     async def test_trie_prefix_search_large_corpus(self, benchmark, large_corpus, test_db):
@@ -224,8 +226,12 @@ class TestSearchPerformance:
         assert len(result) > 0
 
     @pytest.mark.asyncio
-    async def test_cached_vs_noncached_search(self, medium_corpus, test_db):
-        """Compare cached vs non-cached search performance."""
+    async def test_cached_vs_noncached_search(self, small_corpus, test_db):
+        """Compare cached vs non-cached search performance.
+
+        Uses small_corpus to ensure inline content storage (not external cache).
+        This prevents cache clearing from evicting corpus content.
+        """
         cache_manager = await get_global_cache()
 
         # Clear cache to ensure clean start
@@ -233,11 +239,11 @@ class TestSearchPerformance:
 
         # Initialize engine asynchronously
         engine = await Search.from_corpus(
-            corpus_name=medium_corpus.corpus_name,
+            corpus_name=small_corpus.corpus_name,
             semantic=False
         )
 
-        query = "word_0100"
+        query = "apple"  # Valid word in small_corpus
 
         # Test non-cached search (run multiple times for stable measurement)
         await cache_manager.clear()
@@ -441,7 +447,7 @@ class TestSearchPerformance:
         tracemalloc.stop()
 
     @pytest.mark.asyncio
-    async def test_semantic_index_caching_performance(self, benchmark, test_db):
+    async def test_semantic_index_caching_performance(self, test_db):
         """Test performance of semantic index caching."""
         vocabulary = ["apple", "banana", "cherry", "dog", "cat", "elephant"]
 
@@ -479,9 +485,9 @@ class TestSearchPerformance:
             f"Cached time {cached_time:.3f}s is slower than first {first_time:.3f}s"
         )
 
-        # Both should work correctly
-        results1 = engine1.search("fruit", max_results=3)
-        results2 = engine2.search("fruit", max_results=3)
+        # Both should work correctly (await the async search calls)
+        results1 = await engine1.search("fruit", max_results=3)
+        results2 = await engine2.search("fruit", max_results=3)
 
         # Should get same results
         assert len(results1) == len(results2)

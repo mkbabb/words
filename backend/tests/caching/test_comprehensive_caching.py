@@ -133,6 +133,84 @@ class TestCachingInfrastructure:
         for i, result in enumerate(results):
             assert result["id"] == i
 
+    async def test_compression_verification(self, cache_manager):
+        """Test that compression reduces storage size for compressible data."""
+        import json
+        from floridify.caching.core import CacheNamespace
+
+        # Use CORPUS namespace (has ZSTD compression)
+        namespace = CacheNamespace.CORPUS
+        key = "test:compression:verify"
+
+        # Highly compressible data (repeated pattern)
+        compressible_data = {"data": "a" * 50000, "metadata": "test"}
+
+        await cache_manager.set(namespace, key, compressible_data)
+        cached = await cache_manager.get(namespace, key)
+
+        # Data should round-trip correctly
+        assert cached == compressible_data
+
+        # Verify compression occurred by checking L2 storage
+        backend_key = cache_manager._make_backend_key(namespace, key)
+        raw_cached = await cache_manager.l2_backend.get(backend_key)
+
+        # Compressed data should be stored as bytes in L2
+        assert isinstance(raw_cached, bytes), "Compressed data should be bytes in L2"
+
+        # Compressed size should be significantly smaller than original JSON
+        original_json = json.dumps(compressible_data, sort_keys=True)
+        original_size = len(original_json.encode())
+        compressed_size = len(raw_cached)
+        compression_ratio = compressed_size / original_size
+
+        # Repeated data should compress to <10% of original size
+        assert compression_ratio < 0.1, (
+            f"Compression ratio {compression_ratio:.2%} too high. "
+            f"Expected <10% for repeated data (original: {original_size}, "
+            f"compressed: {compressed_size})"
+        )
+
+    async def test_memory_ttl_expiration(self, cache_manager):
+        """Test that memory (L1) TTL expiration works correctly."""
+        import asyncio
+        from datetime import timedelta
+        from floridify.caching.core import CacheNamespace
+
+        # Use DICTIONARY namespace
+        namespace = CacheNamespace.DICTIONARY
+        key = "test:ttl:memory"
+        value = {"data": "expires soon"}
+
+        # Get namespace config and temporarily set short TTL
+        ns = cache_manager.namespaces.get(namespace)
+        original_ttl = ns.memory_ttl
+        ns.memory_ttl = timedelta(seconds=0.5)
+
+        try:
+            # Set value
+            await cache_manager.set(namespace, key, value)
+
+            # Should be in L1 cache immediately
+            cached = await cache_manager.get(namespace, key)
+            assert cached == value
+
+            # Wait for L1 TTL to expire
+            await asyncio.sleep(0.6)
+
+            # Access should trigger TTL check and eviction from L1
+            result = await cache_manager.get(namespace, key)
+
+            # Should still get value from L2 (and re-promote to L1)
+            assert result == value
+
+            # Verify L1 was evicted due to TTL (check stats)
+            assert ns.stats.evictions > 0, "TTL should have triggered L1 eviction"
+
+        finally:
+            # Restore original TTL
+            ns.memory_ttl = original_ttl
+
 
 @pytest.mark.asyncio
 class TestVersionedCaching:
