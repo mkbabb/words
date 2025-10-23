@@ -425,10 +425,8 @@ async def _create_provider_mapped_entry(
 
         # Extract etymology if available
         etymology = None
-        if hasattr(provider_data, "raw_data") and provider_data.raw_data:
-            raw_data = provider_data.raw_data
-            if raw_data.get("etymology"):
-                etymology = Etymology(text=raw_data["etymology"])
+        if provider_data.raw_data and provider_data.raw_data.get("etymology"):
+            etymology = Etymology(text=provider_data.raw_data["etymology"])
 
         # Create the synthesized entry without AI content generation
         synthesized_entry = DictionaryEntry(

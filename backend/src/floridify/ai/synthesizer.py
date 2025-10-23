@@ -287,13 +287,8 @@ class DefinitionSynthesizer:
         # Generate fallback definitions
         dictionary_entry = await self.ai.lookup_fallback(word)
 
-        if (
-            not dictionary_entry
-            or not hasattr(dictionary_entry, "definitions")
-            or not dictionary_entry.definitions
-        ):
-            logger.warning(f"No definitions generated for '{word}'")
-            return None
+        if not dictionary_entry or not dictionary_entry.definitions:
+            raise ValueError(f"No definitions generated for '{word}'")
 
         # Convert to provider data format
         definitions: list[Definition] = []

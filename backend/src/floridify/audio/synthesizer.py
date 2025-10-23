@@ -6,10 +6,8 @@ import asyncio
 import hashlib
 import os
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from google.cloud import texttospeech_v1 as texttospeech
-from google.oauth2 import service_account
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,6 +15,11 @@ from ..models.base import AudioMedia
 from ..models.dictionary import Pronunciation
 from ..utils.config import Config
 from ..utils.paths import get_project_root
+
+# Lazy imports - only load Google Cloud dependencies when actually needed
+if TYPE_CHECKING:
+    from google.cloud import texttospeech_v1 as texttospeech
+    from google.oauth2 import service_account
 
 
 class AudioSynthesisConfig(BaseModel):
@@ -32,8 +35,8 @@ class AudioSynthesisConfig(BaseModel):
     american_voice_female: str = "en-US-Wavenet-F"
     british_voice_female: str = "en-GB-Wavenet-A"
 
-    # Audio configuration
-    audio_encoding: int = texttospeech.AudioEncoding.MP3
+    # Audio configuration - default to MP3 encoding (3)
+    audio_encoding: int = 3  # texttospeech.AudioEncoding.MP3
     speaking_rate: float = 1.0
     pitch: float = 0.0
     volume_gain_db: float = 0.0
@@ -55,7 +58,7 @@ class AudioSynthesizer:
 
         """
         self.config = config or self._load_config()
-        self._client: texttospeech.TextToSpeechClient | None = None
+        self._client = None  # Lazy-initialized on first use
 
         # Ensure cache directory exists
         self.config.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -113,9 +116,13 @@ class AudioSynthesizer:
         )
 
     @property
-    def client(self) -> texttospeech.TextToSpeechClient:
-        """Get or create the TTS client."""
+    def client(self):
+        """Get or create the TTS client (lazy imports Google Cloud dependencies)."""
         if self._client is None:
+            # Import Google Cloud dependencies only when client is first accessed
+            from google.cloud import texttospeech_v1 as texttospeech
+            from google.oauth2 import service_account
+
             if self.config.credentials_path and self.config.credentials_path.exists():
                 credentials = service_account.Credentials.from_service_account_file(
                     str(self.config.credentials_path),
@@ -193,6 +200,9 @@ class AudioSynthesizer:
                     accent=accent,
                     quality="high",
                 )
+
+            # Import Google Cloud types when actually synthesizing
+            from google.cloud import texttospeech_v1 as texttospeech
 
             # Synthesize new audio
             synthesis_input = texttospeech.SynthesisInput(ssml=ssml_text)
@@ -299,6 +309,9 @@ class AudioSynthesizer:
                     accent=accent,
                     quality="high",
                 )
+
+            # Import Google Cloud types when actually synthesizing
+            from google.cloud import texttospeech_v1 as texttospeech
 
             # Synthesize new audio
             synthesis_input = texttospeech.SynthesisInput(text=synthesis_text)

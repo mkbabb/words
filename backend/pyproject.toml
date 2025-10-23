@@ -3,7 +3,7 @@ name = "floridify"
 version = "0.1.0"
 description = "AI-Enhanced Dictionary and Learning Tool"
 authors = [{ name = "Mike Babb", email = "mike7400@gmail.com" }]
-requires-python = ">=3.13,<3.15"
+requires-python = ">=3.12,<3.15"
 
 dependencies = [
     "httpx[http2]>=0.28.0",
@@ -33,6 +33,8 @@ dependencies = [
     # REST API framework
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
+    "watchfiles>=0.21.0",  # Required for uvicorn --reload
+    "python-multipart>=0.0.6",  # Required for form data / file uploads
     "nltk>=3.9.1",
     "pillow>=10.0.0", # For image processing in definitions
     # Semantic search dependencies (CPU-only by default)

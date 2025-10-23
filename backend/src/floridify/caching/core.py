@@ -151,8 +151,27 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         namespace: CacheNamespace,
         key: str,
         loader: Callable[[], Any] | None = None,
+        use_cache: bool = True,
     ) -> Any | None:
-        """Two-tier get with optional loader."""
+        """Two-tier get with optional loader.
+
+        Args:
+            namespace: Cache namespace
+            key: Cache key
+            loader: Optional loader function to call on cache miss
+            use_cache: If False, skip cache lookup and call loader directly
+        """
+        # If use_cache=False, skip cache entirely and call loader
+        if not use_cache:
+            if loader:
+                try:
+                    logger.debug(f"Cache bypass: {namespace.value}:{key} (use_cache=False)")
+                    return await loader()
+                except Exception as e:
+                    logger.error(f"Cache loader failed for {namespace.value}:{key}: {e}", exc_info=True)
+                    return None
+            return None
+
         ns = self.namespaces.get(namespace)
         if not ns:
             logger.warning(f"Unknown namespace: {namespace}")
@@ -397,7 +416,9 @@ async def shutdown_global_cache() -> None:
 # ============================================================================
 
 
-async def get_versioned_content(versioned_data: Any) -> dict[str, Any] | None:
+async def get_versioned_content(
+    versioned_data: Any, config: "VersionConfig | None" = None
+) -> dict[str, Any] | None:
     """Retrieve content from a versioned data object.
 
     This is a standalone function that retrieves content from BaseVersionedData objects.
@@ -405,6 +426,7 @@ async def get_versioned_content(versioned_data: Any) -> dict[str, Any] | None:
 
     Args:
         versioned_data: A BaseVersionedData instance (or subclass)
+        config: Optional VersionConfig to control cache behavior
 
     Returns:
         The content dictionary or None if not found
@@ -431,7 +453,12 @@ async def get_versioned_content(versioned_data: Any) -> dict[str, Any] | None:
             namespace = location.cache_namespace
             if isinstance(namespace, str):
                 namespace = CacheNamespace(namespace)
-            cached_content = await cache.get(namespace=namespace, key=location.cache_key)
+
+            # Respect use_cache flag from config
+            use_cache = True if not config else config.use_cache
+            cached_content = await cache.get(
+                namespace=namespace, key=location.cache_key, use_cache=use_cache
+            )
             # Cast to expected return type
             if isinstance(cached_content, dict):
                 return cached_content

@@ -248,12 +248,7 @@ class TreeCorpusManager:
             **(metadata or {}),
         }
 
-        logger.debug(f"save_corpus: saving with child_uuids={full_metadata['child_uuids']}")
-
         # Save using version manager
-        logger.info(
-            f"save_corpus: calling vm.save with resource_id={resource_id}, child_uuids={full_metadata.get('child_uuids', [])}"
-        )
         saved = await self.vm.save(
             resource_id=resource_id,
             resource_type=ResourceType.CORPUS,  # Registry maps this to Corpus.Metadata
@@ -262,7 +257,6 @@ class TreeCorpusManager:
             config=config or VersionConfig(),
             metadata=full_metadata,
         )
-        logger.info(f"save_corpus: vm.save returned ID={saved.id if saved else None}")
 
         # Self-references already cleaned at line 171-174 before save
         # No need for redundant post-save cleanup that causes double-save race condition
@@ -284,13 +278,7 @@ class TreeCorpusManager:
 
         # If we saved metadata, convert back to Corpus
         if saved:
-            logger.debug(
-                f"save_corpus: saved.id={saved.id}, saved.content_inline={saved.content_inline is not None}, saved.content_location={saved.content_location is not None}"
-            )
             saved_content = await get_versioned_content(saved)
-            logger.debug(
-                f"save_corpus: get_versioned_content returned: {saved_content is not None}"
-            )
             if saved_content:
                 # Merge metadata into content - use ENUM OBJECTS, not string values
                 # This ensures Pydantic doesn't need to convert them
@@ -310,23 +298,10 @@ class TreeCorpusManager:
                     # New corpus, use the metadata document's ID
                     saved_content["corpus_id"] = saved.id
                 # CRITICAL: Copy uuid from metadata to content (guaranteed to exist via Pydantic validator)
-                logger.debug(
-                    f"save_corpus: BEFORE override - saved_content has corpus_uuid={saved_content.get('corpus_uuid')}, metadata uuid={saved.uuid}"
-                )
                 saved_content["corpus_uuid"] = saved.uuid
-                logger.debug(f"save_corpus: AFTER override - set corpus_uuid={saved.uuid}")
-                logger.debug(
-                    f"save_corpus: About to validate corpus with keys: {list(saved_content.keys())[:10]}"
-                )
-                logger.debug(
-                    f"save_corpus: saved_content['corpus_uuid']={saved_content.get('corpus_uuid')}"
-                )
                 # PATHOLOGICAL REMOVAL: No try/except - let validation errors propagate
                 result = Corpus.model_validate(saved_content)
-                logger.debug(
-                    f"save_corpus: Successfully created Corpus with uuid={result.corpus_uuid}"
-                )
-                logger.debug(f"save_corpus: Corpus object id: {id(result)}")
+                logger.info(f"✅ Saved corpus '{resource_id}' with {len(result.vocabulary):,} words")
                 return result
         logger.warning("save_corpus: saved_content is None, returning None")
         return None
@@ -386,19 +361,9 @@ class TreeCorpusManager:
             )
         elif corpus_uuid:
             # When retrieving by uuid, find the metadata with that uuid
-            logger.info(f"get_corpus: searching for uuid={corpus_uuid}")
-            # Check if any metadata with this uuid exists at all
-            all_with_uuid = await Corpus.Metadata.find({"uuid": corpus_uuid}).to_list()
-            logger.info(f"get_corpus: found {len(all_with_uuid)} documents with uuid={corpus_uuid}")
-            for doc in all_with_uuid:
-                logger.info(
-                    f"  - doc id={doc.id}, uuid={doc.uuid}, is_latest={doc.version_info.is_latest if doc.version_info else None}"
-                )
-
             metadata = await Corpus.Metadata.find_one(
                 {"uuid": corpus_uuid, "version_info.is_latest": True}
             )
-            logger.info(f"get_corpus: find_one returned metadata: {metadata is not None}")
         elif corpus_name:
             # When retrieving by name, use version manager for latest
             metadata = await self.vm.get_latest(
@@ -412,14 +377,10 @@ class TreeCorpusManager:
         if not metadata:
             return None
 
-        # Get content from versioned storage
-        content = await get_versioned_content(metadata)
+        # Get content from versioned storage, respecting config.use_cache
+        content = await get_versioned_content(metadata, config=config)
         if not content:
             content = {}
-
-        logger.info(
-            f"get_corpus: metadata.id={metadata.id if metadata else None}, content has vocabulary: {len(content.get('vocabulary', []))}, metadata.child_uuids={metadata.child_uuids}"
-        )
 
         # Ensure all required fields from metadata
         # Corpus-specific fields should come from metadata attributes, not content
@@ -505,8 +466,8 @@ class TreeCorpusManager:
         # PATHOLOGICAL REMOVAL: No try/except - let errors propagate
         corpora = []
         for metadata in metadatas:
-            # Get versioned content for each metadata
-            content = await get_versioned_content(metadata)
+            # Get versioned content for each metadata, respecting config.use_cache
+            content = await get_versioned_content(metadata, config=config)
             if content:
                 # Add the ID from metadata
                 content["corpus_id"] = metadata.id
@@ -564,7 +525,8 @@ class TreeCorpusManager:
         # PATHOLOGICAL REMOVAL: No try/except - let errors propagate
         corpora = []
         for metadata in metadatas:
-            content = await get_versioned_content(metadata)
+            # Get versioned content, respecting config.use_cache
+            content = await get_versioned_content(metadata, config=config)
             if content:
                 content["corpus_id"] = metadata.id
                 content["corpus_uuid"] = metadata.uuid

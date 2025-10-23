@@ -761,11 +761,13 @@ class WOTDTrainer:
         logger.info("🎭 Starting literature-based WOTD training")
         logger.info(f"📚 Authors: {', '.join(author.value for author in authors)}")
 
-        # Use lightweight model if requested
+        # Use lightweight model if requested (still use QWEN-based models)
         if use_lightweight_model:
-            self.config.embedding_model = "sentence-transformers/all-MiniLM-L6-v2"  # 384D
+            from ..search.semantic.constants import QWEN3_0_6B_MODEL
+
+            self.config.embedding_model = QWEN3_0_6B_MODEL  # 1024D lightweight QWEN
             self.embedder = WOTDEmbedder(model_name=self.config.embedding_model)
-            self.encoder = get_semantic_encoder(input_dim=384)
+            self.encoder = get_semantic_encoder(input_dim=1024)
 
         # Initialize literature system components
         source_manager = LiteratureSourceManager()
@@ -876,7 +878,7 @@ class WOTDTrainer:
         duration = time.time() - start_time
         results.duration_seconds = duration
         results.metadata = {
-            **getattr(results, "metadata", {}),
+            **(results.metadata or {}),
             "training_type": "literature",
             "authors": [author.value for author in authors],
             "literature_corpora": len(literature_corpora),
@@ -1035,10 +1037,8 @@ class WOTDTrainer:
             period = "Elizabethan" if "shakespeare" in corpus_id.lower() else "Modernist"
             genre = "mixed" if "shakespeare" in corpus_id.lower() else "novel"
 
-            # Get word frequencies (mock for now, could be enhanced)
-            word_frequencies = {
-                w.word: w.frequency if hasattr(w, "frequency") else 1 for w in corpus.words[:20]
-            }
+            # Get word frequencies
+            word_frequencies = {w.word: w.frequency for w in corpus.words[:20]}
 
             try:
                 # Use the new literature analysis method

@@ -159,10 +159,10 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
                 f"Searching for '{query}' in corpus_id={params.corpus_id} corpus_name={params.corpus_name} (mode={mode_enum.value})"
             )
 
-            # Get the corpus manager
             from ...caching.models import VersionConfig
             from ...corpus.manager import get_corpus_manager
             from ...search.core import Search
+            from ...search.models import SearchIndex
 
             corpus_manager = get_corpus_manager()
 
@@ -170,7 +170,7 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
             corpus = await corpus_manager.get_corpus(
                 corpus_id=params.corpus_id,
                 corpus_name=params.corpus_name,
-                config=VersionConfig(use_cache=True)
+                config=VersionConfig(use_cache=True),
             )
 
             if not corpus:
@@ -184,9 +184,16 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
                     metadata={"error": "Corpus not found"},
                 )
 
-            # Create search instance for this specific corpus
-            search_engine = Search(corpus=corpus)
-            await search_engine.build_indices()  # Build basic indices
+            # Create search index for this corpus
+            index = await SearchIndex.get_or_create(
+                corpus=corpus,
+                semantic=mode_enum == SearchMode.SEMANTIC,
+                config=VersionConfig(use_cache=True),
+            )
+
+            # Create search engine from index
+            search_engine = Search(index=index, corpus=corpus)
+            await search_engine.initialize()
 
             # Perform search
             results = await search_engine.search_with_mode(
@@ -436,11 +443,20 @@ async def rebuild_search_index(
         await cache.clear_namespace(CacheNamespace.CORPUS)
         caches_cleared["vocabulary_caches"] = 0
 
-        # Clear semantic caches
-        # Cleanup expired entries in unified cache
-        await get_global_cache()
-        semantic_cleared = 0  # Unified cache handles expiration automatically
-        caches_cleared["semantic_expired"] = semantic_cleared
+        # Clear semantic caches when requested or when force rebuilding
+        semantic_cleared = 0
+        logger.info(
+            f"Semantic cache control: clear_semantic_cache={request.clear_semantic_cache}, "
+            f"semantic_force_rebuild={request.semantic_force_rebuild}, "
+            f"rebuild_semantic={request.rebuild_semantic}"
+        )
+        if request.clear_semantic_cache or request.semantic_force_rebuild:
+            await cache.clear_namespace(CacheNamespace.SEMANTIC)
+            semantic_cleared = 1
+            logger.info("🔥 Cleared SEMANTIC cache namespace")
+        else:
+            logger.warning("❌ SEMANTIC cache NOT cleared - condition not met")
+        caches_cleared["semantic_cleared"] = semantic_cleared
 
         # Clear corpus caches
         corpus_cleared = await corpus_manager.invalidate_all_corpora()
@@ -465,6 +481,7 @@ async def rebuild_search_index(
                     force_rebuild=request.force_download
                     or request.semantic_force_rebuild
                     or request.clear_lexicon_cache,
+                    semantic=request.rebuild_semantic,
                 )
                 stats = search_engine.get_stats()
                 corpus_results["language_search"] = {

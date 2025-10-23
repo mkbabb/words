@@ -131,10 +131,8 @@ async def _lookup_async(
                 meaning_groups: dict[str, list[Definition]] = {}
 
                 for definition in result.definitions:
-                    # Get meaning cluster safely
-                    cluster = "general"
-                    if hasattr(definition, "meaning_cluster") and definition.meaning_cluster:
-                        cluster = definition.meaning_cluster
+                    # Get meaning cluster
+                    cluster = definition.meaning_cluster or "general"
                     if cluster not in meaning_groups:
                         meaning_groups[cluster] = []
                     meaning_groups[cluster].append(definition)

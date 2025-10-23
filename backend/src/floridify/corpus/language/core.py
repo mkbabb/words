@@ -10,7 +10,8 @@ from typing import ClassVar
 
 from beanie import PydanticObjectId
 
-from ...caching.models import VersionConfig
+from ...caching.core import get_global_cache
+from ...caching.models import CacheNamespace, VersionConfig
 from ...models.base import Language
 from ...providers.language.models import LanguageSource
 from ...providers.language.scraper.url import URLLanguageConnector
@@ -207,15 +208,8 @@ class LanguageCorpus(Corpus):
         # Save to get corpus ID
         await corpus.save()
 
-        # TEMP: For testing, only use the French expressions source for English
-        if language == Language.ENGLISH:
-            # Filter to only get the french_expressions source for testing
-            all_sources = LANGUAGE_CORPUS_SOURCES_BY_LANGUAGE.get(language, [])
-            sources = [s for s in all_sources if s.name == "french_expressions"]
-            logger.info("TEMP: Using only french_expressions source for English testing")
-        else:
-            # Get all sources for other languages
-            sources = LANGUAGE_CORPUS_SOURCES_BY_LANGUAGE.get(language, [])
+        # Get all sources for the language (full corpus)
+        sources = LANGUAGE_CORPUS_SOURCES_BY_LANGUAGE.get(language, [])
 
         if not sources:
             logger.warning(f"No sources found for language: {language.value}")
@@ -269,8 +263,11 @@ class LanguageCorpus(Corpus):
 
         # Reload corpus to get aggregated vocabulary
         # Use corpus_name instead of corpus_id because save_corpus creates a new version with new ID
+        # CRITICAL FIX: Don't use use_cache=False here! The aggregation just saved vocabulary to cache,
+        # so we WANT to read from cache. Using use_cache=False causes get_versioned_content() to skip
+        # the cache entirely and return None, resulting in empty vocabulary.
         reloaded = await manager.get_corpus(
-            corpus_name=corpus.corpus_name, config=VersionConfig(use_cache=False)
+            corpus_name=corpus.corpus_name  # Use default config (use_cache=True)
         )
 
         if reloaded:

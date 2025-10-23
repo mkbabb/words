@@ -49,7 +49,7 @@ def parse_args() -> argparse.Namespace:
 
     # Model configuration
     parser.add_argument("--base-model", type=str, default="microsoft/Phi-3.5-mini-instruct")
-    parser.add_argument("--embedding-model", type=str, default="BAAI/bge-m3")
+    parser.add_argument("--embedding-model", type=str, default="Alibaba-NLP/gte-Qwen2-1.5B-instruct")
 
     return parser.parse_args()
 

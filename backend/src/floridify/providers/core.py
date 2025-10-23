@@ -167,8 +167,8 @@ class BaseConnector(ABC):
     @abstractmethod
     def model_dump(self, content: Any) -> Any:
         """Prepare content for persistence."""
-        if hasattr(content, "model_dump"):
-            return content.model_dump(mode="json")  # type: ignore[attr-defined]
+        if isinstance(content, BaseModel):
+            return content.model_dump(mode="json")
         return content
 
     def model_load(self, content: Any) -> Any:

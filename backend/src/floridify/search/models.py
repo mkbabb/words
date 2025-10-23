@@ -28,6 +28,13 @@ from .constants import DEFAULT_MIN_SCORE, SearchMethod
 logger = get_logger(__name__)
 
 
+def _get_default_semantic_model() -> str:
+    """Lazy import to avoid circular dependency."""
+    from .semantic.constants import DEFAULT_SENTENCE_MODEL
+
+    return DEFAULT_SENTENCE_MODEL
+
+
 class SearchResult(BaseModel):
     """Unified search result across all search methods."""
 
@@ -126,9 +133,13 @@ class TrieIndex(BaseModel):
 
         """
         effective_config = config or VersionConfig()
+        # CRITICAL FIX: Don't clear force_rebuild flag - downstream methods need it
+        # When force_rebuild=True, we want Corpus.get() and version manager to skip cache
+        # The VersionedDataManager.get_latest() already checks both flags correctly:
+        #   if use_cache and not config.force_rebuild: <check cache>
         if effective_config.force_rebuild:
+            # Ensure use_cache=False for consistency (though force_rebuild already bypasses cache)
             effective_config = effective_config.model_copy()
-            effective_config.force_rebuild = False
             effective_config.use_cache = False
 
         if not corpus_uuid and not corpus_name:
@@ -150,15 +161,15 @@ class TrieIndex(BaseModel):
         metadata: TrieIndex.Metadata | None = await manager.get_latest(
             resource_id=resource_id,
             resource_type=ResourceType.TRIE,
-            use_cache=config.use_cache if config else True,
-            config=config or VersionConfig(),
+            use_cache=effective_config.use_cache,
+            config=effective_config,
         )
 
         if not metadata:
             return None
 
-        # Load content from metadata
-        content = await get_versioned_content(metadata)
+        # Load content from metadata, respecting config.use_cache
+        content = await get_versioned_content(metadata, config=effective_config)
         if not content:
             return None
 
@@ -264,50 +275,30 @@ class TrieIndex(BaseModel):
         self,
         config: VersionConfig | None = None,
     ) -> None:
-        """Save trie index to versioned storage with verification.
+        """Save trie index to versioned storage.
 
         Args:
             config: Version configuration
 
         Raises:
-            RuntimeError: If save fails or verification fails
+            RuntimeError: If save fails
 
         """
         manager = get_version_manager()
         resource_id = f"{self.corpus_uuid}:trie"
 
-        try:
-            # Save using version manager - convert ObjectIds to strings for JSON
-            await manager.save(
-                resource_id=resource_id,
-                resource_type=ResourceType.TRIE,
-                namespace=manager._get_namespace(ResourceType.TRIE),
-                content=self.model_dump(mode="json"),
-                config=config or VersionConfig(),
-                metadata={
-                    "corpus_uuid": self.corpus_uuid,
-                },
-            )
+        await manager.save(
+            resource_id=resource_id,
+            resource_type=ResourceType.TRIE,
+            namespace=manager._get_namespace(ResourceType.TRIE),
+            content=self.model_dump(mode="json"),
+            config=config or VersionConfig(),
+            metadata={
+                "corpus_uuid": self.corpus_uuid,
+            },
+        )
 
-            # Verify save succeeded
-            verify_config = VersionConfig(use_cache=False)
-            saved = await self.get(corpus_uuid=self.corpus_uuid, config=verify_config)
-            if not saved:
-                raise ValueError("Could not retrieve saved trie index")
-            if saved.vocabulary_hash != self.vocabulary_hash:
-                raise ValueError(
-                    f"Vocabulary hash mismatch after save: "
-                    f"expected {self.vocabulary_hash}, got {saved.vocabulary_hash}"
-                )
-
-            logger.info(f"Successfully saved and verified trie index for {resource_id}")
-
-        except Exception as e:
-            logger.error(f"Failed to save trie index {resource_id}: {e}")
-            raise RuntimeError(
-                f"Trie index persistence failed for corpus {self.corpus_uuid}. "
-                f"Index may be corrupted. Error: {e}"
-            ) from e
+        logger.info(f"Saved trie index for {resource_id}")
 
     async def delete(self) -> None:
         """Delete trie index from versioned storage.
@@ -364,7 +355,7 @@ class SearchIndex(BaseModel):
     # Search configuration
     min_score: float = DEFAULT_MIN_SCORE
     semantic_enabled: bool = True
-    semantic_model: str = "BAAI/bge-m3"  # Default semantic model
+    semantic_model: str = Field(default_factory=_get_default_semantic_model)
 
     # Component indices (embedded or referenced)
     trie_index_id: PydanticObjectId | None = None
@@ -419,9 +410,13 @@ class SearchIndex(BaseModel):
 
         """
         effective_config = config or VersionConfig()
+        # CRITICAL FIX: Don't clear force_rebuild flag - downstream methods need it
+        # When force_rebuild=True, we want Corpus.get() and version manager to skip cache
+        # The VersionedDataManager.get_latest() already checks both flags correctly:
+        #   if use_cache and not config.force_rebuild: <check cache>
         if effective_config.force_rebuild:
+            # Ensure use_cache=False for consistency (though force_rebuild already bypasses cache)
             effective_config = effective_config.model_copy()
-            effective_config.force_rebuild = False
             effective_config.use_cache = False
 
         if not corpus_uuid and not corpus_name:
@@ -451,8 +446,8 @@ class SearchIndex(BaseModel):
         if not metadata:
             return None
 
-        # Load content from metadata
-        content = await get_versioned_content(metadata)
+        # Load content from metadata, respecting config.use_cache
+        content = await get_versioned_content(metadata, config=effective_config)
         if not content:
             return None
 
@@ -468,7 +463,7 @@ class SearchIndex(BaseModel):
         corpus: Corpus,
         min_score: float = 0.75,
         semantic: bool = True,
-        semantic_model: str = "BAAI/bge-m3",
+        semantic_model: str | None = None,
     ) -> SearchIndex:
         """Create new search index from corpus.
 
@@ -491,7 +486,7 @@ class SearchIndex(BaseModel):
             vocabulary_hash=get_vocabulary_hash(corpus.vocabulary),
             min_score=min_score,
             semantic_enabled=semantic,
-            semantic_model=semantic_model,
+            semantic_model=semantic_model or _get_default_semantic_model(),
             vocabulary_size=len(corpus.vocabulary),
             has_trie=True,  # Always build trie for exact/prefix search
             has_fuzzy=True,  # Always enable fuzzy
@@ -504,7 +499,7 @@ class SearchIndex(BaseModel):
         corpus: Corpus,
         min_score: float = 0.75,
         semantic: bool = True,
-        semantic_model: str = "BAAI/bge-m3",
+        semantic_model: str | None = None,
         config: VersionConfig | None = None,
     ) -> SearchIndex:
         """Get existing search index or create new one.

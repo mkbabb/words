@@ -166,6 +166,9 @@ class Embedder:
         )  # type: ignore
         self.supports_matryoshka = self.model_name in MATRYOSHKA_MODELS
 
+        # Initialize current dimension to full dimension
+        self._current_dim = self.full_dim
+
         # Load model with careful device and precision handling
         try:
             self.model = SentenceTransformer(
@@ -197,8 +200,7 @@ class Embedder:
     @property
     def current_dim(self) -> int:
         """Get the current effective embedding dimension based on the last operation."""
-        # This will be updated dynamically based on the mode/target_dim used
-        return getattr(self, "_current_dim", self.full_dim)
+        return self._current_dim
 
     def _update_current_dim(self, mode: EmbeddingMode, target_dim: int | None = None) -> int:
         """Update and return the current dimension based on mode and target."""

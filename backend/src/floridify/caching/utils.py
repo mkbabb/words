@@ -5,12 +5,14 @@ including JSON encoding, namespace normalization, and async utilities.
 """
 
 import asyncio
+from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 from uuid import UUID
 
 from beanie import PydanticObjectId
+from pydantic import BaseModel
 
 from .models import CacheNamespace
 
@@ -58,7 +60,7 @@ def json_encoder(obj: Any) -> Any:
         return obj.isoformat()
     if isinstance(obj, UUID):
         return str(obj)
-    if hasattr(obj, "model_dump"):
+    if isinstance(obj, BaseModel):
         return obj.model_dump()
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 

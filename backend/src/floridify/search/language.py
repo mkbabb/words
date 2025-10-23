@@ -118,8 +118,8 @@ async def get_language_search(
     """
     global _language_search_cache
 
-    # Create cache key
-    cache_key = tuple(sorted(languages, key=lambda x: x.value))
+    # Create cache key including semantic parameter to prevent stale cache hits
+    cache_key = tuple(sorted(languages, key=lambda x: x.value)) + (semantic,)
 
     # Check cache unless force rebuild
     if not force_rebuild and cache_key in _language_search_cache:
@@ -150,16 +150,18 @@ async def get_language_search(
     language = languages[0] if languages else Language.ENGLISH
 
     try:
-        # Create version config with force_rebuild flag
-        config = VersionConfig(force_rebuild=force_rebuild)
+        # Create version config with BOTH force_rebuild and use_cache flags
+        # CRITICAL FIX: When force_rebuild=True, MUST set use_cache=False
+        # Otherwise L1 cache remains active and returns stale cached data
+        config = VersionConfig(
+            force_rebuild=force_rebuild, use_cache=False if force_rebuild else True
+        )
 
-        # First, try to get existing corpus
-        corpus = await Corpus.get(corpus_name=corpus_name, config=config)
-
-        # If not found or forcing rebuild, create a new LanguageCorpus with sources
-        if not corpus or force_rebuild:
+        # CRITICAL FIX: When force_rebuild=True, skip Corpus.get() entirely and recreate from scratch
+        # This ensures TEST MODE code in LanguageCorpus.create_from_language() executes
+        if force_rebuild:
             logger.info(
-                f"Creating new language corpus '{corpus_name}' with sources for {language.value}"
+                f"Force rebuild: Creating new language corpus '{corpus_name}' from scratch for {language.value}"
             )
             corpus = await LanguageCorpus.create_from_language(
                 corpus_name=corpus_name,
@@ -167,6 +169,21 @@ async def get_language_search(
                 semantic=semantic,
                 model_name=DEFAULT_SENTENCE_MODEL,  # Use constant for model
             )
+        else:
+            # Normal path: try to get existing corpus first
+            corpus = await Corpus.get(corpus_name=corpus_name, config=config)
+
+            # If not found, create a new LanguageCorpus with sources
+            if not corpus:
+                logger.info(
+                    f"Corpus not found: Creating new language corpus '{corpus_name}' with sources for {language.value}"
+                )
+                corpus = await LanguageCorpus.create_from_language(
+                    corpus_name=corpus_name,
+                    language=language,
+                    semantic=semantic,
+                    model_name=DEFAULT_SENTENCE_MODEL,  # Use constant for model
+                )
 
         if not corpus:
             raise ValueError(f"Failed to get or create corpus '{corpus_name}'")
@@ -181,6 +198,9 @@ async def get_language_search(
             config=index_config,
         )
         search_engine = Search(index=index, corpus=corpus)
+
+        # CRITICAL: Initialize search engine to trigger semantic index creation
+        await search_engine.initialize()
 
         # Create language search wrapper
         language_search = LanguageSearch(

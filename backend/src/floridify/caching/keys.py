@@ -117,6 +117,25 @@ def serialize_cache_value(value: Any) -> Any:
         >>> serialize_cache_value([1, 2, 3])
         (1, 2, 3)
     """
+
+    def make_hashable(obj: Any) -> Any:
+        """Recursively convert nested lists/dicts to hashable tuples."""
+        if obj is None or isinstance(obj, str | int | float | bool):
+            return obj
+        if isinstance(obj, Enum):
+            return obj.value
+        if isinstance(obj, list | tuple):
+            # Recursively convert nested lists
+            return tuple(make_hashable(item) for item in obj)
+        if isinstance(obj, dict):
+            # Convert dict to sorted tuple of (key, value) pairs
+            return tuple(sorted((k, make_hashable(v)) for k, v in obj.items()))
+        # For other objects, try to hash or use id
+        try:
+            return str(hash(obj))
+        except TypeError:
+            return str(id(obj))
+
     # Primitives pass through unchanged
     if value is None or isinstance(value, str | int | float | bool):
         return value
@@ -125,9 +144,10 @@ def serialize_cache_value(value: Any) -> Any:
     if isinstance(value, Enum):
         return value.value
 
-    # Small collections (< 10 items) → preserve as tuple
+    # Small collections (< 10 items) → preserve as hashable tuple
+    # CRITICAL FIX: Use make_hashable to handle nested lists
     if isinstance(value, list | tuple) and len(value) < 10:
-        return tuple(value) if isinstance(value, list) else value
+        return make_hashable(value)
 
     # Complex objects → hash
     try:
@@ -159,10 +179,12 @@ def generate_versioned_cache_key(
         >>> generate_versioned_cache_key(ResourceType.CORPUS, "my-corpus", "1.0.0")
         'def456...'
     """
-    if version:
-        parts = (resource_type.value, resource_id, "v", version)
-    else:
-        parts = (resource_type.value, resource_id)
+    # Build parts tuple - type varies based on version presence
+    parts: tuple[Any, ...] = (
+        (resource_type.value, resource_id, "v", version)
+        if version
+        else (resource_type.value, resource_id)
+    )
     return generate_cache_key(parts)
 
 

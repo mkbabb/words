@@ -142,8 +142,7 @@ class FilesystemBackend:
 
         def _clear() -> int:
             count = 0
-            iter_keys = getattr(self.cache, "iterkeys", None)
-            keys = list(iter_keys()) if iter_keys else list(self.cache)
+            keys = list(self.cache)
             for key in keys:
                 if fnmatch.fnmatch(key, pattern):
                     del self.cache[key]

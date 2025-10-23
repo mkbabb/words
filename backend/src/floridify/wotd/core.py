@@ -147,9 +147,9 @@ class TrainingConfig(BaseModel):
     words_per_corpus: int = DEFAULT_WORDS_PER_CORPUS  # Words per semantic corpus
     num_corpora: int = DEFAULT_NUM_CORPORA  # Total semantic coverage
 
-    # BGE Embeddings (Stage 2) - matches semantic search architecture
-    embedding_model: str = DEFAULT_EMBEDDING_MODEL  # BAAI/bge-m3 for consistency
-    embedding_dim: int = DEFAULT_EMBEDDING_DIM  # 1024D vectors
+    # GTE-Qwen2 Embeddings (Stage 2) - SOTA multilingual embeddings
+    embedding_model: str = DEFAULT_EMBEDDING_MODEL  # GTE-Qwen2-1.5B for quality
+    embedding_dim: int = DEFAULT_EMBEDDING_DIM  # 4096D vectors with Matryoshka
     normalize_embeddings: bool = NORMALIZE_EMBEDDINGS  # L2 normalization
 
     # Semantic Encoder (Stage 3) - RVQ for preference compression

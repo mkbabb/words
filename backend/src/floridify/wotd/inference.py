@@ -53,9 +53,11 @@ class WOTDInference:
     async def load_models(self) -> None:
         """Load all trained models and mappings."""
         try:
-            # Load embedder (same model used during training)
+            # Load embedder (use QWEN3 lightweight model for consistency)
+            from ..search.semantic.constants import QWEN3_0_6B_MODEL
+
             self.embedder = get_embedder(
-                model_name="sentence-transformers/all-MiniLM-L6-v2",
+                model_name=QWEN3_0_6B_MODEL,
                 device="cpu",
             )
             logger.info("✅ Embedding model loaded")

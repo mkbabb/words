@@ -94,18 +94,14 @@ class BatchCollector:
 
                 # Add response format if using structured output
                 # Check if response_model is a Pydantic BaseModel class
-                try:
-                    schema = req.response_model.model_json_schema()
-                    batch_entry["body"]["response_format"] = {
-                        "type": "json_schema",
-                        "json_schema": {
-                            "name": req.response_model.__name__,
-                            "schema": schema,
-                        },
-                    }
-                except (AttributeError, TypeError):
-                    # Not a Pydantic model or schema generation failed
-                    pass
+                schema = req.response_model.model_json_schema()
+                batch_entry["body"]["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": req.response_model.__name__,
+                        "schema": schema,
+                    },
+                }
 
                 f.write(json.dumps(batch_entry) + "\n")
 

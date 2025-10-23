@@ -61,9 +61,9 @@ DEFAULT_NUM_CORPORA = 12  # Total corpora for complete coverage
 MIN_CORPUS_SIZE = 25  # Minimum viable corpus size
 MAX_CORPUS_SIZE = 500  # Maximum efficient corpus size
 
-# BGE Embedding Configuration
+# Embedding Configuration
 NORMALIZE_EMBEDDINGS = True  # L2 normalization for similarity
-EMBEDDING_BATCH_SIZE = 32  # BGE-M3 optimal batch size
+EMBEDDING_BATCH_SIZE = 32  # Optimal batch size for GTE-Qwen2 models
 EMBEDDING_DEVICE = "cpu"  # Default to CPU for reliability
 
 # Semantic Encoder Configuration - RVQ and FSQ options

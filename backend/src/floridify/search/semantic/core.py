@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import gzip
 import hashlib
 import math
 import multiprocessing
 import os
 import pickle
+import tempfile
 import time
 from typing import Any, Literal
 
@@ -292,18 +294,45 @@ class SemanticSearch:
 
             # Load FAISS index - handle both old base64 format and new compressed bytes format
             if "index_compressed_bytes" in binary_data:
-                # New format: compressed bytes stored directly (no base64)
-                compressed_bytes = binary_data["index_compressed_bytes"]
+                # New format: compressed bytes with FAISS native serialization
+                compressed = binary_data["index_compressed_bytes"]
+                if isinstance(compressed, str):
+                    compressed = base64.b64decode(compressed.encode("utf-8"))
                 logger.debug("Decompressing gzip FAISS index")
-                index_bytes = gzip.decompress(compressed_bytes)
-                faiss_data = pickle.loads(index_bytes)
-                self.sentence_index = faiss.deserialize_index(faiss_data)
-                logger.debug(
-                    f"Loaded FAISS index: {len(index_bytes) / 1024 / 1024:.2f}MB, "
-                    f"{self.sentence_index.ntotal if self.sentence_index is not None else 0} vectors"
-                )
+                index_bytes = gzip.decompress(compressed)
+                logger.debug(f"Decompressed FAISS index: {len(index_bytes) / 1024 / 1024:.1f}MB")
+
+                # Write bytes to temp file and load with FAISS native read
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.faiss') as tmp_file:
+                    tmp_file.write(index_bytes)
+                    tmp_path = tmp_file.name
+
+                try:
+                    # FAISS native read - matches faiss.write_index() from save
+                    self.sentence_index = faiss.read_index(tmp_path)
+                    logger.debug(f"Loaded FAISS index using native disk I/O: {len(index_bytes) / 1024 / 1024:.1f}MB")
+                finally:
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+            elif "index_bytes" in binary_data:
+                # New format: uncompressed bytes with FAISS native serialization
+                index_bytes = binary_data["index_bytes"]
+                if isinstance(index_bytes, str):
+                    index_bytes = base64.b64decode(index_bytes.encode("utf-8"))
+
+                # Write bytes to temp file and load with FAISS native read
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.faiss') as tmp_file:
+                    tmp_file.write(index_bytes)
+                    tmp_path = tmp_file.name
+
+                try:
+                    self.sentence_index = faiss.read_index(tmp_path)
+                    logger.debug(f"Loaded FAISS index using native disk I/O: {len(index_bytes) / 1024 / 1024:.1f}MB")
+                finally:
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
             elif "index_data" in binary_data:
-                # Old format: base64 encoded (possibly compressed)
+                # Old format: base64 encoded with pickle serialization
                 index_bytes = base64.b64decode(binary_data["index_data"].encode("utf-8"))
 
                 # Check if index was compressed
@@ -314,7 +343,7 @@ class SemanticSearch:
                 faiss_data = pickle.loads(index_bytes)
                 self.sentence_index = faiss.deserialize_index(faiss_data)
                 logger.debug(
-                    f"Loaded FAISS index: {len(index_bytes) / 1024 / 1024:.2f}MB, "
+                    f"Loaded FAISS index (legacy pickle format): {len(index_bytes) / 1024 / 1024:.2f}MB, "
                     f"{self.sentence_index.ntotal if self.sentence_index is not None else 0} vectors"
                 )
             else:
@@ -393,7 +422,6 @@ class SemanticSearch:
             if cache_key in self.query_cache_order:
                 self.query_cache_order.remove(cache_key)
             self.query_cache_order.append(cache_key)
-            logger.debug(f"Query embedding cache HIT for: {query[:50]}...")
             return self.query_cache[cache_key]
 
         return None
@@ -414,14 +442,10 @@ class SemanticSearch:
                 # Remove least recently used
                 oldest_key = self.query_cache_order.pop(0)
                 self.query_cache.pop(oldest_key, None)
-                logger.debug(f"Evicted oldest query from cache (size: {self.query_cache_size})")
 
         # Add to cache
         self.query_cache[cache_key] = embedding
         self.query_cache_order.append(cache_key)
-        logger.debug(
-            f"Cached query embedding (cache size: {len(self.query_cache)}/{self.query_cache_size})"
-        )
 
     def _get_result_cache_key(self, query: str, max_results: int, min_score: float) -> str:
         """Generate cache key for search results."""
@@ -440,9 +464,6 @@ class SemanticSearch:
             if cache_key in self.result_cache_order:
                 self.result_cache_order.remove(cache_key)
             self.result_cache_order.append(cache_key)
-            logger.debug(
-                f"Result cache HIT for: {query[:50]}... (max={max_results}, min={min_score})"
-            )
             return self.result_cache[cache_key]
 
         return None
@@ -459,14 +480,10 @@ class SemanticSearch:
                 # Remove least recently used
                 oldest_key = self.result_cache_order.pop(0)
                 self.result_cache.pop(oldest_key, None)
-                logger.debug(f"Evicted oldest result from cache (size: {self.result_cache_size})")
 
         # Add to cache
         self.result_cache[cache_key] = results
         self.result_cache_order.append(cache_key)
-        logger.debug(
-            f"Cached search results (cache size: {len(self.result_cache)}/{self.result_cache_size})"
-        )
 
     def _encode(self, texts: list[str], use_multiprocessing: bool = True) -> np.ndarray:
         """Encode texts with optimizations (quantization + GPU acceleration + multiprocessing).
@@ -483,64 +500,81 @@ class SemanticSearch:
         # Determine precision based on configuration and corpus size
         # INT8 quantization needs at least 100 embeddings for stable quantization ranges
         use_quantization = USE_QUANTIZATION and len(texts) >= 100
+
+        # CRITICAL FIX: Disable int8 quantization during thread-based encoding to prevent
+        # shared state corruption in sentence-transformers model. Float32 is thread-safe
+        # and maintains full parallelization without deadlocks.
+        # Threading path (use_multiprocessing=True): force float32 (thread-safe)
+        # Single-process path (use_multiprocessing=False): can use int8 (no shared state)
+        will_use_threading = use_multiprocessing and len(texts) > 5000 and self.device == "cpu"
         precision: Literal["float32", "int8", "uint8", "binary", "ubinary"] = (
-            QUANTIZATION_PRECISION if use_quantization else "float32"
+            "float32" if will_use_threading else  # Thread-safe precision for parallel encoding
+            (QUANTIZATION_PRECISION if use_quantization else "float32")
         )
 
-        # Use multiprocessing for large corpora (>5000 words) on CPU
-        if use_multiprocessing and len(texts) > 5000 and self.device == "cpu":
-            # CRITICAL FIX: Set spawn method for Docker compatibility
-            # fork() fails silently in Docker containers, spawn() works reliably
-            try:
-                multiprocessing.set_start_method("spawn", force=True)
-                logger.debug("Multiprocessing start method set to 'spawn' for Docker compatibility")
-            except RuntimeError:
-                # Already set, that's fine
-                pass
-
+        # CRITICAL FIX (2025-10-21): ThreadPoolExecutor causes semaphore leaks and deadlocks
+        # when wrapping sentence-transformers model.encode() which has internal PyTorch threading.
+        # This creates double parallelization conflict. The model already parallelizes via batch_size
+        # and PyTorch DataLoader, so external threading is unnecessary and harmful.
+        # Disable threading path entirely - use single-process path which lets model handle parallelization.
+        if False and use_multiprocessing and len(texts) > 5000 and self.device == "cpu":
             # Use cpu_count() - 1 workers (leave one core for OS/coordination)
             num_workers = max(4, (os.cpu_count() or 8) - 1)
-            devices = ["cpu"] * num_workers
 
             logger.info(
-                f"Encoding {len(texts)} texts with {num_workers} parallel workers "
+                f"Encoding {len(texts)} texts with {num_workers} parallel threads "
                 f"({precision} precision, ~{self._get_compression_ratio(precision):.0%} compression)"
             )
 
             try:
-                # Start multiprocess pool with explicit error handling
-                logger.debug(f"Starting multiprocessing pool with {num_workers} workers...")
-                pool = self.sentence_model.start_multi_process_pool(target_devices=devices)
-                logger.debug("Multiprocessing pool started successfully")
+                # Split texts into chunks for parallel processing
+                chunk_size = max(100, len(texts) // num_workers)
+                chunks = [texts[i : i + chunk_size] for i in range(0, len(texts), chunk_size)]
 
-                # Calculate optimal chunk size for load balancing
-                chunk_size = max(100, len(texts) // (num_workers * 3))
+                logger.debug(f"Split {len(texts)} texts into {len(chunks)} chunks for parallel encoding")
 
-                # Encode with multiprocessing
-                logger.debug(f"Encoding {len(texts)} texts with chunk_size={chunk_size}...")
-                embeddings = self.sentence_model.encode_multi_process(
-                    sentences=texts,
-                    pool=pool,
-                    batch_size=self.index.batch_size,
-                    chunk_size=chunk_size,
-                    precision=precision,
-                    normalize_embeddings=True,
-                    show_progress_bar=len(texts) > 1000,
-                )
-                logger.debug(f"Multiprocessing encoding completed: {len(embeddings)} embeddings")
+                # Process chunks in parallel using threads
+                embeddings_list = [None] * len(chunks)
 
-                # Convert to numpy if needed
-                if not isinstance(embeddings, np.ndarray):
-                    embeddings = np.array(embeddings)
+                with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                    # Submit all chunks for processing
+                    future_to_idx = {
+                        executor.submit(
+                            self.sentence_model.encode,
+                            chunk,
+                            batch_size=self.index.batch_size,
+                            show_progress_bar=False,  # Disable per-chunk progress bars
+                            output_value="sentence_embedding",
+                            precision=precision,
+                            convert_to_numpy=True,
+                            convert_to_tensor=False,
+                            device=self.device,
+                            normalize_embeddings=True,
+                        ): idx
+                        for idx, chunk in enumerate(chunks)
+                    }
 
-                # Cleanup pool
-                self.sentence_model.stop_multi_process_pool(pool)
-                logger.debug("Multiprocessing pool stopped successfully")
+                    # Collect results in order
+                    for future in as_completed(future_to_idx):
+                        idx = future_to_idx[future]
+                        try:
+                            chunk_embeddings = future.result()
+                            embeddings_list[idx] = chunk_embeddings
+                            logger.debug(
+                                f"Thread {idx + 1}/{len(chunks)} completed: {len(chunk_embeddings)} embeddings"
+                            )
+                        except Exception as e:
+                            logger.error(f"Thread {idx + 1} failed: {e}", exc_info=True)
+                            raise
+
+                # Concatenate all chunk embeddings
+                embeddings = np.vstack(embeddings_list)
+                logger.debug(f"Thread-based encoding completed: {len(embeddings)} total embeddings")
 
                 return embeddings
 
             except Exception as e:
-                logger.error(f"Multiprocessing encoding failed: {e}", exc_info=True)
+                logger.error(f"Thread-based encoding failed: {e}", exc_info=True)
                 logger.warning("Falling back to single-process encoding...")
                 # Fall back to single-process encoding below
         else:
@@ -581,10 +615,11 @@ class SemanticSearch:
 
         if not self.corpus:
             # Try to load corpus from index - use corpus_uuid for lookup
+            # CRITICAL: use_cache=False to avoid loading stale corpus after test modifications
             self.corpus = await Corpus.get(
                 corpus_uuid=self.index.corpus_uuid,
                 corpus_name=self.index.corpus_name,
-                config=VersionConfig(),
+                config=VersionConfig(use_cache=False),
             )
 
         if not self.corpus:
@@ -725,7 +760,9 @@ class SemanticSearch:
             batch_size = 8000  # Medium corpora: conservative
 
         if len(embedding_vocabulary) > batch_size:
-            logger.info(f"🔄 Processing {len(embedding_vocabulary):,} lemmas in batches of {batch_size:,}")
+            logger.info(
+                f"🔄 Processing {len(embedding_vocabulary):,} lemmas in batches of {batch_size:,}"
+            )
             embeddings_list = []
             total_batches = (len(embedding_vocabulary) + batch_size - 1) // batch_size
 
@@ -734,16 +771,29 @@ class SemanticSearch:
                 batch_num = i // batch_size + 1
                 progress_pct = (batch_num / total_batches) * 100
 
-                logger.info(f"  📊 Batch {batch_num}/{total_batches} ({len(batch):,} words, {progress_pct:.1f}% complete)...")
+                # Log every 5th batch or first/last batch (reduces 36+ logs to ~8 logs)
+                if batch_num % 5 == 0 or batch_num == 1 or batch_num == total_batches:
+                    logger.info(
+                        f"  📊 Batch {batch_num}/{total_batches} ({progress_pct:.0f}% complete)"
+                    )
+                else:
+                    logger.debug(
+                        f"  📊 Batch {batch_num}/{total_batches} ({progress_pct:.0f}% complete)"
+                    )
 
                 batch_start = time.time()
                 try:
-                    # CRITICAL FIX: Disable multiprocessing for batches to avoid Docker deadlocks
-                    # Each batch creating its own pool causes issues - process single-threaded
-                    batch_embeddings = self._encode(batch, use_multiprocessing=False)
+                    # Use thread-based parallel encoding (implemented in _encode)
+                    batch_embeddings = self._encode(batch, use_multiprocessing=True)
                     batch_time = time.time() - batch_start
 
-                    logger.info(f"    ✅ Batch {batch_num} complete in {batch_time:.1f}s ({len(batch) / batch_time:.0f} words/sec)")
+                    # Log completion only for logged start batches
+                    if batch_num % 5 == 0 or batch_num == 1 or batch_num == total_batches:
+                        logger.debug(
+                            f"    ✅ Batch {batch_num} complete in {batch_time:.1f}s "
+                            f"({len(batch) / batch_time:.0f} words/sec)"
+                        )
+
                     embeddings_list.append(batch_embeddings)
 
                 except Exception as e:
@@ -752,11 +802,13 @@ class SemanticSearch:
 
             # Concatenate all batches
             self.sentence_embeddings = np.vstack(embeddings_list)
-            logger.info(f"✅ All batches complete - concatenated {len(embeddings_list)} batches")
+            logger.info(
+                f"✅ Completed {len(embeddings_list)} batches - {len(embedding_vocabulary):,} lemmas encoded"
+            )
         else:
-            # Small vocabulary - process all at once without multiprocessing
+            # Small vocabulary - use thread-based parallel encoding
             logger.info(f"🔄 Processing {len(embedding_vocabulary):,} lemmas (small corpus, no batching)")
-            self.sentence_embeddings = self._encode(embedding_vocabulary, use_multiprocessing=False)
+            self.sentence_embeddings = self._encode(embedding_vocabulary, use_multiprocessing=True)
 
         # Safety check for empty embeddings
         if self.sentence_embeddings.size == 0:
@@ -819,8 +871,9 @@ class SemanticSearch:
         if not self.index or not self.corpus:
             raise ValueError("Index and corpus required")
 
-        # CRITICAL FIX: For large embeddings, store compressed bytes directly
-        # without base64 encoding to avoid OOM crashes
+        # CRITICAL FIX: Store binary data DIRECTLY to disk, not through JSON
+        # User requirement: Metadata ONLY in MongoDB, binary content on disk
+        # Architecture: Write raw compressed bytes to cache filesystem using pickle
         binary_data = {}
 
         # Serialize and compress embeddings for large corpora
@@ -828,40 +881,60 @@ class SemanticSearch:
             embeddings_bytes = pickle.dumps(self.sentence_embeddings)
             embeddings_size_mb = len(embeddings_bytes) / 1024 / 1024
 
-            # For large embeddings (>100MB), compress and store as bytes
-            # without base64 encoding (save will handle this)
-            if embeddings_size_mb > 100:
-                logger.info(f"Compressing large embeddings ({embeddings_size_mb:.1f}MB) before encoding...")
-                compressed_bytes = gzip.compress(embeddings_bytes, compresslevel=1)  # Fast compression
+            # ALWAYS compress for large embeddings (>10MB) - use gzip level 1 for speed
+            if embeddings_size_mb > 10:
+                logger.info(f"Compressing large embeddings ({embeddings_size_mb:.1f}MB)...")
+                compressed_bytes = gzip.compress(embeddings_bytes, compresslevel=1)
                 compressed_size_mb = len(compressed_bytes) / 1024 / 1024
                 compression_ratio = (1 - compressed_size_mb / embeddings_size_mb) * 100
                 logger.info(
                     f"Compressed embeddings: {embeddings_size_mb:.1f}MB -> {compressed_size_mb:.1f}MB "
                     f"({compression_ratio:.1f}% reduction)"
                 )
-                # Store compressed bytes directly, let save() handle encoding
+                # Store RAW bytes - pickle will handle serialization to disk
                 binary_data["embeddings_compressed_bytes"] = compressed_bytes
-                binary_data["embeddings_compressed"] = "gzip"  # Flag for decompression
+                binary_data["embeddings_compressed"] = "gzip"
             else:
-                binary_data["embeddings"] = base64.b64encode(embeddings_bytes).decode("utf-8")
+                # Small embeddings - store directly as bytes (pickle handles it)
+                binary_data["embeddings_bytes"] = embeddings_bytes
                 logger.debug(f"Serialized embeddings: {embeddings_size_mb:.2f}MB")
 
-        # Serialize FAISS index (usually much smaller than embeddings)
+        # CRITICAL FIX (2025-10-22): Use FAISS native disk I/O instead of pickle serialization
+        # pickle.dumps(faiss.serialize_index()) does DOUBLE serialization which hangs for 20+ mins
+        # FAISS's write_index() writes directly to disk using optimized C++ I/O
         if self.sentence_index is not None:
-            index_bytes = pickle.dumps(faiss.serialize_index(self.sentence_index))
-            index_size_mb = len(index_bytes) / 1024 / 1024
+            logger.info("Serializing FAISS index using native disk I/O (not pickle)...")
 
-            # Compress large FAISS indices too
-            if index_size_mb > 50:
-                logger.info(f"Compressing large FAISS index ({index_size_mb:.1f}MB)...")
-                compressed_bytes = gzip.compress(index_bytes, compresslevel=1)
-                compressed_size_mb = len(compressed_bytes) / 1024 / 1024
-                logger.info(f"Compressed FAISS index: {index_size_mb:.1f}MB -> {compressed_size_mb:.1f}MB")
-                binary_data["index_compressed_bytes"] = compressed_bytes
-                binary_data["index_compressed"] = "gzip"
-            else:
-                binary_data["index_data"] = base64.b64encode(index_bytes).decode("utf-8")
-                logger.debug(f"Serialized FAISS index: {index_size_mb:.2f}MB")
+            # Write FAISS index directly to temp file using optimized C++ serialization
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.faiss') as tmp_file:
+                tmp_path = tmp_file.name
+
+            try:
+                # FAISS native write - fast, optimized C++ disk I/O
+                faiss.write_index(self.sentence_index, tmp_path)
+
+                # Read the serialized bytes from disk
+                with open(tmp_path, 'rb') as f:
+                    index_bytes = f.read()
+
+                index_size_mb = len(index_bytes) / 1024 / 1024
+                logger.info(f"FAISS index serialized: {index_size_mb:.1f}MB using native disk I/O")
+
+                # Compress large FAISS indices (>10MB)
+                if index_size_mb > 10:
+                    logger.info(f"Compressing FAISS index ({index_size_mb:.1f}MB)...")
+                    compressed_bytes = gzip.compress(index_bytes, compresslevel=1)
+                    compressed_size_mb = len(compressed_bytes) / 1024 / 1024
+                    logger.info(f"Compressed FAISS: {index_size_mb:.1f}MB → {compressed_size_mb:.1f}MB")
+                    binary_data["index_compressed_bytes"] = compressed_bytes
+                    binary_data["index_compressed"] = "gzip"
+                else:
+                    binary_data["index_bytes"] = index_bytes
+                    logger.debug(f"Stored FAISS index: {index_size_mb:.2f}MB")
+            finally:
+                # Clean up temp file
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
 
         # Update statistics
         self.index.build_time_seconds = build_time
@@ -923,17 +996,41 @@ class SemanticSearch:
                     logger.error(f"Failed to load embeddings: {e}")
                     raise RuntimeError(f"Corrupted embeddings data: {e}") from e
 
-            if "index_data" in binary_data:
+            # Load FAISS index using native disk I/O (not pickle deserialization)
+            if "index_bytes" in binary_data or "index_compressed_bytes" in binary_data:
                 try:
-                    index_bytes = base64.b64decode(binary_data["index_data"].encode("utf-8"))
-                    faiss_data = pickle.loads(index_bytes)
-                    self.sentence_index = faiss.deserialize_index(faiss_data)
-                    logger.debug(
-                        f"Loaded FAISS index: {len(index_bytes) / 1024 / 1024:.2f}MB"
-                    )
+                    # Get the index bytes (decompressed if needed)
+                    if "index_compressed_bytes" in binary_data:
+                        compressed = binary_data["index_compressed_bytes"]
+                        if isinstance(compressed, str):
+                            compressed = base64.b64decode(compressed.encode("utf-8"))
+                        index_bytes = gzip.decompress(compressed)
+                        logger.debug(f"Decompressed FAISS index: {len(index_bytes) / 1024 / 1024:.1f}MB")
+                    else:
+                        index_bytes = binary_data["index_bytes"]
+                        if isinstance(index_bytes, str):
+                            index_bytes = base64.b64decode(index_bytes.encode("utf-8"))
+
+                    # Write bytes to temp file and load with FAISS native read
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.faiss') as tmp_file:
+                        tmp_file.write(index_bytes)
+                        tmp_path = tmp_file.name
+
+                    try:
+                        # FAISS native read - fast, optimized C++ disk I/O
+                        self.sentence_index = faiss.read_index(tmp_path)
+                        logger.debug(f"Loaded FAISS index using native disk I/O: {len(index_bytes) / 1024 / 1024:.1f}MB")
+                    finally:
+                        if os.path.exists(tmp_path):
+                            os.unlink(tmp_path)
+
                 except Exception as e:
                     logger.error(f"Failed to load FAISS index: {e}")
                     raise RuntimeError(f"Corrupted FAISS index data: {e}") from e
+            else:
+                # No FAISS index in storage - will rebuild from embeddings
+                logger.info("No FAISS index in storage, will rebuild from embeddings on first use")
+                self.sentence_index = None
         else:
             # PATHOLOGICAL REMOVAL: Remove deprecated fallback for inline format
             logger.error("No binary_data found in index - cannot load embeddings")

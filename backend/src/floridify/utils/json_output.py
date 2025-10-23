@@ -34,8 +34,6 @@ def json_serializer(obj: Any) -> Any:
         return obj.model_dump()
     elif isinstance(obj, set):
         return list(obj)
-    elif hasattr(obj, "__dict__"):
-        return obj.__dict__
     else:
         raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 

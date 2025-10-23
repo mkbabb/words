@@ -25,12 +25,14 @@ _search_engine: LanguageSearch | None = None
 async def get_search_engine(
     languages: list[Language] | None = None,
     force_rebuild: bool = False,
+    semantic: bool = True,
 ) -> LanguageSearch:
     """Get or create the global LanguageSearch singleton.
 
     Args:
         languages: Languages to support (defaults to English)
         force_rebuild: Force rebuild of search indices
+        semantic: Enable semantic search (default: True)
 
     Returns:
         Initialized LanguageSearch instance
@@ -43,7 +45,11 @@ async def get_search_engine(
 
     # Check if we need to recreate
     if _search_engine is None or _search_engine.languages != target_languages or force_rebuild:
-        _search_engine = await get_language_search(target_languages, force_rebuild=force_rebuild)
+        _search_engine = await get_language_search(
+            target_languages,
+            force_rebuild=force_rebuild,
+            semantic=semantic,
+        )
 
     return _search_engine
 

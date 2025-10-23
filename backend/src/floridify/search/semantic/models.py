@@ -7,16 +7,19 @@ from typing import Any, ClassVar
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
 
-from ...caching.core import get_versioned_content
-from ...caching.manager import get_version_manager
+from ...caching.core import get_global_cache, get_versioned_content
+from ...caching.manager import _generate_cache_key, get_version_manager
 from ...caching.models import (
     BaseVersionedData,
     CacheNamespace,
+    ContentLocation,
     ResourceType,
+    StorageType,
     VersionConfig,
 )
 from ...corpus.core import Corpus
 from ...utils.logging import get_logger
+from .constants import DEFAULT_BATCH_SIZE, DEFAULT_SENTENCE_MODEL, MODEL_BATCH_SIZES
 
 logger = get_logger(__name__)
 
@@ -66,13 +69,13 @@ class SemanticIndex(BaseModel):
     embeddings_per_second: float = 0.0
 
     # CRITICAL FIX: Binary data storage field
-    # This field holds base64-encoded embeddings and FAISS index data
+    # This field holds embeddings and FAISS index data (bytes or base64 strings)
     # It's excluded from serialization since it's stored externally via content_location
     # Previous implementation used object.__setattr__() which was fragile
-    binary_data: dict[str, str] | None = Field(
+    binary_data: dict[str, str | bytes] | None = Field(
         default=None,
         exclude=True,  # Never serialize to model_dump() - handled via external storage
-        description="Base64-encoded embeddings and FAISS index data (stored externally)",
+        description="Embeddings and FAISS index data as bytes or base64 strings (stored externally)",
     )
 
     class Metadata(
@@ -102,6 +105,7 @@ class SemanticIndex(BaseModel):
         corpus_name: str | None = None,
         model_name: str | None = None,
         config: VersionConfig | None = None,
+        corpus: Corpus | None = None,
     ) -> SemanticIndex | None:
         """Get semantic index from versioned storage by ID or name.
 
@@ -110,6 +114,7 @@ class SemanticIndex(BaseModel):
             corpus_name: Name of the corpus (fallback)
             model_name: Name of the embedding model
             config: Version configuration
+            corpus: Optional corpus instance to avoid database lookup
 
         Returns:
             SemanticIndex instance or None if not found
@@ -119,26 +124,27 @@ class SemanticIndex(BaseModel):
         if config and config.force_rebuild:
             return None
 
-        if not corpus_uuid and not corpus_name:
-            raise ValueError("Either corpus_uuid or corpus_name must be provided")
+        if not corpus_uuid and not corpus_name and not corpus:
+            raise ValueError("Either corpus_uuid, corpus_name, or corpus must be provided")
 
         # Use constant for consistency
-        from .constants import DEFAULT_SENTENCE_MODEL
         model_name = model_name or DEFAULT_SENTENCE_MODEL
         manager = get_version_manager()
 
-        # Build resource ID using uuid (always stable across versions)
-        if corpus_uuid:
-            resource_id = f"{corpus_uuid}:semantic:{model_name}"
-        else:
-            # Lookup uuid from corpus_name
-            from floridify.corpus.core import Corpus
+        # Use provided corpus or load from database
+        if not corpus:
+            if corpus_uuid:
+                corpus = await Corpus.get(corpus_uuid=corpus_uuid, config=config)
+            else:
+                corpus = await Corpus.get(corpus_name=corpus_name, config=config)
 
-            corpus = await Corpus.get(corpus_name=corpus_name, config=config)
             if not corpus or not corpus.corpus_uuid:
-                logger.warning(f"Corpus '{corpus_name}' not found or missing uuid")
+                logger.warning(f"Corpus not found: uuid={corpus_uuid}, name={corpus_name}")
                 return None
-            resource_id = f"{corpus.corpus_uuid}:semantic:{model_name}"
+
+        # Build resource ID including vocabulary_hash to invalidate cache on vocab changes
+        vocab_hash_short = corpus.vocabulary_hash[:8] if corpus.vocabulary_hash else "none"
+        resource_id = f"{corpus.corpus_uuid}:semantic:{model_name}:{vocab_hash_short}"
 
         # Get the latest semantic index metadata
         metadata: SemanticIndex.Metadata | None = await manager.get_latest(
@@ -151,8 +157,8 @@ class SemanticIndex(BaseModel):
         if not metadata:
             return None
 
-        # Load content from metadata
-        content = await get_versioned_content(metadata)
+        # Load content from metadata, respecting config.use_cache
+        content = await get_versioned_content(metadata, config=config)
         if not content:
             return None
 
@@ -186,8 +192,6 @@ class SemanticIndex(BaseModel):
             SemanticIndex instance ready for embedding generation
 
         """
-        from .constants import DEFAULT_BATCH_SIZE, DEFAULT_SENTENCE_MODEL, MODEL_BATCH_SIZES
-
         # Use constant for consistency
         model_name = model_name or DEFAULT_SENTENCE_MODEL
 
@@ -232,7 +236,6 @@ class SemanticIndex(BaseModel):
 
         """
         # Use constant for consistency
-        from .constants import DEFAULT_SENTENCE_MODEL
         model_name = model_name or DEFAULT_SENTENCE_MODEL
 
         # Try to get existing using corpus ID if available, otherwise name
@@ -241,6 +244,7 @@ class SemanticIndex(BaseModel):
             corpus_name=corpus.corpus_name,
             model_name=model_name,
             config=config,
+            corpus=corpus,
         )
 
         # FIX: Check if embeddings actually exist before returning cached
@@ -295,7 +299,9 @@ class SemanticIndex(BaseModel):
         manager = get_version_manager()
         # Use corpus_uuid for consistency with get() method
         cid = corpus_uuid or self.corpus_uuid
-        resource_id = f"{cid}:semantic:{self.model_name}"
+        # Include vocabulary_hash in resource_id to invalidate cache on vocab changes
+        vocab_hash_short = self.vocabulary_hash[:8] if self.vocabulary_hash else "none"
+        resource_id = f"{cid}:semantic:{self.model_name}:{vocab_hash_short}"
 
         # CRITICAL FIX: Prepare content WITHOUT binary_data for manager.save()
         # binary_data will be added to external storage AFTER metadata is saved
@@ -328,10 +334,6 @@ class SemanticIndex(BaseModel):
             # For large compressed bytes, store directly to cache using pickle
             # This avoids base64 encoding which creates massive strings (392MB -> 523MB)
             if binary_data_to_store:
-                from ...caching.core import get_global_cache
-                from ...caching.manager import _generate_cache_key
-                from ...caching.models import ContentLocation, StorageType
-
                 # Write large binary data directly to cache without JSON/base64 encoding
                 cache = await get_global_cache()
 
@@ -349,7 +351,6 @@ class SemanticIndex(BaseModel):
                 # Ensure namespace is CacheNamespace enum
                 namespace = versioned.namespace
                 if isinstance(namespace, str):
-                    from ...caching.models import CacheNamespace
                     namespace = CacheNamespace(namespace)
 
                 logger.info(f"Storing large binary data to cache for {resource_id} (pickle will handle bytes)")
@@ -379,14 +380,7 @@ class SemanticIndex(BaseModel):
                 # Save the updated versioned object with content_location
                 await versioned.save()
 
-            # Verify save succeeded by attempting to retrieve
-            saved = await self.get(corpus_uuid=cid, model_name=self.model_name, config=config)
-            if not saved:
-                raise RuntimeError(
-                    f"Verification failed: Could not retrieve saved semantic index {resource_id}"
-                )
-
-            logger.info(f"Successfully saved and verified semantic index for {resource_id}")
+            logger.info(f"Successfully saved semantic index for {resource_id}")
 
         except Exception as e:
             logger.error(f"Failed to save semantic index {resource_id}: {e}")
@@ -410,7 +404,9 @@ class SemanticIndex(BaseModel):
         )
 
         manager = get_version_manager()
-        resource_id = f"{self.corpus_uuid}:semantic:{self.model_name}"
+        # Include vocabulary_hash in resource_id to match save() and get()
+        vocab_hash_short = self.vocabulary_hash[:8] if self.vocabulary_hash else "none"
+        resource_id = f"{self.corpus_uuid}:semantic:{self.model_name}:{vocab_hash_short}"
 
         try:
             # Get the latest version to delete

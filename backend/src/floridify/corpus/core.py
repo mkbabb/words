@@ -328,8 +328,10 @@ class Corpus(BaseModel):
 
     async def _create_unified_indices(self) -> None:
         """Create unified indexing and lemmatization maps."""
-        # Skip if already created
-        if self.lemmatized_vocabulary:
+        # Skip if already created AND vocabulary is empty (nothing to lemmatize)
+        # CRITICAL: Must validate lemmatized_vocabulary is in sync with vocabulary
+        # If vocabulary exists but lemmatized_vocabulary is empty/stale, rebuild it
+        if self.lemmatized_vocabulary and not self.vocabulary:
             return
 
         # Create lemmatized versions
