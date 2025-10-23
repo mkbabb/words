@@ -12,7 +12,7 @@ import pytest
 import pytest_asyncio
 
 from floridify.corpus.core import Corpus, CorpusType
-from floridify.corpus.manager import CorpusManager
+from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.base import Language
 from floridify.search.constants import SearchMethod, SearchMode
 from floridify.search.core import Search
@@ -175,7 +175,7 @@ async def multilingual_corpus(test_db) -> Corpus:
 
     corpus.lemmatized_vocabulary = unique_lemmas
 
-    manager = CorpusManager()
+    manager = TreeCorpusManager()
     saved = await manager.save_corpus(corpus)
     return saved
 
@@ -212,7 +212,7 @@ async def large_corpus(test_db) -> Corpus:
     corpus.vocabulary_to_index = {word: i for i, word in enumerate(corpus.vocabulary)}
     corpus._build_signature_index()
 
-    manager = CorpusManager()
+    manager = TreeCorpusManager()
     saved = await manager.save_corpus(corpus)
     return saved
 
@@ -256,7 +256,7 @@ async def literature_corpus(test_db) -> Corpus:
     corpus.vocabulary_to_index = {word: i for i, word in enumerate(vocabulary)}
     corpus._build_signature_index()
 
-    manager = CorpusManager()
+    manager = TreeCorpusManager()
     saved = await manager.save_corpus(corpus)
     return saved
 
@@ -521,7 +521,7 @@ class TestVersioning:
         corpus.corpus_type = CorpusType.LANGUAGE
         corpus.lemmatized_vocabulary = ["apple", "banana"]
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved1 = await manager.save_corpus(corpus)
 
         # Get version from metadata since Corpus doesn't have version_info
@@ -563,7 +563,7 @@ class TestVersioning:
         corpus.corpus_type = CorpusType.LANGUAGE
         corpus.lemmatized_vocabulary = ["word1", "word2"]
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved1 = await manager.save_corpus(corpus)
 
         # Create search index
@@ -689,7 +689,7 @@ class TestEdgeCases:
             lemmatized_vocabulary=[],
         )
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved = await manager.save_corpus(corpus)
 
         search = await Search.from_corpus(corpus_name=saved.corpus_name, semantic=False)

@@ -8,8 +8,6 @@ import os
 from pathlib import Path
 from typing import Literal
 
-from google.cloud import texttospeech_v1 as texttospeech
-from google.oauth2 import service_account
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -116,6 +114,15 @@ class AudioSynthesizer:
     def client(self):
         """Get or create the TTS client."""
         if self._client is None:
+            try:
+                from google.cloud import texttospeech_v1 as texttospeech
+                from google.oauth2 import service_account
+            except ImportError as e:
+                raise ImportError(
+                    "google-cloud-texttospeech is required for audio synthesis. "
+                    "Install with: pip install google-cloud-texttospeech"
+                ) from e
+
             if self.config.credentials_path and self.config.credentials_path.exists():
                 credentials = service_account.Credentials.from_service_account_file(
                     str(self.config.credentials_path),
@@ -194,7 +201,9 @@ class AudioSynthesizer:
                     quality="high",
                 )
 
-            # Synthesize new audio
+            # Synthesize new audio (imports handled by client property)
+            from google.cloud import texttospeech_v1 as texttospeech
+
             synthesis_input = texttospeech.SynthesisInput(ssml=ssml_text)
 
             voice = texttospeech.VoiceSelectionParams(
@@ -300,7 +309,9 @@ class AudioSynthesizer:
                     quality="high",
                 )
 
-            # Synthesize new audio
+            # Synthesize new audio (imports handled by client property)
+            from google.cloud import texttospeech_v1 as texttospeech
+
             synthesis_input = texttospeech.SynthesisInput(text=synthesis_text)
 
             voice = texttospeech.VoiceSelectionParams(

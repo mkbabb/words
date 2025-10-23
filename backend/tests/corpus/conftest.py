@@ -18,7 +18,7 @@ from floridify.models.base import Language
 @pytest_asyncio.fixture
 async def tree_manager(test_db) -> TreeCorpusManager:
     """Create a TreeCorpusManager instance."""
-    return TreeCorpusManager()
+    return TreeTreeCorpusManager()
 
 
 @pytest_asyncio.fixture

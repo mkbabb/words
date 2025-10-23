@@ -64,7 +64,7 @@ async def test_add_language_source_builds_child(connector: StubConnector, test_d
     assert child_id is not None
 
     # Use corpus_name (stable across versions) instead of corpus_id (changes with each version)
-    refreshed = await TreeCorpusManager().get_corpus(corpus_name=corpus.corpus_name)
+    refreshed = await TreeTreeCorpusManager().get_corpus(corpus_name=corpus.corpus_name)
     assert refreshed is not None
     assert len(refreshed.child_uuids) == 1
     assert sorted(refreshed.vocabulary) == ["alpha", "alpha beta", "beta"]
@@ -90,7 +90,7 @@ async def test_remove_language_source(connector: StubConnector, test_db) -> None
     child_id = await corpus.add_language_source(source, connector=connector)
     assert child_id is not None
     # Get the child to check its UUID is in parent's child_uuids
-    child = await TreeCorpusManager().get_corpus(corpus_id=child_id)
+    child = await TreeTreeCorpusManager().get_corpus(corpus_id=child_id)
     assert child is not None
     assert child.corpus_uuid in corpus.child_uuids
 
@@ -100,7 +100,7 @@ async def test_remove_language_source(connector: StubConnector, test_db) -> None
     from floridify.caching.models import VersionConfig
 
     # Use corpus_name (stable across versions) instead of corpus_id (changes with each version)
-    updated = await TreeCorpusManager().get_corpus(
+    updated = await TreeTreeCorpusManager().get_corpus(
         corpus_name=corpus.corpus_name,
         config=VersionConfig(use_cache=False),
     )

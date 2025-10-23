@@ -10,7 +10,7 @@ import pytest_asyncio
 
 from floridify.caching.core import get_global_cache
 from floridify.corpus.core import Corpus
-from floridify.corpus.manager import CorpusManager
+from floridify.corpus.manager import TreeCorpusManager
 from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
 from floridify.search.core import Search
@@ -37,7 +37,7 @@ class TestSearchPerformance:
         )
         await corpus._rebuild_indices()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
 
     @pytest_asyncio.fixture
@@ -87,7 +87,7 @@ class TestSearchPerformance:
         )
         await corpus._rebuild_indices()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
 
     @pytest_asyncio.fixture
@@ -115,7 +115,7 @@ class TestSearchPerformance:
         )
         await corpus._rebuild_indices()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
 
     @pytest.mark.asyncio
@@ -390,7 +390,7 @@ class TestSearchPerformance:
         )
         await corpus._rebuild_indices()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
 
         engine = await Search.from_corpus(
@@ -460,7 +460,7 @@ class TestSearchPerformance:
         )
         await corpus._rebuild_indices()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
 
         async def create_semantic_engine():

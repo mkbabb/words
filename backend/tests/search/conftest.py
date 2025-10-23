@@ -24,7 +24,7 @@ import pytest
 import pytest_asyncio
 
 from floridify.corpus.core import Corpus, CorpusType
-from floridify.corpus.manager import CorpusManager
+from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.dictionary import Definition, DictionaryProvider, Language, Word
 from floridify.search.core import Search
 from floridify.search.models import SearchIndex

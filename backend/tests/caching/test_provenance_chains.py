@@ -20,7 +20,7 @@ import pytest_asyncio
 from floridify.caching.manager import VersionedDataManager
 from floridify.caching.models import BaseVersionedData, CacheNamespace, ResourceType, VersionConfig
 from floridify.corpus.core import Corpus, CorpusType
-from floridify.corpus.manager import CorpusManager
+from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.base import Language
 
 
@@ -30,7 +30,7 @@ class TestProvenanceChains:
     @pytest_asyncio.fixture
     async def corpus_manager(self, test_db):
         """Create corpus manager."""
-        return CorpusManager()
+        return TreeCorpusManager()
 
     @pytest_asyncio.fixture
     async def version_manager(self, test_db):

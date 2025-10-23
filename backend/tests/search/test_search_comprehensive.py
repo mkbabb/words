@@ -55,9 +55,9 @@ async def language_corpus_small(test_db):
     corpus._build_signature_index()
 
     # Save corpus to database
-    from floridify.corpus.manager import CorpusManager
+    from floridify.corpus.manager import TreeCorpusManager
 
-    manager = CorpusManager()
+    manager = TreeCorpusManager()
     saved = await manager.save_corpus(corpus)
 
     return saved
@@ -100,9 +100,9 @@ async def language_corpus_large(test_db):
     corpus.vocabulary_to_index = {word: i for i, word in enumerate(corpus.vocabulary)}
     corpus._build_signature_index()
 
-    from floridify.corpus.manager import CorpusManager
+    from floridify.corpus.manager import TreeCorpusManager
 
-    manager = CorpusManager()
+    manager = TreeCorpusManager()
     saved = await manager.save_corpus(corpus)
 
     return saved
@@ -140,9 +140,9 @@ async def literature_corpus(test_db):
     corpus.vocabulary_to_index = {word: i for i, word in enumerate(vocabulary)}
     corpus._build_signature_index()
 
-    from floridify.corpus.manager import CorpusManager
+    from floridify.corpus.manager import TreeCorpusManager
 
-    manager = CorpusManager()
+    manager = TreeCorpusManager()
     saved = await manager.save_corpus(corpus)
 
     return saved

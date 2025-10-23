@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 
 from floridify.corpus.core import Corpus, CorpusType
-from floridify.corpus.manager import CorpusManager
+from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.base import Language
 from floridify.search.core import Search
 
@@ -56,7 +56,7 @@ class TestDiacriticsPreservation:
         )
         corpus.corpus_type = CorpusType.CUSTOM
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
 
     @pytest.mark.asyncio

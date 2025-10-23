@@ -7,7 +7,7 @@ import pytest
 import pytest_asyncio
 
 from floridify.corpus.core import Corpus
-from floridify.corpus.manager import CorpusManager
+from floridify.corpus.manager import TreeCorpusManager
 from floridify.corpus.models import CorpusType
 from floridify.models.dictionary import Language
 from floridify.search.semantic.core import SemanticSearch
@@ -74,7 +74,7 @@ class TestSemanticSearchEndToEnd:
         corpus.vocabulary_to_index = {word: i for i, word in enumerate(sorted(vocabulary))}
         corpus._build_signature_index()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
 
     @pytest_asyncio.fixture
@@ -149,7 +149,7 @@ class TestSemanticSearchEndToEnd:
         corpus.vocabulary_to_index = {word: i for i, word in enumerate(sorted(set(vocabulary)))}
         corpus._build_signature_index()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
 
     @pytest_asyncio.fixture
@@ -216,7 +216,7 @@ class TestSemanticSearchEndToEnd:
         corpus.vocabulary_to_index = {word: i for i, word in enumerate(sorted(vocabulary))}
         corpus._build_signature_index()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
 
     @pytest.mark.asyncio
@@ -397,7 +397,7 @@ class TestSemanticSearchEndToEnd:
         corpus.vocabulary_to_index = {word: i for i, word in enumerate(sorted(vocabulary))}
         corpus._build_signature_index()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
 
         engine = await SemanticSearch.from_corpus(corpus=saved_corpus)
@@ -447,7 +447,7 @@ class TestSemanticSearchEndToEnd:
             corpus.vocabulary_to_index = {word: idx for idx, word in enumerate(sorted(vocab))}
             corpus._build_signature_index()
 
-            manager = CorpusManager()
+            manager = TreeCorpusManager()
             saved = await manager.save_corpus(corpus)
             corpora.append(saved)
 
@@ -528,7 +528,7 @@ class TestSemanticSearchEndToEnd:
             corpus.vocabulary_to_index = {word: i for i, word in enumerate(vocab)}
             corpus._build_signature_index()
 
-            manager = CorpusManager()
+            manager = TreeCorpusManager()
             saved_corpus = await manager.save_corpus(corpus)
 
             engine = await SemanticSearch.from_corpus(corpus=saved_corpus)

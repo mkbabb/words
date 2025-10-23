@@ -15,7 +15,7 @@ class TestTreeCorpusCRUD:
 
     async def test_create_single_corpus(self, test_db):
         """Test creating a single corpus."""
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
 
         corpus = Corpus(
             corpus_name="test-single",
@@ -34,7 +34,7 @@ class TestTreeCorpusCRUD:
 
     async def test_create_tree_structure(self, test_db):
         """Test creating a complete tree structure."""
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
 
         # Create master
         master = Corpus(
@@ -81,7 +81,7 @@ class TestTreeCorpusCRUD:
 
     async def test_read_corpus(self, test_db):
         """Test reading corpus by ID and name."""
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
 
         # Create corpus
         corpus = Corpus(
@@ -103,7 +103,7 @@ class TestTreeCorpusCRUD:
 
     async def test_update_corpus(self, test_db):
         """Test updating corpus content and metadata."""
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
 
         # Create corpus
         corpus = Corpus(
@@ -129,7 +129,7 @@ class TestTreeCorpusCRUD:
 
     async def test_delete_corpus(self, test_db):
         """Test deleting corpus."""
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
 
         # Create corpus
         corpus = Corpus(
@@ -149,7 +149,7 @@ class TestTreeCorpusCRUD:
 
     async def test_delete_cascade(self, test_db):
         """Test cascading deletion in tree."""
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
 
         # Create tree
         master = Corpus(
@@ -189,7 +189,7 @@ class TestTreeCorpusCRUD:
 
     async def test_vocabulary_aggregation(self, test_db):
         """Test vocabulary aggregation in tree."""
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
 
         # Create tree with vocabularies
         master = Corpus(
@@ -228,7 +228,7 @@ class TestTreeCorpusCRUD:
 
     async def test_update_parent(self, test_db):
         """Test updating parent-child relationships."""
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
 
         # Create initial structure
         parent1 = Corpus(
@@ -265,7 +265,7 @@ class TestTreeCorpusCRUD:
 
     async def test_remove_child(self, test_db):
         """Test removing child from parent without deletion."""
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
 
         # Create parent-child
         parent = Corpus(
@@ -306,7 +306,7 @@ class TestTreeCorpusCRUD:
 
     async def test_cache_invalidation(self, test_db):
         """Test cache invalidation on corpus changes."""
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
 
         # Create corpus
         corpus = Corpus(

@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 
 from floridify.corpus.core import Corpus, CorpusType
-from floridify.corpus.manager import CorpusManager
+from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.base import Language
 from floridify.search.constants import SearchMethod, SearchMode
 from floridify.search.language import LanguageSearch
@@ -120,7 +120,7 @@ async def language_corpus(test_db):
         corpus.word_to_lemma_indices[i] = lemma_idx
         corpus.lemma_to_word_indices[lemma_idx].append(i)
 
-    manager = CorpusManager()
+    manager = TreeCorpusManager()
     saved = await manager.save_corpus(corpus)
     return saved
 
@@ -335,7 +335,7 @@ class TestLanguageSearch:
             original_vocabulary=["word1", "word2"],
         )
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
 
         from floridify.search.core import Search

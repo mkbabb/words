@@ -25,7 +25,7 @@ class TestCascadeDeletion:
     @pytest_asyncio.fixture
     async def tree_manager(self, test_db) -> TreeCorpusManager:
         """Create a tree corpus manager."""
-        return TreeCorpusManager()
+        return TreeTreeCorpusManager()
 
     @pytest_asyncio.fixture
     async def test_corpus(self, tree_manager: TreeCorpusManager) -> Corpus:

@@ -93,7 +93,7 @@ class TestLiteratureCorpus:
         mock_connector.fetch_source.assert_called_once_with(source)
 
         # Verify child corpus was created
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
         children = await manager.get_children(parent.corpus_id)
         assert len(children) == 1
 
@@ -161,7 +161,7 @@ class TestLiteratureCorpus:
         assert len(child_ids) == 3
 
         # Verify all children were added
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
         children = await manager.get_children(master.corpus_id)
         assert len(children) == 3
 
@@ -174,7 +174,7 @@ class TestLiteratureCorpus:
     @pytest.mark.asyncio
     async def test_literature_corpus_with_tree_manager(self, test_db):
         """Test LiteratureCorpus integration with TreeCorpusManager."""
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
 
         # Create root literature corpus
         root = LiteratureCorpus(
@@ -260,7 +260,7 @@ class TestLiteratureCorpus:
         await poem2.save()
 
         # Add children to parent
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
         await manager.add_child(parent, poem1)
         await manager.add_child(parent, poem2)
 
@@ -362,7 +362,7 @@ class TestLiteratureCorpus:
         assert child_id is None
 
         # Verify no child was added
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
         children = await manager.get_children(corpus.corpus_id)
         assert len(children) == 0
 

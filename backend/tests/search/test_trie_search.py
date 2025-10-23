@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 
 from floridify.corpus.core import Corpus, CorpusType
-from floridify.corpus.manager import CorpusManager
+from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.base import Language
 from floridify.search.trie import TrieSearch
 
@@ -51,7 +51,7 @@ async def trie_corpus(test_db):
     corpus.vocabulary_to_index = {word: i for i, word in enumerate(sorted(vocabulary))}
     corpus._build_signature_index()
 
-    manager = CorpusManager()
+    manager = TreeCorpusManager()
     saved = await manager.save_corpus(corpus)
     return saved
 
@@ -209,7 +209,7 @@ class TestTrieSearch:
             original_vocabulary=vocabulary,
         )
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
 
         # Create trie index
@@ -230,7 +230,7 @@ class TestTrieSearch:
             original_vocabulary=[],
         )
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
 
         from floridify.search.models import TrieIndex

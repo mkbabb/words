@@ -80,7 +80,7 @@ class TestTreeStructure:
         """Test that circular references are properly prevented in tree operations."""
         from floridify.corpus.manager import TreeCorpusManager
 
-        manager = TreeCorpusManager()
+        manager = TreeTreeCorpusManager()
         parent = corpus_tree["master"]
         child = corpus_tree["work1"]
 

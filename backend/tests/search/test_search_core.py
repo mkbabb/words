@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 
 from floridify.corpus.core import Corpus, CorpusType
-from floridify.corpus.manager import CorpusManager
+from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.base import Language
 from floridify.models.dictionary import Definition, DictionaryProvider, Word
 from floridify.search.constants import SearchMethod
@@ -32,7 +32,7 @@ async def search_engine(test_db, sample_words):
     corpus.vocabulary_to_index = {word: i for i, word in enumerate(vocabulary)}
     corpus._build_signature_index()
 
-    manager = CorpusManager()
+    manager = TreeCorpusManager()
     saved_corpus = await manager.save_corpus(corpus)
 
     # Create search engine from corpus
@@ -176,7 +176,7 @@ class TestSearch:
         corpus._build_signature_index()
 
         # Save and create search engine
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
         search_engine = await Search.from_corpus(
             corpus_name=saved_corpus.corpus_name, semantic=False

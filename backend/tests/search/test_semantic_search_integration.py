@@ -7,7 +7,7 @@ import pytest
 import pytest_asyncio
 
 from floridify.corpus.core import Corpus, CorpusType
-from floridify.corpus.manager import CorpusManager
+from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.base import Language
 from floridify.search.semantic.constants import DEFAULT_SENTENCE_MODEL
 from floridify.search.semantic.core import SemanticSearch
@@ -73,7 +73,7 @@ class TestSemanticSearchIntegration:
         # Build indices
         await corpus._rebuild_indices()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
 
     @pytest_asyncio.fixture
@@ -134,7 +134,7 @@ class TestSemanticSearchIntegration:
 
         await corpus._rebuild_indices()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
 
     @pytest.mark.asyncio
@@ -261,7 +261,7 @@ class TestSemanticSearchIntegration:
             lemmatized_vocabulary=[],
         )
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved = await manager.save_corpus(empty_corpus)
 
         # Should handle empty corpus gracefully

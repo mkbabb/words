@@ -19,7 +19,7 @@ class TestCorpusLifecycle:
     @pytest_asyncio.fixture
     async def tree_manager(self, test_db) -> TreeCorpusManager:
         """Create a tree corpus manager."""
-        return TreeCorpusManager()
+        return TreeTreeCorpusManager()
 
     @pytest.mark.asyncio
     async def test_corpus_creation_with_normalization(

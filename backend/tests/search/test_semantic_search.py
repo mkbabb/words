@@ -16,7 +16,7 @@ from floridify.search.semantic.core import SemanticSearch
 async def semantic_engine(test_db, words_with_definitions):
     """Create a semantic search engine instance with corpus."""
     from floridify.corpus.core import Corpus, CorpusType
-    from floridify.corpus.manager import CorpusManager
+    from floridify.corpus.manager import TreeCorpusManager
 
     # Extract vocabulary from test words
     vocabulary = sorted(set(word.text for word, _ in words_with_definitions))
@@ -35,7 +35,7 @@ async def semantic_engine(test_db, words_with_definitions):
     corpus.vocabulary_to_index = {word: i for i, word in enumerate(vocabulary)}
     corpus._build_signature_index()
 
-    manager = CorpusManager()
+    manager = TreeCorpusManager()
     saved_corpus = await manager.save_corpus(corpus)
 
     # Create semantic search engine from corpus
@@ -155,7 +155,7 @@ class TestSemanticSearch:
     async def test_search_empty_index(self, test_db):
         """Test search on empty index."""
         from floridify.corpus.core import Corpus, CorpusType
-        from floridify.corpus.manager import CorpusManager
+        from floridify.corpus.manager import TreeCorpusManager
 
         # Create empty corpus using proper initialization
         corpus = Corpus(
@@ -167,7 +167,7 @@ class TestSemanticSearch:
             lemmatized_vocabulary=[],
         )
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
 
         # Create semantic search from empty corpus
@@ -270,7 +270,7 @@ class TestSemanticSearch:
 
         # Update corpus with new vocabulary
         from floridify.corpus.core import Corpus, CorpusType
-        from floridify.corpus.manager import CorpusManager
+        from floridify.corpus.manager import TreeCorpusManager
 
         new_vocabulary = sorted(set([w.text for w, _ in words_with_definitions] + ["ecstatic"]))
         new_corpus = Corpus(
@@ -286,7 +286,7 @@ class TestSemanticSearch:
         new_corpus.vocabulary_to_index = {word: i for i, word in enumerate(new_vocabulary)}
         new_corpus._build_signature_index()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved_new_corpus = await manager.save_corpus(new_corpus)
 
         await semantic_engine.update_corpus(saved_new_corpus)

@@ -8,7 +8,7 @@ import pytest
 import pytest_asyncio
 
 from floridify.corpus.core import Corpus
-from floridify.corpus.manager import CorpusManager
+from floridify.corpus.manager import TreeCorpusManager
 from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
 from floridify.search.core import Search
@@ -56,7 +56,7 @@ class TestSearchPipelineComprehensive:
         # Build indices
         await corpus._rebuild_indices()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
 
     @pytest_asyncio.fixture
@@ -142,7 +142,7 @@ class TestSearchPipelineComprehensive:
 
         await corpus._rebuild_indices()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
 
     @pytest_asyncio.fixture
@@ -224,7 +224,7 @@ class TestSearchPipelineComprehensive:
 
         await corpus._rebuild_indices()
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
 
     @pytest.mark.asyncio
@@ -594,7 +594,7 @@ class TestSearchPipelineComprehensive:
             original_vocabulary=[],
         )
 
-        manager = CorpusManager()
+        manager = TreeCorpusManager()
         saved = await manager.save_corpus(empty_corpus)
 
         engine = Search()
