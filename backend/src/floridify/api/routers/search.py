@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from ...caching.core import CacheNamespace, get_global_cache
 from ...core.search_pipeline import get_search_engine, reset_search_engine
-from ...corpus.manager import get_corpus_manager
+from ...corpus.manager import get_tree_corpus_manager
 from ...corpus.models import CorpusType
 from ...models.base import Language
 from ...models.parameters import SearchParams
@@ -160,11 +160,11 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
             )
 
             from ...caching.models import VersionConfig
-            from ...corpus.manager import get_corpus_manager
+            from ...corpus.manager import get_tree_corpus_manager
             from ...search.core import Search
             from ...search.models import SearchIndex
 
-            corpus_manager = get_corpus_manager()
+            corpus_manager = get_tree_corpus_manager()
 
             # Get the corpus by ID or name
             corpus = await corpus_manager.get_corpus(
@@ -413,7 +413,7 @@ async def rebuild_search_index(
 
     try:
         # Initialize unified corpus manager
-        corpus_manager = get_corpus_manager()
+        corpus_manager = get_tree_corpus_manager()
 
         # Determine corpus types to rebuild
         target_corpus_types: list[CorpusType] = []

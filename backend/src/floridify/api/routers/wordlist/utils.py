@@ -7,7 +7,7 @@ from typing import Any
 from beanie import PydanticObjectId
 
 from ....api.repositories import WordListRepository
-from ....corpus.manager import get_corpus_manager
+from ....corpus.manager import get_tree_corpus_manager
 from ....models import Word
 from ....models.base import Language
 from ....search import Search
@@ -79,7 +79,7 @@ async def search_words_in_wordlist(
 
     # Create/get corpus for this wordlist
     corpus_name = f"wordlist_{wordlist_id}"
-    corpus_manager = get_corpus_manager()
+    corpus_manager = get_tree_corpus_manager()
     existing_corpus = await corpus_manager.get_corpus(corpus_name=corpus_name)
     if existing_corpus is None:
         await corpus_manager.create_corpus(

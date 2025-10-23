@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ...corpus.manager import get_corpus_manager
+from ...corpus.manager import get_tree_corpus_manager
 from ...search.core import Search
 
 
@@ -34,7 +34,7 @@ class CorpusRepository:
     """Repository for corpus operations."""
 
     def __init__(self) -> None:
-        self._manager = get_corpus_manager()
+        self._manager = get_tree_corpus_manager()
 
     async def create(self, data: CorpusCreate) -> dict[str, Any]:
         """Create a new corpus."""

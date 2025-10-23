@@ -6,7 +6,7 @@ import asyncio
 import hashlib
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from google.cloud import texttospeech_v1 as texttospeech
 from google.oauth2 import service_account

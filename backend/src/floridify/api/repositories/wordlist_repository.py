@@ -8,7 +8,7 @@ from beanie.odm.enums import SortDirection
 from beanie.operators import RegEx
 from pydantic import BaseModel, Field
 
-from ...corpus.manager import CorpusManager, get_corpus_manager
+from ...corpus.manager import TreeCorpusManager, get_tree_corpus_manager
 from ...models import Word
 from ...models.base import Language
 from ...text import normalize
@@ -124,12 +124,12 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
     def __init__(self) -> None:
         super().__init__(WordList)
         self.corpus_repo = CorpusRepository()
-        self._corpus_manager: CorpusManager | None = None
+        self._corpus_manager: TreeCorpusManager | None = None
 
-    async def _get_corpus_manager(self) -> CorpusManager:
+    async def _get_tree_corpus_manager(self) -> TreeCorpusManager:
         """Get or create corpus manager instance."""
         if self._corpus_manager is None:
-            self._corpus_manager = get_corpus_manager()
+            self._corpus_manager = get_tree_corpus_manager()
         return self._corpus_manager
 
     async def find_by_name(self, name: str, owner_id: str | None = None) -> WordList | None:
@@ -198,7 +198,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         existing_count = await WordList.count()
         if existing_count > 1:  # More than just the one we just created
             logger.debug(f"Invalidating wordlist names corpus (total wordlists: {existing_count})")
-            corpus_manager = await self._get_corpus_manager()
+            corpus_manager = await self._get_tree_corpus_manager()
             await corpus_manager.invalidate_corpus("wordlist_names_global")
         else:
             logger.debug("Skipping corpus invalidation - this is the first wordlist")
@@ -291,7 +291,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             return
 
         # Create unified corpus with automatic semantic embeddings for small corpora
-        corpus_manager = await self._get_corpus_manager()
+        corpus_manager = await self._get_tree_corpus_manager()
         corpus_name = f"wordlist_{wordlist.id}"
         corpus = await corpus_manager.create_corpus(
             corpus_name=corpus_name,
@@ -315,7 +315,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         await wordlist.save()
 
         # Invalidate corpus cache for this wordlist since words changed
-        corpus_manager = await self._get_corpus_manager()
+        corpus_manager = await self._get_tree_corpus_manager()
         corpus_name = f"wordlist_{wordlist_id}"
         await corpus_manager.invalidate_corpus(corpus_name)
 
@@ -338,7 +338,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         await wordlist.save()
 
         # Invalidate corpus cache for this wordlist since words changed
-        corpus_manager = await self._get_corpus_manager()
+        corpus_manager = await self._get_tree_corpus_manager()
         corpus_name = f"wordlist_{wordlist_id}"
         await corpus_manager.invalidate_corpus(corpus_name)
 
@@ -361,7 +361,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
 
         # Invalidate name corpus cache if name changed
         if data.name and data.name != original_name:
-            corpus_manager = await self._get_corpus_manager()
+            corpus_manager = await self._get_tree_corpus_manager()
             await corpus_manager.invalidate_corpus("wordlist_names_global")
 
         return updated_wordlist
@@ -372,7 +372,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         result = await super().delete(id, cascade)
 
         # Invalidate both corpus caches using unified manager
-        corpus_manager = await self._get_corpus_manager()
+        corpus_manager = await self._get_tree_corpus_manager()
         corpus_name = f"wordlist_{id}"
         await corpus_manager.invalidate_corpus(corpus_name)
         await corpus_manager.invalidate_corpus("wordlist_names_global")

@@ -1357,10 +1357,3 @@ def get_tree_corpus_manager() -> TreeCorpusManager:
     return _tree_corpus_manager
 
 
-# Backwards compatibility aliases for legacy imports
-CorpusManager = TreeCorpusManager
-
-
-def get_corpus_manager() -> TreeCorpusManager:
-    """Legacy alias that returns the tree corpus manager."""
-    return get_tree_corpus_manager()

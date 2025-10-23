@@ -5,7 +5,7 @@ from typing import Any
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends
 
-from ....corpus.manager import get_corpus_manager
+from ....corpus.manager import get_tree_corpus_manager
 from ...core import ListResponse
 from ...repositories import WordListRepository
 from .utils import search_wordlist_names, search_words_in_wordlist
@@ -107,11 +107,11 @@ async def search_wordlists(
 async def invalidate_wordlist_corpus(wordlist_id: PydanticObjectId) -> None:
     """Invalidate wordlist corpus when wordlist is modified."""
     corpus_name = f"wordlist_{wordlist_id}"
-    corpus_manager = get_corpus_manager()
+    corpus_manager = get_tree_corpus_manager()
     await corpus_manager.invalidate_corpus(corpus_name)
 
 
 async def get_corpus_stats() -> dict[str, Any]:
     """Get corpus statistics for monitoring."""
-    corpus_manager = get_corpus_manager()
+    corpus_manager = get_tree_corpus_manager()
     return await corpus_manager.get_stats()
