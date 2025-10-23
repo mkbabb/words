@@ -20,6 +20,7 @@ from .models import (
     CompressionType,
     ContentLocation,
     StorageType,
+    VersionConfig,
 )
 from .serialize import CacheStats, estimate_binary_size, serialize_content
 
@@ -417,7 +418,7 @@ async def shutdown_global_cache() -> None:
 
 
 async def get_versioned_content(
-    versioned_data: Any, config: "VersionConfig | None" = None
+    versioned_data: Any, config: VersionConfig | None = None
 ) -> dict[str, Any] | None:
     """Retrieve content from a versioned data object.
 

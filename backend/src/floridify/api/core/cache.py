@@ -1,19 +1,10 @@
 """Caching utilities for API responses."""
 
 import hashlib
-from collections.abc import Callable
-from datetime import UTC, datetime
-from functools import wraps
-from typing import Any
 
-import orjson
-from fastapi import Request, Response
+from fastapi import Request
 from pydantic import BaseModel
 
-from ...caching import get_global_cache
-from ...caching.core import GlobalCacheManager
-from ...caching.filesystem import FilesystemBackend
-from ...caching.models import CacheNamespace
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)

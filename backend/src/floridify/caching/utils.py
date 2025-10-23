@@ -95,7 +95,7 @@ def normalize_namespace(namespace: CacheNamespace | str) -> CacheNamespace:
     raise TypeError(f"Invalid namespace type: {type(namespace).__name__}")
 
 
-async def run_in_executor(func: Callable[[], T]) -> T:
+async def run_in_executor[T](func: Callable[[], T]) -> T:
     """Execute synchronous function in thread pool executor.
 
     Allows CPU-bound synchronous operations to run without blocking

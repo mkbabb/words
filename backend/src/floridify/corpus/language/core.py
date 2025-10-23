@@ -10,8 +10,7 @@ from typing import ClassVar
 
 from beanie import PydanticObjectId
 
-from ...caching.core import get_global_cache
-from ...caching.models import CacheNamespace, VersionConfig
+from ...caching.models import VersionConfig
 from ...models.base import Language
 from ...providers.language.models import LanguageSource
 from ...providers.language.scraper.url import URLLanguageConnector
