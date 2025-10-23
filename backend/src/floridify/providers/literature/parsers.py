@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import io
 import re
 from typing import Any
+
+import ebooklib
+from bs4 import BeautifulSoup
+from ebooklib import epub
+from pypdf import PdfReader
 
 
 def parse_text(content: str | dict[str, Any]) -> str:
@@ -109,12 +115,6 @@ def parse_epub(content: bytes | str | dict[str, Any]) -> str:
 
     # Parse EPUB from bytes
     try:
-        import io
-
-        import ebooklib
-        from bs4 import BeautifulSoup
-        from ebooklib import epub
-
         book = epub.read_epub(io.BytesIO(content))
         text_parts = []
 
@@ -157,10 +157,6 @@ def parse_pdf(content: bytes | str | dict[str, Any]) -> str:
 
     # Parse PDF from bytes
     try:
-        import io
-
-        from pypdf import PdfReader
-
         reader = PdfReader(io.BytesIO(content))
         text_parts = []
 

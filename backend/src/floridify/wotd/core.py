@@ -10,6 +10,7 @@ Key Concepts:
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Literal
@@ -229,8 +230,6 @@ class DSLPattern(BaseModel):
     @classmethod
     def parse(cls, pattern: str) -> DSLPattern | None:
         """Parse [0,1,*,2] format."""
-        import re
-
         match = re.match(r"\[([0-9*]),([0-9*]),([0-9*]),([0-9*])\]", pattern)
         if not match:
             return None

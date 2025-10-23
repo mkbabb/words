@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from google.cloud import texttospeech_v1 as texttospeech
+from google.oauth2 import service_account
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,11 +17,6 @@ from ..models.base import AudioMedia
 from ..models.dictionary import Pronunciation
 from ..utils.config import Config
 from ..utils.paths import get_project_root
-
-# Lazy imports - only load Google Cloud dependencies when actually needed
-if TYPE_CHECKING:
-    from google.cloud import texttospeech_v1 as texttospeech
-    from google.oauth2 import service_account
 
 
 class AudioSynthesisConfig(BaseModel):
@@ -117,12 +114,8 @@ class AudioSynthesizer:
 
     @property
     def client(self):
-        """Get or create the TTS client (lazy imports Google Cloud dependencies)."""
+        """Get or create the TTS client."""
         if self._client is None:
-            # Import Google Cloud dependencies only when client is first accessed
-            from google.cloud import texttospeech_v1 as texttospeech
-            from google.oauth2 import service_account
-
             if self.config.credentials_path and self.config.credentials_path.exists():
                 credentials = service_account.Credentials.from_service_account_file(
                     str(self.config.credentials_path),
@@ -200,9 +193,6 @@ class AudioSynthesizer:
                     accent=accent,
                     quality="high",
                 )
-
-            # Import Google Cloud types when actually synthesizing
-            from google.cloud import texttospeech_v1 as texttospeech
 
             # Synthesize new audio
             synthesis_input = texttospeech.SynthesisInput(ssml=ssml_text)
@@ -309,9 +299,6 @@ class AudioSynthesizer:
                     accent=accent,
                     quality="high",
                 )
-
-            # Import Google Cloud types when actually synthesizing
-            from google.cloud import texttospeech_v1 as texttospeech
 
             # Synthesize new audio
             synthesis_input = texttospeech.SynthesisInput(text=synthesis_text)

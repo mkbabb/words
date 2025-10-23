@@ -6,8 +6,10 @@ testing, and lightweight production use. Uses FastAPI instead of Flask
 for better async support and automatic API docs.
 """
 
+import argparse
 import asyncio
 import json
+import re
 import time
 from pathlib import Path
 
@@ -175,8 +177,6 @@ class LocalWOTDServer:
 
     def _parse_semantic_id(self, prompt: str) -> tuple[int, int, int, int] | None:
         """Parse semantic ID from prompt like [2,1,3,0]."""
-        import re
-
         match = re.search(r"\[(\d+),(\d+),(\d+),(\d+)\]", prompt)
         if match:
             return tuple(int(x) for x in match.groups())
@@ -357,8 +357,6 @@ async def run_server(
 
 
 if __name__ == "__main__":
-    import argparse
-
     parser = argparse.ArgumentParser(description="Run local WOTD inference server")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
     parser.add_argument("--port", type=int, default=8888, help="Port to bind to")

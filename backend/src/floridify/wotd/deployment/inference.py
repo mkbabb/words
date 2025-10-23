@@ -3,6 +3,7 @@
 
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -116,8 +117,6 @@ class WOTDInferenceHandler:
     def _detect_semantic_id(self, prompt: str) -> tuple[int, int, int, int] | None:
         """Detect semantic ID from prompt (mock implementation)."""
         # Parse DSL patterns like [0,1,*,2]
-        import re
-
         match = re.search(r"\[([0-9*]),([0-9*]),([0-9*]),([0-9*])\]", prompt)
         if match:
             levels = []
