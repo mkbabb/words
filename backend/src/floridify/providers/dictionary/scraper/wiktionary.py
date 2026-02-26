@@ -450,6 +450,19 @@ class WiktionaryConnector(DictionaryConnector):
         """Extract numbered definition items from section text, separating definitions from examples."""
         items = []
 
+        # Strip multi-line quote templates BEFORE line splitting.
+        # wtp.parse handles templates that span multiple lines correctly,
+        # whereas the line-by-line regex below would miss split templates.
+        try:
+            parsed = wtp.parse(section_text)
+            for template in parsed.templates:
+                tname = template.name.strip().lower()
+                if tname.startswith("quote-") or tname in ("quote", "quotation"):
+                    template.string = ""
+            section_text = str(parsed)
+        except Exception:
+            pass  # Fall through to line-by-line parsing
+
         # Split section into lines for more precise processing
         lines = section_text.split("\n")
 
