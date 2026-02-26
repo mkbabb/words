@@ -302,23 +302,15 @@ class WiktionaryConnector(DictionaryConnector):
             # After save(), word_obj.id is guaranteed to be not None
             assert word_obj.id is not None
 
-            definitions = await self._extract_definitions(english_section, word_obj.id)
-            etymology = self._extract_etymology(english_section)
-            pronunciation = self._extract_pronunciation(english_section, word_obj.id)
-
-            # Extract synonyms from the dedicated section and add to definitions
+            # Extract section synonyms FIRST so they can be merged into definitions
+            # before the initial save (avoids a consistency window with missing synonyms).
             section_synonyms = self._extract_section_synonyms(english_section)
 
-            # Merge section synonyms with each definition
-            for definition in definitions:
-                assert definition.id is not None  # After save(), id is guaranteed to be not None
-
-                synonyms = set(definition.synonyms)
-                synonyms.update(section_synonyms)
-
-                definition.synonyms = list(synonyms)
-
-                await definition.save()  # Update the definition
+            definitions = await self._extract_definitions(
+                english_section, word_obj.id, section_synonyms=section_synonyms
+            )
+            etymology = self._extract_etymology(english_section)
+            pronunciation = self._extract_pronunciation(english_section, word_obj.id)
 
             return DictionaryProviderEntry(
                 word=word_obj.text,
@@ -381,6 +373,7 @@ class WiktionaryConnector(DictionaryConnector):
         self,
         section: wtp.Section,
         word_id: PydanticObjectId,
+        section_synonyms: list[str] | None = None,
     ) -> list[Definition]:
         """Extract definitions using new model structure."""
         definitions = []
@@ -416,8 +409,10 @@ class WiktionaryConnector(DictionaryConnector):
                 if not clean_def:
                     continue
 
-                # Extract inline synonyms from definition
+                # Extract inline synonyms and merge with section-level synonyms
                 synonyms = self._extract_inline_synonyms(def_text)
+                if section_synonyms:
+                    synonyms = list(set(synonyms) | set(section_synonyms))
 
                 # Extract collocations from the definition context
                 collocations = self._extract_collocations_from_definition(def_text)
