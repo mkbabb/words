@@ -252,6 +252,12 @@ class BaseVersionedData(Document):
             IndexModel([("corpus_name", 1)], sparse=True, name="corpus_name_sparse"),
             IndexModel([("vocabulary_hash", 1)], sparse=True, name="vocabulary_hash_sparse"),
             IndexModel([("parent_corpus_id", 1)], sparse=True, name="parent_corpus_id_sparse"),
+            # Delta chain traversal (sparse - only for delta-stored versions)
+            IndexModel(
+                [("version_info.delta_base_id", 1)],
+                sparse=True,
+                name="delta_base_id_sparse",
+            ),
             # Index metadata indices (sparse - for TrieIndex, SearchIndex, SemanticIndex)
             IndexModel([("corpus_id", 1)], sparse=True, name="corpus_id_sparse"),
         ]
