@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +46,8 @@ class DefinitionSynthesizer:
         self.ai = openai_connector  # wrap_connector_for_logging(openai_connector)
         self.examples_count = examples_count
         self.facts_count = facts_count
+        # Per-resource locks for the DictionaryEntry upsert (separate from VM lock).
+        self._upsert_locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     async def synthesize_entry(
         self,
@@ -104,9 +107,10 @@ class DefinitionSynthesizer:
             primary_idx = dedup_def.source_indices[0]
             primary_def = all_definitions[primary_idx]
 
-            # Update the definition text with the deduplicated version
-            primary_def.text = dedup_def.definition
-            unique_definitions.append(primary_def)
+            # Copy instead of mutating the tracked Beanie Document in-place,
+            # so the original provider definition is not overwritten if .save() is called later.
+            deduped = primary_def.model_copy(update={"text": dedup_def.definition, "id": None})
+            unique_definitions.append(deduped)
 
             # Track all processed indices
             processed_indices.update(dedup_def.source_indices)
@@ -363,7 +367,7 @@ class DefinitionSynthesizer:
             else:
                 metadata["model_info"] = entry.model_info.model_dump(mode="json")
 
-        # Save using version manager
+        # Save using version manager (canonical version history)
         await manager.save(
             resource_id=resource_id,
             resource_type=ResourceType.DICTIONARY,
@@ -373,8 +377,31 @@ class DefinitionSynthesizer:
             metadata=metadata,
         )
 
-        # Also save to MongoDB for compatibility
-        await entry.save()
+        # Upsert the live DictionaryEntry document to keep it in sync.
+        # The VM version chain holds history; this document is the current state.
+        # Wrap in per-resource lock to prevent races from concurrent force_refresh calls.
+        from ..models.dictionary import DictionaryEntry
+
+        async with self._upsert_locks[resource_id]:
+            existing_live = await DictionaryEntry.find_one(
+                DictionaryEntry.word_id == entry.word_id,
+                DictionaryEntry.provider == entry.provider,
+            )
+            if existing_live:
+                # Update existing document in-place (no duplicate)
+                existing_live.definition_ids = entry.definition_ids
+                existing_live.pronunciation_id = entry.pronunciation_id
+                existing_live.fact_ids = entry.fact_ids
+                existing_live.etymology = entry.etymology
+                existing_live.model_info = entry.model_info
+                existing_live.raw_data = entry.raw_data
+                await existing_live.save()
+                # Update the entry's id to match the persisted document
+                entry.id = existing_live.id
+                logger.debug(f"Updated live DictionaryEntry '{resource_id}'")
+            else:
+                await entry.save()
+                logger.debug(f"Created live DictionaryEntry '{resource_id}'")
 
         logger.debug(f"Saved dictionary entry '{resource_id}' using version manager")
 
