@@ -10,7 +10,7 @@ import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from beanie import Document, PydanticObjectId
@@ -161,6 +161,29 @@ class VersionInfo(BaseModel):
     superseded_by: PydanticObjectId | None = None
     supersedes: PydanticObjectId | None = None
     dependencies: list[PydanticObjectId] = Field(default_factory=list)
+
+    # Delta versioning fields (backward-compatible defaults)
+    storage_mode: Literal["snapshot", "delta"] = "snapshot"
+    delta_base_id: PydanticObjectId | None = None  # Nearest snapshot this delta reconstructs from
+
+    @model_validator(mode="after")
+    def validate_delta_has_base(self) -> VersionInfo:
+        """Ensure delta_base_id is set when storage_mode is 'delta'."""
+        if self.storage_mode == "delta" and self.delta_base_id is None:
+            raise ValueError("delta_base_id is required when storage_mode is 'delta'")
+        return self
+
+
+# Resource types eligible for delta compression.
+# Binary types (SEMANTIC, TRIE) are excluded since their content is opaque blobs.
+DELTA_ELIGIBLE_TYPES: frozenset[ResourceType] = frozenset(
+    {
+        ResourceType.DICTIONARY,
+        ResourceType.CORPUS,
+        ResourceType.LANGUAGE,
+        ResourceType.LITERATURE,
+    }
+)
 
 
 # ============================================================================
