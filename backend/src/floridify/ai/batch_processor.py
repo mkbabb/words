@@ -8,7 +8,6 @@ import asyncio
 import json
 import tempfile
 import time
-import types
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -79,13 +78,16 @@ class BatchCollector:
                     {"role": "user", "content": req.prompt},
                 ]
 
+                # Resolve model from task_name (if present) for correct tier routing
+                model = self._resolve_model(req)
+
                 # Build batch request
                 batch_entry: dict[str, Any] = {
                     "custom_id": req.custom_id,
                     "method": "POST",
                     "url": "/v1/chat/completions",
                     "body": {
-                        "model": req.kwargs.get("model", "gpt-5-nano"),
+                        "model": model,
                         "messages": messages,
                         "max_tokens": req.kwargs.get("max_tokens", 500),
                         "temperature": req.kwargs.get("temperature", 0.7),
@@ -106,6 +108,15 @@ class BatchCollector:
                 f.write(json.dumps(batch_entry) + "\n")
 
             return Path(f.name)
+
+    def _resolve_model(self, req: AIBatchRequest) -> str:
+        """Resolve the correct model tier from task_name in kwargs."""
+        task_name = req.kwargs.pop("task_name", None)
+        if task_name:
+            from .model_selection import get_model_for_task
+
+            return get_model_for_task(task_name).value
+        return req.kwargs.pop("model", "gpt-5-nano")
 
     def clear(self) -> None:
         """Clear all collected requests."""
@@ -214,22 +225,25 @@ class BatchContext:
         # Store reference to self for the wrapper
         batch_context = self
 
-        # Create wrapper that collects requests
+        # Create closure wrapper that collects requests.
+        # Uses a plain closure (not MethodType) so task_name is captured explicitly.
         async def batch_wrapper(
-            connector: OpenAIConnector,
             prompt: str,
             response_model: type[BaseModel],
+            task_name: str | None = None,
             **kwargs: Any,
         ) -> Any:
-            # Add to batch and return future
+            # Forward task_name into kwargs so prepare_batch_file can resolve the model.
+            if task_name is not None:
+                kwargs["task_name"] = task_name
             future = batch_context.collector.add_request(prompt, response_model, **kwargs)
             logger.debug(
                 f"📥 Collected request #{len(batch_context.collector.requests)}: {response_model.__name__}",
             )
             return await batch_context._await_future(future)
 
-        # Patch the method
-        self.connector._make_structured_request = types.MethodType(batch_wrapper, self.connector)
+        # Patch the method (plain function, not MethodType)
+        self.connector._make_structured_request = batch_wrapper  # type: ignore[assignment]
         logger.info("✅ Batch mode activated - collecting API requests")
         return self
 
