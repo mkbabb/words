@@ -926,7 +926,9 @@ async def enhance_definitions_parallel(
 
     # Execute tasks based on mode
     if batch_mode:
-        # Use batch processing for 50% cost reduction
+        # batch_synthesis patches connector._make_structured_request to collect
+        # requests into a batch; the gather triggers collection, not execution.
+        # Actual batch execution happens on context manager __aexit__.
         async with batch_synthesis(ai):
             results = await asyncio.gather(*tasks, return_exceptions=True)
     else:
@@ -961,7 +963,9 @@ async def enhance_definitions_parallel(
                     text=example_text,
                     type="generated",
                     model_info=ModelInfo(
-                        name=ai.last_model_used,  # Track the model used
+                        name=ai.last_model_info.name
+                        if ai.last_model_info
+                        else "unknown",  # Track the model used
                         confidence=1.0,  # Examples don't have confidence in response
                         generation_count=1,
                     ),
