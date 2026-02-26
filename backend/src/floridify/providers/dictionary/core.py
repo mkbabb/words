@@ -17,6 +17,7 @@ from ...models.dictionary import (
     Pronunciation,
     Word,
 )
+from ...models.relationships import Collocation, UsageNote
 from ...utils.logging import get_logger
 from ..core import BaseConnector, ConnectorConfig
 from .models import DictionaryProviderEntry
@@ -154,9 +155,18 @@ class DictionaryConnector(BaseConnector):
                 word_id=word.id,
                 part_of_speech=def_data.get("part_of_speech", "unknown"),
                 text=def_data.get("text", ""),
+                sense_number=def_data.get("sense_number"),
                 synonyms=def_data.get("synonyms", []),
                 antonyms=def_data.get("antonyms", []),
                 providers=[self.provider],
+                collocations=[
+                    Collocation(**c) if isinstance(c, dict) else c
+                    for c in def_data.get("collocations", [])
+                ],
+                usage_notes=[
+                    UsageNote(**n) if isinstance(n, dict) else n
+                    for n in def_data.get("usage_notes", [])
+                ],
             )
             await definition.save()
 
