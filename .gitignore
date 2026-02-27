@@ -35,3 +35,4 @@ dist/
 benchmark_results/
 
 .serena/
+.playwright-mcp/
