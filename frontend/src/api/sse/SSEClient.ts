@@ -52,32 +52,6 @@ export interface SSEHandlers<T> {
   onError?: (error: Error) => void
 }
 
-// Stage name mapping for backward compatibility
-const STAGE_CATEGORY_MAP: Record<string, string> = {
-  'START': 'SEARCH',
-  'SEARCH_START': 'SEARCH',
-  'SEARCH_COMPLETE': 'SEARCH',
-  'PROVIDER_FETCH_START': 'FETCH',
-  'PROVIDER_FETCH_COMPLETE': 'FETCH',
-  'AI_CLUSTERING': 'SYNTHESIZE',
-  'AI_SYNTHESIS': 'SYNTHESIZE',
-  'AI_FALLBACK': 'SYNTHESIZE',
-  'STORAGE_SAVE': 'SYNTHESIZE',
-  'COMPLETE': 'COMPLETE',
-  // Upload stages
-  'UPLOAD_START': 'UPLOAD',
-  'UPLOAD_READING': 'UPLOAD',
-  'UPLOAD_PARSING': 'UPLOAD',
-  'UPLOAD_PROCESSING': 'UPLOAD',
-  'UPLOAD_CREATING': 'UPLOAD',
-  'UPLOAD_FINALIZING': 'UPLOAD',
-  // Image stages
-  'IMAGE_UPLOAD_START': 'IMAGE',
-  'IMAGE_UPLOAD_VALIDATING': 'IMAGE',
-  'IMAGE_UPLOAD_PROCESSING': 'IMAGE',
-  'IMAGE_UPLOAD_STORING': 'IMAGE'
-}
-
 export class SSEClient {
   constructor(private axios: AxiosInstance) {}
 
@@ -183,12 +157,7 @@ export class SSEClient {
             case 'progress':
               if (options.onProgress) {
                 const progressData = data as ProgressEvent
-                // Map detailed stage names to categories if needed
-                const mappedStage = STAGE_CATEGORY_MAP[progressData.stage] || progressData.stage
-                options.onProgress({
-                  ...progressData,
-                  stage: mappedStage
-                })
+                options.onProgress(progressData)
               }
               break
               

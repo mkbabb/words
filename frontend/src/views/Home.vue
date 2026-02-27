@@ -185,12 +185,15 @@ watch(() => route.fullPath, async () => {
         if (!content.currentEntry || content.currentEntry.word !== word) {
             searchBar.setDirectLookup(true);
             try {
-                await orchestrator.getDefinition(word, {
+                const definition = await orchestrator.getDefinition(word, {
                     onProgress: (stage, progress) => {
                         loading.setLoadingStage(stage);
                         loading.setLoadingProgress(progress);
                     }
                 });
+                if (definition) {
+                    content.setCurrentEntry(definition);
+                }
             } finally {
                 searchBar.setDirectLookup(false);
             }

@@ -95,7 +95,7 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
 
     if (results.length > 0) {
       searchBar.openDropdown();
-      searchBar.setSelectedIndex(0);
+      searchBar.setSelectedIndex(-1);
     } else {
       searchBar.hideDropdown();
     }

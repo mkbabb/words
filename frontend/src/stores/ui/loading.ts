@@ -84,6 +84,8 @@ export function useLoadingState() {
     if (_activeOperations.value === 0) {
       _isSearching.value = false
       _isLoading.value = false
+      _loadingProgress.value = 0
+      _loadingStage.value = ''
     }
   }
 

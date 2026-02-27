@@ -94,17 +94,20 @@ async def lookup_word_pipeline(
         if state_tracker:
             await state_tracker.update_stage(Stages.SEARCH_COMPLETE)
 
-        if not best_match_result:
-            logger.error(f"No search results found for '{word}' after {search_duration:.2f}s")
-            return None
-
-        # Use the best match
-        best_match = best_match_result.word
-        logger.info(
-            f"✅ Found best match: '{best_match}' "
-            f"(score: {best_match_result.score:.3f}, method: {best_match_result.method}, "
-            f"search_time: {search_duration:.2f}s)",
-        )
+        if best_match_result:
+            best_match = best_match_result.word
+            logger.info(
+                f"✅ Found best match: '{best_match}' "
+                f"(score: {best_match_result.score:.3f}, method: {best_match_result.method}, "
+                f"search_time: {search_duration:.2f}s)",
+            )
+        else:
+            # No corpus match — use the raw query word and proceed to provider fetch
+            best_match = word
+            logger.info(
+                f"No corpus match for '{word}' after {search_duration:.2f}s — "
+                f"proceeding to provider fetch with raw query",
+            )
 
         # Handle force_refresh: skip cache but preserve history
         # (Old versions are retained in the VersionedDataManager chain)

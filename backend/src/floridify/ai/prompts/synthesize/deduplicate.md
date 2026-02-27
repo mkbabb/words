@@ -2,8 +2,8 @@
 
 ## Definitions
 
-{% for idx, def in enumerate(definitions) %}
-{{ idx }}. {{ def.part_of_speech }}: {{ def.text }}
+{% for def in definitions %}
+{{ loop.index0 }}. {{ def.part_of_speech }}: {{ def.text }}
 {% endfor %}
 
 ## Task

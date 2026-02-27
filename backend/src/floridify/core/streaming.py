@@ -90,122 +90,6 @@ class SSEEvent:
         return "\n".join(lines) + "\n\n"
 
 
-class StreamingProgressHandler:
-    """Handles streaming progress updates for any process."""
-
-    def __init__(self, state_tracker: StateTracker) -> None:
-        self.state_tracker = state_tracker
-        self.logger = get_logger(f"{__name__}.{state_tracker.category}")
-
-    async def stream_progress(
-        self,
-        process_func: Callable[[], Any],
-        *,
-        include_stage_definitions: bool = True,
-        include_completion_data: bool = True,
-    ) -> AsyncGenerator[str]:
-        """Stream progress updates from a StateTracker during process execution.
-
-        Args:
-            process_func: Async function that performs the work and updates the state tracker
-            include_stage_definitions: Whether to send stage definitions at start
-            include_completion_data: Whether to include process result in completion event
-
-        Yields:
-            SSE-formatted strings for streaming to client
-
-        """
-        try:
-            # Send initial configuration if requested
-            if include_stage_definitions:
-                config_event = SSEEvent(
-                    event_type="config",
-                    data={
-                        "category": self.state_tracker.category,
-                        "stages": [
-                            stage.model_dump()
-                            for stage in self.state_tracker.get_stage_definitions()
-                        ],
-                    },
-                )
-                yield config_event.format()
-
-            # Start progress monitoring task
-            progress_task = asyncio.create_task(self._monitor_progress())
-
-            # Execute the process
-            try:
-                result = await process_func()
-
-                # Send completion event
-                completion_data = {
-                    "type": "complete",
-                    "message": "Process completed successfully",
-                }
-
-                if include_completion_data and result is not None:
-                    completion_data["result"] = result.model_dump(mode="json")
-
-                completion_event = SSEEvent(event_type="complete", data=completion_data)
-                yield completion_event.format()
-
-            except Exception as e:
-                self.logger.error(f"Process failed: {e}")
-                await self.state_tracker.update_error(str(e))
-
-                error_event = SSEEvent(
-                    event_type="error",
-                    data={
-                        "type": "error",
-                        "message": str(e),
-                        "details": {"exception_type": type(e).__name__},
-                    },
-                )
-                yield error_event.format()
-
-            finally:
-                # Cancel progress monitoring
-                progress_task.cancel()
-                try:
-                    await progress_task
-                except asyncio.CancelledError:
-                    pass
-
-        except Exception as e:
-            self.logger.error(f"Streaming error: {e}")
-            error_event = SSEEvent(
-                event_type="error",
-                data={"type": "error", "message": f"Streaming error: {e!s}"},
-            )
-            yield error_event.format()
-
-    async def _monitor_progress(self) -> None:
-        """Monitor the state tracker and yield progress events."""
-        try:
-            async with self.state_tracker.subscribe() as queue:
-                while True:
-                    try:
-                        # Wait for state update with timeout
-                        state = await asyncio.wait_for(queue.get(), timeout=1.0)
-
-                        # Convert state to SSE event
-                        # This would need to be yielded to the outer generator
-                        # For now, we'll use a different approach in the main method
-
-                        if state.is_complete or state.error:
-                            break
-
-                    except TimeoutError:
-                        # No state update in timeout period, continue monitoring
-                        continue
-
-        except asyncio.CancelledError:
-            self.logger.debug("Progress monitoring cancelled")
-            raise
-        except Exception as e:
-            self.logger.error(f"Progress monitoring error: {e}")
-
-
 async def create_streaming_response(
     state_tracker: StateTracker,
     process_func: Callable[[], Any],
@@ -229,9 +113,9 @@ async def create_streaming_response(
     """
 
     async def event_generator() -> AsyncGenerator[str]:
-        """Generate SSE events by monitoring state tracker and running process."""
+        """Generate SSE events by running process in background and streaming progress."""
         try:
-            # Send initial configuration if requested
+            # Send initial configuration
             if include_stage_definitions:
                 config_event = SSEEvent(
                     event_type="config",
@@ -243,80 +127,79 @@ async def create_streaming_response(
                     },
                 )
                 yield config_event.format()
-                await asyncio.sleep(0)  # Yield control to event loop
 
             # Reset state tracker
             state_tracker.reset()
 
-            # Start progress monitoring and process execution concurrently
-            async def monitor_and_yield() -> AsyncGenerator[str]:
-                """Monitor state tracker and yield progress events."""
-                async with state_tracker.subscribe() as queue:
-                    while True:
-                        try:
-                            state = await asyncio.wait_for(queue.get(), timeout=0.1)
+            # Subscribe to state updates before starting the process
+            # so we don't miss early events
+            async with state_tracker.subscribe() as queue:
+                # Run the process in a background task
+                process_result: Any = None
+                process_error: Exception | None = None
 
-                            progress_event = SSEEvent(
-                                event_type="progress",
-                                data=state.model_dump_optimized(),
-                            )
-                            yield progress_event.format()
-
-                            if state.is_complete or state.error:
-                                break
-
-                        except TimeoutError:
-                            continue
-
-            # Start monitoring task
-            monitor_task = asyncio.create_task(monitor_and_yield().__anext__())
-
-            try:
-                # Execute process and monitor concurrently
-                result = await process_func()
-
-                # Yield any remaining progress events
-                try:
-                    while True:
-                        event = await asyncio.wait_for(monitor_task, timeout=0.5)
-                        yield event
-                        monitor_task = asyncio.create_task(monitor_and_yield().__anext__())
-                except TimeoutError:
-                    pass
-
-                # Send completion event
-                completion_data = {
-                    "type": "complete",
-                    "message": "Process completed successfully",
-                }
-
-                if include_completion_data and result is not None:
-                    completion_data["result"] = result.model_dump(mode="json")
-
-                completion_event = SSEEvent(event_type="complete", data=completion_data)
-                yield completion_event.format()
-
-            except Exception as e:
-                logger.error(f"Process failed: {e}")
-                await state_tracker.update_error(str(e))
-
-                error_event = SSEEvent(
-                    event_type="error",
-                    data={
-                        "type": "error",
-                        "message": str(e),
-                    },
-                )
-                yield error_event.format()
-
-            finally:
-                # Cancel monitoring task
-                if not monitor_task.done():
-                    monitor_task.cancel()
+                async def run_process() -> None:
+                    nonlocal process_result, process_error
                     try:
-                        await monitor_task
-                    except asyncio.CancelledError:
-                        pass
+                        process_result = await process_func()
+                    except Exception as e:
+                        process_error = e
+
+                process_task = asyncio.create_task(run_process())
+
+                # Stream progress events until the process completes
+                while not process_task.done():
+                    try:
+                        state = await asyncio.wait_for(queue.get(), timeout=0.2)
+                        progress_event = SSEEvent(
+                            event_type="progress",
+                            data=state.model_dump_optimized(),
+                        )
+                        yield progress_event.format()
+
+                        if state.is_complete or state.error:
+                            break
+                    except TimeoutError:
+                        continue
+
+                # Process finished — drain any remaining queued events
+                while not queue.empty():
+                    try:
+                        state = queue.get_nowait()
+                        progress_event = SSEEvent(
+                            event_type="progress",
+                            data=state.model_dump_optimized(),
+                        )
+                        yield progress_event.format()
+                    except asyncio.QueueEmpty:
+                        break
+
+                # Ensure the task is awaited (propagates cancellation cleanly)
+                if not process_task.done():
+                    await process_task
+
+                # Send completion or error
+                if process_error is not None:
+                    logger.error(f"Process failed: {process_error}")
+                    await state_tracker.update_error(str(process_error))
+                    error_event = SSEEvent(
+                        event_type="error",
+                        data={
+                            "type": "error",
+                            "message": str(process_error),
+                        },
+                    )
+                    yield error_event.format()
+                else:
+                    completion_data = {
+                        "type": "complete",
+                        "message": "Process completed successfully",
+                    }
+                    if include_completion_data and process_result is not None:
+                        completion_data["result"] = process_result.model_dump(mode="json")
+
+                    completion_event = SSEEvent(event_type="complete", data=completion_data)
+                    yield completion_event.format()
 
         except Exception as e:
             logger.error(f"Streaming generator error: {e}")
