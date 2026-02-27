@@ -9,14 +9,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ...caching.core import CacheNamespace, get_global_cache
-from ...core.search_pipeline import get_search_engine, reset_search_engine
+from ...caching.models import VersionConfig
+from ...core.search_pipeline import (
+    get_search_engine_manager,
+)
 from ...corpus.manager import get_tree_corpus_manager
 from ...corpus.models import CorpusType
 from ...models.base import Language
 from ...models.parameters import SearchParams
 from ...models.responses import SearchResponse
 from ...search.constants import SearchMode
+from ...search.core import Search
 from ...search.language import get_language_search
+from ...search.models import SearchIndex
 from ...text import clear_lemma_cache, get_lemma_cache_stats
 from ...utils.logging import get_logger
 
@@ -132,10 +137,11 @@ def parse_search_params(
     force_rebuild: bool = Query(default=False, description="Force rebuild indices"),
     corpus_id: str | None = Query(default=None, description="Specific corpus ID"),
     corpus_name: str | None = Query(default=None, description="Specific corpus name"),
+    semantic: bool = Query(default=True, description="Enable semantic search (disable to avoid model load)"),
 ) -> SearchParams:
     """Parse and validate search parameters using shared model."""
     # Use the shared model's validators
-    return SearchParams(
+    params = SearchParams(
         languages=languages,  # validators handle conversion
         max_results=max_results,
         min_score=min_score,
@@ -144,6 +150,9 @@ def parse_search_params(
         corpus_id=corpus_id,
         corpus_name=corpus_name,
     )
+    # Attach semantic flag as extra attribute for search routing
+    params._semantic = semantic  # type: ignore[attr-defined]
+    return params
 
 
 async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
@@ -159,11 +168,6 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
                 f"Searching for '{query}' in corpus_id={params.corpus_id} corpus_name={params.corpus_name} (mode={mode_enum.value})"
             )
 
-            from ...caching.models import VersionConfig
-            from ...corpus.manager import get_tree_corpus_manager
-            from ...search.core import Search
-            from ...search.models import SearchIndex
-
             corpus_manager = get_tree_corpus_manager()
 
             # Get the corpus by ID or name
@@ -174,7 +178,9 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
             )
 
             if not corpus:
-                logger.warning(f"Corpus not found: id={params.corpus_id}, name={params.corpus_name}")
+                logger.warning(
+                    f"Corpus not found: id={params.corpus_id}, name={params.corpus_name}"
+                )
                 return SearchResponse(
                     query=query,
                     results=[],
@@ -222,8 +228,9 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
                 f"Searching for '{query}' in {[lang.value for lang in params.languages]} (mode={mode_enum.value})"
             )
 
-            # Get language search instance
-            language_search = await get_language_search(languages=params.languages)
+            # Get language search instance (respect semantic flag to avoid model load crash)
+            semantic = getattr(params, "_semantic", True)
+            language_search = await get_language_search(languages=params.languages, semantic=semantic)
 
             # Perform search with specified mode
             results = await language_search.search_with_mode(
@@ -441,6 +448,8 @@ async def rebuild_search_index(
 
         cache = await get_global_cache()
         await cache.clear_namespace(CacheNamespace.CORPUS)
+        await cache.clear_namespace(CacheNamespace.SEARCH)
+        await cache.clear_namespace(CacheNamespace.TRIE)
         caches_cleared["vocabulary_caches"] = 0
 
         # Clear semantic caches when requested or when force rebuilding
@@ -474,13 +483,12 @@ async def rebuild_search_index(
 
         for corpus_type in target_corpus_types:
             if corpus_type == CorpusType.LANGUAGE:
-                # Rebuild language search corpus (main search engine)
-                await reset_search_engine()
-                search_engine = await get_search_engine(
+                # Rebuild language search corpus via SearchEngineManager
+                manager = get_search_engine_manager()
+                await manager.reset()
+                search_engine = await manager.get_engine(
                     languages=request.languages,
-                    force_rebuild=request.force_download
-                    or request.semantic_force_rebuild
-                    or request.clear_lexicon_cache,
+                    force_rebuild=True,
                     semantic=request.rebuild_semantic,
                 )
                 stats = search_engine.get_stats()
@@ -559,3 +567,29 @@ async def rebuild_search_index(
     except Exception as e:
         logger.error(f"Failed to rebuild search index with unified corpus management: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to rebuild search index: {e!s}")
+
+
+class HotReloadStatusResponse(BaseModel):
+    """Response for hot-reload status."""
+
+    engine_loaded: bool = Field(..., description="Whether a search engine is currently loaded")
+    last_check_seconds_ago: float | None = Field(
+        None, description="Seconds since last corpus change check"
+    )
+    check_interval: float = Field(..., description="Interval between corpus change checks")
+    corpus_fingerprint: dict[str, Any] | None = Field(
+        None, description="Current corpus fingerprint (name, hash, version)"
+    )
+    languages: list[str] | None = Field(None, description="Currently loaded languages")
+
+
+@router.get("/search/hot-reload/status", response_model=HotReloadStatusResponse)
+async def get_hot_reload_status() -> HotReloadStatusResponse:
+    """Get the status of the search engine hot-reload mechanism.
+
+    Shows when the last corpus change check occurred, the check interval,
+    and the current corpus fingerprint used for change detection.
+    """
+    manager = get_search_engine_manager()
+    status = manager.get_status()
+    return HotReloadStatusResponse(**status)

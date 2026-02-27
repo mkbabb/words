@@ -323,8 +323,9 @@ def get_pipeline_health() -> dict[str, Any]:
                 vocabulary = get_semantic_vocabulary()
                 status["vocabulary_size"] = len(vocabulary)
                 status["available_corpora"] = list(vocabulary.keys())
-            except Exception:
-                status["vocabulary_error"] = True
+            except Exception as e:
+                logger.error(f"Failed to retrieve vocabulary from pipeline: {e}", exc_info=True)
+                status["vocabulary_error"] = str(e)
 
         return status
 

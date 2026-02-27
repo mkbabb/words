@@ -40,8 +40,6 @@ from .constants import (
     FSQ_LATENT_DIM,
     FSQ_LEVELS_PER_DIM,
     FSQ_USE_L2_NORM,
-    USE_FSQ,
-    USE_HIERARCHICAL_VQ,
 )
 from .core import SemanticID
 
@@ -600,15 +598,12 @@ def get_semantic_encoder(
 
     Args:
         input_dim: Input embedding dimension
-        use_fsq: Override USE_FSQ constant
+        use_fsq: Use FSQ encoding (default: True for production)
 
     Returns:
         Unified semantic encoder instance
 
     """
-    if use_fsq is None:
-        use_fsq = USE_FSQ
-
-    encoding_type = "fsq" if use_fsq else "hvq" if USE_HIERARCHICAL_VQ else "fsq"
+    encoding_type = "fsq" if use_fsq else "fsq"
 
     return UnifiedSemanticEncoder(input_dim=input_dim, encoding_type=encoding_type)

@@ -11,6 +11,21 @@ from .models import CacheNamespace, CompressionType, ResourceType
 
 
 @dataclass(frozen=True)
+class DeltaConfig:
+    """Immutable configuration for delta-based version storage.
+
+    Controls when full snapshots are kept versus delta-compressed versions.
+    """
+
+    snapshot_interval: int = 10  # Full snapshot every N versions
+    max_chain_length: int = 50  # Safety limit on delta chain traversal
+    enabled: bool = True
+
+
+DELTA_CONFIG = DeltaConfig()
+
+
+@dataclass(frozen=True)
 class NamespaceCacheConfig:
     """Immutable configuration for a cache namespace.
 
@@ -48,9 +63,10 @@ DEFAULT_CONFIGS: dict[CacheNamespace, NamespaceCacheConfig] = {
     ),
     CacheNamespace.SEMANTIC: NamespaceCacheConfig(
         namespace=CacheNamespace.SEMANTIC,
-        memory_limit=50,
+        memory_limit=5,
         memory_ttl=timedelta(days=7),
         disk_ttl=timedelta(days=30),
+        compression=CompressionType.ZSTD,
     ),
     CacheNamespace.SEARCH: NamespaceCacheConfig(
         namespace=CacheNamespace.SEARCH,
@@ -128,8 +144,6 @@ NAMESPACE_MAP: dict[str, CacheNamespace] = {
     "openai": CacheNamespace.OPENAI,
     "lexicon": CacheNamespace.LEXICON,
     "wotd": CacheNamespace.WOTD,
-    # Legacy aliases
-    "compute": CacheNamespace.SEARCH,  # Map compute to SEARCH for backward compatibility
 }
 
 # ResourceType -> CacheNamespace mapping (all 7 resource types)
@@ -170,8 +184,5 @@ def validate_namespace(name: str) -> CacheNamespace:
     """
     if name not in NAMESPACE_MAP:
         valid_names = ", ".join(sorted(NAMESPACE_MAP.keys()))
-        raise ValueError(
-            f"Unknown namespace: {name}. "
-            f"Valid namespaces are: {valid_names}"
-        )
+        raise ValueError(f"Unknown namespace: {name}. Valid namespaces are: {valid_names}")
     return NAMESPACE_MAP[name]

@@ -59,7 +59,6 @@ from .constants import (
     DEFAULT_EMBEDDING_MODEL,
     QWEN_25_7B,
     USE_BINARY_EMBEDDINGS,
-    USE_FSQ,
     USE_INT8_EMBEDDINGS,
 )
 from .core import (
@@ -465,9 +464,8 @@ class WOTDTrainer:
                 pref_vector = torch.tensor(pref_vector, dtype=torch.float32)
             preference_vectors[corpus_id] = pref_vector
 
-        # Stage 3: Train semantic encoder (high-D → 4D compression)
-        encoder_type = "FSQ" if USE_FSQ else "RVQ"
-        logger.info(f"🔢 Stage 3: Training {encoder_type} semantic encoder")
+        # Stage 3: Train semantic encoder (high-D → 4D compression using FSQ)
+        logger.info("🔢 Stage 3: Training FSQ semantic encoder")
         semantic_ids = await self._train_semantic_encoder(preference_vectors)
 
         # Stage 4: Generate DSL training examples (semantic IDs → word generation)

@@ -72,7 +72,6 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         """
         self.namespaces: dict[CacheNamespace, NamespaceConfig] = {}
         self.l2_backend = l2_backend
-        self.l1_caches: dict[CacheNamespace, NamespaceConfig] = {}
         self._init_default_namespaces()
 
     @staticmethod
@@ -122,12 +121,7 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         return evictions
 
     async def initialize(self) -> None:
-        """Initialize the cache manager.
-
-        Sets up L1 cache references and prepares the system for operations.
-        """
-        # Set up L1 cache references (aliases to namespaces for backwards compatibility)
-        self.l1_caches = self.namespaces
+        """Initialize the cache manager."""
         logger.info("GlobalCacheManager initialized")
 
     def _init_default_namespaces(self) -> None:

@@ -52,7 +52,7 @@ class DictionaryProvider(Enum):
 class Word(Document, BaseMetadata):
     """Core word entity."""
 
-    text: str
+    text: str = Field(min_length=1, max_length=200)
     normalized: str = ""  # Will be auto-populated
     lemma: str = ""  # Will be auto-populated
     language: Language = Language.ENGLISH
@@ -112,7 +112,7 @@ class Example(Document, BaseMetadata):
     """Example storage with type discrimination."""
 
     definition_id: PydanticObjectId  # FK to Definition - optimized with ObjectId
-    text: str
+    text: str = Field(min_length=1, max_length=2000)
     type: Literal["generated", "literature"]
 
     # Generated example fields
@@ -134,7 +134,7 @@ class Fact(Document, BaseMetadata):
     """Interesting fact about a word."""
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
-    content: str
+    content: str = Field(min_length=1, max_length=2000)
     category: Literal["etymology", "usage", "cultural", "linguistic", "historical"]
     model_info: ModelInfo | None = None  # If AI-generated
     source: str | None = None  # If from external source
@@ -162,15 +162,15 @@ class Definition(Document, BaseMetadata):
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     part_of_speech: str  # noun, verb, adjective, etc.
-    text: str  # The definition text
+    text: str = Field(min_length=1, max_length=5000)  # The definition text
     meaning_cluster: MeaningCluster | None = None
     sense_number: str | None = None  # e.g., "1a", "2b"
     word_forms: list[WordForm] = []  # List of WordForm objects
 
     # Examples and relationships
-    example_ids: list[PydanticObjectId] = []  # FK to Example documents - optimized with ObjectIds
-    synonyms: list[str] = []
-    antonyms: list[str] = []
+    example_ids: list[PydanticObjectId] = Field(default_factory=list, max_length=20)  # FK to Example documents
+    synonyms: list[str] = Field(default_factory=list, max_length=50)
+    antonyms: list[str] = Field(default_factory=list, max_length=50)
 
     # Usage and context
     language_register: Literal["formal", "informal", "neutral", "slang", "technical"] | None = None
@@ -209,6 +209,7 @@ class DictionaryEntry(Document, BaseMetadata):
     word_id: PydanticObjectId  # FK to Word document
     definition_ids: list[PydanticObjectId] = Field(
         default_factory=list,
+        max_length=100,
     )  # FK to Definition documents
     pronunciation_id: PydanticObjectId | None = None  # FK to Pronunciation document
     fact_ids: list[PydanticObjectId] = Field(default_factory=list)  # FK to Fact documents

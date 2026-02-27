@@ -285,12 +285,6 @@ class MongoDBStorage:
             return []
 
 
-# Helper functions for AI module
-async def init_db() -> None:
-    """Initialize database connection (alias for _ensure_initialized)."""
-    await _ensure_initialized()
-
-
 async def _ensure_initialized() -> None:
     """Ensure MongoDB is initialized with environment-aware configuration."""
     global _storage

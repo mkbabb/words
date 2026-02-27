@@ -58,7 +58,8 @@ async def search_words_in_wordlist(
             query=query,
             results=[],
             total_found=0,
-            language=Language.ENGLISH,
+            languages=[Language.ENGLISH],
+            mode="fuzzy",
             metadata={},
         )
 
@@ -73,7 +74,8 @@ async def search_words_in_wordlist(
             query=query,
             results=[],
             total_found=0,
-            language=language,
+            languages=[language],
+            mode="fuzzy",
             metadata={},
         )
 
@@ -107,7 +109,8 @@ async def search_words_in_wordlist(
         query=query,
         results=results,
         total_found=len(results),
-        language=language,
+        languages=[language],
+        mode="fuzzy",
         metadata={"corpus_name": corpus_name},
     )
 

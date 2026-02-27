@@ -13,6 +13,7 @@ from floridify.search.semantic.constants import DEFAULT_SENTENCE_MODEL
 from floridify.search.semantic.core import SemanticSearch
 
 
+@pytest.mark.semantic
 class TestSemanticSearchIntegration:
     """Integration tests for semantic search with real embeddings."""
 

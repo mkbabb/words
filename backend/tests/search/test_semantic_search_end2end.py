@@ -13,6 +13,8 @@ from floridify.models.dictionary import Language
 from floridify.search.semantic.core import SemanticSearch
 
 
+@pytest.mark.semantic
+@pytest.mark.slow
 class TestSemanticSearchEndToEnd:
     """End-to-end tests for semantic search with real embeddings."""
 
@@ -424,7 +426,7 @@ class TestSemanticSearchEndToEnd:
         assert engine.index.model_name is not None
 
         # Verify embeddings match expected dimensions for the model
-        expected_dim = engine._get_embedding_dimension()
+        expected_dim = engine.index.embedding_dimension
         assert engine.sentence_embeddings.shape[1] == expected_dim
 
     @pytest.mark.asyncio

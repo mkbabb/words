@@ -6,6 +6,7 @@ Contains the actual vocabulary processing and storage logic and base corpus sour
 from __future__ import annotations
 
 import time
+from datetime import datetime
 from typing import Any, ClassVar
 
 import coolname
@@ -18,11 +19,10 @@ from ..caching.models import (
     CacheNamespace,
     ContentLocation,
     ResourceType,
-    VersionConfig,
     VersionInfo,
 )
 from ..models.base import Language
-from ..text.normalize import batch_lemmatize, batch_normalize
+from ..text.normalize import batch_lemmatize, batch_normalize, get_word_signature
 from ..utils.logging import get_logger
 from .models import CorpusType
 from .utils import get_vocabulary_hash
@@ -148,6 +148,11 @@ class Corpus(BaseModel):
         # Vocabulary metadata (versioning)
         vocabulary_size: int = 0
         vocabulary_hash: str = ""
+
+        # Usage tracking (persisted to MongoDB)
+        ttl_hours: float = 1.0
+        search_count: int = 0
+        last_accessed: datetime | None = None
 
         # Storage configuration
         content_location: ContentLocation | None = None
@@ -561,8 +566,6 @@ class Corpus(BaseModel):
 
         # Signature-based candidates
         if use_signatures and self.signature_buckets:
-            from ..text.normalize import get_word_signature
-
             query_sig = get_word_signature(normalized_query)
             if query_sig in self.signature_buckets:
                 sig_candidates = self.signature_buckets[query_sig]
@@ -584,8 +587,6 @@ class Corpus(BaseModel):
 
     def _build_signature_index(self) -> None:
         """Build signature-based index for efficient searching."""
-        from ..text.normalize import get_word_signature
-
         self.signature_buckets.clear()
         self.length_buckets.clear()
 
@@ -641,178 +642,9 @@ class Corpus(BaseModel):
         """
         return cls.model_validate(data)
 
-    @classmethod
-    async def get(
-        cls,
-        corpus_id: PydanticObjectId | None = None,
-        corpus_uuid: str | None = None,
-        corpus_name: str | None = None,
-        config: VersionConfig | None = None,
-    ) -> Corpus | None:
-        """Get corpus from versioned storage by ID, UUID, or name.
 
-        Args:
-            corpus_id: ObjectId of the corpus (changes with versions)
-            corpus_uuid: Immutable UUID of the corpus (stable across versions)
-            corpus_name: Name of the corpus (fallback)
-            config: Version configuration
 
-        Returns:
-            Corpus instance or None if not found
 
-        """
-        if not corpus_id and not corpus_uuid and not corpus_name:
-            raise ValueError("Either corpus_id, corpus_uuid, or corpus_name must be provided")
-
-        from .manager import get_tree_corpus_manager
-
-        manager = get_tree_corpus_manager()
-
-        # Get the corpus directly from manager
-        # The manager already returns a Corpus object, not metadata
-        corpus = await manager.get_corpus(
-            corpus_id=corpus_id,
-            corpus_uuid=corpus_uuid,
-            corpus_name=corpus_name,
-            config=config,
-        )
-
-        return corpus
-
-    @classmethod
-    async def get_or_create(
-        cls,
-        corpus_id: PydanticObjectId | None = None,
-        corpus_name: str | None = None,
-        vocabulary: list[str] | None = None,
-        language: Language = Language.ENGLISH,
-        corpus_type: CorpusType = CorpusType.LEXICON,
-        semantic: bool = True,
-        model_name: str | None = None,
-        config: VersionConfig | None = None,
-    ) -> Corpus:
-        """Get existing corpus or create new one.
-
-        Args:
-            corpus_id: ObjectId of the corpus (preferred for lookup)
-            corpus_name: Name of the corpus (optional, will generate slug if not provided)
-            vocabulary: List of words if creating new
-            language: Language of the corpus
-            corpus_type: Type of corpus
-            semantic: Enable semantic search
-            model_name: Embedding model name
-            config: Version configuration
-
-        Returns:
-            Corpus instance
-
-        """
-        # Try to get existing by ID or name
-        existing = await cls.get(corpus_id, corpus_name, config)
-        if existing:
-            return existing
-
-        # Create new corpus
-        corpus = await cls.create(
-            corpus_name=corpus_name,
-            vocabulary=vocabulary or [],
-            semantic=semantic,
-            model_name=model_name,
-            language=language,
-        )
-
-        # Set the corpus type
-        corpus.corpus_type = corpus_type
-
-        # Save the new corpus
-        await corpus.save(config)
-
-        return corpus
-
-    @classmethod
-    async def get_many_by_ids(
-        cls,
-        corpus_ids: list[PydanticObjectId],
-        config: VersionConfig | None = None,
-    ) -> list[Corpus]:
-        """Get multiple corpora by their IDs in batch.
-
-        Args:
-            corpus_ids: List of corpus IDs to retrieve
-            config: Version configuration
-
-        Returns:
-            List of Corpus instances (may be shorter than input if some IDs don't exist)
-
-        """
-        from .manager import get_tree_corpus_manager
-
-        manager = get_tree_corpus_manager()
-        return await manager.get_corpora_by_ids(corpus_ids, config)
-
-    async def save(self, config: VersionConfig | None = None, update_metadata: bool = True) -> bool:
-        """Save corpus to versioned storage.
-
-        Args:
-            config: Version configuration
-            update_metadata: Whether to update metadata
-
-        Returns:
-            True if saved successfully
-
-        """
-        from .manager import get_tree_corpus_manager
-
-        manager = get_tree_corpus_manager()
-
-        # Update metadata if requested
-        if update_metadata:
-            self.last_updated = time.time()
-            self.unique_word_count = len(self.vocabulary)
-            self.vocabulary_hash = get_vocabulary_hash(self.vocabulary)
-
-        # Handle versioning - create or update config for version increment
-        if not config:
-            config = VersionConfig()
-
-        # Version updates should be handled through explicit config params
-        # No more private attribute magic
-
-        # Save through manager (which will set the corpus_id and corpus_uuid)
-        saved = await manager.save_corpus(
-            corpus_id=self.corpus_id,
-            corpus_name=self.corpus_name,
-            corpus_type=self.corpus_type,
-            language=self.language,
-            content=self.model_dump(),
-            config=config,
-            parent_uuid=self.parent_uuid,
-            child_uuids=self.child_uuids,
-            is_master=self.is_master,
-        )
-
-        if saved:
-            if saved.corpus_id:
-                self.corpus_id = saved.corpus_id
-            if saved.corpus_uuid:
-                self.corpus_uuid = saved.corpus_uuid
-
-            # Update version info from the saved metadata
-            # We need to get the metadata to access version_info
-            try:
-                metadata = await manager.vm.get_latest(
-                    resource_id=self.corpus_name,
-                    resource_type=ResourceType.CORPUS,
-                )
-                if metadata and metadata.version_info:
-                    self.version_info = metadata.version_info
-                    self._metadata_id = metadata.id
-                    # Also update uuid from metadata (guaranteed to exist)
-                    self.corpus_uuid = metadata.uuid
-            except Exception as e:
-                logger.warning(f"Failed to update version info: {e}")
-
-        return bool(saved)
 
     def update_version(self, change_description: str = "") -> None:
         """Mark the corpus for version update on next save.
@@ -895,3 +727,18 @@ class Corpus(BaseModel):
             logger.warning(
                 f"No metadata found for corpus {self.corpus_name}, may already be deleted"
             )
+
+    async def save(self) -> "Corpus":
+        """Persist corpus via TreeCorpusManager (convenience wrapper).
+
+        Delegates to TreeCorpusManager.save_corpus() which handles versioning,
+        metadata creation, and MongoDB persistence.
+        """
+        from .manager import get_tree_corpus_manager
+
+        manager = get_tree_corpus_manager()
+        saved = await manager.save_corpus(self)
+        if saved:
+            self.corpus_id = saved.corpus_id
+            self.corpus_uuid = saved.corpus_uuid
+        return self

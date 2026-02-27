@@ -44,6 +44,10 @@ class DictionaryEntryResponse(BaseModel):
         description="AI model information (null for non-AI entries)",
     )
 
+    # Version provenance
+    version: str | None = Field(None, description="Current version string (e.g. 1.0.3)")
+    version_count: int | None = Field(None, description="Total number of versions in history")
+
     # Pronunciation
     pronunciation: dict[str, Any] | None = Field(None, description="Pronunciation information")
 

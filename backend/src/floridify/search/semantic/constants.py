@@ -61,18 +61,19 @@ PQ_CORPUS_THRESHOLD = 100000  # Product Quantization threshold
 MASSIVE_CORPUS_THRESHOLD = 200000  # OPQ+IVF-PQ (for 200k+ lemmas)
 
 # Batch Processing - Model-aware
+# Profiled on Apple Silicon M4 Max: larger batches give significant speedup
+# for small models (0.6B: batch=128 is 42% faster than batch=32)
 MODEL_BATCH_SIZES = {
-    BGE_M3_MODEL: 32,  # Smaller batch for 1024D embeddings
-    MINI_LM_MODEL: 64,  # Larger batch for 384D embeddings
-    GTE_QWEN2_MODEL: 24,  # Smaller batch for 1536D embeddings
-    QWEN3_8B_MODEL: 8,   # Small batch for 8B model, 4096D embeddings
-    QWEN3_4B_MODEL: 16,  # Medium batch for 4B model, 2560D embeddings
-    QWEN3_0_6B_MODEL: 32,  # Larger batch for 0.6B model, 1024D embeddings
+    BGE_M3_MODEL: 64,  # 1024D embeddings
+    MINI_LM_MODEL: 128,  # 384D embeddings (lightweight)
+    GTE_QWEN2_MODEL: 24,  # 1536D embeddings (memory-heavy)
+    QWEN3_8B_MODEL: 8,   # 8B model, 4096D embeddings
+    QWEN3_4B_MODEL: 16,  # 4B model, 2560D embeddings
+    QWEN3_0_6B_MODEL: 128,  # 0.6B model, 1024D — profiled optimal for M-series
 }
-DEFAULT_BATCH_SIZE = 16  # Updated for Qwen3-4B default
+DEFAULT_BATCH_SIZE = 32
 
 # Optimization Configuration
-USE_ONNX_BACKEND = False  # Disable ONNX backend (macOS compatibility issue)
 ENABLE_GPU_ACCELERATION = True  # Enable GPU acceleration when available
 MEMORY_MAP_EMBEDDINGS = True  # Use memory-mapped storage for zero-copy access
 

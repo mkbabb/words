@@ -12,7 +12,7 @@ import pytest_asyncio
 from floridify.caching.manager import get_version_manager
 from floridify.caching.models import ResourceType
 from floridify.corpus.core import Corpus
-from floridify.corpus.manager import TreeCorpusManager
+from floridify.corpus.manager import TreeCorpusManager, get_tree_corpus_manager
 from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
 from floridify.search.models import SearchIndex, TrieIndex
@@ -25,7 +25,7 @@ class TestCascadeDeletion:
     @pytest_asyncio.fixture
     async def tree_manager(self, test_db) -> TreeCorpusManager:
         """Create a tree corpus manager."""
-        return TreeTreeCorpusManager()
+        return TreeCorpusManager()
 
     @pytest_asyncio.fixture
     async def test_corpus(self, tree_manager: TreeCorpusManager) -> Corpus:
@@ -37,7 +37,8 @@ class TestCascadeDeletion:
             language=Language.ENGLISH,
             semantic=False,  # Start without semantic index
         )
-        await corpus.save()
+        manager = get_tree_corpus_manager()
+        corpus = await manager.save_corpus(corpus)
         return corpus
 
     @pytest.mark.asyncio
@@ -302,7 +303,8 @@ class TestCascadeDeletion:
             language=Language.ENGLISH,
             semantic=False,
         )
-        await corpus.save()
+        manager = get_tree_corpus_manager()
+        corpus = await manager.save_corpus(corpus)
 
         corpus_id = corpus.corpus_id
 
@@ -401,6 +403,8 @@ class TestCascadeDeletion:
         self, tree_manager: TreeCorpusManager, test_db
     ):
         """Test that deleting one corpus doesn't affect others."""
+        manager = get_tree_corpus_manager()
+
         # Create two separate corpora
         corpus1 = await Corpus.create(
             corpus_name="corpus_1",
@@ -408,7 +412,7 @@ class TestCascadeDeletion:
             language=Language.ENGLISH,
             semantic=False,
         )
-        await corpus1.save()
+        corpus1 = await manager.save_corpus(corpus1)
 
         corpus2 = await Corpus.create(
             corpus_name="corpus_2",
@@ -416,7 +420,7 @@ class TestCascadeDeletion:
             language=Language.ENGLISH,
             semantic=False,
         )
-        await corpus2.save()
+        corpus2 = await manager.save_corpus(corpus2)
 
         # Create indices for both
         search1 = await SearchIndex.create(corpus=corpus1, semantic=False)
@@ -429,11 +433,11 @@ class TestCascadeDeletion:
         await corpus1.delete()
 
         # Verify corpus1 and its index are deleted
-        assert await Corpus.get(corpus_uuid=corpus1.corpus_uuid) is None
+        assert await manager.get_corpus(corpus_uuid=corpus1.corpus_uuid) is None
         assert await SearchIndex.get(corpus_uuid=corpus1.corpus_uuid) is None
 
         # Verify corpus2 and its index still exist
-        assert await Corpus.get(corpus_uuid=corpus2.corpus_uuid) is not None
+        assert await manager.get_corpus(corpus_uuid=corpus2.corpus_uuid) is not None
         assert await SearchIndex.get(corpus_uuid=corpus2.corpus_uuid) is not None
 
         # Clean up

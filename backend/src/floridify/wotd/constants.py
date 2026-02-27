@@ -72,14 +72,10 @@ RVQ_CODEBOOK_SIZE = 32  # Codebook size per level
 RVQ_ENCODER_EPOCHS = 200  # Training epochs for RVQ
 RVQ_ENCODER_LR = 1e-3  # Learning rate for RVQ
 
-# Finite Scalar Quantization (FSQ) - simpler alternative to RVQ
+# Finite Scalar Quantization (FSQ) - production default
 FSQ_LATENT_DIM = 4  # Number of latent dimensions (matches semantic levels)
 FSQ_LEVELS_PER_DIM = [8, 8, 8, 5]  # Quantization levels per dimension
 FSQ_USE_L2_NORM = True  # L2 normalize before quantization
-
-# Hierarchical encoding options
-USE_FSQ = False  # Use FSQ instead of RVQ (experimental)
-USE_HIERARCHICAL_VQ = False  # Use multi-level VQ (experimental)
 
 # Language Model (LoRA) Configuration
 LM_MAX_LENGTH = 512  # Maximum sequence length

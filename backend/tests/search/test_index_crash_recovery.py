@@ -1,8 +1,8 @@
 """Tests for index persistence crash recovery and corruption handling."""
 
-import base64
+import gzip
 import pickle
-import zlib
+import tempfile
 from unittest.mock import MagicMock, patch
 
 import faiss
@@ -13,6 +13,7 @@ from beanie import PydanticObjectId
 
 from floridify.caching.models import VersionConfig
 from floridify.corpus.core import Corpus
+from floridify.models.base import Language
 from floridify.search.models import SearchIndex, TrieIndex
 from floridify.search.semantic.core import SemanticSearch
 from floridify.search.semantic.models import SemanticIndex
@@ -41,16 +42,16 @@ async def test_corpus(test_db):
     Note: Uses test_db fixture from root conftest to ensure proper event loop handling.
     Function-scoped to avoid event loop issues with module-scoped fixtures.
     """
-    corpus = Corpus(
+    corpus = await Corpus.create(
         corpus_name="test_crash_recovery",
         vocabulary=TEST_VOCABULARY,
-        lemmatized_vocabulary=TEST_LEMMAS,
-        language="en",
+        language=Language.ENGLISH,
     )
-    await corpus.save(VersionConfig())
+    await corpus.save()
     return corpus
 
 
+@pytest.mark.semantic
 class TestCrashRecovery:
     """Test suite for crash recovery scenarios."""
 
@@ -75,7 +76,7 @@ class TestCrashRecovery:
             with pytest.raises(RuntimeError) as exc_info:
                 await trie_index.save()
 
-            assert "Trie index persistence failed" in str(exc_info.value)
+            assert "Index persistence failed" in str(exc_info.value)
             assert "Database connection lost" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -91,11 +92,26 @@ class TestCrashRecovery:
             lemmatized_vocabulary=TEST_LEMMAS,
         )
 
-        # Create fake embeddings
+        # Create fake embeddings in the current compressed format
         fake_embeddings = np.random.randn(len(TEST_VOCABULARY), 384).astype(np.float32)
         embeddings_bytes = pickle.dumps(fake_embeddings)
-        compressed = zlib.compress(embeddings_bytes)
-        binary_data = {"embeddings": base64.b64encode(compressed).decode("utf-8")}
+        embeddings_compressed = gzip.compress(embeddings_bytes, compresslevel=1)
+
+        # Build a FAISS index for complete binary_data
+        index = faiss.IndexFlatL2(384)
+        index.add(fake_embeddings)
+        with tempfile.NamedTemporaryFile(suffix='.faiss', delete=False) as tmp:
+            faiss.write_index(index, tmp.name)
+            with open(tmp.name, 'rb') as f:
+                index_bytes = f.read()
+        index_compressed = gzip.compress(index_bytes, compresslevel=1)
+
+        binary_data = {
+            "embeddings_compressed_bytes": embeddings_compressed,
+            "embeddings_compressed": "gzip",
+            "index_compressed_bytes": index_compressed,
+            "index_compressed": "gzip",
+        }
 
         await semantic_index.save(binary_data=binary_data)
 
@@ -193,13 +209,12 @@ class TestCrashRecovery:
     async def test_concurrent_save_operations(self, test_db):
         """Test handling of sequential version updates (not truly concurrent saves)."""
         # Create a test corpus for versioning test
-        corpus = Corpus(
+        corpus = await Corpus.create(
             corpus_name="test_concurrent_versions",
             vocabulary=TEST_VOCABULARY,
-            lemmatized_vocabulary=TEST_LEMMAS,
-            language="en",
+            language=Language.ENGLISH,
         )
-        await corpus.save(VersionConfig())
+        await corpus.save()
 
         # Create multiple versions sequentially
         # Each save creates a new version in the version chain for the same resource_id
@@ -265,10 +280,25 @@ class TestCrashRecovery:
             dtype=np.float32,
         )
 
-        # Compress and encode
+        # Compress using current format (gzip)
         embeddings_bytes = pickle.dumps(original_embeddings)
-        compressed = zlib.compress(embeddings_bytes, level=6)
-        binary_data = {"embeddings": base64.b64encode(compressed).decode("utf-8")}
+        embeddings_compressed = gzip.compress(embeddings_bytes, compresslevel=1)
+
+        # Build a FAISS index for complete binary_data
+        index = faiss.IndexFlatL2(3)
+        index.add(original_embeddings)
+        with tempfile.NamedTemporaryFile(suffix='.faiss', delete=False) as tmp:
+            faiss.write_index(index, tmp.name)
+            with open(tmp.name, 'rb') as f:
+                index_bytes = f.read()
+        index_compressed = gzip.compress(index_bytes, compresslevel=1)
+
+        binary_data = {
+            "embeddings_compressed_bytes": embeddings_compressed,
+            "embeddings_compressed": "gzip",
+            "index_compressed_bytes": index_compressed,
+            "index_compressed": "gzip",
+        }
 
         await semantic_index.save(binary_data=binary_data)
 
@@ -281,8 +311,7 @@ class TestCrashRecovery:
 
         # Decompress and verify data integrity
         if hasattr(retrieved, "binary_data") and retrieved.binary_data:
-            compressed_data = base64.b64decode(retrieved.binary_data["embeddings"])
-            decompressed = zlib.decompress(compressed_data)
+            decompressed = gzip.decompress(retrieved.binary_data["embeddings_compressed_bytes"])
             restored_embeddings = pickle.loads(decompressed)
 
             # Verify exact match
@@ -323,6 +352,7 @@ class TestCrashRecovery:
             assert retrieved2.vocabulary_hash == test_corpus.vocabulary_hash
 
 
+@pytest.mark.semantic
 class TestErrorPropagation:
     """Test that errors propagate correctly through the system."""
 

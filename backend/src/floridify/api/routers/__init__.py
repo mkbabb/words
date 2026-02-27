@@ -21,6 +21,7 @@ from .words import (
     definitions_router as definitions,
     examples_router as examples,
     main_router as words,
+    versions_router as word_versions,
 )
 
 # from .wotd import (
@@ -47,6 +48,7 @@ __all__ = [
     "wordlist_search",
     "wordlist_words",
     "wordlists",
+    "word_versions",
     "words",
     # "wotd_main",
     # "wotd_ml",

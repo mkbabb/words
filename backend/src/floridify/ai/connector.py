@@ -82,11 +82,6 @@ class OpenAIConnector:
         """Get the last model info that was actually used for a request."""
         return self._last_model_info
 
-    @property
-    def last_model_used(self) -> str:
-        """Get the last model that was actually used for a request (backward compat)."""
-        return self._last_model_info.name if self._last_model_info else self.model_name
-
     @cached_api_call(
         ttl_hours=24.0,  # Cache OpenAI responses for 24 hours
         key_prefix="openai_structured",

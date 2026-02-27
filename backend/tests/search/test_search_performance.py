@@ -19,6 +19,7 @@ from floridify.search.semantic.core import SemanticSearch
 from floridify.search.trie import TrieSearch
 
 
+@pytest.mark.slow
 class TestSearchPerformance:
     """Performance benchmarks for search operations."""
 

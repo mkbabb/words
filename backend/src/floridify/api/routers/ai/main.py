@@ -807,7 +807,7 @@ async def synthesize_entry_components(
         raise HTTPException(404, "Synthesized dictionary entry not found")
 
     return ResourceResponse(
-        data=entry.model_dump(),
+        data=entry.model_dump(mode="json"),
         metadata={
             "regenerated_components": list(components) if components else "default",
             "version": entry.version,

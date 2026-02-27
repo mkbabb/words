@@ -10,7 +10,6 @@ from typing import Any
 from floridify.storage.mongodb import get_storage
 
 from ..caching.models import VersionConfig
-from ..corpus.core import Corpus
 from ..corpus.language.core import LanguageCorpus
 from ..models.base import Language
 from ..utils.logging import get_logger
@@ -171,7 +170,10 @@ async def get_language_search(
             )
         else:
             # Normal path: try to get existing corpus first
-            corpus = await Corpus.get(corpus_name=corpus_name, config=config)
+            from ..corpus.manager import get_tree_corpus_manager
+
+            manager = get_tree_corpus_manager()
+            corpus = await manager.get_corpus(corpus_name=corpus_name, config=config)
 
             # If not found, create a new LanguageCorpus with sources
             if not corpus:

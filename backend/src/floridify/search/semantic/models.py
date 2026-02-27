@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import zlib
 from typing import Any, ClassVar
 
 from beanie import PydanticObjectId
@@ -134,9 +135,15 @@ class SemanticIndex(BaseModel):
         # Use provided corpus or load from database
         if not corpus:
             if corpus_uuid:
-                corpus = await Corpus.get(corpus_uuid=corpus_uuid, config=config)
+                from ...corpus.manager import get_tree_corpus_manager
+
+                corpus_manager = get_tree_corpus_manager()
+                corpus = await corpus_manager.get_corpus(corpus_uuid=corpus_uuid, config=config)
             else:
-                corpus = await Corpus.get(corpus_name=corpus_name, config=config)
+                from ...corpus.manager import get_tree_corpus_manager
+
+                corpus_manager = get_tree_corpus_manager()
+                corpus = await corpus_manager.get_corpus(corpus_name=corpus_name, config=config)
 
             if not corpus or not corpus.corpus_uuid:
                 logger.warning(f"Corpus not found: uuid={corpus_uuid}, name={corpus_name}")
@@ -366,19 +373,47 @@ class SemanticIndex(BaseModel):
                     len(v) if isinstance(v, bytes) else len(str(v))
                     for v in binary_data_to_store.values()
                 )
+
+                # Reject excessively large binary data (>8GB)
+                max_binary_size = 8 * 1024 * 1024 * 1024  # 8GB
+                if binary_size > max_binary_size:
+                    raise ValueError(
+                        f"Binary data too large ({binary_size / (1024**3):.1f}GB). "
+                        f"Maximum allowed: 8GB"
+                    )
+
                 content_size = binary_size + 1000  # Add overhead estimate
+
+                binary_crc = 0
+                for value in binary_data_to_store.values():
+                    if isinstance(value, bytes):
+                        binary_crc = zlib.crc32(value, binary_crc)
+                    elif isinstance(value, str):
+                        binary_crc = zlib.crc32(value.encode("utf-8"), binary_crc)
 
                 versioned.content_location = ContentLocation(
                     cache_namespace=versioned.namespace,
                     cache_key=cache_key,
                     storage_type=StorageType.CACHE,
                     size_bytes=content_size,
-                    checksum="skip-large-binary-data",  # Skip checksum for large data
+                    checksum=f"crc32:{binary_crc & 0xFFFFFFFF:08x}",
                 )
                 versioned.content_inline = None
 
                 # Save the updated versioned object with content_location
                 await versioned.save()
+
+                # Re-cache metadata so get_latest() returns updated content_location
+                meta_cache_key = _generate_cache_key(
+                    versioned.resource_type,
+                    versioned.resource_id,
+                )
+                await cache.set(
+                    namespace=namespace,
+                    key=meta_cache_key,
+                    value=versioned,
+                    ttl_override=versioned.ttl,
+                )
 
             logger.info(f"Successfully saved semantic index for {resource_id}")
 

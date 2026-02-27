@@ -56,8 +56,13 @@ async def search_wordlist_words(
         return ListResponse(items=[], total=0, offset=0, limit=params.limit)
 
     # Extract items and total from search response
-    items = search_response.results[params.offset : params.offset + params.limit]
-    total = len(search_response.results)
+    # Serialize SearchResult objects to dicts for the response model
+    all_items = [
+        r.model_dump(mode="json") if hasattr(r, "model_dump") else r
+        for r in search_response.results
+    ]
+    items = all_items[params.offset : params.offset + params.limit]
+    total = len(all_items)
 
     return ListResponse(
         items=items,

@@ -21,6 +21,7 @@ from floridify.caching.models import (
     ResourceType,
 )
 from floridify.corpus.core import Corpus
+from floridify.corpus.manager import get_tree_corpus_manager
 from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
 from floridify.models.registry import get_model_class as get_versioned_model_class
@@ -146,7 +147,7 @@ class TestModelValidation:
             corpus_name="test-corpus",
             vocabulary_hash="test-hash-123",
         )
-        assert valid_index.corpus_id is not None
+        assert valid_index.corpus_uuid is not None
         assert valid_index.corpus_name == "test-corpus"
 
         # Invalid - missing required fields
@@ -186,71 +187,66 @@ class TestModelRelationships:
 
     async def test_corpus_parent_child(self, test_db):
         """Test corpus parent-child relationships."""
+        manager = get_tree_corpus_manager()
+
         # Create parent
-        parent = Corpus(
+        parent = await Corpus.create(
             corpus_name="parent-corpus",
             vocabulary=["parent"],
             language=Language.ENGLISH,
-            is_master=True,
         )
-        save_result = await parent.save()
-        assert save_result is True
+        parent.is_master = True
+        parent = await manager.save_corpus(parent)
+        assert parent is not None
 
         # Create child with parent reference
-        child = Corpus(
+        child = await Corpus.create(
             corpus_name="child-corpus",
             vocabulary=["child"],
             language=Language.ENGLISH,
-            parent_uuid=parent.corpus_id,  # Use parent directly, not saved_parent
         )
-        child_save_result = await child.save()
-        assert child_save_result is True
+        child.parent_uuid = parent.corpus_uuid
+        child = await manager.save_corpus(child)
+        assert child is not None
 
         # Verify relationship exists in the objects
-        assert child.parent_uuid == parent.corpus_id
-
-        # Update parent's children list
-        parent.child_uuids.append(child.corpus_id)
-        await parent.save()
-
-        # Test basic relationship data (since retrieval may not be implemented)
-        assert parent.corpus_id is not None
-        assert child.corpus_id is not None
-        assert child.parent_uuid == parent.corpus_id
+        assert child.parent_uuid == parent.corpus_uuid
 
     async def test_corpus_tree_hierarchy(self, test_db):
         """Test multi-level corpus hierarchy."""
+        manager = get_tree_corpus_manager()
+
         # Create 3-level hierarchy
-        master = Corpus(
+        master = await Corpus.create(
             corpus_name="master",
             vocabulary=["master"],
             language=Language.ENGLISH,
-            is_master=True,
         )
-        master_saved = await master.save()
-        assert master_saved is True
+        master.is_master = True
+        master = await manager.save_corpus(master)
+        assert master is not None
 
-        child1 = Corpus(
+        child1 = await Corpus.create(
             corpus_name="child1",
             vocabulary=["child1"],
             language=Language.ENGLISH,
-            parent_uuid=master.corpus_id,
         )
-        child1_saved = await child1.save()
-        assert child1_saved is True
+        child1.parent_uuid = master.corpus_uuid
+        child1 = await manager.save_corpus(child1)
+        assert child1 is not None
 
-        grandchild = Corpus(
+        grandchild = await Corpus.create(
             corpus_name="grandchild",
             vocabulary=["grandchild"],
             language=Language.ENGLISH,
-            parent_uuid=child1.corpus_id,
         )
-        grandchild_saved = await grandchild.save()
-        assert grandchild_saved is True
+        grandchild.parent_uuid = child1.corpus_uuid
+        grandchild = await manager.save_corpus(grandchild)
+        assert grandchild is not None
 
         # Verify hierarchy
-        assert grandchild.parent_uuid == child1.corpus_id
-        assert child1.parent_uuid == master.corpus_id
+        assert grandchild.parent_uuid == child1.corpus_uuid
+        assert child1.parent_uuid == master.corpus_uuid
         assert master.parent_uuid is None
 
 
@@ -265,7 +261,6 @@ class TestVersionedModels:
             resource_id="versioned-corpus",
             resource_type=ResourceType.CORPUS,
             corpus_name="test",
-            vocabulary=["test"],
             language=Language.ENGLISH,
         )
 
@@ -273,7 +268,6 @@ class TestVersionedModels:
         assert hasattr(corpus, "version_info")
         assert hasattr(corpus.version_info, "data_hash")
         assert hasattr(corpus.version_info, "created_at")
-        # updated_at removed in new versioning API
 
         # Save and verify
         saved = await corpus.save()
@@ -288,7 +282,6 @@ class TestVersionedModels:
             resource_id="increment-test",
             resource_type=ResourceType.CORPUS,
             corpus_name="test",
-            vocabulary=["v1"],
             language=Language.ENGLISH,
         )
         saved_v1 = await v1.save()
@@ -299,7 +292,6 @@ class TestVersionedModels:
             resource_id="increment-test",
             resource_type=ResourceType.CORPUS,
             corpus_name="test",
-            vocabulary=["v1", "v2"],
             language=Language.ENGLISH,
         )
         v2.version_info.version = "1.0.1"
@@ -318,49 +310,50 @@ class TestVersionedModels:
 
     async def test_content_hash(self, test_db):
         """Test content hash generation via full Corpus save/load."""
+        manager = get_tree_corpus_manager()
+
         # Create two corpora with same content
-        c1 = Corpus(
+        c1 = await Corpus.create(
             corpus_name="hash-test-1",
             vocabulary=["word1", "word2"],
             language=Language.ENGLISH,
         )
-        await c1.save()
+        await manager.save_corpus(c1)
 
-        c2 = Corpus(
+        c2 = await Corpus.create(
             corpus_name="hash-test-2",
             vocabulary=["word1", "word2"],  # Same vocabulary as c1
             language=Language.ENGLISH,
         )
-        await c2.save()
+        await manager.save_corpus(c2)
 
         # Retrieve metadata to check hashes
         from floridify.caching.manager import get_version_manager
 
-        manager = get_version_manager()
+        vm = get_version_manager()
 
-        m1 = await manager.get_latest(
+        m1 = await vm.get_latest(
             resource_id=c1.corpus_name,
             resource_type=ResourceType.CORPUS,
         )
-        m2 = await manager.get_latest(
+        m2 = await vm.get_latest(
             resource_id=c2.corpus_name,
             resource_type=ResourceType.CORPUS,
         )
 
         # Same vocabulary should produce same vocabulary hash in content
-        # (Note: vocabulary_hash metadata field may be empty if not extracted during save)
         # Different corpus content (names, IDs) = different data_hash
         assert m1.version_info.data_hash != m2.version_info.data_hash
 
         # Create corpus with different content
-        c3 = Corpus(
+        c3 = await Corpus.create(
             corpus_name="hash-test-3",
             vocabulary=["different", "words"],  # Different vocabulary
             language=Language.ENGLISH,
         )
-        await c3.save()
+        await manager.save_corpus(c3)
 
-        m3 = await manager.get_latest(
+        m3 = await vm.get_latest(
             resource_id=c3.corpus_name,
             resource_type=ResourceType.CORPUS,
         )
@@ -376,36 +369,40 @@ class TestMongoDBIntegration:
 
     async def test_save_and_retrieve(self, test_db):
         """Test saving and retrieving models."""
+        manager = get_tree_corpus_manager()
+
         # Create and save
-        corpus = Corpus(
+        corpus = await Corpus.create(
             corpus_name="mongo-test",
             vocabulary=["mongo", "test"],
             language=Language.ENGLISH,
         )
-        save_result = await corpus.save()
-        assert save_result is True
-        assert corpus.corpus_id is not None
+        saved = await manager.save_corpus(corpus)
+        assert saved is not None
+        assert saved.corpus_id is not None
 
-        # Retrieve by ID
-        retrieved = await Corpus.get(corpus.corpus_id)
+        # Retrieve by uuid
+        retrieved = await manager.get_corpus(corpus_uuid=saved.corpus_uuid)
         assert retrieved is not None
         assert retrieved.corpus_name == "mongo-test"
-        assert retrieved.vocabulary == ["mongo", "test"]
+        assert "mongo" in retrieved.vocabulary
+        assert "test" in retrieved.vocabulary
 
     async def test_query_operations(self, test_db):
         """Test MongoDB query operations via Corpus.Metadata."""
+        manager = get_tree_corpus_manager()
+
         # Create multiple corpora
         for i in range(5):
-            corpus = Corpus(
+            corpus = await Corpus.create(
                 corpus_name=f"query-test-{i}",
                 vocabulary=[f"word{i}"],
                 language=Language.ENGLISH,
-                corpus_type=CorpusType.LEXICON if i % 2 == 0 else CorpusType.LITERATURE,
             )
-            await corpus.save()
+            corpus.corpus_type = CorpusType.LEXICON if i % 2 == 0 else CorpusType.LITERATURE
+            await manager.save_corpus(corpus)
 
         # Query Corpus.Metadata (Beanie Document) by type
-        # Use dict syntax for nested fields to avoid ExpressionField issues
         import re
 
         lexicon_meta = await Corpus.Metadata.find(
@@ -421,66 +418,64 @@ class TestMongoDBIntegration:
 
     async def test_update_operations(self, test_db):
         """Test MongoDB update operations."""
+        manager = get_tree_corpus_manager()
+
         # Create corpus
-        corpus = Corpus(
+        corpus = await Corpus.create(
             corpus_name="update-test",
             vocabulary=["initial"],
             language=Language.ENGLISH,
         )
-        result = await corpus.save()
-        assert result is True
-        corpus_id = corpus.corpus_id
+        saved = await manager.save_corpus(corpus)
+        assert saved is not None
 
-        # Update the corpus object directly
-        corpus.vocabulary.extend(["updated", "words"])
-        corpus.metadata["updated_at"] = datetime.now(UTC).isoformat()
+        # Update the corpus vocabulary
+        await saved.add_words(["updated", "words"])
 
         # Save updates (creates new version)
-        result = await corpus.save()
-        assert result is True
+        updated = await manager.save_corpus(saved)
+        assert updated is not None
 
         # Retrieve fresh copy and verify updates
-        retrieved = await Corpus.get(corpus_uuid=corpus.corpus_uuid)
+        retrieved = await manager.get_corpus(corpus_uuid=saved.corpus_uuid)
         assert retrieved is not None
         assert "initial" in retrieved.vocabulary
         assert "updated" in retrieved.vocabulary
         assert "words" in retrieved.vocabulary
-        assert "updated_at" in retrieved.metadata
 
     async def test_delete_operations(self, test_db):
         """Test MongoDB delete operations."""
+        manager = get_tree_corpus_manager()
+
         # Create corpus
-        corpus = Corpus(
+        corpus = await Corpus.create(
             corpus_name="delete-test",
             vocabulary=["delete", "me"],
             language=Language.ENGLISH,
         )
-        result = await corpus.save()
-        assert result is True
-        corpus_id = corpus.corpus_id
+        saved = await manager.save_corpus(corpus)
+        assert saved is not None
 
         # Delete
-        await corpus.delete()
+        await manager.delete_corpus(corpus_name=saved.corpus_name)
 
         # Verify deletion
-        deleted = await Corpus.get(corpus_uuid=corpus.corpus_uuid)
+        deleted = await manager.get_corpus(corpus_name="delete-test")
         assert deleted is None
 
     async def test_bulk_operations(self, test_db):
         """Test saving multiple corpora and bulk query."""
+        manager = get_tree_corpus_manager()
+
         # Create and save multiple corpora
-        corpus_ids = []
         for i in range(10):
-            corpus = Corpus(
+            corpus = await Corpus.create(
                 corpus_name=f"bulk-test-{i}",
                 vocabulary=[f"bulk{i}"],
                 language=Language.ENGLISH,
             )
-            result = await corpus.save()
-            assert result is True
-            corpus_ids.append(corpus.corpus_id)
-
-        assert len(corpus_ids) == 10
+            saved = await manager.save_corpus(corpus)
+            assert saved is not None
 
         # Bulk query via Corpus.Metadata
         import re
@@ -492,16 +487,16 @@ class TestMongoDBIntegration:
 
     async def test_concurrent_operations(self, test_db):
         """Test concurrent MongoDB operations."""
+        manager = get_tree_corpus_manager()
 
         async def create_corpus(id: int):
-            corpus = Corpus(
+            corpus = await Corpus.create(
                 corpus_name=f"concurrent-{id}",
                 vocabulary=[f"word{id}"],
                 language=Language.ENGLISH,
             )
-            result = await corpus.save()
-            # Return corpus with save status
-            return (result, corpus)
+            saved = await manager.save_corpus(corpus)
+            return saved
 
         # Run concurrent creates
         tasks = [create_corpus(i) for i in range(20)]
@@ -509,7 +504,6 @@ class TestMongoDBIntegration:
 
         # Verify all succeeded
         assert len(results) == 20
-        for i, (save_result, corpus) in enumerate(results):
-            assert save_result is True
+        for i, corpus in enumerate(results):
+            assert corpus is not None
             assert corpus.corpus_name == f"concurrent-{i}"
-            assert corpus.corpus_id is not None

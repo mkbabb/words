@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pydantic import AliasChoices, BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from .base import Language
 from .dictionary import DictionaryProvider
@@ -35,6 +35,7 @@ class LookupParams(BaseModel):
 
     providers: list[DictionaryProvider] = Field(
         default=[DictionaryProvider.WIKTIONARY],
+        max_length=10,
         description="Dictionary providers to use for lookup",
     )
     languages: list[Language] = Field(
@@ -60,8 +61,11 @@ class LookupParams(BaseModel):
                 if isinstance(item, str):
                     try:
                         result.append(DictionaryProvider(item.lower()))
-                    except ValueError:
-                        pass  # Skip invalid
+                    except ValueError as e:
+                        valid_providers = [p.value for p in DictionaryProvider]
+                        raise ValueError(
+                            f"Invalid provider '{item}'. Valid providers: {', '.join(valid_providers)}"
+                        ) from e
                 elif isinstance(item, DictionaryProvider):
                     result.append(item)
             return result or [DictionaryProvider.WIKTIONARY]
@@ -77,8 +81,11 @@ class LookupParams(BaseModel):
                 if isinstance(item, str):
                     try:
                         result.append(Language(item.lower()))
-                    except ValueError:
-                        pass  # Skip invalid
+                    except ValueError as e:
+                        valid_languages = [lang.value for lang in Language]
+                        raise ValueError(
+                            f"Invalid language '{item}'. Valid languages: {', '.join(valid_languages)}"
+                        ) from e
                 elif isinstance(item, Language):
                     result.append(item)
             return result or [Language.ENGLISH]
@@ -136,8 +143,11 @@ class SearchParams(BaseModel):
                 if isinstance(item, str):
                     try:
                         result.append(Language(item.lower()))
-                    except ValueError:
-                        pass
+                    except ValueError as e:
+                        valid_languages = [lang.value for lang in Language]
+                        raise ValueError(
+                            f"Invalid language '{item}'. Valid languages: {', '.join(valid_languages)}"
+                        ) from e
                 elif isinstance(item, Language):
                     result.append(item)
             return result or [Language.ENGLISH]
@@ -307,6 +317,8 @@ class CorpusCreateParams(BaseModel):
 
     name: str = Field(
         ...,
+        min_length=1,
+        max_length=200,
         description="Corpus name",
     )
     language: Language = Field(
@@ -323,13 +335,27 @@ class CorpusCreateParams(BaseModel):
     )
     vocabulary: list[str] = Field(
         default_factory=list,
+        max_length=500000,
         description="Initial vocabulary words",
-        validation_alias=AliasChoices("vocabulary", "words"),  # Backward compatibility
     )
     enable_semantic: bool = Field(
         default=False,
         description="Enable semantic search for this corpus",
     )
+    ttl_hours: float = Field(
+        default=1.0,
+        ge=0.001,
+        le=24.0,
+        description="Time-to-live in hours (default 1 hour, max 24 hours)",
+    )
+
+    @field_validator("vocabulary", mode="after")
+    @classmethod
+    def validate_vocabulary_not_empty(cls, v: list[str]) -> list[str]:
+        """Ensure vocabulary is not empty - fail explicitly."""
+        if not v:
+            raise ValueError("Vocabulary must contain at least one word")
+        return v
 
 
 class CorpusListParams(BaseModel):
@@ -434,18 +460,3 @@ class SortParams(BaseModel):
         pattern="^(asc|desc)$",
         description="Sort order: asc or desc",
     )
-
-
-# Alias mappings for backward compatibility
-PARAMETER_ALIASES: dict[str, str] = {
-    # Old names -> New names
-    "force": "force_refresh",
-    "provider": "providers",  # Note: singular -> plural
-    "language": "languages",  # Note: singular -> plural
-    "semantic": "mode",  # Maps to SearchMode.SEMANTIC
-}
-
-
-def resolve_parameter_alias(name: str) -> str:
-    """Resolve parameter alias to canonical name."""
-    return PARAMETER_ALIASES.get(name, name)

@@ -57,7 +57,7 @@ class APIException(HTTPException):
         )
         super().__init__(
             status_code=status_code,
-            detail=response.model_dump(),
+            detail=response.model_dump(mode="json"),
             headers=headers,
         )
 

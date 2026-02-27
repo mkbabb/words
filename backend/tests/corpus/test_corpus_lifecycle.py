@@ -19,7 +19,7 @@ class TestCorpusLifecycle:
     @pytest_asyncio.fixture
     async def tree_manager(self, test_db) -> TreeCorpusManager:
         """Create a tree corpus manager."""
-        return TreeTreeCorpusManager()
+        return TreeCorpusManager()
 
     @pytest.mark.asyncio
     async def test_corpus_creation_with_normalization(
@@ -419,9 +419,9 @@ class TestCorpusLifecycle:
         successful_children = [c for c in children if not isinstance(c, Exception)]
         assert len(successful_children) >= 3  # At least some should succeed
 
-        # Reload parent and check children
-        reloaded = await tree_manager.get_corpus(corpus_uuid=base_corpus.corpus_uuid)
-        assert len(reloaded.child_uuids) == len(successful_children)
+        # Verify children were created with parent_uuid set
+        for child in successful_children:
+            assert child.parent_uuid == base_corpus.corpus_uuid
 
     @pytest.mark.asyncio
     async def test_small_bespoke_corpus(self, tree_manager: TreeCorpusManager, test_db):

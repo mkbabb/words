@@ -27,10 +27,11 @@ from .routers import (
     providers,
     search,
     suggestions,
-    # wordlist_reviews,
-    # wordlist_search,
-    # wordlist_words,
-    # wordlists,
+    word_versions,
+    wordlist_reviews,
+    wordlist_search,
+    wordlist_words,
+    wordlists,
     words,
     # wotd_main,
     # wotd_ml,
@@ -48,10 +49,6 @@ async def lifespan(app: FastAPI) -> Any:
         # Initialize MongoDB storage
         await get_storage()
         print("✅ MongoDB storage initialized successfully")
-
-        # TEMP: Skip search initialization on startup to avoid Beanie issues
-        # await get_language_search([Language.ENGLISH], force_rebuild=False, semantic=True)
-        print("⚠️  Language search NOT initialized - will lazy-load on first request")
 
         # Initialize AI components (singletons)
         get_openai_connector()
@@ -95,6 +92,12 @@ app.add_middleware(
 app.add_middleware(CacheHeadersMiddleware)  # Add cache headers before logging
 app.add_middleware(LoggingMiddleware)
 
+# Register global exception handlers
+from .middleware.exception_handlers import register_exception_handlers
+
+register_exception_handlers(app)
+
+
 # API versioning configuration
 API_V1_PREFIX = "/api/v1"
 
@@ -107,8 +110,15 @@ app.include_router(ai, prefix=API_V1_PREFIX, tags=["ai"])
 app.include_router(definitions, prefix=f"{API_V1_PREFIX}/definitions", tags=["definitions"])
 app.include_router(examples, prefix=API_V1_PREFIX, tags=["examples"])
 app.include_router(words, prefix=f"{API_V1_PREFIX}/words", tags=["words"])
+app.include_router(word_versions, prefix=f"{API_V1_PREFIX}/words", tags=["word-versions"])
 app.include_router(audio, prefix=API_V1_PREFIX, tags=["audio"])
 app.include_router(images, prefix=f"{API_V1_PREFIX}/images", tags=["images"])
+
+# Wordlist routers
+app.include_router(wordlists, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
+app.include_router(wordlist_words, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
+app.include_router(wordlist_reviews, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
+app.include_router(wordlist_search, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
 
 # New comprehensive routers for isomorphism with CLI
 app.include_router(database, prefix=API_V1_PREFIX, tags=["database"])

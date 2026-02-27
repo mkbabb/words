@@ -170,7 +170,6 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         hash_id = generate_wordlist_hash(data.words)
 
         # Check for existing list with same hash
-        # Temporarily disabled to avoid loading old data format
         existing = await self.find_by_hash(hash_id)
         if existing:
             return existing
@@ -469,7 +468,7 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         due_count = len(wordlist.get_due_for_review())
 
         return {
-            "basic_stats": wordlist.learning_stats.model_dump(),
+            "basic_stats": wordlist.learning_stats.model_dump(mode="json"),
             "word_counts": {
                 "total": wordlist.total_words,
                 "unique": wordlist.unique_words,
@@ -477,8 +476,8 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
             },
             "mastery_distribution": mastery_counts,
             "temperature_distribution": temperature_counts,
-            "most_frequent": [w.model_dump() for w in wordlist.get_most_frequent(5)],
-            "hot_words": [w.model_dump() for w in wordlist.get_hot_words(5)],
+            "most_frequent": [w.model_dump(mode="json") for w in wordlist.get_most_frequent(5)],
+            "hot_words": [w.model_dump(mode="json") for w in wordlist.get_hot_words(5)],
         }
 
     async def create_corpus(self, wordlist_id: PydanticObjectId, ttl_hours: float = 2.0) -> str:

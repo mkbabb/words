@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import io
+import os
 import re
+import tempfile
 from typing import Any
 
 import ebooklib
 from bs4 import BeautifulSoup
 from ebooklib import epub
 from pypdf import PdfReader
+
+from ...utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def parse_text(content: str | dict[str, Any]) -> str:
@@ -114,8 +120,15 @@ def parse_epub(content: bytes | str | dict[str, Any]) -> str:
         return parse_text(content)
 
     # Parse EPUB from bytes
+    # ebooklib's read_epub requires a file path, not a file-like object,
+    # so we write to a temporary file first.
+    tmp_path = None
     try:
-        book = epub.read_epub(io.BytesIO(content))
+        with tempfile.NamedTemporaryFile(suffix=".epub", delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        book = epub.read_epub(tmp_path)
         text_parts = []
 
         # Extract text from all document items (chapters)
@@ -128,9 +141,16 @@ def parse_epub(content: bytes | str | dict[str, Any]) -> str:
         full_text = "\n\n".join(text_parts)
         return parse_text(full_text)  # Clean using existing logic
 
-    except Exception:
-        # Fall back to text parser on any error
-        return parse_text(str(content))
+    except Exception as e:
+        logger.error(f"Failed to parse EPUB content: {e}", exc_info=True)
+        return ""
+
+    finally:
+        if tmp_path is not None:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 def parse_pdf(content: bytes | str | dict[str, Any]) -> str:
@@ -169,9 +189,9 @@ def parse_pdf(content: bytes | str | dict[str, Any]) -> str:
         full_text = "\n\n".join(text_parts)
         return parse_text(full_text)  # Clean using existing logic
 
-    except Exception:
-        # Fall back to text parser on any error
-        return parse_text(str(content))
+    except Exception as e:
+        logger.error(f"Failed to parse PDF content: {e}", exc_info=True)
+        return ""
 
 
 def extract_metadata(content: str | dict[str, Any]) -> dict[str, Any]:

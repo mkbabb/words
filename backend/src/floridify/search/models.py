@@ -152,7 +152,10 @@ class TrieIndex(BaseModel):
             resource_id = f"{corpus_uuid}:trie"
         else:
             # Lookup uuid from corpus_name
-            corpus = await Corpus.get(corpus_name=corpus_name, config=effective_config)
+            from ..corpus.manager import get_tree_corpus_manager
+
+            corpus_manager = get_tree_corpus_manager()
+            corpus = await corpus_manager.get_corpus(corpus_name=corpus_name, config=effective_config)
             if not corpus or not corpus.corpus_uuid:
                 return None
             resource_id = f"{corpus.corpus_uuid}:trie"
@@ -429,7 +432,10 @@ class SearchIndex(BaseModel):
             resource_id = f"{corpus_uuid}:search"
         else:
             # Lookup uuid from corpus_name
-            corpus = await Corpus.get(corpus_name=corpus_name, config=effective_config)
+            from ..corpus.manager import get_tree_corpus_manager
+
+            corpus_manager = get_tree_corpus_manager()
+            corpus = await corpus_manager.get_corpus(corpus_name=corpus_name, config=effective_config)
             if not corpus or not corpus.corpus_uuid:
                 logger.warning(f"Corpus '{corpus_name}' not found or missing uuid")
                 return None

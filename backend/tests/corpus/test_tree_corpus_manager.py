@@ -14,7 +14,7 @@ from floridify.models.base import Language
 @pytest_asyncio.fixture
 async def manager(test_db) -> TreeCorpusManager:
     """Provide an isolated manager for each test."""
-    return TreeTreeCorpusManager()
+    return TreeCorpusManager()
 
 
 @pytest.mark.asyncio

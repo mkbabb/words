@@ -358,39 +358,3 @@ def parse_scraped_data(
                             phrases.append(normalized)
 
     return list(set(words)), list(set(phrases))
-
-
-# Backwards compatibility aliases
-def parse_frequency_list(content: str, language: Language) -> ParseResult:
-    """Alias for parse_text_lines (handles frequency lists)."""
-    return parse_text_lines(content, language)
-
-
-def parse_json_dict(content: str, language: Language) -> ParseResult:
-    """Alias for parse_json_vocabulary (handles dict keys)."""
-    return parse_json_vocabulary(content, language)
-
-
-def parse_json_idioms(content: str, language: Language) -> ParseResult:
-    """Alias for parse_json_vocabulary (handles idioms)."""
-    return parse_json_vocabulary(content, language)
-
-
-def parse_json_array(content: str, language: Language) -> ParseResult:
-    """Alias for parse_json_vocabulary (handles arrays)."""
-    return parse_json_vocabulary(content, language)
-
-
-def parse_github_api(content: str, language: Language) -> ParseResult:
-    """Alias for parse_json_vocabulary (handles GitHub API)."""
-    return parse_json_vocabulary(content, language)
-
-
-def parse_csv_idioms(content: str, language: Language) -> ParseResult:
-    """Alias for parse_csv_words (handles idioms in CSV)."""
-    return parse_csv_words(content, language)
-
-
-def parse_json_phrasal_verbs(content: str, language: Language) -> ParseResult:
-    """Alias for parse_json_vocabulary (handles phrasal verbs)."""
-    return parse_json_vocabulary(content, language)

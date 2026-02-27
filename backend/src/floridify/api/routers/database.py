@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from ...models.dictionary import Definition, DictionaryEntry, Word
 from ...models.parameters import DatabaseStatsParams
 from ...models.responses import DatabaseStatsResponse, HealthResponse
 from ...storage.mongodb import get_storage
@@ -45,8 +46,6 @@ async def get_database_stats(
         await get_storage()
 
         # Get basic counts
-        from ...models.dictionary import Definition, DictionaryEntry, Word
-
         word_count = await Word.count()
         definition_count = await Definition.count()
         entry_count = await DictionaryEntry.count()
@@ -61,8 +60,6 @@ async def get_database_stats(
         provider_coverage = None
         if params.include_provider_coverage:
             # Aggregate definitions by provider
-            from ...models.dictionary import Definition
-
             pipeline = [
                 {"$group": {"_id": "$provider", "count": {"$sum": 1}}},
                 {"$sort": {"count": -1}},
@@ -128,8 +125,6 @@ async def get_database_health() -> HealthResponse:
         await get_storage()
 
         # Simple ping to check connection
-        from ...models.dictionary import Word
-
         count = await Word.count()
 
         components = {

@@ -157,7 +157,7 @@ class FilesystemBackend:
         await loop.run_in_executor(None, self.cache.clear)
 
     async def clear(self) -> None:
-        """Alias for clear_all for backwards compatibility."""
+        """Clear all cached items (alias for clear_all)."""
         await self.clear_all()
 
     async def get_stats(self) -> dict[str, Any]:

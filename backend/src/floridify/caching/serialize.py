@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import zlib
 from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import Enum
@@ -196,43 +197,44 @@ def compute_content_hash(content: Any) -> str:
 
 
 def estimate_binary_size(content: dict[str, Any]) -> tuple[int, str]:
-    """Estimate size of content with large binary data without full serialization.
+    """Estimate size of content with large binary data and compute CRC32 checksum.
 
     Pure function for estimating size of large binary payloads without
-    expensive JSON encoding. Returns rough estimate and skips checksum.
+    expensive JSON encoding. Computes CRC32 checksum (~1GB/s) for integrity.
 
     Args:
         content: Dictionary that may contain large binary_data field
 
     Returns:
-        Tuple of (estimated_size_bytes, checksum_or_marker)
-        Returns ("skip-large-content" as checksum marker for large data)
+        Tuple of (estimated_size_bytes, checksum)
+        For binary data, checksum is "crc32:XXXXXXXX" format.
 
     Examples:
-        >>> content = {"binary_data": {"embedding": "x" * 1000000}}
+        >>> content = {"binary_data": {"embedding": b"hello world"}}
         >>> size, checksum = estimate_binary_size(content)
-        >>> size > 1000000
+        >>> size > 0
         True
-        >>> checksum
-        'skip-large-content'
+        >>> checksum.startswith('crc32:')
+        True
     """
     if not isinstance(content, dict) or "binary_data" not in content:
         # Not binary content - use full serialization
         serialized = serialize_content(content)
         return serialized.size_bytes, serialized.content_hash
 
-    # Estimate binary data size
     binary_size = 0
+    crc = 0
     binary_data = content.get("binary_data", {})
     if isinstance(binary_data, dict):
         for value in binary_data.values():
-            if isinstance(value, str):
+            if isinstance(value, bytes):
                 binary_size += len(value)
-            elif isinstance(value, bytes):
-                binary_size += len(value)
+                crc = zlib.crc32(value, crc)
+            elif isinstance(value, str):
+                encoded = value.encode("utf-8")
+                binary_size += len(encoded)
+                crc = zlib.crc32(encoded, crc)
 
-    # Add overhead for JSON structure (rough estimate)
     estimated_size = binary_size + 1000
-
-    # Skip checksum for very large data
-    return estimated_size, "skip-large-content"
+    checksum = f"crc32:{crc & 0xFFFFFFFF:08x}"
+    return estimated_size, checksum

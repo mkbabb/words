@@ -80,7 +80,7 @@ def _configure_loguru() -> None:
     # Add file handler for persistent logs
     loguru_logger.add(
         "logs/floridify.log",
-        level="DEBUG",
+        level="INFO",
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}\n",
         rotation="50 MB",
         retention="7 days",
@@ -262,14 +262,15 @@ def log_stage(stage_name: str, emoji: str = "🔄") -> Callable[[Callable[..., T
             )
 
             stage_logger.info(f"{emoji} Entering stage: {stage_name}")
-            # Preserve Rich console output
-            console.print(
-                Panel(
-                    Text(f"Stage: {stage_name}", style="bold cyan"),
-                    title="Pipeline Stage",
-                    border_style="cyan",
-                ),
-            )
+            # Rich console output only in DEBUG/TRACE mode
+            if os.getenv("LOG_LEVEL", "INFO").upper() in ("DEBUG", "TRACE"):
+                console.print(
+                    Panel(
+                        Text(f"Stage: {stage_name}", style="bold cyan"),
+                        title="Pipeline Stage",
+                        border_style="cyan",
+                    ),
+                )
 
             try:
                 result: T = await func(*args, **kwargs)  # type: ignore[misc]
@@ -289,14 +290,15 @@ def log_stage(stage_name: str, emoji: str = "🔄") -> Callable[[Callable[..., T
             )
 
             stage_logger.info(f"{emoji} Entering stage: {stage_name}")
-            # Preserve Rich console output
-            console.print(
-                Panel(
-                    Text(f"Stage: {stage_name}", style="bold cyan"),
-                    title="Pipeline Stage",
-                    border_style="cyan",
-                ),
-            )
+            # Rich console output only in DEBUG/TRACE mode
+            if os.getenv("LOG_LEVEL", "INFO").upper() in ("DEBUG", "TRACE"):
+                console.print(
+                    Panel(
+                        Text(f"Stage: {stage_name}", style="bold cyan"),
+                        title="Pipeline Stage",
+                        border_style="cyan",
+                    ),
+                )
 
             try:
                 result = func(*args, **kwargs)

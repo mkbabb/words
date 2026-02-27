@@ -42,26 +42,43 @@ class WordListQueryParams(BaseModel):
     limit: int = Field(20, ge=1, le=100, description="Maximum results")
 
 
+def _get_attr(item: Any, key: str, default: Any = None) -> Any:
+    """Get attribute from dict or Pydantic model uniformly."""
+    if isinstance(item, dict):
+        return item.get(key, default)
+    return getattr(item, key, default)
+
+
 async def apply_wordlist_filters_and_sort(
     words: list[Any],
     params: WordListQueryParams,
 ) -> list[Any]:
-    """Apply filtering and sorting to wordlist items."""
+    """Apply filtering and sorting to wordlist items.
+
+    Handles both dict and Pydantic model objects (WordListItem).
+    """
     filtered = words
 
-    # Apply filters
+    # Apply filters (use _get_attr to support both dicts and Pydantic models)
     if params.mastery_levels:
-        filtered = [w for w in filtered if w.get("mastery_level") in params.mastery_levels]
+        filtered = [w for w in filtered if str(_get_attr(w, "mastery_level", "")) in params.mastery_levels]
     if params.hot_only:
-        filtered = [w for w in filtered if w.get("is_hot")]
+        filtered = [w for w in filtered if _get_attr(w, "temperature", "") == "hot"]
     if params.due_only:
-        filtered = [w for w in filtered if w.get("is_due")]
+        filtered = [
+            w for w in filtered
+            if hasattr(w, "is_due_for_review") and w.is_due_for_review()
+            or _get_attr(w, "is_due", False)
+        ]
     if params.min_views is not None:
-        filtered = [w for w in filtered if w.get("view_count", 0) >= params.min_views]
+        filtered = [w for w in filtered if _get_attr(w, "frequency", 0) >= params.min_views]
     if params.max_views is not None:
-        filtered = [w for w in filtered if w.get("view_count", 0) <= params.max_views]
+        filtered = [w for w in filtered if _get_attr(w, "frequency", 0) <= params.max_views]
     if params.reviewed is not None:
-        filtered = [w for w in filtered if w.get("reviewed") == params.reviewed]
+        filtered = [
+            w for w in filtered
+            if (_get_attr(w, "last_visited") is not None) == params.reviewed
+        ]
 
     # Apply sorting
     sort_fields = params.sort_by.split(",")
@@ -74,7 +91,7 @@ async def apply_wordlist_filters_and_sort(
     # Sort by multiple fields
     for field, order in reversed(list(zip(sort_fields, sort_orders, strict=False))):
         reverse = order.lower() == "desc"
-        filtered = sorted(filtered, key=lambda x: x.get(field.strip(), ""), reverse=reverse)
+        filtered = sorted(filtered, key=lambda x: _get_attr(x, field.strip(), "") or "", reverse=reverse)
 
     return filtered
 
@@ -84,14 +101,24 @@ async def convert_wordlist_items_to_response(
     paginated: bool = True,
     offset: int = 0,
     limit: int = 20,
-) -> tuple[list[Any], int]:
+) -> tuple[list[dict[str, Any]], int]:
     """Convert wordlist items to response format with optional pagination."""
     total = len(items)
 
     if paginated:
         items = items[offset : offset + limit]
 
-    return items, total
+    # Convert Pydantic models to dicts for JSON serialization
+    result = []
+    for item in items:
+        if hasattr(item, "model_dump"):
+            result.append(item.model_dump(mode="json"))
+        elif isinstance(item, dict):
+            result.append(item)
+        else:
+            result.append(dict(item))
+
+    return result, total
 
 
 class WordListSearchQueryParams(WordListQueryParams):
@@ -202,6 +229,62 @@ async def add_word(
         metadata={
             "version": updated_list.version,
         },
+        links={
+            "wordlist": f"/wordlists/{wordlist_id}",
+            "words": f"/wordlists/{wordlist_id}/words",
+        },
+    )
+
+
+class WordUpdateRequest(BaseModel):
+    """Request body for updating a word's metadata in a wordlist."""
+
+    notes: str | None = Field(None, description="User notes about the word")
+    tags: list[str] | None = Field(None, description="User-defined tags")
+
+
+@router.patch("/{wordlist_id}/words/{word}", response_model=ResourceResponse)
+async def update_word(
+    wordlist_id: PydanticObjectId,
+    word: str,
+    request: WordUpdateRequest,
+    repo: WordListRepository = Depends(get_wordlist_repo),
+) -> ResourceResponse:
+    """Update a word's metadata (notes, tags) in a wordlist.
+
+    Errors:
+        404: Wordlist or word not found
+    """
+    wordlist = await repo.get(wordlist_id, raise_on_missing=True)
+    assert wordlist is not None
+
+    # Find the word document by text
+    word_doc = await Word.find_one({"text": word})
+    if not word_doc:
+        raise HTTPException(status_code=404, detail=f"Word '{word}' not found")
+
+    # Find the WordListItem in the wordlist
+    target_item = None
+    for item in wordlist.words:
+        if item.word_id == word_doc.id:
+            target_item = item
+            break
+
+    if target_item is None:
+        raise HTTPException(status_code=404, detail=f"Word '{word}' not in wordlist")
+
+    # Apply updates
+    if request.notes is not None:
+        target_item.notes = request.notes
+    if request.tags is not None:
+        target_item.tags = request.tags
+
+    # Save wordlist
+    await wordlist.save()
+
+    return ResourceResponse(
+        data=target_item.model_dump(mode="json"),
+        metadata={"version": wordlist.version},
         links={
             "wordlist": f"/wordlists/{wordlist_id}",
             "words": f"/wordlists/{wordlist_id}/words",

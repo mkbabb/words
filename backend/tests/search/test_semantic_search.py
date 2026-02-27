@@ -94,6 +94,7 @@ async def words_with_definitions(test_db):
     return created_words
 
 
+@pytest.mark.semantic
 class TestSemanticSearch:
     """Test suite for semantic search functionality."""
 
@@ -305,9 +306,9 @@ class TestSemanticSearch:
             # Return wrong dimension
             mock_embed.return_value = np.array([[0.1] * 512])  # Wrong size
 
-            # Search should handle gracefully
-            results = await semantic_engine.search("test")
-            assert isinstance(results, list)  # Should return list (possibly empty)
+            # Search should raise RuntimeError for dimension mismatch
+            with pytest.raises(RuntimeError, match="Semantic search failed"):
+                await semantic_engine.search("test")
 
     @pytest.mark.asyncio
     async def test_empty_query(

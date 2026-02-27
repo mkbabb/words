@@ -106,14 +106,14 @@ async def lookup_word_pipeline(
             f"search_time: {search_duration:.2f}s)",
         )
 
-        # Handle force_refresh by deleting existing entry
+        # Handle force_refresh: skip cache but preserve history
+        # (Old versions are retained in the VersionedDataManager chain)
         if force_refresh:
             existing = await get_synthesized_entry(word)
             if existing:
                 logger.info(
-                    f"🗑️  Deleting existing synthesized entry for '{best_match}' due to force_refresh",
+                    f"🔄 Force refresh for '{best_match}' — existing entry preserved in version history",
                 )
-                await existing.delete()
         else:
             # Try to get a cached entry if not forcing refresh (regardless of AI setting)
             existing = await get_synthesized_entry(word)

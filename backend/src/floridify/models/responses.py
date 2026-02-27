@@ -13,7 +13,7 @@ Design Principles:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -238,29 +238,17 @@ class CorpusResponse(BaseResponse):
 
     @computed_field
     @property
-    def corpus_id(self) -> str:
-        """Backward compatibility: corpus_id alias for id."""
-        return self.id
+    def search_count(self) -> int:
+        """Number of searches performed on this corpus."""
+        return self.statistics.get("search_count", 0) if self.statistics else 0
 
     @computed_field
     @property
-    def word_count(self) -> int:
-        """Backward compatibility: word_count alias for vocabulary_size."""
-        return self.vocabulary_size
-
-    @computed_field
-    @property
-    def expires_at(self) -> datetime:
-        """Backward compatibility: expires_at for TTL-based corpora.
-
-        Returns a default expiration of 1 hour from creation if no TTL is set.
-        """
-        # Check if statistics contains TTL info
-        if self.statistics and "ttl_hours" in self.statistics:
-            ttl_hours = self.statistics["ttl_hours"]
-            return self.created_at + timedelta(hours=ttl_hours)
-        # Default to 1 hour expiration for backward compatibility
-        return self.created_at + timedelta(hours=1)
+    def last_accessed(self) -> datetime | None:
+        """Last time this corpus was accessed for search."""
+        if self.statistics and "last_accessed" in self.statistics:
+            return self.statistics["last_accessed"]
+        return None
 
 
 class CacheStatsResponse(BaseResponse):
@@ -381,6 +369,43 @@ class HealthResponse(BaseResponse):
         description="Component health status",
     )
     uptime_seconds: float | None = Field(None, description="Uptime")
+
+
+# ============================================================================
+# VERSION HISTORY RESPONSE MODELS
+# ============================================================================
+
+
+class VersionSummary(BaseModel):
+    """Summary of a single version in the version chain."""
+
+    version: str = Field(..., description="Semantic version string (e.g. 1.0.3)")
+    created_at: datetime = Field(..., description="When this version was created")
+    data_hash: str = Field(..., description="SHA-256 content hash")
+    storage_mode: str = Field(
+        default="snapshot",
+        description="Storage mode: 'snapshot' (full content) or 'delta' (compressed diff)",
+    )
+    is_latest: bool = Field(default=False, description="Whether this is the current version")
+
+
+class VersionHistoryResponse(BaseResponse):
+    """Response for version history of a resource."""
+
+    resource_id: str = Field(..., description="Resource identifier")
+    total_versions: int = Field(..., description="Total number of versions")
+    versions: list[VersionSummary] = Field(..., description="Version summaries, newest first")
+
+
+class VersionDiffResponse(BaseResponse):
+    """Response for diff between two versions."""
+
+    from_version: str = Field(..., description="Source version for diff")
+    to_version: str = Field(..., description="Target version for diff")
+    changes: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Categorized changes (values_changed, items_added, items_removed, etc.)",
+    )
 
 
 # Type aliases for common generic responses

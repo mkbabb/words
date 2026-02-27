@@ -7,6 +7,8 @@ from typing import Any
 from beanie import PydanticObjectId
 from motor.motor_asyncio import AsyncIOMotorCollection
 
+from ...models.dictionary import Definition, DictionaryEntry, Pronunciation
+
 logger = logging.getLogger(__name__)
 
 
@@ -54,9 +56,6 @@ class CleanupService:
             Total number of documents that had their image_ids arrays updated
 
         """
-        # Import models here to avoid circular imports
-        from ...models.dictionary import Definition, DictionaryEntry
-
         collections = [
             Definition.get_pymongo_collection(),
             DictionaryEntry.get_pymongo_collection(),
@@ -85,9 +84,6 @@ class CleanupService:
             Total number of documents that had their audio_file_ids arrays updated
 
         """
-        # Import models here to avoid circular imports
-        from ...models.dictionary import Pronunciation
-
         collections = [
             Pronunciation.get_pymongo_collection(),
         ]

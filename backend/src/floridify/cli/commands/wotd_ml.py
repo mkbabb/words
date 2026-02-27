@@ -484,7 +484,6 @@ def info():
         DEFAULT_LANGUAGE_MODEL,
         MATRYOSHKA_TRAINING,
         USE_BINARY_EMBEDDINGS,
-        USE_FSQ,
         USE_INT8_EMBEDDINGS,
     )
 
@@ -496,7 +495,7 @@ def info():
 
     table.add_row("Embedding Model", DEFAULT_EMBEDDING_MODEL, "Default embedding model")
     table.add_row("Language Model", DEFAULT_LANGUAGE_MODEL, "Default generation model")
-    table.add_row("Encoder Type", "FSQ" if USE_FSQ else "HVQ", "Semantic encoding method")
+    table.add_row("Encoder Type", "FSQ", "Semantic encoding method (production default)")
     table.add_row("Binary Embeddings", str(USE_BINARY_EMBEDDINGS), "Use binary quantization")
     table.add_row("INT8 Embeddings", str(USE_INT8_EMBEDDINGS), "Use int8 quantization")
     table.add_row("Matryoshka Training", str(MATRYOSHKA_TRAINING), "Hierarchical embeddings")

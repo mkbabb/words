@@ -5,11 +5,15 @@ from __future__ import annotations
 # Set OpenMP threading limits BEFORE any library imports to prevent conflicts
 # These settings work universally (local development and Docker)
 import os
+
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["LOG_LEVEL"] = "ERROR"
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
 
 import shutil
 import subprocess
@@ -135,8 +139,8 @@ def get_document_models():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def mongodb_client(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClient, None]:
-    """Create MongoDB client for test session."""
+async def mongodb_client(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClient]:
+    """Create MongoDB client for test."""
     client = AsyncIOMotorClient(mongodb_server, serverSelectionTimeoutMS=500)
     try:
         # Test connection
@@ -149,7 +153,7 @@ async def mongodb_client(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClie
 
 
 @pytest_asyncio.fixture(scope="session")
-async def mongodb_client_session(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClient, None]:
+async def mongodb_client_session(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClient]:
     """Create session-scoped MongoDB client for expensive setup (like semantic indices)."""
     client = AsyncIOMotorClient(mongodb_server, serverSelectionTimeoutMS=500)
     try:
@@ -235,12 +239,60 @@ def assert_valid_object_id(value: str) -> None:
 # Additional fixtures for API tests
 @pytest_asyncio.fixture
 async def async_client(test_db):
-    """Create async FastAPI test client."""
+    """Create async FastAPI test client.
+
+    Creates a test-specific app without BaseHTTPMiddleware-based middleware
+    to avoid event loop conflicts with Motor/Beanie. Starlette's
+    BaseHTTPMiddleware runs handlers in a TaskGroup that causes
+    'Future attached to a different loop' errors with async MongoDB drivers.
+    """
+    from fastapi import FastAPI
     from httpx import ASGITransport, AsyncClient
 
-    from floridify.api.main import app
+    from floridify.api.main import API_V1_PREFIX
+    from floridify.api.routers import (
+        ai,
+        cache,
+        config,
+        corpus,
+        database,
+        health,
+        lookup,
+        providers,
+        search,
+        suggestions,
+        word_versions,
+        wordlist_reviews,
+        wordlist_search,
+        wordlist_words,
+        wordlists,
+    )
 
-    transport = ASGITransport(app=app)
+    # Create a minimal test app without BaseHTTPMiddleware
+    test_app = FastAPI(title="Test App")
+
+    # Register the same routers as the main app
+    test_app.include_router(lookup, prefix=API_V1_PREFIX, tags=["lookup"])
+    test_app.include_router(search, prefix=API_V1_PREFIX, tags=["search"])
+    test_app.include_router(wordlists, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
+    test_app.include_router(wordlist_words, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"])
+    test_app.include_router(
+        wordlist_reviews, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"]
+    )
+    test_app.include_router(
+        wordlist_search, prefix=f"{API_V1_PREFIX}/wordlists", tags=["wordlists"]
+    )
+    test_app.include_router(database, prefix=API_V1_PREFIX, tags=["database"])
+    test_app.include_router(providers, prefix=API_V1_PREFIX, tags=["providers"])
+    test_app.include_router(corpus, prefix=API_V1_PREFIX, tags=["corpus"])
+    test_app.include_router(cache, prefix=API_V1_PREFIX, tags=["cache"])
+    test_app.include_router(config, prefix=API_V1_PREFIX, tags=["config"])
+    test_app.include_router(ai, prefix=API_V1_PREFIX, tags=["ai"])
+    test_app.include_router(suggestions, prefix=API_V1_PREFIX, tags=["suggestions"])
+    test_app.include_router(word_versions, prefix=f"{API_V1_PREFIX}/words", tags=["word-versions"])
+    test_app.include_router(health, prefix="", tags=["health"])
+
+    transport = ASGITransport(app=test_app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
 
@@ -487,6 +539,12 @@ async def mock_openai_client():
 
     # Mock the last_model_used property to return a string
     type(mock_connector).last_model_used = property(lambda self: "gpt-4")
+
+    # Mock the last_model_info property to return a proper ModelInfo
+    from floridify.models.base import ModelInfo
+
+    _mock_model_info = ModelInfo(name="gpt-4", confidence=0.95, temperature=0.7)
+    type(mock_connector).last_model_info = property(lambda self: _mock_model_info)
 
     # Mock pronunciation method
     mock_connector.pronunciation = AsyncMock(

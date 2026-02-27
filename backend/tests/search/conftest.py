@@ -30,6 +30,49 @@ from floridify.search.core import Search
 from floridify.search.models import SearchIndex
 from floridify.search.semantic.core import SemanticSearch
 
+@pytest_asyncio.fixture(scope="session")
+async def shared_semantic_corpus(test_db_session):
+    """Session-scoped corpus with pre-built semantic index.
+
+    For tests that NEED a semantic index but don't test index creation itself.
+    Builds the index once per session and shares it across all semantic tests.
+    """
+    vocabulary = [
+        # Emotion words
+        "happy", "joyful", "cheerful", "glad", "delighted",
+        "sad", "unhappy", "sorrowful", "miserable", "dejected",
+        "angry", "furious", "irate", "enraged", "irritated",
+        "calm", "peaceful", "serene", "tranquil", "relaxed",
+        # Animal words
+        "dog", "cat", "elephant", "tiger", "lion",
+        # Food words
+        "apple", "banana", "orange", "bread", "cheese",
+        # Action words
+        "run", "walk", "jump", "swim", "fly",
+    ]
+
+    sorted_vocab = sorted(vocabulary)
+    corpus = Corpus(
+        corpus_name="shared_semantic_test",
+        corpus_type=CorpusType.LANGUAGE,
+        language=Language.ENGLISH,
+        vocabulary=sorted_vocab,
+        original_vocabulary=sorted_vocab,
+        lemmatized_vocabulary=sorted_vocab,
+    )
+    corpus.vocabulary_to_index = {word: i for i, word in enumerate(sorted_vocab)}
+    corpus._build_signature_index()
+
+    manager = TreeCorpusManager()
+    saved = await manager.save_corpus(corpus)
+
+    # Pre-build semantic index so tests don't have to
+    engine = await SemanticSearch.from_corpus(corpus=saved)
+    await engine.initialize()
+
+    return saved
+
+
 @pytest_asyncio.fixture
 async def search_test_words(test_db):
     """Create a comprehensive set of test words for search testing."""
@@ -63,9 +106,9 @@ async def search_test_words(test_db):
         # Add a basic definition for each word
         definition = Definition(
             word_id=word.id,
-            meaning=f"Definition for {word.text}",
-            examples=[f"Example using {word.text}"],
-            provider=DictionaryProvider.WIKTIONARY,
+            text=f"Definition for {word.text}",
+            part_of_speech="noun",
+            providers=[DictionaryProvider.WIKTIONARY],
         )
         await definition.save()
 
@@ -80,7 +123,7 @@ async def empty_search_engine(test_db):
     from beanie import PydanticObjectId
 
     index = SearchIndex(
-        corpus_id=PydanticObjectId(),
+        corpus_uuid=str(PydanticObjectId()),
         corpus_name="empty_test_corpus",
         vocabulary_hash="empty_test_hash_" + str(PydanticObjectId()),
         semantic_enabled=False,
@@ -95,7 +138,7 @@ async def populated_search_engine(search_test_words):
     from beanie import PydanticObjectId
 
     index = SearchIndex(
-        corpus_id=PydanticObjectId(),
+        corpus_uuid=str(PydanticObjectId()),
         corpus_name="populated_test_corpus",
         vocabulary_hash="populated_test_hash_" + str(PydanticObjectId()),
         semantic_enabled=False,
@@ -110,7 +153,7 @@ async def semantic_search_engine(search_test_words):
     from beanie import PydanticObjectId
 
     index = SearchIndex(
-        corpus_id=PydanticObjectId(),
+        corpus_uuid=str(PydanticObjectId()),
         corpus_name="semantic_test_corpus",
         vocabulary_hash="semantic_test_hash_" + str(PydanticObjectId()),
         semantic_enabled=True,

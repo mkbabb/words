@@ -77,7 +77,7 @@ class SSEEvent:
         self.event_id = event_id
 
     def format(self) -> str:
-        """Format as SSE string."""
+        """Format as SSE string (per SSE spec: each event ends with \\n\\n)."""
         lines = []
 
         if self.event_id:
@@ -85,9 +85,9 @@ class SSEEvent:
 
         lines.append(f"event: {self.event_type}")
         lines.append(f"data: {json.dumps(self.data)}")
-        lines.append("")  # Empty line to end event
 
-        return "\n".join(lines)
+        # SSE spec requires double newline to terminate event
+        return "\n".join(lines) + "\n\n"
 
 
 class StreamingProgressHandler:
@@ -243,6 +243,7 @@ async def create_streaming_response(
                     },
                 )
                 yield config_event.format()
+                await asyncio.sleep(0)  # Yield control to event loop
 
             # Reset state tracker
             state_tracker.reset()
@@ -323,123 +324,6 @@ async def create_streaming_response(
                 event_type="error",
                 data={"type": "error", "message": f"Streaming error: {e!s}"},
             )
-            yield error_event.format()
-
-    # Simplified event generator that works with the existing pattern
-    async def simple_generator() -> AsyncGenerator[str]:
-        """Simplified generator that follows the existing SSE pattern."""
-        try:
-            # Send initial stage configuration
-            if include_stage_definitions:
-                stages_data = [
-                    {
-                        "progress": stage.progress,
-                        "label": stage.label,
-                        "description": stage.description,
-                    }
-                    for stage in state_tracker.get_stage_definitions()
-                ]
-                config_data = {
-                    "type": "config",
-                    "category": state_tracker.category,
-                    "stages": stages_data,
-                }
-                yield f"data: {json.dumps(config_data)}\n\n"
-
-            # Reset state tracker
-            state_tracker.reset()
-
-            # Start process and monitor states
-            process_task = asyncio.create_task(process_func())
-
-            try:
-                # Monitor state updates
-                async with state_tracker.subscribe() as queue:
-                    while True:
-                        try:
-                            # Wait for state update with increased timeout for better reliability
-                            state = await asyncio.wait_for(queue.get(), timeout=0.5)
-
-                            # Send progress update
-                            progress_data = {"type": "progress", **state.model_dump_optimized()}
-                            yield f"data: {json.dumps(progress_data)}\n\n"
-
-                            if state.is_complete or state.error:
-                                if state.error:
-                                    # Process had an error
-                                    error_data = {
-                                        "message": state.error,
-                                    }
-                                    error_event = SSEEvent(event_type="error", data=error_data)
-                                    yield error_event.format()
-                                    break
-
-                                # State is complete, now wait for and send process result
-                                if not process_task.done():
-                                    # Wait a bit more for the process to finish
-                                    try:
-                                        await asyncio.wait_for(process_task, timeout=1.0)
-                                    except TimeoutError:
-                                        logger.warning(
-                                            "Process task did not complete after state marked complete",
-                                        )
-
-                                if process_task.done():
-                                    result = await process_task
-
-                                    # Send final completion with chunking for large payloads
-                                    if include_completion_data and result is not None:
-                                        # Serialize the result data
-                                        result_data = result.model_dump(mode="json")
-                                        result_json = json.dumps(result_data)
-
-                                        # Check if payload is too large (> 32KB)
-                                        if len(result_json) > 32768:
-                                            # Send completion in chunks
-                                            # Send completion in chunks
-                                            for chunk in _send_chunked_completion(result_data):
-                                                yield chunk
-                                        else:
-                                            # Send as single completion event
-                                            completion_data = {
-                                                "message": "Process completed successfully",
-                                                "result": result_data,
-                                            }
-                                            completion_event = SSEEvent(
-                                                event_type="complete",
-                                                data=completion_data,
-                                            )
-                                            yield completion_event.format()
-                                    else:
-                                        # Send simple completion without data
-                                        completion_data = {
-                                            "message": "Process completed successfully",
-                                        }
-                                        completion_event = SSEEvent(
-                                            event_type="complete",
-                                            data=completion_data,
-                                        )
-                                        yield completion_event.format()
-                                break
-
-                        except TimeoutError:
-                            # No state update, continue monitoring
-                            continue
-
-            except Exception as e:
-                logger.error(f"Process execution error: {e}")
-                process_task.cancel()
-
-                error_data = {
-                    "message": str(e),
-                }
-                error_event = SSEEvent(event_type="error", data=error_data)
-                yield error_event.format()
-
-        except Exception as e:
-            logger.error(f"Streaming error: {e}")
-            error_data = {"message": f"Streaming error: {e!s}"}
-            error_event = SSEEvent(event_type="error", data=error_data)
             yield error_event.format()
 
     return StreamingResponse(

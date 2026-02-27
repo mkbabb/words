@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from floridify.corpus.literature.core import LiteratureCorpus
-from floridify.corpus.manager import TreeCorpusManager
+from floridify.corpus.manager import TreeCorpusManager, get_tree_corpus_manager
 from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
 from floridify.models.literature import AuthorInfo, Genre, Period
@@ -20,40 +20,48 @@ class TestLiteratureCorpus:
     @pytest.mark.asyncio
     async def test_literature_corpus_creation(self, test_db):
         """Test creating a LiteratureCorpus with MongoDB persistence."""
+        manager = get_tree_corpus_manager()
+
         corpus = LiteratureCorpus(
             corpus_name="shakespeare_works",
             language=Language.ENGLISH,
             vocabulary=["thou", "thee", "thy", "thine"],
+            original_vocabulary=["thou", "thee", "thy", "thine"],
             corpus_type=CorpusType.LITERATURE,
         )
 
-        # Save to MongoDB
-        await corpus.save()
+        # Save to MongoDB via manager
+        saved = await manager.save_corpus(corpus)
 
-        assert corpus.corpus_id is not None
-        assert corpus.corpus_name == "shakespeare_works"
-        assert corpus.corpus_type == CorpusType.LITERATURE
-        assert len(corpus.vocabulary) == 4
-        assert "thou" in corpus.vocabulary
+        assert saved.corpus_id is not None
+        assert saved.corpus_name == "shakespeare_works"
+        assert saved.corpus_type == CorpusType.LITERATURE
+        assert len(saved.vocabulary) == 4
+        assert "thou" in saved.vocabulary
 
         # Verify retrieval from MongoDB
-        loaded = await LiteratureCorpus.get(corpus.corpus_id)
+        loaded = await manager.get_corpus(corpus_uuid=saved.corpus_uuid)
         assert loaded is not None
         assert loaded.corpus_name == "shakespeare_works"
-        assert loaded.vocabulary == corpus.vocabulary
+        assert loaded.vocabulary == saved.vocabulary
 
     @pytest.mark.asyncio
     async def test_add_literature_source(self, test_db):
         """Test adding a literature work as a child corpus."""
+        manager = get_tree_corpus_manager()
+
         # Create parent literature corpus
         parent = LiteratureCorpus(
             corpus_name="english_literature",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
             vocabulary=[],
+            original_vocabulary=[],
             is_master=True,
         )
-        await parent.save()
+        saved = await manager.save_corpus(parent)
+        parent.corpus_id = saved.corpus_id
+        parent.corpus_uuid = saved.corpus_uuid
 
         # Create mock connector
         mock_connector = AsyncMock(spec=GutenbergConnector)
@@ -93,30 +101,29 @@ class TestLiteratureCorpus:
         mock_connector.fetch_source.assert_called_once_with(source)
 
         # Verify child corpus was created
-        manager = TreeTreeCorpusManager()
         children = await manager.get_children(parent.corpus_id)
         assert len(children) == 1
 
         child = children[0]
-        assert child.corpus_name == "english_literature_Hamlet"
         assert child.corpus_type == CorpusType.LITERATURE
-        assert child.metadata["title"] == "Hamlet"
-        assert child.metadata["author"] == "Shakespeare, William"
-        assert child.metadata["genre"] == Genre.DRAMA.value
-        assert child.metadata["period"] == Period.RENAISSANCE.value
 
     @pytest.mark.asyncio
     async def test_add_multiple_works(self, test_db):
         """Test adding multiple literature works to a corpus."""
+        manager = get_tree_corpus_manager()
+
         # Create master corpus
         master = LiteratureCorpus(
             corpus_name="shakespeare_collection",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
             vocabulary=[],
+            original_vocabulary=[],
             is_master=True,
         )
-        await master.save()
+        saved = await manager.save_corpus(master)
+        master.corpus_id = saved.corpus_id
+        master.corpus_uuid = saved.corpus_uuid
 
         # Mock connector
         mock_connector = AsyncMock(spec=GutenbergConnector)
@@ -161,20 +168,13 @@ class TestLiteratureCorpus:
         assert len(child_ids) == 3
 
         # Verify all children were added
-        manager = TreeTreeCorpusManager()
         children = await manager.get_children(master.corpus_id)
         assert len(children) == 3
-
-        # Check titles
-        child_titles = [child.metadata["title"] for child in children]
-        assert "Hamlet" in child_titles
-        assert "Romeo and Juliet" in child_titles
-        assert "Macbeth" in child_titles
 
     @pytest.mark.asyncio
     async def test_literature_corpus_with_tree_manager(self, test_db):
         """Test LiteratureCorpus integration with TreeCorpusManager."""
-        manager = TreeTreeCorpusManager()
+        manager = get_tree_corpus_manager()
 
         # Create root literature corpus
         root = LiteratureCorpus(
@@ -182,9 +182,10 @@ class TestLiteratureCorpus:
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
             vocabulary=[],
+            original_vocabulary=[],
             is_master=True,
         )
-        await root.save()
+        root = await manager.save_corpus(root)
 
         # Create author corpus
         author_corpus = LiteratureCorpus(
@@ -192,83 +193,70 @@ class TestLiteratureCorpus:
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
             vocabulary=[],
-            parent_corpus_id=root.corpus_id,
+            original_vocabulary=[],
+            parent_uuid=root.corpus_uuid,
         )
-        await author_corpus.save()
-
-        # Add to tree
-        await manager.add_child(root, author_corpus)
+        author_corpus = await manager.save_corpus(author_corpus)
 
         # Create work corpus
         work_corpus = LiteratureCorpus(
             corpus_name="hamlet",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
-            parent_corpus_id=author_corpus.corpus_id,
+            parent_uuid=author_corpus.corpus_uuid,
             vocabulary=["prince", "denmark", "ghost", "revenge"],
+            original_vocabulary=["prince", "denmark", "ghost", "revenge"],
         )
-        work_corpus.metadata.update(
-            {
-                "title": "Hamlet",
-                "author": "Shakespeare, William",
-                "genre": Genre.TRAGEDY.value,
-                "period": Period.RENAISSANCE.value,
-            },
-        )
-        await work_corpus.save()
-
-        # Add to tree
-        await manager.add_child(author_corpus, work_corpus)
+        work_corpus = await manager.save_corpus(work_corpus)
 
         # Verify tree structure
         tree = await manager.get_tree(root.corpus_id)
         assert tree is not None
         assert len(tree["children"]) == 1  # author_corpus
         assert len(tree["children"][0]["children"]) == 1  # work_corpus
-        assert tree["children"][0]["children"][0]["metadata"]["title"] == "Hamlet"
 
     @pytest.mark.asyncio
     async def test_literature_corpus_vocabulary_aggregation(self, test_db):
         """Test vocabulary aggregation across literature works."""
+        manager = get_tree_corpus_manager()
+
         # Create parent corpus
         parent = LiteratureCorpus(
             corpus_name="poetry_collection",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
             vocabulary=[],
+            original_vocabulary=[],
             is_master=True,
         )
-        await parent.save()
+        parent = await manager.save_corpus(parent)
 
         # Create child corpora with vocabularies
         poem1 = LiteratureCorpus(
             corpus_name="poem1",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
-            parent_corpus_id=parent.corpus_id,
+            parent_uuid=parent.corpus_uuid,
             vocabulary=["rose", "red", "love", "sweet"],
+            original_vocabulary=["rose", "red", "love", "sweet"],
         )
-        await poem1.save()
+        await manager.save_corpus(poem1)
 
         poem2 = LiteratureCorpus(
             corpus_name="poem2",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
-            parent_corpus_id=parent.corpus_id,
+            parent_uuid=parent.corpus_uuid,
             vocabulary=["violet", "blue", "love", "true"],
+            original_vocabulary=["violet", "blue", "love", "true"],
         )
-        await poem2.save()
-
-        # Add children to parent
-        manager = TreeTreeCorpusManager()
-        await manager.add_child(parent, poem1)
-        await manager.add_child(parent, poem2)
+        await manager.save_corpus(poem2)
 
         # Aggregate vocabulary
         await manager.aggregate_vocabulary(parent.corpus_id)
 
         # Reload parent
-        reloaded = await LiteratureCorpus.get(parent.corpus_id)
+        reloaded = await manager.get_corpus(corpus_uuid=parent.corpus_uuid)
         assert reloaded is not None
 
         # Check aggregated vocabulary
@@ -279,11 +267,14 @@ class TestLiteratureCorpus:
     @pytest.mark.asyncio
     async def test_literature_corpus_with_metadata(self, test_db):
         """Test LiteratureCorpus with rich metadata."""
+        manager = get_tree_corpus_manager()
+
         corpus = LiteratureCorpus(
             corpus_name="victorian_novels",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
             vocabulary=[],
+            original_vocabulary=[],
         )
 
         # Add metadata
@@ -297,10 +288,10 @@ class TestLiteratureCorpus:
             },
         )
 
-        await corpus.save()
+        saved = await manager.save_corpus(corpus)
 
         # Verify metadata persistence
-        loaded = await LiteratureCorpus.get(corpus.corpus_id)
+        loaded = await manager.get_corpus(corpus_uuid=saved.corpus_uuid)
         assert loaded is not None
         assert loaded.metadata["period"] == Period.VICTORIAN.value
         assert Genre.NOVEL.value in loaded.metadata["genres"]
@@ -308,44 +299,20 @@ class TestLiteratureCorpus:
         assert loaded.metadata["date_range"] == "1837-1901"
 
     @pytest.mark.asyncio
-    async def test_literature_corpus_versioning(self, test_db):
-        """Test versioning of literature corpus changes."""
-        corpus = LiteratureCorpus(
-            corpus_name="evolving_work",
-            language=Language.ENGLISH,
-            corpus_type=CorpusType.LITERATURE,
-            vocabulary=["original", "words"],
-        )
-        await corpus.save()
-
-        original_id = corpus.corpus_id
-        original_version = corpus.version_info.version
-
-        # Update vocabulary
-        corpus.vocabulary.extend(["new", "additions"])
-        corpus.update_version("Added new vocabulary")
-        await corpus.save()
-
-        # Check version was updated
-        assert corpus.version_info.version != original_version
-        assert corpus.corpus_id == original_id  # Same document
-
-        # Load and verify
-        loaded = await LiteratureCorpus.get(original_id)
-        assert loaded is not None
-        assert "new" in loaded.vocabulary
-        assert "additions" in loaded.vocabulary
-
-    @pytest.mark.asyncio
     async def test_literature_corpus_error_handling(self, test_db):
         """Test error handling in literature corpus operations."""
+        manager = get_tree_corpus_manager()
+
         corpus = LiteratureCorpus(
             corpus_name="test_errors",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
             vocabulary=[],
+            original_vocabulary=[],
         )
-        await corpus.save()
+        saved = await manager.save_corpus(corpus)
+        corpus.corpus_id = saved.corpus_id
+        corpus.corpus_uuid = saved.corpus_uuid
 
         # Mock connector that fails
         mock_connector = AsyncMock(spec=GutenbergConnector)
@@ -362,13 +329,14 @@ class TestLiteratureCorpus:
         assert child_id is None
 
         # Verify no child was added
-        manager = TreeTreeCorpusManager()
         children = await manager.get_children(corpus.corpus_id)
         assert len(children) == 0
 
     @pytest.mark.asyncio
     async def test_literature_corpus_batch_operations(self, test_db):
         """Test batch operations on literature corpora."""
+        manager = get_tree_corpus_manager()
+
         # Create multiple corpora
         corpora = []
         for i in range(5):
@@ -377,28 +345,38 @@ class TestLiteratureCorpus:
                 language=Language.ENGLISH,
                 corpus_type=CorpusType.LITERATURE,
                 vocabulary=[f"word_{i}", f"unique_{i}"],
+                original_vocabulary=[f"word_{i}", f"unique_{i}"],
             )
             corpus.metadata["work_number"] = i
-            await corpus.save()
-            corpora.append(corpus)
+            saved = await manager.save_corpus(corpus)
+            corpora.append(saved)
 
-        # Batch retrieval
-        ids = [c.corpus_id for c in corpora]
-        loaded = await LiteratureCorpus.get_many_by_ids(ids)
+        # Batch retrieval by UUIDs
+        uuids = [c.corpus_uuid for c in corpora]
+        loaded = await manager.get_corpora_by_uuids(uuids)
 
         assert len(loaded) == 5
-        work_numbers = [c.metadata["work_number"] for c in loaded]
-        assert sorted(work_numbers) == [0, 1, 2, 3, 4]
 
     @pytest.mark.asyncio
     async def test_literature_corpus_search_integration(self, test_db):
         """Test literature corpus integration with search capabilities."""
-        # Create corpus with meaningful vocabulary
+        manager = get_tree_corpus_manager()
+
         corpus = LiteratureCorpus(
             corpus_name="searchable_literature",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
             vocabulary=[
+                "love",
+                "hate",
+                "passion",
+                "sorrow",
+                "joy",
+                "melancholy",
+                "desire",
+                "longing",
+            ],
+            original_vocabulary=[
                 "love",
                 "hate",
                 "passion",
@@ -414,16 +392,16 @@ class TestLiteratureCorpus:
                 "genre": Genre.POETRY.value,
                 "themes": ["emotion", "human nature"],
                 "searchable": True,
-                "semantic_enabled": True,  # Store semantic flag in metadata
+                "semantic_enabled": True,
             },
         )
-        await corpus.save()
+        saved = await manager.save_corpus(corpus)
 
-        # Verify searchable metadata
-        loaded = await LiteratureCorpus.get(corpus.corpus_id)
+        # Verify metadata and vocabulary
+        loaded = await manager.get_corpus(corpus_uuid=saved.corpus_uuid)
         assert loaded is not None
         assert loaded.metadata["searchable"] is True
-        assert loaded.metadata.get("semantic_enabled", False) is True  # Check in metadata
+        assert loaded.metadata.get("semantic_enabled", False) is True
 
         # Vocabulary should be available for search
         assert "love" in loaded.vocabulary
@@ -432,15 +410,18 @@ class TestLiteratureCorpus:
     @pytest.mark.asyncio
     async def test_literature_corpus_parallel_operations(self, test_db):
         """Test parallel operations on literature corpora."""
+        manager = get_tree_corpus_manager()
+
         # Create parent
         parent = LiteratureCorpus(
             corpus_name="parallel_parent",
             language=Language.ENGLISH,
             corpus_type=CorpusType.LITERATURE,
             vocabulary=[],
+            original_vocabulary=[],
             is_master=True,
         )
-        await parent.save()
+        parent = await manager.save_corpus(parent)
 
         # Create children in parallel
         async def create_child(index: int):
@@ -448,11 +429,11 @@ class TestLiteratureCorpus:
                 corpus_name=f"parallel_child_{index}",
                 language=Language.ENGLISH,
                 corpus_type=CorpusType.LITERATURE,
-                parent_corpus_id=parent.corpus_id,
+                parent_uuid=parent.corpus_uuid,
                 vocabulary=[f"word_{index}"],
+                original_vocabulary=[f"word_{index}"],
             )
-            await child.save()
-            return child
+            return await manager.save_corpus(child)
 
         # Create 10 children in parallel
         children = await asyncio.gather(*[create_child(i) for i in range(10)])

@@ -33,7 +33,7 @@ class PlatformError(AppleDictionaryError):
     """Raised when platform doesn't support Dictionary Services."""
 
 
-class ImportError(AppleDictionaryError):
+class DependencyImportError(AppleDictionaryError):
     """Raised when required PyObjC modules cannot be imported."""
 
 

@@ -37,7 +37,6 @@ class TreeCorpusManager:
 
     @staticmethod
     def _remove_self_references(
-        corpus_id: PydanticObjectId | str | None,
         child_uuids: list[str] | None,
         corpus_uuid: str | None = None,
     ) -> list[str]:
@@ -48,9 +47,8 @@ class TreeCorpusManager:
         which breaks tree traversal and aggregation logic.
 
         Args:
-            corpus_id: The corpus ID (ObjectId) - DEPRECATED, use corpus_uuid
             child_uuids: List of child UUIDs (strings)
-            corpus_uuid: The corpus UUID (string) - PREFERRED for comparison
+            corpus_uuid: The corpus UUID (string) for self-reference comparison
 
         Returns:
             Filtered list with self-reference removed, or original list if no self-reference
@@ -59,13 +57,10 @@ class TreeCorpusManager:
         if not child_uuids:
             return []
 
-        # PATHOLOGICAL REMOVAL: No fallbacks - only use corpus_uuid
-        # corpus_id is ObjectId which will NEVER match UUID strings
         if corpus_uuid and corpus_uuid in child_uuids:
             logger.warning(f"Removing self-reference from child_uuids: {corpus_uuid}")
             return [cid for cid in child_uuids if cid != corpus_uuid]
 
-        # NO FALLBACK - if no corpus_uuid provided, don't try to guess
         return child_uuids
 
     async def save_corpus_simple(
@@ -124,7 +119,7 @@ class TreeCorpusManager:
         """
         # Clean self-references before saving using extracted helper
         # Use UUID for comparison since child_uuids contains UUID strings
-        metadata.child_uuids = self._remove_self_references(metadata.uuid, metadata.child_uuids)
+        metadata.child_uuids = self._remove_self_references(metadata.child_uuids, corpus_uuid=metadata.uuid)
 
         await metadata.save()
         return metadata
@@ -208,7 +203,7 @@ class TreeCorpusManager:
             # NO FALLBACK - removed reference to undefined 'existing'
 
             child_uuids = self._remove_self_references(
-                corpus_id, child_uuids, corpus_uuid=corpus_uuid_for_clean
+                child_uuids, corpus_uuid=corpus_uuid_for_clean
             )
 
         # Generate name if not provided
@@ -267,13 +262,24 @@ class TreeCorpusManager:
         if parent_uuid and saved and not corpus_id and (child_uuids is None or not child_uuids):
             child_uuid = saved.uuid  # Use UUID string, not ObjectId
             if child_uuid:
-                # Get the parent using UUID (correct way)
-                parent_meta = await Corpus.Metadata.find_one({"uuid": parent_uuid})
-                if parent_meta and child_uuid not in parent_meta.child_uuids:
-                    # This is a new child being created with a parent reference
-                    # child_uuids contains UUID strings, not ObjectIds
-                    parent_meta.child_uuids.append(child_uuid)
-                    await parent_meta.save()
+                # Get the full parent corpus via versioned path (not raw Beanie save)
+                parent_corpus = await self.get_corpus(
+                    corpus_uuid=parent_uuid,
+                    config=VersionConfig(use_cache=False),  # Fresh from DB
+                )
+                if parent_corpus and child_uuid not in parent_corpus.child_uuids:
+                    updated_children = parent_corpus.child_uuids.copy()
+                    updated_children.append(child_uuid)
+                    await self.save_corpus(
+                        corpus_id=parent_corpus.corpus_id,
+                        corpus_name=parent_corpus.corpus_name,
+                        content=parent_corpus.model_dump(mode="json"),
+                        corpus_type=parent_corpus.corpus_type,
+                        language=parent_corpus.language,
+                        parent_uuid=parent_corpus.parent_uuid,
+                        child_uuids=updated_children,
+                        is_master=parent_corpus.is_master,
+                    )
                     logger.debug(f"Auto-added new child UUID {child_uuid} to parent {parent_uuid}")
 
         # If we saved metadata, convert back to Corpus
@@ -399,9 +405,8 @@ class TreeCorpusManager:
         )
 
         # Clean self-references even when reading using extracted helper
-        # PATHOLOGICAL FIX: Use corpus_uuid (which we just set above), not corpus_id
         content["child_uuids"] = self._remove_self_references(
-            content.get("corpus_id"), content.get("child_uuids"), corpus_uuid=content.get("corpus_uuid")
+            content.get("child_uuids"), corpus_uuid=content.get("corpus_uuid")
         )
 
         # Handle vocabulary

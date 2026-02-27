@@ -22,6 +22,9 @@ from .trie import TrieSearch
 
 logger = get_logger(__name__)
 
+# Module-level cache for Search instances keyed by (corpus_name, semantic_model)
+_search_instance_cache: dict[tuple[str, str], Search] = {}
+
 
 class Search:
     """High-performance search engine using corpus-based vocabulary.
@@ -93,7 +96,10 @@ class Search:
 
         """
         # Get corpus
-        corpus = await Corpus.get(
+        from ..corpus.manager import get_tree_corpus_manager
+
+        manager = get_tree_corpus_manager()
+        corpus = await manager.get_corpus(
             corpus_name=corpus_name,
             config=config or VersionConfig(),
         )
@@ -115,6 +121,34 @@ class Search:
         await engine.initialize()
 
         return engine
+
+    @classmethod
+    async def get_or_create(
+        cls,
+        corpus_name: str,
+        min_score: float = DEFAULT_MIN_SCORE,
+        semantic: bool = True,
+        semantic_model: SemanticModel = DEFAULT_SENTENCE_MODEL,
+        config: VersionConfig | None = None,
+    ) -> Search:
+        """Get cached Search instance or create and cache a new one."""
+        force_rebuild = config.force_rebuild if config else False
+        cache_key = (corpus_name, str(semantic_model))
+
+        if not force_rebuild and cache_key in _search_instance_cache:
+            cached = _search_instance_cache[cache_key]
+            if cached._initialized:
+                return cached
+
+        instance = await cls.from_corpus(
+            corpus_name=corpus_name,
+            min_score=min_score,
+            semantic=semantic,
+            semantic_model=semantic_model,
+            config=config,
+        )
+        _search_instance_cache[cache_key] = instance
+        return instance
 
     async def initialize(self) -> None:
         """Initialize expensive components lazily with vocab hash-based caching."""
@@ -138,7 +172,10 @@ class Search:
 
         # Load corpus if not already loaded - use corpus_uuid for lookup
         if not self.corpus:
-            self.corpus = await Corpus.get(
+            from ..corpus.manager import get_tree_corpus_manager
+
+            manager = get_tree_corpus_manager()
+            self.corpus = await manager.get_corpus(
                 corpus_uuid=self.index.corpus_uuid,
                 corpus_name=self.index.corpus_name,
                 config=VersionConfig(),
@@ -311,7 +348,10 @@ class Search:
 
         try:
             # Try with corpus_uuid first, fallback to corpus_name
-            corpus = await Corpus.get(
+            from ..corpus.manager import get_tree_corpus_manager
+
+            manager = get_tree_corpus_manager()
+            corpus = await manager.get_corpus(
                 corpus_uuid=self.index.corpus_uuid,
                 corpus_name=self.index.corpus_name,
                 config=VersionConfig(),
@@ -339,7 +379,10 @@ class Search:
         )
 
         # Get updated corpus - use corpus_uuid and corpus_name
-        updated_corpus = await Corpus.get(
+        from ..corpus.manager import get_tree_corpus_manager
+
+        manager = get_tree_corpus_manager()
+        updated_corpus = await manager.get_corpus(
             corpus_uuid=self.index.corpus_uuid,
             corpus_name=self.index.corpus_name,
             config=VersionConfig(),
@@ -846,4 +889,9 @@ class Search:
         }
 
 
-__all__ = ["Search", "SearchMode", "SearchResult"]
+def reset_search_cache() -> None:
+    """Clear the search instance cache."""
+    _search_instance_cache.clear()
+
+
+__all__ = ["Search", "SearchMode", "SearchResult", "reset_search_cache"]

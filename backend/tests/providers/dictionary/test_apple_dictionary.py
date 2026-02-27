@@ -14,7 +14,7 @@ from floridify.models.dictionary import DictionaryProvider
 from floridify.providers.dictionary.local.apple_dictionary import (
     AppleDictionaryConnector,
     AppleDictionaryError,
-    ImportError as AppleDictionaryImportError,
+    DependencyImportError as AppleDictionaryImportError,
     PlatformError,
 )
 
