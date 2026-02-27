@@ -55,6 +55,8 @@ dependencies = [
     # Document parsing
     "pypdf>=4.0.0",        # Modern PDF parsing (fork of PyPDF2)
     "ebooklib>=0.18",      # EPUB parsing
+    # Authentication
+    "PyJWT[crypto]>=2.8.0",  # JWT validation for Clerk auth
 ]
 
 [project.optional-dependencies]
