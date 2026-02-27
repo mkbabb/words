@@ -20,30 +20,41 @@ export const aiApi = {
       try {
         // Get word context from lookup
         const dictionaryEntryResponse = await api.get<DictionaryEntryResponse>(`/lookup/${encodeURIComponent(word)}`);
-        
-        if (!dictionaryEntryResponse.data?.definitions?.length) {
-          throw new Error('No definitions found for word');
+
+        // Safely extract entry data - handle both direct response and wrapped envelope shapes
+        const entryData = dictionaryEntryResponse.data;
+        if (!entryData) {
+          throw new Error(`No data returned from lookup for "${word}"`);
         }
 
-        const firstDefinition = dictionaryEntryResponse.data.definitions[0];
-        
+        // Extract definitions, handling potential response shape variations
+        const definitions = entryData.definitions ?? (entryData as any).entry?.definitions;
+        if (!definitions || !Array.isArray(definitions) || definitions.length === 0) {
+          throw new Error(`No definitions found for "${word}"`);
+        }
+
+        const firstDefinition = definitions[0];
+
         // Call AI synthesis endpoint with consistent parameter structure
-        const response = await api.post<AIResponse<{ 
+        const response = await api.post<AIResponse<{
           synonyms: Array<{ word: string; score: number }>;
           confidence: number;
         }>>('/ai/synthesize/synonyms', {
           word,
-          definition: firstDefinition.text,
-          part_of_speech: firstDefinition.part_of_speech,
-          existing_synonyms: firstDefinition.synonyms || [],
+          definition: firstDefinition.text ?? '',
+          part_of_speech: firstDefinition.part_of_speech ?? '',
+          existing_synonyms: firstDefinition.synonyms ?? [],
           count: 10
         });
+
+        // Safely extract AI result
+        const result = response.data?.result;
 
         // Transform response to frontend format
         return {
           word,
-          synonyms: response.data.result.synonyms || [],
-          confidence: response.data.result.confidence || 0
+          synonyms: result?.synonyms ?? [],
+          confidence: result?.confidence ?? 0
         };
       } catch (error) {
         logger.error('Error fetching synonyms:', error);

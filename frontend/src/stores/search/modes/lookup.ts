@@ -436,24 +436,24 @@ export const useLookupMode = defineStore(
         // ==========================================================================
 
         return {
-            // Configuration State
-            selectedSources: readonly(selectedSources),
-            selectedLanguages: readonly(selectedLanguages),
-            noAI: readonly(noAI),
-            searchMode: readonly(searchMode),
+            // Configuration State (persisted — no readonly for hydration)
+            selectedSources,
+            selectedLanguages,
+            noAI,
+            searchMode,
 
-            // Search Bar State
+            // Search Bar State (not persisted — keep readonly)
             isAIQuery: readonly(isAIQuery),
             showSparkle: readonly(showSparkle),
             aiSuggestions: readonly(aiSuggestions),
 
-            // UI State
-            selectedCardVariant: readonly(selectedCardVariant),
-            pronunciationMode: readonly(pronunciationMode),
+            // UI State (persisted — no readonly for hydration)
+            selectedCardVariant,
+            pronunciationMode,
 
-            // Results State
+            // Results State (cursorPosition persisted — no readonly; others keep readonly)
             results: readonly(results),
-            cursorPosition: readonly(cursorPosition),
+            cursorPosition,
             searchMethod: readonly(searchMethod),
 
             // Computed

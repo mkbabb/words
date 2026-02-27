@@ -334,10 +334,10 @@ export const useHistoryStore = defineStore('history', () => {
   // ==========================================================================
   
   return {
-    // State
-    searchHistory: readonly(searchHistory),
-    lookupHistory: readonly(lookupHistory),
-    aiQueryHistory: readonly(aiQueryHistory),
+    // State (persisted fields exposed as raw refs for hydration)
+    searchHistory,
+    lookupHistory,
+    aiQueryHistory,
     vocabularySuggestions,
     isLoadingSuggestions: readonly(isLoadingSuggestions),
     

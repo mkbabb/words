@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, readonly, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { Themes, DEFAULT_THEME, type Theme } from '@/stores/types/constants'
 
 /**
@@ -81,10 +81,10 @@ export const useUIStore = defineStore('ui', () => {
 
   return {
     // Shared State
-    theme: readonly(theme),
+    theme,
     resolvedTheme,
-    sidebarOpen: readonly(sidebarOpen),
-    sidebarCollapsed: readonly(sidebarCollapsed),
+    sidebarOpen,
+    sidebarCollapsed,
 
     // Shared Actions
     toggleTheme,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
+import { useAttrs } from 'vue'
 import { reactiveOmit } from '@vueuse/core'
 import {
   HoverCardContent,
@@ -9,12 +10,18 @@ import {
 } from 'reka-ui'
 import { cn } from '@/utils'
 
+defineOptions({
+  inheritAttrs: false,
+})
+
 const props = withDefaults(
   defineProps<HoverCardContentProps & { class?: HTMLAttributes['class'] }>(),
   {
     sideOffset: 4,
   },
 )
+
+const attrs = useAttrs()
 
 const delegatedProps = reactiveOmit(props, 'class')
 
@@ -25,7 +32,7 @@ const forwardedProps = useForwardProps(delegatedProps)
   <HoverCardPortal>
     <HoverCardContent
       data-slot="hover-card-content"
-      v-bind="forwardedProps"
+      v-bind="{ ...forwardedProps, ...attrs }"
       :class="
         cn(
           'hovercard-animated bg-popover/20 backdrop-blur-md text-popover-foreground border-border/30 z-50 w-64 rounded-2xl border-2 cartoon-shadow-sm p-4 outline-none',

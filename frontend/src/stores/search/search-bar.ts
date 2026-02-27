@@ -406,17 +406,17 @@ export const useSearchBarStore = defineStore(
         // ==========================================================================
 
         return {
-            // Core Mode State
-            searchMode: readonly(searchMode),
-            searchSubMode: readonly(searchSubMode),
-            previousMode: readonly(previousMode),
-            savedQueries: readonly(savedQueries),
-            
-            // Shared State
-            searchQuery: readonly(searchQuery),
+            // Core Mode State (persisted — no readonly for hydration)
+            searchMode,
+            searchSubMode,
+            previousMode,
+            savedQueries,
+
+            // Shared State (persisted fields exposed as raw refs)
+            searchQuery,
             searchSelectedIndex: readonly(searchSelectedIndex),
             showDropdown: readonly(showDropdown),
-            showSearchControls: readonly(showSearchControls),
+            showSearchControls,
             isFocused: readonly(isFocused),
             isHovered: readonly(isHovered),
             hasErrorAnimation: readonly(hasErrorAnimation),

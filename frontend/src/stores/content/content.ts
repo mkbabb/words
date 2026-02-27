@@ -279,10 +279,10 @@ export const useContentStore = defineStore('content', () => {
     sidebarActiveCluster,
     sidebarActivePartOfSpeech,
     
-    // Shared state
-    currentWord: readonly(currentWord),
+    // Shared state (persisted fields exposed as raw refs for hydration)
+    currentWord,
     definitionError: readonly(definitionError),
-    sidebarAccordionState: readonly(sidebarAccordionState),
+    sidebarAccordionState,
     
     
     // Delegated actions

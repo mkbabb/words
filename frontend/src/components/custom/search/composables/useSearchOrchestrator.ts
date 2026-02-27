@@ -149,6 +149,15 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
     loading.startOperation();
     try {
       return await aiApi.synthesize.synonyms(word);
+    } catch (error) {
+      logger.error('Failed to fetch thesaurus data:', error);
+      // Return a graceful fallback instead of crashing the UI
+      return {
+        word,
+        synonyms: [],
+        confidence: 0,
+        error: error instanceof Error ? error.message : 'Failed to load thesaurus data'
+      };
     } finally {
       loading.endOperation();
     }
