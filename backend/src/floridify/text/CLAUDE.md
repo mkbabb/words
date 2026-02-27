@@ -1,23 +1,16 @@
-# Text Module - Normalization & Processing
+# text/
 
-Text normalization, lemmatization, signature generation for search optimization.
+Text normalization, lemmatization, signature generation.
 
-## Key Functions
+```
+text/
+├── normalize.py (614)      # normalize_comprehensive(), lemmatize, LRU cache (50K entries)
+├── constants.py (133)      # Regex patterns, Unicode mappings, suffix rules
+└── phrase.py (24)          # Phrase detection
+```
 
-**Normalization** (`normalize.py`):
-- `normalize()` - Remove diacritics, lowercase, strip whitespace
-- `normalize_basic()` - Simple lowercase + strip
-- `batch_normalize()` - Parallel processing for large vocabularies
-- `lemmatize_comprehensive()` - Convert to base form (running → run)
-- `batch_lemmatize()` - Parallel lemmatization
-
-**Signature Generation** (`signature.py`):
-- `get_word_signature()` - Consonant-only signature ("perspicacious" → "prsp")
-- Used for fuzzy search bucketing
-
-**Utilities**:
-- `is_phrase()` - Detect multi-word phrases
-- `split_words()` - Tokenization
-- `remove_punctuation()` - Clean text
-
-**Performance**: Batch operations use asyncio for 10-100x speedup on large vocabularies
+- `normalize_basic()` — lowercase + strip
+- `normalize_comprehensive()` — diacritics, Unicode, contractions, LRU cached
+- `lemmatize_comprehensive()` — base form (running → run)
+- `batch_normalize()` / `batch_lemmatize()` — parallel for large vocabularies
+- `get_word_signature()` — consonant-only signature for fuzzy search bucketing

@@ -1,19 +1,15 @@
-# Anki Module - Flashcard Export
+# anki/
 
-Direct Anki flashcard generation from wordlists.
+Flashcard export to .apkg format.
 
-## Features
+```
+anki/
+├── generator.py (717)      # AnkiDeckGenerator: .apkg creation
+├── templates.py (527)      # Card HTML/CSS templates
+├── ankiconnect.py (441)    # AnkiConnect API client (optional)
+└── constants.py (21)
+```
 
-**Card Types**:
-- Fill-in-the-blank (cloze deletion)
-- Multiple choice (best describes)
-- Definition → word
-- Word → definition
+Card types: fill-in-the-blank (cloze), multiple choice, definition→word, word→definition.
 
-**Export** (`exporter.py`):
-- `export_wordlist_to_anki()` - Generate .apkg file
-- Deck configuration (daily limits, learning steps)
-- Card styling (CSS)
-- Media embedding (audio, images)
-
-**Integration**: Uses AI synthesis for card content generation
+`export_wordlist_to_anki()` generates .apkg with deck config, card styling, and media embedding. Uses AI synthesis for card content generation.

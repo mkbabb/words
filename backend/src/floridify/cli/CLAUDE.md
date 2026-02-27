@@ -1,30 +1,18 @@
-# CLI Module - Command-Line Interface
+# cli/
 
-Rich-powered terminal UI with 0.07s startup time (98% faster via lazy imports).
+Typer CLI with Rich terminal UI. 0.07s startup via lazy imports (98% faster than 4.2s original).
 
-## Commands
+```
+cli/
+├── cli.py (507)            # Typer app, main entry point
+├── completion.py (161)     # ZSH autocomplete
+├── commands/               # lookup, search, wordlist, corpus, anki, wotd, config, scrape
+│   ├── lookup.py (161)     # floridify lookup <word> [--no-ai] [--json] [--providers]
+│   ├── search.py (342)     # floridify search <query> [--fuzzy] [--semantic]
+│   ├── wordlist.py (353)   # floridify wordlist create/add/review
+│   ├── corpus.py           # floridify corpus list/rebuild
+│   └── anki.py (382)       # floridify anki export
+└── utils/formatting.py (571)  # Rich terminal formatting
+```
 
-**Lookup** (`lookup.py`):
-- `floridify lookup <word>` - Full AI-enhanced definition
-- `--no-ai` - Skip AI synthesis
-- `--json` - JSON output for scripting
-- `--providers` - Select providers (wiktionary, oxford, etc.)
-
-**Search** (`search.py`):
-- `floridify search <query>` - Multi-method search
-- `--fuzzy` - Fuzzy-only mode
-- `--semantic` - Semantic-only mode
-
-**Corpus** (`corpus.py`):
-- `floridify corpus list` - List all corpora
-- `floridify corpus rebuild --corpus-name <name> --semantic` - Rebuild indices
-
-**Wordlist** (`wordlist.py`):
-- `floridify wordlist create <name> <words...>` - Create wordlist
-- `floridify wordlist review <name> --due` - Get due words for spaced repetition
-
-**Features**:
-- Unicode formatting, progress bars via Rich
-- ZSH autocomplete with performance optimization
-- Lazy imports for fast startup (0.07s vs 4.2s)
-- JSON output mode for scripting
+Key: all heavy imports (torch, FAISS, sentence-transformers) are lazy — only loaded when the command needs them.

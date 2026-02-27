@@ -1,184 +1,236 @@
-# Floridify Backend - Python FastAPI
+# Floridify Backend
 
-Async-first Python 3.12+ FastAPI REST API, MongoDB + Beanie ODM, OpenAI GPT-5 synthesis, FAISS semantic search.
+Async-first Python 3.12+ FastAPI. MongoDB + Beanie ODM. OpenAI GPT-5 synthesis. FAISS semantic search. ~50K LOC.
 
-## Module Structure
+## Structure
 
 ```
 backend/src/floridify/
-├── api/                 # FastAPI REST (111+ endpoints, 17 routers) → CLAUDE.md
-│   ├── routers/         # 17 routers: ai, words, wordlist, corpus, media, cache, etc.
-│   ├── repositories/    # 11 data access layers
-│   ├── services/        # Business logic
-│   ├── middleware/      # CORS, caching, logging, error handling
-│   └── app.py          # Application factory
+├── api/                    # REST API layer → api/CLAUDE.md
+│   ├── main.py             # FastAPI app factory, lifespan context
+│   ├── routers/            # 17 routers, 111+ endpoints
+│   │   ├── lookup.py       # GET /lookup/{word}, /lookup/{word}/stream (SSE)
+│   │   ├── search.py       # GET /search (multi-method cascade)
+│   │   ├── ai/             # 40+ AI generation endpoints
+│   │   ├── words/          # Definition CRUD, versions
+│   │   ├── wordlist/       # Wordlist CRUD, reviews, SM-2
+│   │   ├── corpus.py       # Corpus hierarchy management
+│   │   ├── media/          # Image + audio upload/retrieval
+│   │   └── cache.py, health.py, config.py, database.py, providers.py
+│   ├── repositories/       # 11 data access layers
+│   │   ├── word_repository.py, definition_repository.py
+│   │   ├── wordlist_repository.py (596 LOC, SM-2 reviews)
+│   │   ├── provider_repository.py, synthesis_repository.py
+│   │   └── image_, audio_, corpus_, example_, fact_repository.py
+│   ├── core/               # API utilities (1,572 LOC)
+│   │   ├── base.py         # PaginationParams, SortParams, BaseRepository
+│   │   ├── exceptions.py   # 10+ exception types → HTTP mapping
+│   │   ├── query.py        # AggregationBuilder, QueryOptimizer
+│   │   └── responses.py, dependencies.py, monitoring.py, protocols.py
+│   └── middleware/          # CORS, auth (Clerk), rate limiting, logging
+│       ├── auth.py          # Clerk OAuth (optional)
+│       ├── rate_limiting.py # Adaptive with exponential backoff
+│       └── middleware.py, exception_handlers.py
 │
-├── core/                # Business logic pipelines → CLAUDE.md
-│   ├── lookup_pipeline.py    # Word lookup: search→providers→AI→storage
-│   ├── search_pipeline.py    # Multi-method search orchestration
-│   ├── state_tracker.py      # Progress tracking, SSE streaming
-│   ├── streaming.py          # Server-Sent Events
-│   └── wotd_pipeline.py      # Word-of-the-Day ML pipeline
+├── core/                   # Business logic pipelines → core/CLAUDE.md
+│   ├── lookup_pipeline.py  # 5-stage: search → cache → providers → AI → store
+│   ├── search_pipeline.py  # SearchEngineManager with hot-reload + cascade
+│   ├── state_tracker.py    # Real-time progress, 9 stages, multi-subscriber
+│   ├── streaming.py        # SSE: chunked responses, heartbeat, timeout
+│   └── wotd_pipeline.py    # Word-of-the-Day ML orchestration
 │
-├── models/              # Type-safe data layer (179+ models) → CLAUDE.md
-│   ├── base.py          # Base classes, Language enum, metadata
-│   ├── dictionary.py    # Word, Definition, DictionaryEntry (MongoDB docs)
-│   ├── parameters.py    # CLI/API shared parameters (isomorphic)
-│   ├── responses.py     # API response models
-│   └── relationships.py # WordForm, MeaningCluster, Collocation
+├── models/                 # 179+ Pydantic/Beanie models → models/CLAUDE.md
+│   ├── base.py             # Language enum, DictionaryProvider enum, BaseMetadata
+│   ├── dictionary.py       # Word, Definition, DictionaryEntry (MongoDB docs)
+│   ├── relationships.py    # MeaningCluster, Collocation, GrammarPattern
+│   ├── parameters.py       # CLI/API shared params (isomorphic with frontend)
+│   ├── responses.py        # LookupResponse, SearchResponse, CorpusResponse
+│   ├── literature.py       # AuthorInfo, Genre/Period enums
+│   ├── registry.py         # ResourceType → Model mapping
+│   └── user.py             # User(Document) for OAuth
 │
-├── search/              # Multi-method search engine → CLAUDE.md
-│   ├── core.py          # Search orchestrator with cascade
-│   ├── language.py      # LanguageSearch (multi-corpus)
-│   ├── exact/           # TrieSearch (marisa-trie + Bloom filter, <1ms)
-│   ├── fuzzy/           # FuzzySearch (RapidFuzz dual-scorer, 10-50ms)
-│   └── semantic/        # SemanticSearch (FAISS + embeddings, 50-200ms)
+├── search/                 # Multi-method search → search/CLAUDE.md
+│   ├── core.py             # Search orchestrator (897 LOC), cascade logic
+│   ├── trie.py             # marisa-trie + Bloom filter (<1ms)
+│   ├── fuzzy.py            # RapidFuzz dual-scorer (WRatio + token_set_ratio)
+│   ├── bloom.py            # Bitarray-based membership testing
+│   ├── language.py         # Multi-corpus orchestration
+│   ├── models.py           # SearchResult, SearchIndex, SearchMode
+│   ├── constants.py        # SearchMethod/SearchMode enums
+│   └── semantic/           # FAISS vector search (2,213 LOC)
+│       ├── core.py         # SemanticSearch: 7 index types, embeddings
+│       ├── models.py       # SemanticIndex(Document)
+│       ├── constants.py    # Model catalog (Qwen3-0.6B, BGE-M3)
+│       └── config.py       # Index selection by corpus size
 │
-├── ai/                  # OpenAI integration → CLAUDE.md
-│   ├── connector.py             # OpenAI client (32 async methods)
-│   ├── synthesizer.py           # DefinitionSynthesizer orchestrator
-│   ├── synthesis_functions.py   # 25+ synthesis functions
-│   ├── model_selection.py       # 3-tier routing (87% cost savings)
-│   ├── batch_processor.py       # Batch API (50% discount)
-│   ├── prompt_manager.py        # Jinja2 templates
-│   └── prompts/                 # 27 Markdown templates
+├── ai/                     # OpenAI integration → ai/CLAUDE.md
+│   ├── connector.py        # OpenAIConnector: 32 async methods (1,209 LOC)
+│   ├── synthesizer.py      # DefinitionSynthesizer: dedup→cluster→enhance
+│   ├── synthesis_functions.py  # 25+ synthesis functions (1,152 LOC)
+│   ├── model_selection.py  # 3-tier routing: Nano/Mini/Full (87% savings)
+│   ├── batch_processor.py  # OpenAI Batch API (50% discount)
+│   ├── prompt_manager.py   # Jinja2 templates, 27 prompts
+│   ├── models.py           # 40+ AI response models
+│   └── constants.py        # 27 SynthesisComponent enum values
 │
-├── caching/             # Multi-tier storage → CLAUDE.md
-│   ├── core.py          # GlobalCacheManager (L1 memory, L2 disk)
-│   ├── manager.py       # VersionedDataManager (L3 versioned, SHA-256)
-│   ├── config.py        # 13 namespace configurations
-│   ├── decorators.py    # 5 caching decorators
-│   └── models.py        # BaseVersionedData, CacheNamespace
+├── caching/                # Multi-tier storage → caching/CLAUDE.md
+│   ├── core.py             # GlobalCacheManager: L1 memory + L2 disk
+│   ├── manager.py          # VersionedDataManager: L3 versioned (SHA-256)
+│   ├── config.py           # 13 namespace configs (TTL, compression, limits)
+│   ├── decorators.py       # @cached_api_call, @cached_computation, etc.
+│   ├── models.py           # CacheNamespace, BaseVersionedData, VersionInfo
+│   ├── filesystem.py       # DiskCache backend (10GB limit)
+│   ├── keys.py             # Deterministic key generation
+│   ├── serialize.py        # Content hashing, JSON serialization
+│   ├── compression.py      # ZSTD (2-3x), LZ4 (1.5-2x), GZIP (3-4x)
+│   ├── validation.py       # Version validation, corruption detection
+│   └── version_chains.py   # Semantic versioning, chain management
 │
-├── corpus/              # Vocabulary management → CLAUDE.md
-│   ├── core.py          # Corpus data model with indices
-│   ├── manager.py       # TreeCorpusManager (UUID-based hierarchy)
-│   ├── parser.py        # 9 corpus parsers
-│   ├── language/        # LanguageCorpus with source management
-│   └── literature/      # LiteratureCorpus with work management
+├── corpus/                 # Vocabulary management → corpus/CLAUDE.md
+│   ├── core.py             # Corpus: UUID hierarchy, vocabulary indices
+│   ├── manager.py          # TreeCorpusManager: per-resource locking (1,364 LOC)
+│   ├── parser.py           # 9 parsers (text, freq, JSON, CSV, phrasal verbs)
+│   ├── models.py           # CorpusType/CorpusSource enums
+│   ├── language/core.py    # LanguageCorpus source management
+│   └── literature/core.py  # LiteratureCorpus work management
 │
-├── providers/           # External data sources → CLAUDE.md
-│   ├── core.py          # BaseConnector, RateLimitPresets
-│   ├── factory.py       # create_connector() factory
-│   ├── utils.py         # AdaptiveRateLimiter, RespectfulHttpClient
-│   ├── dictionary/      # 7 providers: Wiktionary, Oxford, Free, etc.
-│   ├── language/        # Language corpus providers
-│   └── literature/      # Gutenberg, Internet Archive + 15 author mappings
+├── providers/              # External data sources → providers/CLAUDE.md
+│   ├── core.py             # BaseConnector, ConnectorConfig
+│   ├── factory.py          # create_connector() factory
+│   ├── utils.py            # AdaptiveRateLimiter, RespectfulHttpClient
+│   ├── dictionary/         # 7 providers
+│   │   ├── api/            # Oxford, Merriam-Webster, Free Dictionary
+│   │   ├── scraper/        # Wiktionary (1,121 LOC), WordHippo
+│   │   ├── local/          # Apple Dictionary (macOS, pyobjc)
+│   │   └── wholesale/      # Wiktionary bulk XML processing
+│   ├── language/           # URL + file-based language sources
+│   └── literature/         # Gutenberg, Internet Archive + 15 author mappings
 │
-├── cli/                 # Command-line interface → CLAUDE.md
-│   ├── lookup.py        # floridify lookup <word>
-│   ├── search.py        # floridify search <query>
-│   ├── corpus.py        # floridify corpus list/rebuild
-│   └── wordlist.py      # floridify wordlist create/review
+├── cli/                    # Command-line interface → cli/CLAUDE.md
+│   ├── cli.py              # Typer app, main entry point
+│   ├── completion.py       # ZSH autocomplete
+│   ├── commands/           # lookup, search, wordlist, corpus, anki, wotd
+│   └── utils/formatting.py # Rich terminal UI
 │
-├── text/                # Text processing → CLAUDE.md
-│   ├── normalize.py     # Normalization, lemmatization
-│   └── signature.py     # Signature generation for fuzzy search
+├── text/                   # Text processing → text/CLAUDE.md
+│   ├── normalize.py        # normalize_comprehensive(), lemmatize, LRU cache (50K)
+│   ├── constants.py        # Regex patterns, Unicode mappings, suffix rules
+│   └── phrase.py           # Phrase detection
 │
-├── storage/             # MongoDB layer → CLAUDE.md
-│   └── mongodb.py       # Beanie ODM initialization, async operations
+├── storage/                # MongoDB layer → storage/CLAUDE.md
+│   └── mongodb.py          # Beanie ODM init, 28 document models, 50 conn pool
 │
-├── audio/               # Speech synthesis → CLAUDE.md
-│   └── synthesizer.py   # Google Cloud TTS integration
+├── wordlist/               # Vocabulary lists → wordlist/CLAUDE.md
+│   ├── models.py           # Wordlist(Document), WordlistEntry(Document)
+│   ├── review.py           # SM-2 spaced repetition (Bronze → Silver → Gold)
+│   ├── parser.py           # Text, JSON, CSV, TSV file parsers
+│   └── word_of_the_day/    # WordOfTheDay(Document)
 │
-├── anki/                # Flashcard export → CLAUDE.md
-│   └── exporter.py      # .apkg generation from wordlists
+├── wotd/                   # Word-of-the-Day ML → wotd/CLAUDE.md
+│   ├── trainer.py          # ML training pipeline (1,440 LOC)
+│   ├── encoders.py         # Semantic + metadata encoding
+│   ├── embeddings.py       # SentenceTransformer management
+│   ├── generator.py        # WordOfTheDayGenerator
+│   ├── inference.py        # ML scoring
+│   └── deployment/         # Local + SageMaker deployment
 │
-├── wordlist/            # Vocabulary lists → CLAUDE.md
-│   ├── models.py        # Wordlist, WordlistEntry
-│   └── sm2.py          # SM-2 spaced repetition algorithm
+├── anki/                   # Flashcard export → anki/CLAUDE.md
+│   ├── generator.py        # AnkiDeckGenerator: .apkg creation
+│   ├── templates.py        # Card HTML/CSS templates
+│   └── ankiconnect.py      # AnkiConnect API client
 │
-├── wotd/                # Word of the Day → CLAUDE.md
-│   └── pipeline.py      # ML pipeline for personalized WOTD
+├── audio/                  # Speech synthesis → audio/CLAUDE.md
+│   └── synthesizer.py      # Google Cloud TTS
 │
-└── utils/               # Shared utilities → CLAUDE.md
-    ├── logging.py       # Loguru-based structured logging
-    ├── config.py        # Config singleton (auth/config.toml)
-    ├── paths.py         # Platform-specific paths
-    └── validation.py    # Input validation
+└── utils/                  # Shared utilities → utils/CLAUDE.md
+    ├── logging.py          # Loguru + Rich structured logging
+    ├── config.py           # Config singleton (auth/config.toml)
+    ├── paths.py            # Platform-specific path management
+    ├── sanitization.py     # Input validation, XSS prevention
+    └── json_output.py, introspection.py, timeouts.py
 ```
 
 ## Key Pipelines
 
-**Lookup** - `core/lookup_pipeline.py:504`
+**Lookup** (`core/lookup_pipeline.py`, 504 LOC):
 ```
-User Query → Search (10-100ms) → Provider Fetch (2-5s, parallel)
-→ AI Synthesis (1-3s, dedup→cluster→enhance) → MongoDB + Cache → Response
-```
-
-**Search** - `search/core.py:1,382`
-```
-Query → Smart Cascade: Exact (<1ms) → Fuzzy (10-50ms) → Semantic (50-200ms)
-→ Deduplicate → Sort by score → Return top N
+Query → Search (10-100ms) → Cache check (0.2-5ms)
+  → Provider fetch (2-5s, asyncio.gather)
+  → AI synthesis (1-3s, dedup→cluster→enhance)
+  → MongoDB + cache → Response
 ```
 
-**AI Synthesis** - `ai/synthesizer.py:432`
+**Search** (`search/core.py`, 897 LOC):
 ```
-Provider Data (47 defs) → Deduplicate (23 defs) → Cluster (3-4 groups)
-→ Parallel Enhancement (12 tasks) → MongoDB → Response
+Query → Exact (<1ms, marisa-trie) → Fuzzy (10-50ms, RapidFuzz)
+  → Semantic (50-200ms, FAISS HNSW) → Deduplicate → Top N
+```
+SearchEngineManager: hot-reload via 30s vocabulary_hash polling, atomic swap.
+
+**AI Synthesis** (`ai/synthesizer.py`, 432 LOC):
+```
+Provider data (47 defs) → Dedup (23 defs, 50%)
+  → Cluster (3-4 groups) → Parallel enhance (12 tasks)
+  → Version + save
 ```
 
-## Technology Stack
+## Patterns
 
-**Framework**: FastAPI + Uvicorn (async), Pydantic v2, Beanie ODM
-**Database**: MongoDB 7.0 with Motor (async driver)
-**AI**: OpenAI API (GPT-5 series, 3-tier selection)
-**Search**: FAISS (semantic), RapidFuzz (fuzzy), marisa-trie (exact)
-**Caching**: Multi-tier (OrderedDict LRU + DiskCache + MongoDB versioning)
-**Package Manager**: UV (Rust-based, 10-100x faster than pip)
-
-## Architecture Patterns
-
-- **Async-First**: All I/O async, 80+ async fixtures in tests
-- **Type-Safe**: Pydantic v2 throughout, mypy strict mode
-- **Isomorphic Types**: Frontend TS mirrors backend Pydantic exactly
-- **Repository Pattern**: 11 repositories for data access
-- **Dependency Injection**: FastAPI `Depends()` for loose coupling
-- **Multi-Tier Caching**: L1 (0.2ms) → L2 (5ms) → L3 (versioned)
-- **Content-Addressable**: SHA-256 hashing for deduplication
-- **3-Tier Model Selection**: Nano/Mini/Full routing (87% cost savings)
-
-## Performance Targets
-
-| Operation | Time | Notes |
-|-----------|------|-------|
-| Lookup (cached) | <500ms | L1/L2 hit |
-| Lookup (uncached) | 2-5s | Provider fetch + AI synthesis |
-| Search exact | <1ms | marisa-trie O(m) |
-| Search fuzzy | 10-50ms | RapidFuzz with signature buckets |
-| Search semantic | 50-200ms | FAISS HNSW + embeddings |
-| AI synthesis | 1-3s | Parallel processing, 12 components |
-
-## Module Documentation
-
-Each module has a dedicated CLAUDE.md:
-- **api/CLAUDE.md** - REST endpoints, routers, repositories, services, middleware
-- **core/CLAUDE.md** - Pipelines (lookup, search, WOTD), state tracking, SSE
-- **models/CLAUDE.md** - Data models (179+), parameters, responses, relationships
-- **search/CLAUDE.md** - Multi-method search, cascade logic, FAISS config
-- **ai/CLAUDE.md** - OpenAI integration, synthesis functions, 3-tier selection
-- **caching/CLAUDE.md** - Multi-tier architecture, versioning, compression
-- **corpus/CLAUDE.md** - Vocabulary management, tree operations, aggregation
-- **providers/CLAUDE.md** - External sources (11 providers), rate limiting
-- **cli/CLAUDE.md** - Command-line interface, Rich terminal UI
-- **text/CLAUDE.md** - Normalization, lemmatization, signature generation
-- **storage/CLAUDE.md** - MongoDB layer, Beanie ODM integration
-- **audio/CLAUDE.md** - Google Cloud TTS integration
-- **anki/CLAUDE.md** - Flashcard export to .apkg format
-- **wordlist/CLAUDE.md** - SM-2 spaced repetition algorithm
-- **wotd/CLAUDE.md** - ML pipeline for WOTD selection
-- **utils/CLAUDE.md** - Logging, config, paths, validation
+- **Async-first**: All I/O async. Motor, httpx, asyncio.gather
+- **Repository pattern**: 11 data access layers between API and MongoDB
+- **Dependency injection**: FastAPI `Depends()` for loose coupling
+- **Factory**: `create_connector()`, `Corpus.create()`, `get_global_cache()`
+- **Singleton**: `get_openai_connector()`, `lookup_state_tracker()`
+- **Content-addressable**: SHA-256 hashing for L3 cache dedup
+- **Per-resource locking**: Fine-grained concurrency (3-5x throughput)
+- **Cascade with early termination**: Search stops when sufficient results found
+- **Graceful degradation**: AI synthesis — definitions required, others optional
 
 ## Testing
 
-**Coverage**: 58 files, 19,000 lines, 639+ test functions, 80%+ coverage
-**Strategy**: Real integration tests (actual MongoDB, FAISS indices, file ops)
-**Mocking**: Only external APIs (OpenAI, dictionary providers)
-**Async**: 80+ async fixtures, asyncio.gather for parallel operations
+```
+backend/tests/
+├── conftest.py              # Root: MongoDB infra, factories, 80+ async fixtures
+├── api/                     # 7 files, 119 tests — endpoint integration
+├── search/                  # 15 files, 154 tests — all search methods
+├── providers/               # 13 files, 141 tests — all provider types
+├── corpus/                  # 9 files, 97 tests — tree ops, cascade deletion
+├── caching/                 # 8 files, 76 tests — L1/L2/L3 tiers
+├── models/                  # 1 file, 19 tests — Pydantic validation
+├── end_to_end/              # 1 file, 3 tests — full pipeline
+└── utils/                   # 1 file, 14 tests — introspection
+```
 
-## Statistics
+**Strategy**: Real MongoDB per test (unique DB), real FAISS indices, real file ops. Only external APIs mocked (OpenAI, dictionary providers). 80+ async fixtures. Session-scoped for expensive operations (semantic indices).
 
-- **23 modules**, **179+ Pydantic models**, **111+ API endpoints**
-- **3 core pipelines**: lookup, search, WOTD
-- **4,582 LOC** search module, **4,837 LOC** AI module, **9,863 LOC** providers
-- **Total backend**: ~50,000 LOC Python
+**Stats**: 58 files, 19K lines, 707 tests, 80%+ coverage.
+
+## Performance
+
+| Operation | Time | Notes |
+|-----------|------|-------|
+| L1 cache hit | 0.2ms | OrderedDict O(1) |
+| L2 cache hit | 5ms | DiskCache + decompress |
+| Exact search | <1ms | marisa-trie O(m) |
+| Fuzzy search | 10-50ms | RapidFuzz dual-scorer |
+| Semantic search | 50-200ms | FAISS HNSW |
+| Lookup (cached) | <500ms | L1/L2 hit |
+| Lookup (uncached) | 2-5s | Provider + AI |
+| AI synthesis | 1-3s | Parallel 12 tasks |
+| CLI startup | 0.07s | Lazy imports |
+
+## Development
+
+```bash
+cd backend
+uv venv && source .venv/bin/activate
+uv sync
+cp auth/config.toml.example auth/config.toml  # Add OpenAI key
+uv run scripts/run_api.py                      # Port 8000
+
+# Quality
+ruff check --fix && ruff format
+mypy src/ --strict
+pytest tests/ -v
+pytest tests/ --cov=src/floridify --cov-report=html
+```

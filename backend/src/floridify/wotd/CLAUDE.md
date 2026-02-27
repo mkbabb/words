@@ -1,25 +1,21 @@
-# WOTD Module - Word of the Day
+# wotd/
 
-ML pipeline for personalized word-of-the-day selection.
+Word-of-the-Day ML pipeline.
 
-## Components
+```
+wotd/
+├── trainer.py (1,440)      # ML training pipeline
+├── encoders.py (609)       # Semantic + metadata encoding
+├── embeddings.py (600)     # SentenceTransformer management
+├── core.py (259)           # WOTD core logic
+├── generator.py (266)      # WordOfTheDayGenerator
+├── inference.py (275)      # ML scoring
+├── sagemaker.py (320)      # AWS SageMaker (optional)
+├── storage.py, storage_minimal.py
+├── constants.py (127)      # Training hyperparameters
+└── deployment/             # Local + SageMaker deployment
+```
 
-**ML Pipeline** (`pipeline.py`):
-- Semantic encoder (sentence transformer)
-- DSL model (domain-specific language decoder)
-- Semantic vocabulary IDs
-- Training metadata
+Models: semantic_encoder.pt, dsl_model/, semantic_ids.json, training_metadata.json.
 
-**Models Required**:
-- `semantic_encoder.pt` - Embedding model
-- `dsl_model/` - Decoder
-- `semantic_ids.json` - Vocabulary mapping
-- `training_metadata.json` - Training info
-
-**Features**:
-- Literature corpus analysis
-- Semantic style/era/complexity encoding (4D: style/complexity/era/variation)
-- Synthetic corpus generation for training
-- Preference interpolation
-
-**Integration**: Managed via `core/wotd_pipeline.py` with singleton pattern
+4D encoding: style, complexity, era, variation. Literature corpus analysis. Synthetic corpus generation. Preference interpolation. Managed via `core/wotd_pipeline.py` singleton.

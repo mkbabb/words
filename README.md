@@ -46,18 +46,12 @@ npm run dev
 floridify lookup perspicacious
 ```
 
-**Configuration** (add your OpenAI API key):
-```bash
-cp auth/config.toml.example auth/config.toml
-# Edit auth/config.toml and add your OpenAI API key
-```
-
 ## Core Features
 
 ### AI-Powered Synthesis
 - **Deduplication**: 47 → 23 definitions (50% reduction, preserves quality)
 - **Semantic clustering**: Groups by meaning, not etymology
-- **Multi-source**: Synthesizes from Wiktionary + Oxford + Apple Dictionary
+- **Multi-source**: Synthesizes from Wiktionary + Oxford + Apple Dictionary + Free Dictionary
 - **Cost-optimized**: 3-tier model selection (87% cheaper than naive GPT-4o)
 - **Parallel generation**: Definitions, pronunciation, etymology, facts—all concurrent
 
@@ -72,8 +66,7 @@ Fast cascading search with early termination:
 Sub-millisecond cached lookups with 3-tier system:
 - **L1 Memory**: 0.2ms avg, 13 namespaces (OrderedDict LRU)
 - **L2 Disk**: 5ms avg, 10GB limit (DiskCache + ZSTD compression)
-- **L3 Versioned**: MongoDB with content-addressable storage
-- **Performance**: 10-50x speedup vs direct DB/API calls
+- **L3 Versioned**: MongoDB with content-addressable storage (SHA-256)
 
 ### Learning Tools
 - **Spaced repetition**: SM-2 algorithm (Bronze → Silver → Gold)
@@ -96,33 +89,29 @@ Sub-millisecond cached lookups with 3-tier system:
 
 ## Architecture
 
-**Full-stack application** with clear separation:
-- **Backend**: Python 3.12+ FastAPI (23 modules, 179+ models, 111+ endpoints)
-- **Frontend**: Vue 3 TypeScript (173 components, 12 Pinia stores)
-- **Database**: MongoDB 7.0 with Beanie ODM
-- **AI**: OpenAI GPT-5 series with 3-tier model selection
-- **Search**: FAISS semantic + RapidFuzz fuzzy + marisa-trie exact
-- **Infrastructure**: Docker containers, AWS EC2, DocumentDB, GitHub Actions CI/CD
+```
+/
+├── backend/            # Python 3.12+ FastAPI (23 modules, ~50K LOC)
+│   ├── src/floridify/  # Core: api, core, models, search, ai, caching, corpus, providers, cli, ...
+│   └── tests/          # 58 files, 19K lines, 707 tests
+├── frontend/           # Vue 3.5 TypeScript SPA (~34K LOC)
+│   └── src/            # 173 components, 12 stores, 20+ composables
+├── notification-server/ # PWA push notifications (Express + web-push)
+├── scripts/            # dev, deploy, install-floridify
+├── nginx/              # Production reverse proxy + SSL
+├── docs/               # 100+ technical docs
+└── docker-compose.yml  # Multi-service orchestration
+```
 
 **Data Flow**: User Query → Multi-Method Search → Provider Fetch → AI Synthesis → Cache → Response
 
-## Key Technologies
-
-**Backend**:
-- **Framework**: FastAPI (async), Pydantic v2, Uvicorn
-- **Database**: MongoDB + Motor (async driver) + Beanie ODM
-- **AI**: OpenAI API, sentence-transformers (Qwen3-0.6B), FAISS
-- **Search**: RapidFuzz (Rust), marisa-trie (C++), Bloom filters
-- **Caching**: Multi-tier (OrderedDict + DiskCache + MongoDB versioning)
-- **Package Manager**: UV (Astral, 10-100x faster than pip)
-
-**Frontend**:
-- **Framework**: Vue 3.5 (Composition API, `<script setup>`)
-- **Language**: TypeScript 5.8 (strict mode, 100% coverage)
-- **State**: Pinia 3.0 with localStorage persistence
-- **UI**: shadcn/ui (123 components, Radix Vue, accessible)
-- **Styling**: Tailwind CSS 4.1 with custom design system
-- **Build**: Vite 7.0 with esbuild (fast bundling)
+**Stack**:
+- **Backend**: FastAPI, Pydantic v2, Beanie ODM, MongoDB 7.0, Motor (async), UV
+- **AI/ML**: OpenAI GPT-5 (3-tier), sentence-transformers (Qwen3-0.6B), FAISS
+- **Search**: marisa-trie, RapidFuzz, FAISS HNSW, Bloom filter
+- **Cache**: OrderedDict LRU → DiskCache + ZSTD → MongoDB versioned (SHA-256)
+- **Frontend**: Vue 3.5, TypeScript 5.8 strict, Pinia 3.0, shadcn/ui, Tailwind CSS 4.1, Vite 7.0
+- **Infra**: Docker multi-stage, AWS EC2 + DocumentDB, nginx + Let's Encrypt, GitHub Actions
 
 ## API Endpoints
 
@@ -142,7 +131,6 @@ POST /api/v1/ai/synthesize/*           # 40+ generation endpoints
 # Corpus
 GET /api/v1/corpus/                    # List corpora
 POST /api/v1/corpus/                   # Create corpus
-GET /api/v1/corpus/{id}                # Get corpus details
 
 # Wordlist
 GET /api/v1/wordlist/                  # List wordlists
@@ -150,36 +138,26 @@ POST /api/v1/wordlist/                 # Create wordlist
 GET /api/v1/wordlist/{id}/due          # Get due words for review
 ```
 
-**Performance Targets**:
-- Lookup (cached): < 500ms
-- Lookup (uncached): < 3s (includes AI synthesis)
-- Search (exact): < 200ms
-- Search (semantic): < 500ms
-- AI synthesis: < 5s (parallel, 12 components)
+## CLI Commands
 
-## Configuration
-
-**Environment** (`.env`):
 ```bash
-ENVIRONMENT=development
-LOG_LEVEL=INFO
-BACKEND_PORT=8000
-FRONTEND_PORT=3000
-```
+# Lookup
+floridify lookup perspicacious           # Full definition
+floridify lookup --no-ai perspicacious   # Raw provider data
+floridify lookup --json perspicacious    # JSON output
 
-**API Keys** (`auth/config.toml`, **not in git**):
-```toml
-[openai]
-api_key = "sk-..."
-model = "gpt-5"              # Reasoning model (o-series)
-reasoning_effort = "high"
+# Search
+floridify search serendipity             # Multi-method cascade
+floridify search --fuzzy serendip        # Fuzzy only
+floridify search --semantic happy        # Semantic only
 
-[embedding]
-model = "Qwen/Qwen3-Embedding-0.6B"  # 1024D, 64.33 MTEB
+# Corpus
+floridify corpus list
+floridify corpus rebuild --corpus-name english_master --semantic
 
-[database]
-production_url = "mongodb://..."
-development_url = "mongodb://localhost:27018/..."
+# Wordlist
+floridify wordlist create my-words word1 word2 word3
+floridify wordlist review my-words --due
 ```
 
 ## Testing
@@ -192,26 +170,52 @@ pytest tests/ --cov=src/floridify --cov-report=html  # With coverage
 pytest tests/ -m "not slow"                    # Fast tests only
 ```
 
-**Coverage**: 58 files, 19,000 lines, 639+ test functions, 80%+ coverage
+**Coverage**: 58 files, 19K lines, 707 tests, 80%+ coverage.
+**Strategy**: Real MongoDB per test, real FAISS indices. Only external APIs mocked.
 
-**Frontend** (TO BE IMPLEMENTED):
+**Frontend**: Vitest configured but unused (gap identified).
+
+## Quality Checks
+
 ```bash
-cd frontend
-npm test  # Vitest configured but unused (gap identified)
+# Backend
+ruff check --fix && ruff format  # Lint + format
+mypy src/ --strict               # Type check
+
+# Frontend
+npm run type-check               # TypeScript strict
+prettier --write .               # Format
+```
+
+## Configuration
+
+**Environment** (`.env`):
+```bash
+ENVIRONMENT=development
+BACKEND_PORT=8000
+FRONTEND_PORT=3000
+```
+
+**API Keys** (`auth/config.toml`, **not in git**):
+```toml
+[openai]
+api_key = "sk-..."
+model = "gpt-5"
+reasoning_effort = "high"
+
+[embedding]
+model = "Qwen/Qwen3-Embedding-0.6B"
+
+[database]
+development_url = "mongodb://localhost:27018/..."
+production_url = "mongodb://..."
 ```
 
 ## Deployment
 
 **Production** (AWS EC2 + DocumentDB):
 ```bash
-./scripts/deploy  # Automated deployment
-
-# Manual:
-ssh ubuntu@44.216.140.209
-cd /var/www/floridify
-git pull
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml build
-docker-compose --profile ssl up -d
+./scripts/deploy  # Automated: SSH → sync secrets → build → deploy → health check
 ```
 
 **CI/CD** (GitHub Actions):
@@ -222,54 +226,38 @@ docker-compose --profile ssl up -d
 
 **Production URL**: https://words.babb.dev
 
-## CLI Commands
+## Performance
 
-**Lookup**:
-```bash
-floridify lookup perspicacious           # Full definition
-floridify lookup --no-ai perspicacious   # Raw provider data (skip AI)
-floridify lookup --json perspicacious    # JSON output
-```
+| Operation | Target |
+|-----------|--------|
+| Lookup (cached) | <500ms |
+| Lookup (uncached) | <5s |
+| Search exact | <1ms |
+| Search fuzzy | 10-50ms |
+| Search semantic | 50-200ms |
+| AI synthesis | <5s |
+| CLI startup | 0.07s |
+| Per-word cost | ~$0.02 |
 
-**Search**:
-```bash
-floridify search serendipity         # Multi-method search
-floridify search --fuzzy serendip    # Fuzzy only (typo-tolerant)
-floridify search --semantic happy    # Semantic only (meaning-based)
-```
+## Documentation
 
-**Corpus**:
-```bash
-floridify corpus list                                # List all corpora
-floridify corpus rebuild --corpus-name english_master --semantic  # Rebuild with semantic indices
-```
+| File | Scope |
+|------|-------|
+| `CLAUDE.md` | Project architecture (this file's technical counterpart) |
+| `backend/CLAUDE.md` | Backend: 23 modules, pipelines, testing |
+| `frontend/CLAUDE.md` | Frontend: components, stores, composables |
+| `backend/src/floridify/*/CLAUDE.md` | 16 module-level guides |
+| `docs/` | 100+ technical docs (architecture, search, AI, deployment) |
 
-**Wordlist**:
-```bash
-floridify wordlist create my-words word1 word2 word3
-floridify wordlist add my-words word4 word5
-floridify wordlist review my-words --due  # Get due words
-```
+## Development Workflow
 
-## Performance Metrics
-
-**Codebase**:
-- Backend: 23 modules, 179+ models, 111+ endpoints, 3 core pipelines
-- Frontend: 173 components (123 shadcn/ui + 50 custom), 12 stores
-- Tests: 58 files, 19,000 lines, 639+ functions (backend only)
-- Documentation: 50+ technical docs, 3 CLAUDE.md files
-
-**Performance**:
-- CLI startup: 0.07s (vs 4.2s original, 98% improvement)
-- L1 cache hit: 0.2ms avg (vs 50ms MongoDB, 250x faster)
-- Search exact: < 1ms (marisa-trie O(m))
-- Search semantic: 50-200ms (FAISS HNSW + embeddings)
-- AI synthesis: < 5s (parallel processing)
-
-**Cost**:
-- Per-word synthesis: ~$0.02 (vs ~$0.15 naive GPT-4o)
-- 87% reduction: 3-tier model selection + batching
-- 50% discount: OpenAI Batch API for bulk operations
+1. Write types in `backend/src/floridify/models/` (Pydantic)
+2. Mirror types in `frontend/src/types/api.ts` (TypeScript)
+3. Implement backend logic in `backend/src/floridify/core/`
+4. Add API endpoint in `backend/src/floridify/api/routers/`
+5. Write backend tests in `backend/tests/` (80%+ coverage)
+6. Implement frontend in `frontend/src/components/custom/`
+7. Add composable in `frontend/src/composables/`
 
 ## Why This Exists
 
@@ -291,98 +279,19 @@ Built for those who collect words like others collect stamps, who understand tha
 
 **Look up → Understand → Remember → Use**
 
-## Documentation
-
-**Core Architecture**:
-- `CLAUDE.md` - Project overview (this file's technical counterpart)
-- `backend/CLAUDE.md` - Backend implementation details
-- `frontend/CLAUDE.md` - Frontend architecture
-
-**Technical Docs** (`docs/`):
-- `architecture.md` - System design and data flow
-- `search.md` - Multi-method search deep dive
-- `ai.md` - AI synthesis pipeline
-- `batch_processing_guide.md` - OpenAI Batch API
-- `rest-api-architecture.md` - API design patterns
-- `docker-ssl-ec2-deployment-guide.md` - AWS deployment
-- `cli.md` - Command-line interface
-- `anki.md` - Anki integration
-- `PWA-Technical-Guide.md` - Progressive Web App
-
-## Development Workflow
-
-**Feature Development**:
-1. Write types in `backend/src/floridify/models/` (Pydantic)
-2. Mirror types in `frontend/src/types/api.ts` (TypeScript)
-3. Implement backend logic in `backend/src/floridify/core/`
-4. Add API endpoint in `backend/src/floridify/api/routers/`
-5. Write backend tests in `backend/tests/` (80%+ coverage)
-6. Implement frontend in `frontend/src/components/custom/`
-7. Add composable in `frontend/src/composables/`
-
-**Quality Checks**:
-```bash
-# Backend
-ruff check --fix && ruff format
-mypy src/ --strict
-pytest tests/ -v
-
-# Frontend
-npm run type-check
-prettier --write .
-```
-
-**Git Workflow**:
-```bash
-git checkout -b feature/my-feature
-# ... make changes and quality checks
-git commit -m "feat(search): add phonetic search mode"
-git push origin feature/my-feature
-# Create PR → GitHub Actions → Merge → Auto-deploy
-```
-
-## Common Tasks
-
-```bash
-# Build semantic search index (one-time per corpus)
-floridify corpus rebuild --corpus-name english_master --semantic
-
-# Add literature work to corpus
-floridify literature add-work \
-  --author shakespeare \
-  --work-id 1524 \
-  --corpus-name shakespeare_corpus
-
-# Generate VAPID keys for push notifications
-cd notification-server && npm run generate-vapid-keys
-
-# Clear cache namespace
-curl -X POST http://localhost:8000/api/v1/cache/clear?namespace=SEMANTIC
-
-# View API documentation
-open http://localhost:8000/docs  # Swagger UI
-```
-
 ## Troubleshooting
 
 **Docker Issues**:
 ```bash
-./scripts/dev --build  # Rebuild images
-docker-compose logs -f backend  # View backend logs
-docker-compose down -v  # Clean restart (removes volumes)
+./scripts/dev --build                   # Rebuild images
+docker-compose logs -f backend          # View logs
+docker-compose down -v                  # Clean restart
 ```
 
 **MongoDB Connection**:
 ```bash
-# Check if MongoDB is running
-docker-compose ps
-
-# Connect to MongoDB
-docker-compose exec mongodb mongosh
-
-# Check SSH tunnel (for DocumentDB)
-ps aux | grep ssh
-./scripts/start-ssh-tunnel.sh
+docker-compose ps                       # Check if running
+./scripts/start-ssh-tunnel.sh           # DocumentDB tunnel
 ```
 
 **Frontend Build Errors**:
@@ -390,20 +299,11 @@ ps aux | grep ssh
 cd frontend
 rm -rf node_modules package-lock.json
 npm install
-npm run type-check  # Check for TypeScript errors
+npm run type-check
 ```
-
-## Contributing
-
-This is a private project. For issues or feature requests, contact mike@babb.dev.
-
-## License
-
-Proprietary. All rights reserved.
 
 ---
 
-**Version**: January 2025
+**License**: MIT
 **Author**: Mike Babb (mike@babb.dev)
 **Deployment**: https://words.babb.dev
-**Repository**: Private

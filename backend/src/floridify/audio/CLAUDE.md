@@ -1,18 +1,14 @@
-# Audio Module - Speech Synthesis
+# audio/
 
-Google Cloud Text-to-Speech integration for pronunciation audio.
+Google Cloud TTS integration for pronunciation audio.
 
-## Key Components
+```
+audio/
+└── synthesizer.py          # AudioSynthesizer
+```
 
-**AudioSynthesizer** (`synthesizer.py`):
-- `synthesize_audio()` - Generate audio from IPA/phonetic
+- `synthesize_audio()` — generate from IPA/phonetic text
 - Accents: US, UK, Australian
-- Format: MP3, WAV
-- Quality levels: Standard, Premium (WaveNet)
-
-**Storage**:
-- MongoDB GridFS for audio files
-- AudioMedia model with metadata
-- Automatic caching via GlobalCacheManager
-
-**Lazy Loading**: Google Cloud SDK imported only when needed
+- Formats: MP3, WAV. Quality: Standard, Premium (WaveNet)
+- Storage: MongoDB GridFS. Cached via GlobalCacheManager
+- Lazy loading: Google Cloud SDK imported only when needed
