@@ -1,6 +1,6 @@
 """Spaced repetition review logic using SM-2 algorithm."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from pydantic import BaseModel, Field
 
@@ -33,7 +33,7 @@ class ReviewData(BaseModel):
     )
     interval: int = Field(default=1, ge=1, description="Days until next review")
     next_review_date: datetime = Field(
-        default_factory=datetime.now,
+        default_factory=lambda: datetime.now(UTC),
         description="Next scheduled review",
     )
     last_review_date: datetime | None = Field(default=None, description="Last review timestamp")
@@ -80,7 +80,7 @@ class ReviewData(BaseModel):
         self.ease_factor = self.calculate_ease_factor(quality)
 
         # Calculate next review date
-        self.last_review_date = datetime.now()
+        self.last_review_date = datetime.now(UTC)
         self.next_review_date = self.last_review_date + timedelta(days=self.interval)
 
         # Add to history
@@ -96,13 +96,13 @@ class ReviewData(BaseModel):
     def is_due_for_review(self, reference_date: datetime | None = None) -> bool:
         """Check if item is due for review."""
         if reference_date is None:
-            reference_date = datetime.now()
+            reference_date = datetime.now(UTC)
         return self.next_review_date <= reference_date
 
     def get_overdue_days(self, reference_date: datetime | None = None) -> int:
         """Get number of days overdue (negative if not due yet)."""
         if reference_date is None:
-            reference_date = datetime.now()
+            reference_date = datetime.now(UTC)
         delta = reference_date - self.next_review_date
         return delta.days
 

@@ -9,6 +9,7 @@ from typing import Any
 import lz4.frame  # type: ignore[import-untyped]
 import zstandard as zstd
 
+from .filesystem import safe_pickle_loads
 from .models import CompressionType
 
 
@@ -64,5 +65,5 @@ def decompress_data(data: bytes, compression: CompressionType | None = None) -> 
     else:
         decompressed = data
 
-    # Deserialize with pickle
-    return pickle.loads(decompressed)
+    # Deserialize with restricted pickle (prevents arbitrary code execution)
+    return safe_pickle_loads(decompressed)

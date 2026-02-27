@@ -4,6 +4,8 @@
         :value="modelValue"
         :placeholder="placeholder"
         :disabled="disabled"
+        aria-label="Search for a word"
+        role="searchbox"
         :style="{
             minHeight: `${minHeight}px`,
             lineHeight: '1.4',

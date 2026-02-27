@@ -39,7 +39,7 @@
                         ? `${uiState.searchBarHeight}px`
                         : undefined,
                     maxHeight: searchBar.isAIQuery
-                        ? '420px'
+                        ? 'min(420px, 60vh)'
                         : undefined,
                     overflowY: searchBar.isAIQuery
                         ? 'visible'

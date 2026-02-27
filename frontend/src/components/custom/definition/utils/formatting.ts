@@ -3,14 +3,35 @@ import { MasteryLevel } from '@/types/wordlist';
 import type { CardVariant } from '@/types';
 
 /**
+ * Escapes HTML special characters to prevent XSS
+ */
+function escapeHTML(str: string): string {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/**
+ * Escapes special regex characters in a string
+ */
+function escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Formats example sentences with bold highlighting for the target word
  */
 export function formatExampleHTML(example: string, word: string): string {
-    // Create a case-insensitive regex to find the word and make it bold
-    const regex = new RegExp(`\\b${word}\\b`, 'gi');
-    return example.replace(
+    // Escape both inputs before constructing HTML
+    const safeExample = escapeHTML(example);
+    const safeWord = escapeHTML(word);
+    const regex = new RegExp(`\\b${escapeRegex(safeWord)}\\b`, 'gi');
+    return safeExample.replace(
         regex,
-        `<strong class="hover-word">${word}</strong>`
+        `<strong class="hover-word">${safeWord}</strong>`
     );
 }
 
@@ -85,6 +106,7 @@ export function formatPercent(value: number): string {
  * Formats example usage text with markdown-style bold syntax
  */
 export function formatExampleUsage(example: string): string {
-    // Bold the suggested word in the example
-    return example.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-foreground">$1</strong>');
+    // Escape HTML first, then convert markdown bold to HTML bold
+    const safe = escapeHTML(example);
+    return safe.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-foreground">$1</strong>');
 }

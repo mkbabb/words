@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import html
 import re
 import time
 from pathlib import Path
@@ -18,6 +19,15 @@ from .ankiconnect import AnkiDirectIntegration
 from .templates import AnkiCardTemplate, CardType
 
 logger = get_logger(__name__)
+
+
+def _escape_field(value: Any) -> str:
+    """HTML-escape a field value for safe insertion into Anki card templates."""
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        return ", ".join(html.escape(str(item)) for item in value)
+    return html.escape(str(value))
 
 
 def render_list_fields(template: str, fields: dict[str, Any]) -> str:
@@ -302,19 +312,22 @@ class AnkiCardGenerator:
                 synonyms_list = definition.synonyms[:5]
                 synonyms_text = ", ".join(synonyms_list)
 
-            # Prepare card fields
+            # Prepare card fields (HTML-escape user/AI content to prevent XSS)
+            # Examples use <br><br> intentionally, so escape individual items then join
+            safe_examples = "<br><br>".join(html.escape(ex) for ex in examples_list)
+
             fields = {
-                "Word": entry.word,
-                "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word}/",
-                "PartOfSpeech": definition.part_of_speech,
-                "ChoiceA": ai_response.choice_a,
-                "ChoiceB": ai_response.choice_b,
-                "ChoiceC": ai_response.choice_c,
-                "ChoiceD": ai_response.choice_d,
-                "CorrectChoice": ai_response.correct_choice,
-                "Definition": definition.definition,
-                "Examples": examples_text,
-                "Synonyms": synonyms_text,
+                "Word": _escape_field(entry.word),
+                "Pronunciation": _escape_field(entry.pronunciation.phonetic or f"/{entry.word}/"),
+                "PartOfSpeech": _escape_field(definition.part_of_speech),
+                "ChoiceA": _escape_field(ai_response.choice_a),
+                "ChoiceB": _escape_field(ai_response.choice_b),
+                "ChoiceC": _escape_field(ai_response.choice_c),
+                "ChoiceD": _escape_field(ai_response.choice_d),
+                "CorrectChoice": _escape_field(ai_response.correct_choice),
+                "Definition": _escape_field(definition.definition),
+                "Examples": safe_examples,
+                "Synonyms": _escape_field(synonyms_text),
                 "Frequency": frequency,
                 "FrequencyDisplay": f"×{frequency}" if frequency > 1 else "",
             }
@@ -392,20 +405,22 @@ class AnkiCardGenerator:
                 synonyms_text = ", ".join(synonyms_list)
 
             # AI already generated choices including target word - use directly
-            # Prepare card fields
+            # Prepare card fields (HTML-escape user/AI content to prevent XSS)
+            safe_examples = "<br><br>".join(html.escape(ex) for ex in examples_list)
+
             fields = {
-                "Word": entry.word,
-                "Pronunciation": entry.pronunciation.phonetic or f"/{entry.word}/",
-                "SentenceWithBlank": ai_response.sentence,
-                "PartOfSpeech": definition.part_of_speech,
-                "ChoiceA": ai_response.choice_a,
-                "ChoiceB": ai_response.choice_b,
-                "ChoiceC": ai_response.choice_c,
-                "ChoiceD": ai_response.choice_d,
-                "CorrectChoice": ai_response.correct_choice,
-                "Definition": definition.definition,
-                "Examples": examples_text,
-                "Synonyms": synonyms_text,
+                "Word": _escape_field(entry.word),
+                "Pronunciation": _escape_field(entry.pronunciation.phonetic or f"/{entry.word}/"),
+                "SentenceWithBlank": _escape_field(ai_response.sentence),
+                "PartOfSpeech": _escape_field(definition.part_of_speech),
+                "ChoiceA": _escape_field(ai_response.choice_a),
+                "ChoiceB": _escape_field(ai_response.choice_b),
+                "ChoiceC": _escape_field(ai_response.choice_c),
+                "ChoiceD": _escape_field(ai_response.choice_d),
+                "CorrectChoice": _escape_field(ai_response.correct_choice),
+                "Definition": _escape_field(definition.definition),
+                "Examples": safe_examples,
+                "Synonyms": _escape_field(synonyms_text),
                 "Frequency": frequency,
                 "FrequencyDisplay": f"×{frequency}" if frequency > 1 else "",
             }
@@ -537,12 +552,20 @@ class AnkiCardGenerator:
         try:
             # Try direct export first
             if await self.direct_integration.is_available():
-                success = await self.direct_integration.export_cards_directly(cards, deck_name)
+                successful, failed = await self.direct_integration.export_cards_directly(
+                    cards, deck_name
+                )
 
-                if success:
+                if successful > 0 and failed == 0:
                     total_time = time.time() - start_time
                     logger.success(f"✅ Cards exported directly to Anki in {total_time:.2f}s")
                     return True, None
+                if successful > 0 and failed > 0:
+                    total_time = time.time() - start_time
+                    logger.warning(
+                        f"⚠️ Partial export: {successful} succeeded, {failed} failed in {total_time:.2f}s"
+                    )
+                    return True, None  # Partial success
                 logger.warning("⚠️ Direct export failed, falling back to .apkg")
             else:
                 logger.info("📦 AnkiConnect not available, using .apkg export")

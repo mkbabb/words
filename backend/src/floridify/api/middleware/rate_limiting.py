@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import time
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi import HTTPException, Request, Response
 from fastapi.routing import APIRoute
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from ...utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class RateLimiter:
@@ -183,11 +189,31 @@ ai_limiter = OpenAIRateLimiter(
 )
 
 
+# Trusted proxy CIDR networks (nginx, Docker, loopback)
+TRUSTED_PROXY_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("192.168.0.0/16"),
+]
+
+
+def _is_trusted_proxy(ip_str: str) -> bool:
+    """Check if an IP address belongs to a trusted proxy network."""
+    try:
+        addr = ipaddress.ip_address(ip_str)
+        return any(addr in network for network in TRUSTED_PROXY_NETWORKS)
+    except ValueError:
+        return False
+
+
 def get_client_key(request: Request) -> str:
     """Extract client identifier from request.
 
     Prefers authenticated user ID, falls back to IP address.
-    X-Forwarded-For is only trusted when coming from known proxies.
+    X-Forwarded-For is only trusted when the direct connection is from a known proxy.
+    Uses the rightmost non-trusted IP (not leftmost, which is spoofable).
     """
     # Try to get authenticated user ID through safe access
     try:
@@ -195,16 +221,19 @@ def get_client_key(request: Request) -> str:
     except AttributeError:
         pass  # Fall through to IP-based identification
 
-    # Fall back to IP address
-    # Only trust X-Forwarded-For from known proxies (nginx in our stack)
+    # Fall back to IP address with proper CIDR validation
     client_ip = request.client.host if request.client else "unknown"
-    trusted_proxies = {"127.0.0.1", "::1", "172.16.0.0/12", "10.0.0.0/8"}
 
-    if client_ip in trusted_proxies or client_ip.startswith(("172.", "10.")):
+    if _is_trusted_proxy(client_ip):
         forwarded_for = request.headers.get("X-Forwarded-For")
         if forwarded_for:
-            # Take the leftmost (client) IP from the chain
-            client_ip = forwarded_for.split(",")[0].strip()
+            # Walk the chain from right to left, find the rightmost non-trusted IP.
+            # This is the first IP not set by our own infrastructure.
+            ips = [ip.strip() for ip in forwarded_for.split(",")]
+            for ip in reversed(ips):
+                if not _is_trusted_proxy(ip):
+                    client_ip = ip
+                    break
 
     return f"ip:{client_ip}"
 
@@ -279,3 +308,138 @@ def rate_limit(
         return wrapper
 
     return decorator
+
+
+# Tiered rate limiters for middleware
+_tiered_limiters: dict[str, RateLimiter] = {
+    "public": RateLimiter(requests_per_minute=60, requests_per_hour=1000),
+    "ai": RateLimiter(requests_per_minute=20, requests_per_hour=200),
+    "streaming": RateLimiter(requests_per_minute=10, requests_per_hour=100),
+    "admin": RateLimiter(requests_per_minute=30, requests_per_hour=300),
+}
+
+
+def _classify_endpoint(path: str) -> str:
+    """Classify an endpoint path into a rate limit tier."""
+    if "/ai/" in path or path.endswith("/ai"):
+        return "ai"
+    if "/stream" in path:
+        return "streaming"
+    if any(
+        path.startswith(p)
+        for p in (
+            "/api/v1/cache/",
+            "/api/v1/config",
+            "/api/v1/database/",
+            "/api/v1/corpus/rebuild",
+            "/api/v1/providers/",
+            "/api/v1/metrics",
+        )
+    ):
+        return "admin"
+    return "public"
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Middleware that applies tiered rate limiting to all endpoints."""
+
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        # Skip rate limiting for OPTIONS (CORS preflight)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        # Skip health checks
+        path = request.url.path
+        if path in ("/health", "/api/v1/health"):
+            return await call_next(request)
+
+        client_key = get_client_key(request)
+        tier = _classify_endpoint(path)
+        limiter = _tiered_limiters[tier]
+
+        allowed, headers = await limiter.check_rate_limit(client_key)
+
+        if not allowed:
+            return Response(
+                content='{"detail":"Rate limit exceeded"}',
+                status_code=429,
+                media_type="application/json",
+                headers=headers,
+            )
+
+        response = await call_next(request)
+
+        # Add rate limit headers to response
+        for key, value in headers.items():
+            response.headers[key] = value
+
+        return response
+
+
+class SpendingTracker:
+    """Tracks AI API spending with daily and hourly budget caps."""
+
+    def __init__(
+        self,
+        daily_budget: float = 10.0,
+        hourly_budget: float = 2.0,
+    ):
+        self.daily_budget = daily_budget
+        self.hourly_budget = hourly_budget
+        self._hourly_spend: list[tuple[float, float]] = []  # (timestamp, cost)
+        self._daily_spend: list[tuple[float, float]] = []
+        self._lock = asyncio.Lock()
+
+    def _estimate_cost(self, model: str, total_tokens: int) -> float:
+        """Estimate cost in dollars for a request."""
+        # Approximate pricing per 1M tokens (input+output blended)
+        pricing = {
+            "gpt-5": 0.015,
+            "gpt-5-mini": 0.004,
+            "gpt-5-nano": 0.001,
+        }
+        rate = pricing.get(model, 0.01)
+        return (total_tokens / 1_000_000) * rate
+
+    async def check_budget(self) -> tuple[bool, str | None]:
+        """Check if spending is within budget. Returns (allowed, reason)."""
+        async with self._lock:
+            now = time.time()
+
+            # Clean old entries
+            self._hourly_spend = [(t, c) for t, c in self._hourly_spend if now - t < 3600]
+            self._daily_spend = [(t, c) for t, c in self._daily_spend if now - t < 86400]
+
+            hourly_total = sum(c for _, c in self._hourly_spend)
+            daily_total = sum(c for _, c in self._daily_spend)
+
+            if daily_total >= self.daily_budget:
+                return False, f"Daily spending limit reached (${daily_total:.2f}/${self.daily_budget:.2f})"
+            if hourly_total >= self.hourly_budget:
+                return False, f"Hourly spending limit reached (${hourly_total:.2f}/${self.hourly_budget:.2f})"
+
+            # Log warnings at thresholds
+            if daily_total >= self.daily_budget * 0.9:
+                logger.warning(f"AI spending at 90% of daily budget: ${daily_total:.2f}/${self.daily_budget:.2f}")
+            elif daily_total >= self.daily_budget * 0.75:
+                logger.warning(f"AI spending at 75% of daily budget: ${daily_total:.2f}/${self.daily_budget:.2f}")
+            elif daily_total >= self.daily_budget * 0.5:
+                logger.info(f"AI spending at 50% of daily budget: ${daily_total:.2f}/${self.daily_budget:.2f}")
+
+            return True, None
+
+    async def record_spend(self, model: str, total_tokens: int) -> None:
+        """Record actual API spend."""
+        cost = self._estimate_cost(model, total_tokens)
+        async with self._lock:
+            now = time.time()
+            self._hourly_spend.append((now, cost))
+            self._daily_spend.append((now, cost))
+
+
+# Global spending tracker
+spending_tracker = SpendingTracker(daily_budget=10.0, hourly_budget=2.0)

@@ -1,6 +1,6 @@
 <template>
     <!-- Credit to Kevin Powell at https://codepen.io/kevinpowell/pen/PomqjxO -->
-    <button class="dark-mode-toggle-button" v-bind="$attrs" @click="changeTheme()">
+    <button class="dark-mode-toggle-button" v-bind="$attrs" :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'" @click="changeTheme()">
         <svg
             xmlns="http://www.w3.org/2000/svg"
             width="472.39"
@@ -20,7 +20,7 @@
 </template>
 
 <script setup>
-import { changeTheme } from ".";
+import { changeTheme, isDark } from ".";
 
 const { size } = defineProps({
     size: { type: String, default: "2rem" },

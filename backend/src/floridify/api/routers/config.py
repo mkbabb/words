@@ -18,12 +18,11 @@ router = APIRouter()
 
 def parse_config_get_params(
     section: str = "general",
-    show_keys: bool = False,
 ) -> ConfigGetParams:
     """Parse config get parameters."""
     return ConfigGetParams(
         section=section,
-        show_keys=show_keys,
+        show_keys=False,
     )
 
 

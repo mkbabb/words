@@ -34,12 +34,10 @@ PUBLIC_PREFIXES = frozenset({
     "/api/v1/search",
     "/api/v1/suggestions",
     "/api/v1/health",
-    "/api/v1/config",
     "/api",
 })
 PUBLIC_EXACT = frozenset({
     "/api/v1/health",
-    "/api/v1/config",
     "/api",
 })
 
@@ -47,6 +45,7 @@ PUBLIC_EXACT = frozenset({
 ADMIN_PREFIXES = frozenset({
     "/api/v1/cache/clear",
     "/api/v1/cache/prune",
+    "/api/v1/config",
     "/api/v1/corpus/rebuild",
     "/api/v1/database/cleanup",
     "/api/v1/database/stats",
@@ -77,9 +76,6 @@ def _is_admin_endpoint(path: str) -> bool:
     for prefix in ADMIN_PREFIXES:
         if path.startswith(prefix):
             return True
-    # Config with show_keys is admin
-    if path.startswith("/api/v1/config") and "show_keys" in path:
-        return True
     return False
 
 
@@ -153,9 +149,13 @@ class ClerkAuthMiddleware(BaseHTTPMiddleware):
 
         clerk_domain = os.getenv("CLERK_DOMAIN", "")
         if not clerk_domain:
-            # Auth not configured - pass through with warning
-            logger.warning("CLERK_DOMAIN not set - auth middleware disabled")
-            return await call_next(request)
+            # Fail-closed: deny access when auth is not configured
+            logger.error("CLERK_DOMAIN not set - denying access to protected endpoint")
+            return Response(
+                content='{"detail":"Authentication service not configured"}',
+                status_code=503,
+                media_type="application/json",
+            )
 
         try:
             jwks = await _get_jwks(clerk_domain)

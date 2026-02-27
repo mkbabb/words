@@ -143,13 +143,35 @@ class DefinitionSynthesizer:
         if state_tracker:
             await state_tracker.update_stage(Stages.AI_SYNTHESIS)
 
-        # Run all synthesis operations in parallel
-        synthesized_definitions, pronunciation, etymology, facts = await asyncio.gather(
+        # Run all synthesis operations in parallel with graceful degradation
+        results = await asyncio.gather(
             self._synthesize_definitions(word_obj, clustered_definitions, state_tracker),
             synthesize_pronunciation(word_obj.text, providers_data, self.ai, state_tracker),
             synthesize_etymology(word_obj, providers_data, self.ai, state_tracker),
             generate_facts(word_obj, unique_definitions, self.ai, self.facts_count, state_tracker),
+            return_exceptions=True,
         )
+
+        # Handle partial failures: definitions are required, others are optional
+        synthesized_definitions = results[0]
+        if isinstance(synthesized_definitions, BaseException):
+            logger.error(f"Definition synthesis failed for '{word}': {synthesized_definitions}")
+            raise synthesized_definitions
+
+        pronunciation = results[1]
+        if isinstance(pronunciation, BaseException):
+            logger.warning(f"Pronunciation synthesis failed for '{word}': {pronunciation}")
+            pronunciation = None
+
+        etymology = results[2]
+        if isinstance(etymology, BaseException):
+            logger.warning(f"Etymology synthesis failed for '{word}': {etymology}")
+            etymology = None
+
+        facts = results[3]
+        if isinstance(facts, BaseException):
+            logger.warning(f"Facts generation failed for '{word}': {facts}")
+            facts = []
 
         # Create synthesized entry
         assert word_obj.id is not None  # Word should have been saved before this point
@@ -258,9 +280,16 @@ class DefinitionSynthesizer:
             task = synthesize_cluster(cluster_id, cluster_defs)
             synthesis_tasks.append(task)
 
-        # Execute all syntheses in parallel
+        # Execute all syntheses in parallel with graceful degradation
+        results = await asyncio.gather(*synthesis_tasks, return_exceptions=True)
 
-        synthesized_definitions = await asyncio.gather(*synthesis_tasks)
+        synthesized_definitions = []
+        for i, result in enumerate(results):
+            if isinstance(result, BaseException):
+                cluster_id = list(clusters.keys())[i]
+                logger.error(f"Cluster '{cluster_id}' synthesis failed: {result}")
+            else:
+                synthesized_definitions.append(result)
 
         return synthesized_definitions
 

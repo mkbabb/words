@@ -24,9 +24,19 @@ from ...search.language import get_language_search
 from ...search.models import SearchIndex
 from ...text import clear_lemma_cache, get_lemma_cache_stats
 from ...utils.logging import get_logger
+from ...utils.sanitization import sanitize_mongodb_input
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+def _validate_search_query(query: str) -> str:
+    """Validate and sanitize a search query string."""
+    if not query or len(query.strip()) < 1:
+        raise HTTPException(status_code=422, detail="Search query cannot be empty")
+    if len(query) > 200:
+        raise HTTPException(status_code=422, detail="Search query too long (max 200 characters)")
+    return sanitize_mongodb_input(query)
 
 
 class RebuildIndexRequest(BaseModel):
@@ -181,13 +191,9 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
                 logger.warning(
                     f"Corpus not found: id={params.corpus_id}, name={params.corpus_name}"
                 )
-                return SearchResponse(
-                    query=query,
-                    results=[],
-                    total_found=0,
-                    languages=params.languages,
-                    mode=params.mode,
-                    metadata={"error": "Corpus not found"},
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Corpus not found: id={params.corpus_id}, name={params.corpus_name}",
                 )
 
             # Create search index for this corpus
@@ -263,6 +269,7 @@ async def search_words_query(
     params: SearchParams = Depends(parse_search_params),
 ) -> SearchResponse:
     """Search for words using query parameter."""
+    q = _validate_search_query(q)
     start_time = time.perf_counter()
 
     try:
@@ -278,7 +285,7 @@ async def search_words_query(
         raise
     except Exception as e:
         logger.error(f"Search failed for '{q}': {e}")
-        raise HTTPException(status_code=500, detail=f"Internal error during search: {e!s}")
+        raise HTTPException(status_code=500, detail="Internal error during search")
 
 
 @router.get("/search/{query}", response_model=SearchResponse)
@@ -287,6 +294,7 @@ async def search_words_path(
     params: SearchParams = Depends(parse_search_params),
 ) -> SearchResponse:
     """Search for words using path parameter."""
+    query = _validate_search_query(query)
     start_time = time.perf_counter()
 
     try:
@@ -304,7 +312,7 @@ async def search_words_path(
         raise
     except Exception as e:
         logger.error(f"Search failed for '{query}': {e}")
-        raise HTTPException(status_code=500, detail=f"Internal error during search: {e!s}")
+        raise HTTPException(status_code=500, detail="Internal error during search")
 
 
 @router.get("/search/{query}/suggestions", response_model=SearchResponse)
@@ -314,6 +322,7 @@ async def get_search_suggestions(
     params: SearchParams = Depends(parse_search_params),
 ) -> SearchResponse:
     """Get search suggestions for autocomplete (lower threshold)."""
+    query = _validate_search_query(query)
     start_time = time.perf_counter()
 
     # Override parameters for suggestions
@@ -337,7 +346,7 @@ async def get_search_suggestions(
 
     except Exception as e:
         logger.error(f"Suggestions failed for '{query}': {e}")
-        raise HTTPException(status_code=500, detail=f"Internal error during suggestions: {e!s}")
+        raise HTTPException(status_code=500, detail="Internal error during suggestions")
 
 
 class SemanticStatusResponse(BaseModel):
@@ -396,7 +405,7 @@ async def get_semantic_status(
 
     except Exception as e:
         logger.error(f"Failed to get semantic status: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get semantic status: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to get semantic status")
 
 
 @router.post("/search/rebuild", response_model=RebuildIndexResponse)
@@ -566,7 +575,7 @@ async def rebuild_search_index(
 
     except Exception as e:
         logger.error(f"Failed to rebuild search index with unified corpus management: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to rebuild search index: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to rebuild search index")
 
 
 class HotReloadStatusResponse(BaseModel):

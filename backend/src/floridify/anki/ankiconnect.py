@@ -306,7 +306,9 @@ class AnkiDirectIntegration:
 
         return await self.ankiconnect.is_available()
 
-    async def export_cards_directly(self, cards: list[Any], deck_name: str) -> bool:
+    async def export_cards_directly(
+        self, cards: list[Any], deck_name: str
+    ) -> tuple[int, int]:
         """Export cards directly to running Anki instance.
 
         Args:
@@ -314,12 +316,11 @@ class AnkiDirectIntegration:
             deck_name: Target deck name in Anki
 
         Returns:
-            True if all cards were added successfully
+            Tuple of (successful_cards, failed_cards) counts.
 
         """
         if not await self.is_available():
-            return False
-
+            return (0, len(cards))
 
         start_time = time.time()
 
@@ -386,11 +387,11 @@ class AnkiDirectIntegration:
                 logger.success(
                     f"✅ Successfully added all {successful_cards} cards to Anki in {total_time:.2f}s",
                 )
-                return True
-            logger.warning(
-                f"⚠️ Added {successful_cards} cards, {failed_cards} failed in {total_time:.2f}s",
-            )
-            return successful_cards > 0
+            else:
+                logger.warning(
+                    f"⚠️ Added {successful_cards} cards, {failed_cards} failed in {total_time:.2f}s",
+                )
+            return (successful_cards, failed_cards)
 
         except AnkiConnectError as e:
             logger.error(f"💥 Direct export failed (AnkiConnect error): {e}")

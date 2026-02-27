@@ -78,10 +78,11 @@ export const aiApi = {
         count: 10
       });
 
+      const result = response.data?.result;
       return {
         word,
-        antonyms: response.data.result.antonyms || [],
-        confidence: response.data.result.confidence || 0
+        antonyms: result?.antonyms ?? [],
+        confidence: result?.confidence ?? 0
       };
     },
 

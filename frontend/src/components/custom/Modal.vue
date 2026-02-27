@@ -90,7 +90,7 @@ const maxHeightClass = computed(() => {
     'lg': 'max-h-[40rem]',
     'xl': 'max-h-[48rem]',
     'screen': 'max-h-screen',
-    'viewport': 'max-h-[calc(100vh-2rem)]',
+    'viewport': 'max-h-[calc(100dvh-2rem)]',
   }
   return heightMap[props.maxHeight]
 })

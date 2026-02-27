@@ -37,6 +37,8 @@ from typing import Any, Literal
 
 import faiss
 import numpy as np
+
+from ...caching.filesystem import safe_pickle_loads
 import torch
 from sentence_transformers import SentenceTransformer
 
@@ -327,7 +329,7 @@ class SemanticSearch:
             compressed_bytes = binary_data["embeddings_compressed_bytes"]
             logger.debug(f"Decompressing gzip embeddings ({len(compressed_bytes) / 1024 / 1024:.1f}MB compressed)")
             embeddings_bytes = gzip.decompress(compressed_bytes)
-            self.sentence_embeddings = pickle.loads(embeddings_bytes)
+            self.sentence_embeddings = safe_pickle_loads(embeddings_bytes)
             logger.debug(
                 f"Loaded embeddings: {len(embeddings_bytes) / 1024 / 1024:.2f}MB, "
                 f"shape={self.sentence_embeddings.shape if self.sentence_embeddings is not None else 'none'}"
@@ -1056,7 +1058,7 @@ class SemanticSearch:
         try:
             compressed_bytes = binary_data["embeddings_compressed_bytes"]
             embeddings_bytes = gzip.decompress(compressed_bytes)
-            self.sentence_embeddings = pickle.loads(embeddings_bytes)
+            self.sentence_embeddings = safe_pickle_loads(embeddings_bytes)
             logger.debug(f"Loaded embeddings: {len(embeddings_bytes) / 1024 / 1024:.2f}MB")
         except Exception as e:
             raise RuntimeError(f"Corrupted embeddings data for '{self.index.corpus_name}': {e}") from e

@@ -143,11 +143,12 @@ class OpenAIConnector:
         # Use correct token parameter based on model capabilities
         if model_tier.uses_completion_tokens:
             if model_tier.is_reasoning_model:
-                # Reasoning models need massive token allocation for internal thinking
+                # Reasoning models need token allocation for internal thinking
+                # Cap multiplier to prevent runaway token usage
                 reasoning_multiplier = 30 if max_tokens_value <= 50 else 15
-                request_params["max_completion_tokens"] = max(
-                    4000,
-                    max_tokens_value * reasoning_multiplier,
+                request_params["max_completion_tokens"] = min(
+                    16000,
+                    max(4000, max_tokens_value * reasoning_multiplier),
                 )
             else:
                 # Non-reasoning models with completion tokens use standard allocation
@@ -167,6 +168,17 @@ class OpenAIConnector:
             f"response_type={response_model.__name__}, "
             f"prompt_length={len(prompt)}",
         )
+
+        # Check AI spending budget before making API call
+        from ..api.middleware.rate_limiting import spending_tracker
+
+        budget_ok, budget_reason = await spending_tracker.check_budget()
+        if not budget_ok:
+            raise RateLimitError(
+                message=f"AI budget exceeded: {budget_reason}",
+                response=None,
+                body=None,
+            )
 
         # Make the API call with structured output (retry on transient errors)
         max_retries = 3
@@ -215,6 +227,9 @@ class OpenAIConnector:
             "completion_tokens": completion_tokens,
             "total_tokens": total_tokens,
         }
+
+        # Record actual AI spending
+        await spending_tracker.record_spend(active_model, total_tokens)
 
         # Log successful API call
         log_metrics(

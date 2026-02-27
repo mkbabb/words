@@ -700,6 +700,25 @@ class VersionedDataManager:
         ).to_list()
         return results
 
+    async def invalidate_cache(
+        self,
+        resource_id: str,
+        resource_type: ResourceType,
+    ) -> None:
+        """Invalidate all cache entries for a resource.
+
+        Use when external changes (e.g., direct MongoDB updates) have occurred
+        and cached data may be stale.
+        """
+        namespace = self._get_namespace(resource_type)
+        cache_key = _generate_cache_key(resource_type, resource_id)
+
+        if self.cache is None:
+            self.cache = await get_global_cache()
+
+        await self.cache.delete(namespace, cache_key)
+        logger.debug(f"Invalidated cache for {resource_type.value}:{resource_id}")
+
     # ============================================================================
     # WRAPPER METHODS FOR TEST COMPATIBILITY
     # ============================================================================

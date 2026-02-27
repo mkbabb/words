@@ -8,6 +8,8 @@
       <div
         v-for="notification in notificationList"
         :key="notification.id"
+        role="alert"
+        aria-live="polite"
         :class="[
           'cartoon-shadow-sm rounded-xl p-4 backdrop-blur-xl border-2',
           'transition-all duration-300 hover-lift cursor-pointer',

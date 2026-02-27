@@ -108,4 +108,4 @@ CMD ["uvicorn", "src.floridify.api.main:app", \
      "--host", "0.0.0.0", \
      "--port", "8000", \
      "--proxy-headers", \
-     "--forwarded-allow-ips", "*"]
+     "--forwarded-allow-ips", "127.0.0.1,172.16.0.0/12,10.0.0.0/8"]

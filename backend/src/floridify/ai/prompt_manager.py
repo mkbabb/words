@@ -12,10 +12,14 @@ def _sanitize_user_input(value: str) -> str:
     """Sanitize user-provided text before injecting into prompts.
 
     Strips control characters and common prompt injection patterns
-    while preserving legitimate content.
+    while preserving legitimate content. Enforces a 500-char hard limit.
     """
     if not isinstance(value, str):
         return str(value)
+
+    # Hard limit on user input length to prevent abuse
+    if len(value) > 500:
+        value = value[:500]
 
     # Strip control characters (except newlines and tabs)
     value = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', value)
@@ -28,6 +32,9 @@ def _sanitize_user_input(value: str) -> str:
         lambda m: m.group(0).replace(':', ':\u200B'),  # Zero-width space after colon
         value,
     )
+
+    # Neutralize XML-style injection attempts
+    value = re.sub(r'</?(?:system|tool|function|assistant|human)\b[^>]*>', '', value, flags=re.IGNORECASE)
 
     return value
 

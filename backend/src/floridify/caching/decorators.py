@@ -345,9 +345,8 @@ def deduplicated(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable
             future.set_exception(e)
             raise
         finally:
-            # Clean up
-            await asyncio.sleep(0.01)  # Small delay to ensure waiters get the result
-            del _active_calls[cache_key]
+            # Clean up - use pop() to avoid KeyError races
+            _active_calls.pop(cache_key, None)
 
     return wrapper
 
@@ -459,9 +458,8 @@ def cached_api_call_with_dedup(
                 raise
 
             finally:
-                # Clean up deduplication state
-                await asyncio.sleep(0.01)  # Small delay to ensure waiters get the result
-                del _active_calls[cache_key]
+                # Clean up deduplication state - use pop() to avoid KeyError races
+                _active_calls.pop(cache_key, None)
 
         return wrapper
 

@@ -175,9 +175,9 @@ export const useHistoryStore = defineStore('history', () => {
     // Add new entry at the beginning
     lookupHistory.value.unshift(historyEntry)
 
-    // Keep only last 50 lookups
-    if (lookupHistory.value.length > 50) {
-      lookupHistory.value = lookupHistory.value.slice(0, 50)
+    // Keep only last 25 lookups (entries are large SynthesizedDictionaryEntry objects)
+    if (lookupHistory.value.length > 25) {
+      lookupHistory.value = lookupHistory.value.slice(0, 25)
     }
 
     // Refresh vocabulary suggestions with new history, but throttle it

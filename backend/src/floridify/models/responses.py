@@ -349,6 +349,7 @@ class AnkiExportResponse(BaseResponse):
     wordlist_name: str = Field(..., description="Source wordlist name")
     deck_name: str = Field(..., description="Generated deck name")
     cards_generated: int = Field(..., description="Number of cards created")
+    cards_failed: int = Field(default=0, description="Number of cards that failed to export")
     file_path: str | None = Field(None, description="Output file path (CLI)")
     download_url: str | None = Field(None, description="Download URL (API)")
     card_types: list[str] = Field(..., description="Card types included")

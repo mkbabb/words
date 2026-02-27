@@ -1,4 +1,4 @@
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useEventListener } from '@vueuse/core';
 import { logger } from '@/utils/logger';
 
@@ -235,33 +235,48 @@ export function usePWA() {
     return isInstallable.value && !isInstalled.value && deferredPrompt.value !== null;
   });
   
+  // Cleanup tracking
+  const cleanupFns: (() => void)[] = [];
+
   // Initialize
   onMounted(() => {
     checkInstallState();
     registerServiceWorker();
-    
+
     // Listen for beforeinstallprompt
-    window.addEventListener('beforeinstallprompt', (e: Event) => {
+    const handleInstallPrompt = (e: Event) => {
       e.preventDefault();
       deferredPrompt.value = e as BeforeInstallPromptEvent;
       isInstallable.value = true;
-    });
-    
+    };
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
+    cleanupFns.push(() => window.removeEventListener('beforeinstallprompt', handleInstallPrompt));
+
     // Listen for app installed
-    window.addEventListener('appinstalled', () => {
+    const handleAppInstalled = () => {
       isInstalled.value = true;
       deferredPrompt.value = null;
-    });
-    
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
+    cleanupFns.push(() => window.removeEventListener('appinstalled', handleAppInstalled));
+
     // Monitor online/offline status
     useEventListener('online', () => { isOffline.value = false; });
     useEventListener('offline', () => { isOffline.value = true; });
-    
+
     // Listen for display mode changes
     const displayModeQuery = window.matchMedia('(display-mode: standalone)');
     displayModeQuery.addEventListener('change', checkInstallState);
+    cleanupFns.push(() => displayModeQuery.removeEventListener('change', checkInstallState));
   });
-  
+
+  onUnmounted(() => {
+    for (const cleanup of cleanupFns) {
+      cleanup();
+    }
+    cleanupFns.length = 0;
+  });
+
   return {
     // State
     isServiceWorkerSupported,

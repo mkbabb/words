@@ -207,6 +207,7 @@ import { useMagicKeys, whenever } from '@vueuse/core';
 import { useContentStore, useNotificationStore } from '@/stores';
 import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useSearchBarStore } from '@/stores/search/search-bar';
+import { useRouterSync } from '@/stores/composables/useRouterSync';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -444,10 +445,10 @@ const handleClusterNameUpdate = async (clusterId: string, newName: string) => {
     }
 };
 
-const handleWordSearch = (_word: string) => {
-    // This should trigger a search for the new word
-    // We'll emit this to parent or handle through router
-    // TODO: Implement word search navigation
+const handleWordSearch = (word: string) => {
+    // Navigate to the new word's definition via router
+    const { navigateToLookupMode } = useRouterSync();
+    navigateToLookupMode(word, 'dictionary');
 };
 
 const handleAddToWordlist = (word: string) => {
@@ -455,16 +456,18 @@ const handleAddToWordlist = (word: string) => {
     showWordlistModal.value = true;
 };
 
-const handleWordAddedToList = (_wordlist: any, _word: string) => {
-    // Show success notification or handle the addition result
-    // TODO: Show success toast notification
+const handleWordAddedToList = (_wordlist: any, word: string) => {
+    const notifications = useNotificationStore();
+    notifications.showNotification({
+        type: 'success',
+        message: `"${word}" added to wordlist`
+    });
 };
 
 // Error handling methods
 const handleRetryLookup = () => {
     if (contentStore.definitionError?.originalWord) {
         const wordToRetry = contentStore.definitionError.originalWord;
-        // Clear the error state and retry the lookup
         contentStore.clearError();
         handleWordSearch(wordToRetry);
     }

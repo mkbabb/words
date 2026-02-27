@@ -10,6 +10,9 @@ export interface SafeAreaInsets {
 }
 
 export function useIOSPWA() {
+  // Cleanup tracking for event listeners
+  const cleanupFns: (() => void)[] = [];
+
   // Device detection
   const isIOS = ref(false);
   const isIPadOS = ref(false);
@@ -87,10 +90,16 @@ export function useIOSPWA() {
     useEventListener('resize', handleViewportResize);
     
     // Listen for install prompt
-    window.addEventListener('beforeinstallprompt', (e: any) => {
+    const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       deferredPrompt.value = e;
       canInstall.value = true;
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Cleanup on unmount
+    cleanupFns.push(() => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     });
   });
   
@@ -127,16 +136,18 @@ export function useIOSPWA() {
   
   function detectKeyboard() {
     if (!isIOS.value) return;
-    
+
     const viewport = window.visualViewport;
     if (viewport) {
-      viewport.addEventListener('resize', () => {
+      const handleViewportResize = () => {
         const hasKeyboard = window.innerHeight > viewport.height;
         keyboardHeight.value = hasKeyboard ? window.innerHeight - viewport.height : 0;
-      });
+      };
+      viewport.addEventListener('resize', handleViewportResize);
+      cleanupFns.push(() => viewport.removeEventListener('resize', handleViewportResize));
     }
   }
-  
+
   onMounted(detectKeyboard);
   
   // Swipe navigation handling
@@ -283,6 +294,14 @@ export function useIOSPWA() {
     }
   }
   
+  // Cleanup all event listeners on unmount
+  onUnmounted(() => {
+    for (const cleanup of cleanupFns) {
+      cleanup();
+    }
+    cleanupFns.length = 0;
+  });
+
   return {
     // Device detection
     isIOS,

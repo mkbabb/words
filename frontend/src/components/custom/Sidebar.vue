@@ -33,7 +33,7 @@
       <!-- Mobile Sidebar Content -->
       <div
         :class="cn(
-          'bg-background/[0.98] border-border pointer-events-auto fixed top-0 left-0 z-50 flex h-full w-80 flex-col border-r shadow-2xl backdrop-blur-sm transition-transform duration-400 ease-apple-smooth',
+          'bg-background/[0.98] border-border pointer-events-auto fixed top-0 left-0 z-50 flex h-full w-[min(80vw,320px)] flex-col border-r shadow-2xl backdrop-blur-sm transition-transform duration-400 ease-apple-smooth',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )"
       >

@@ -234,6 +234,17 @@ const checkEngagement = () => {
 // Store interval ID outside to clear it later
 let checkInterval: ReturnType<typeof setInterval> | null = null;
 
+// Event handlers defined at module scope for cleanup
+const handleWordSearched = () => {
+  const count = parseInt(localStorage.getItem('search-count') || '0');
+  localStorage.setItem('search-count', (count + 1).toString());
+};
+
+const handleShowPWAPrompt = () => {
+  showPrompt.value = true;
+  isMinimized.value = false;
+};
+
 onMounted(() => {
   // iOS prompt logic
   if (isIOS.value && !isInstalled.value) {
@@ -256,22 +267,18 @@ onMounted(() => {
   }
   
   // Track searches for engagement
-  window.addEventListener('word-searched', () => {
-    const count = parseInt(localStorage.getItem('search-count') || '0');
-    localStorage.setItem('search-count', (count + 1).toString());
-  });
-  
+  window.addEventListener('word-searched', handleWordSearched);
+
   // Listen for debug show prompt event
-  window.addEventListener('show-pwa-prompt', () => {
-    showPrompt.value = true;
-    isMinimized.value = false;
-  });
+  window.addEventListener('show-pwa-prompt', handleShowPWAPrompt);
 });
 
-// Clean up interval on unmount
+// Clean up all listeners on unmount
 onUnmounted(() => {
   if (checkInterval) {
     clearInterval(checkInterval);
   }
+  window.removeEventListener('word-searched', handleWordSearched);
+  window.removeEventListener('show-pwa-prompt', handleShowPWAPrompt);
 });
 </script>

@@ -82,14 +82,21 @@ class SSEEvent:
         self.event_id = event_id
 
     def format(self) -> str:
-        """Format as SSE string (per SSE spec: each event ends with \\n\\n)."""
+        """Format as SSE string (per SSE spec: each event ends with \\n\\n).
+
+        Handles multiline JSON by prefixing each line with 'data:' per SSE spec.
+        """
         lines = []
 
         if self.event_id:
             lines.append(f"id: {self.event_id}")
 
         lines.append(f"event: {self.event_type}")
-        lines.append(f"data: {json.dumps(self.data)}")
+
+        # SSE spec: multiline data must have each line prefixed with "data: "
+        json_str = json.dumps(self.data)
+        for json_line in json_str.split("\n"):
+            lines.append(f"data: {json_line}")
 
         # SSE spec requires double newline to terminate event
         return "\n".join(lines) + "\n\n"
@@ -268,7 +275,7 @@ async def create_streaming_response(
 
     return StreamingResponse(
         event_generator(),
-        media_type="text/event-stream",
+        media_type="text/event-stream; charset=utf-8",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",

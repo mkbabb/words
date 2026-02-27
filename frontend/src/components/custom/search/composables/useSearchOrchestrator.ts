@@ -32,6 +32,9 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
   const searchError = computed(() => _searchError);
   let _searchError: Error | null = null;
 
+  // Track active stream for cancellation on new lookups
+  let activeStreamController: AbortController | null = null;
+
   // ============================================================================
   // SEARCH EXECUTION - MODE ROUTER
   // ============================================================================
@@ -111,6 +114,12 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
       onProgress?: (stage: string, progress: number) => void;
     }
   ): Promise<SynthesizedDictionaryEntry> => {
+    // Abort any active stream before starting a new one
+    if (activeStreamController) {
+      activeStreamController.abort();
+      activeStreamController = null;
+    }
+
     const apiOptions = {
       forceRefresh: options?.forceRefresh || false,
       providers: Array.from(lookupMode.selectedSources) as any[],
@@ -123,11 +132,13 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
 
     try {
       if (options?.onProgress) {
+        activeStreamController = new AbortController();
         return await lookupApi.lookupStream(word, {
           forceRefresh: apiOptions.forceRefresh,
           providers: apiOptions.providers,
           languages: apiOptions.languages,
           noAI: apiOptions.noAI,
+          abortController: activeStreamController,
           onProgress: (event) => {
             const stage = event.stage || 'processing';
             const progress = event.progress || 0;
@@ -140,6 +151,7 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
 
       return await lookupApi.lookup(word, apiOptions);
     } finally {
+      activeStreamController = null;
       loading.setShowLoadingModal(false);
       loading.endOperation();
     }

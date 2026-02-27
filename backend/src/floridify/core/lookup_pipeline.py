@@ -166,10 +166,14 @@ async def lookup_word_pipeline(
         if state_tracker:
             await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
 
-        # Fail fast if no provider data available
+        # If all providers failed, try AI fallback
         if not providers_data:
-            logger.error(f"All providers failed for '{best_match}'")
-            return None
+            logger.warning(f"All providers failed for '{best_match}', attempting AI fallback")
+            return await _ai_fallback_lookup(
+                word=best_match,
+                force_refresh=force_refresh,
+                state_tracker=state_tracker,
+            )
 
         # Synthesize with AI if enabled and we have provider data
         if not no_ai and providers_data:
@@ -273,7 +277,15 @@ async def _get_provider_definition(
         if connector:
             fetch_start = time.perf_counter()
 
-            result = await connector.fetch_definition(word_obj, state_tracker)
+            # Per-provider timeout to prevent a single slow provider from blocking
+            try:
+                result = await asyncio.wait_for(
+                    connector.fetch_definition(word_obj, state_tracker),
+                    timeout=30.0,
+                )
+            except TimeoutError:
+                logger.warning(f"⏱️ Provider {provider.value} timed out after 30s for '{word}'")
+                return None
 
             fetch_duration = time.perf_counter() - fetch_start
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import fnmatch
+import io
 import pickle
 from datetime import timedelta
 from pathlib import Path
@@ -15,6 +16,68 @@ from ..utils.logging import get_logger
 from ..utils.paths import get_cache_directory
 
 logger = get_logger(__name__)
+
+
+# Allowlisted modules for safe pickle deserialization.
+# Only known-safe modules from our own codebase and standard libraries
+# are permitted to prevent arbitrary code execution from tampered cache files.
+_SAFE_PICKLE_MODULES = frozenset({
+    "builtins",
+    "collections",
+    "datetime",
+    "decimal",
+    "enum",
+    "copy",
+    "copyreg",
+    "re",
+    "uuid",
+    # Pydantic & Beanie ODM
+    "pydantic",
+    "pydantic.main",
+    "pydantic._internal",
+    "pydantic._internal._model_construction",
+    "pydantic.fields",
+    "pydantic.v1",
+    "beanie",
+    "beanie.odm",
+    "beanie.odm.documents",
+    # BSON / MongoDB
+    "bson",
+    "bson.objectid",
+    "bson.decimal128",
+    "bson.binary",
+    "bson.regex",
+    # NumPy (for semantic embeddings)
+    "numpy",
+    "numpy.core",
+    "numpy.core.multiarray",
+    "numpy._core",
+    "numpy._core.multiarray",
+    # Application models
+    "floridify",
+})
+
+
+class RestrictedUnpickler(pickle.Unpickler):
+    """Unpickler that only allows known-safe modules to be deserialized.
+
+    Prevents arbitrary code execution from tampered cache files by restricting
+    which modules can be instantiated during deserialization.
+    """
+
+    def find_class(self, module: str, name: str) -> Any:
+        # Allow any sub-module of safe top-level modules
+        top_module = module.split(".")[0]
+        if top_module in _SAFE_PICKLE_MODULES or module in _SAFE_PICKLE_MODULES:
+            return super().find_class(module, name)
+        raise pickle.UnpicklingError(
+            f"Restricted unpickle: module '{module}' class '{name}' is not allowlisted"
+        )
+
+
+def safe_pickle_loads(data: bytes) -> Any:
+    """Safely deserialize pickled data using RestrictedUnpickler."""
+    return RestrictedUnpickler(io.BytesIO(data)).load()
 
 # Constants
 DEFAULT_SIZE_LIMIT = 1024 * 1024 * 1024 * 10  # 10GB
@@ -94,10 +157,9 @@ class FilesystemBackend:
             if data is None:
                 return None
 
-            # For bytes, attempt pickle deserialization (most performant)
+            # For bytes, attempt pickle deserialization with restricted unpickler
             if isinstance(data, bytes):
-
-                return pickle.loads(data)
+                return safe_pickle_loads(data)
 
             return data
 

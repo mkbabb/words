@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -14,6 +15,7 @@ from ..storage.mongodb import get_storage
 from ..utils.logging import setup_logging
 from .middleware import CacheHeadersMiddleware, LoggingMiddleware
 from .middleware.auth import ClerkAuthMiddleware
+from .middleware.rate_limiting import RateLimitMiddleware
 from .routers import (
     ai,
     audio,
@@ -39,8 +41,8 @@ from .routers import (
     # wotd_ml,
 )
 
-# Configure logging for the application
-setup_logging("DEBUG")
+# Configure logging from environment
+setup_logging(os.getenv("LOG_LEVEL", "INFO"))
 
 
 @asynccontextmanager
@@ -48,6 +50,14 @@ async def lifespan(app: FastAPI) -> Any:
     """Initialize database and resources on startup, cleanup on shutdown."""
     # Startup
     try:
+        # Validate auth configuration in production
+        environment = os.getenv("ENVIRONMENT", "development")
+        if environment == "production" and not os.getenv("CLERK_DOMAIN"):
+            raise RuntimeError(
+                "CLERK_DOMAIN must be set in production. "
+                "Auth middleware will deny all protected requests without it."
+            )
+
         # Initialize MongoDB storage
         await get_storage()
         print("✅ MongoDB storage initialized successfully")
@@ -61,8 +71,8 @@ async def lifespan(app: FastAPI) -> Any:
 
         # Start background TTL cleanup task (runs every 5 minutes)
         cache = await get_global_cache()
-        cache.start_ttl_cleanup_task(interval_seconds=300.0)
-        print("✅ Background TTL cleanup task started (interval=300s)")
+        cache.start_ttl_cleanup_task(interval_seconds=60.0)
+        print("✅ Background TTL cleanup task started (interval=60s)")
 
     except Exception as e:
         print(f"❌ Application initialization failed: {e}")
@@ -106,6 +116,7 @@ app.add_middleware(
 )
 app.add_middleware(CacheHeadersMiddleware)  # Add cache headers before logging
 app.add_middleware(LoggingMiddleware)
+app.add_middleware(RateLimitMiddleware)  # Rate limiting after auth
 app.add_middleware(ClerkAuthMiddleware)  # Auth check (innermost - runs first)
 
 # Register global exception handlers

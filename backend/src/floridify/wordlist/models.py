@@ -79,6 +79,8 @@ class WordListItem(BaseModel):
             self.mastery_level = MasteryLevel.SILVER
         elif self.review_data.repetitions > 0:
             self.mastery_level = MasteryLevel.BRONZE
+        else:
+            self.mastery_level = MasteryLevel.DEFAULT
 
     def is_due_for_review(self) -> bool:
         """Check if word is due for review."""

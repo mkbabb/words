@@ -66,17 +66,31 @@ export class SSEClient {
       let hasReceivedData = false
       let timeoutId: NodeJS.Timeout
 
+      // Link external abort signal if provided
+      if (options.signal) {
+        options.signal.addEventListener('abort', () => {
+          cleanup()
+          reject(new Error('Stream aborted by caller'))
+        })
+      }
+
       const cleanup = () => {
         clearTimeout(timeoutId)
         controller.abort()
       }
 
-      timeoutId = setTimeout(() => {
-        cleanup()
-        reject(new Error(`SSE connection timeout after ${timeout}ms`))
-      }, timeout)
+      // Progressive timeout: reset on each received event
+      const resetTimeout = () => {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(() => {
+          cleanup()
+          reject(new Error(`SSE connection timeout after ${timeout}ms of inactivity`))
+        }, timeout)
+      }
 
-      this.processStream(url, controller.signal, options, handlers)
+      resetTimeout()
+
+      this.processStream(url, controller.signal, options, handlers, resetTimeout)
         .then(result => {
           cleanup()
           resolve(result)
@@ -96,7 +110,8 @@ export class SSEClient {
     url: string,
     signal: AbortSignal,
     options: SSEOptions,
-    handlers: SSEHandlers<T>
+    handlers: SSEHandlers<T>,
+    resetTimeout?: () => void
   ): Promise<T> {
     const response = await fetch(url, {
       method: 'GET',
@@ -150,6 +165,8 @@ export class SSEClient {
           if (line.startsWith('event: ')) {
             currentEvent = line.slice(7)
           } else if (line.startsWith('data: ')) {
+            // Reset timeout on each received event
+            resetTimeout?.()
             const data = this.parseData(line.slice(6))
 
             // Handle different event types
