@@ -100,15 +100,6 @@ export function useSearchBarScroll(options: UseSearchBarScrollOptions) {
   // Update scroll progress from external prop
   watch(shrinkPercentage, (newValue) => {
     uiState.scrollProgress = newValue;
-    
-    // Debug logging in development
-    if (import.meta.env.DEV) {
-      console.log('SearchBar scroll update:', {
-        shrinkPercentage: newValue,
-        scrollProgress: uiState.scrollProgress,
-        containerStyle: containerStyle.value,
-      });
-    }
   }, { immediate: true });
 
   return {

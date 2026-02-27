@@ -34,6 +34,7 @@ import { FancyF } from '@/components/custom/icons';
 import { useRouter } from 'vue-router';
 import { useStores } from '@/stores';
 import { useRouterSync } from '@/stores/composables/useRouterSync';
+import { logger } from '@/utils/logger';
 import type { LookupMode } from '@/types';
 
 interface ModeToggleProps {
@@ -69,49 +70,41 @@ const { navigateToLookupMode } = useRouterSync();
 
 const handleToggle = async () => {
     if (!props.canToggle) return;
-    
-    console.log('🔄 ModeToggle handleToggle called');
-    
+
     // Safety checks
     if (!router) {
-        console.error('❌ Router is not available in ModeToggle');
+        logger.error('Router is not available in ModeToggle');
         return;
     }
-    
+
     if (!searchBar) {
-        console.error('❌ SearchBar store is not available in ModeToggle');
+        logger.error('SearchBar store is not available in ModeToggle');
         return;
     }
-    
+
     const current = modelValue.value;
-    console.log('🔄 Current mode:', current);
-    
+
     // Simple state machine with clear transitions using centralized types
     const transitions: Record<LookupMode, LookupMode> = {
         // From dictionary
         'dictionary': 'thesaurus',
-        
+
         // From thesaurus
         'thesaurus': content.wordSuggestions ? 'suggestions' : 'dictionary',
-        
+
         // From suggestions
         'suggestions': 'dictionary'
     };
-    
+
     const newMode = transitions[current] || 'dictionary';
-    console.log('🔄 New mode:', newMode);
     modelValue.value = newMode;
-    
+
     // Handle router navigation for definition/thesaurus/suggestions toggle
     if (searchBar.searchMode === 'lookup' && searchBar.searchQuery && searchBar.searchQuery.trim()) {
         const currentWord = searchBar.searchQuery;
-        console.log('🧭 Navigation needed for word:', currentWord, 'to mode:', newMode);
-        
+
         // Use the enhanced router navigation with router instance
         navigateToLookupMode(currentWord, newMode);
-        console.log('✅ Navigation completed using enhanced router sync');
-    } else {
-        console.log('🔄 No navigation needed - not in lookup mode or no query');
     }
 };
 </script>

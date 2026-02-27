@@ -565,10 +565,7 @@ const handleEnterWrapped = async () => {
 };
 
 const toggleControls = () => {
-    console.log('🍔 Hamburger toggleControls called');
-    console.log('🍔 Current showControls:', searchBar.showSearchControls);
     searchBar.toggleSearchControls();
-    console.log('🍔 After toggle showControls:', searchBar.showSearchControls);
 };
 
 
@@ -708,7 +705,6 @@ onMounted(async () => {
         // Don't hide for AI mode - let it show AI suggestions
         if (!focused || !query || query.length === 0) {
             if (searchBar.showDropdown) {
-                console.log('🔍 Hiding dropdown - no focus/query');
                 searchBar.hideDropdown();
             }
         }

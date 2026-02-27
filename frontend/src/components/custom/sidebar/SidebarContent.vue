@@ -123,6 +123,7 @@ import SidebarLookupView from './SidebarLookupView.vue';
 import SidebarWordListView from './SidebarWordListView.vue';
 import type { SynthesizedDictionaryEntry, WordList } from '@/types';
 import { wordlistApi } from '@/api';
+import { logger } from '@/utils/logger';
 
 interface Props {
     collapsed: boolean;
@@ -226,7 +227,7 @@ const handleCollapsedAIClick = async (query: string) => {
             searchBar.setQuery(query);
         }
     } catch (error) {
-        console.error('Error getting AI suggestions:', error);
+        logger.error('Error getting AI suggestions:', error);
     }
 };
 
@@ -309,7 +310,7 @@ const loadRecentWordlists = async () => {
             owner_id: item.owner_id,
         }));
     } catch (error) {
-        console.error('Failed to load recent wordlists:', error);
+        logger.error('Failed to load recent wordlists:', error);
     }
 };
 

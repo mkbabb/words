@@ -65,9 +65,6 @@ interface ExampleListProps {
 
 const props = defineProps<ExampleListProps>();
 
-// Debug logging
-console.log('[ExampleListEditable] Examples:', props.examples);
-
 const regeneratingIndex = ref<number | null>(null);
 
 const emit = defineEmits<{

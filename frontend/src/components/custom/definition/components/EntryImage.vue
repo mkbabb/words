@@ -27,6 +27,7 @@
 
 <script setup lang="ts">
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { logger } from '@/utils/logger';
 import type { ImageMedia } from '@/types/api';
 
 interface EntryImageProps {
@@ -42,7 +43,7 @@ const emit = defineEmits<{
 }>();
 
 const handleImageError = (event: Event) => {
-    console.error('Failed to load image:', (event.target as HTMLImageElement).src);
+    logger.error('Failed to load image:', (event.target as HTMLImageElement).src);
     // Hide the image on error
     (event.target as HTMLImageElement).style.display = 'none';
     emit('image-error', event);

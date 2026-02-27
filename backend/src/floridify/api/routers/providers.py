@@ -10,6 +10,7 @@ from ...caching.core import CacheNamespace, get_global_cache
 from ...models.dictionary import DictionaryProvider
 from ...models.parameters import ProviderStatusParams
 from ...models.responses import ProviderListResponse, ProviderStatusResponse
+from ...providers.utils import get_all_circuit_statuses
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -95,6 +96,21 @@ async def get_provider_status(
             status_code=500,
             detail=f"Failed to get provider status: {e!s}",
         )
+
+
+@router.get("/providers/circuit-status")
+async def get_circuit_breaker_status() -> dict:
+    """Get circuit breaker status for all providers.
+
+    Returns per-provider circuit state (closed/open/half-open),
+    failure counts, and recovery info. Admin-only endpoint.
+    """
+    statuses = get_all_circuit_statuses()
+    return {
+        "circuits": statuses,
+        "total": len(statuses),
+        "open_circuits": sum(1 for s in statuses if s["state"] == "open"),
+    }
 
 
 async def _get_provider_status(

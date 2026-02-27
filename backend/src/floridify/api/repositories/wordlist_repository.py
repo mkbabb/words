@@ -17,6 +17,7 @@ from ...wordlist.constants import MasteryLevel, Temperature
 from ...wordlist.models import WordList, WordListItem
 from ...wordlist.utils import generate_wordlist_hash
 from ..core.base import BaseRepository
+from ..core.exceptions import VersionConflictException
 from .corpus_repository import CorpusRepository, CorpusSearchParams
 
 logger = get_logger(__name__)
@@ -101,6 +102,11 @@ class WordAddRequest(BaseModel):
     """Request to add words to a list."""
 
     words: list[str] = Field(..., min_length=1, description="Words to add")
+    version: int | None = Field(
+        default=None,
+        description="Expected wordlist version for optimistic locking. "
+        "If provided, the operation will fail with 409 if the wordlist has been modified.",
+    )
 
 
 class WordReviewRequest(BaseModel):
@@ -301,10 +307,23 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         )
 
     async def add_word(self, wordlist_id: PydanticObjectId, request: WordAddRequest) -> WordList:
-        """Add words to an existing word list."""
+        """Add words to an existing word list.
+
+        Supports optimistic locking: if request.version is provided, the operation
+        will fail with 409 Conflict if the wordlist has been modified since the
+        client last read it.
+        """
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
             raise ValueError(f"WordList with id {wordlist_id} not found")
+
+        # Optimistic locking: verify version if provided
+        if request.version is not None and wordlist.version != request.version:
+            raise VersionConflictException(
+                expected=request.version,
+                actual=wordlist.version,
+                resource="WordList",
+            )
 
         # Use batch processing for better performance
         word_ids = await self._batch_get_or_create_words(request.words)
@@ -324,11 +343,25 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         self,
         wordlist_id: PydanticObjectId,
         word_id: PydanticObjectId,
+        version: int | None = None,
     ) -> WordList:
-        """Remove a word from a word list by word ID."""
+        """Remove a word from a word list by word ID.
+
+        Supports optimistic locking: if version is provided, the operation
+        will fail with 409 Conflict if the wordlist has been modified since the
+        client last read it.
+        """
         wordlist = await self.get(wordlist_id, raise_on_missing=True)
         if wordlist is None:
             raise ValueError(f"WordList with id {wordlist_id} not found")
+
+        # Optimistic locking: verify version if provided
+        if version is not None and wordlist.version != version:
+            raise VersionConflictException(
+                expected=version,
+                actual=wordlist.version,
+                resource="WordList",
+            )
 
         # Find and remove the word by ID
         wordlist.words = [w for w in wordlist.words if w.word_id != word_id]

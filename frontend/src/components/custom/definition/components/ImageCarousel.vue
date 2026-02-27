@@ -157,6 +157,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import type { CarouselApi } from '@/components/ui/carousel';
 import ImageUploader from './ImageUploader.vue';
+import { logger } from '@/utils/logger';
 import type { ImageMedia } from '@/types/api';
 import { mediaApi } from '@/api/media';
 
@@ -247,7 +248,7 @@ const onImageLoad = (index: number) => {
 };
 
 const handleImageError = (event: Event, index: number) => {
-    console.error('Failed to load image:', (event.target as HTMLImageElement).src);
+    logger.error('Failed to load image:', (event.target as HTMLImageElement).src);
     loadingImages.value.delete(index);
     emit('image-error', event, index);
 };
@@ -289,7 +290,7 @@ const handleDeleteImage = async (imageId: string, index: number) => {
             }
         }
     } catch (error) {
-        console.error('Failed to delete image:', error);
+        logger.error('Failed to delete image:', error);
         // Could emit an error event here if needed
     } finally {
         // Always remove from deleting set

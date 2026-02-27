@@ -339,6 +339,7 @@ import RefreshButton from '@/components/custom/common/RefreshButton.vue';
 import { useToast } from '@/components/ui/toast/use-toast';
 import { useSlugGeneration } from '@/composables/useSlugGeneration';
 import { wordlistApi } from '@/api';
+import { logger } from '@/utils/logger';
 import type { WordList } from '@/types';
 
 interface Props {
@@ -399,7 +400,7 @@ const loadWordlists = async () => {
     wordlists.value = response.items;
     return response.items;
   } catch (error) {
-    console.error('Failed to load wordlists:', error);
+    logger.error('Failed to load wordlists:', error);
     toast({
       title: "Error",
       description: "Failed to load wordlists",
@@ -551,7 +552,7 @@ const parseFile = async (file: File): Promise<void> => {
             (a, b) => b.frequency - a.frequency
         );
     } catch (err) {
-        console.error('File parsing error:', err);
+        logger.error('File parsing error:', err);
         error.value = `Failed to parse ${file.name}`;
     }
 };
@@ -694,7 +695,7 @@ const handleUpload = async () => {
         uploadStatus.value = 'Complete!';
         closeModal();
     } catch (err) {
-        console.error('Upload error:', err);
+        logger.error('Upload error:', err);
         error.value =
             err instanceof Error
                 ? err.message

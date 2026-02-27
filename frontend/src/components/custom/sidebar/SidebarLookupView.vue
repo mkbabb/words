@@ -98,6 +98,7 @@ import GoldenSidebarSection from './GoldenSidebarSection.vue';
 import SidebarRecentItem from './SidebarRecentItem.vue';
 import VocabularySuggestionItem from './VocabularySuggestionItem.vue';
 import type { SynthesizedDictionaryEntry } from '@/types';
+import { logger } from '@/utils/logger';
 
 const { history, ui, content } = useStores();
 const searchBar = useSearchBarStore();
@@ -215,7 +216,7 @@ const handleAISuggestionClick = async (suggestion: { query: string }) => {
             searchBar.setQuery(suggestion.query);
         }
     } catch (error) {
-        console.error('Error getting AI suggestions:', error);
+        logger.error('Error getting AI suggestions:', error);
     }
     
     // Close mobile sidebar if open
@@ -232,18 +233,11 @@ const extractWordCount = (query: string): number => {
 
 // Initialize vocabulary suggestions on component mount
 onMounted(async () => {
-    console.log('🔍 SidebarLookupView mounted - checking history and suggestions');
-    console.log('Recent lookups count:', history.recentLookups.length);
-    console.log('Current vocab suggestions count:', history.vocabularySuggestions.length);
-    console.log('Recent lookup words:', history.recentLookupWords.slice(0, 5));
-    
     // If no lookup history exists, add some test data for vocabulary suggestions
     if (history.recentLookups.length === 0) {
-        console.log('📝 No lookup history found. Adding test data for vocabulary suggestions...');
-        
         // Add some sample lookup history to test vocabulary suggestions
         const sampleWords = ['eloquent', 'serendipity', 'ephemeral', 'ubiquitous', 'perspicacious'];
-        
+
         for (const word of sampleWords) {
             // Create a minimal entry for testing
             const mockEntry = {
@@ -275,50 +269,18 @@ onMounted(async () => {
                 last_updated: new Date().toISOString(),
                 lookup_count: 1
             } as unknown as SynthesizedDictionaryEntry;
-            
+
             history.addToLookupHistory(word, mockEntry);
         }
-        
-        console.log('✅ Added sample lookup history. Recent lookups:', history.recentLookups.length);
     }
-    
+
     // Check if we need to initialize vocabulary suggestions
     if (history.vocabularySuggestions.length === 0 && history.recentLookups.length > 0) {
-        console.log('🌟 Attempting to generate vocabulary suggestions...');
-        
         try {
             await history.refreshVocabularySuggestions();
-            const response = { suggestions: history.vocabularySuggestions };
-            
-            if (response && response.suggestions && response.suggestions.length > 0) {
-                console.log('✅ Successfully generated vocabulary suggestions:', response.suggestions.length);
-            } else {
-                console.log('⚠️ No vocabulary suggestions generated from API');
-            }
         } catch (error) {
-            console.error('❌ Failed to generate vocabulary suggestions:', error);
-            
-            // If API fails, create some fallback suggestions based on recent lookups
-            console.log('🔄 Creating fallback vocabulary suggestions...');
-            const fallbackSuggestions = history.recentLookupWords.slice(0, 3).map(word => ({
-                word: word + '-related',
-                reason: `Explore words related to "${word}"`,
-                difficulty: 'intermediate' as const,
-                relevance_score: 0.8
-            }));
-            
-            // Note: Cannot directly set vocabulary suggestions as there's no setter method
-            // The fallback suggestions will be used only if the API fails
-            console.log('⚠️ Fallback suggestions created but cannot be directly set:', fallbackSuggestions);
-            
-            if (fallbackSuggestions.length === 0) {
-                console.log('💡 No recent lookups available for fallback suggestions');
-            } else {
-                console.log('✅ Created fallback vocabulary suggestions:', fallbackSuggestions.length);
-            }
+            logger.error('Failed to generate vocabulary suggestions:', error);
         }
-    } else {
-        console.log('📚 Vocabulary suggestions already present:', history.vocabularySuggestions.length);
     }
 });
 </script>

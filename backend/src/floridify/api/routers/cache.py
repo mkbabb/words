@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from ...caching.core import CacheNamespace, get_global_cache
+from ...caching.manager import get_version_manager
 from ...models.parameters import CacheClearParams, CacheStatsParams
 from ...models.responses import CacheStatsResponse, SuccessResponse
 from ...utils.logging import get_logger
@@ -203,6 +205,100 @@ async def clear_cache(
     except Exception as e:
         logger.error(f"Failed to clear cache: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to clear cache: {e!s}")
+
+
+class VersionPruneParams(BaseModel):
+    """Parameters for version pruning."""
+
+    max_age_days: int = Field(
+        default=90,
+        ge=1,
+        le=3650,
+        description="Delete non-latest versions older than this many days",
+    )
+    keep_minimum: int = Field(
+        default=10,
+        ge=1,
+        le=1000,
+        description="Always keep at least this many versions per resource",
+    )
+    dry_run: bool = Field(
+        default=False,
+        description="Preview what would be deleted without making changes",
+    )
+
+
+@router.post("/cache/prune", response_model=SuccessResponse)
+async def prune_old_versions(
+    params: VersionPruneParams,
+) -> SuccessResponse:
+    """Prune old non-latest versions from the versioned data store.
+
+    Deletes versions older than max_age_days while always keeping at least
+    keep_minimum versions per resource. The latest version is never deleted.
+    Delta base versions (referenced by other versions) are also preserved.
+
+    Supports dry_run mode to preview changes before executing.
+    """
+    try:
+        manager = get_version_manager()
+        result = await manager.prune_old_versions(
+            max_age_days=params.max_age_days,
+            keep_minimum=params.keep_minimum,
+            dry_run=params.dry_run,
+        )
+
+        action = "Would delete" if params.dry_run else "Deleted"
+        message = (
+            f"{action} {result['total_deleted']} old versions "
+            f"across {result['resources_affected']} resources "
+            f"(max_age={params.max_age_days}d, keep_min={params.keep_minimum})"
+        )
+        if params.dry_run:
+            message += " (dry run)"
+
+        return SuccessResponse(
+            message=message,
+            data=result,
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to prune versions: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to prune versions: {e!s}")
+
+
+class DiskUsageResponse(BaseModel):
+    """Response for disk usage endpoint."""
+
+    volume_bytes: int = Field(..., description="Total bytes used by L2 disk cache")
+    volume_human: str = Field(..., description="Human-readable size string")
+    item_count: int = Field(..., description="Number of items in L2 disk cache")
+    hits: int = Field(..., description="L2 cache hits since startup")
+    misses: int = Field(..., description="L2 cache misses since startup")
+
+
+@router.get("/cache/disk-usage", response_model=DiskUsageResponse)
+async def get_cache_disk_usage() -> DiskUsageResponse:
+    """Get L2 disk cache consumption.
+
+    Returns the total disk space used by the filesystem-backed L2 cache,
+    the number of stored items, and basic hit/miss statistics from diskcache.
+    """
+    try:
+        cache = await get_global_cache()
+        l2_stats = await cache.l2_backend.get_stats()
+
+        volume = l2_stats.get("size", 0)
+        return DiskUsageResponse(
+            volume_bytes=volume,
+            volume_human=_format_bytes(volume),
+            item_count=l2_stats.get("count", 0),
+            hits=l2_stats.get("hits", 0),
+            misses=l2_stats.get("misses", 0),
+        )
+    except Exception as e:
+        logger.error(f"Failed to get disk usage: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get disk usage: {e!s}")
 
 
 def _format_bytes(bytes_count: int) -> str:

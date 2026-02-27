@@ -152,6 +152,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { WordList } from '@/types';
 import { MasteryLevel, Temperature } from '@/types';
+import { logger } from '@/utils/logger';
 
 interface Props {
   modelValue: boolean;
@@ -291,7 +292,7 @@ const handleQuickCreate = async () => {
     closeModal();
 
   } catch (err) {
-    console.error('Create wordlist error:', err);
+    logger.error('Create wordlist error:', err);
     error.value = 'Failed to create wordlist. Please try again.';
   } finally {
     isCreating.value = false;
@@ -351,7 +352,7 @@ const handleAddToWordlist = async (wordlist: WordList) => {
     }, 500);
 
   } catch (err) {
-    console.error('Add to wordlist error:', err);
+    logger.error('Add to wordlist error:', err);
     error.value = 'Failed to add word to wordlist. Please try again.';
   } finally {
     isAdding.value = false;

@@ -132,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { generateRainbowGradient } from '@/utils/animations';
 import {
     HoverCard,
@@ -140,6 +140,7 @@ import {
     HoverCardTrigger,
 } from '@/components/ui/hover-card';
 import { getDefaultStages, getCheckpointDescription } from './pipeline-stages';
+import { logger } from '@/utils/logger';
 
 interface Checkpoint {
     progress: number;
@@ -196,25 +197,6 @@ const effectiveCheckpoints = computed(() => {
 
 const emit = defineEmits<Emits>();
 
-// Debug logging
-watch(
-    () => props.progress,
-    (newVal, oldVal) => {
-        console.log(`LoadingProgress prop: ${oldVal} → ${newVal}`);
-    }
-);
-
-watch(normalizedProgress, (newVal, oldVal) => {
-    console.log(`LoadingProgress normalized: ${oldVal} → ${newVal}`);
-});
-
-watch(
-    () => props.currentStage,
-    (newVal) => {
-        console.log('LoadingProgress stage:', newVal);
-    }
-);
-
 const progressBarRef = ref<HTMLElement>();
 const isDragging = ref(false);
 const isMounted = ref(false);
@@ -269,7 +251,7 @@ const handleProgressBarInteraction = (event: MouseEvent) => {
     try {
         // Additional check: ensure element is still connected to DOM
         if (!progressBarRef.value.isConnected) {
-            console.warn('LoadingProgress: Element no longer connected to DOM');
+            logger.warn('LoadingProgress: Element no longer connected to DOM');
             return;
         }
 
@@ -281,7 +263,7 @@ const handleProgressBarInteraction = (event: MouseEvent) => {
 
         emit('progress-change', percentage);
     } catch (error) {
-        console.warn('LoadingProgress: Failed to get bounding rect during interaction:', error);
+        logger.warn('LoadingProgress: Failed to get bounding rect during interaction:', error);
     }
 };
 

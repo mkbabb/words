@@ -138,6 +138,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import ActionButton from './ActionButton.vue';
 // import { usePWA } from '@/composables';
 import { useStores } from '@/stores';
+import { logger } from '@/utils/logger';
 
 interface ActionsRowProps {
     showRefreshButton?: boolean;
@@ -248,7 +249,7 @@ const handleSendNotification = async () => {
             message: 'Notifications are enabled! 🎉'
         });
     } catch (error) {
-        console.error('Notification error:', error);
+        logger.error('Notification error:', error);
         notifications.showNotification({
             type: 'error',
             message: 'Failed to send notification'

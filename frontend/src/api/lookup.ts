@@ -5,6 +5,7 @@ import type {
 } from '@/types/api';
 import type { SynthesizedDictionaryEntry } from '@/types';
 import { api, transformError, API_BASE_URL } from './core';
+import { logger } from '@/utils/logger';
 import { 
   SSEClient, 
   type SSEOptions, 
@@ -117,7 +118,7 @@ export const lookupApi = {
         // Additional processing if needed
       },
       onError: (error: Error) => {
-        console.error('Stream error:', error);
+        logger.error('Stream error:', error);
       }
     };
 

@@ -1,5 +1,6 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useEventListener } from '@vueuse/core';
+import { logger } from '@/utils/logger';
 
 export interface SafeAreaInsets {
   top: number;
@@ -232,7 +233,7 @@ export function useIOSPWA() {
         await (navigator as any).setAppBadge(count);
       }
     } catch (error) {
-      console.error('Failed to set app badge:', error);
+      logger.error('Failed to set app badge:', error);
     }
   }
   
@@ -245,7 +246,7 @@ export function useIOSPWA() {
       return true;
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
-        console.error('Share failed:', error);
+        logger.error('Share failed:', error);
       }
       return false;
     }
@@ -277,7 +278,7 @@ export function useIOSPWA() {
       
       return outcome === 'accepted';
     } catch (error) {
-      console.error('Install prompt error:', error);
+      logger.error('Install prompt error:', error);
       return false;
     }
   }

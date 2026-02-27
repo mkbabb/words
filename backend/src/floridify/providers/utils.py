@@ -114,6 +114,118 @@ class ScrapingSession(BaseModel):
         return remaining / rate
 
 
+class CircuitState(str, Enum):
+    """Circuit breaker states."""
+
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Failing, reject requests
+    HALF_OPEN = "half_open"  # Testing if service recovered
+
+
+class CircuitBreaker:
+    """Circuit breaker for provider fault tolerance.
+
+    After `failure_threshold` consecutive errors, the circuit opens and all
+    requests are rejected for `recovery_timeout` seconds. After that, one
+    request is allowed through (half-open). If it succeeds, the circuit
+    closes; if it fails, the circuit re-opens.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        failure_threshold: int = 5,
+        recovery_timeout: float = 60.0,
+    ):
+        self.name = name
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.state = CircuitState.CLOSED
+        self.failure_count = 0
+        self.last_failure_time: float = 0
+        self.success_count = 0
+        self.total_requests = 0
+        self._lock = asyncio.Lock()
+
+    async def can_execute(self) -> bool:
+        """Check if request is allowed through the circuit."""
+        async with self._lock:
+            self.total_requests += 1
+
+            if self.state == CircuitState.CLOSED:
+                return True
+
+            if self.state == CircuitState.OPEN:
+                # Check if recovery timeout has elapsed
+                import time
+
+                if time.time() - self.last_failure_time >= self.recovery_timeout:
+                    self.state = CircuitState.HALF_OPEN
+                    logger.info(f"Circuit {self.name}: OPEN -> HALF_OPEN (testing recovery)")
+                    return True
+                return False
+
+            # HALF_OPEN: allow one request through
+            return True
+
+    async def record_success(self) -> None:
+        """Record a successful request."""
+        async with self._lock:
+            self.success_count += 1
+            if self.state == CircuitState.HALF_OPEN:
+                self.state = CircuitState.CLOSED
+                self.failure_count = 0
+                logger.info(f"Circuit {self.name}: HALF_OPEN -> CLOSED (recovered)")
+            else:
+                self.failure_count = 0
+
+    async def record_failure(self) -> None:
+        """Record a failed request."""
+        import time
+
+        async with self._lock:
+            self.failure_count += 1
+            self.last_failure_time = time.time()
+
+            if self.state == CircuitState.HALF_OPEN:
+                self.state = CircuitState.OPEN
+                logger.warning(f"Circuit {self.name}: HALF_OPEN -> OPEN (still failing)")
+            elif self.failure_count >= self.failure_threshold:
+                self.state = CircuitState.OPEN
+                logger.warning(
+                    f"Circuit {self.name}: CLOSED -> OPEN "
+                    f"(after {self.failure_count} consecutive failures)"
+                )
+
+    def get_status(self) -> dict[str, Any]:
+        """Get circuit breaker status for monitoring."""
+        return {
+            "name": self.name,
+            "state": self.state.value,
+            "failure_count": self.failure_count,
+            "success_count": self.success_count,
+            "total_requests": self.total_requests,
+            "failure_threshold": self.failure_threshold,
+            "recovery_timeout": self.recovery_timeout,
+        }
+
+
+# Global circuit breakers keyed by provider name
+_circuit_breakers: dict[str, CircuitBreaker] = {}
+
+
+def get_circuit_breaker(provider_name: str) -> CircuitBreaker:
+    """Get or create a circuit breaker for a provider."""
+    if provider_name not in _circuit_breakers:
+        _circuit_breakers[provider_name] = CircuitBreaker(name=provider_name)
+    return _circuit_breakers[provider_name]
+
+
+def get_all_circuit_statuses() -> list[dict[str, Any]]:
+    """Get status of all circuit breakers for monitoring."""
+    return [cb.get_status() for cb in _circuit_breakers.values()]
+
+
 class AdaptiveRateLimiter:
     """Adaptive rate limiter with backoff and server respect."""
 

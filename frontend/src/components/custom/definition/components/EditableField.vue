@@ -155,12 +155,10 @@ function handleInput() {
 
 function save() {
   const currentValue = getTextContent();
-  console.log('[EditableField] Saving:', props.fieldName, 'currentValue:', currentValue, 'originalValue:', originalValue.value);
-  
+
   if (props.validator) {
     const error = props.validator(currentValue);
     if (error) {
-      console.log('[EditableField] Validation failed:', error);
       return;
     }
   }
@@ -180,10 +178,7 @@ function save() {
   
   // Only emit if value actually changed
   if (JSON.stringify(newValue) !== JSON.stringify(props.modelValue)) {
-    console.log('[EditableField] Emitting update:', newValue);
     emit('update:modelValue', newValue);
-  } else {
-    console.log('[EditableField] No changes detected');
   }
   
   isEditing.value = false;

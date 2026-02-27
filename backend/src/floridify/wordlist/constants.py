@@ -26,4 +26,5 @@ SM2_INITIAL_INTERVALS = {
     1: 1,  # First review after 1 day
     2: 6,  # Second review after 6 days
 }
+SM2_MAX_EASE_FACTOR = 4.0
 SM2_QUALITY_THRESHOLD = 3  # Quality scores below this reset repetitions

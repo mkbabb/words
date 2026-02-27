@@ -54,13 +54,11 @@ export function useWordOfTheDayModeConfig() {
   // ==========================================================================
   
   const handler: ModeHandler<any, WordOfTheDayConfig> = {
-    onEnter: async (previousMode: SearchMode) => {
-      console.log('📅 Entering word-of-the-day mode from:', previousMode)
+    onEnter: async (_previousMode: SearchMode) => {
       setToday() // Always start with today's word
     },
-    
-    onExit: async (nextMode: SearchMode) => {
-      console.log('👋 Exiting word-of-the-day mode to:', nextMode)
+
+    onExit: async (_nextMode: SearchMode) => {
     },
     
     validateConfig: (config: WordOfTheDayConfig) => {

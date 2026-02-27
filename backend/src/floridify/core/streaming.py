@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 from collections.abc import AsyncGenerator, Callable, Generator
 from typing import Any
 
@@ -11,6 +12,10 @@ from ..utils.logging import get_logger
 from .state_tracker import StateTracker
 
 logger = get_logger(__name__)
+
+# SSE configuration
+SSE_HEARTBEAT_INTERVAL = 30  # seconds between heartbeat pings
+SSE_STREAM_TIMEOUT = 300  # 5 minute overall stream timeout
 
 
 def _send_chunked_completion(result_data: dict[str, Any]) -> Generator[str]:
@@ -113,7 +118,16 @@ async def create_streaming_response(
     """
 
     async def event_generator() -> AsyncGenerator[str]:
-        """Generate SSE events by running process in background and streaming progress."""
+        """Generate SSE events by running process in background and streaming progress.
+
+        Features:
+        - Heartbeat pings every 30s to keep proxies alive
+        - 5-minute overall stream timeout
+        - Cancels background process when client disconnects (generator closes)
+        """
+        process_task: asyncio.Task | None = None
+        stream_start = time.monotonic()
+
         try:
             # Send initial configuration
             if include_stage_definitions:
@@ -142,13 +156,33 @@ async def create_streaming_response(
                     nonlocal process_result, process_error
                     try:
                         process_result = await process_func()
+                    except asyncio.CancelledError:
+                        logger.info("Process task cancelled (client disconnected)")
+                        raise
                     except Exception as e:
                         process_error = e
 
                 process_task = asyncio.create_task(run_process())
+                last_heartbeat = time.monotonic()
 
                 # Stream progress events until the process completes
                 while not process_task.done():
+                    # Check overall stream timeout
+                    elapsed = time.monotonic() - stream_start
+                    if elapsed > SSE_STREAM_TIMEOUT:
+                        logger.warning(f"SSE stream timed out after {elapsed:.0f}s")
+                        process_task.cancel()
+                        try:
+                            await process_task
+                        except asyncio.CancelledError:
+                            pass
+                        error_event = SSEEvent(
+                            event_type="error",
+                            data={"type": "error", "message": "Stream timeout exceeded"},
+                        )
+                        yield error_event.format()
+                        return
+
                     try:
                         state = await asyncio.wait_for(queue.get(), timeout=0.2)
                         progress_event = SSEEvent(
@@ -156,10 +190,16 @@ async def create_streaming_response(
                             data=state.model_dump_optimized(),
                         )
                         yield progress_event.format()
+                        last_heartbeat = time.monotonic()
 
                         if state.is_complete or state.error:
                             break
                     except TimeoutError:
+                        # Send heartbeat ping if no events for 30s
+                        now = time.monotonic()
+                        if now - last_heartbeat >= SSE_HEARTBEAT_INTERVAL:
+                            yield ": ping\n\n"
+                            last_heartbeat = now
                         continue
 
                 # Process finished — drain any remaining queued events
@@ -201,6 +241,15 @@ async def create_streaming_response(
                     completion_event = SSEEvent(event_type="complete", data=completion_data)
                     yield completion_event.format()
 
+        except GeneratorExit:
+            # Client disconnected - cancel background process
+            logger.info("SSE client disconnected, cancelling background process")
+            if process_task and not process_task.done():
+                process_task.cancel()
+                try:
+                    await process_task
+                except asyncio.CancelledError:
+                    pass
         except Exception as e:
             logger.error(f"Streaming generator error: {e}")
             error_event = SSEEvent(
@@ -208,6 +257,14 @@ async def create_streaming_response(
                 data={"type": "error", "message": f"Streaming error: {e!s}"},
             )
             yield error_event.format()
+        finally:
+            # Ensure process task is cleaned up
+            if process_task and not process_task.done():
+                process_task.cancel()
+                try:
+                    await process_task
+                except (asyncio.CancelledError, Exception):
+                    pass
 
     return StreamingResponse(
         event_generator(),

@@ -7,6 +7,7 @@ import type {
   WordSuggestionResponse,
 } from '@/types';
 import { api, transformError, API_BASE_URL } from './core';
+import { logger } from '@/utils/logger';
 import { SSEClient, type SSEOptions, type SSEHandlers } from './sse/SSEClient';
 
 const sseClient = new SSEClient(api);
@@ -45,7 +46,7 @@ export const aiApi = {
           confidence: response.data.result.confidence || 0
         };
       } catch (error) {
-        console.error('Error fetching synonyms:', error);
+        logger.error('Error fetching synonyms:', error);
         throw transformError(error);
       }
     },
@@ -390,11 +391,9 @@ export const aiApi = {
         }
         return null;
       },
-      onComplete: (result: WordSuggestionResponse) => {
-        console.log('AI suggestions completed:', result);
-      },
+      onComplete: () => {},
       onError: (error: Error) => {
-        console.error('AI suggestions stream error:', error);
+        logger.error('AI suggestions stream error:', error);
       }
     };
 

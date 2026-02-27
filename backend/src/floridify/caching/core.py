@@ -72,6 +72,7 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         """
         self.namespaces: dict[CacheNamespace, NamespaceConfig] = {}
         self.l2_backend = l2_backend
+        self._cleanup_task: asyncio.Task[None] | None = None
         self._init_default_namespaces()
 
     @staticmethod
@@ -364,6 +365,92 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
             total_stats["memory_count"] += len(ns.memory_cache)
 
         return total_stats
+
+    async def cleanup_expired_entries(self) -> int:
+        """Scan all namespaces and evict expired L1 entries.
+
+        Returns:
+            Total number of expired entries evicted across all namespaces.
+        """
+        total_evicted = 0
+        now = time.time()
+
+        for namespace, ns in self.namespaces.items():
+            if ns.memory_ttl is None:
+                continue
+
+            ttl_seconds = ns.memory_ttl.total_seconds()
+            expired_keys: list[str] = []
+
+            async with ns.lock:
+                for key, entry in ns.memory_cache.items():
+                    age = now - entry["timestamp"]
+                    if age > ttl_seconds:
+                        expired_keys.append(key)
+
+                for key in expired_keys:
+                    del ns.memory_cache[key]
+                    ns.stats = ns.stats.increment_evictions()
+
+            evicted_count = len(expired_keys)
+            if evicted_count > 0:
+                total_evicted += evicted_count
+                logger.debug(
+                    f"TTL cleanup: evicted {evicted_count} expired entries "
+                    f"from {namespace.value}"
+                )
+
+        if total_evicted > 0:
+            logger.info(f"TTL cleanup complete: evicted {total_evicted} total expired entries")
+
+        return total_evicted
+
+    async def _run_periodic_cleanup(self, interval_seconds: float = 300.0) -> None:
+        """Run cleanup_expired_entries periodically.
+
+        Args:
+            interval_seconds: Seconds between cleanup runs (default 300 = 5 minutes).
+        """
+        logger.info(f"Background TTL cleanup task started (interval={interval_seconds}s)")
+        try:
+            while True:
+                await asyncio.sleep(interval_seconds)
+                try:
+                    await self.cleanup_expired_entries()
+                except Exception as e:
+                    logger.error(f"TTL cleanup error: {e}", exc_info=True)
+        except asyncio.CancelledError:
+            logger.info("Background TTL cleanup task cancelled")
+
+    def start_ttl_cleanup_task(self, interval_seconds: float = 300.0) -> asyncio.Task[None]:
+        """Start the periodic TTL cleanup background task.
+
+        Args:
+            interval_seconds: Seconds between cleanup runs (default 300 = 5 minutes).
+
+        Returns:
+            The asyncio.Task running the cleanup loop.
+        """
+        if self._cleanup_task is not None and not self._cleanup_task.done():
+            logger.warning("TTL cleanup task already running")
+            return self._cleanup_task
+
+        self._cleanup_task = asyncio.create_task(
+            self._run_periodic_cleanup(interval_seconds),
+            name="cache-ttl-cleanup",
+        )
+        return self._cleanup_task
+
+    async def stop_ttl_cleanup_task(self) -> None:
+        """Stop the periodic TTL cleanup background task."""
+        if self._cleanup_task is not None and not self._cleanup_task.done():
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            logger.info("TTL cleanup task stopped")
+        self._cleanup_task = None
 
 
 # Global instance management

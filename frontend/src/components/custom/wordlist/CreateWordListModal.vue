@@ -173,6 +173,7 @@ import RefreshButton from '@/components/custom/common/RefreshButton.vue';
 import { useSlugGeneration } from '@/composables/useSlugGeneration';
 import { wordlistApi } from '@/api';
 import { useToast } from '@/components/ui/toast/use-toast';
+import { logger } from '@/utils/logger';
 import type { WordList } from '@/types';
 
 interface Props {
@@ -259,14 +260,10 @@ const resetForm = () => {
 
 // Slug generation methods
 const generateSlugName = async () => {
-  console.log('🎯 Generating slug for CreateWordListModal...')
   const slugName = await generateSlugWithFallback();
-  console.log('🎯 Got slug name:', slugName)
   if (slugName) {
-    console.log('🎯 Setting form name to:', slugName)
     form.value.name = slugName;
     isSlugGenerated.value = true;
-    console.log('🎯 Form name is now:', form.value.name)
   }
 };
 
@@ -335,7 +332,7 @@ const handleCreate = async () => {
     }
     
   } catch (err) {
-    console.error('Create wordlist error:', err);
+    logger.error('Create wordlist error:', err);
     error.value = 'Failed to create wordlist. Please try again.';
   } finally {
     isCreating.value = false;

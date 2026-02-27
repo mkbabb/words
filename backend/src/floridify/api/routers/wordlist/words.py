@@ -133,6 +133,11 @@ class WordListSearchQueryParams(WordListQueryParams):
         description="Maximum search results before filtering",
     )
     min_score: float = Field(0.4, ge=0.0, le=1.0, description="Minimum match score")
+    semantic: bool | None = Field(
+        None,
+        description="Enable semantic search. If not set, automatically enabled "
+        "for wordlists with more than 100 words.",
+    )
 
     # Override default sort to use relevance for search
     sort_by: str = Field(
@@ -296,12 +301,19 @@ async def update_word(
 async def remove_word(
     wordlist_id: PydanticObjectId,
     word: str,
+    version: int | None = None,
     repo: WordListRepository = Depends(get_wordlist_repo),
 ) -> None:
     """Remove a word from the wordlist.
 
+    Query Parameters:
+        - version: Expected wordlist version for optimistic locking (optional).
+          If provided, returns 409 Conflict when the wordlist has been
+          concurrently modified.
+
     Errors:
         404: Word not in list
+        409: Version mismatch (optimistic locking)
     """
     # Find the word document by text
     word_doc = await Word.find_one({"text": word})
@@ -309,4 +321,4 @@ async def remove_word(
         raise HTTPException(status_code=404, detail="Word not found")
 
     assert word_doc.id is not None  # Word from database should have ID
-    await repo.remove_word(wordlist_id, word_doc.id)
+    await repo.remove_word(wordlist_id, word_doc.id, version=version)

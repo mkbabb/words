@@ -225,6 +225,7 @@ import { ThemedCard } from '@/components/custom/card';
 import { WordlistSelectionModal } from '@/components/custom/wordlist';
 import { useDefinitionGroups, useProviders, useImageManagement } from './composables';
 import { normalizeEtymology } from '@/utils/guards';
+import { logger } from '@/utils/logger';
 import type { ImageMedia } from '@/types/api';
 
 // Stores
@@ -383,7 +384,7 @@ const handleRegenerateExamples = async (definitionIndex: number) => {
     try {
         await contentStore.regenerateExamples(definitionIndex);
     } catch (error) {
-        console.error('Failed to regenerate examples:', error);
+        logger.error('Failed to regenerate examples:', error);
     }
 };
 
@@ -391,14 +392,12 @@ const handleRegenerateExamples = async (definitionIndex: number) => {
 const handleImageError = baseHandleImageError;
 const handleImageClick = baseHandleImageClick;
 
-const handleImagesUpdated = async (newImages: ImageMedia[]) => {
-    console.log('Images updated, refreshing synthesized entry:', newImages);
-    
+const handleImagesUpdated = async (_newImages: ImageMedia[]) => {
     try {
         // Refresh the synthesized entry to get updated images from the backend
         await contentStore.refreshEntryImages();
     } catch (error) {
-        console.error('Failed to refresh entry images:', error);
+        logger.error('Failed to refresh entry images:', error);
         // Fallback - still show a success message since the upload itself succeeded
         notificationStore.showNotification({
             type: 'warning',
@@ -408,9 +407,7 @@ const handleImagesUpdated = async (newImages: ImageMedia[]) => {
     }
 };
 
-const handleImageDeleted = async (imageId: string) => {
-    console.log('Image deleted, refreshing synthesized entry:', imageId);
-    
+const handleImageDeleted = async (_imageId: string) => {
     try {
         // Refresh the synthesized entry to remove the deleted image reference
         await contentStore.refreshEntryImages();
@@ -421,7 +418,7 @@ const handleImageDeleted = async (imageId: string) => {
             duration: 3000,
         });
     } catch (error) {
-        console.error('Failed to refresh entry after image deletion:', error);
+        logger.error('Failed to refresh entry after image deletion:', error);
         notificationStore.showNotification({
             type: 'error',
             message: 'Image deleted but display may not be current. Try refreshing.',
@@ -447,10 +444,9 @@ const handleClusterNameUpdate = async (clusterId: string, newName: string) => {
     }
 };
 
-const handleWordSearch = (word: string) => {
+const handleWordSearch = (_word: string) => {
     // This should trigger a search for the new word
     // We'll emit this to parent or handle through router
-    console.log('Searching for word:', word);
     // TODO: Implement word search navigation
 };
 
@@ -459,9 +455,8 @@ const handleAddToWordlist = (word: string) => {
     showWordlistModal.value = true;
 };
 
-const handleWordAddedToList = (wordlist: any, word: string) => {
+const handleWordAddedToList = (_wordlist: any, _word: string) => {
     // Show success notification or handle the addition result
-    console.log(`Successfully added "${word}" to wordlist "${wordlist.name}"`);
     // TODO: Show success toast notification
 };
 
@@ -477,14 +472,12 @@ const handleRetryLookup = () => {
 
 const handleShowHelp = () => {
     // Show help modal or redirect to help page
-    console.log('Show help for definition lookup issues');
     // TODO: Implement help system
 };
 
 const handleSuggestAlternatives = () => {
     // Switch to suggestions mode or show alternative suggestions
     searchBar.setSubMode('lookup', 'suggestions');
-    console.log('Suggesting alternatives for failed lookup');
 };
 
 const handleRetryThesaurus = async () => {
@@ -492,7 +485,7 @@ const handleRetryThesaurus = async () => {
         try {
             await orchestrator.getThesaurusData(entry.value.word);
         } catch (error) {
-            console.error('Failed to retry thesaurus lookup:', error);
+            logger.error('Failed to retry thesaurus lookup:', error);
             notificationStore.showNotification({
                 type: 'error',
                 message: 'Failed to load thesaurus data. Please try again.',

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from .constants import (
     SM2_DEFAULT_EASE_FACTOR,
     SM2_INITIAL_INTERVALS,
+    SM2_MAX_EASE_FACTOR,
     SM2_MIN_EASE_FACTOR,
     SM2_QUALITY_THRESHOLD,
 )
@@ -54,12 +55,16 @@ class ReviewData(BaseModel):
         return round(self.interval * self.ease_factor)
 
     def calculate_ease_factor(self, quality: int) -> float:
-        """Calculate new ease factor based on review quality."""
+        """Calculate new ease factor based on review quality.
+
+        Clamped to [SM2_MIN_EASE_FACTOR, SM2_MAX_EASE_FACTOR] to prevent
+        unbounded growth from repeated perfect recalls.
+        """
         if quality < SM2_QUALITY_THRESHOLD:
             return self.ease_factor
 
         new_ef = self.ease_factor + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)
-        return max(SM2_MIN_EASE_FACTOR, new_ef)
+        return max(SM2_MIN_EASE_FACTOR, min(new_ef, SM2_MAX_EASE_FACTOR))
 
     def update_sm2(self, quality: int) -> None:
         """Update using SM-2 algorithm (quality: 0-5)."""

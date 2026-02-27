@@ -1,5 +1,6 @@
 import { ref, onMounted, computed } from 'vue';
 import { useEventListener } from '@vueuse/core';
+import { logger } from '@/utils/logger';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -45,7 +46,7 @@ export function usePWA() {
     
     // Skip service worker in development to prevent caching issues
     if (import.meta.env.DEV) {
-      console.log('Skipping service worker registration in development mode');
+      logger.info('Skipping service worker registration in development mode');
       return;
     }
     
@@ -77,9 +78,9 @@ export function usePWA() {
         notificationPermission.value = Notification.permission;
       }
       
-      console.log('Service Worker registered successfully');
+      logger.info('Service Worker registered successfully');
     } catch (error) {
-      console.error('Service Worker registration failed:', error);
+      logger.error('Service Worker registration failed:', error);
     }
   };
   
@@ -128,41 +129,25 @@ export function usePWA() {
   
   // Subscribe to push notifications
   const subscribeToPush = async (): Promise<boolean> => {
-    console.log('Starting push subscription...', {
-      isPushSupported: isPushSupported.value,
-      hasServiceWorker: !!serviceWorkerRegistration.value,
-      hasVapidKey: !!vapidPublicKey,
-      vapidKeyLength: vapidPublicKey.length
-    });
-    
     if (!isPushSupported.value || !serviceWorkerRegistration.value || !vapidPublicKey) {
-      console.error('Missing requirements for push subscription');
+      logger.warn('Missing requirements for push subscription');
       return false;
     }
-    
+
     try {
-      // Request notification permission
-      console.log('Current notification permission:', Notification.permission);
       const permission = await Notification.requestPermission();
-      console.log('Permission result:', permission);
       notificationPermission.value = permission;
-      
+
       if (permission !== 'granted') {
-        console.log('Notification permission denied:', permission);
-        if (permission === 'denied') {
-          console.log('Notifications are blocked. Please enable them in browser settings.');
-        }
+        logger.warn('Notification permission denied:', permission);
         return false;
       }
-      
-      // Subscribe to push
-      console.log('Subscribing to push notifications...');
+
       const subscription = await serviceWorkerRegistration.value.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as Uint8Array<ArrayBuffer>
       });
-      
-      console.log('Push subscription created:', subscription);
+
       pushSubscription.value = subscription;
       
       // Send subscription to backend
@@ -170,7 +155,7 @@ export function usePWA() {
       
       return true;
     } catch (error) {
-      console.error('Failed to subscribe to push:', error);
+      logger.error('Failed to subscribe to push:', error);
       return false;
     }
   };
@@ -185,7 +170,7 @@ export function usePWA() {
       pushSubscription.value = null;
       return true;
     } catch (error) {
-      console.error('Failed to unsubscribe from push:', error);
+      logger.error('Failed to unsubscribe from push:', error);
       return false;
     }
   };
@@ -208,7 +193,7 @@ export function usePWA() {
         throw new Error('Failed to save subscription');
       }
     } catch (error) {
-      console.error('Failed to send subscription to server:', error);
+      logger.error('Failed to send subscription to server:', error);
       throw error;
     }
   };
@@ -224,7 +209,7 @@ export function usePWA() {
         body: JSON.stringify({ endpoint: subscription.endpoint })
       });
     } catch (error) {
-      console.error('Failed to remove subscription from server:', error);
+      logger.error('Failed to remove subscription from server:', error);
     }
   };
   

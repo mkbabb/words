@@ -74,12 +74,10 @@ export function useWordlistContentState() {
   // ==========================================================================
   
   const handler: ModeHandler<WordlistContentState> = {
-    onEnter: async (previousMode: SearchMode) => {
-      console.log('📚 Content entering wordlist mode from:', previousMode)
+    onEnter: async (_previousMode: SearchMode) => {
     },
-    
-    onExit: async (nextMode: SearchMode) => {
-      console.log('👋 Content exiting wordlist mode to:', nextMode)
+
+    onExit: async (_nextMode: SearchMode) => {
       // Clear batch results when leaving
       clearBatchResults()
     },

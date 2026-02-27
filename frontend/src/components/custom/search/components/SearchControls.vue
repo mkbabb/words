@@ -377,14 +377,12 @@ const handleEnterKey = (event: KeyboardEvent) => {
 
 // Handle mode change from BouncyToggle
 const handleModeChange = async (newMode: string | SearchMode) => {
-    console.log('🎛️ SearchControls handleModeChange:', searchMode.value, '->', newMode);
     const typedMode = newMode as SearchMode;
     if (typedMode !== searchMode.value) {
-        console.log('✅ Using simple mode setter with query management');
-        // ✅ Save current query and switch mode - returns saved query for new mode
+        // Save current query and switch mode - returns saved query for new mode
         const currentQuery = searchBar.searchQuery;
         const savedQuery = await searchBar.setMode(typedMode, currentQuery);
-        
+
         // Update search bar with the saved query for the new mode
         if (savedQuery) {
             searchBar.setQuery(savedQuery);
@@ -392,10 +390,9 @@ const handleModeChange = async (newMode: string | SearchMode) => {
             // Clear query for non-lookup modes if no saved query
             searchBar.setQuery('');
         }
-        
-        // ✅ Basic navigation - just go to Home to reflect mode change
+
+        // Basic navigation - just go to Home to reflect mode change
         router.push({ name: 'Home' });
-        console.log('🧭 Navigated to Home for mode:', typedMode);
     }
 };
 

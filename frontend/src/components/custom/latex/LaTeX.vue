@@ -5,6 +5,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import katex from 'katex';
+import { logger } from '@/utils/logger';
 import 'katex/dist/katex.min.css';
 
 interface Props {
@@ -37,7 +38,7 @@ const renderMath = () => {
       },
     });
   } catch (error) {
-    console.error('KaTeX rendering error:', error);
+    logger.warn('KaTeX rendering error:', error);
     renderedMath.value = props.expression;
   }
 };

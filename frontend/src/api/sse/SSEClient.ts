@@ -124,94 +124,110 @@ export class SSEClient {
     let isChunkedCompletion = false
     let chunks: ChunkedCompletionChunk[] = []
 
-    while (true) {
-      const { done, value } = await reader.read()
-      
-      if (done) break
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
 
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
+        if (done) break
 
-      for (const line of lines) {
-        if (line.trim() === '') {
-          if (currentEvent) {
-            currentEvent = ''
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          // Skip heartbeat pings
+          if (line.startsWith(':')) {
+            continue
           }
-          continue
-        }
 
-        if (line.startsWith('event: ')) {
-          currentEvent = line.slice(7)
-        } else if (line.startsWith('data: ')) {
-          const data = this.parseData(line.slice(6))
-          
-          // Handle different event types
-          switch (currentEvent) {
-            case 'config':
-              if (options.onConfig) {
-                options.onConfig(data as ConfigEvent)
+          if (line.trim() === '') {
+            if (currentEvent) {
+              currentEvent = ''
+            }
+            continue
+          }
+
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7)
+          } else if (line.startsWith('data: ')) {
+            const data = this.parseData(line.slice(6))
+
+            // Handle different event types
+            switch (currentEvent) {
+              case 'config':
+                if (options.onConfig) {
+                  options.onConfig(data as ConfigEvent)
+                }
+                break
+
+              case 'progress':
+                if (options.onProgress) {
+                  const progressData = data as ProgressEvent
+                  options.onProgress(progressData)
+                }
+                break
+
+              case 'completion_start':
+                isChunkedCompletion = true
+                chunks = []
+                break
+
+              case 'completion_chunk':
+                if (isChunkedCompletion) {
+                  chunks.push(data as ChunkedCompletionChunk)
+                }
+                break
+
+              case 'complete':
+              case 'completion':
+                if (isChunkedCompletion && chunks.length > 0) {
+                  // Assemble chunked result
+                  const assembled = this.assembleChunkedResult(chunks)
+                  result = handlers.onEvent('complete', assembled)
+                } else {
+                  // Regular completion
+                  const completion = data as CompletionEvent
+                  result = handlers.onEvent('complete', completion.result || data)
+                }
+
+                if (result) {
+                  handlers.onComplete(result)
+                  return result
+                }
+                break
+
+              case 'error': {
+                const errorData = data as { message?: string }
+                const error = new Error(errorData.message || 'SSE stream error')
+                if (handlers.onError) {
+                  handlers.onError(error)
+                }
+                throw error
               }
-              break
-              
-            case 'progress':
-              if (options.onProgress) {
-                const progressData = data as ProgressEvent
-                options.onProgress(progressData)
+
+              case 'partial':
+                if (options.onPartialResult) {
+                  options.onPartialResult(data)
+                }
+                break
+
+              default: {
+                // Let handler process unknown events
+                const eventResult = handlers.onEvent(currentEvent, data)
+                if (eventResult) {
+                  result = eventResult
+                }
               }
-              break
-              
-            case 'completion_start':
-              isChunkedCompletion = true
-              chunks = []
-              break
-              
-            case 'completion_chunk':
-              if (isChunkedCompletion) {
-                chunks.push(data as ChunkedCompletionChunk)
-              }
-              break
-              
-            case 'complete':
-            case 'completion':
-              if (isChunkedCompletion && chunks.length > 0) {
-                // Assemble chunked result
-                const assembled = this.assembleChunkedResult(chunks)
-                result = handlers.onEvent('complete', assembled)
-              } else {
-                // Regular completion
-                const completion = data as CompletionEvent
-                result = handlers.onEvent('complete', completion.result || data)
-              }
-              
-              if (result) {
-                handlers.onComplete(result)
-                return result
-              }
-              break
-              
-            case 'error':
-              const errorData = data as { message?: string }
-              const error = new Error(errorData.message || 'SSE stream error')
-              if (handlers.onError) {
-                handlers.onError(error)
-              }
-              throw error
-              
-            case 'partial':
-              if (options.onPartialResult) {
-                options.onPartialResult(data)
-              }
-              break
-              
-            default:
-              // Let handler process unknown events
-              const eventResult = handlers.onEvent(currentEvent, data)
-              if (eventResult) {
-                result = eventResult
-              }
+            }
           }
         }
+      }
+    } finally {
+      // Always release the reader to prevent resource leaks
+      try {
+        reader.cancel()
+      } catch {
+        // Reader may already be closed
       }
     }
 

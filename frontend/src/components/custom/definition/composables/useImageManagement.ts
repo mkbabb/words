@@ -1,6 +1,7 @@
 import { computed, type ComputedRef } from 'vue';
 import type { ImageMedia } from '@/types/api';
 import type { SynthesizedDictionaryEntry } from '@/types';
+import { logger } from '@/utils/logger';
 
 /**
  * Composable for managing images from synthesized dictionary entries
@@ -86,7 +87,7 @@ export function useImageManagement(entry: ComputedRef<SynthesizedDictionaryEntry
      * Helper to handle image error events
      */
     const handleImageError = (event: Event) => {
-        console.error('Failed to load image:', (event.target as HTMLImageElement).src);
+        logger.error('Failed to load image:', (event.target as HTMLImageElement).src);
         // Hide the failed image
         (event.target as HTMLImageElement).style.display = 'none';
     };

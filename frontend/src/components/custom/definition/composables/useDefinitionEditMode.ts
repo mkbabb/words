@@ -2,6 +2,7 @@ import { ref, reactive, computed, watch, toRaw, type Ref } from 'vue';
 import { useContentStore } from '@/stores';
 import type { Definition } from '@/types/api';
 import { useDebounceFn } from '@vueuse/core';
+import { logger } from '@/utils/logger';
 
 interface EditableField<T = any> {
   value: T;
@@ -154,12 +155,7 @@ export function useDefinitionEditMode(
 
   // Save changes
   async function save() {
-    console.log('[useDefinitionEditMode] save() called');
-    console.log('[useDefinitionEditMode] hasErrors:', hasErrors.value, 'isDirty:', isDirty.value);
-    console.log('[useDefinitionEditMode] fields.text.isDirty:', fields.text.isDirty, 'value:', fields.text.value);
-    
     if (hasErrors.value || !isDirty.value) {
-      console.log('[useDefinitionEditMode] Skipping save - hasErrors or not dirty');
       return;
     }
 
@@ -194,15 +190,10 @@ export function useDefinitionEditMode(
         };
       }
 
-      console.log('[useDefinitionEditMode] updateData:', updateData);
-
       // Call save handler or default store method
       if (options.onSave) {
-        console.log('[useDefinitionEditMode] Calling onSave handler');
         await options.onSave(updateData);
       } else {
-        console.log('[useDefinitionEditMode] Calling ContentStore.updateDefinition');
-        // Use ContentStore directly
         await contentStore.updateDefinition(definition.value.id, updateData);
       }
 
@@ -223,7 +214,7 @@ export function useDefinitionEditMode(
       isEditMode.value = false;
       activeFieldId.value = null;
     } catch (error) {
-      console.error('Failed to save definition:', error);
+      logger.error('Failed to save definition:', error);
       throw error;
     } finally {
       isSaving.value = false;
@@ -258,7 +249,7 @@ export function useDefinitionEditMode(
   // Regenerate AI component
   async function regenerateComponent(component: string) {
     if (!REGENERABLE_COMPONENTS.has(component)) {
-      console.warn(`Component ${component} is not regeneratable`);
+      logger.warn(`Component ${component} is not regeneratable`);
       return;
     }
 
@@ -290,7 +281,7 @@ export function useDefinitionEditMode(
         }
       }
     } catch (error) {
-      console.error(`Failed to regenerate ${component}:`, error);
+      logger.error(`Failed to regenerate ${component}:`, error);
       throw error;
     } finally {
       field.isRegenerating = false;

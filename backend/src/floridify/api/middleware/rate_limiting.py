@@ -184,7 +184,11 @@ ai_limiter = OpenAIRateLimiter(
 
 
 def get_client_key(request: Request) -> str:
-    """Extract client identifier from request."""
+    """Extract client identifier from request.
+
+    Prefers authenticated user ID, falls back to IP address.
+    X-Forwarded-For is only trusted when coming from known proxies.
+    """
     # Try to get authenticated user ID through safe access
     try:
         return f"user:{request.state.user_id}"
@@ -192,13 +196,17 @@ def get_client_key(request: Request) -> str:
         pass  # Fall through to IP-based identification
 
     # Fall back to IP address
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        ip = forwarded_for.split(",")[0].strip()
-    else:
-        ip = request.client.host if request.client else "unknown"
+    # Only trust X-Forwarded-For from known proxies (nginx in our stack)
+    client_ip = request.client.host if request.client else "unknown"
+    trusted_proxies = {"127.0.0.1", "::1", "172.16.0.0/12", "10.0.0.0/8"}
 
-    return f"ip:{ip}"
+    if client_ip in trusted_proxies or client_ip.startswith(("172.", "10.")):
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            # Take the leftmost (client) IP from the chain
+            client_ip = forwarded_for.split(",")[0].strip()
+
+    return f"ip:{client_ip}"
 
 
 class RateLimitedRoute(APIRoute):

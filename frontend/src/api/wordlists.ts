@@ -1,4 +1,5 @@
 import { api, API_BASE_URL } from './core';
+import { logger } from '@/utils/logger';
 import type { 
   WordListQueryParams, 
   WordListSearchQueryParams, 
@@ -127,7 +128,7 @@ export const wordlistsApi = {
                   return;
                 }
               } catch (e) {
-                console.error('Error parsing SSE data:', e);
+                logger.error('Error parsing SSE data:', e);
               }
             }
           }

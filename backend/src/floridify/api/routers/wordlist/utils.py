@@ -40,14 +40,31 @@ async def search_wordlist_names(
     return matches
 
 
+"""Threshold above which wordlist search uses semantic search by default."""
+SEMANTIC_SEARCH_WORD_COUNT_THRESHOLD = 100
+
+
 async def search_words_in_wordlist(
     wordlist_id: PydanticObjectId,
     query: str,
     max_results: int = 20,
     min_score: float = 0.6,
+    semantic: bool | None = None,
     repo: WordListRepository | None = None,
 ) -> SearchResponse:
-    """Search words in a wordlist using generalized SearchEngine."""
+    """Search words in a wordlist using generalized SearchEngine.
+
+    Args:
+        wordlist_id: ID of the wordlist to search within.
+        query: Search query string.
+        max_results: Maximum number of results to return.
+        min_score: Minimum similarity score threshold.
+        semantic: Whether to enable semantic search. If None (default),
+            semantic search is automatically enabled for wordlists with
+            more than SEMANTIC_SEARCH_WORD_COUNT_THRESHOLD words and
+            disabled for smaller wordlists.
+        repo: Optional repository instance for dependency injection.
+    """
     # Get repository if not provided
     repository = repo or WordListRepository()
 
@@ -79,6 +96,11 @@ async def search_words_in_wordlist(
             metadata={},
         )
 
+    # Determine whether to use semantic search:
+    # - Explicit parameter takes precedence
+    # - Otherwise, enable for wordlists above the threshold
+    use_semantic = semantic if semantic is not None else len(word_texts) > SEMANTIC_SEARCH_WORD_COUNT_THRESHOLD
+
     # Create/get corpus for this wordlist
     corpus_name = f"wordlist_{wordlist_id}"
     corpus_manager = get_tree_corpus_manager()
@@ -93,7 +115,7 @@ async def search_words_in_wordlist(
     search_engine = await Search.from_corpus(
         corpus_name=corpus_name,
         min_score=min_score,
-        semantic=False,  # Disable semantic for wordlist search
+        semantic=use_semantic,
         config=None,
     )
 
@@ -105,13 +127,14 @@ async def search_words_in_wordlist(
 
     # Convert results to expected format
     language = _resolve_wordlist_language(wordlist)
+    search_mode = "semantic" if use_semantic else "fuzzy"
     return SearchResponse(
         query=query,
         results=results,
         total_found=len(results),
         languages=[language],
-        mode="fuzzy",
-        metadata={"corpus_name": corpus_name},
+        mode=search_mode,
+        metadata={"corpus_name": corpus_name, "semantic_enabled": use_semantic},
     )
 
 

@@ -1,3 +1,5 @@
+import { logger } from '@/utils/logger';
+
 // PWA Service Manager with iOS-specific features
 export class PWAService {
   private registration: ServiceWorkerRegistration | null = null;
@@ -21,13 +23,13 @@ export class PWAService {
 
   async init() {
     if (!('serviceWorker' in navigator)) {
-      console.log('Service Workers not supported');
+      logger.warn('Service Workers not supported');
       return;
     }
 
     // Skip service worker in development to prevent caching issues
     if (import.meta.env.DEV) {
-      console.log('Skipping service worker registration in development mode');
+      logger.info('Skipping service worker registration in development mode');
       return;
     }
 
@@ -68,7 +70,7 @@ export class PWAService {
       await this.setupPushNotifications();
 
     } catch (error) {
-      console.error('Service Worker registration failed:', error);
+      logger.error('Service Worker registration failed:', error);
     }
   }
 
@@ -102,22 +104,22 @@ export class PWAService {
 
   private async setupBackgroundSync() {
     if (!('sync' in this.registration!)) {
-      console.log('Background Sync not supported');
+      logger.warn('Background Sync not supported');
       return;
     }
 
     try {
       // @ts-ignore - sync API may not be available in all browsers
       await this.registration!.sync?.register('sync-searches');
-      console.log('Background sync registered');
+      logger.info('Background sync registered');
     } catch (error: unknown) {
-      console.error('Background sync registration failed:', error);
+      logger.error('Background sync registration failed:', error);
     }
   }
 
   private async setupPushNotifications() {
     if (!('PushManager' in window)) {
-      console.log('Push notifications not supported');
+      logger.warn('Push notifications not supported');
       return;
     }
 
@@ -135,7 +137,7 @@ export class PWAService {
         await this.sendSubscriptionToServer(subscription);
       }
     } catch (error) {
-      console.error('Push notification setup failed:', error);
+      logger.error('Push notification setup failed:', error);
     }
   }
 
@@ -145,7 +147,7 @@ export class PWAService {
       try {
         await this.registration.update();
       } catch (error) {
-        console.error('Update check failed:', error);
+        logger.error('Update check failed:', error);
       }
     }
   }
@@ -208,7 +210,7 @@ export class PWAService {
         throw new Error('Failed to send subscription to server');
       }
     } catch (error) {
-      console.error('Failed to send subscription:', error);
+      logger.error('Failed to send subscription:', error);
     }
   }
 
@@ -229,7 +231,7 @@ export class PWAService {
 
   private handleAppClipInvocation(invocation: any) {
     // Handle App Clip specific logic
-    console.log('App Clip invocation:', invocation);
+    logger.info('App Clip invocation:', invocation);
     window.dispatchEvent(new CustomEvent('app-clip-invocation', { detail: invocation }));
   }
 
@@ -245,7 +247,7 @@ export class PWAService {
         url: shortcut.url
       })));
     } catch (error) {
-      console.error('Failed to update shortcuts:', error);
+      logger.error('Failed to update shortcuts:', error);
     }
   }
 
@@ -259,7 +261,7 @@ export class PWAService {
           await (navigator as any).clearAppBadge();
         }
       } catch (error) {
-        console.error('Failed to set badge:', error);
+        logger.error('Failed to set badge:', error);
       }
     }
   }

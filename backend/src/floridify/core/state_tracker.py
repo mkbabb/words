@@ -389,7 +389,18 @@ class StateTracker:
                 # Non-blocking put to avoid deadlocks
                 subscriber.put_nowait(state)
             except asyncio.QueueFull:
-                logger.warning("Subscriber queue full, skipping state update")
+                # Drop oldest event and enqueue the new one to prevent data loss
+                try:
+                    subscriber.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+                try:
+                    subscriber.put_nowait(state)
+                except asyncio.QueueFull:
+                    logger.warning(
+                        "Subscriber queue persistently full, dropping state update",
+                        extra={"stage": state.stage, "progress": state.progress},
+                    )
 
     async def update_stage(self, stage: str, progress: int | None = None) -> None:
         """Optimized update for stage-only changes (most common case)."""

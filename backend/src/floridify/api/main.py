@@ -9,9 +9,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..ai import get_definition_synthesizer, get_openai_connector
+from ..caching.core import get_global_cache, shutdown_global_cache
 from ..storage.mongodb import get_storage
 from ..utils.logging import setup_logging
 from .middleware import CacheHeadersMiddleware, LoggingMiddleware
+from .middleware.auth import ClerkAuthMiddleware
 from .routers import (
     ai,
     audio,
@@ -57,6 +59,11 @@ async def lifespan(app: FastAPI) -> Any:
         get_definition_synthesizer()
         print("✅ Definition synthesizer initialized successfully")
 
+        # Start background TTL cleanup task (runs every 5 minutes)
+        cache = await get_global_cache()
+        cache.start_ttl_cleanup_task(interval_seconds=300.0)
+        print("✅ Background TTL cleanup task started (interval=300s)")
+
     except Exception as e:
         print(f"❌ Application initialization failed: {e}")
         raise
@@ -65,6 +72,13 @@ async def lifespan(app: FastAPI) -> Any:
 
     # Shutdown
     print("🔄 Shutting down...")
+    try:
+        cache = await get_global_cache()
+        await cache.stop_ttl_cleanup_task()
+        await shutdown_global_cache()
+        print("✅ Cache cleanup task stopped and cache shut down")
+    except Exception as e:
+        print(f"⚠️ Cache shutdown error: {e}")
 
 
 # Create FastAPI application
@@ -86,11 +100,13 @@ app.add_middleware(
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "Authorization", "X-Request-ID", "Accept", "Cache-Control", "If-None-Match"],
     expose_headers=["ETag", "Cache-Control", "X-Process-Time", "X-Request-ID"],
+    max_age=3600,  # Cache preflight responses for 1 hour
 )
 app.add_middleware(CacheHeadersMiddleware)  # Add cache headers before logging
 app.add_middleware(LoggingMiddleware)
+app.add_middleware(ClerkAuthMiddleware)  # Auth check (innermost - runs first)
 
 # Register global exception handlers
 from .middleware.exception_handlers import register_exception_handlers

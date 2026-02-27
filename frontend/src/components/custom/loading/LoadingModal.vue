@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed } from 'vue';
 import { Modal } from '@/components/custom';
 import { AnimatedText, ShimmerText } from '@/components/custom/animation';
 import { LoadingProgress } from '@/components/custom/loading';
@@ -72,21 +72,6 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<Emits>();
-
-// Debug props
-watch(
-    () => props.progress,
-    (newVal) => {
-        console.log('LoadingModal progress prop:', newVal);
-    }
-);
-
-watch(
-    () => props.modelValue,
-    (newVal) => {
-        console.log('LoadingModal visible:', newVal);
-    }
-);
 
 // Computed properties
 

@@ -50,6 +50,7 @@ async def search_wordlist_words(
         repo=repo,
         max_results=params.max_results,
         min_score=params.min_score,
+        semantic=params.semantic,
     )
 
     if not search_response.results:

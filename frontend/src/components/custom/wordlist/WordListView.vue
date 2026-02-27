@@ -142,6 +142,7 @@ import EditWordNotesModal from './EditWordNotesModal.vue';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
+import { logger } from '@/utils/logger';
 
 const { searchBar } = useStores();
 const wordlistMode = useWordlistMode();
@@ -229,10 +230,8 @@ const handleWordClick = async (word: WordListItem) => {
 
 const handleReview = async (word: WordListItem, quality: number) => {
   try {
-    console.log('Processing review:', word.word, 'Quality:', quality);
-    
     if (!currentWordlist.value?.id) {
-      console.error('No wordlist selected');
+      logger.error('No wordlist selected');
       return;
     }
     
@@ -256,25 +255,21 @@ const handleReview = async (word: WordListItem, quality: number) => {
       };
     }
     
-    console.log('Review completed successfully');
   } catch (error) {
-    console.error('Failed to process review:', error);
+    logger.error('Failed to process review:', error);
     // Could show a toast notification here
   }
 };
 
 const handleEdit = (word: WordListItem) => {
-  console.log('Opening edit dialog for:', word.word);
   editingWord.value = word;
   showEditNotesModal.value = true;
 };
 
 const updateWordNotes = async (word: WordListItem, newNotes: string) => {
   try {
-    console.log('Updating notes for:', word.word);
-    
     if (!currentWordlist.value?.id) {
-      console.error('No wordlist selected');
+      logger.error('No wordlist selected');
       return;
     }
     
@@ -285,9 +280,8 @@ const updateWordNotes = async (word: WordListItem, newNotes: string) => {
       currentWords.value[wordIndex] = { ...currentWords.value[wordIndex], notes: newNotes };
     }
     
-    console.log('Notes updated locally (backend endpoint pending)');
   } catch (error) {
-    console.error('Failed to update notes:', error);
+    logger.error('Failed to update notes:', error);
     toast({
       title: "Error",
       description: "Failed to update notes. Please try again.",
@@ -296,15 +290,11 @@ const updateWordNotes = async (word: WordListItem, newNotes: string) => {
   }
 };
 
-const handleWordsUploaded = (words: string[]) => {
-  console.log('Words uploaded:', words.length);
-  // Refresh current wordlist
+const handleWordsUploaded = (_words: string[]) => {
   // Refresh current wordlist - stub for now
-  console.log('Refreshing wordlist data...');
 };
 
 const handleWordlistCreated = async (wordlist: any) => {
-  console.log('Wordlist created:', wordlist.name);
   wordlistMode.setWordlist(wordlist.id);
   searchBarStore.setMode('wordlist');
 };
@@ -314,11 +304,9 @@ const handleWordlistCreated = async (wordlist: any) => {
 const loadWordlistMeta = async (id: string) => {
   if (!id) return;
   
-  console.log('DEBUG: Loading wordlist metadata for ID:', id);
   isLoadingMeta.value = true;
   try {
     const response = await wordlistApi.getWordlist(id);
-    console.log('DEBUG: Wordlist metadata response:', response);
     
     currentWordlistData.value = {
       id: response.data._id || response.data.id,
@@ -338,7 +326,7 @@ const loadWordlistMeta = async (id: string) => {
       owner_id: response.data.owner_id,
     };
   } catch (error) {
-    console.error('Failed to load wordlist metadata:', error);
+    logger.error('Failed to load wordlist metadata:', error);
   } finally {
     isLoadingMeta.value = false;
   }
@@ -399,7 +387,7 @@ const triggerWordlistSearch = async () => {
         searchBar.hideDropdown();
       }
     } catch (error) {
-      console.error('Wordlist search error:', error);
+      logger.error('Wordlist search error:', error);
       wordlistMode.clearResults();
       searchBar.hideDropdown();
       currentWords.value = [];
@@ -415,7 +403,7 @@ const triggerWordlistSearch = async () => {
 const loadMoreWords = async () => {
   // Pagination will be handled in a future update
   // For now, the orchestrator loads all matching results
-  console.log('Load more not yet implemented with new search pipeline');
+  // Load more not yet implemented with new search pipeline
 };
 
 // Infinite scroll removed - using manual Load More button instead
@@ -513,7 +501,7 @@ watch(sortCriteria, () => {
 // Lifecycle
 onMounted(async () => {
   // The watcher with immediate: true will handle initial load
-  console.log('WordListView mounted, selectedWordlist:', wordlistMode.selectedWordlist);
+  // Initial load handled by watcher with immediate: true
 });
 
 onUnmounted(() => {
@@ -540,9 +528,8 @@ watch(() => wordlistMode.selectedWordlist, async (newId) => {
 }, { immediate: true });
 
 // Watch for search query changes
-watch(() => searchBar.searchQuery, async (newQuery) => {
+watch(() => searchBar.searchQuery, async (_newQuery) => {
   if (searchBarStore.searchMode === 'wordlist' && wordlistMode.selectedWordlist) {
-    console.log('🔍 WordListView - search query changed:', newQuery);
     await triggerWordlistSearch();
   }
 });
@@ -551,7 +538,6 @@ watch(() => searchBar.searchQuery, async (newQuery) => {
 // The orchestrator now handles all search operations including wordlist searches
 watch(() => wordlistMode.results, (results) => {
   if (searchBarStore.searchMode === 'wordlist' && results) {
-    console.log('📚 WordListView - received search results:', results.length);
     // Results are now handled in triggerWordlistSearch with filtering
     // The orchestrator already updated the dropdown results
     // We just need to update our main display
@@ -572,7 +558,7 @@ watch(() => searchBar.searchQuery, (newQuery) => {
   if (searchBarStore.searchMode === 'wordlist' && wordlistMode.selectedWordlist && !newQuery.trim()) {
     // Empty query - orchestrator will call getWordlistWords
     // Results will come through wordlistSearchResults watcher
-    console.log('📚 WordListView - empty query detected');
+    // Empty query - orchestrator will call getWordlistWords
   }
 });
 

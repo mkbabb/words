@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { logger } from '@/utils/logger';
 
 // API versioning configuration
 export const API_VERSION = 'v1';
@@ -38,7 +39,7 @@ export function transformError(error: any): APIError {
 // Request interceptor
 api.interceptors.request.use(
   config => {
-    console.log(
+    logger.debug(
       `API Request: ${config.method?.toUpperCase()} ${config.url}`,
       config.params
     );
@@ -50,14 +51,14 @@ api.interceptors.request.use(
 // Response interceptor
 api.interceptors.response.use(
   response => {
-    console.log(
+    logger.debug(
       `API Response: ${response.config.method?.toUpperCase()} ${response.config.url}`,
       response.data
     );
     return response;
   },
   error => {
-    console.error('API Error:', {
+    logger.error('API Error:', {
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import functools
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from openai import APIConnectionError, APITimeoutError, AuthenticationError, RateLimitError
 from pydantic import BaseModel, Field
 
 from ....ai.connector import get_openai_connector
@@ -20,6 +23,47 @@ from ...middleware.rate_limiting import ai_limiter, get_client_key
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+
+def handle_ai_errors(func: Callable) -> Callable:
+    """Decorator that maps OpenAI errors to appropriate HTTP status codes.
+
+    - RateLimitError -> 429
+    - APITimeoutError, APIConnectionError -> 502
+    - AuthenticationError -> 500 (our config issue, not user's)
+    """
+
+    @functools.wraps(func)
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return await func(*args, **kwargs)
+        except HTTPException:
+            raise  # Already handled
+        except RateLimitError as e:
+            raise HTTPException(
+                status_code=429,
+                detail=f"AI provider rate limit exceeded: {e}",
+            )
+        except (APITimeoutError, APIConnectionError) as e:
+            logger.error(f"AI provider unavailable: {e}")
+            raise HTTPException(
+                status_code=502,
+                detail="AI provider temporarily unavailable",
+            )
+        except AuthenticationError:
+            logger.error("OpenAI authentication failed - check API key")
+            raise HTTPException(
+                status_code=500,
+                detail="AI service configuration error",
+            )
+        except Exception as e:
+            logger.error(f"Unexpected AI error in {func.__name__}: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"AI processing error: {type(e).__name__}",
+            )
+
+    return wrapper
 
 
 # Request Models for Pure Generation Functions
@@ -147,6 +191,7 @@ class SynthesizeRequest(BaseModel):
 
 
 @router.post("/synthesize/pronunciation")
+@handle_ai_errors
 async def generate_pronunciation(
     request: PronunciationRequest,
     api_request: Request,
@@ -187,6 +232,7 @@ async def _cached_suggestions(input_words: list[str], count: int) -> dict[str, A
 
 
 @router.post("/suggestions")
+@handle_ai_errors
 async def generate_suggestions(
     request: SuggestionsRequest,
     api_request: Request,
@@ -214,6 +260,7 @@ async def generate_suggestions(
 
 
 @router.post("/generate/word-forms")
+@handle_ai_errors
 async def generate_word_forms(
     request: WordFormsRequest,
     api_request: Request,
@@ -244,6 +291,7 @@ async def generate_word_forms(
 
 
 @router.post("/assess/frequency")
+@handle_ai_errors
 async def assess_frequency(
     request: FrequencyAssessmentRequest,
     api_request: Request,
@@ -274,6 +322,7 @@ async def assess_frequency(
 
 
 @router.post("/assess/cefr")
+@handle_ai_errors
 async def assess_cefr(
     request: CEFRAssessmentRequest,
     api_request: Request,
@@ -307,6 +356,7 @@ async def assess_cefr(
 
 
 @router.post("/synthesize/synonyms")
+@handle_ai_errors
 async def generate_synonyms(
     request: SynonymRequest,
     api_request: Request,
@@ -350,6 +400,7 @@ async def generate_synonyms(
 
 
 @router.post("/synthesize/antonyms")
+@handle_ai_errors
 async def generate_antonyms(
     request: AntonymRequest,
     api_request: Request,
@@ -393,6 +444,7 @@ async def generate_antonyms(
 
 
 @router.post("/generate/examples")
+@handle_ai_errors
 async def generate_examples(
     request: ExampleRequest,
     api_request: Request,
@@ -434,6 +486,7 @@ async def generate_examples(
 
 
 @router.post("/generate/facts")
+@handle_ai_errors
 async def generate_facts(
     request: FactsRequest,
     api_request: Request,
@@ -476,6 +529,7 @@ async def generate_facts(
 
 
 @router.post("/assess/register")
+@handle_ai_errors
 async def classify_register(
     request: RegisterClassificationRequest,
     api_request: Request,
@@ -505,6 +559,7 @@ async def classify_register(
 
 
 @router.post("/assess/domain")
+@handle_ai_errors
 async def identify_domain(
     request: DomainIdentificationRequest,
     api_request: Request,
@@ -524,6 +579,7 @@ async def identify_domain(
 
 
 @router.post("/assess/collocations")
+@handle_ai_errors
 async def identify_collocations(
     request: CollocationRequest,
     api_request: Request,
@@ -547,6 +603,7 @@ async def identify_collocations(
 
 
 @router.post("/assess/grammar-patterns")
+@handle_ai_errors
 async def extract_grammar_patterns(
     request: GrammarPatternRequest,
     api_request: Request,
@@ -569,6 +626,7 @@ async def extract_grammar_patterns(
 
 
 @router.post("/usage-notes")
+@handle_ai_errors
 async def generate_usage_notes(
     request: UsageNotesRequest,
     api_request: Request,
@@ -591,6 +649,7 @@ async def generate_usage_notes(
 
 
 @router.post("/assess/regional-variants")
+@handle_ai_errors
 async def detect_regional_variants(
     request: RegionalVariantRequest,
     api_request: Request,
@@ -626,6 +685,7 @@ class WordSuggestionRequest(BaseModel):
 
 
 @router.post("/validate-query")
+@handle_ai_errors
 async def validate_query(
     request: QueryValidationRequest,
     api_request: Request,
@@ -644,6 +704,7 @@ async def validate_query(
 
 
 @router.post("/suggest-words")
+@handle_ai_errors
 async def suggest_words(
     request: WordSuggestionRequest,
     api_request: Request,
@@ -669,6 +730,7 @@ async def suggest_words(
 
 
 @router.get("/suggest-words/stream", response_model=None)
+@handle_ai_errors
 async def suggest_words_stream(
     request: Request,
     query: str,
@@ -771,6 +833,7 @@ async def suggest_words_stream(
 
 
 @router.post("/synthesize")
+@handle_ai_errors
 async def synthesize_entry_components(
     request: SynthesizeRequest,
     api_request: Request,

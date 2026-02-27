@@ -1,5 +1,6 @@
 import type { SearchResponse, SearchResult } from '@/types/api';
 import { api } from './core';
+import { logger } from '@/utils/logger';
 
 export const searchApi = {
   // Search for words using query parameter - GET /search
@@ -30,7 +31,7 @@ export const searchApi = {
       });
       return response.data.results || [];
     } catch (error) {
-      console.error('Search API error:', error);
+      logger.error('Search API error:', error);
       return [];
     }
   },
@@ -51,7 +52,7 @@ export const searchApi = {
       });
       return response.data.results || [];
     } catch (error) {
-      console.error('Search by path API error:', error);
+      logger.error('Search by path API error:', error);
       return [];
     }
   },
@@ -70,7 +71,7 @@ export const searchApi = {
       });
       return response.data.suggestions || [];
     } catch (error) {
-      console.error('Search suggestions API error:', error);
+      logger.error('Search suggestions API error:', error);
       return [];
     }
   },
@@ -110,7 +111,7 @@ export const searchApi = {
       const response = await api.post('/search/rebuild-index', requestData);
       return response.data;
     } catch (error) {
-      console.error('Rebuild index API error:', error);
+      logger.error('Rebuild index API error:', error);
       throw error;
     }
   },
@@ -133,7 +134,7 @@ export const searchApi = {
       const response = await api.post('/corpus/invalidate', requestData);
       return response.data;
     } catch (error) {
-      console.error('Invalidate corpus API error:', error);
+      logger.error('Invalidate corpus API error:', error);
       throw error;
     }
   },

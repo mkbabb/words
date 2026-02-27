@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from pathlib import Path
 from typing import Any, TypeVar
 
 from openai import (
+    APIConnectionError,
+    APITimeoutError,
     AsyncOpenAI,
+    RateLimitError,
 )
 from pydantic import BaseModel
 
@@ -164,12 +168,42 @@ class OpenAIConnector:
             f"prompt_length={len(prompt)}",
         )
 
-        # Make the API call with structured output
+        # Make the API call with structured output (retry on transient errors)
+        max_retries = 3
         api_start = time.perf_counter()
-        response = await self.client.beta.chat.completions.parse(
-            response_format=response_model,
-            **request_params,
-        )
+        last_error: Exception | None = None
+
+        for attempt in range(max_retries):
+            try:
+                response = await self.client.beta.chat.completions.parse(
+                    response_format=response_model,
+                    **request_params,
+                )
+                break
+            except RateLimitError as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    # Exponential backoff: 1s, 2s, 4s
+                    wait_time = 2**attempt
+                    logger.warning(
+                        f"Rate limited (attempt {attempt + 1}/{max_retries}), "
+                        f"retrying in {wait_time}s"
+                    )
+                    await asyncio.sleep(wait_time)
+                else:
+                    raise
+            except (APITimeoutError, APIConnectionError) as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    wait_time = 2**attempt
+                    logger.warning(
+                        f"Transient API error (attempt {attempt + 1}/{max_retries}): {e}, "
+                        f"retrying in {wait_time}s"
+                    )
+                    await asyncio.sleep(wait_time)
+                else:
+                    raise
+
         api_duration = time.perf_counter() - api_start
 
         # Extract token usage from response

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, readonly, computed } from 'vue'
 import { generateId } from '@/utils'
 import { suggestionsApi } from '@/api'
+import { logger } from '@/utils/logger'
 import type {
   SearchHistory,
   LookupHistory,
@@ -246,10 +247,8 @@ export const useHistoryStore = defineStore('history', () => {
     isLoadingSuggestions.value = true
     try {
       const recentWords = recentLookupWords.value.slice(0, 10)
-      console.log('📜 [History Store] Fetching vocabulary suggestions with recent words:', recentWords)
-      
+
       const response = await suggestionsApi.getVocabulary(recentWords)
-      console.log('📜 [History Store] API response:', response)
 
       const newSuggestions = response.words.map((word) => ({
         word,
@@ -257,8 +256,6 @@ export const useHistoryStore = defineStore('history', () => {
         difficulty_level: 0,
         semantic_category: '',
       }))
-      
-      console.log('📜 [History Store] Processed suggestions:', newSuggestions)
 
       // Update cache
       suggestionsCache.value = {
@@ -266,14 +263,11 @@ export const useHistoryStore = defineStore('history', () => {
         lastWord: currentWord,
         timestamp: Date.now(),
       }
-      
-      console.log('📜 [History Store] Cache updated with', newSuggestions.length, 'suggestions')
     } catch (error) {
-      console.error('📜 [History Store] Failed to get vocabulary suggestions:', error)
+      logger.error('Failed to get vocabulary suggestions:', error)
       // Don't clear cache on error - keep using old suggestions
     } finally {
       isLoadingSuggestions.value = false
-      console.log('📜 [History Store] Loading finished. Final suggestions count:', vocabularySuggestions.value.length)
     }
   }
 
@@ -283,7 +277,7 @@ export const useHistoryStore = defineStore('history', () => {
       const response = await suggestionsApi.getVocabulary(recentWords)
       return response.words
     } catch (error) {
-      console.error('Failed to get history-based suggestions:', error)
+      logger.error('Failed to get history-based suggestions:', error)
       // Fallback to simple word list from history
       return recentLookupWords.value.slice(0, 4)
     }

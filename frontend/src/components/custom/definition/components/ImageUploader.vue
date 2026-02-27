@@ -54,6 +54,7 @@
 import { ref, computed } from 'vue';
 import { CameraIcon, LoaderIcon } from 'lucide-vue-next';
 import { useToast } from '@/components/ui/toast/use-toast';
+import { logger } from '@/utils/logger';
 import type { ImageMedia } from '@/types/api';
 import { imageApi, entriesApi } from '@/api';
 
@@ -172,7 +173,7 @@ const handleFileSelect = async (event: Event) => {
                 emit('upload-progress', uploadProgress.value);
                 
             } catch (error) {
-                console.error(`Failed to upload ${file.name}:`, error);
+                logger.error(`Failed to upload ${file.name}:`, error);
                 toast({
                     title: "Upload Failed",
                     description: `Failed to upload ${file.name}`,
@@ -191,7 +192,7 @@ const handleFileSelect = async (event: Event) => {
         }
 
     } catch (error) {
-        console.error('Upload error:', error);
+        logger.error('Upload error:', error);
         emit('upload-error', error instanceof Error ? error.message : 'Upload failed');
         toast({
             title: "Upload Error",
@@ -230,7 +231,7 @@ const uploadSingleFile = async (file: File): Promise<ImageMedia> => {
         return uploadedImage;
         
     } catch (error) {
-        console.error('Upload error:', error);
+        logger.error('Upload error:', error);
         throw error;
     }
 };

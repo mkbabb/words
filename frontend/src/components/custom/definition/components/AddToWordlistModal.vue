@@ -106,6 +106,7 @@ import CreateWordListModal from '../../wordlist/CreateWordListModal.vue';
 import type { WordList } from '@/types';
 import { MasteryLevel, Temperature } from '@/types';
 import { wordlistApi } from '@/api';
+import { logger } from '@/utils/logger';
 
 interface Props {
   modelValue: boolean;
@@ -160,7 +161,7 @@ const loadWordlists = async () => {
       owner_id: item.owner_id,
     }));
   } catch (error) {
-    console.error('Failed to load wordlists:', error);
+    logger.error('Failed to load wordlists:', error);
   } finally {
     isLoading.value = false;
   }
@@ -219,7 +220,7 @@ const addToWordlist = async (wordlist: WordList) => {
     
     emit('added', wordlist.name);
   } catch (error) {
-    console.error('Failed to add word to wordlist:', error);
+    logger.error('Failed to add word to wordlist:', error);
   } finally {
     isAdding.value = false;
   }

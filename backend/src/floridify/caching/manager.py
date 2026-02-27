@@ -114,28 +114,28 @@ class VersionedDataManager:
                     # Save new version
                     await versioned.insert(session=session)
 
-                    # Update version chain
+                    # Update version chain atomically using update_many
                     if versioned.version_info.is_latest:
-                        # Find and update other latest versions atomically
-                        # Use the specific model class for polymorphic queries
-                        model_class = self._get_model_class(resource_type)
-                        other_latest = await model_class.find(
+                        collection = BaseVersionedData.get_pymongo_collection()
+                        result = await collection.update_many(
                             {
                                 "resource_id": resource_id,
                                 "resource_type": resource_type.value,
                                 "version_info.is_latest": True,
                                 "_id": {"$ne": versioned.id},
                             },
+                            {
+                                "$set": {
+                                    "version_info.is_latest": False,
+                                    "version_info.superseded_by": versioned.id,
+                                }
+                            },
                             session=session,
-                        ).to_list()
-
-                        for other_version in other_latest:
-                            other_version.version_info.is_latest = False
-                            other_version.version_info.superseded_by = versioned.id
-                            await other_version.save(session=session)
+                        )
 
                         logger.debug(
-                            f"[Transaction] Updated {len(other_latest)} previous versions to not be latest"
+                            f"[Transaction] Atomically updated {result.modified_count} "
+                            f"previous versions to not be latest"
                         )
 
                     # Transaction commits automatically on context exit
@@ -862,6 +862,129 @@ class VersionedDataManager:
             return True
 
         return False
+
+    async def prune_old_versions(
+        self,
+        max_age_days: int = 90,
+        keep_minimum: int = 10,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Delete old non-latest versions older than max_age_days, keeping at least keep_minimum.
+
+        For each (resource_id, resource_type) group, versions are sorted by creation time.
+        The latest version is always preserved. Among non-latest versions, those older than
+        max_age_days are candidates for deletion, but at least keep_minimum total versions
+        (including the latest) are always retained.
+
+        Args:
+            max_age_days: Delete non-latest versions older than this many days.
+            keep_minimum: Always keep at least this many versions per resource.
+            dry_run: If True, return counts without actually deleting.
+
+        Returns:
+            Dict with pruning statistics: total_deleted, resources_affected, details.
+        """
+        from datetime import UTC, datetime, timedelta as td
+
+        cutoff = datetime.now(UTC) - td(days=max_age_days)
+        collection = BaseVersionedData.get_pymongo_collection()
+
+        # Find all distinct (resource_id, resource_type) pairs
+        pipeline = [
+            {"$group": {"_id": {"resource_id": "$resource_id", "resource_type": "$resource_type"}}},
+        ]
+        groups = await collection.aggregate(pipeline).to_list(length=None)
+
+        total_deleted = 0
+        resources_affected = 0
+        details: list[dict[str, Any]] = []
+
+        for group in groups:
+            resource_id = group["_id"]["resource_id"]
+            resource_type = group["_id"]["resource_type"]
+
+            # Get all versions for this resource, sorted newest first
+            versions = await collection.find(
+                {
+                    "resource_id": resource_id,
+                    "resource_type": resource_type,
+                },
+            ).sort([("version_info.created_at", -1), ("_id", -1)]).to_list(length=None)
+
+            total_versions = len(versions)
+            if total_versions <= keep_minimum:
+                # Already at or below minimum -- skip entirely
+                continue
+
+            # Identify candidates for deletion:
+            # - Must NOT be the latest version
+            # - Must be older than cutoff
+            # - Must leave at least keep_minimum versions remaining
+            candidates_to_delete: list[PydanticObjectId] = []
+            for version_doc in versions:
+                # Never delete the latest version
+                vi = version_doc.get("version_info", {})
+                if vi.get("is_latest", False):
+                    continue
+
+                created_at = vi.get("created_at")
+                if created_at is not None and created_at < cutoff:
+                    candidates_to_delete.append(version_doc["_id"])
+
+            # Ensure we keep at least keep_minimum versions
+            max_deletable = total_versions - keep_minimum
+            if max_deletable <= 0:
+                continue
+
+            ids_to_delete = candidates_to_delete[:max_deletable]
+
+            if not ids_to_delete:
+                continue
+
+            if not dry_run:
+                # Also clean up delta chains: any version that has delta_base_id
+                # pointing to a deleted version needs to be handled.
+                # For safety, we skip deleting versions that are delta bases for others.
+                delta_base_ids = set()
+                dependent_cursor = collection.find(
+                    {"version_info.delta_base_id": {"$in": ids_to_delete}},
+                    {"version_info.delta_base_id": 1},
+                )
+                async for dep_doc in dependent_cursor:
+                    base_id = dep_doc.get("version_info", {}).get("delta_base_id")
+                    if base_id:
+                        delta_base_ids.add(base_id)
+
+                # Remove delta bases from deletion candidates
+                safe_ids = [did for did in ids_to_delete if did not in delta_base_ids]
+
+                if safe_ids:
+                    result = await collection.delete_many({"_id": {"$in": safe_ids}})
+                    deleted_count = result.deleted_count
+                else:
+                    deleted_count = 0
+            else:
+                deleted_count = len(ids_to_delete)
+
+            if deleted_count > 0:
+                total_deleted += deleted_count
+                resources_affected += 1
+                details.append({
+                    "resource_id": resource_id,
+                    "resource_type": resource_type,
+                    "versions_before": total_versions,
+                    "versions_deleted": deleted_count,
+                    "versions_after": total_versions - deleted_count,
+                })
+
+        return {
+            "total_deleted": total_deleted,
+            "resources_affected": resources_affected,
+            "max_age_days": max_age_days,
+            "keep_minimum": keep_minimum,
+            "dry_run": dry_run,
+            "details": details,
+        }
 
     async def _find_by_hash(
         self, resource_id: str, resource_type: ResourceType, content_hash: str

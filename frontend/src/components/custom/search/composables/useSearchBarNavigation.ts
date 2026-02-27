@@ -7,6 +7,7 @@ import { useHistoryStore } from '@/stores/content/history';
 import { useSearchOrchestrator } from './useSearchOrchestrator';
 import { showError } from '@/plugins/toast';
 import { extractWordCount } from '../utils/ai-query';
+import { logger } from '@/utils/logger';
 import type { SearchResult } from '@/types';
 
 interface UseSearchBarNavigationOptions {
@@ -98,16 +99,14 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
   const modeHandlers = {
     // Wordlist mode handlers
     wordlist: {
-      selectResult: async (result: SearchResult) => {
-        console.log('Selected wordlist item:', result.word);
+      selectResult: async (_result: SearchResult) => {
         searchBar.setQuery('');
         searchBar.hideDropdown();
         searchBar.clearResults();
         // TODO: Emit event to scroll to word in list
       },
-      
+
       handleEnter: async () => {
-        console.log('Enter in wordlist mode - no action');
         // WordListView handles filtering
       }
     },
@@ -158,7 +157,7 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
               showError('No word suggestions found for this query');
             }
           } catch (error: any) {
-            console.error('AI suggestion error:', error);
+            logger.error('AI suggestion error:', error);
             searchBar.triggerErrorAnimation();
             showError(error.message || 'Failed to get word suggestions');
           }

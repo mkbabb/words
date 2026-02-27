@@ -260,11 +260,9 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
       
     } catch (error: any) {
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        console.log('[WordlistMode] Request cancelled')
         return []
       }
       
-      console.error('[WordlistMode] Failed to get wordlist words:', error)
       clearResults()
       throw error
     } finally {
@@ -305,11 +303,9 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
       
     } catch (error: any) {
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        console.log('[WordlistMode] Search cancelled')
         return []
       }
       
-      console.error('[WordlistMode] Failed to search wordlist:', error)
       clearResults()
       throw error
     } finally {
@@ -458,12 +454,10 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
   // ==========================================================================
   
   const handler: ModeHandler = {
-    onEnter: async (previousMode: SearchMode) => {
-      console.log('📚 Entering wordlist mode from:', previousMode)
+    onEnter: async (_previousMode: SearchMode) => {
     },
-    
-    onExit: async (nextMode: SearchMode) => {
-      console.log('👋 Exiting wordlist mode to:', nextMode)
+
+    onExit: async (_nextMode: SearchMode) => {
       // Disable batch mode when leaving
       setBatchMode(false)
     },

@@ -193,12 +193,10 @@ export function useLookupContentState() {
   // ==========================================================================
   
   const handler: ModeHandler<LookupContentState> = {
-    onEnter: async (previousMode: SearchMode) => {
-      console.log('📖 Content entering lookup mode from:', previousMode)
+    onEnter: async (_previousMode: SearchMode) => {
     },
-    
-    onExit: async (nextMode: SearchMode) => {
-      console.log('👋 Content exiting lookup mode to:', nextMode)
+
+    onExit: async (_nextMode: SearchMode) => {
       // Stop any streaming when leaving
       isStreamingData.value = false
     },

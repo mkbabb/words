@@ -261,12 +261,10 @@ const startReview = () => {
 
 const markAsVisited = () => {
   // Mark word as visited without formal review
-  console.log('Marking as visited:', props.word.word);
 };
 
 const removeFromList = () => {
   // Remove word from wordlist
-  console.log('Removing from list:', props.word.word);
 };
 </script>
 

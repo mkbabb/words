@@ -1,5 +1,6 @@
 import type { ResourceResponse } from '@/types/api';
 import { api, transformError } from './core';
+import { logger } from '@/utils/logger';
 
 export const definitionsApi = {
   // Get definition by ID - GET /definitions/{id}
@@ -20,13 +21,11 @@ export const definitionsApi = {
     cefr_level: string;
     frequency_band: number;
   }>): Promise<ResourceResponse> {
-    console.log('[API] Updating definition:', definitionId, 'with:', updates);
     try {
       const response = await api.put<ResourceResponse>(`/definitions/${definitionId}`, updates);
-      console.log('[API] Update successful:', response.data);
       return response.data;
     } catch (error) {
-      console.error('[API] Update failed:', error);
+      logger.error('Definition update failed:', error);
       throw transformError(error);
     }
   },

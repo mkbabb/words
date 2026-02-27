@@ -4,6 +4,7 @@ import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { useLoadingState } from '@/stores/ui/loading';
 import { lookupApi, aiApi } from '@/api';
+import { logger } from '@/utils/logger';
 import type { SearchResult, WordListItem, WordSuggestionResponse, SynthesizedDictionaryEntry } from '@/types';
 
 interface UseSearchOrchestratorOptions {
@@ -59,7 +60,7 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
           results = await executeStageSearch(queryText);
           break;
         default:
-          console.warn(`Unhandled search mode: ${mode}`);
+          logger.warn(`Unhandled search mode: ${mode}`);
           results = [];
       }
 
@@ -69,7 +70,7 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
 
       return results;
     } catch (error) {
-      console.error('Search error:', error);
+      logger.error('Search error:', error);
       _searchError = error as Error;
       searchBar.clearResults();
       searchBar.hideDropdown();
@@ -213,20 +214,20 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
     return results;
   };
 
-  const addToWordlist = async (word: string): Promise<void> => {
+  const addToWordlist = async (_word: string): Promise<void> => {
     const wordlistId = wordlistMode.selectedWordlist;
     if (!wordlistId) {
       throw new Error('No wordlist selected');
     }
-    console.log('Adding word to list:', wordlistId, word);
+    // TODO: implement add word API call
   };
 
-  const removeFromWordlist = async (word: string): Promise<void> => {
+  const removeFromWordlist = async (_word: string): Promise<void> => {
     const wordlistId = wordlistMode.selectedWordlist;
     if (!wordlistId) {
       throw new Error('No wordlist selected');
     }
-    console.log('Removing word from list:', wordlistId, word);
+    // TODO: implement remove word API call
   };
 
   const processBatchWordlist = async (
@@ -276,8 +277,8 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
     return [];
   };
 
-  const executeStagedOperation = async (operation: string, params?: any): Promise<any> => {
-    console.log('Executing staged operation:', operation, params);
+  const executeStagedOperation = async (_operation: string, _params?: any): Promise<any> => {
+    // TODO: implement staged operation execution
     return null;
   };
 

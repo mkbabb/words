@@ -318,9 +318,6 @@ export const useContentStore = defineStore('content', () => {
   persist: {
     key: 'content',
     pick: [
-      'currentEntry',
-      'currentThesaurus',
-      'wordSuggestions',
       'currentWord',
       'sidebarAccordionState'
     ]

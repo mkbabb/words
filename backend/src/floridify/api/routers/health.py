@@ -53,6 +53,62 @@ class HealthResponse(HealthCheckResponse):
     )
 
 
+class MetricsResponse(BaseModel):
+    """Response for operational metrics endpoint."""
+
+    uptime_seconds: int = Field(..., ge=0, description="Service uptime in seconds")
+    cache_hit_rate: float = Field(..., ge=0.0, le=1.0, description="L1 aggregate cache hit rate")
+    cache_hits: int = Field(..., ge=0, description="Total L1 cache hits")
+    cache_misses: int = Field(..., ge=0, description="Total L1 cache misses")
+    cache_evictions: int = Field(..., ge=0, description="Total L1 cache evictions")
+    l1_memory_items: int = Field(..., ge=0, description="Total items held in L1 memory")
+    timestamp: str = Field(..., description="Metrics collection timestamp")
+
+
+@router.get("/metrics", response_model=MetricsResponse)
+async def get_metrics() -> MetricsResponse:
+    """Get basic operational metrics.
+
+    Returns uptime, cache hit rate, and L1 cache statistics.
+    This is a lightweight endpoint suitable for monitoring dashboards
+    and alerting systems.
+    """
+    # Uptime
+    uptime_seconds = int(time.perf_counter() - _start_time)
+
+    # Cache stats
+    cache_hits = 0
+    cache_misses = 0
+    cache_evictions = 0
+    l1_memory_items = 0
+    cache_hit_rate = 0.0
+
+    try:
+        cache = await get_global_cache()
+        stats = cache.get_stats()
+
+        cache_hits = stats.get("hits", 0)
+        cache_misses = stats.get("misses", 0)
+        cache_evictions = stats.get("evictions", 0)
+        l1_memory_items = stats.get("memory_count", 0)
+
+        total = cache_hits + cache_misses
+        if total > 0:
+            cache_hit_rate = cache_hits / total
+    except Exception as e:
+        logger.warning(f"Failed to collect cache metrics: {e}")
+
+    return MetricsResponse(
+        uptime_seconds=uptime_seconds,
+        cache_hit_rate=cache_hit_rate,
+        cache_hits=cache_hits,
+        cache_misses=cache_misses,
+        cache_evictions=cache_evictions,
+        l1_memory_items=l1_memory_items,
+        timestamp=datetime.now(UTC).isoformat(),
+    )
+
+
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Get service health status.

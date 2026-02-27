@@ -140,6 +140,7 @@ import ConfirmDialog from '../ConfirmDialog.vue';
 import type { WordList } from '@/types';
 import { wordlistApi } from '@/api';
 import { useToast } from '@/components/ui/toast/use-toast';
+import { logger } from '@/utils/logger';
 
 const searchBarStore = useSearchBarStore();
 const wordlistMode = useWordlistMode();
@@ -195,7 +196,7 @@ const handleFiles = async (files: File[]) => {
   });
   
   if (validFiles.length === 0) {
-    console.error('No valid files selected');
+    logger.error('No valid files selected');
     return;
   }
   
@@ -245,7 +246,7 @@ const processFilesDirectly = async (files: File[]) => {
         }, 2000);
       }
     } catch (error) {
-      console.error('File processing error:', error);
+      logger.error('File processing error:', error);
       const upload = activeUploads.value.find(u => u.id === uploadId);
       if (upload) {
         upload.status = 'Error';
@@ -287,22 +288,14 @@ const loadWordlists = async () => {
       limit: 50
     });
     
-    console.log('Loaded wordlists:', response);
     wordlists.value = response.items.map(transformWordlistFromAPI);
     
     // Auto-select first wordlist if none selected and wordlists exist
     if (!selectedWordlist && wordlists.value.length > 0) {
-      console.log('Auto-selecting first wordlist:', wordlists.value[0].name, 'ID:', wordlists.value[0].id);
       wordlistMode.setWordlist(wordlists.value[0].id);
-    } else {
-      console.log('Wordlist selection state:', {
-        selectedWordlist: selectedWordlist,
-        wordlistsCount: wordlists.value.length,
-        firstWordlistId: wordlists.value[0]?.id
-      });
     }
   } catch (error) {
-    console.error('Failed to load wordlists:', error);
+    logger.error('Failed to load wordlists:', error);
   } finally {
     isLoading.value = false;
   }
@@ -332,7 +325,7 @@ const updateWordlistName = async (wordlist: WordList, newName: string) => {
       wordlists.value[index].name = newName;
     }
   } catch (error) {
-    console.error('Failed to update wordlist name:', error);
+    logger.error('Failed to update wordlist name:', error);
     toast({
       title: "Error",
       description: "Failed to update wordlist name",
@@ -364,7 +357,7 @@ const confirmDelete = async () => {
       description: `Wordlist "${wordlistToDelete.value.name}" has been deleted`,
     });
   } catch (error) {
-    console.error('Failed to delete wordlist:', error);
+    logger.error('Failed to delete wordlist:', error);
     toast({
       title: "Error",
       description: "Failed to delete wordlist",
@@ -390,12 +383,11 @@ const handleWordlistDuplicate = async (wordlist: WordList) => {
     const newWordlist = transformWordlistFromAPI(result.data);
     wordlists.value.unshift(newWordlist);
   } catch (error) {
-    console.error('Failed to duplicate wordlist:', error);
+    logger.error('Failed to duplicate wordlist:', error);
   }
 };
 
-const handleWordsUploaded = (words: string[]) => {
-  console.log('Words uploaded:', words.length);
+const handleWordsUploaded = (_words: string[]) => {
   showUploadModal.value = false;
   pendingFiles.value = [];
 };

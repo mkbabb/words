@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, readonly, computed, shallowRef, watch } from 'vue';
+import { ref, readonly, computed, shallowRef, watch, type WatchStopHandle } from 'vue';
 import { searchApi } from '@/api';
 import { shouldTriggerAIMode } from '@/components/custom/search/utils/ai-query';
 import { useSearchBarStore } from '../search-bar';
@@ -46,29 +46,46 @@ export const useLookupMode = defineStore(
         const aiSuggestions = ref<string[]>([]);
 
         // Watch for query changes to detect AI mode
-        watch(
-            () => {
-                const store = getSearchBarStore();
-                return store?.searchQuery || '';
-            },
-            (newQuery) => {
-                if (newQuery && newQuery.length > 0) {
-                    const shouldBeAI = shouldTriggerAIMode(newQuery);
-                    if (shouldBeAI !== isAIQuery.value) {
-                        setAIQuery(shouldBeAI);
-                        if (shouldBeAI) {
-                            setShowSparkle(true);
+        // Store the stop handle so we can clean up on mode exit
+        let queryWatchStopHandle: WatchStopHandle | null = null;
+
+        const startQueryWatcher = () => {
+            // Stop any existing watcher before creating a new one
+            stopQueryWatcher();
+            queryWatchStopHandle = watch(
+                () => {
+                    const store = getSearchBarStore();
+                    return store?.searchQuery || '';
+                },
+                (newQuery) => {
+                    if (newQuery && newQuery.length > 0) {
+                        const shouldBeAI = shouldTriggerAIMode(newQuery);
+                        if (shouldBeAI !== isAIQuery.value) {
+                            setAIQuery(shouldBeAI);
+                            if (shouldBeAI) {
+                                setShowSparkle(true);
+                            }
+                        }
+                    } else {
+                        // Reset AI mode for empty queries
+                        if (isAIQuery.value) {
+                            setAIQuery(false);
+                            setShowSparkle(false);
                         }
                     }
-                } else {
-                    // Reset AI mode for empty queries
-                    if (isAIQuery.value) {
-                        setAIQuery(false);
-                        setShowSparkle(false);
-                    }
                 }
+            );
+        };
+
+        const stopQueryWatcher = () => {
+            if (queryWatchStopHandle) {
+                queryWatchStopHandle();
+                queryWatchStopHandle = null;
             }
-        );
+        };
+
+        // Start the watcher immediately (lookup is the default mode)
+        startQueryWatcher();
 
         // ==========================================================================
         // UI STATE
@@ -261,8 +278,6 @@ export const useLookupMode = defineStore(
             abortController = new AbortController();
 
             try {
-                console.log(`[LookupMode] Searching for: ${query}`);
-
                 const normalized = query.trim().toLowerCase();
 
                 // Always perform dictionary search - AI mode is user-initiated only
@@ -278,20 +293,15 @@ export const useLookupMode = defineStore(
                 );
                 setResults(searchResults, method);
 
-                console.log(
-                    `[LookupMode] Found ${searchResults.length} results using ${method} method`
-                );
                 return searchResults;
             } catch (error: any) {
                 if (
                     error.name === 'AbortError' ||
                     error.code === 'ERR_CANCELED'
                 ) {
-                    console.log('[LookupMode] Search cancelled');
                     return [];
                 }
 
-                console.error('[LookupMode] Search error:', error);
                 clearResults();
                 throw error;
             } finally {
@@ -391,18 +401,20 @@ export const useLookupMode = defineStore(
         // ==========================================================================
 
         const handler: ModeHandler = {
-            onEnter: async (previousMode: SearchMode) => {
-                console.log('🔍 Entering lookup mode from:', previousMode);
+            onEnter: async (_previousMode: SearchMode) => {
                 // Clear AI state when entering
                 isAIQuery.value = false;
                 showSparkle.value = false;
                 clearAISuggestions();
+                // Re-start the query watcher when entering lookup mode
+                startQueryWatcher();
             },
 
-            onExit: async (nextMode: SearchMode) => {
-                console.log('👋 Exiting lookup mode to:', nextMode);
+            onExit: async (_nextMode: SearchMode) => {
                 // Clear AI suggestions when leaving
                 clearAISuggestions();
+                // Stop the query watcher to prevent memory leaks
+                stopQueryWatcher();
             },
 
             validateConfig: (config: any) => {

@@ -55,12 +55,22 @@ export const useSearchBarStore = defineStore(
         const lookupMode = useLookupMode();
         const wordlistMode = useWordlistMode();
 
+        // Stub handler for modes without dedicated stores
+        const noopModeHandler = {
+            handler: {
+                onEnter: async (_previousMode: SearchMode) => {},
+                onExit: async (_nextMode: SearchMode) => {},
+            },
+            results: [] as any[],
+            clearResults: () => {},
+        };
+
         // Mode store registry
         const modeStores = {
             lookup: lookupMode,
             wordlist: wordlistMode,
-            'word-of-the-day': null,
-            stage: null
+            'word-of-the-day': noopModeHandler,
+            stage: noopModeHandler,
         } as const;
 
         // ==========================================================================
@@ -115,8 +125,6 @@ export const useSearchBarStore = defineStore(
         
         const setMode = async (newMode: SearchMode, currentQuery?: string) => {
             if (newMode !== searchMode.value) {
-                console.log('🔄 Mode change:', searchMode.value, '->', newMode);
-                
                 // Save current query if provided
                 if (currentQuery !== undefined) {
                     saveCurrentQuery(currentQuery);
@@ -140,9 +148,7 @@ export const useSearchBarStore = defineStore(
                 
                 // Trigger mode switch animation
                 triggerModeSwitchAnimation();
-                
-                console.log('✅ Mode changed to:', newMode);
-                
+
                 // Return saved query for the new mode
                 return getSavedQuery(newMode);
             }
@@ -152,13 +158,10 @@ export const useSearchBarStore = defineStore(
         const setSubMode = <T extends SearchMode>(mode: T, newSubMode: SearchSubModeMap[T]) => {
             const currentSubMode = searchSubMode.value[mode];
             if (newSubMode !== currentSubMode) {
-                console.log(`🔄 ${mode} sub-mode change:`, currentSubMode, '->', newSubMode);
-                
                 searchSubMode.value = {
                     ...searchSubMode.value,
                     [mode]: newSubMode
                 };
-                console.log(`✅ ${mode} sub-mode changed to:`, newSubMode);
             }
         };
         
@@ -179,7 +182,6 @@ export const useSearchBarStore = defineStore(
         
         const saveCurrentQuery = (query: string) => {
             savedQueries.value[searchMode.value] = query;
-            console.log('💾 Saved query for', searchMode.value, ':', query);
         };
         
         const getSavedQuery = (mode: SearchMode) => {

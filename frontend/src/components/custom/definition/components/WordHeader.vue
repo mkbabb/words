@@ -134,8 +134,7 @@ defineEmits<{
 const showAddToWordlistModal = ref(false);
 
 // Handle word added to wordlist
-const handleWordAdded = (wordlistName: string) => {
-    console.log(`Word "${props.word}" added to wordlist "${wordlistName}"`);
+const handleWordAdded = (_wordlistName: string) => {
     showAddToWordlistModal.value = false;
 };
 

@@ -51,13 +51,10 @@ export function useStageModeConfig() {
   // ==========================================================================
   
   const handler: ModeHandler<any, StageConfig> = {
-    onEnter: async (previousMode: SearchMode) => {
-      console.log('🔧 Entering stage mode from:', previousMode)
-      console.log('Debug level:', debugLevel.value)
+    onEnter: async (_previousMode: SearchMode) => {
     },
-    
-    onExit: async (nextMode: SearchMode) => {
-      console.log('👋 Exiting stage mode to:', nextMode)
+
+    onExit: async (_nextMode: SearchMode) => {
       // Disable test mode when leaving
       testMode.value = false
     },
