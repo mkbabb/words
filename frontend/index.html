@@ -38,10 +38,13 @@
     
     <title>floridify</title>
     <script>
-      // Prevent dark mode FOUC
+      // Prevent dark mode FOUC - read theme from Pinia persisted ui-state store
       (function() {
-        const savedTheme = localStorage.getItem('vueuse-color-scheme') || 'light';
-        document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+        try {
+          var uiState = JSON.parse(localStorage.getItem('ui-state') || '{}');
+          var theme = uiState.theme || 'light';
+          document.documentElement.classList.toggle('dark', theme === 'dark');
+        } catch(e) {}
       })();
       
       // Development mode: Clear service workers and caches

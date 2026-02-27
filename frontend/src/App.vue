@@ -22,10 +22,14 @@ import NotificationToast from '@/components/custom/NotificationToast.vue';
 import { useIOSPWA, usePWA } from '@/composables';
 
 // Sync UIStore resolvedTheme to <html> class (single source of truth)
+// Note: { immediate: true } is intentionally omitted to prevent FOUC.
+// The inline script in index.html applies the initial dark class from localStorage
+// before Vue mounts. Using immediate here would flash light mode because the store
+// initializes with DEFAULT_THEME before persistence restores the saved value.
 const ui = useUIStore();
 watch(() => ui.resolvedTheme, (theme) => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
-}, { immediate: true });
+});
 
 // Initialize PWA features
 const { isIOS, isStandalone, handleSwipeNavigation, handleViewportResize } = useIOSPWA();
