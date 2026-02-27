@@ -53,6 +53,9 @@ export interface SSEHandlers<T> {
 }
 
 export class SSEClient {
+  private static readonly MAX_RETRIES = 3
+  private static readonly BASE_RETRY_DELAY = 1000
+
   constructor(private axios: AxiosInstance) {}
 
   async stream<T>(
@@ -90,7 +93,7 @@ export class SSEClient {
 
       resetTimeout()
 
-      this.processStream(url, controller.signal, options, handlers, resetTimeout)
+      this.processStreamWithRetry(url, controller.signal, options, handlers, resetTimeout)
         .then(result => {
           cleanup()
           resolve(result)
@@ -104,6 +107,47 @@ export class SSEClient {
           }
         })
     })
+  }
+
+  private async processStreamWithRetry<T>(
+    url: string,
+    signal: AbortSignal,
+    options: SSEOptions,
+    handlers: SSEHandlers<T>,
+    resetTimeout?: () => void
+  ): Promise<T> {
+    let lastError: Error | null = null
+
+    for (let attempt = 0; attempt <= SSEClient.MAX_RETRIES; attempt++) {
+      if (signal.aborted) {
+        throw new Error('Stream aborted by caller')
+      }
+
+      try {
+        return await this.processStream(url, signal, options, handlers, resetTimeout)
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error))
+
+        // Don't retry on abort or if we already got a complete event
+        if (signal.aborted) {
+          throw lastError
+        }
+
+        // Don't retry if we've exhausted attempts
+        if (attempt >= SSEClient.MAX_RETRIES) {
+          break
+        }
+
+        const delay = SSEClient.BASE_RETRY_DELAY * Math.pow(2, attempt)
+        console.warn(
+          `SSE connection attempt ${attempt + 1} failed, retrying in ${delay}ms:`,
+          lastError.message
+        )
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+
+    throw lastError || new Error('SSE connection failed after retries')
   }
 
   private async processStream<T>(

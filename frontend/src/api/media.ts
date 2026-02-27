@@ -63,16 +63,16 @@ export const mediaApi = {
   },
 
   // Bind image to definition
-  async bindImageToDefinition(definitionId: string, imageId: string): Promise<any> {
-    const response = await api.patch(`/definitions/${definitionId}`, {
+  async bindImageToDefinition(definitionId: string, imageId: string): Promise<ResourceResponse> {
+    const response = await api.patch<ResourceResponse>(`/definitions/${definitionId}`, {
       add_image_id: imageId
     });
     return response.data;
   },
 
   // Remove image from definition
-  async removeImageFromDefinition(definitionId: string, imageId: string): Promise<any> {
-    const response = await api.patch(`/definitions/${definitionId}`, {
+  async removeImageFromDefinition(definitionId: string, imageId: string): Promise<ResourceResponse> {
+    const response = await api.patch<ResourceResponse>(`/definitions/${definitionId}`, {
       remove_image_id: imageId
     });
     return response.data;

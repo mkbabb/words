@@ -1,10 +1,10 @@
-import type { ResourceResponse } from '@/types/api';
+import type { Definition, ResourceResponse } from '@/types/api';
 import { api, transformError } from './core';
 import { logger } from '@/utils/logger';
 
 export const definitionsApi = {
   // Get definition by ID - GET /definitions/{id}
-  async getDefinition(definitionId: string): Promise<any> {
+  async getDefinition(definitionId: string): Promise<Definition> {
     const response = await api.get(`/definitions/${definitionId}`);
     return response.data.data;
   },
@@ -31,7 +31,7 @@ export const definitionsApi = {
   },
 
   // Regenerate definition components - POST /definitions/{id}/regenerate
-  async regenerateComponents(definitionId: string, component: string): Promise<any> {
+  async regenerateComponents(definitionId: string, component: string): Promise<Definition> {
     const response = await api.post(`/definitions/${definitionId}/regenerate`, {
       components: [component],
       force: true

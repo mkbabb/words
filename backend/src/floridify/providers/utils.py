@@ -226,6 +226,9 @@ def get_all_circuit_statuses() -> list[dict[str, Any]]:
     return [cb.get_status() for cb in _circuit_breakers.values()]
 
 
+MAX_RETRY_AFTER = 3600  # Cap server-specified retry delays to 1 hour
+
+
 class AdaptiveRateLimiter:
     """Adaptive rate limiter with backoff and server respect."""
 
@@ -279,7 +282,12 @@ class AdaptiveRateLimiter:
         self.consecutive_successes = 0
 
         if retry_after and self.config.respect_retry_after:
-            # Use server-specified retry delay
+            # Cap server-specified retry delay
+            if retry_after > MAX_RETRY_AFTER:
+                logger.warning(
+                    f"⚠️ Server Retry-After {retry_after}s exceeds max, capping to {MAX_RETRY_AFTER}s"
+                )
+                retry_after = MAX_RETRY_AFTER
             self.backoff_until = asyncio.get_running_loop().time() + retry_after
             logger.info(f"⏸️ Server requested {retry_after}s delay")
         else:

@@ -165,8 +165,16 @@ class BatchExecutor:
             if batch_file.exists():
                 batch_file.unlink()
 
-    async def _wait_for_completion(self, batch_id: str, check_interval: int) -> Any:
-        """Wait for batch job to complete."""
+    async def _wait_for_completion(
+        self, batch_id: str, check_interval: int, max_wait_time: float = 3600.0
+    ) -> Any:
+        """Wait for batch job to complete.
+
+        Args:
+            batch_id: The batch job ID to poll.
+            check_interval: Seconds between status checks.
+            max_wait_time: Maximum seconds to wait before raising TimeoutError.
+        """
         start_time = time.time()
         check_count = 0
 
@@ -182,6 +190,12 @@ class BatchExecutor:
                 return batch_job
             if batch_job.status in ["failed", "expired", "cancelled"]:
                 raise Exception(f"Batch job failed: {batch_job.status}")
+
+            if elapsed > max_wait_time:
+                raise TimeoutError(
+                    f"Batch job {batch_id} timed out after {elapsed:.0f}s "
+                    f"(max_wait_time={max_wait_time}s, status={batch_job.status})"
+                )
 
             await asyncio.sleep(check_interval)
 

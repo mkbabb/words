@@ -51,7 +51,7 @@
                             ? 'scale-[1.02] border-l-8 bg-accent/60 pl-4 shadow-md'
                             : 'border-l-0 pl-4 hover:bg-accent/20 hover:scale-[1.01]',
                     ]"
-                    @click="$emit('select-result', { word: result.word, score: result.score || 1.0, method: 'EXACT' as any, is_phrase: false })"
+                    @click="$emit('select-result', { word: result.word, score: result.score || 1.0, method: SearchMethod.EXACT, is_phrase: false })"
                     @mouseenter="selectedIndex = index"
                 >
                     <span
@@ -164,6 +164,7 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
 import type { SearchResult } from '@/types';
+import { SearchMethod } from '@/types/api';
 
 interface SearchResultsProps {
     show: boolean;

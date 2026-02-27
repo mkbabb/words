@@ -17,18 +17,20 @@ export enum Language {
 export enum DictionaryProvider {
   WIKTIONARY = 'wiktionary',
   OXFORD = 'oxford',
-  DICTIONARY_COM = 'dictionary_com',
+  MERRIAM_WEBSTER = 'merriam_webster',
+  FREE_DICTIONARY = 'free_dictionary',
+  WORDHIPPO = 'wordhippo',
   APPLE_DICTIONARY = 'apple_dictionary',
   AI_FALLBACK = 'ai_fallback',
   SYNTHESIS = 'synthesis'
 }
 
 export enum SearchMethod {
-  EXACT = 'EXACT',
-  FUZZY = 'FUZZY',
-  SEMANTIC = 'SEMANTIC',
-  PHONETIC = 'PHONETIC',
-  AI = 'AI'
+  EXACT = 'exact',
+  PREFIX = 'prefix',
+  FUZZY = 'fuzzy',
+  SEMANTIC = 'semantic',
+  AUTO = 'auto'
 }
 
 // Base Metadata

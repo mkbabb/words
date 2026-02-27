@@ -133,7 +133,7 @@ export function useLookupContentState() {
         ...currentEntry.value,
         definitions: currentEntry.value.definitions?.map(def => 
           def.id === definitionId 
-            ? { ...def, [component]: response[component] } 
+            ? { ...def, [component]: (response as unknown as Record<string, unknown>)[component] }
             : def
         )
       }

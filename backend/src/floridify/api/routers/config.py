@@ -57,10 +57,10 @@ async def get_configuration(
                 if not params.show_keys and any(
                     sensitive in key.lower() for sensitive in ["key", "token", "password", "secret"]
                 ):
-                    if value_str and len(value_str) > 6:
-                        section_data[key] = value_str[:6] + "..." + value_str[-4:]
+                    if value_str and len(value_str) > 4:
+                        section_data[key] = value_str[:4] + "****"
                     else:
-                        section_data[key] = "***"
+                        section_data[key] = "****"
                     masked_keys.append(f"{section_name}.{key}")
                 else:
                     section_data[key] = value
@@ -111,10 +111,10 @@ async def get_config_value(
         )
 
         if is_sensitive and not params.show_keys:
-            if value and len(value) > 6:
-                display_value = value[:6] + "..." + value[-4:]
+            if value and len(value) > 4:
+                display_value = value[:4] + "****"
             else:
-                display_value = "***"
+                display_value = "****"
         else:
             display_value = value
 
