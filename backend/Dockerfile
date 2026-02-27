@@ -32,9 +32,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy dependency files
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies only
+# Install dependencies only (CPU-only PyTorch — no NVIDIA/CUDA packages)
 RUN --mount=type=cache,target=/opt/uv-cache \
-    uv sync --frozen --no-install-project --no-dev
+    UV_TORCH_BACKEND=cpu uv sync --frozen --no-install-project --no-dev
 
 # Builder stage
 FROM dependencies AS builder
@@ -45,7 +45,7 @@ COPY . .
 
 # Install application
 RUN --mount=type=cache,target=/opt/uv-cache \
-    uv sync --frozen --no-dev
+    UV_TORCH_BACKEND=cpu uv sync --frozen --no-dev
 
 # Development stage
 FROM base AS development
