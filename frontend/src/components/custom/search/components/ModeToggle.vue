@@ -108,7 +108,7 @@ const handleToggle = async () => {
         console.log('🧭 Navigation needed for word:', currentWord, 'to mode:', newMode);
         
         // Use the enhanced router navigation with router instance
-        navigateToLookupMode(currentWord, newMode, router);
+        navigateToLookupMode(currentWord, newMode);
         console.log('✅ Navigation completed using enhanced router sync');
     } else {
         console.log('🔄 No navigation needed - not in lookup mode or no query');

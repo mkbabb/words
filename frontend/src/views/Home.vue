@@ -21,7 +21,6 @@
                         :scroll-threshold="scrollThreshold"
                         :shrink-percentage="shrinkPercentage"
                         :scroll-progress="scrollProgress"
-                        @stage-enter="handleStageEnter"
                     />
                 </div>
             </div>
@@ -33,11 +32,11 @@
             <div class="container mx-auto max-w-6xl">
                 <div class="flex gap-6 relative">
                     <!-- Progressive Sidebar (Sticky) -->
-                    <div 
+                    <div
                         class="hidden xl:block transition-all duration-300 ease-out"
                         :class="shouldShowProgressiveSidebar ? 'w-48 opacity-100' : 'w-0 opacity-0'"
                     >
-                        <div 
+                        <div
                             v-if="shouldShowProgressiveSidebar"
                             class="sticky w-48"
                             :style="{ top: '5.5rem', zIndex: 30 }"
@@ -45,7 +44,7 @@
                             <ProgressiveSidebar />
                         </div>
                     </div>
-                    
+
                     <!-- Main Content -->
                     <div :class="['flex-1 max-w-5xl mx-auto', (lookupSubMode === 'suggestions' || searchBar.searchMode === 'wordlist') ? 'px-4 sm:px-2' : '']">
                         <!-- Animated Content Cards -->
@@ -57,12 +56,12 @@
                     <!-- Definition Content -->
                     <div v-if="searchBar.searchMode === 'lookup' && lookupSubMode !== 'suggestions'" key="lookup">
                         <!-- Loading State -->
-                        <div v-if="isSearching && showLoadingModal && !partialEntry" class="space-y-8">
+                        <div v-if="loading.isSearching.value && loading.showLoadingModal.value && !content.partialEntry" class="space-y-8">
                             <DefinitionSkeleton />
                         </div>
 
                         <!-- Definition Display -->
-                        <div v-else-if="isStreamingData || partialEntry || currentEntry || previousEntry || definitionError?.hasError" class="space-y-8">
+                        <div v-else-if="content.isStreamingData || content.partialEntry || currentEntry || content.definitionError" class="space-y-8">
                             <DefinitionDisplay />
                         </div>
 
@@ -96,8 +95,9 @@
                     <!-- Stage Content -->
                     <div v-else-if="searchBar.searchMode === 'stage'" key="stage">
                         <div class="space-y-8">
-                            <!-- TODO: Import StageTest component -->
-                            <div>Stage mode coming soon...</div>
+                            <div class="py-16 text-center text-muted-foreground">
+                                Stage mode coming soon...
+                            </div>
                         </div>
                     </div>
                         </Transition>
@@ -111,33 +111,31 @@
     <LoadingModal
         v-model="showLoadingModal"
         :word="searchBar.searchQuery || 'searching'"
-        :progress="loading.loadingProgress"
-        :current-stage="loading.loadingStage"
+        :progress="loading.loadingProgress.value"
+        :current-stage="loading.loadingStage.value"
         :allow-dismiss="true"
         mode="lookup"
-        :dynamic-checkpoints="[...loading.loadingStageDefinitions]"
-        :category="loading.loadingCategory"
+        :dynamic-checkpoints="undefined"
+        :category="loading.loadingCategory.value"
     />
-    
+
     <!-- Loading Modal for AI Suggestions -->
     <LoadingModal
         v-model="showSuggestionsModal"
         :display-text="'efflorescing'"
-        :progress="loading.suggestionsProgress"
-        :current-stage="loading.suggestionsStage"
+        :progress="loading.suggestionsProgress.value"
+        :current-stage="loading.suggestionsStage.value"
         mode="suggestions"
-        :dynamic-checkpoints="[...loading.suggestionsStageDefinitions]"
-        :category="loading.suggestionsCategory"
+        :dynamic-checkpoints="undefined"
+        :category="loading.suggestionsCategory.value"
     />
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useStores } from '@/stores';
-// import { useLookupMode } from '@/stores/search/modes/lookup'; // Unused
-// import { useWordlistMode } from '@/stores/search/modes/wordlist'; // Unused
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { useScroll } from '@vueuse/core';
 import { cn } from '@/utils';
@@ -147,27 +145,24 @@ import { DefinitionSkeleton } from '@/components/custom/definition';
 import { Sidebar } from '@/components/custom';
 import { LoadingModal } from '@/components/custom/loading';
 import WordListView from '@/components/custom/wordlist/WordListView.vue';
-// import { StageTest } from '@/components/custom/test';
 import { ProgressiveSidebar } from '@/components/custom/navigation';
 
 const { searchBar, content, ui, loading } = useStores();
-// const wordlistMode = useWordlistMode(); // Unused
 const route = useRoute();
 
-// Use the orchestrator for search operations
 const orchestrator = useSearchOrchestrator({
     query: computed(() => searchBar.searchQuery)
 });
 
-// Component refs
-const stageTestRef = ref();
+// Loading modal bindings driven by global loading store
+// Show for ALL lookups (removed isDirectLookup gate that suppressed it)
+const showLoadingModal = computed({
+    get: () => loading.showLoadingModal.value && searchBar.searchMode === 'lookup',
+    set: (value: boolean) => loading.setShowLoadingModal(value)
+});
 
-// Track loading modal visibility separately from search state
-const showLoadingModal = ref(false);
-
-// Computed property for suggestions modal visibility
 const showSuggestionsModal = computed({
-    get: () => loading.isSuggestingWords,
+    get: () => loading.isSuggestingWords.value,
     set: (value: boolean) => {
         if (!value) {
             loading.stopSuggestions();
@@ -178,40 +173,34 @@ const showSuggestionsModal = computed({
 // Computed for current lookup submode
 const lookupSubMode = computed(() => searchBar.getSubMode('lookup'));
 
-// Handle stage mode enter key
-const handleStageEnter = (_query: string) => {
-    if (stageTestRef.value && stageTestRef.value.startMockTest) {
-        stageTestRef.value.startMockTest();
-    }
-};
-
-
-// Route orchestration using modern store API and orchestrator
-watch(() => route.name, async (routeName) => {
+// Route orchestration — watch fullPath to catch same-route param changes (e.g. /search/hello → /search/world)
+watch(() => route.fullPath, async () => {
+    const routeName = route.name;
     if (routeName === 'Definition' && route.params.word) {
         const word = route.params.word as string;
-        // Use modern mode system - just change the modes
         searchBar.setMode('lookup');
         searchBar.setSubMode('lookup', 'dictionary');
         searchBar.setQuery(word);
-        
-        // Only search if we don't have the current entry or it's a different word
+
         if (!content.currentEntry || content.currentEntry.word !== word) {
             searchBar.setDirectLookup(true);
             try {
-                await orchestrator.getDefinition(word);
+                await orchestrator.getDefinition(word, {
+                    onProgress: (stage, progress) => {
+                        loading.setLoadingStage(stage);
+                        loading.setLoadingProgress(progress);
+                    }
+                });
             } finally {
                 searchBar.setDirectLookup(false);
             }
         }
     } else if (routeName === 'Thesaurus' && route.params.word) {
         const word = route.params.word as string;
-        // Use modern mode system - just change the modes
         searchBar.setMode('lookup');
         searchBar.setSubMode('lookup', 'thesaurus');
         searchBar.setQuery(word);
-        
-        // Only search if we don't have the current entry or it's a different word  
+
         if (!content.currentEntry || content.currentEntry.word !== word) {
             searchBar.setDirectLookup(true);
             try {
@@ -220,8 +209,12 @@ watch(() => route.name, async (routeName) => {
                 searchBar.setDirectLookup(false);
             }
         }
+    } else if (routeName === 'Search' && route.params.query) {
+        const query = route.params.query as string;
+        searchBar.setMode('lookup');
+        searchBar.setQuery(query);
+        await orchestrator.performSearch();
     } else if (routeName === 'Home') {
-        // Clear when returning to home
         searchBar.clearQuery();
         content.clearCurrentEntry();
     }
@@ -229,47 +222,28 @@ watch(() => route.name, async (routeName) => {
 
 // Watch search mode changes for clearing content
 watch(() => searchBar.searchMode, (newMode, oldMode) => {
-    if (newMode !== oldMode) {
-        // Clear appropriate content when switching modes
-        if (newMode !== 'lookup') {
-            content.clearCurrentEntry();
-        }
+    if (newMode !== oldMode && newMode !== 'lookup') {
+        content.clearCurrentEntry();
     }
 });
 
 // State from stores
-const isSearching = computed(() => loading.isSearching);
-const isStreamingData = computed(() => false); // TODO: Implement streaming
 const currentEntry = computed(() => content.currentEntry);
-const partialEntry = computed(() => null); // TODO: Implement partial results
-const previousEntry = computed(() => null); // TODO: Implement previous entry
-const definitionError = computed(() => ({
-    hasError: false, // TODO: Implement error state
-    message: ''
-}));
 
 // Scroll handling with responsive thresholds
 const { y } = useScroll(typeof window !== 'undefined' ? window : null);
 
 const scrollThreshold = computed(() => {
     const hasContent = currentEntry.value || content.wordSuggestions;
-    // Dynamic thresholds based on content
     return hasContent ? 50 : 100;
 });
 
-// Enhanced scroll progress calculation
 const scrollProgress = computed(() => {
     const threshold = scrollThreshold.value;
     const scrollPos = y.value;
-    
-    // Normalize scroll position to 0-1 range
-    const maxScroll = threshold * 2; // Full effect at 2x threshold
+    const maxScroll = threshold * 2;
     const progress = Math.min(scrollPos / maxScroll, 1);
-    
-    // Apply easing function for smoother transitions
-    const easedProgress = 1 - Math.pow(1 - progress, 3);
-    
-    return easedProgress;
+    return 1 - Math.pow(1 - progress, 3);
 });
 
 const shrinkPercentage = computed(() => {
@@ -278,7 +252,6 @@ const shrinkPercentage = computed(() => {
     return Math.max(baseline, Math.min(progress * 0.85, 0.85));
 });
 
-// Search bar classes
 const searchBarClasses = computed(() => [
     'relative top-0 z-40 bg-transparent',
     'transition-all duration-300 ease-out',
@@ -290,38 +263,18 @@ const searchBarClasses = computed(() => [
     },
 ]);
 
-// Progressive sidebar visibility
 const shouldShowProgressiveSidebar = computed(() => {
     const hasDefinition = !!currentEntry.value;
     const isLookupMode = searchBar.searchMode === 'lookup';
     const isSuggestionsSubMode = lookupSubMode.value === 'suggestions';
     const hasSuggestions = !!content.wordSuggestions;
-    
+
     return isLookupMode && (hasDefinition || (isSuggestionsSubMode && hasSuggestions));
 });
 
-// Watch loading state for modal visibility
-watch(() => loading.isSearching, (newValue) => {
-    if (searchBar.searchMode === 'lookup' && !searchBar.isDirectLookup) {
-        showLoadingModal.value = newValue;
-    }
-});
-
-// Show loading modal when loading state is updated
-watch(() => loading.showLoadingModal, (newValue) => {
-    if (searchBar.searchMode === 'lookup') {
-        showLoadingModal.value = newValue;
-    }
-});
-
-// TODO: Handle streaming data updates when implemented
-
-// Initialize wordlist if needed
 onMounted(async () => {
-    // Only fetch wordlists if we're in wordlist mode
     if (searchBar.searchMode === 'wordlist') {
-        // TODO: Implement fetchWordlists
-        console.log('TODO: Fetch wordlists');
+        // Wordlist initialization handled by mode store
     }
 });
 </script>
@@ -353,7 +306,6 @@ onMounted(async () => {
     transform: translateY(-10px);
 }
 
-/* Card animations */
 @keyframes cardFadeIn {
     from {
         opacity: 0;

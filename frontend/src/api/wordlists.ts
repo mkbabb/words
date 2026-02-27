@@ -229,7 +229,7 @@ export const wordlistsApi = {
 
   // Get wordlist statistics
   async getStatistics(id: string) {
-    const response = await api.get(`/wordlists/${id}/statistics`);
+    const response = await api.get(`/wordlists/${id}/stats`);
     return response.data;
   },
 
@@ -276,13 +276,14 @@ export const wordlistsApi = {
   },
 
   // Update word in wordlist (notes, tags, etc)
-  async updateWord(_wordlistId: string, wordText: string, updates: {
+  async updateWord(wordlistId: string, wordText: string, updates: {
     notes?: string;
     tags?: string[];
   }) {
-    // Since backend doesn't have a direct update endpoint, we'll need to handle this differently
-    // For now, return a mock response
-    console.warn('updateWord API not implemented on backend');
-    return { data: { ...updates, word: wordText } };
+    const response = await api.patch(
+      `/wordlists/${wordlistId}/words/${encodeURIComponent(wordText)}`,
+      updates
+    );
+    return response.data;
   },
 };

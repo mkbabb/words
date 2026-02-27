@@ -163,7 +163,7 @@ import { Share2, Download, Minus, CheckCircle2 } from 'lucide-vue-next';
 import { useIOSPWA, usePWA } from '@/composables';
 import { useStores } from '@/stores';
 
-const { notifications, loading } = useStores();
+const { notifications } = useStores();
 const { isIOS, isInstalled } = useIOSPWA();
 const { shouldShowInstallPrompt, installApp } = usePWA();
 
@@ -224,7 +224,8 @@ const checkEngagement = () => {
   
   // Check engagement metrics
   const searchCount = parseInt(localStorage.getItem('search-count') || '0');
-  const sessionTime = Date.now() - (loading.sessionStartTime || Date.now());
+  const sessionStartTime = parseInt(localStorage.getItem('session-start-time') || String(Date.now()));
+  const sessionTime = Date.now() - sessionStartTime;
   
   // Show after 3 searches or 2 minutes of engagement
   return searchCount >= 3 || sessionTime > 120000;

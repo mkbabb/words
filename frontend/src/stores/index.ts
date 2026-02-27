@@ -3,31 +3,30 @@ export { useContentStore } from './content/content'
 export { useHistoryStore } from './content/history'
 export { useSearchBarStore } from './search/search-bar'
 
+// UI stores
+export { useUIStore } from './ui/ui-state'
+export { useLoadingState } from './ui/loading'
+
+// Mode stores
+export { useLookupMode } from './search/modes/lookup'
+export { useWordlistMode } from './search/modes/wordlist'
+
 // Composables
 export { useNotifications } from './composables/useNotifications'
-export { useUIState } from './composables/useUIState'
-export { usePersistedState } from './composables/usePersistedState'
+export { useRouterSync } from './composables/useRouterSync'
+
+// Types
+export type { Theme } from './types/constants'
+export type { Notification } from './composables/useNotifications'
 
 // Import for useStores function
 import { useContentStore } from './content/content'
 import { useHistoryStore } from './content/history'
 import { useSearchBarStore } from './search/search-bar'
+import { useUIStore } from './ui/ui-state'
 import { useNotifications } from './composables/useNotifications'
-import { useUIState } from './composables/useUIState'
-
-// Event bus
-export { eventBus, useEventBus, StoreEvents } from './EventBus'
-export type { StoreEventType } from './EventBus'
-
-// State providers
-export { localStorageProvider } from './providers/LocalStorageProvider'
-export { migrationHelper } from './providers/MigrationHelper'
-export type { StateProvider, PersistedState, StateProviderOptions } from './providers/StateProvider'
-export type { Migration, MigrationFunction } from './providers/MigrationHelper'
-
-// Types
-export type { Theme } from './composables/useUIState'
-export type { Notification } from './composables/useNotifications'
+import { useLoadingState } from './ui/loading'
+import { useLookupMode } from './search/modes/lookup'
 
 // Store aggregator for components
 export function useStores() {
@@ -36,9 +35,13 @@ export function useStores() {
     history: useHistoryStore(),
     searchBar: useSearchBarStore(),
     notifications: useNotifications(),
-    ui: useUIState()
+    ui: useUIStore(),
+    loading: useLoadingState(),
+    lookupMode: useLookupMode()
   }
 }
 
-// Alias for backward compatibility
+// Backward compatibility aliases
+export { useUIStore as useUIState } from './ui/ui-state'
 export { useNotifications as useNotificationStore } from './composables/useNotifications'
+export { useLoadingState as useLoadingStore } from './ui/loading'

@@ -1,4 +1,4 @@
-import { ref, nextTick, Ref } from 'vue';
+import { ref, nextTick, onMounted, onUnmounted, Ref } from 'vue';
 import { useStores } from '@/stores';
 
 interface UseFocusManagementOptions {
@@ -103,12 +103,38 @@ export function useFocusManagement(options: UseFocusManagementOptions) {
   };
 
   /**
+   * Global Cmd+K / Ctrl+K shortcut to focus search bar
+   */
+  const handleGlobalKeydown = (e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      focusInput();
+      // Select all text for easy replacement
+      nextTick(() => {
+        const textarea = searchInputComponent.value?.element?.value;
+        if (textarea) {
+          textarea.select();
+        }
+      });
+    }
+  };
+
+  onMounted(() => {
+    window.addEventListener('keydown', handleGlobalKeydown);
+  });
+
+  onUnmounted(() => {
+    window.removeEventListener('keydown', handleGlobalKeydown);
+  });
+
+  /**
    * Cleanup timers
    */
   const cleanup = () => {
     if (blurTimer.value) {
       clearTimeout(blurTimer.value);
     }
+    window.removeEventListener('keydown', handleGlobalKeydown);
   };
 
   return {

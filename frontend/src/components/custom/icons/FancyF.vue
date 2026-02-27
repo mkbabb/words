@@ -74,8 +74,8 @@ const emit = defineEmits<{
   'toggle-mode': [];
 }>();
 
-// Refs for animation
-const fancyFButton = ref<HTMLButtonElement>();
+// Refs for animation (fancyFButton bound via template ref="fancyFButton")
+const fancyFButton = ref<HTMLButtonElement>(); void fancyFButton;
 const fancyFMain = ref<HTMLElement>();
 const fancyFSubscript = ref<HTMLElement>();
 

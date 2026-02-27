@@ -30,11 +30,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { CheckCircle2, XCircle, Info, AlertTriangle } from 'lucide-vue-next';
-import { useStores } from '@/stores';
+import { useNotifications, type Notification } from '@/stores/composables/useNotifications';
 
-const { notifications } = useStores();
+const notifications = useNotifications();
 
-const notificationList = computed(() => notifications.notifications);
+const notificationList = computed<Notification[]>(() => {
+  const items = notifications.notifications;
+  return Array.isArray(items) ? [...items] : [];
+});
 const removeNotification = (id: string) => notifications.removeNotification(id);
 
 const notificationIcons = {

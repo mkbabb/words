@@ -47,13 +47,14 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useStores } from '@/stores';
+import { useUIStore } from '@/stores/ui/ui-state';
 import { cn } from '@/utils';
 import SidebarHeader from './sidebar/SidebarHeader.vue';
 import SidebarContent from './sidebar/SidebarContent.vue';
 import SidebarFooter from './sidebar/SidebarFooter.vue';
 
-const { ui } = useStores();
+const ui = useUIStore();
+// CRITICAL: Use computed() to preserve reactivity from readonly refs
 const sidebarOpen = computed(() => ui.sidebarOpen);
 const sidebarCollapsed = computed(() => ui.sidebarCollapsed);
 </script>

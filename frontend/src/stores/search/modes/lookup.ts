@@ -1,15 +1,13 @@
 import { defineStore } from 'pinia';
 import { ref, readonly, computed, shallowRef, watch } from 'vue';
-import { lookupApi, searchApi } from '@/api';
-import { normalizeWord } from '@/utils';
-import { CARD_VARIANTS } from '@/types';
+import { searchApi } from '@/api';
 import { shouldTriggerAIMode } from '@/components/custom/search/utils/ai-query';
 import { useSearchBarStore } from '../search-bar';
 import type { ModeHandler } from '@/stores/types/mode-types';
 import type { SearchMode, SearchResult, CardVariant } from '@/types';
+import { CARD_VARIANTS } from '@/types';
 import {
     PronunciationModes,
-    DEFAULT_CARD_VARIANT,
     DEFAULT_PRONUNCIATION_MODE,
     DEFAULT_SOURCES,
     DEFAULT_LANGUAGES,
@@ -76,7 +74,7 @@ export const useLookupMode = defineStore(
         // UI STATE
         // ==========================================================================
 
-        const selectedCardVariant = ref<CardVariant>(DEFAULT_CARD_VARIANT);
+        const selectedCardVariant = ref<CardVariant>('default');
         const pronunciationMode = ref<PronunciationMode>(
             DEFAULT_PRONUNCIATION_MODE
         );
@@ -227,12 +225,32 @@ export const useLookupMode = defineStore(
 
         const clearResults = () => {
             results.value = [];
-            searchMethod.value = null;
+            searchMethod.value = 'smart';
             cursorPosition.value = 0;
         };
 
         const addResults = (newResults: SearchResult[]) => {
             results.value = [...results.value, ...newResults];
+        };
+
+        const detectSearchMethod = (
+            searchResults: SearchResult[],
+            query: string
+        ): SearchMethod => {
+            // Heuristic: if any result matches exactly, it was exact search
+            const exactMatch = searchResults.some(
+                (r) => r.word.toLowerCase() === query.toLowerCase()
+            );
+            if (exactMatch && searchResults.length > 0) return 'exact';
+            if (searchResults.length > 0) return 'fuzzy';
+            return 'smart';
+        };
+
+        const cycleCardVariant = () => {
+            const variants: CardVariant[] = [...CARD_VARIANTS];
+            const currentIndex = variants.indexOf(selectedCardVariant.value);
+            const nextIndex = (currentIndex + 1) % variants.length;
+            selectedCardVariant.value = variants[nextIndex];
         };
 
         const search = async (query: string): Promise<SearchResult[]> => {
@@ -245,8 +263,10 @@ export const useLookupMode = defineStore(
             try {
                 console.log(`[LookupMode] Searching for: ${query}`);
 
+                const normalized = query.trim().toLowerCase();
+
                 // Always perform dictionary search - AI mode is user-initiated only
-                const searchResults = await searchApi.search(normalizedQuery, {
+                const searchResults = await searchApi.search(normalized, {
                     signal: abortController.signal,
                     mode: searchMode.value,
                 });
@@ -254,7 +274,7 @@ export const useLookupMode = defineStore(
                 // Store results with method detection
                 const method = detectSearchMethod(
                     searchResults,
-                    normalizedQuery
+                    normalized
                 );
                 setResults(searchResults, method);
 
@@ -359,7 +379,7 @@ export const useLookupMode = defineStore(
             aiSuggestions.value = [];
 
             // Reset UI
-            selectedCardVariant.value = DEFAULT_CARD_VARIANT;
+            selectedCardVariant.value = 'default';
             pronunciationMode.value = DEFAULT_PRONUNCIATION_MODE;
 
             // Reset results

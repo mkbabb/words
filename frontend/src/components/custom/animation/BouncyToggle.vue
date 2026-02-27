@@ -38,6 +38,7 @@ defineOptions({
 interface ToggleOption {
   label: string;
   value: string;
+  icon?: string;
 }
 
 interface BouncyToggleProps {

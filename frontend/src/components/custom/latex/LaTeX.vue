@@ -19,7 +19,7 @@ const props = withDefaults(defineProps<Props>(), {
   className: '',
 });
 
-const mathElement = ref<HTMLElement>();
+const mathElement = ref<HTMLElement>(); void mathElement; // bound via template ref="mathElement"
 const renderedMath = ref('');
 
 const renderMath = () => {

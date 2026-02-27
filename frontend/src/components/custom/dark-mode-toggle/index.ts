@@ -1,12 +1,18 @@
 export { default as DarkModeToggle } from './DarkModeToggle.vue';
 
-import { useDark, useToggle } from '@vueuse/core';
+import { computed } from 'vue';
+import { useUIStore } from '@/stores/ui/ui-state';
 
-const isDark = useDark({ disableTransition: false });
-const toggleDark = useToggle(isDark);
+// Unified theme: UIStore is the single source of truth
+// isDark is a computed that reads from UIStore's resolvedTheme
+const isDark = computed(() => {
+  const ui = useUIStore();
+  return ui.resolvedTheme === 'dark';
+});
 
 export const changeTheme = () => {
-  toggleDark();
+  const ui = useUIStore();
+  ui.toggleTheme();
 };
 
 export { isDark };

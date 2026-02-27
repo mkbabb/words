@@ -26,7 +26,8 @@ export type ViewMode = typeof ViewModes[keyof typeof ViewModes]
 
 export const Themes = {
   LIGHT: 'light',
-  DARK: 'dark'
+  DARK: 'dark',
+  SYSTEM: 'system'
 } as const
 
 export type Theme = typeof Themes[keyof typeof Themes]

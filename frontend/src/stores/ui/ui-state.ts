@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, readonly } from 'vue'
+import { ref, readonly, computed } from 'vue'
 import { Themes, DEFAULT_THEME, type Theme } from '@/stores/types/constants'
 
 /**
@@ -11,72 +11,89 @@ export const useUIStore = defineStore('ui', () => {
   // ==========================================================================
   // SHARED UI STATE
   // ==========================================================================
-  
+
   // Theme and appearance
   const theme = ref<Theme>(DEFAULT_THEME)
-  
+
   // Sidebar visibility
   const sidebarOpen = ref(false)
   const sidebarCollapsed = ref(true)
-  
-  
+
+  // ==========================================================================
+  // COMPUTED
+  // ==========================================================================
+
+  const resolvedTheme = computed((): 'light' | 'dark' => {
+    if (theme.value === Themes.SYSTEM) {
+      if (typeof window !== 'undefined' && window.matchMedia) {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+      }
+      return 'light'
+    }
+    return theme.value as 'light' | 'dark'
+  })
+
   // ==========================================================================
   // SHARED ACTIONS
   // ==========================================================================
-  
+
   // Theme management
   const toggleTheme = () => {
-    theme.value = theme.value === Themes.LIGHT ? Themes.DARK : Themes.LIGHT
+    const themes: Theme[] = [Themes.LIGHT, Themes.DARK, Themes.SYSTEM]
+    const currentIndex = themes.indexOf(theme.value)
+    theme.value = themes[(currentIndex + 1) % themes.length]
   }
-  
+
   const setTheme = (newTheme: Theme) => {
     theme.value = newTheme
   }
-  
+
   // Sidebar management
   const toggleSidebar = () => {
     sidebarOpen.value = !sidebarOpen.value
   }
-  
+
   const setSidebarOpen = (open: boolean) => {
     sidebarOpen.value = open
   }
-  
+
   const setSidebarCollapsed = (collapsed: boolean) => {
     sidebarCollapsed.value = collapsed
   }
-  
-  
+
+  const toggleSidebarCollapsed = () => {
+    sidebarCollapsed.value = !sidebarCollapsed.value
+  }
+
   // ==========================================================================
   // RESET
   // ==========================================================================
-  
+
   const resetUI = () => {
-    // Reset shared state only
     theme.value = DEFAULT_THEME
     sidebarOpen.value = false
     sidebarCollapsed.value = true
   }
-  
+
   // ==========================================================================
   // RETURN API
   // ==========================================================================
-  
+
   return {
     // Shared State
     theme: readonly(theme),
+    resolvedTheme,
     sidebarOpen: readonly(sidebarOpen),
     sidebarCollapsed: readonly(sidebarCollapsed),
-    
-    
+
     // Shared Actions
     toggleTheme,
     setTheme,
     toggleSidebar,
     setSidebarOpen,
     setSidebarCollapsed,
-    
-    
+    toggleSidebarCollapsed,
+
     // Reset
     resetUI,
   }
@@ -87,7 +104,6 @@ export const useUIStore = defineStore('ui', () => {
       'theme',
       'sidebarOpen',
       'sidebarCollapsed',
-      // Note: Mode-specific UI states handle their own persistence
     ]
   }
 })

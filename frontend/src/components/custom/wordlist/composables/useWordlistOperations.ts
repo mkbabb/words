@@ -114,7 +114,7 @@ export function useWordlistOperations() {
   };
   
   // Update word notes
-  const updateWordNotes = async (wordlistId: string, word: string, notes: string): Promise<boolean> => {
+  const updateWordNotes = async (_wordlistId: string, word: string, notes: string): Promise<boolean> => {
     try {
       // Note: Backend endpoint may not exist yet, update locally for now
       const wordIndex = currentWords.value.findIndex(w => w.word === word);

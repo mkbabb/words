@@ -10,6 +10,9 @@ defineOptions({
 const props = defineProps<WithClassAsProps>()
 
 const { carouselRef, orientation } = useCarousel()
+
+// carouselRef is used as a template ref (ref="carouselRef") for embla-carousel binding
+defineExpose({ carouselRef })
 </script>
 
 <template>

@@ -166,7 +166,7 @@ const currentWords = ref<any[]>([]);
 const totalWords = ref(0);
 const currentPage = ref(0);
 // const wordsPerPage = ref(25); // Unused
-const scrollContainer = ref<HTMLElement>();
+const scrollContainer = ref<HTMLElement>(); void scrollContainer; // bound via template ref="scrollContainer"
 
 // Sort criteria from wordlist mode store (writeable)
 const sortCriteria = computed({

@@ -85,11 +85,13 @@ export interface WordlistFilters {
 
 // Statistics types
 export interface MasteryStats {
+  default: number;
   bronze: number;
   silver: number;
   gold: number;
   total: number;
   dueForReview: number;
+  [key: string]: number;
 }
 
 // File parsing types

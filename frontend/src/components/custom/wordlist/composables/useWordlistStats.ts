@@ -9,14 +9,14 @@ export function useWordlistStats(words: Ref<WordListItem[]>) {
   // Calculate mastery distribution
   const masteryStats = computed<MasteryStats>(() => {
     if (!words.value || words.value.length === 0) {
-      return { bronze: 0, silver: 0, gold: 0, total: 0, dueForReview: 0 };
+      return { default: 0, bronze: 0, silver: 0, gold: 0, total: 0, dueForReview: 0 };
     }
-    
+
     const stats = words.value.reduce((acc, word) => {
       const level = word.mastery_level || 'bronze';
       acc[level] = (acc[level] || 0) + 1;
       acc.total++;
-      
+
       // Check if due for review
       if (word.review_data?.next_review_date) {
         const nextReview = new Date(word.review_data.next_review_date);
@@ -24,9 +24,9 @@ export function useWordlistStats(words: Ref<WordListItem[]>) {
           acc.dueForReview++;
         }
       }
-      
+
       return acc;
-    }, { bronze: 0, silver: 0, gold: 0, total: 0, dueForReview: 0 } as MasteryStats);
+    }, { default: 0, bronze: 0, silver: 0, gold: 0, total: 0, dueForReview: 0 } as MasteryStats);
     
     return stats;
   });

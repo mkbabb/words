@@ -1,34 +1,21 @@
-import { watch } from 'vue'
 import { useRouter } from 'vue-router'
-import type { SearchMode } from '@/types'
 
 /**
  * Router synchronization composable
- * Syncs store state with URL parameters
+ * Provides navigation helpers for store ↔ URL coordination
  */
 export function useRouterSync() {
   const router = useRouter()
 
-  const syncModeToRoute = (mode: SearchMode) => {
-    // Update URL without triggering navigation
-    router.replace({ 
-      query: { 
-        ...router.currentRoute.value.query, 
-        mode 
-      } 
+  const navigateToLookupMode = (word: string, subMode: string = 'dictionary') => {
+    const routeName = subMode === 'thesaurus' ? 'Thesaurus' : 'Definition'
+    router.push({ name: routeName, params: { word } }).catch(() => {
+      // Fallback if named route doesn't exist
+      router.push({ path: `/definition/${encodeURIComponent(word)}` })
     })
   }
 
-  const getModeFromRoute = (): SearchMode | null => {
-    const query = router.currentRoute.value.query
-    if (typeof query.mode === 'string') {
-      return query.mode as SearchMode
-    }
-    return null
-  }
-
   return {
-    syncModeToRoute,
-    getModeFromRoute
+    navigateToLookupMode
   }
 }

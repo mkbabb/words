@@ -76,7 +76,7 @@ export const lookupApi = {
       timeout: 120000,
       signal: options?.abortController?.signal,
       onProgress: options?.onProgress,
-      onPartialResult: options?.onPartialResult ? (data: unknown) => options.onPartialResult(data as Partial<SynthesizedDictionaryEntry>) : undefined,
+      onPartialResult: options?.onPartialResult ? (data: unknown) => options.onPartialResult!(data as Partial<SynthesizedDictionaryEntry>) : undefined,
       onConfig: options?.onConfig
     };
 

@@ -225,10 +225,10 @@
             <!-- Thin Loading Progress Bar -->
             <ThinLoadingProgress
                 :show="showProgressBar"
-                :progress="loading.loadingProgress"
-                :current-stage="loading.loadingStage"
+                :progress="loading.loadingProgress.value"
+                :current-stage="loading.loadingStage.value"
                 :mode="searchBar.searchMode"
-                :category="loading.loadingCategory"
+                :category="loading.loadingCategory.value"
                 @click="handleProgressBarClick"
             />
 
@@ -246,7 +246,7 @@
                     :ai-suggestions="searchBar.aiSuggestions as string[]"
                     :is-development="uiState.isDevelopment"
                     :show-refresh-button="!!content.currentEntry && searchBar.searchMode === 'lookup'"
-                    :force-refresh-mode="loading.forceRefreshMode"
+                    :force-refresh-mode="loading.forceRefreshMode.value"
                     @word-select="selectWord"
                     @clear-storage="clearAllStorage"
                     @interaction="handleSearchAreaInteraction"
@@ -264,7 +264,7 @@
                         ref="searchResultsComponent"
                         :show="searchBar.showDropdown"
                         :results="(searchBar.currentResults || []) as any[]"
-                        :loading="loading.isSearching"
+                        :loading="loading.isSearching.value"
                         v-model:selected-index="searchSelectedIndex"
                         :query="searchQuery"
                         :ai-mode="searchBar.isAIQuery"
@@ -447,7 +447,7 @@ const wordlistSortCriteria = computed({
 
 // Progress bar state - computed based on loading state
 const isLoadingInProgress = computed(() => {
-    return loading.isSearching || (loading.loadingProgress > 0 && loading.loadingProgress < 100);
+    return loading.isSearching.value || (loading.loadingProgress.value > 0 && loading.loadingProgress.value < 100);
 });
 
 // Dialog state
@@ -455,12 +455,12 @@ const showClearStorageDialog = ref(false);
 
 const showProgressBar = computed(() => {
     // Show progress bar if loading is in progress and modal is not visible
-    return isLoadingInProgress.value && !loading.showLoadingModal;
+    return isLoadingInProgress.value && !loading.showLoadingModal.value;
 });
 
 // Refs
 const searchContainer = ref<HTMLDivElement>();
-const searchBarElement = ref<HTMLDivElement>();
+const searchBarElement = ref<HTMLDivElement>(); void searchBarElement; // bound via template ref="searchBarElement"
 const searchInputComponent = ref<any>();
 const searchResultsComponent = ref<any>();
 
@@ -588,12 +588,12 @@ const selectWord = async (word: string) => {
 
 const handleForceRegenerate = () => {
     handleSearchAreaInteraction();
-    loading.forceRefreshMode = !loading.forceRefreshMode;
+    loading.setForceRefreshMode(!loading.forceRefreshMode.value);
 };
 
 const handleProgressBarClick = () => {
     // Reshow the loading progress modal when clicking the thin progress bar
-    loading.showModal();
+    loading.setShowLoadingModal(true);
 };
 
 const clearQuery = () => {

@@ -157,7 +157,7 @@ const emit = defineEmits<{
 
 // PWA composables
 // const { subscribeToPush } = usePWA();
-const { notifications, lookupMode } = useStores();
+const { notifications } = useStores();
 
 // Reactive window width for potential future use
 const windowWidth = ref(window.innerWidth);

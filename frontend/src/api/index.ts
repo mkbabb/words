@@ -12,6 +12,7 @@ import { entriesApi } from './entries';
 import { mediaApi } from './media';
 import { wordlistsApi } from './wordlists';
 import { healthApi } from './health';
+import { versionsApi } from './versions';
 
 // Isomorphic API exports - mirrors backend structure
 export { lookupApi } from './lookup';         // /lookup/*
@@ -24,6 +25,7 @@ export { entriesApi } from './entries';       // /words/entries/*
 export { mediaApi } from './media';           // /images/*, /audio/*
 export { wordlistsApi } from './wordlists';   // /wordlists/*
 export { healthApi } from './health';         // /health
+export { versionsApi } from './versions';     // /words/{word}/versions/*
 
 
 
@@ -49,4 +51,5 @@ export default {
   media: mediaApi,
   wordlists: wordlistsApi,
   health: healthApi,
+  versions: versionsApi,
 };

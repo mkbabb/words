@@ -13,12 +13,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { isDark } from '@/components/custom/dark-mode-toggle';
+import { useUIStore } from '@/stores/ui/ui-state';
 import { Toaster } from '@/components/ui/toast';
 import { PWAInstallPrompt, PWANotificationPrompt } from '@/components/custom/pwa';
 import NotificationToast from '@/components/custom/NotificationToast.vue';
 import { useIOSPWA, usePWA } from '@/composables';
+
+// Sync UIStore resolvedTheme to <html> class (single source of truth)
+const ui = useUIStore();
+watch(() => ui.resolvedTheme, (theme) => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+}, { immediate: true });
 
 // Initialize PWA features
 const { isIOS, isStandalone, handleSwipeNavigation, handleViewportResize } = useIOSPWA();

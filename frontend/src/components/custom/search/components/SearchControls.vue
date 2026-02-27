@@ -252,7 +252,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStores } from '@/stores';
-import { Button, Slider } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { BouncyToggle } from '@/components/custom/animation';
 import { Flame, Clock, PanelLeft } from 'lucide-vue-next';
 import ActionsRow from './ActionsRow.vue';
@@ -278,7 +278,7 @@ const searchMode = computed(() => searchBar.searchMode);
 const currentSearchMode = computed(() => lookupMode.searchMode);
 
 // Search mode descriptions
-const searchModeDescriptions = {
+const searchModeDescriptions: Record<string, string> = {
     smart: 'Adaptive search that combines exact, fuzzy, and semantic matching',
     exact: 'Find exact word matches only',
     fuzzy: 'Find similar words and handle typos',

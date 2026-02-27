@@ -146,7 +146,7 @@ const wordlistMode = useWordlistMode();
 const { toast } = useToast();
 
 // Component state
-const fileInput = ref<HTMLInputElement>();
+const fileInput = ref<HTMLInputElement>(); void fileInput; // bound via template ref="fileInput"
 const isDragging = ref(false);
 const showUploadModal = ref(false);
 const showCreateModal = ref(false);

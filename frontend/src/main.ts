@@ -1,55 +1,12 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import { createPersistedState } from 'pinia-plugin-persistedstate';
-import { createRouter, createWebHistory } from 'vue-router';
 import App from './App.vue';
-import Home from './views/Home.vue';
+import router from './router';
 
 // Import Tailwind CSS and custom styles
 import './assets/index.css';
 import './styles/ios-pwa.css';
-
-// Create router
-const router = createRouter({
-  history: createWebHistory(),
-  routes: [
-    {
-      path: '/',
-      name: 'Home',
-      component: Home,
-    },
-    {
-      path: '/search/:query?',
-      name: 'Search',
-      component: Home,
-      props: true,
-    },
-    {
-      path: '/definition/:word',
-      name: 'Definition',
-      component: Home,
-      props: true,
-    },
-    {
-      path: '/thesaurus/:word',
-      name: 'Thesaurus',
-      component: Home,
-      props: true,
-    },
-    {
-      path: '/wordlist/:wordlistId',
-      name: 'Wordlist',
-      component: Home,
-      props: true,
-    },
-    {
-      path: '/wordlist/:wordlistId/search/:query?',
-      name: 'WordlistSearch',
-      component: Home,
-      props: true,
-    },
-  ],
-});
 
 // Create app
 const app = createApp(App);
