@@ -321,6 +321,10 @@ start_native_servers() {
     if command -v uv &>/dev/null; then
         cd ./backend
         unset VIRTUAL_ENV
+        # Prevent libomp conflict on macOS (PyTorch + scikit-learn + FAISS)
+        # OMP=1 at import prevents segfault; parallelism via torch.set_num_threads()
+        export KMP_DUPLICATE_LIB_OK=TRUE
+        export OMP_NUM_THREADS=1
         uv run ./scripts/run_api.py &
         BACKEND_PID=$!
         echo "Backend started with PID $BACKEND_PID"
