@@ -84,7 +84,7 @@ class MongoDBStorage:
             "socketTimeoutMS": 20000,  # Socket timeout (20s)
             "connectTimeoutMS": 10000,  # Connection timeout (10s)
             # Reliability Settings
-            "retryWrites": False,  # Disable retry writes for Docker MongoDB compatibility
+            "retryWrites": True,  # MongoDB 7.0 supports retry writes (DocumentDB did not)
             "waitQueueTimeoutMS": 5000,  # Queue timeout for connection pool
         }
 

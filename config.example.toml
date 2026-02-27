@@ -15,11 +15,17 @@ api_key = "your-oxford-api-key"
 authorization = "your-dictionary-com-authorization-token"
 
 [database]
-# Production connection (when running in EC2/VPC)
-production_url = "mongodb://username:password@your-docdb-cluster.amazonaws.com:27017/floridify?tls=true&retryWrites=false"
+# Production: MongoDB in Docker on same EC2 host (backend connects via Docker network)
+production_url = "mongodb://admin:password@mongodb:27017/floridify?authSource=admin"
 
-# Development connection (via SSH tunnel to localhost:27018)
-development_url = "mongodb://username:password@localhost:27018/floridify?tls=true&retryWrites=false&tlsAllowInvalidHostnames=true&directConnection=true"
+# Development via SSH tunnel to EC2 (localhost:27018 -> EC2:27017)
+development_url = "mongodb://admin:password@localhost:27018/floridify?authSource=admin&directConnection=true"
+
+# Docker development: same Docker network
+docker_development_url = "mongodb://admin:password@mongodb:27017/floridify?authSource=admin"
+
+# Native local development (no auth)
+native_local_url = "mongodb://localhost:27017/floridify"
 
 # Database name
 name = "floridify"

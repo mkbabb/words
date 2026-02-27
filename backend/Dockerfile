@@ -43,12 +43,6 @@ WORKDIR /app
 # Copy source code
 COPY . .
 
-# Download and install AWS RDS CA certificate bundle
-# This provides TLS certificates for AWS DocumentDB connections
-# Place in /opt to avoid volume mount conflicts
-RUN curl -o /opt/rds-ca-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem && \
-    chmod 644 /opt/rds-ca-bundle.pem
-
 # Install application
 RUN --mount=type=cache,target=/opt/uv-cache \
     uv sync --frozen --no-dev
@@ -64,10 +58,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=uv-installer /bin/uv /bin/uv
 COPY --from=builder /app /app
-
-# Copy certificate from builder stage to persistent location outside volume mount
-COPY --from=builder /opt/rds-ca-bundle.pem /usr/local/share/rds-ca-bundle.pem
-RUN chmod 644 /usr/local/share/rds-ca-bundle.pem
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/src:$PYTHONPATH"

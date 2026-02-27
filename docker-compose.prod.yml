@@ -17,8 +17,9 @@ services:
               "--workers", "4",
               "--proxy-headers", 
               "--forwarded-allow-ips", "172.16.0.0/12,10.0.0.0/8,127.0.0.1"]
-    # Don't need to wait for local MongoDB in production
-    depends_on: []
+    depends_on:
+      mongodb:
+        condition: service_healthy
 
   frontend:
     build:
@@ -93,7 +94,20 @@ services:
     profiles:
       - ssl
 
-  # MongoDB is not included in production - use remote instance
+  mongodb:
+    ports:
+      - "127.0.0.1:27017:27017"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
 volumes:
   nginx_secrets:

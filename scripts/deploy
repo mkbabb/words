@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-EC2_HOST="${EC2_HOST:-44.216.140.209}"
+EC2_HOST="${EC2_HOST:-3.225.200.137}"
 EC2_USER="${EC2_USER:-ubuntu}"
 DOMAIN="${DOMAIN:-words.babb.dev}"
 CERTBOT_EMAIL="${CERTBOT_EMAIL:-mike@babb.dev}"

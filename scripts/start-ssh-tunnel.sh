@@ -1,14 +1,13 @@
 #!/bin/bash
-# Start SSH tunnel for MongoDB/DocumentDB access
+# Start SSH tunnel for MongoDB access on EC2
 
 # Configuration
-BASTION_HOST="44.216.140.209"
-DOCDB_HOST="docdb-2025-07-21-21-16-19.cluster-cuvowu48w9vs.us-east-1.docdb.amazonaws.com"
+EC2_HOST="3.225.200.137"
 LOCAL_PORT=27018
 REMOTE_PORT=27017
 
-echo "Starting SSH tunnel to DocumentDB..."
-echo "Local port: $LOCAL_PORT -> Remote: $DOCDB_HOST:$REMOTE_PORT"
+echo "Starting SSH tunnel to MongoDB on EC2..."
+echo "Local port: $LOCAL_PORT -> Remote: localhost:$REMOTE_PORT"
 
 # Check if tunnel is already running
 if lsof -i :$LOCAL_PORT > /dev/null 2>&1; then
@@ -17,7 +16,8 @@ if lsof -i :$LOCAL_PORT > /dev/null 2>&1; then
 fi
 
 # Start SSH tunnel in background
-ssh -N -L $LOCAL_PORT:$DOCDB_HOST:$REMOTE_PORT ubuntu@$BASTION_HOST &
+# MongoDB is bound to 127.0.0.1 on EC2, so we tunnel to localhost
+ssh -N -L $LOCAL_PORT:localhost:$REMOTE_PORT ubuntu@$EC2_HOST &
 SSH_PID=$!
 
 # Wait a moment for tunnel to establish

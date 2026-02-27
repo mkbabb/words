@@ -108,14 +108,13 @@ services:
     profiles:
       - dev
 
-  # MongoDB - only for local development
-  # Comment out this service if using a remote MongoDB instance
+  # MongoDB - self-hosted on EC2 (replaces AWS DocumentDB)
   mongodb:
     image: mongo:7.0
     container_name: floridify-mongodb
     restart: unless-stopped
     ports:
-      - "${MONGO_PORT:-27017}:27017"
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-password}
@@ -131,8 +130,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
-    profiles:
-      - dev
 
 networks:
   app-network:

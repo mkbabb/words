@@ -80,27 +80,26 @@ check_env_file() {
     fi
 }
 
-# SSH tunnel for DocumentDB access (required since DocumentDB is VPC-only)
+# SSH tunnel for MongoDB access on EC2 (MongoDB bound to 127.0.0.1)
 manage_ssh_tunnel() {
     local action="$1"
     local tunnel_port="27018"
-    local ec2_host="44.216.140.209"
-    local docdb_host="docdb-2025-07-21-21-16-19.cluster-cuvowu48w9vs.us-east-1.docdb.amazonaws.com"
-    
+    local ec2_host="3.225.200.137"
+
     case "$action" in
         "start")
             if lsof -Pi :$tunnel_port -sTCP:LISTEN -t >/dev/null 2>&1; then
                 echo "📡 SSH tunnel already active on port $tunnel_port"
                 return 0
             fi
-            
-            echo "📡 Creating SSH tunnel to DocumentDB..."
-            ssh -o StrictHostKeyChecking=no -f -N -L $tunnel_port:$docdb_host:27017 ubuntu@$ec2_host
+
+            echo "📡 Creating SSH tunnel to MongoDB on EC2..."
+            ssh -o StrictHostKeyChecking=no -f -N -L $tunnel_port:localhost:27017 ubuntu@$ec2_host
             
             if [ $? -eq 0 ]; then
                 sleep 2
                 if lsof -Pi :$tunnel_port -sTCP:LISTEN -t >/dev/null 2>&1; then
-                    echo "✅ SSH tunnel established: localhost:$tunnel_port -> DocumentDB"
+                    echo "✅ SSH tunnel established: localhost:$tunnel_port -> EC2 MongoDB"
                 else
                     echo "❌ SSH tunnel failed to start"
                     return 1
@@ -142,10 +141,10 @@ display_config_info() {
         # Extract MongoDB info (mask sensitive parts)
         local mongo_info=""
         if grep -q "url.*mongodb" "$ROOT_DIR/auth/config.toml" 2>/dev/null; then
-            if grep -q "docdb.*amazonaws" "$ROOT_DIR/auth/config.toml" 2>/dev/null; then
-                mongo_info="AWS DocumentDB (Production)"
-            elif grep -q "localhost:27017" "$ROOT_DIR/auth/config.toml" 2>/dev/null; then
-                mongo_info="Local MongoDB (Development)"
+            if grep -q "localhost:27017\|mongodb:27017" "$ROOT_DIR/auth/config.toml" 2>/dev/null; then
+                mongo_info="MongoDB (Self-hosted on EC2)"
+            elif grep -q "localhost:27018" "$ROOT_DIR/auth/config.toml" 2>/dev/null; then
+                mongo_info="MongoDB via SSH tunnel (Development)"
             else
                 mongo_info="Custom MongoDB Instance"
             fi
@@ -165,12 +164,12 @@ display_config_info() {
         fi
         echo "  OpenAI API Key: $api_key_status"
         
-        # Check SSH tunnel status for DocumentDB access
+        # Check SSH tunnel status for remote MongoDB access
         manage_ssh_tunnel status >/dev/null 2>&1
         if [ $? -eq 0 ]; then
-            echo "  SSH Tunnel: ✅ active (DocumentDB accessible)"
+            echo "  SSH Tunnel: ✅ active (EC2 MongoDB accessible)"
         else
-            echo "  SSH Tunnel: ❌ inactive (DocumentDB not accessible)"
+            echo "  SSH Tunnel: ❌ inactive (EC2 MongoDB not accessible)"
         fi
         
     else
@@ -187,10 +186,10 @@ start_docker_servers() {
     check_docker
     check_env_file
     
-    # Start SSH tunnel for DocumentDB access
+    # Start SSH tunnel for EC2 MongoDB access
     manage_ssh_tunnel start
     if [ $? -ne 0 ]; then
-        echo "Warning: SSH tunnel failed - DocumentDB will not be accessible"
+        echo "Warning: SSH tunnel failed - EC2 MongoDB will not be accessible"
     fi
     
     # Build images if requested
@@ -214,7 +213,7 @@ start_docker_servers() {
     echo "🚀 Floridify servers are running in Docker!"
     echo "  Backend:  http://localhost:8000"
     echo "  Frontend: http://localhost:3000"
-    echo "  MongoDB:  DocumentDB via SSH tunnel (localhost:27018)"
+    echo "  MongoDB:  EC2 MongoDB via SSH tunnel (localhost:27018)"
     echo ""
     echo "Useful commands:"
     echo "  docker-compose ps          - Show container status"

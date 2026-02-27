@@ -85,9 +85,10 @@ class DatabaseConfig:
         return url
 
     @property
-    def cert_path(self) -> Path:
-        """Certificate path is always at project_root/auth/."""
-        return get_project_root() / "auth" / "rds-ca-2019-root.pem"
+    def cert_path(self) -> Path | None:
+        """Certificate path for TLS connections. Returns None if cert doesn't exist."""
+        cert = get_project_root() / "auth" / "rds-ca-2019-root.pem"
+        return cert if cert.exists() else None
 
 
 @dataclass
