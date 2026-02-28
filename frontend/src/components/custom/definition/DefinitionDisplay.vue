@@ -9,7 +9,6 @@
                 :retryable="contentStore.definitionError.canRetry"
                 :show-help="contentStore.definitionError.errorType === 'unknown'"
                 @retry="handleRetryLookup"
-                @help="handleShowHelp"
             />
         </ThemedCard>
     </div>
@@ -473,10 +472,6 @@ const handleRetryLookup = () => {
     }
 };
 
-const handleShowHelp = () => {
-    // Show help modal or redirect to help page
-    // TODO: Implement help system
-};
 
 const handleSuggestAlternatives = () => {
     // Switch to suggestions mode or show alternative suggestions
@@ -515,22 +510,6 @@ whenever(keys.escape, () => {
         editModeEnabled.value = false;
         // Trigger save when exiting edit mode
         saveAllChanges();
-    }
-});
-
-// Navigation with arrow keys
-whenever(keys.arrowdown, () => {
-    if (entry.value?.definitions) {
-        document.dispatchEvent(new CustomEvent('navigate-definition', { 
-            detail: { direction: 'next' } 
-        }));
-    }
-});
-whenever(keys.arrowup, () => {
-    if (entry.value?.definitions) {
-        document.dispatchEvent(new CustomEvent('navigate-definition', { 
-            detail: { direction: 'prev' } 
-        }));
     }
 });
 

@@ -661,57 +661,43 @@ const handleClickOutside = (event: MouseEvent) => {
     }
 };
 
+// Watch query changes for immediate search - NO DEBOUNCING
+watch(
+    () => searchBar.searchQuery,
+    () => {
+        // Trigger search immediately for all modes
+        performSearch();
+
+        // Update autocomplete
+        updateAutocomplete();
+        searchBar.setAutocompleteText(autocompleteText.value);
+    }
+);
+
+// Watch search results for autocomplete updates
+watch(
+    () => searchBar.getResults('lookup'),
+    () => {
+        updateAutocomplete();
+        searchBar.setAutocompleteText(autocompleteText.value);
+    }
+);
+
+// Hide dropdown when focus is lost or query is empty
+watchEffect(() => {
+    const focused = searchBar.isFocused;
+    const query = searchBar.searchQuery;
+
+    if (!focused || !query || query.length === 0) {
+        if (searchBar.showDropdown) {
+            searchBar.hideDropdown();
+        }
+    }
+});
+
 // Initialize
-onMounted(async () => {
+onMounted(() => {
     document.addEventListener('click', handleClickOutside);
-    
-    // Watch query changes for immediate search - NO DEBOUNCING
-    watch(
-        () => searchBar.searchQuery,
-        () => {
-            // Trigger search immediately for all modes
-            performSearch();
-            
-            // Update autocomplete
-            updateAutocomplete();
-            searchBar.setAutocompleteText(autocompleteText.value);
-        }
-    );
-
-    // Watch search results for autocomplete updates
-    watch(
-        () => searchBar.getResults('lookup'),
-        () => {
-            updateAutocomplete();
-            searchBar.setAutocompleteText(autocompleteText.value);
-        }
-    );
-
-
-    // Watch for AI mode changes from store
-    // AI mode is now non-persisted and dynamically determined by query
-    
-    // Note: isAIQuery and showSparkle are computed properties from search bar store
-    // They are automatically reactive and don't need manual assignment
-
-    // Let search operations handle dropdown visibility directly
-    // Only hide dropdown when focus is lost or query is empty
-    watchEffect(() => {
-        const focused = searchBar.isFocused;
-        const query = searchBar.searchQuery;
-        
-        // Only hide dropdown for specific conditions, let search operations show it
-        // Don't hide for AI mode - let it show AI suggestions
-        if (!focused || !query || query.length === 0) {
-            if (searchBar.showDropdown) {
-                searchBar.hideDropdown();
-            }
-        }
-    });
-
-    // AI mode detection is now handled in the lookup store itself
-
-    // Initialize AI suggestions using the store action
     searchBar.setAISuggestions([]);
 });
 
