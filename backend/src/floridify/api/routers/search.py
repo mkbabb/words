@@ -209,6 +209,11 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
             search_engine = Search(index=index, corpus=corpus)
             await search_engine.initialize()
 
+            # For per-corpus search, wait for semantic to be ready
+            # (small corpora build quickly, and each request creates a new Search instance)
+            if use_semantic:
+                await search_engine.await_semantic_ready()
+
             # Perform search
             results = await search_engine.search_with_mode(
                 query=query,
