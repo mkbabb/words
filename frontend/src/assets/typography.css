@@ -2,8 +2,7 @@
 
 @layer utilities {
   .text-word-title {
-    @apply text-6xl;
-    font-family: 'Fraunces', serif;
+    @apply text-6xl font-serif;
     font-weight: bold;
     line-height: 1.4;
     padding-bottom: 0.1em;
@@ -16,15 +15,15 @@
   }
 
   .text-pronunciation {
+    @apply font-mono;
     font-size: 1.125rem;
-    font-family: 'Fira Code', monospace;
     color: var(--color-muted-foreground);
   }
 
   .text-definition {
+    @apply font-serif;
     font-size: 1.2rem;
     line-height: 1.75;
-    font-family: 'Fraunces', serif;
   }
 
   .text-part-of-speech {

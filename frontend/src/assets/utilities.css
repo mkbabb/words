@@ -240,7 +240,7 @@
 
   /* Fira Code utility class */
   .fira-code {
-    font-family: 'Fira Code', monospace;
+    font-family: theme('fontFamily.mono');
   }
 
   /* Shake animation for errors */

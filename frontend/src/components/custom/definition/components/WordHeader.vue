@@ -4,8 +4,7 @@
             <!-- Container for invisible text and overlay -->
             <div class="relative">
                 <!-- Invisible text to reserve space -->
-                <span class="text-[clamp(1.5rem,10vw,4.5rem)] leading-tight font-bold invisible" 
-                      style="font-family: 'Fraunces', serif;">
+                <span class="text-[clamp(1.5rem,10vw,4.5rem)] leading-tight font-bold font-serif invisible">
                     {{ word }}
                 </span>
                 
@@ -44,7 +43,7 @@
             v-if="pronunciation && hasPronunciation"
             class="flex items-center gap-3 pt-2"
         >
-            <span class="text-lg text-muted-foreground" style="font-family: 'Fira Code', monospace;">
+            <span class="text-lg text-muted-foreground font-mono">
                 {{ currentPronunciation }}
             </span>
             

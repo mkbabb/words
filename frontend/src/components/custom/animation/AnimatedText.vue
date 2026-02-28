@@ -154,7 +154,7 @@ const duration = computed(
 }
 
 .font-fraunces {
-    font-family: 'Fraunces', serif;
+    font-family: theme('fontFamily.serif');
     font-variation-settings: 'wght' 900;
 }
 </style>
