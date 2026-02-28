@@ -84,8 +84,10 @@ export interface Collocation {
 // Etymology
 export interface Etymology {
   text: string;
-  language?: string;
-  period?: string;
+  origin_language?: string;
+  root_words?: string[];
+  first_known_use?: string;
+  period?: string; // Legacy frontend field, not in backend
 }
 
 // Model Info (for AI-generated content)
