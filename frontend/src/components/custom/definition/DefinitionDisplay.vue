@@ -193,10 +193,10 @@
         </ThemedCard>
         
         <!-- Wordlist Selection Modal -->
-        <WordlistSelectionModal
+        <AddToWordlistModal
             v-model="showWordlistModal"
             :word="wordToAdd"
-            @word-added="handleWordAddedToList"
+            @added="handleWordAddedToList"
         />
     </div>
 </template>
@@ -223,7 +223,7 @@ import {
     EmptyState
 } from './components';
 import { ThemedCard } from '@/components/custom/card';
-import { WordlistSelectionModal } from '@/components/custom/wordlist';
+import AddToWordlistModal from './components/AddToWordlistModal.vue';
 import { useDefinitionGroups, useProviders, useImageManagement } from './composables';
 import { normalizeEtymology } from '@/utils/guards';
 import { logger } from '@/utils/logger';
@@ -456,11 +456,11 @@ const handleAddToWordlist = (word: string) => {
     showWordlistModal.value = true;
 };
 
-const handleWordAddedToList = (_wordlist: any, word: string) => {
+const handleWordAddedToList = (wordlistName: string) => {
     const notifications = useNotificationStore();
     notifications.showNotification({
         type: 'success',
-        message: `"${word}" added to wordlist`
+        message: `Added "${wordToAdd.value}" to "${wordlistName}"`
     });
 };
 
