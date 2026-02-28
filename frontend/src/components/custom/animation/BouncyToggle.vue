@@ -27,7 +27,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, useAttrs } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, useAttrs } from 'vue';
 import { gsap } from 'gsap';
 
 // Disable automatic attribute inheritance
@@ -122,8 +122,8 @@ onMounted(() => {
 });
 
 // Watch for external value changes
-computed(() => {
-  const activeIndex = props.options.findIndex(option => option.value === activeValue.value);
+watch(activeValue, (newValue) => {
+  const activeIndex = props.options.findIndex(option => option.value === newValue);
   if (activeIndex !== -1) {
     updateBackground(activeIndex, true);
   }
