@@ -1,22 +1,28 @@
 import { api, API_BASE_URL } from './core';
 import { logger } from '@/utils/logger';
-import type { 
-  WordListQueryParams, 
-  WordListSearchQueryParams, 
+import type {
+  WordListItem,
+  WordListQueryParams,
+  WordListSearchQueryParams,
   WordListsQueryParams,
-  WordListNamesSearchParams 
+  WordListNamesSearchParams,
+  WordListResponse,
+  WordListsResponse,
+  WordListSearchResponse,
+  WordListStats,
 } from '@/types/wordlist';
+import type { ListResponse } from '@/types/api';
 
 export const wordlistApi = {
   // Get all wordlists
-  async getWordlists(params?: WordListsQueryParams) {
-    const response = await api.get('/wordlists', { params });
+  async getWordlists(params?: WordListsQueryParams): Promise<WordListsResponse> {
+    const response = await api.get<WordListsResponse>('/wordlists', { params });
     return response.data;
   },
 
   // Get single wordlist by ID
-  async getWordlist(id: string) {
-    const response = await api.get(`/wordlists/${id}`);
+  async getWordlist(id: string): Promise<WordListResponse> {
+    const response = await api.get<WordListResponse>(`/wordlists/${id}`);
     return response.data;
   },
 
@@ -28,8 +34,8 @@ export const wordlistApi = {
     tags?: string[];
     is_public?: boolean;
     owner_id?: string;
-  }) {
-    const response = await api.post('/wordlists', data);
+  }): Promise<WordListResponse> {
+    const response = await api.post<WordListResponse>('/wordlists', data);
     return response.data;
   },
 
@@ -40,17 +46,17 @@ export const wordlistApi = {
     tags?: string;
     is_public?: boolean;
     owner_id?: string;
-  }) {
+  }): Promise<WordListResponse> {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     if (options?.name) formData.append('name', options.name);
     if (options?.description) formData.append('description', options.description);
     if (options?.tags) formData.append('tags', options.tags);
     if (options?.is_public !== undefined) formData.append('is_public', options.is_public.toString());
     if (options?.owner_id) formData.append('owner_id', options.owner_id);
 
-    const response = await api.post('/wordlists/upload', formData, {
+    const response = await api.post<WordListResponse>('/wordlists/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -162,8 +168,8 @@ export const wordlistApi = {
     description?: string;
     tags?: string[];
     is_public?: boolean;
-  }) {
-    const response = await api.put(`/wordlists/${id}`, data);
+  }): Promise<WordListResponse> {
+    const response = await api.put<WordListResponse>(`/wordlists/${id}`, data);
     return response.data;
   },
 
@@ -173,8 +179,8 @@ export const wordlistApi = {
   },
 
   // Add words to wordlist
-  async addWords(id: string, words: string[]) {
-    const response = await api.post(`/wordlists/${id}/words`, { words });
+  async addWords(id: string, words: string[]): Promise<WordListResponse> {
+    const response = await api.post<WordListResponse>(`/wordlists/${id}/words`, { words });
     return response.data;
   },
 
@@ -204,7 +210,7 @@ export const wordlistApi = {
     if (searchParams.reviewed !== undefined) params.reviewed = searchParams.reviewed;
     
     const response = await api.post(`/wordlists/${id}/search`, null, { params });
-    return response.data;
+    return response.data as WordListSearchResponse;
   },
 
   // Get wordlist words (paginated)
@@ -224,13 +230,13 @@ export const wordlistApi = {
     if (params?.max_views !== undefined) queryParams.max_views = params.max_views;
     if (params?.reviewed !== undefined) queryParams.reviewed = params.reviewed;
     
-    const response = await api.get(`/wordlists/${id}/words`, { params: queryParams });
+    const response = await api.get<ListResponse<WordListItem>>(`/wordlists/${id}/words`, { params: queryParams });
     return response.data;
   },
 
   // Get wordlist statistics
-  async getStatistics(id: string) {
-    const response = await api.get(`/wordlists/${id}/stats`);
+  async getStatistics(id: string): Promise<WordListStats> {
+    const response = await api.get<WordListStats>(`/wordlists/${id}/stats`);
     return response.data;
   },
 
@@ -252,12 +258,12 @@ export const wordlistApi = {
   },
 
   // Search wordlists by name
-  async searchWordlists(query: string, params?: WordListNamesSearchParams) {
+  async searchWordlists(query: string, params?: WordListNamesSearchParams): Promise<WordListsResponse> {
     const queryParams: Record<string, any> = {
       limit: params?.limit || 10,
     };
-    
-    const response = await api.get(`/wordlists/search/${encodeURIComponent(query)}`, { params: queryParams });
+
+    const response = await api.get<WordListsResponse>(`/wordlists/search/${encodeURIComponent(query)}`, { params: queryParams });
     return response.data;
   },
 

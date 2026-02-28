@@ -16,6 +16,17 @@ import {
 
 const sseClient = new SSEClient(api);
 
+// SSE event data envelope types
+interface SSECompleteEvent {
+  result?: DictionaryEntryResponse;
+  [key: string]: unknown;
+}
+
+interface SSEChunkEvent {
+  data: Partial<DictionaryEntryResponse>;
+  [key: string]: unknown;
+}
+
 export const lookupApi = {
   // Main word lookup - GET /lookup/{word}
   async lookup(
@@ -87,7 +98,8 @@ export const lookupApi = {
       onEvent: (event: string, data: unknown) => {
         if (event === 'complete') {
           // Handle both regular and chunked completion
-          const result = (data as any).result || data;
+          const completeEvent = data as SSECompleteEvent;
+          const result = (completeEvent.result || data) as DictionaryEntryResponse;
           return {
             ...result,
             lookup_count: 0,
@@ -98,7 +110,7 @@ export const lookupApi = {
 
         if (event === 'completion_chunk') {
           // Handle incremental chunked data
-          const chunkData = (data as any).data;
+          const chunkData = (data as SSEChunkEvent).data;
           partialResult = {
             ...partialResult,
             ...chunkData,

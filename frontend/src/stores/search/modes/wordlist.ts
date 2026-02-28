@@ -286,10 +286,11 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
         offset,
         limit
       })
-      
-      const items = response.items || []
+
+      // Search results are a subset of full WordListItem; cast for display compatibility
+      const items = (response.items || []) as unknown as WordListItem[]
       const replace = offset === 0
-      
+
       // Update pagination
       pagination.value = {
         offset: offset + items.length,
@@ -297,7 +298,7 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
         total: response.total || items.length,
         hasMore: (response.total || 0) > offset + items.length
       }
-      
+
       setResults(items, replace)
       return items
       

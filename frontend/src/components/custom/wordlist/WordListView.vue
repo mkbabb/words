@@ -307,23 +307,24 @@ const loadWordlistMeta = async (id: string) => {
   isLoadingMeta.value = true;
   try {
     const response = await wordlistApi.getWordlist(id);
-    
+    const wl = response.data;
+
     currentWordlistData.value = {
-      id: response.data._id || response.data.id,
-      name: response.data.name,
-      description: response.data.description,
-      hash_id: response.data.hash_id,
+      id: (wl as any)._id || wl.id,
+      name: wl.name,
+      description: wl.description,
+      hash_id: wl.hash_id,
       words: [], // Words loaded separately
-      total_words: response.data.total_words,
-      unique_words: response.data.unique_words,
-      learning_stats: response.data.learning_stats,
-      last_accessed: response.data.last_accessed,
-      created_at: response.data.created_at,
-      updated_at: response.data.updated_at,
-      metadata: response.data.metadata || {},
-      tags: response.data.tags || [],
-      is_public: response.data.is_public || false,
-      owner_id: response.data.owner_id,
+      total_words: wl.total_words,
+      unique_words: wl.unique_words,
+      learning_stats: wl.learning_stats,
+      last_accessed: wl.last_accessed,
+      created_at: wl.created_at,
+      updated_at: wl.updated_at,
+      metadata: wl.metadata || {},
+      tags: wl.tags || [],
+      is_public: wl.is_public || false,
+      owner_id: wl.owner_id,
     };
   } catch (error) {
     logger.error('Failed to load wordlist metadata:', error);
