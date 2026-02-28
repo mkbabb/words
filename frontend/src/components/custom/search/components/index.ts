@@ -5,6 +5,4 @@ export { default as AutocompleteOverlay } from './AutocompleteOverlay.vue';
 export { default as SearchControls } from './SearchControls.vue';
 export { default as SearchResults } from './SearchResults.vue';
 export { default as ExpandModal } from './ExpandModal.vue';
-export { default as HamburgerButton } from './HamburgerButton.vue';
-export { default as RegenerateButton } from './RegenerateButton.vue';
 export { default as ThinLoadingProgress } from './ThinLoadingProgress.vue';
