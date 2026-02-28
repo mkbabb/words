@@ -1,4 +1,4 @@
-import { Ref, computed } from 'vue';
+import { Ref, computed, ref, readonly } from 'vue';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
@@ -28,9 +28,8 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
   const loading = useLoadingState();
   const { query, onSearchComplete } = options;
 
-  // Use global loading state instead of local refs
-  const searchError = computed(() => _searchError);
-  let _searchError: Error | null = null;
+  // Reactive error state
+  const _searchError = ref<Error | null>(null);
 
   // Track active stream for cancellation on new lookups
   let activeStreamController: AbortController | null = null;
@@ -43,7 +42,7 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
     const queryText = query.value?.trim() || '';
     const mode = searchBar.searchMode;
 
-    _searchError = null;
+    _searchError.value = null;
     loading.startOperation();
 
     try {
@@ -74,7 +73,7 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
       return results;
     } catch (error) {
       logger.error('Search error:', error);
-      _searchError = error as Error;
+      _searchError.value = error as Error;
       searchBar.clearResults();
       searchBar.hideDropdown();
       return [];
@@ -311,7 +310,7 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
     searchBar.setQuery('');
     searchBar.clearResults();
     searchBar.hideDropdown();
-    _searchError = null;
+    _searchError.value = null;
     loading.resetLoading();
   };
 
@@ -323,8 +322,8 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
 
   const searchStatus = computed(() => ({
     isSearching: loading.isSearching.value,
-    hasError: _searchError !== null,
-    error: _searchError,
+    hasError: _searchError.value !== null,
+    error: _searchError.value,
     mode: searchBar.searchMode,
     query: query.value,
     resultsCount: searchBar.currentResults.length
@@ -337,7 +336,7 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
   return {
     // State (from global loading store)
     isSearching: loading.isSearching,
-    searchError,
+    searchError: readonly(_searchError),
     searchStatus,
 
     // Main Operations
