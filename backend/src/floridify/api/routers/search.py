@@ -197,9 +197,11 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
                 )
 
             # Create search index for this corpus
+            # Enable semantic for SMART mode (cascades through all methods) and SEMANTIC mode
+            use_semantic = mode_enum in (SearchMode.SEMANTIC, SearchMode.SMART)
             index = await SearchIndex.get_or_create(
                 corpus=corpus,
-                semantic=mode_enum == SearchMode.SEMANTIC,
+                semantic=use_semantic,
                 config=VersionConfig(use_cache=True),
             )
 

@@ -529,6 +529,11 @@ class SearchIndex(BaseModel):
                 config=config,
             )
             if existing and existing.vocabulary_hash == get_vocabulary_hash(corpus.vocabulary):
+                # Upgrade semantic if requested but not currently enabled
+                if semantic and not existing.semantic_enabled:
+                    existing.semantic_enabled = True
+                    existing.has_semantic = True
+                    await existing.save(config)
                 return existing
         except RuntimeError as e:
             # Handle corrupted data gracefully - proceed to create new
