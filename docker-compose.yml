@@ -1,8 +1,6 @@
 # Base docker-compose configuration
-# For development: docker-compose up
-# For production: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
-version: '3.8'
-
+# For development: docker compose up
+# For production: docker compose -f docker-compose.yml -f docker-compose.prod.yml up
 services:
   backend:
     build:
@@ -35,14 +33,8 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - app-network
-    # Development volume mounts
     volumes:
-      - ./backend:/app
-      - /app/.venv
-      - ./auth:/app/auth
-      - ./backend/cache:/app/cache
-    # Development command with reload
-    command: ["uvicorn", "src.floridify.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+      - ./auth:/app/auth:ro
 
   frontend:
     build:
@@ -63,11 +55,6 @@ services:
       CHOKIDAR_USEPOLLING: "true"
     networks:
       - app-network
-    # Development volume mounts
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
   # Notification server for PWA push notifications
   notification-server:
