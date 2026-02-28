@@ -79,7 +79,7 @@ RUN chmod +x /docker-entrypoint.d/40-envsubst.sh
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost/ || exit 1
+    CMD curl -f http://localhost/health || exit 1
 
 # Expose port
 EXPOSE 80

@@ -18,7 +18,7 @@ EOF
 
 # Inject the env.js script into index.html if not already present
 if ! grep -q "env.js" /usr/share/nginx/html/index.html; then
-    sed -i 's|</head>|<script src="/env.js"></script></head>|' /usr/share/nginx/html/index.html
+    sed -i 's|</head>|<script src="/words/env.js"></script></head>|' /usr/share/nginx/html/index.html
 fi
 
 echo "Environment variables injected successfully"

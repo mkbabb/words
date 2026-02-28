@@ -25,7 +25,8 @@ services:
     build:
       target: production
     image: floridify-frontend:latest
-    ports: []
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
 
   notification-server:
     build:

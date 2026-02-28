@@ -198,7 +198,7 @@ export class PWAService {
 
   private async sendSubscriptionToServer(subscription: PushSubscription) {
     try {
-      const response = await fetch('/api/push/subscribe', {
+      const response = await fetch('/words/api/push/subscribe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
