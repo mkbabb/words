@@ -1,0 +1,37 @@
+/* Typography: Word title, pronunciation, definition, part-of-speech classes */
+
+@layer utilities {
+  .text-word-title {
+    @apply text-6xl;
+    font-family: 'Fraunces', serif;
+    font-weight: bold;
+    line-height: 1.4;
+    padding-bottom: 0.1em;
+  }
+
+  @media (min-width: 768px) {
+    .text-word-title {
+      @apply text-7xl;
+    }
+  }
+
+  .text-pronunciation {
+    font-size: 1.125rem;
+    font-family: 'Fira Code', monospace;
+    color: var(--color-muted-foreground);
+  }
+
+  .text-definition {
+    font-size: 1.2rem;
+    line-height: 1.75;
+    font-family: 'Fraunces', serif;
+  }
+
+  .text-part-of-speech {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+}
