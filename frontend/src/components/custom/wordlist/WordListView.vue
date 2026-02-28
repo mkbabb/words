@@ -553,33 +553,7 @@ watch(() => wordlistMode.results, (results) => {
   }
 }, { immediate: true });
 
-// Watch for empty queries to reload all words
-watch(() => searchBar.searchQuery, (newQuery) => {
-  if (searchBarStore.searchMode === 'wordlist' && wordlistMode.selectedWordlist && !newQuery.trim()) {
-    // Empty query - orchestrator will call getWordlistWords
-    // Results will come through wordlistSearchResults watcher
-    // Empty query - orchestrator will call getWordlistWords
-  }
-});
 
-
-// TEMPORARILY DISABLED - these watchers were causing infinite loops
-// watch(() => filters.value, () => {
-//   if (wordlistMode.selectedWordlist) {
-//     currentPage.value = 0;
-//     loadWordlistWords(wordlistMode.selectedWordlist, 0, false);
-//   }
-// }, { deep: true });
-
-// watch(() => sortCriteria.value, () => {
-//   if (wordlistMode.selectedWordlist) {
-//     currentPage.value = 0;
-//     loadWordlistWords(wordlistMode.selectedWordlist, 0, false);
-//   }
-// }, { deep: true });
-
-// Only restart observer when wordlist changes, not on every data append
-// Removing this watcher as it causes scroll position issues
 </script>
 
 <style scoped>

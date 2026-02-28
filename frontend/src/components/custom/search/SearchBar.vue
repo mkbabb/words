@@ -335,7 +335,6 @@ import {
 
 interface SearchBarProps {
     className?: string;
-    hideDelay?: number;
     scrollThreshold?: number;
     scrollY?: number;
     shrinkPercentage?: number;
@@ -343,7 +342,6 @@ interface SearchBarProps {
 }
 
 const props = withDefaults(defineProps<SearchBarProps>(), {
-    hideDelay: 3000,
     scrollThreshold: 100,
     scrollY: 0,
     shrinkPercentage: 0,

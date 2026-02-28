@@ -132,11 +132,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref } from 'vue';
 import { Trash2, RefreshCw, Wand2, Download, Bell, BellDot } from 'lucide-vue-next';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import ActionButton from './ActionButton.vue';
-// import { usePWA } from '@/composables';
 import { useStores } from '@/stores';
 import { logger } from '@/utils/logger';
 
@@ -159,9 +158,6 @@ const emit = defineEmits<{
 // PWA composables
 // const { subscribeToPush } = usePWA();
 const { notifications } = useStores();
-
-// Reactive window width for potential future use
-const windowWidth = ref(window.innerWidth);
 
 // Animation states
 const aiAnimating = ref(false);
@@ -272,62 +268,6 @@ const handleShowNotificationPrompt = () => {
     window.dispatchEvent(event);
 };
 
-// Test push notification via service worker
-// const handleTestPushNotification = async () => {
-//     try {
-//         // Check if we have a push subscription
-//         const registration = await navigator.serviceWorker.ready;
-//         const subscription = await registration.pushManager.getSubscription();
-//         
-//         if (!subscription) {
-//             store.showNotification({
-//                 type: 'error',
-//                 message: 'No push subscription. Enable notifications first!'
-//             });
-//             return;
-//         }
-//         
-//         // Send test push via backend
-//         const response = await fetch(`${window.location.origin}/notifications/api/test`, {
-//             method: 'POST',
-//             headers: {
-//                 'Content-Type': 'application/json'
-//             },
-//             body: JSON.stringify({
-//                 endpoint: subscription.endpoint
-//             })
-//         });
-//         
-//         if (response.ok) {
-//             store.showNotification({
-//                 type: 'success',
-//                 message: 'Push notification sent! Check your notifications.'
-//             });
-//         } else {
-//             throw new Error('Failed to send push');
-//         }
-//     } catch (error) {
-//         console.error('Push test error:', error);
-//         store.showNotification({
-//             type: 'error',
-//             message: 'Failed to send push notification'
-//         });
-//     }
-// };
-
-// Handle window resize
-const handleResize = () => {
-    windowWidth.value = window.innerWidth;
-};
-
-// Set up resize listener
-onMounted(() => {
-    window.addEventListener('resize', handleResize);
-});
-
-onUnmounted(() => {
-    window.removeEventListener('resize', handleResize);
-});
 </script>
 
 <style scoped>

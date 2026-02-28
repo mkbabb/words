@@ -13,8 +13,6 @@
                 <div class="absolute left-0 top-0 w-[calc(100%+2ch)]">
                     <AnimatedTitle
                         :text="word"
-                        animation-type="typewriter"
-                        :animation-key="0"
                         class="block"
                     />
                 </div>

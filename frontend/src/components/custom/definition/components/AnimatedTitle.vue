@@ -13,18 +13,11 @@ import { TypewriterText } from '@/components/custom/typewriter';
 
 interface AnimatedTitleProps {
     text: string;
-    animationType?: string;
-    animationKey: number;
 }
 
-const props = withDefaults(defineProps<AnimatedTitleProps>(), {
-    animationType: 'typewriter',
-});
+const props = defineProps<AnimatedTitleProps>();
 
-const animationComponent = computed(() => {
-    // Only typewriter is available for now
-    return TypewriterText;
-});
+const animationComponent = TypewriterText;
 
 const animationProps = computed(() => {
     return {

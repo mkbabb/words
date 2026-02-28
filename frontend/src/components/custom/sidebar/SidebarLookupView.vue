@@ -88,7 +88,6 @@ import { computed, onMounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useStores } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';
-// import { useLookupMode } from '@/stores/search/modes/lookup'; // Unused
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { useRouter } from 'vue-router';
 import { Accordion } from '@/components/ui/accordion';

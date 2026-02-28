@@ -21,10 +21,6 @@
 
 <script setup>
 import { changeTheme, isDark } from ".";
-
-const { size } = defineProps({
-    size: { type: String, default: "2rem" },
-});
 </script>
 
 <style scoped lang="scss">

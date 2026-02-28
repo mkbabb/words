@@ -124,7 +124,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-// import { useStores } from '@/stores'; // Unused
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { 
