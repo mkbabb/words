@@ -63,13 +63,18 @@ export function useIOSPWA() {
   onMounted(() => {
     // Detect iOS
     isIOS.value = /iPhone|iPad|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    
+
     // Detect iPadOS 13+ (reports as macOS in user agent)
     if (navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform)) {
       isIPadOS.value = true;
       isIOS.value = true;
     }
-    
+
+    // Conditionally load iOS PWA styles
+    if (isIOS.value) {
+      import('../styles/ios-pwa.css');
+    }
+
     // Check if installed as PWA
     isStandalone.value = window.matchMedia('(display-mode: standalone)').matches;
     isInstalled.value = isStandalone.value || (window.navigator as any).standalone === true;
