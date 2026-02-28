@@ -22,21 +22,21 @@ const props = withDefaults(defineProps<AnimatedTitleProps>(), {
 });
 
 const animationComponent = computed(() => {
-    // Only typewriter is available for now
     return TypewriterText;
 });
 
-const animationProps = computed(() => {
-    return {
-        text: props.text,
-        mode: 'human' as const, // Use human-like typing mode (first animation will be expert)
-        baseSpeed: 150, // Faster base speed
-        variance: 0.4, // Less variance for more consistent speed
-        errorRate: 0.015, // Occasional typos (reduced)
-        cursorBlink: true,
-        startDelay: 50,
-        loop: false, // Disable looping - we want single animations per word
-        animationDelay: 0, // No delay needed when not looping
-    };
-});
+const animationProps = computed(() => ({
+    text: props.text,
+    ngramSize: { min: 1, max: 2 },
+    baseSpeed: 120,
+    variance: 0.35,
+    errorRate: 0.015,
+    firstAnimationSpeedFactor: 0.6,
+    maxCharsBeforeNotice: 3,
+    correctionSpeedMultiplier: 0.4,
+    cursorVisible: true,
+    cursorBlink: true,
+    startDelay: 50,
+    loop: false,
+}));
 </script>
