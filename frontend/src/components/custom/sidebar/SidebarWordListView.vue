@@ -291,7 +291,7 @@ const loadWordlists = async () => {
     wordlists.value = response.items.map(transformWordlistFromAPI);
     
     // Auto-select first wordlist if none selected and wordlists exist
-    if (!selectedWordlist && wordlists.value.length > 0) {
+    if (!selectedWordlist.value && wordlists.value.length > 0) {
       wordlistMode.setWordlist(wordlists.value[0].id);
     }
   } catch (error) {
