@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, readonly, computed, shallowRef } from 'vue'
-import { wordlistsApi } from '@/api'
+import { wordlistApi } from '@/api'
 import type { ModeHandler } from '@/stores/types/mode-types'
 import type { SearchMode, WordListItem, WordlistFilters as WordlistFiltersType, MasteryLevel, Temperature } from '@/types'
 import {
@@ -239,7 +239,7 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
     abortController = new AbortController()
     
     try {
-      const response = await wordlistsApi.getWordlistWords(wordlistId, {
+      const response = await wordlistApi.getWordlistWords(wordlistId, {
         offset,
         limit
       })
@@ -279,7 +279,7 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
     abortController = new AbortController()
     
     try {
-      const response = await wordlistsApi.searchWordlist(wordlistId, {
+      const response = await wordlistApi.searchWordlist(wordlistId, {
         query,
         max_results: limit,
         min_score: filters.value.minScore,

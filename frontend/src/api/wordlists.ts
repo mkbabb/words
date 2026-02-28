@@ -7,7 +7,7 @@ import type {
   WordListNamesSearchParams 
 } from '@/types/wordlist';
 
-export const wordlistsApi = {
+export const wordlistApi = {
   // Get all wordlists
   async getWordlists(params?: WordListsQueryParams) {
     const response = await api.get('/wordlists', { params });

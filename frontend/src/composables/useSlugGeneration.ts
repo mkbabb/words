@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { wordlistsApi } from '@/api'
+import { wordlistApi } from '@/api'
 import { useToast } from '@/components/ui/toast/use-toast'
 import { logger } from '@/utils/logger'
 
@@ -13,7 +13,7 @@ export function useSlugGeneration() {
   const generateSlug = async (): Promise<string | null> => {
     try {
       isGenerating.value = true
-      const response = await wordlistsApi.generateSlugName()
+      const response = await wordlistApi.generateSlugName()
       return response.name
     } catch (error) {
       logger.error('Failed to generate slug name:', error)

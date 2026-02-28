@@ -10,7 +10,7 @@ import { definitionsApi } from './definitions';
 import { examplesApi } from './examples';
 import { entriesApi } from './entries';
 import { mediaApi } from './media';
-import { wordlistsApi } from './wordlists';
+import { wordlistApi } from './wordlists';
 import { healthApi } from './health';
 import { versionsApi } from './versions';
 
@@ -23,7 +23,7 @@ export { definitionsApi } from './definitions'; // /definitions/*
 export { examplesApi } from './examples';     // /examples/*
 export { entriesApi } from './entries';       // /words/entries/*
 export { mediaApi } from './media';           // /images/*, /audio/*
-export { wordlistsApi } from './wordlists';   // /wordlists/*
+export { wordlistApi } from './wordlists';     // /wordlists/*
 export { healthApi } from './health';         // /health
 export { versionsApi } from './versions';     // /words/{word}/versions/*
 
@@ -32,11 +32,6 @@ export { versionsApi } from './versions';     // /words/{word}/versions/*
 export const imageApi = {
   // Image operations (from media module)
   ...mediaApi,
-};
-
-export const wordlistApi = {
-  // Wordlist operations (from wordlists module)  
-  ...wordlistsApi,
 };
 
 // Default export for convenience
@@ -49,7 +44,7 @@ export default {
   examples: examplesApi,
   entries: entriesApi,
   media: mediaApi,
-  wordlists: wordlistsApi,
+  wordlists: wordlistApi,
   health: healthApi,
   versions: versionsApi,
 };
