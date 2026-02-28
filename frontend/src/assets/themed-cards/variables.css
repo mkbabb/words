@@ -1,0 +1,76 @@
+/* Theme-specific CSS custom properties (gold/silver/bronze × light/dark) */
+
+@layer utilities {
+    [data-theme='gold'] {
+        --theme-gradient-start: theme('colors.yellow.100');
+        --theme-gradient-mid: theme('colors.amber.400');
+        --theme-gradient-end: theme('colors.amber.600');
+        --theme-border: theme('colors.amber.400/50');
+        --theme-text: theme('colors.amber.950');
+        --theme-text-muted: theme('colors.amber.800');
+        --theme-bg-subtle: theme('colors.amber.50');
+        --theme-bg-hover: theme('colors.amber.100');
+        --theme-sparkle: theme('colors.amber.300/30');
+    }
+
+    [data-theme='silver'] {
+        --theme-gradient-start: theme('colors.gray.100');
+        --theme-gradient-mid: theme('colors.gray.400');
+        --theme-gradient-end: theme('colors.gray.600');
+        --theme-border: theme('colors.gray.400/50');
+        --theme-text: theme('colors.slate.950');
+        --theme-text-muted: theme('colors.slate.800');
+        --theme-bg-subtle: theme('colors.gray.50');
+        --theme-bg-hover: theme('colors.gray.100');
+        --theme-sparkle: theme('colors.gray.300/40');
+    }
+
+    [data-theme='bronze'] {
+        --theme-gradient-start: theme('colors.orange.100');
+        --theme-gradient-mid: theme('colors.orange.400');
+        --theme-gradient-end: theme('colors.orange.600');
+        --theme-border: theme('colors.orange.400/50');
+        --theme-text: theme('colors.orange.950');
+        --theme-text-muted: theme('colors.orange.800');
+        --theme-bg-subtle: theme('colors.orange.50');
+        --theme-bg-hover: theme('colors.orange.100');
+        --theme-sparkle: theme('colors.orange.300/30');
+    }
+
+    /* Dark mode theme overrides */
+    .dark [data-theme='gold'] {
+        --theme-gradient-start: rgb(251 191 36 / 0.4);
+        --theme-gradient-mid: rgb(245 158 11 / 0.5);
+        --theme-gradient-end: rgb(217 119 6 / 0.6);
+        --theme-border: rgb(245 158 11 / 0.4);
+        --theme-text: rgb(254 240 138);
+        --theme-text-muted: rgb(252 211 77);
+        --theme-bg-subtle: rgb(245 158 11 / 0.2);
+        --theme-bg-hover: rgb(245 158 11 / 0.3);
+        --theme-sparkle: rgb(252 211 77 / 0.3);
+    }
+
+    .dark [data-theme='silver'] {
+        --theme-gradient-start: rgb(209 213 219 / 0.35);
+        --theme-gradient-mid: rgb(156 163 175 / 0.45);
+        --theme-gradient-end: rgb(107 114 128 / 0.55);
+        --theme-border: rgb(156 163 175 / 0.4);
+        --theme-text: rgb(229 231 235);
+        --theme-text-muted: rgb(209 213 219);
+        --theme-bg-subtle: rgb(156 163 175 / 0.2);
+        --theme-bg-hover: rgb(156 163 175 / 0.3);
+        --theme-sparkle: rgb(209 213 219 / 0.3);
+    }
+
+    .dark [data-theme='bronze'] {
+        --theme-gradient-start: rgb(251 146 60 / 0.4);
+        --theme-gradient-mid: rgb(249 115 22 / 0.5);
+        --theme-gradient-end: rgb(234 88 12 / 0.6);
+        --theme-border: rgb(249 115 22 / 0.4);
+        --theme-text: rgb(254 215 170);
+        --theme-text-muted: rgb(253 186 116);
+        --theme-bg-subtle: rgb(249 115 22 / 0.2);
+        --theme-bg-hover: rgb(249 115 22 / 0.3);
+        --theme-sparkle: rgb(253 186 116 / 0.3);
+    }
+}

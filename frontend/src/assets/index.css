@@ -3,7 +3,7 @@
 @import './typography.css';
 @import './utilities.css';
 @import './transitions.css';
-@import './themed-cards.css';
+@import './themed-cards/index.css';
 
 @custom-variant dark (&:is(.dark *));
 
