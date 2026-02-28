@@ -394,42 +394,6 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
     }
   }
   
-  // ==========================================================================
-  // STATE MANAGEMENT
-  // ==========================================================================
-  
-  const getConfig = () => ({
-    filters: { ...wordlistFilters.value },
-    sortCriteria: [...wordlistSortCriteria.value],
-    selectedWordlist: selectedWordlist.value
-  })
-  
-  const setConfig = (config: any) => {
-    if (config.filters) setWordlistFilters(config.filters)
-    if (config.sortCriteria) setWordlistSortCriteria(config.sortCriteria)
-    if (config.selectedWordlist !== undefined) setWordlist(config.selectedWordlist)
-  }
-  
-  const getSearchBarState = () => ({
-    batchMode: batchMode.value,
-    processingQueue: [...processingQueue.value]
-  })
-  
-  const setSearchBarState = (state: any) => {
-    if (state.batchMode !== undefined) setBatchMode(state.batchMode)
-    if (state.processingQueue) processingQueue.value = [...state.processingQueue]
-  }
-  
-  const getUIState = () => ({
-    viewMode: viewMode.value,
-    itemsPerPage: itemsPerPage.value
-  })
-  
-  const setUIState = (state: any) => {
-    if (state.viewMode) setViewMode(state.viewMode)
-    if (state.itemsPerPage !== undefined) setItemsPerPage(state.itemsPerPage)
-  }
-  
   const reset = () => {
     // Reset config
     selectedWordlist.value = null
@@ -546,12 +510,6 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
     resetBatchProcessing,
     
     // State Management
-    getConfig,
-    setConfig,
-    getSearchBarState,
-    setSearchBarState,
-    getUIState,
-    setUIState,
     reset,
     
     // Mode Handler

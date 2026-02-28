@@ -34,16 +34,6 @@ export function useWordOfTheDayModeConfig() {
     archiveView.value = enabled
   }
   
-  const getConfig = (): WordOfTheDayConfig => ({
-    currentDate: currentDate.value,
-    archiveView: archiveView.value
-  })
-  
-  const setConfig = (config: Partial<WordOfTheDayConfig>) => {
-    if (config.currentDate) setCurrentDate(config.currentDate)
-    if (config.archiveView !== undefined) setArchiveView(config.archiveView)
-  }
-  
   const reset = () => {
     setToday()
     archiveView.value = false
@@ -89,8 +79,6 @@ export function useWordOfTheDayModeConfig() {
     setArchiveView,
     
     // Config management
-    getConfig,
-    setConfig,
     reset,
     
     // Mode handler
