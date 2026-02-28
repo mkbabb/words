@@ -34,7 +34,7 @@ import { changeTheme, isDark } from ".";
     isolation: isolate;
     background: 0;
 
-    transition: all !important;
+    transition: opacity 200ms, background 200ms, transform 200ms;
 
     z-index: 999;
 

@@ -376,7 +376,7 @@ const triggerWordlistSearch = async () => {
       // Update currentWords with filtered results
       currentWords.value = filteredResults.map((item: any, index: number) => ({
         ...item,
-        _uniqueId: `${item.word}-${index}-${Date.now()}` // Add unique key for Vue
+        _uniqueId: `${item.word}-${index}` // Add unique key for Vue
       }));
       totalWords.value = filteredResults.length;
       
@@ -442,7 +442,7 @@ watch(filters, async () => {
     // Update displayed words
     currentWords.value = filteredResults.map((item: any, index: number) => ({
       ...item,
-      _uniqueId: `${item.word}-${index}-${Date.now()}`
+      _uniqueId: `${item.word}-${index}`
     }));
     totalWords.value = filteredResults.length;
   }
@@ -545,7 +545,7 @@ watch(() => wordlistMode.results, (results) => {
       // Search results - update display
       const newItems = results.map((item: any, idx: number) => ({
         ...item,
-        _uniqueId: `${item.word}-${item.added_date || Date.now()}-${idx}`
+        _uniqueId: `${item.word}-${item.added_date || ''}-${idx}`
       }));
       currentWords.value = newItems;
       totalWords.value = results.length;
