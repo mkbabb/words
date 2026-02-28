@@ -8,9 +8,15 @@ services:
     command: ["uvicorn", "src.floridify.api.main:app",
               "--host", "0.0.0.0",
               "--port", "8000",
-              "--workers", "4",
+              "--workers", "${BACKEND_WORKERS:-1}",
               "--proxy-headers",
               "--forwarded-allow-ips", "172.16.0.0/12,10.0.0.0/8,127.0.0.1"]
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
     depends_on:
       mongodb:
         condition: service_healthy
