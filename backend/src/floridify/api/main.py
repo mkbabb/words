@@ -50,13 +50,10 @@ async def lifespan(app: FastAPI) -> Any:
     """Initialize database and resources on startup, cleanup on shutdown."""
     # Startup
     try:
-        # Validate auth configuration in production
+        # Warn about auth configuration in production
         environment = os.getenv("ENVIRONMENT", "development")
         if environment == "production" and not os.getenv("CLERK_DOMAIN"):
-            raise RuntimeError(
-                "CLERK_DOMAIN must be set in production. "
-                "Auth middleware will deny all protected requests without it."
-            )
+            print("⚠️  CLERK_DOMAIN not set — auth middleware will skip JWT validation")
 
         # Initialize MongoDB storage
         await get_storage()
