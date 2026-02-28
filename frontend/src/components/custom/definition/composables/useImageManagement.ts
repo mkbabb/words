@@ -23,7 +23,7 @@ export function useImageManagement(entry: ComputedRef<SynthesizedDictionaryEntry
                 if (image.id) {
                     images.push({
                         ...image,
-                        url: `/words/api/v1/images/${image.id}/content`
+                        url: `${import.meta.env.BASE_URL}api/v1/images/${image.id}/content`
                     });
                 }
             }
@@ -37,7 +37,7 @@ export function useImageManagement(entry: ComputedRef<SynthesizedDictionaryEntry
                         if (image.id) {
                             images.push({
                                 ...image,
-                                url: `/words/api/v1/images/${image.id}/content`
+                                url: `${import.meta.env.BASE_URL}api/v1/images/${image.id}/content`
                             });
                         }
                     }

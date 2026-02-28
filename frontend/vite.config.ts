@@ -7,7 +7,7 @@ import autoprefixer from 'autoprefixer';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: '/words/',
+  base: process.env.VITE_BASE_PATH || '/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

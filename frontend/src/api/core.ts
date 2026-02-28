@@ -3,7 +3,7 @@ import { logger } from '@/utils/logger';
 
 // API versioning configuration
 export const API_VERSION = 'v1';
-export const API_BASE_URL = `/words/api/${API_VERSION}`;
+export const API_BASE_URL = `${import.meta.env.BASE_URL}api/${API_VERSION}`;
 
 // Create axios instance with standardized configuration
 export const api = axios.create({

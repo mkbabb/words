@@ -7,6 +7,10 @@ set -e
 
 echo "Injecting runtime environment variables..."
 
+# BASE_PATH should match the VITE_BASE_PATH used at build time.
+# It determines the URL prefix for the env.js script tag.
+BASE_PATH="${BASE_PATH:-/}"
+
 # Create env.js file with runtime environment variables
 cat > /usr/share/nginx/html/env.js <<EOF
 window.__env__ = {
@@ -18,7 +22,7 @@ EOF
 
 # Inject the env.js script into index.html if not already present
 if ! grep -q "env.js" /usr/share/nginx/html/index.html; then
-    sed -i 's|</head>|<script src="/words/env.js"></script></head>|' /usr/share/nginx/html/index.html
+    sed -i "s|</head>|<script src=\"${BASE_PATH}env.js\"></script></head>|" /usr/share/nginx/html/index.html
 fi
 
 echo "Environment variables injected successfully"
