@@ -29,6 +29,8 @@ services:
       TOKENIZERS_PARALLELISM: "true"
       # Set multiprocessing start method for Docker compatibility
       MULTIPROCESSING_START_METHOD: "spawn"
+      # Semantic search toggle (set false on low-memory servers to skip model loading)
+      SEMANTIC_SEARCH_ENABLED: ${SEMANTIC_SEARCH_ENABLED:-true}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

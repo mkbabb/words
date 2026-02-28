@@ -283,6 +283,17 @@ export interface ProgressEvent {
   details?: any;
 }
 
+// Semantic Status Types
+export interface SemanticStatusResponse {
+  enabled: boolean;
+  ready: boolean;
+  building: boolean;
+  languages: Language[];
+  model_name: string | null;
+  vocabulary_size: number;
+  message: string;
+}
+
 // Health Check Types
 export interface HealthResponse {
   status: 'healthy' | 'degraded';
@@ -291,7 +302,7 @@ export interface HealthResponse {
   metrics: Record<string, any>;
   timestamp: string;
   database: 'connected' | 'disconnected' | 'unhealthy';
-  search_engine: 'initialized' | 'uninitialized';
+  search_engine: 'initialized' | 'uninitialized' | 'initializing' | 'error';
   cache_hit_rate: number;
   uptime_seconds: number;
   connection_pool: Record<string, any>;

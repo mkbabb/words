@@ -362,34 +362,47 @@ class SemanticStatusResponse(BaseModel):
 
 
 @router.get("/search/semantic/status", response_model=SemanticStatusResponse)
-async def get_semantic_status(
-    params: SearchParams = Depends(parse_search_params),
-) -> SemanticStatusResponse:
+async def get_semantic_status() -> SemanticStatusResponse:
     """Get status of semantic search initialization.
 
     This endpoint allows clients to check if semantic search is ready to use,
     or if it's still building in the background. Useful for showing loading
-    states in the UI.
+    states in the UI. Non-blocking — does not trigger initialization.
     """
     try:
-        # Get the current search engine
-        language_search = await get_language_search(languages=params.languages)
-        stats = language_search.get_stats()
+        manager = get_search_engine_manager()
 
-        # Check semantic status
+        if manager._engine is None:
+            # Engine not yet initialized
+            if manager._initializing:
+                message = "Search engine initializing in background..."
+            elif manager._init_error:
+                message = f"Search engine initialization failed: {manager._init_error}"
+            else:
+                message = "Search engine not yet initialized"
+
+            return SemanticStatusResponse(
+                enabled=manager._semantic,
+                ready=False,
+                building=manager._initializing,
+                languages=list(manager._languages or []),
+                model_name=None,
+                vocabulary_size=0,
+                message=message,
+            )
+
+        # Engine exists — delegate to existing LanguageSearch methods
+        stats = manager._engine.get_stats()
         enabled = stats.get("semantic_enabled", False)
-        ready = language_search.is_semantic_ready()
-        building = language_search.is_semantic_building()
+        ready = manager._engine.is_semantic_ready()
+        building = manager._engine.is_semantic_building()
 
-        # Generate human-readable message
         if not enabled:
             message = "Semantic search is disabled"
         elif ready:
             message = "Semantic search is ready"
         elif building:
-            message = (
-                "Semantic search is building in background (search still works with exact/fuzzy)"
-            )
+            message = "Semantic search is building in background (search still works with exact/fuzzy)"
         else:
             message = "Semantic search is not initialized"
 
@@ -397,7 +410,7 @@ async def get_semantic_status(
             enabled=enabled,
             ready=ready,
             building=building,
-            languages=params.languages,
+            languages=list(manager._languages or []),
             model_name=stats.get("semantic_model"),
             vocabulary_size=stats.get("vocabulary_size", 0),
             message=message,
@@ -582,6 +595,9 @@ class HotReloadStatusResponse(BaseModel):
     """Response for hot-reload status."""
 
     engine_loaded: bool = Field(..., description="Whether a search engine is currently loaded")
+    initializing: bool = Field(False, description="Whether background init is in progress")
+    init_error: str | None = Field(None, description="Error from last init attempt")
+    semantic_enabled: bool = Field(True, description="Whether semantic search is enabled")
     last_check_seconds_ago: float | None = Field(
         None, description="Seconds since last corpus change check"
     )

@@ -71,6 +71,13 @@ async def lifespan(app: FastAPI) -> Any:
         cache.start_ttl_cleanup_task(interval_seconds=60.0)
         print("✅ Background TTL cleanup task started (interval=60s)")
 
+        # Start search engine initialization in background (non-blocking)
+        from ..core.search_pipeline import get_search_engine_manager
+
+        manager = get_search_engine_manager()
+        await manager.start_background_init()
+        print("🔍 Search engine initialization started in background")
+
     except Exception as e:
         print(f"❌ Application initialization failed: {e}")
         raise

@@ -10,8 +10,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from ...caching.core import get_global_cache
-from ...core.search_pipeline import get_search_engine
-from ...models.base import Language
+from ...core.search_pipeline import get_search_engine_manager
 from ...storage.mongodb import _ensure_initialized, get_storage
 from ...utils.logging import get_logger
 
@@ -139,12 +138,16 @@ async def health_check() -> HealthResponse:
         logger.warning(f"Database health check failed: {e}")
         connection_pool_stats = {"status": "error", "error": str(e)}
 
-    # Check search engine
+    # Check search engine (non-blocking — don't trigger initialization)
     search_status = "uninitialized"
     try:
-        search_engine = await get_search_engine([Language.ENGLISH])
-        if search_engine._initialized:
+        manager = get_search_engine_manager()
+        if manager._engine is not None:
             search_status = "initialized"
+        elif manager._initializing:
+            search_status = "initializing"
+        elif manager._init_error:
+            search_status = "error"
     except Exception as e:
         logger.warning(f"Search engine health check failed: {e}")
 
@@ -181,8 +184,11 @@ async def health_check() -> HealthResponse:
     uptime_seconds = int(time.perf_counter() - _start_time)
 
     # Determine overall status
+    # "initializing" and "uninitialized" are NOT degraded — server is functional
     overall_status = "healthy"
-    if database_status != "connected" or search_status != "initialized":
+    if database_status != "connected":
+        overall_status = "degraded"
+    if search_status == "error":
         overall_status = "degraded"
 
     return HealthResponse(

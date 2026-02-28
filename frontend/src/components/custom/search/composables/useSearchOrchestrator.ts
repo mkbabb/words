@@ -308,7 +308,7 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
   // ============================================================================
 
   const clearSearch = () => {
-    query.value = '';
+    searchBar.setQuery('');
     searchBar.clearResults();
     searchBar.hideDropdown();
     _searchError = null;

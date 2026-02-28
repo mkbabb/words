@@ -1,4 +1,4 @@
-import type { SearchResponse, SearchResult } from '@/types/api';
+import type { SearchResponse, SearchResult, SemanticStatusResponse } from '@/types/api';
 import { api } from './core';
 import { logger } from '@/utils/logger';
 
@@ -74,6 +74,12 @@ export const searchApi = {
       logger.error('Search suggestions API error:', error);
       return [];
     }
+  },
+
+  // Get semantic search status - GET /search/semantic/status
+  async getSemanticStatus(): Promise<SemanticStatusResponse> {
+    const { data } = await api.get<SemanticStatusResponse>('/search/semantic/status');
+    return data;
   },
 
   // Rebuild search index with unified corpus management - POST /search/rebuild-index

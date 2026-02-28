@@ -5,6 +5,7 @@ import { shouldTriggerAIMode } from '@/components/custom/search/utils/ai-query';
 import { useSearchBarStore } from '../search-bar';
 import type { ModeHandler } from '@/stores/types/mode-types';
 import type { SearchMode, SearchResult, CardVariant } from '@/types';
+import type { SemanticStatusResponse } from '@/types/api';
 import { CARD_VARIANTS } from '@/types';
 import {
     PronunciationModes,
@@ -15,6 +16,7 @@ import {
     type DictionarySource,
     type Language,
 } from '@/stores/types/constants';
+import { logger } from '@/utils/logger';
 
 // Search mode type:
 export type SearchMethod = 'smart' | 'exact' | 'fuzzy' | 'semantic';
@@ -86,6 +88,45 @@ export const useLookupMode = defineStore(
 
         // Start the watcher immediately (lookup is the default mode)
         startQueryWatcher();
+
+        // ==========================================================================
+        // SEMANTIC STATUS
+        // ==========================================================================
+
+        const semanticStatus = ref<SemanticStatusResponse | null>(null);
+        let semanticPollTimer: ReturnType<typeof setInterval> | null = null;
+
+        const pollSemanticStatus = async () => {
+            try {
+                const status = await searchApi.getSemanticStatus();
+                semanticStatus.value = status;
+
+                // Stop polling when search engine is ready and semantic is either ready or disabled
+                if (status.ready || !status.enabled) {
+                    stopSemanticPolling();
+                }
+            } catch (e) {
+                logger.debug('Semantic status poll failed:', e);
+            }
+        };
+
+        const startSemanticPolling = () => {
+            stopSemanticPolling();
+            // Initial fetch
+            pollSemanticStatus();
+            // Poll every 5s
+            semanticPollTimer = setInterval(pollSemanticStatus, 5000);
+        };
+
+        const stopSemanticPolling = () => {
+            if (semanticPollTimer) {
+                clearInterval(semanticPollTimer);
+                semanticPollTimer = null;
+            }
+        };
+
+        // Start polling immediately (lookup is default mode)
+        startSemanticPolling();
 
         // ==========================================================================
         // UI STATE
@@ -408,6 +449,8 @@ export const useLookupMode = defineStore(
                 clearAISuggestions();
                 // Re-start the query watcher when entering lookup mode
                 startQueryWatcher();
+                // Resume semantic status polling
+                startSemanticPolling();
             },
 
             onExit: async (_nextMode: SearchMode) => {
@@ -415,6 +458,8 @@ export const useLookupMode = defineStore(
                 clearAISuggestions();
                 // Stop the query watcher to prevent memory leaks
                 stopQueryWatcher();
+                // Stop semantic polling
+                stopSemanticPolling();
             },
 
             validateConfig: (config: any) => {
@@ -446,6 +491,9 @@ export const useLookupMode = defineStore(
             isAIQuery: readonly(isAIQuery),
             showSparkle: readonly(showSparkle),
             aiSuggestions: readonly(aiSuggestions),
+
+            // Semantic Status (not persisted — keep readonly)
+            semanticStatus: readonly(semanticStatus),
 
             // UI State (persisted — no readonly for hydration)
             selectedCardVariant,

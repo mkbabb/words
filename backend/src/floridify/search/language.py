@@ -5,6 +5,7 @@ Provides a wrapper around the core Search class with language-specific corpus ma
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from floridify.storage.mongodb import get_storage
@@ -19,6 +20,12 @@ from .models import SearchIndex, SearchResult
 from .semantic.constants import DEFAULT_SENTENCE_MODEL
 
 logger = get_logger(__name__)
+
+
+def _semantic_search_enabled() -> bool:
+    """Check if semantic search is enabled via environment variable."""
+    return os.getenv("SEMANTIC_SEARCH_ENABLED", "true").lower() in ("true", "1", "yes")
+
 
 # Global singleton cache for language search engines
 _language_search_cache: dict[tuple[Language, ...], LanguageSearch] = {}
@@ -102,19 +109,21 @@ class LanguageSearch:
 async def get_language_search(
     languages: list[Language],
     force_rebuild: bool = False,
-    semantic: bool = True,
+    semantic: bool | None = None,
 ) -> LanguageSearch:
     """Get or create a language-specific search engine.
 
     Args:
         languages: List of languages to support
         force_rebuild: Force rebuild of search indices
-        semantic: Enable semantic search
+        semantic: Enable semantic search (None = use SEMANTIC_SEARCH_ENABLED env var)
 
     Returns:
         LanguageSearch instance
 
     """
+    if semantic is None:
+        semantic = _semantic_search_enabled()
     global _language_search_cache
 
     # Create cache key including semantic parameter to prevent stale cache hits
@@ -228,4 +237,4 @@ async def reset_language_search() -> None:
     logger.info("Language search cache reset")
 
 
-__all__ = ["LanguageSearch", "get_language_search", "reset_language_search"]
+__all__ = ["LanguageSearch", "get_language_search", "reset_language_search", "_semantic_search_enabled"]

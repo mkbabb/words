@@ -270,6 +270,7 @@
                         :ai-mode="searchBar.isAIQuery"
                         :wordlist-mode="searchBar.searchMode === 'wordlist'"
                         :wordlist-results="searchBar.getResults('wordlist') as any[] || []"
+                        :semantic-building="lookupMode.semanticStatus?.building ?? false"
                         @select-result="selectResult"
                         @interaction="handleSearchAreaInteraction"
                     />

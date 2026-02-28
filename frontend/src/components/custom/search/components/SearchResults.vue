@@ -144,6 +144,14 @@
                 </button>
             </div>
 
+            <!-- Semantic status indicator -->
+            <p
+                v-if="semanticBuilding && results.length > 0 && !wordlistMode"
+                class="border-t border-border/30 px-4 py-1.5 text-xs text-muted-foreground/60"
+            >
+                Semantic search building in background — results are exact + fuzzy only
+            </p>
+
             <!-- No Results Messages -->
             <div
                 v-else-if="!loading && query.length < 2"
@@ -174,6 +182,7 @@ interface SearchResultsProps {
     aiMode: boolean;
     wordlistMode?: boolean;
     wordlistResults?: any[];
+    semanticBuilding?: boolean;
 }
 
 defineProps<SearchResultsProps>();

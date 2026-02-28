@@ -10,7 +10,7 @@ from typing import Any
 from ..models.base import Language
 from ..search.constants import SearchMode
 from ..search.core import SearchResult
-from ..search.language import LanguageSearch, get_language_search
+from ..search.language import LanguageSearch, _semantic_search_enabled, get_language_search
 from ..utils.logging import (
     get_logger,
     log_metrics,
@@ -50,13 +50,16 @@ class SearchEngineManager:
         self._check_interval: float = check_interval
         self._reload_lock: asyncio.Lock = asyncio.Lock()
         self._languages: list[Language] | None = None
-        self._semantic: bool = True
+        self._semantic: bool = _semantic_search_enabled()
+        self._init_task: asyncio.Task[None] | None = None
+        self._init_error: str | None = None
+        self._initializing: bool = False
 
     async def get_engine(
         self,
         languages: list[Language] | None = None,
         force_rebuild: bool = False,
-        semantic: bool = True,
+        semantic: bool | None = None,
     ) -> LanguageSearch:
         """Get the search engine, rebuilding if the corpus has changed.
 
@@ -65,10 +68,20 @@ class SearchEngineManager:
         If hash changed: hot-reload (clear caches, rebuild indices).
         """
         target_languages = languages or [Language.ENGLISH]
+        effective_semantic = semantic if semantic is not None else self._semantic
+
+        # Wait for background init if running
+        if self._init_task and not self._init_task.done():
+            await self._init_task
 
         # Force rebuild always triggers a full reload
         if force_rebuild:
-            return await self._full_reload(target_languages, semantic)
+            return await self._full_reload(target_languages, effective_semantic)
+
+        # If background init failed, retry inline
+        if self._engine is None and self._init_error:
+            logger.info(f"Background init failed ({self._init_error}), retrying inline")
+            return await self._full_reload(target_languages, effective_semantic)
 
         # Fast path: engine exists and we're within check interval
         if self._engine is not None and self._languages == target_languages:
@@ -83,10 +96,44 @@ class SearchEngineManager:
 
             # Corpus changed — hot reload
             logger.info("Corpus change detected — initiating hot reload")
-            return await self._hot_reload(target_languages, semantic)
+            return await self._hot_reload(target_languages, effective_semantic)
 
         # No engine yet — initial load
-        return await self._full_reload(target_languages, semantic)
+        return await self._full_reload(target_languages, effective_semantic)
+
+    async def start_background_init(
+        self,
+        languages: list[Language] | None = None,
+        semantic: bool | None = None,
+    ) -> None:
+        """Start search engine initialization in background. Called from lifespan."""
+        if self._init_task is not None:
+            return
+        self._initializing = True
+        self._init_task = asyncio.create_task(
+            self._background_init(
+                languages or [Language.ENGLISH],
+                semantic if semantic is not None else self._semantic,
+            )
+        )
+
+    async def _background_init(self, languages: list[Language], semantic: bool) -> None:
+        """Background task: build corpus + search engine."""
+        try:
+            logger.info(
+                f"Background search init starting (languages={[l.value for l in languages]}, semantic={semantic})"
+            )
+            self._engine = await get_language_search(languages, semantic=semantic)
+            self._languages = languages
+            self._last_check = time.monotonic()
+            self._fingerprint = await self._capture_fingerprint(languages)
+            self._init_error = None
+            logger.info("Background search init completed successfully")
+        except Exception as e:
+            self._init_error = str(e)
+            logger.error(f"Background search init failed: {e}", exc_info=True)
+        finally:
+            self._initializing = False
 
     async def _corpus_changed(self) -> bool:
         """Lightweight check if the corpus metadata has changed.
@@ -237,6 +284,9 @@ class SearchEngineManager:
             self._fingerprint = None
             self._last_check = 0.0
             self._languages = None
+            self._init_task = None
+            self._init_error = None
+            self._initializing = False
             logger.info("SearchEngineManager reset")
 
     def get_status(self) -> dict[str, Any]:
@@ -244,6 +294,9 @@ class SearchEngineManager:
         now = time.monotonic()
         return {
             "engine_loaded": self._engine is not None,
+            "initializing": self._initializing,
+            "init_error": self._init_error,
+            "semantic_enabled": self._semantic,
             "last_check_seconds_ago": round(now - self._last_check, 1)
             if self._last_check
             else None,
@@ -279,7 +332,7 @@ def get_search_engine_manager() -> SearchEngineManager:
 async def get_search_engine(
     languages: list[Language] | None = None,
     force_rebuild: bool = False,
-    semantic: bool = True,
+    semantic: bool | None = None,
 ) -> LanguageSearch:
     """Get or create the global LanguageSearch singleton.
 
@@ -288,7 +341,7 @@ async def get_search_engine(
     Args:
         languages: Languages to support (defaults to English)
         force_rebuild: Force rebuild of search indices
-        semantic: Enable semantic search (default: True)
+        semantic: Enable semantic search (None = use SEMANTIC_SEARCH_ENABLED env var)
 
     Returns:
         Initialized LanguageSearch instance
