@@ -185,26 +185,6 @@ const lookupWord = async (word: string) => {
 </script>
 
 <style scoped>
-/* Hide scrollbar by default */
-.scrollbar-none::-webkit-scrollbar {
-  width: 0;
-  display: none;
-}
-
-/* Show thin scrollbar on hover */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 4px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted));
-  border-radius: 2px;
-}
-
 /* History list transitions */
 .history-list-enter-active,
 .history-list-leave-active {
