@@ -137,7 +137,7 @@ const duration = computed(
         7px 7px 0 rgba(200, 200, 200, 0.7),
         8px 8px 0 rgba(200, 200, 200, 0.65);
 
-    transition: all 0.3s ease;
+    transition: opacity 0.3s ease, transform 0.3s ease, color 0.3s ease;
 }
 
 .dark .depth-text {

@@ -188,7 +188,7 @@ const lookupWord = async (word: string) => {
 /* History list transitions */
 .history-list-enter-active,
 .history-list-leave-active {
-  transition: all 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .history-list-enter-from {
@@ -208,7 +208,7 @@ const lookupWord = async (word: string) => {
 /* Toast stack transitions */
 .toast-stack-enter-active,
 .toast-stack-leave-active {
-  transition: all 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .toast-stack-enter-from {
@@ -222,6 +222,6 @@ const lookupWord = async (word: string) => {
 }
 
 .toast-stack-move {
-  transition: all 0.3s ease;
+  transition: transform 0.3s ease;
 }
 </style>

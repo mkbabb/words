@@ -240,11 +240,11 @@ const uploadSingleFile = async (file: File): Promise<ImageMedia> => {
 <style scoped>
 /* Icon transition animations */
 .upload-icon-enter-active {
-    transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition: opacity 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .upload-icon-leave-active {
-    transition: all 0.15s cubic-bezier(0.55, 0.055, 0.675, 0.19);
+    transition: opacity 0.15s cubic-bezier(0.55, 0.055, 0.675, 0.19), transform 0.15s cubic-bezier(0.55, 0.055, 0.675, 0.19);
 }
 
 .upload-icon-enter-from {
@@ -269,11 +269,11 @@ const uploadSingleFile = async (file: File): Promise<ImageMedia> => {
 
 /* Progress fade animations */
 .progress-fade-enter-active {
-    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition: opacity 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .progress-fade-leave-active {
-    transition: all 0.2s cubic-bezier(0.55, 0.055, 0.675, 0.19);
+    transition: opacity 0.2s cubic-bezier(0.55, 0.055, 0.675, 0.19), transform 0.2s cubic-bezier(0.55, 0.055, 0.675, 0.19);
 }
 
 .progress-fade-enter-from {

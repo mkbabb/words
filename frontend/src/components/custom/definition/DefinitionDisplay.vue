@@ -540,11 +540,11 @@ watch(editModeEnabled, (newVal, oldVal) => {
 <style scoped>
 /* Mode switch transitions - Apple-style with bounce */
 .mode-switch-enter-active {
-    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* apple-spring */
+    transition: opacity 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* apple-spring */
 }
 
 .mode-switch-leave-active {
-    transition: all 0.25s cubic-bezier(0.6, -0.28, 0.735, 0.045); /* apple-bounce-in */
+    transition: opacity 0.25s cubic-bezier(0.6, -0.28, 0.735, 0.045), transform 0.25s cubic-bezier(0.6, -0.28, 0.735, 0.045); /* apple-bounce-in */
 }
 
 .mode-switch-enter-from {
