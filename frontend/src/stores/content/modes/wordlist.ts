@@ -1,6 +1,6 @@
 import { ref, readonly, shallowRef } from 'vue'
 import type { WordlistContentState, ModeHandler } from '@/stores/types/mode-types'
-import type { SearchMode } from '@/types'
+import type { SearchMode, WordList, SynthesizedDictionaryEntry } from '@/types'
 
 /**
  * Wordlist mode content state
@@ -11,15 +11,15 @@ export function useWordlistContentState() {
   // WORDLIST-SPECIFIC CONTENT STATE
   // ==========================================================================
   
-  const currentWordlist = shallowRef<any | null>(null)
+  const currentWordlist = shallowRef<WordList | null>(null)
   const processingQueue = ref<string[]>([])
-  const batchResults = shallowRef<Map<string, any>>(new Map())
+  const batchResults = shallowRef<Map<string, SynthesizedDictionaryEntry>>(new Map())
   
   // ==========================================================================
   // ACTIONS
   // ==========================================================================
   
-  const setCurrentWordlist = (wordlist: any | null) => {
+  const setCurrentWordlist = (wordlist: WordList | null) => {
     currentWordlist.value = wordlist
   }
   
@@ -37,7 +37,7 @@ export function useWordlistContentState() {
     processingQueue.value = []
   }
   
-  const setBatchResult = (word: string, result: any) => {
+  const setBatchResult = (word: string, result: SynthesizedDictionaryEntry) => {
     const newMap = new Map(batchResults.value)
     newMap.set(word, result)
     batchResults.value = newMap

@@ -1,10 +1,9 @@
-import type { 
+import type {
   SearchMode,
   SynthesizedDictionaryEntry,
   ThesaurusEntry,
   WordSuggestionResponse,
   WordList,
-  WordListItem
 } from '@/types'
 import type { 
   CardVariant, 
@@ -132,7 +131,7 @@ export interface LookupContentState {
 export interface WordlistContentState {
   currentWordlist: WordList | null
   processingQueue: string[]
-  batchResults: Map<string, WordListItem>
+  batchResults: Map<string, SynthesizedDictionaryEntry>
 }
 
 export interface WordOfTheDayContentState {

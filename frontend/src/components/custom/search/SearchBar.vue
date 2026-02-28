@@ -460,8 +460,8 @@ const showProgressBar = computed(() => {
 // Refs
 const searchContainer = ref<HTMLDivElement>();
 const searchBarElement = ref<HTMLDivElement>(); void searchBarElement; // bound via template ref="searchBarElement"
-const searchInputComponent = ref<any>();
-const searchResultsComponent = ref<any>();
+const searchInputComponent = ref<InstanceType<typeof SearchInput>>();
+const searchResultsComponent = ref<InstanceType<typeof SearchResults>>();
 
 // Computed ref for search input element
 const searchInputRef = computed(() => searchInputComponent.value?.element);
