@@ -1312,9 +1312,12 @@ class SemanticSearch:
         if self.corpus is None or self.sentence_embeddings is None:
             return None
 
-        # Corpus vocabulary_to_index uses batch_normalize (lowercased) keys,
-        # but semantic search() only does query.strip(). Lowercase here to match.
-        lookup_key = normalized_query.lower()
+        # Corpus vocabulary_to_index uses batch_normalize → normalize_comprehensive
+        # (lowercased + diacritics stripped + contractions expanded). Apply the same
+        # normalization here so "café", "CAFÉ", "Café" all match the "cafe" key.
+        from floridify.text.normalize import normalize
+
+        lookup_key = normalize(normalized_query)
 
         # O(1) dict lookup: normalized word → vocabulary index
         word_idx = self.corpus.vocabulary_to_index.get(lookup_key)
