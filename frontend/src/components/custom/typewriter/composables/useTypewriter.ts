@@ -1,192 +1,287 @@
 import { ref } from 'vue';
-import { calculateKeyDelay } from '../utils/qwertyMap';
+import type { TypewriterOptions, CancellationToken } from '../types';
+import { DEFAULTS } from '../types';
+import { calculateKeyDelay } from '../utils/keyboard';
 import { getPauseDelay, PAUSE_PATTERNS } from '../utils/pausePatterns';
+import {
+    createCancellationToken,
+    sleep,
+    stochasticDelay,
+    backspaceDelay as calcBackspaceDelay,
+    pickNgramSize,
+    prefersReducedMotion,
+} from '../utils/timing';
+import {
+    nextTypoAction,
+    createTypoContext,
+    DEFAULT_TYPO_CONFIG,
+    type TypoConfig,
+} from '../utils/typoStateMachine';
 
-interface TypewriterOptions {
-    text: string;
-    mode?: 'basic' | 'human' | 'expert';
-    baseSpeed?: number;
-    variance?: number;
-    errorRate?: number;
-    loop?: boolean;
-    animationDelay?: number;
-    onComplete?: () => void;
-}
+export function useTypewriter(options: TypewriterOptions) {
+    // Merge options with defaults
+    const opts = { ...DEFAULTS, ...options };
 
-export const useTypewriter = (options: TypewriterOptions) => {
+    // --- Reactive state ---
     const displayText = ref('');
     const isTyping = ref(false);
     const isFirstAnimation = ref(true);
-    const currentText = ref(options.text);
 
-    const delay = (ms: number): Promise<void> => {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    };
+    // --- Internal state (non-reactive) ---
+    let targetText = opts.text;
+    let currentToken: CancellationToken | null = null;
 
-    const getTypingDelay = (baseDelay: number, variance: number): number => {
-        const variation = (Math.random() - 0.5) * 2 * variance;
-        const calculatedDelay = baseDelay * (1 + variation);
-        return Math.max(50, Math.min(500, calculatedDelay));
-    };
+    // --- Derived typo config ---
+    function getTypoConfig(): TypoConfig {
+        return {
+            ...DEFAULT_TYPO_CONFIG,
+            maxCharsBeforeNotice: opts.maxCharsBeforeNotice,
+            continueAfterTypoProbability: opts.continueAfterTypoProbability,
+            sequentialTypoDecay: opts.sequentialTypoDecay,
+        };
+    }
 
-    const animateBackspace = async (count: number) => {
-        for (let i = 0; i < count && isTyping.value; i++) {
+    // --- Core typing loop ---
+
+    async function typeTextWithNgrams(token: CancellationToken): Promise<void> {
+        const chars = targetText;
+        let typoCtx = createTypoContext();
+        const typoConfig = getTypoConfig();
+        const speedFactor = isFirstAnimation.value ? opts.firstAnimationSpeedFactor : 1;
+        const skipTypos = isFirstAnimation.value;
+
+        while (displayText.value.length < chars.length) {
+            if (token.cancelled) return;
+
+            const pos = displayText.value.length;
+            const currentChar = chars[pos];
+            const prevChar = pos > 0 ? chars[pos - 1] : '';
+
+            // If FSM is in a non-normal state, drive it single-char
+            if (typoCtx.state !== 'normal') {
+                const result = nextTypoAction(
+                    typoCtx,
+                    currentChar,
+                    typoConfig,
+                    opts.errorRate,
+                );
+                typoCtx = result.ctx;
+
+                const ok = await executeAction(result.action, token, prevChar, speedFactor);
+                if (!ok) return;
+                continue;
+            }
+
+            // Normal state: decide typo or n-gram
+            if (!skipTypos && pos > 3 && pos < chars.length - 3) {
+                const result = nextTypoAction(
+                    typoCtx,
+                    currentChar,
+                    typoConfig,
+                    opts.errorRate,
+                );
+                typoCtx = result.ctx;
+
+                if (result.action.type === 'type_wrong') {
+                    const ok = await executeAction(result.action, token, prevChar, speedFactor);
+                    if (!ok) return;
+                    continue;
+                }
+
+                // FSM said type_correct — fall through to n-gram path
+            }
+
+            // N-gram typing
+            const ngramSize = Math.min(
+                pickNgramSize(opts.ngramSize),
+                chars.length - pos,
+            );
+
+            for (let i = 0; i < ngramSize; i++) {
+                if (token.cancelled) return;
+                const charPos = pos + i;
+                const ch = chars[charPos];
+                const prev = charPos > 0 ? chars[charPos - 1] : '';
+
+                displayText.value += ch;
+
+                // Only delay after the last char of the n-gram
+                if (i === ngramSize - 1) {
+                    const nextCh = chars[charPos + 1] ?? '';
+                    const keyDelay = calculateKeyDelay(prev, ch) * speedFactor;
+                    const typingDelay = stochasticDelay(keyDelay, opts.variance);
+
+                    // Punctuation pauses (skip on first animation)
+                    let pauseDelay = 0;
+                    if (!isFirstAnimation.value) {
+                        pauseDelay = getPauseDelay(ch, nextCh, PAUSE_PATTERNS);
+                    }
+
+                    const ok = await sleep(typingDelay + pauseDelay, token);
+                    if (!ok) return;
+                }
+            }
+        }
+    }
+
+    async function executeAction(
+        action: ReturnType<typeof nextTypoAction>['action'],
+        token: CancellationToken,
+        prevChar: string,
+        speedFactor: number,
+    ): Promise<boolean> {
+        switch (action.type) {
+            case 'type_correct': {
+                if (action.char === '') return true; // resume placeholder
+                displayText.value += action.char;
+                const delay = calculateKeyDelay(prevChar, action.char) * speedFactor;
+                return sleep(stochasticDelay(delay, opts.variance), token);
+            }
+
+            case 'type_wrong': {
+                displayText.value += action.char;
+                const delay = calculateKeyDelay(prevChar, action.char) * speedFactor;
+                return sleep(stochasticDelay(delay, opts.variance), token);
+            }
+
+            case 'type_past_correct': {
+                displayText.value += action.char;
+                const delay = calculateKeyDelay(prevChar, action.char) * speedFactor;
+                return sleep(
+                    stochasticDelay(delay * opts.correctionSpeedMultiplier, opts.variance),
+                    token,
+                );
+            }
+
+            case 'notice': {
+                return sleep(action.pauseMs, token);
+            }
+
+            case 'backspace': {
+                return animateBackspaceSequence(action.count, token, action.frantic);
+            }
+
+            case 'resume': {
+                return sleep(action.pauseMs, token);
+            }
+        }
+    }
+
+    // --- Backspace animation ---
+
+    async function animateBackspaceSequence(
+        count: number,
+        token: CancellationToken,
+        frantic: boolean,
+    ): Promise<boolean> {
+        const base = frantic ? opts.correctionBaseDelay : opts.backspaceBaseDelay;
+        const accel = frantic
+            ? opts.backspaceAcceleration * 2
+            : opts.backspaceAcceleration;
+
+        for (let i = 0; i < count; i++) {
+            if (token.cancelled) return false;
             displayText.value = displayText.value.slice(0, -1);
-            await delay(40 + Math.random() * 30);
+            const delay = calcBackspaceDelay(base, opts.variance * 0.5, i, accel);
+            const ok = await sleep(delay, token);
+            if (!ok) return false;
         }
-    };
+        return true;
+    }
 
-    const startTyping = async () => {
-        if (isTyping.value) return;
-        
+    // --- Public API ---
+
+    async function startTyping(): Promise<void> {
+        // Cancel any in-flight animation
+        currentToken?.cancel();
+        const token = createCancellationToken();
+        currentToken = token;
         isTyping.value = true;
-        
-        // If this is not the first animation and we have text, backspace it
-        if (!isFirstAnimation.value && displayText.value.length > 0) {
-            // Pause before backspacing
-            await delay(500);
-            
-            // Backspace all text
-            await animateBackspace(displayText.value.length);
-            
-            // Pause after backspacing
-            await delay(300);
+
+        // Reduced motion: show final text immediately
+        if (opts.respectReducedMotion && prefersReducedMotion()) {
+            displayText.value = targetText;
+            isTyping.value = false;
+            isFirstAnimation.value = false;
+            opts.onComplete?.();
+            return;
         }
-        
+
+        // If not first animation and we have text, backspace it first
+        if (!isFirstAnimation.value && displayText.value.length > 0) {
+            const ok = await sleep(opts.preBackspacePause, token);
+            if (!ok) return;
+
+            const ok2 = await animateBackspaceSequence(
+                displayText.value.length,
+                token,
+                false,
+            );
+            if (!ok2) return;
+
+            const ok3 = await sleep(opts.postBackspacePause, token);
+            if (!ok3) return;
+        }
+
         // Type the text
-        await typeText();
-        
-        // Mark as completed
-        if (isTyping.value) {
+        await typeTextWithNgrams(token);
+
+        // Complete (only if we weren't cancelled)
+        if (!token.cancelled) {
             isFirstAnimation.value = false;
             isTyping.value = false;
-            options.onComplete?.();
-            
-            // Handle looping
-            if (options.loop) {
-                // Use animationDelay if provided, otherwise default to 2 seconds
-                const loopDelay = options.animationDelay || 2000;
-                await delay(loopDelay);
-                startTyping();
-            }
-        }
-    };
-    
-    const typeText = async () => {
-        const chars = currentText.value.split('');
-        const startPosition = displayText.value.length;
-        
-        for (let position = startPosition; position < chars.length && isTyping.value; position++) {
-            const currentChar = chars[position];
-            const nextChar = chars[position + 1] || '';
-            const prevChar = position > 0 ? chars[position - 1] : '';
-            
-            // Determine typing mode
-            const currentMode = isFirstAnimation.value ? 'expert' : (options.mode || 'human');
-            
-            // Calculate delay
-            let keyDelay: number;
-            if (currentMode === 'basic') {
-                keyDelay = getTypingDelay(options.baseSpeed || 250, 0.2);
-            } else {
-                const qwertyDelay = calculateKeyDelay(prevChar, currentChar);
-                const baseDelay = currentMode === 'expert' ? qwertyDelay * 0.6 : qwertyDelay;
-                keyDelay = getTypingDelay(baseDelay, options.variance || 0.5);
-            }
-            
-            // Add pause patterns for non-first animations
-            let pauseDelay = 0;
-            if (!isFirstAnimation.value && currentMode !== 'basic') {
-                pauseDelay = getPauseDelay(currentChar, nextChar, PAUSE_PATTERNS);
-            }
-            
-            // Occasional mid-word backspacing (only after first animation)
-            if (!isFirstAnimation.value && 
-                position > 5 && 
-                position < chars.length - 5 && 
-                Math.random() < 0.08) {
-                
-                // Backspace 2-5 characters
-                const backspaceCount = 2 + Math.floor(Math.random() * 4);
-                await delay(200); // Pause before backspacing
-                await animateBackspace(Math.min(backspaceCount, position - 2));
-                await delay(200); // Pause after backspacing
-                
-                // Reset position to retype
-                position = displayText.value.length - 1; // Will be incremented by loop
-                continue;
-            }
-            
-            // Occasional typos (only after first animation)
-            if (!isFirstAnimation.value && 
-                currentMode !== 'basic' &&
-                position > 3 &&
-                position < chars.length - 3 &&
-                Math.random() < 0.03) {
-                
-                // Type wrong character
-                const wrongChars = 'asdfjkl;'.split('');
-                const wrongChar = wrongChars[Math.floor(Math.random() * wrongChars.length)];
-                displayText.value += wrongChar;
-                
-                // Type 1-2 more characters before noticing
-                const detectionDelay = 1 + Math.floor(Math.random() * 2);
-                for (let i = 0; i < detectionDelay && position + i + 1 < chars.length; i++) {
-                    await delay(keyDelay);
-                    displayText.value += chars[position + 1 + i];
+            opts.onComplete?.();
+
+            if (opts.loop) {
+                await sleep(2000, token);
+                if (!token.cancelled) {
+                    startTyping();
                 }
-                
-                // Pause and correct
-                await delay(300);
-                await animateBackspace(detectionDelay + 1);
-                await delay(100);
-                
-                // Continue from current position
-                position--; // Will be incremented by loop
-                continue;
             }
-            
-            // Type the character
-            displayText.value += currentChar;
-            await delay(keyDelay + pauseDelay);
         }
-    };
+    }
 
-    const stopTyping = () => {
+    function stopTyping(): void {
+        currentToken?.cancel();
+        currentToken = null;
         isTyping.value = false;
-    };
+    }
 
-    const reset = () => {
+    function reset(): void {
         stopTyping();
         displayText.value = '';
         isFirstAnimation.value = true;
-    };
-    
-    const updateText = (newText: string) => {
-        options.text = newText;
-        currentText.value = newText;
-        // Force non-first animation so backspace will occur
+    }
+
+    function updateText(newText: string): void {
+        targetText = newText;
+        opts.text = newText;
         if (displayText.value.length > 0) {
             isFirstAnimation.value = false;
         }
-    };
+    }
 
-    const backspaceToPosition = async (targetLength: number) => {
+    async function backspaceToPosition(targetLength: number): Promise<void> {
         if (isTyping.value || targetLength >= displayText.value.length || targetLength < 0) {
             return;
         }
-        
+
+        currentToken?.cancel();
+        const token = createCancellationToken();
+        currentToken = token;
         isTyping.value = true;
-        const charactersToRemove = displayText.value.length - targetLength;
-        
-        // Animate backspace to the target position
-        await animateBackspace(charactersToRemove);
-        
-        // Resume typing from the target position
+
+        const charsToRemove = displayText.value.length - targetLength;
+        await animateBackspaceSequence(charsToRemove, token, false);
+
         isTyping.value = false;
-        await delay(200);
-        startTyping();
-    };
+        if (!token.cancelled) {
+            await sleep(200, token);
+            if (!token.cancelled) {
+                startTyping();
+            }
+        }
+    }
 
     return {
         displayText,
@@ -196,6 +291,6 @@ export const useTypewriter = (options: TypewriterOptions) => {
         stopTyping,
         reset,
         updateText,
-        backspaceToPosition
+        backspaceToPosition,
     };
-};
+}

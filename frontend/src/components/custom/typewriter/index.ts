@@ -1,5 +1,7 @@
 export { default as TypewriterText } from './TypewriterText.vue';
 export { useTypewriter } from './composables/useTypewriter';
-export * from './utils/qwertyMap';
+export * from './types';
+export * from './utils/keyboard';
 export * from './utils/pausePatterns';
-export * from './utils/errorSimulation';
+export * from './utils/timing';
+export * from './utils/typoStateMachine';

@@ -1,40 +1,61 @@
 <template>
-    <span>
-        <span 
-            v-for="(char, index) in displayTextChars" 
+    <span class="tw-root">
+        <span
+            v-for="(char, index) in displayTextChars"
             :key="index"
-            @click="handleCharClick(index)"
             class="cursor-pointer hover:bg-muted/50 transition-colors duration-150 rounded-sm px-0.5 -mx-0.5"
-        >{{ char }}</span><span v-if="showCursor" :class="cursorClass">|</span>
+            @click="handleCharClick(index)"
+            >{{ char }}</span
+        ><span
+            v-if="cursorVisible"
+            class="tw-cursor text-primary font-light"
+            :class="{
+                'tw-cursor--blink': cursorBlink && !typewriter.isTyping.value,
+            }"
+            >{{ cursorChar }}</span
+        >
     </span>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
+import { watch, onMounted, onUnmounted, computed } from 'vue';
 import { useTypewriter } from './composables/useTypewriter';
 
 interface Props {
     text: string;
-    mode?: 'basic' | 'human' | 'expert';
+    ngramSize?: number | { min: number; max: number };
     baseSpeed?: number;
     variance?: number;
     errorRate?: number;
-    loop?: boolean;
+    firstAnimationSpeedFactor?: number;
+    maxCharsBeforeNotice?: number;
+    continueAfterTypoProbability?: number;
+    sequentialTypoDecay?: number;
+    correctionSpeedMultiplier?: number;
+    cursorVisible?: boolean;
     cursorBlink?: boolean;
+    cursorChar?: string;
     startDelay?: number;
-    animationDelay?: number; // Delay between animation loops in milliseconds
-    onComplete?: () => void;
+    loop?: boolean;
+    respectReducedMotion?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    mode: 'human',
-    baseSpeed: 250,
-    variance: 0.5,
-    errorRate: 0.03,
-    loop: false,
+    ngramSize: () => ({ min: 1, max: 3 }),
+    baseSpeed: 150,
+    variance: 0.4,
+    errorRate: 0.015,
+    firstAnimationSpeedFactor: 0.6,
+    maxCharsBeforeNotice: 4,
+    continueAfterTypoProbability: 0.6,
+    sequentialTypoDecay: 0.3,
+    correctionSpeedMultiplier: 0.5,
+    cursorVisible: true,
     cursorBlink: true,
+    cursorChar: '|',
     startDelay: 0,
-    animationDelay: 0
+    loop: false,
+    respectReducedMotion: true,
 });
 
 const emit = defineEmits<{
@@ -42,73 +63,54 @@ const emit = defineEmits<{
     start: [];
 }>();
 
-// Cursor state
-const showCursor = ref(true);
-const cursorInterval = ref<number | null>(null);
-
-const cursorClass = computed(() => ({
-    'inline-block': true,
-    'animate-pulse': props.cursorBlink && !typewriter.isTyping.value,
-    'text-primary': true,
-    'font-light': true
-}));
-
-// Split display text into clickable characters
-const displayTextChars = computed(() => typewriter.displayText.value.split(''));
-
-// Initialize typewriter
 const typewriter = useTypewriter({
     text: props.text,
-    mode: props.mode,
+    ngramSize: props.ngramSize,
     baseSpeed: props.baseSpeed,
     variance: props.variance,
     errorRate: props.errorRate,
+    firstAnimationSpeedFactor: props.firstAnimationSpeedFactor,
+    maxCharsBeforeNotice: props.maxCharsBeforeNotice,
+    continueAfterTypoProbability: props.continueAfterTypoProbability,
+    sequentialTypoDecay: props.sequentialTypoDecay,
+    correctionSpeedMultiplier: props.correctionSpeedMultiplier,
+    cursorVisible: props.cursorVisible,
+    cursorBlink: props.cursorBlink,
+    cursorChar: props.cursorChar,
     loop: props.loop,
-    animationDelay: props.animationDelay,
-    onComplete: () => {
-        props.onComplete?.();
-        emit('complete');
-    }
+    respectReducedMotion: props.respectReducedMotion,
+    onComplete: () => emit('complete'),
 });
 
-const { displayText, isTyping, startTyping, stopTyping, reset, updateText, backspaceToPosition } = typewriter;
+const { displayText, startTyping, stopTyping, reset, backspaceToPosition } = typewriter;
 
-// Handle character click for backspacing
-const handleCharClick = (clickedIndex: number) => {
-    const currentLength = displayText.value.length;
-    if (clickedIndex >= currentLength) return;
-    
-    // If currently typing, stop the animation first
-    if (isTyping.value) {
+const displayTextChars = computed(() => displayText.value.split(''));
+
+function handleCharClick(clickedIndex: number) {
+    if (clickedIndex >= displayText.value.length) return;
+
+    if (typewriter.isTyping.value) {
         stopTyping();
-        // Small delay to ensure animation stops cleanly
-        setTimeout(() => {
-            backspaceToPosition(clickedIndex + 1);
-        }, 50);
+        setTimeout(() => backspaceToPosition(clickedIndex + 1), 50);
     } else {
-        // Backspace to the clicked position (keeping the clicked character)
         backspaceToPosition(clickedIndex + 1);
     }
-};
+}
 
-// Watch for text changes
-watch(() => props.text, (newText, oldText) => {
-    if (newText !== oldText && newText) {
-        stopTyping();
-        
-        // Update the text in the typewriter
-        updateText(newText);
-        
-        // Always let the animation handle the transition
-        // DO NOT reset unless we truly have no text
-        setTimeout(() => {
-            emit('start');
-            startTyping();
-        }, props.startDelay);
-    }
-});
+watch(
+    () => props.text,
+    (newText, oldText) => {
+        if (newText !== oldText && newText) {
+            stopTyping();
+            typewriter.updateText(newText);
+            setTimeout(() => {
+                emit('start');
+                startTyping();
+            }, props.startDelay);
+        }
+    },
+);
 
-// Start typing on mount
 onMounted(() => {
     if (props.text) {
         setTimeout(() => {
@@ -116,42 +118,37 @@ onMounted(() => {
             startTyping();
         }, props.startDelay);
     }
-
-    // Cursor blinking
-    if (props.cursorBlink) {
-        cursorInterval.value = window.setInterval(() => {
-            if (!isTyping.value) {
-                showCursor.value = !showCursor.value;
-            } else {
-                showCursor.value = true;
-            }
-        }, 530);
-    }
 });
 
 onUnmounted(() => {
     stopTyping();
-    if (cursorInterval.value) {
-        clearInterval(cursorInterval.value);
-    }
 });
 
-// Expose methods for parent components
 defineExpose({
     startTyping,
     stopTyping,
     reset,
-    isTyping
+    isTyping: typewriter.isTyping,
 });
 </script>
 
 <style scoped>
-@keyframes blink {
-    0%, 50% { opacity: 1; }
-    51%, 100% { opacity: 0; }
+.tw-cursor {
+    display: inline-block;
 }
 
-.animate-pulse {
-    animation: blink 1.06s infinite;
+.tw-cursor--blink {
+    animation: tw-cursor-blink 1.06s step-end infinite;
+}
+
+@keyframes tw-cursor-blink {
+    0%,
+    50% {
+        opacity: 1;
+    }
+    51%,
+    100% {
+        opacity: 0;
+    }
 }
 </style>
