@@ -39,9 +39,7 @@ export const useUIStore = defineStore('ui', () => {
 
   // Theme management
   const toggleTheme = () => {
-    const themes: Theme[] = [Themes.LIGHT, Themes.DARK, Themes.SYSTEM]
-    const currentIndex = themes.indexOf(theme.value)
-    theme.value = themes[(currentIndex + 1) % themes.length]
+    theme.value = resolvedTheme.value === 'dark' ? Themes.LIGHT : Themes.DARK
   }
 
   const setTheme = (newTheme: Theme) => {

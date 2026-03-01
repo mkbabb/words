@@ -147,7 +147,9 @@ def parse_search_params(
     force_rebuild: bool = Query(default=False, description="Force rebuild indices"),
     corpus_id: str | None = Query(default=None, description="Specific corpus ID"),
     corpus_name: str | None = Query(default=None, description="Specific corpus name"),
-    semantic: bool = Query(default=True, description="Enable semantic search (disable to avoid model load)"),
+    semantic: bool = Query(
+        default=True, description="Enable semantic search (disable to avoid model load)"
+    ),
 ) -> SearchParams:
     """Parse and validate search parameters using shared model."""
     # Use the shared model's validators
@@ -167,6 +169,38 @@ def parse_search_params(
 
 async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
     """Cached search implementation."""
+    # Support comma-separated modes (e.g., "exact,fuzzy")
+    mode_parts = [m.strip() for m in params.mode.split(",") if m.strip()]
+
+    if len(mode_parts) > 1:
+        # Multi-mode: run each mode and union results
+        all_results = []
+        seen_words: set[str] = set()
+        for mode_str in mode_parts:
+            try:
+                sub_params = params.model_copy(update={"mode": mode_str})
+                sub_response = await _cached_search(query, sub_params)
+                for result in sub_response.results:
+                    key = result.word.lower()
+                    if key not in seen_words:
+                        seen_words.add(key)
+                        all_results.append(result)
+            except Exception as e:
+                logger.warning(f"Multi-mode search failed for mode '{mode_str}': {e}")
+
+        # Sort by score descending, limit to max_results
+        all_results.sort(key=lambda r: r.score, reverse=True)
+        all_results = all_results[: params.max_results]
+
+        return SearchResponse(
+            query=query,
+            results=all_results,
+            total_found=len(all_results),
+            languages=params.languages,
+            mode=params.mode,
+            metadata={"modes": mode_parts},
+        )
+
     # Convert string mode to enum
     mode_enum = SearchMode(params.mode)
 
@@ -243,7 +277,9 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
 
             # Get language search instance (respect semantic flag to avoid model load crash)
             semantic = getattr(params, "_semantic", True)
-            language_search = await get_language_search(languages=params.languages, semantic=semantic)
+            language_search = await get_language_search(
+                languages=params.languages, semantic=semantic
+            )
 
             # Perform search with specified mode
             results = await language_search.search_with_mode(
@@ -409,7 +445,9 @@ async def get_semantic_status() -> SemanticStatusResponse:
         elif ready:
             message = "Semantic search is ready"
         elif building:
-            message = "Semantic search is building in background (search still works with exact/fuzzy)"
+            message = (
+                "Semantic search is building in background (search still works with exact/fuzzy)"
+            )
         else:
             message = "Semantic search is not initialized"
 

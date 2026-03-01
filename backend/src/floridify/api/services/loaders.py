@@ -10,6 +10,7 @@ from ...models.base import AudioMedia, ImageMedia
 from ...models.dictionary import (
     Definition,
     DictionaryEntry,
+    DictionaryProvider,
     Example,
     Pronunciation,
     Word,
@@ -209,6 +210,13 @@ class DictionaryEntryLoader(DataLoader):
         if not word_obj:
             raise ValueError(f"Word not found for ID: {entry.word_id}")
 
+        # Load provider (non-synthesis) DictionaryEntry documents for this word
+        provider_entries = await DictionaryEntry.find(
+            DictionaryEntry.word_id == entry.word_id,
+            DictionaryEntry.provider != DictionaryProvider.SYNTHESIS,
+        ).to_list()
+        provider_entry_ids = [str(pe.id) for pe in provider_entries] if provider_entries else None
+
         # Load definitions with all relations
         definitions = []
         if entry.definition_ids:
@@ -221,7 +229,7 @@ class DictionaryEntryLoader(DataLoader):
                         include_examples=True,
                         include_images=True,
                         include_provider_data=True,
-                        provider_data_ids=None,  # Provider tracking now in Definition.providers
+                        provider_data_ids=provider_entry_ids,
                     )
                     definitions.append(def_dict)
 

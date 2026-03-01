@@ -37,7 +37,7 @@ export const useLookupMode = defineStore(
         const selectedSources = ref<DictionarySource[]>(DEFAULT_SOURCES);
         const selectedLanguages = ref<Language[]>(DEFAULT_LANGUAGES);
         const noAI = ref(true);
-        const searchMode = ref<SearchMethod>('smart');
+        const searchMode = ref<SearchMethod[]>(['smart']);
 
         // ==========================================================================
         // SEARCH BAR STATE
@@ -198,8 +198,8 @@ export const useLookupMode = defineStore(
             noAI.value = !enabled;
         };
 
-        const setSearchMode = (mode: SearchMethod) => {
-            searchMode.value = mode;
+        const setSearchMode = (mode: SearchMethod | SearchMethod[]) => {
+            searchMode.value = Array.isArray(mode) ? mode : [mode];
         };
 
         const toggleSearchMode = () => {
@@ -209,9 +209,10 @@ export const useLookupMode = defineStore(
                 'fuzzy',
                 'semantic',
             ];
-            const currentIndex = modes.indexOf(searchMode.value);
+            const current = searchMode.value[0] || 'smart';
+            const currentIndex = modes.indexOf(current);
             const nextIndex = (currentIndex + 1) % modes.length;
-            searchMode.value = modes[nextIndex];
+            searchMode.value = [modes[nextIndex]];
         };
 
         // ==========================================================================
@@ -324,7 +325,7 @@ export const useLookupMode = defineStore(
                 // Always perform dictionary search - AI mode is user-initiated only
                 const searchResults = await searchApi.search(normalized, {
                     signal: abortController.signal,
-                    mode: searchMode.value,
+                    mode: searchMode.value.join(','),
                 });
 
                 // Store results with method detection

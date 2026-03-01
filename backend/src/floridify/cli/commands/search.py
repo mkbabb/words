@@ -139,6 +139,43 @@ def search_stats(language: tuple[str, ...]) -> None:
     asyncio.run(_search_stats_async(language))
 
 
+@search_group.command("rebuild")
+@click.option(
+    "--language",
+    type=click.Choice([lang.value for lang in Language], case_sensitive=False),
+    multiple=True,
+    default=[Language.ENGLISH.value],
+    help="Languages to rebuild corpora for",
+)
+def search_rebuild(language: tuple[str, ...]) -> None:
+    """Rebuild search corpus from scratch.
+
+    Clears and rebuilds the corpus, re-downloading word lists
+    (or using bundled fallbacks if downloads fail).
+    """
+    asyncio.run(_search_rebuild_async(language))
+
+
+async def _search_rebuild_async(language: tuple[str, ...]) -> None:
+    """Async implementation of corpus rebuild."""
+    from ...storage.mongodb import get_storage
+
+    await get_storage()
+    languages = [Language(lang) for lang in language]
+
+    console.print("[bold]Rebuilding search corpus (force_rebuild=True)...[/bold]")
+    try:
+        search = await get_language_search(languages=languages, force_rebuild=True)
+        stats = search.get_stats()
+        vocab_size = stats.get("vocabulary_size", 0)
+        console.print(f"  ✅ Rebuilt corpus: {vocab_size:,} words")
+    except Exception as e:
+        console.print(f"  ❌ Rebuild failed: {e}")
+        logger.error(f"Corpus rebuild failed: {e}")
+
+    console.print("\n[bold green]Corpus rebuild complete.[/bold green]")
+
+
 async def _search_word_async(
     query: str,
     language: tuple[str, ...],

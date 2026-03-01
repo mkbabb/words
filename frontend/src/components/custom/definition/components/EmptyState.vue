@@ -1,11 +1,12 @@
 <template>
     <div class="flex flex-col items-center justify-center min-h-[400px] px-6 text-center">
         <div class="mb-6">
-            <div class="relative inline-flex items-center justify-center w-16 h-16 mb-4 rounded-full bg-muted/20">
-                <component 
-                    :is="emptyIcon" 
-                    :size="32" 
-                    class="text-muted-foreground"
+            <div class="relative inline-flex items-center justify-center mb-4">
+                <img
+                    :src="heartBubble"
+                    alt="Yoshi heart speech bubble"
+                    class="w-20 h-20 object-contain opacity-60"
+                    draggable="false"
                 />
             </div>
         </div>
@@ -41,14 +42,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import { Button } from '@/components/ui/button';
-import { 
-    SearchX, 
-    FileText, 
-    BookOpen, 
-    Lightbulb 
-} from 'lucide-vue-next';
+import { Lightbulb } from 'lucide-vue-next';
+import heartBubble from '@/assets/yoshi/ui/heart_speech_bubble.png';
 
 interface EmptyStateProps {
     title?: string;
@@ -68,16 +64,5 @@ defineEmits<{
     'suggest-alternatives': [];
 }>();
 
-const emptyIcon = computed(() => {
-    switch (props.emptyType) {
-        case 'no-results':
-            return SearchX;
-        case 'no-definitions':
-            return FileText;
-        case 'no-suggestions':
-            return BookOpen;
-        default:
-            return SearchX;
-    }
-});
+void props.emptyType;
 </script>

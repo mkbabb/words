@@ -103,8 +103,9 @@
             >
                 <h3 class="mb-3 text-sm font-medium">Search Method</h3>
                 <BouncyToggle
-                    :model-value="currentSearchMode"
+                    :model-value="currentSearchModes"
                     @update:model-value="handleSearchModeChange"
+                    :multi-select="true"
                     :options="[
                         { label: 'Smart', value: 'smart', icon: 'Zap' },
                         { label: 'Exact', value: 'exact', icon: 'Target' },
@@ -114,7 +115,7 @@
                     class="text-sm font-medium"
                 />
                 <p class="mt-2 text-xs text-muted-foreground">
-                    {{ searchModeDescriptions[currentSearchMode] }}
+                    {{ currentSearchModes.map(m => searchModeDescriptions[m]).join(' · ') }}
                 </p>
             </div>
 
@@ -275,7 +276,7 @@ const router = useRouter();
 const { searchBar, lookupMode } = useStores();
 // ✅ Make component reactive to store changes instead of using defineModel
 const searchMode = computed(() => searchBar.searchMode);
-const currentSearchMode = computed(() => lookupMode.searchMode);
+const currentSearchModes = computed(() => lookupMode.searchMode);
 
 // Search mode descriptions
 const searchModeDescriptions: Record<string, string> = {
@@ -351,8 +352,9 @@ const toggleLanguage = (languageCode: string) => {
     }
 };
 
-const handleSearchModeChange = (mode: string) => {
-    lookupMode.setSearchMode(mode as 'smart' | 'exact' | 'fuzzy' | 'semantic');
+const handleSearchModeChange = (mode: string | string[]) => {
+    const modes = Array.isArray(mode) ? mode : [mode];
+    lookupMode.setSearchMode(modes as ('smart' | 'exact' | 'fuzzy' | 'semantic')[]);
 };
 
 const toggleFilter = (filterKey: keyof typeof wordlistFilters.value) => {
@@ -376,8 +378,8 @@ const handleEnterKey = (event: KeyboardEvent) => {
 };
 
 // Handle mode change from BouncyToggle
-const handleModeChange = async (newMode: string | SearchMode) => {
-    const typedMode = newMode as SearchMode;
+const handleModeChange = async (newMode: string | string[]) => {
+    const typedMode = (Array.isArray(newMode) ? newMode[0] : newMode) as SearchMode;
     if (typedMode !== searchMode.value) {
         // Save current query and switch mode - returns saved query for new mode
         const currentQuery = searchBar.searchQuery;

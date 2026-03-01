@@ -71,7 +71,9 @@ class URLLanguageConnector(LanguageConnector):
             if scraper_type == ScraperType.FRENCH_EXPRESSIONS:
                 content = await scrape_french_expressions(source.url, session=client)
             else:  # DEFAULT or unknown
-                content = await default_scraper(source.url, session=client)
+                content = await default_scraper(
+                    source.url, session=client, local_path=source.local_path
+                )
 
             # Determine parser to use and parse content
             parser_type = source.parser or ParserType.TEXT_LINES
@@ -97,7 +99,6 @@ class URLLanguageConnector(LanguageConnector):
             # Extract idioms from parsed JSON data
             if parser_type == ParserType.JSON_VOCABULARY and isinstance(content, str):
                 try:
-
                     json_data = json.loads(content)
                     if isinstance(json_data, dict) and "idioms" in json_data:
                         idioms = list(dict.fromkeys(json_data.get("idioms", [])))

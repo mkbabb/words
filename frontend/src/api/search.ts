@@ -7,7 +7,7 @@ export const searchApi = {
   async search(query: string, options?: {
     max_results?: number;
     min_score?: number;
-    mode?: 'smart' | 'exact' | 'fuzzy' | 'semantic';
+    mode?: string;
     signal?: AbortSignal;
   }): Promise<SearchResult[]> {
     try {

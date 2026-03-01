@@ -47,6 +47,10 @@ class LanguageSource(BaseModel):
 
     name: str = Field(..., description="Unique identifier for the source")
     url: str = Field(default="", description="URL to download the corpus data")
+    local_path: str | None = Field(
+        default=None,
+        description="Local file path for bundled fallback when URL download fails",
+    )
     parser: ParserType = Field(
         default=ParserType.TEXT_LINES,
         description="Parser type for raw data",

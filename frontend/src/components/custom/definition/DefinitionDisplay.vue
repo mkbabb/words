@@ -43,14 +43,16 @@
     <div v-else-if="entry" class="relative">
         <!-- Main Card -->
         <ThemedCard :variant="selectedCardVariant" class="relative">
-            <!-- Theme Selector (includes edit button) -->
-            <ThemeSelector 
+            <!-- Theme Selector (includes edit button + admin controls) -->
+            <ThemeSelector
                 v-model="selectedCardVariant"
                 :isMounted="isMounted"
                 :showDropdown="showThemeDropdown"
                 :editModeEnabled="editModeEnabled"
                 @toggle-dropdown="showThemeDropdown = !showThemeDropdown"
                 @toggle-edit-mode="editModeEnabled = !editModeEnabled"
+                @toggle-version-history="handleToggleVersionHistory"
+                @resynthesize="handleResynthesize"
             />
             
             <!-- Image Carousel Display -->
@@ -90,6 +92,8 @@
             <!-- Gradient Separator -->
             <hr class="border-0 h-px bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30" />
 
+            <!-- Provider Tabs (when provider data available) -->
+            <ProviderTabs :providers-data="allProvidersData">
             <!-- Mode Content -->
             <CardContent class="space-y-4 px-4 sm:px-6">
                 <Transition
@@ -166,6 +170,7 @@
                     </div>
                 </Transition>
             </CardContent>
+            </ProviderTabs>
 
             <!-- Progressive Etymology -->
             <div v-if="normalizedEtymology" data-cluster-id="etymology">
@@ -180,8 +185,18 @@
                 </div>
             </div>
             
-            <!-- Debug Info with Streaming Status -->
-            <div v-if="entry.id" class="flex justify-center mt-4">
+            <!-- Version History Panel (admin only) -->
+            <VersionHistory
+                :show="showVersionHistory"
+                :versions="versionHistoryData"
+                :loading="versionHistoryLoading"
+                @close="showVersionHistory = false"
+                @rollback="handleVersionRollback"
+                @create-snapshot="handleCreateSnapshot"
+            />
+
+            <!-- Debug Info with Version Badge and Streaming Status -->
+            <div v-if="entry.id" class="flex justify-center items-center gap-2 mt-4 flex-wrap">
                 <div class="text-xs text-muted-foreground/50 px-3 py-1 border border-border/30 rounded-md bg-background/50 flex items-center gap-2">
                     {{ entry.id }}
                     <div v-if="isStreaming" class="flex items-center gap-1">
@@ -189,6 +204,10 @@
                         <span class="text-blue-500">streaming</span>
                     </div>
                 </div>
+                <VersionBadge
+                    :version="entry.model_info?.version || entry._version"
+                    :last-updated="entry.last_updated"
+                />
             </div>
         </ThemedCard>
         
@@ -222,6 +241,10 @@ import {
     ErrorState,
     EmptyState
 } from './components';
+import ProviderTabs from './components/ProviderTabs.vue';
+import VersionBadge from './components/VersionBadge.vue';
+import VersionHistory from './components/VersionHistory.vue';
+import { useAuthStore } from '@/stores/auth';
 import { ThemedCard } from '@/components/custom/card';
 import { WordlistSelectionModal } from '@/components/custom/wordlist';
 import { useDefinitionGroups, useProviders, useImageManagement } from './composables';
@@ -240,12 +263,17 @@ const orchestrator = useSearchOrchestrator({
     query: computed(() => searchBar.searchQuery)
 });
 
+void useAuthStore; // Auth store used by child components
+
 // Reactive state
 const isMounted = ref(true);
 const editModeEnabled = ref(false);
 const showWordlistModal = ref(false);
 const wordToAdd = ref('');
 const showThemeDropdown = ref(false);
+const showVersionHistory = ref(false);
+const versionHistoryData = ref<Array<{ version: number; created_at: string; content_hash?: string }>>([]);
+const versionHistoryLoading = ref(false);
 
 // Use UI store state for regeneration
 // const regeneratingIndex = computed(() => ui.regeneratingIndex); // Used in template
@@ -364,6 +392,23 @@ const normalizedEtymology = computed(() => {
     return normalizeEtymology(entry.value?.etymology);
 });
 
+// Collect all unique provider data entries from definitions
+const allProvidersData = computed(() => {
+    const defs = entry.value?.definitions || [];
+    const seen = new Set<string>();
+    const result: Array<Record<string, any>> = [];
+    for (const def of defs) {
+        for (const pd of (def as any).providers_data || []) {
+            const key = pd.provider || JSON.stringify(pd).slice(0, 100);
+            if (!seen.has(key)) {
+                seen.add(key);
+                result.push(pd);
+            }
+        }
+    }
+    return result;
+});
+
 // Composables
 const { groupedDefinitions } = useDefinitionGroups(entry);
 const { usedProviders } = useProviders(entry);
@@ -476,6 +521,88 @@ const handleRetryLookup = () => {
 const handleShowHelp = () => {
     // Show help modal or redirect to help page
     // TODO: Implement help system
+};
+
+// Admin: Version History
+const handleToggleVersionHistory = async () => {
+    showVersionHistory.value = !showVersionHistory.value;
+    if (showVersionHistory.value && entry.value?.id) {
+        versionHistoryLoading.value = true;
+        try {
+            const { api } = await import('@/api/core');
+            const response = await api.get(`/definitions/${entry.value.id}/versions`);
+            versionHistoryData.value = response.data?.versions || [];
+        } catch (error) {
+            logger.error('Failed to load version history:', error);
+            versionHistoryData.value = [];
+        } finally {
+            versionHistoryLoading.value = false;
+        }
+    }
+};
+
+const handleVersionRollback = async (version: number) => {
+    if (!entry.value?.id) return;
+    try {
+        const { api } = await import('@/api/core');
+        await api.post(`/definitions/${entry.value.id}/versions/${version}/rollback`);
+        notificationStore.showNotification({
+            type: 'success',
+            message: `Rolled back to version ${version}`,
+        });
+        // Refresh the entry
+        if (entry.value?.word) {
+            handleWordSearch(entry.value.word);
+        }
+    } catch (error) {
+        logger.error('Rollback failed:', error);
+        notificationStore.showNotification({
+            type: 'error',
+            message: 'Failed to rollback version',
+        });
+    }
+};
+
+const handleCreateSnapshot = async () => {
+    if (!entry.value?.id) return;
+    try {
+        const { api } = await import('@/api/core');
+        await api.post(`/definitions/${entry.value.id}/versions/snapshot`);
+        notificationStore.showNotification({
+            type: 'success',
+            message: 'Snapshot created',
+        });
+        // Refresh history
+        await handleToggleVersionHistory();
+        showVersionHistory.value = true;
+    } catch (error) {
+        logger.error('Snapshot creation failed:', error);
+    }
+};
+
+// Admin: Re-synthesis
+const handleResynthesize = async () => {
+    if (!entry.value?.word) return;
+    try {
+        const { api } = await import('@/api/core');
+        await api.post('/ai/synthesize', { word: entry.value.word, force: true });
+        notificationStore.showNotification({
+            type: 'success',
+            message: `Re-synthesis started for "${entry.value.word}"`,
+        });
+        // Refresh the entry after a delay
+        setTimeout(() => {
+            if (entry.value?.word) {
+                handleWordSearch(entry.value.word);
+            }
+        }, 3000);
+    } catch (error) {
+        logger.error('Re-synthesis failed:', error);
+        notificationStore.showNotification({
+            type: 'error',
+            message: 'Re-synthesis failed',
+        });
+    }
 };
 
 const handleSuggestAlternatives = () => {

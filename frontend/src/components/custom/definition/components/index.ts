@@ -11,3 +11,7 @@ export { default as ThesaurusView } from './ThesaurusView.vue';
 export { default as WordHeader } from './WordHeader.vue';
 export { default as ErrorState } from './ErrorState.vue';
 export { default as EmptyState } from './EmptyState.vue';
+export { default as ProviderDataTab } from './ProviderDataTab.vue';
+export { default as ProviderTabs } from './ProviderTabs.vue';
+export { default as VersionBadge } from './VersionBadge.vue';
+export { default as VersionHistory } from './VersionHistory.vue';

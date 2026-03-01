@@ -1,12 +1,20 @@
 <template>
   <div class="relative flex space-x-2">
-    <!-- Animated background slider -->
+    <!-- Animated background sliders -->
     <div
+      v-for="(_slider, idx) in sliderElements"
+      :key="'slider-' + idx"
+      :ref="(el) => { if (el) sliderRefs[idx] = el as HTMLElement }"
+      class="absolute inset-y-0 rounded-lg bg-primary shadow-sm transition-all duration-300 ease-out"
+    />
+    <!-- Single slider fallback for non-multi mode -->
+    <div
+      v-if="!multiSelect"
       ref="backgroundSlider"
       class="absolute inset-y-0 rounded-lg bg-primary shadow-sm transition-all duration-300 ease-out"
       :style="backgroundStyle"
     />
-    
+
     <!-- Toggle buttons -->
     <button
       v-for="(option, index) in options"
@@ -15,7 +23,7 @@
       @click="handleSelect(option.value, index)"
       :class="[
         'relative z-10 px-3 py-1.5 rounded-lg font-medium transition-all duration-200',
-        activeValue === option.value
+        isActive(option.value)
           ? 'text-primary-foreground'
           : 'text-muted-foreground hover:text-foreground',
         inheritedClass
@@ -27,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, useAttrs } from 'vue';
+import { ref, computed, nextTick, onMounted, watch, useAttrs } from 'vue';
 import { gsap } from 'gsap';
 
 // Disable automatic attribute inheritance
@@ -43,20 +51,38 @@ interface ToggleOption {
 
 interface BouncyToggleProps {
   options: ToggleOption[];
-  modelValue: string;
+  modelValue: string | string[];
+  multiSelect?: boolean;
 }
 
-const props = defineProps<BouncyToggleProps>();
+const props = withDefaults(defineProps<BouncyToggleProps>(), {
+  multiSelect: false,
+});
 const attrs = useAttrs();
 const inheritedClass = computed(() => attrs.class || 'text-sm');
 const emit = defineEmits<{
-  'update:modelValue': [value: string];
+  'update:modelValue': [value: string | string[]];
 }>();
 
 const backgroundSlider = ref<HTMLElement>();
 const buttonRefs = ref<HTMLButtonElement[]>([]);
+const sliderRefs = ref<Record<number, HTMLElement>>({});
 
-const activeValue = computed(() => props.modelValue);
+// For multi-select, track which values are active
+const activeValues = computed<string[]>(() => {
+  if (props.multiSelect) {
+    return Array.isArray(props.modelValue) ? props.modelValue : [props.modelValue];
+  }
+  return [props.modelValue as string];
+});
+
+const isActive = (value: string) => activeValues.value.includes(value);
+
+// For multi-select sliders
+const sliderElements = computed(() => {
+  if (!props.multiSelect) return [];
+  return activeValues.value;
+});
 
 const backgroundStyle = ref({
   width: '0px',
@@ -64,6 +90,7 @@ const backgroundStyle = ref({
 });
 
 const updateBackground = (activeIndex: number, animate = true) => {
+  if (props.multiSelect) return; // Multi-select handles its own sliders
   nextTick(() => {
     const activeButton = buttonRefs.value[activeIndex];
     if (!activeButton || !backgroundSlider.value) return;
@@ -72,7 +99,6 @@ const updateBackground = (activeIndex: number, animate = true) => {
     const newTransform = `translateX(${activeButton.offsetLeft}px)`;
 
     if (animate) {
-      // Simple bouncy background animation
       gsap.to(backgroundSlider.value, {
         width: newWidth,
         x: activeButton.offsetLeft,
@@ -80,7 +106,6 @@ const updateBackground = (activeIndex: number, animate = true) => {
         ease: "back.out(1.7)"
       });
     } else {
-      // Immediate update for initial state
       backgroundStyle.value = {
         width: newWidth,
         transform: newTransform
@@ -89,11 +114,35 @@ const updateBackground = (activeIndex: number, animate = true) => {
   });
 };
 
+const updateMultiSliders = (animate = true) => {
+  if (!props.multiSelect) return;
+  nextTick(() => {
+    activeValues.value.forEach((value, sliderIdx) => {
+      const optionIdx = props.options.findIndex(o => o.value === value);
+      const button = buttonRefs.value[optionIdx];
+      const slider = sliderRefs.value[sliderIdx];
+      if (!button || !slider) return;
+
+      if (animate) {
+        gsap.to(slider, {
+          width: button.offsetWidth,
+          x: button.offsetLeft,
+          duration: 0.4,
+          ease: "back.out(1.7)"
+        });
+      } else {
+        slider.style.width = `${button.offsetWidth}px`;
+        slider.style.transform = `translateX(${button.offsetLeft}px)`;
+      }
+    });
+  });
+};
+
 const handleSelect = (value: string, index: number) => {
   const activeButton = buttonRefs.value[index];
   if (!activeButton) return;
 
-  // Simple button press animation
+  // Button press animation
   gsap.timeline()
     .to(activeButton, {
       scale: 0.95,
@@ -106,27 +155,45 @@ const handleSelect = (value: string, index: number) => {
       ease: "back.out(1.7)"
     });
 
-  // Update background position
-  updateBackground(index, true);
-  
-  // Emit the new value
-  emit('update:modelValue', value);
+  if (props.multiSelect) {
+    const current = [...activeValues.value];
+    const idx = current.indexOf(value);
+    if (idx > -1) {
+      // Don't deselect the last one
+      if (current.length > 1) {
+        current.splice(idx, 1);
+      }
+    } else {
+      current.push(value);
+    }
+    emit('update:modelValue', current);
+  } else {
+    updateBackground(index, true);
+    emit('update:modelValue', value);
+  }
 };
 
 // Initialize background position
 onMounted(() => {
-  const activeIndex = props.options.findIndex(option => option.value === activeValue.value);
-  if (activeIndex !== -1) {
-    updateBackground(activeIndex, false);
+  if (props.multiSelect) {
+    updateMultiSliders(false);
+  } else {
+    const activeIndex = props.options.findIndex(option => option.value === (props.modelValue as string));
+    if (activeIndex !== -1) {
+      updateBackground(activeIndex, false);
+    }
   }
 });
 
 // Watch for external value changes
-computed(() => {
-  const activeIndex = props.options.findIndex(option => option.value === activeValue.value);
-  if (activeIndex !== -1) {
-    updateBackground(activeIndex, true);
+watch(() => props.modelValue, () => {
+  if (props.multiSelect) {
+    updateMultiSliders(true);
+  } else {
+    const activeIndex = props.options.findIndex(option => option.value === (props.modelValue as string));
+    if (activeIndex !== -1) {
+      updateBackground(activeIndex, true);
+    }
   }
-});
+}, { deep: true });
 </script>
-

@@ -186,10 +186,25 @@ class TestSemanticSearchEnabled:
 class TestPerCorpusSemantic:
     """Per-corpus semantic search works independently of global setting."""
 
+    @pytest_asyncio.fixture
+    async def api_client(self, test_db):
+        """Middleware-free client for corpus creation (POST requires auth on real app)."""
+        from fastapi import FastAPI
+        from floridify.api.main import API_V1_PREFIX
+        from floridify.api.routers import corpus, search
+
+        test_app = FastAPI()
+        test_app.include_router(corpus, prefix=API_V1_PREFIX, tags=["corpus"])
+        test_app.include_router(search, prefix=API_V1_PREFIX, tags=["search"])
+
+        transport = ASGITransport(app=test_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            yield client
+
     @pytest.mark.asyncio
-    async def test_create_corpus_with_semantic(self, async_client, test_db):
+    async def test_create_corpus_with_semantic(self, api_client, test_db):
         """Create a corpus with enable_semantic=True even when global is disabled."""
-        response = await async_client.post(
+        response = await api_client.post(
             "/api/v1/corpus",
             json={
                 "name": "test-semantic-corpus",
@@ -219,7 +234,7 @@ class TestPerCorpusSemantic:
         corpus_id = data["id"]
 
         # Search within this corpus using exact mode (should work regardless of semantic)
-        search_response = await async_client.get(
+        search_response = await api_client.get(
             "/api/v1/search",
             params={
                 "q": "happy",
@@ -233,10 +248,10 @@ class TestPerCorpusSemantic:
         assert any(r["word"] == "happy" for r in search_data["results"])
 
     @pytest.mark.asyncio
-    async def test_search_corpus_fuzzy(self, async_client, test_db):
+    async def test_search_corpus_fuzzy(self, api_client, test_db):
         """Fuzzy search works on per-corpus search."""
         # Create corpus
-        create_response = await async_client.post(
+        create_response = await api_client.post(
             "/api/v1/corpus",
             json={
                 "name": "test-fuzzy-corpus",
@@ -261,7 +276,7 @@ class TestPerCorpusSemantic:
         assert create_response.status_code == 201
 
         # Fuzzy search
-        search_response = await async_client.get(
+        search_response = await api_client.get(
             "/api/v1/search",
             params={
                 "q": "beautful",  # typo — should fuzzy match "beautiful"

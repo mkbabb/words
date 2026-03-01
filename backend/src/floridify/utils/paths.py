@@ -93,6 +93,19 @@ def get_cache_directory(cache_type: str = "") -> Path:
     return cache_dir
 
 
+def get_data_dir() -> Path:
+    """Get the data directory, handling Docker and native environments."""
+    if DATA_DIR.exists():
+        return DATA_DIR
+    # In Docker, data/ may be directly at /app/data/ (no backend/ prefix)
+    docker_data = Path("/app/data")
+    if docker_data.exists():
+        return docker_data
+    # Fallback: create and return the standard path
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    return DATA_DIR
+
+
 def ensure_directories() -> None:
     """Ensure all required directories exist."""
     for directory in [AUTH_DIR, DATA_DIR, LOGS_DIR, CACHE_DIR]:

@@ -26,6 +26,7 @@ LANGUAGE_CORPUS_SOURCES = [
     LanguageSource(
         name="google_10k_frequency",
         url="https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-no-swears.txt",
+        local_path="wordlists/google_10k.txt",
         parser=ParserType.TEXT_LINES,
         language=Language.ENGLISH,
         description="Google's 10,000 most common English words (filtered)",

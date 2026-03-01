@@ -46,6 +46,7 @@ const { size } = defineProps({
         fill: var(--color-foreground);
         width: 100%;
         height: 100%;
+        pointer-events: none;
     }
 
     &:hover,
@@ -57,6 +58,13 @@ const { size } = defineProps({
 }
 
 .dark-mode-toggle-button::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: currentColor;
+    pointer-events: none;
+    z-index: -1;
     animation: pulseToDark 650ms ease-out;
 }
 

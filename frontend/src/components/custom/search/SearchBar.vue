@@ -456,7 +456,8 @@ const showClearStorageDialog = ref(false);
 
 const showProgressBar = computed(() => {
     // Show progress bar if loading is in progress and modal is not visible
-    return isLoadingInProgress.value && !loading.showLoadingModal.value;
+    // Hide when noAI is true (raw provider data mode has no AI pipeline stages)
+    return isLoadingInProgress.value && !loading.showLoadingModal.value && !lookupMode.noAI;
 });
 
 // Refs

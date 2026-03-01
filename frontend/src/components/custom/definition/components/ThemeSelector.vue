@@ -9,7 +9,27 @@
             <Edit2 v-if="!editModeEnabled" :size="14" class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground" />
             <Check v-else :size="14" class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground" />
         </button>
-        
+
+        <!-- Admin: Version History Button -->
+        <button
+            v-if="isAdmin && editModeEnabled"
+            @click="$emit('toggle-version-history')"
+            class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-1.5 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
+            title="Version History"
+        >
+            <History :size="14" class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground" />
+        </button>
+
+        <!-- Admin: Re-synthesize Button -->
+        <button
+            v-if="isAdmin && editModeEnabled"
+            @click="$emit('resynthesize')"
+            class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-1.5 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
+            title="Re-synthesize with AI"
+        >
+            <RefreshCw :size="14" class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground" />
+        </button>
+
         <!-- Custom dropdown with controlled animations -->
         <div class="relative">
             <button
@@ -75,8 +95,9 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronLeft, Edit2, Check } from 'lucide-vue-next';
+import { ChevronLeft, Edit2, Check, History, RefreshCw } from 'lucide-vue-next';
 import { CARD_THEMES } from '../constants';
+import { useAuthStore } from '@/stores/auth';
 import type { CardVariant } from '@/types';
 
 interface ThemeSelectorProps {
@@ -90,9 +111,14 @@ defineProps<ThemeSelectorProps>();
 // Modern Vue 3.4+ pattern - using defineModel for two-way binding
 const modelValue = defineModel<CardVariant>({ required: true });
 
+const auth = useAuthStore();
+const isAdmin = auth.isAdmin;
+
 const emit = defineEmits<{
     'toggle-dropdown': [];
     'toggle-edit-mode': [];
+    'toggle-version-history': [];
+    'resynthesize': [];
 }>();
 
 const themes = CARD_THEMES;
