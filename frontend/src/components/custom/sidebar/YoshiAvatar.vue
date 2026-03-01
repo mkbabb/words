@@ -1,9 +1,12 @@
 <template>
-  <div class="yoshi-avatar" :style="{ width: size, height: size }">
+  <div
+    class="yoshi-avatar from-primary/20 to-primary/10 border-primary/20 flex items-center justify-center rounded-full border bg-gradient-to-br"
+    :style="{ width: size, height: size }"
+  >
     <img
       :src="selectedSprite"
       :alt="`Yoshi avatar (${selectedColor})`"
-      class="h-full w-full object-contain"
+      class="h-[75%] w-[75%] object-contain"
       draggable="false"
     />
   </div>

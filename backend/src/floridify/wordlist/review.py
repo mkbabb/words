@@ -93,17 +93,29 @@ class ReviewData(BaseModel):
             ),
         )
 
+    @staticmethod
+    def _ensure_utc(dt: datetime) -> datetime:
+        """Ensure a datetime is UTC-aware.
+
+        MongoDB strips timezone info from stored datetimes, returning naive
+        datetimes on retrieval. This method re-attaches UTC to naive datetimes
+        so they can be safely compared with timezone-aware datetimes.
+        """
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=UTC)
+        return dt
+
     def is_due_for_review(self, reference_date: datetime | None = None) -> bool:
         """Check if item is due for review."""
         if reference_date is None:
             reference_date = datetime.now(UTC)
-        return self.next_review_date <= reference_date
+        return self._ensure_utc(self.next_review_date) <= reference_date
 
     def get_overdue_days(self, reference_date: datetime | None = None) -> int:
         """Get number of days overdue (negative if not due yet)."""
         if reference_date is None:
             reference_date = datetime.now(UTC)
-        delta = reference_date - self.next_review_date
+        delta = reference_date - self._ensure_utc(self.next_review_date)
         return delta.days
 
     def get_retention_rate(self) -> float:
