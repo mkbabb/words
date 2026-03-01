@@ -276,11 +276,12 @@ SMART_QUERIES = [
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  Corpus + engine fixtures  (function-scoped → clean per test)
+#  Corpus + engine fixtures  (session-scoped → built once, shared read-only)
 # ═══════════════════════════════════════════════════════════════════
 
 
 async def _make_corpus(test_db, name: str, vocab: list[str]) -> Corpus:
+    """Create and persist a corpus (requires active Beanie DB)."""
     corpus = await Corpus.create(
         corpus_name=name,
         vocabulary=vocab,
@@ -291,49 +292,93 @@ async def _make_corpus(test_db, name: str, vocab: list[str]) -> Corpus:
     return await manager.save_corpus(corpus)
 
 
+async def _make_corpus_inmemory(name: str, vocab: list[str]) -> Corpus:
+    """Create a corpus in-memory only (no DB calls).
+
+    Used for session-scoped fixtures that must not depend on Beanie global state.
+    """
+    import uuid
+
+    corpus = await Corpus.create(
+        corpus_name=name,
+        vocabulary=vocab,
+        language=Language.ENGLISH,
+    )
+    corpus.corpus_type = CorpusType.LANGUAGE
+    # Set UUID manually since we're not saving to DB
+    if not corpus.corpus_uuid:
+        corpus.corpus_uuid = str(uuid.uuid4())
+    return corpus
+
+
 async def _make_engine(corpus: Corpus) -> Search:
+    """Build a Search engine in-memory (no DB calls).
+
+    Avoids TrieIndex.get_or_create() which hits MongoDB — important for
+    session-scoped fixtures that must not depend on Beanie global state.
+    """
+    from floridify.search.fuzzy import FuzzySearch
+    from floridify.search.models import SearchIndex
+    from floridify.search.trie import TrieSearch
+
     engine = Search()
     engine.corpus = corpus
-    await engine.build_indices()
+
+    # Build index metadata in-memory
+    engine.index = SearchIndex(
+        corpus_name=corpus.corpus_name,
+        corpus_uuid=corpus.corpus_uuid or "",
+        vocabulary_hash=corpus.vocabulary_hash,
+        semantic_enabled=False,
+    )
+
+    # Build trie in-memory (TrieIndex.create is pure, no DB)
+    trie_index = await TrieIndex.create(corpus)
+    engine.trie_search = TrieSearch(index=trie_index)
+
+    # Build fuzzy search
+    engine.fuzzy_search = FuzzySearch(min_score=engine.index.min_score)
+
+    engine._initialized = True
     return engine
 
 
-@pytest_asyncio.fixture
-async def tiny_corpus(test_db) -> Corpus:
-    return await _make_corpus(test_db, "opt_tiny", VOCAB_TINY)
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def tiny_corpus() -> Corpus:
+    return await _make_corpus_inmemory("opt_tiny", VOCAB_TINY)
 
 
-@pytest_asyncio.fixture
-async def small_corpus(test_db) -> Corpus:
-    return await _make_corpus(test_db, "opt_10k", VOCAB_SMALL)
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def small_corpus() -> Corpus:
+    return await _make_corpus_inmemory("opt_10k", VOCAB_SMALL)
 
 
-@pytest_asyncio.fixture
-async def medium_corpus(test_db) -> Corpus:
-    return await _make_corpus(test_db, "opt_140k", VOCAB_MEDIUM)
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def medium_corpus() -> Corpus:
+    return await _make_corpus_inmemory("opt_140k", VOCAB_MEDIUM)
 
 
-@pytest_asyncio.fixture
-async def large_corpus(test_db) -> Corpus:
-    return await _make_corpus(test_db, "opt_278k", VOCAB_LARGE)
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def large_corpus() -> Corpus:
+    return await _make_corpus_inmemory("opt_278k", VOCAB_LARGE)
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def tiny_engine(tiny_corpus) -> Search:
     return await _make_engine(tiny_corpus)
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def small_engine(small_corpus) -> Search:
     return await _make_engine(small_corpus)
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def medium_engine(medium_corpus) -> Search:
     return await _make_engine(medium_corpus)
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def large_engine(large_corpus) -> Search:
     return await _make_engine(large_corpus)
 
@@ -895,32 +940,23 @@ class TestTrieIndexSort:
 
 @pytest.mark.asyncio
 class TestIndexBuild:
-    async def test_build_small(self, small_corpus, test_db):
+    async def test_build_small(self, small_corpus):
         async def build():
-            engine = Search()
-            engine.corpus = small_corpus
-            await engine.build_indices()
-            return engine
+            return await _make_engine(small_corpus)
 
         stats, _ = await _run_timed_async(build, iterations=10, warmup=1)
         print(f"\n  BUILD  {_label(small_corpus):>5}: {_fmt(stats)}")
 
-    async def test_build_medium(self, medium_corpus, test_db):
+    async def test_build_medium(self, medium_corpus):
         async def build():
-            engine = Search()
-            engine.corpus = medium_corpus
-            await engine.build_indices()
-            return engine
+            return await _make_engine(medium_corpus)
 
         stats, _ = await _run_timed_async(build, iterations=5, warmup=1)
         print(f"\n  BUILD {_label(medium_corpus):>5}: {_fmt(stats)}")
 
-    async def test_build_large(self, large_corpus, test_db):
+    async def test_build_large(self, large_corpus):
         async def build():
-            engine = Search()
-            engine.corpus = large_corpus
-            await engine.build_indices()
-            return engine
+            return await _make_engine(large_corpus)
 
         stats, _ = await _run_timed_async(build, iterations=3, warmup=1)
         print(f"\n  BUILD {_label(large_corpus):>5}: {_fmt(stats)}")
@@ -935,14 +971,19 @@ SEMANTIC_QUERIES = ["fruit", "animal", "emotion", "technology", "nature"]
 
 @pytest.mark.asyncio
 class TestSemanticSearchPerf:
-    async def test_semantic_uncached_small(self, small_corpus, test_db):
+    """Semantic search performance tests.
+
+    These use function-scoped test_db because SemanticSearch.initialize()
+    persists embeddings to MongoDB via _save_embeddings_to_index().
+    """
+
+    async def test_semantic_uncached_small(self, test_db):
         from floridify.search.semantic.core import SemanticSearch
 
-        engine = Search()
-        engine.corpus = small_corpus
-        await engine.build_indices()
+        corpus = await _make_corpus(test_db, "sem_perf_uncached", VOCAB_TINY)
+        engine = await _make_engine(corpus)
 
-        semantic = await SemanticSearch.from_corpus(corpus=small_corpus)
+        semantic = await SemanticSearch.from_corpus(corpus=corpus)
         await semantic.initialize()
         engine.semantic_search = semantic
         engine._semantic_ready = True
@@ -962,17 +1003,16 @@ class TestSemanticSearchPerf:
 
         stats, _ = await _run_timed_async(run, iterations=10, warmup=2)
         print(
-            f"\n  SEMANTIC uncached {_label(small_corpus):>5} ({len(SEMANTIC_QUERIES)}q): {_fmt(stats)}"
+            f"\n  SEMANTIC uncached {_label(corpus):>5} ({len(SEMANTIC_QUERIES)}q): {_fmt(stats)}"
         )
 
-    async def test_semantic_cached_small(self, small_corpus, test_db):
+    async def test_semantic_cached_small(self, test_db):
         from floridify.search.semantic.core import SemanticSearch
 
-        engine = Search()
-        engine.corpus = small_corpus
-        await engine.build_indices()
+        corpus = await _make_corpus(test_db, "sem_perf_cached", VOCAB_TINY)
+        engine = await _make_engine(corpus)
 
-        semantic = await SemanticSearch.from_corpus(corpus=small_corpus)
+        semantic = await SemanticSearch.from_corpus(corpus=corpus)
         await semantic.initialize()
         engine.semantic_search = semantic
         engine._semantic_ready = True
@@ -986,7 +1026,7 @@ class TestSemanticSearchPerf:
 
         stats, _ = await _run_timed_async(run, iterations=50, warmup=5)
         print(
-            f"\n  SEMANTIC cached   {_label(small_corpus):>5} ({len(SEMANTIC_QUERIES)}q): {_fmt(stats)}"
+            f"\n  SEMANTIC cached   {_label(corpus):>5} ({len(SEMANTIC_QUERIES)}q): {_fmt(stats)}"
         )
 
 
@@ -1041,12 +1081,12 @@ VOCAB_DIACRITICS = [
 ]
 
 
-@pytest_asyncio.fixture
-async def diacritics_corpus(test_db) -> Corpus:
-    return await _make_corpus(test_db, "opt_diacritics", VOCAB_DIACRITICS)
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def diacritics_corpus() -> Corpus:
+    return await _make_corpus_inmemory("opt_diacritics", VOCAB_DIACRITICS)
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def diacritics_engine(diacritics_corpus) -> Search:
     return await _make_engine(diacritics_corpus)
 

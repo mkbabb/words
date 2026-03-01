@@ -30,7 +30,7 @@ from floridify.search.core import Search
 from floridify.search.models import SearchIndex
 from floridify.search.semantic.core import SemanticSearch
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def shared_semantic_corpus(test_db_session):
     """Session-scoped corpus with pre-built semantic index.
 
