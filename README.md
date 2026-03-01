@@ -1,6 +1,6 @@
 # Floridify
 
-An AI-enhanced dictionary and word-collecting tool. Look up a word and it fetches from Wiktionary, Oxford, Apple Dictionary, and Free Dictionary in parallel, then synthesizes the lot—deduplicating, clustering by semantic sense, generating pronunciation, etymology, and usage à fond. A cornucopia of sources distilled into something pellucid.
+An AI-enhanced dictionary and word-collecting tool. Look up a word and it fetches from Wiktionary, Oxford, Apple Dictionary, and Free Dictionary in parallel, then synthesizes the lot—deduplicating, clustering by semantic sense, generating pronunciation, etymology, and usage à fond.
 
 [words.babb.dev](https://words.babb.dev)
 
