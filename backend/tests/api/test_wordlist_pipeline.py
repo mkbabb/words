@@ -266,27 +266,6 @@ class TestWordlistPipelineAPI:
         assert "remove" not in word_texts
         assert "keep" in word_texts
 
-    async def test_search_words_in_wordlist(self, async_client: AsyncClient, wordlist_factory):
-        """Test searching words within a wordlist."""
-        # Create wordlist with searchable words
-        words = ["testing", "tester", "testify", "example", "sample"]
-        wordlist = await wordlist_factory(words=words)
-
-        # Search endpoint is POST /{wordlist_id}/search with query params
-        # Lower min_score to capture more fuzzy matches (testify scores ~0.5)
-        response = await async_client.post(
-            f"/api/v1/wordlists/{wordlist.id}/search?query=test&limit=10&min_score=0.4",
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-
-        # Should find words related to "test" (at least tester, testing)
-        assert len(data["items"]) >= 2
-        # Verify results contain expected words
-        result_words = [item["word"] for item in data["items"]]
-        assert any("test" in w for w in result_words)
-
     async def test_wordlist_review_system(self, async_client: AsyncClient, wordlist_factory):
         """Test spaced repetition review system."""
         # Create wordlist

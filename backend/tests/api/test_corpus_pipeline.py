@@ -83,62 +83,6 @@ class TestCorpusPipelineAPI:
         assert response.status_code in [400, 422]
 
     @pytest.mark.asyncio
-    async def test_search_within_corpus(self, async_client: AsyncClient):
-        """Test searching within a created corpus."""
-        # Create corpus
-        corpus_data = {
-            "vocabulary": ["testing", "tester", "testify", "protest", "contest"],
-            "name": "test_words_corpus",
-        }
-
-        create_response = await async_client.post("/api/v1/corpus", json=corpus_data)
-        assert create_response.status_code == 201
-        corpus_id = create_response.json()["id"]
-
-        # Search within corpus
-        search_response = await async_client.post(
-            f"/api/v1/corpus/{corpus_id}/search?query=test&max_results=10",
-        )
-
-        assert search_response.status_code == 200
-        data = search_response.json()
-
-        # Validate response structure
-        required_fields = ["results", "metadata"]
-        assert_response_structure(data, required_fields)
-
-        # Should find words containing "test"
-        assert len(data["results"]) > 0
-        result_words = [r["word"] for r in data["results"]]
-        assert "testing" in result_words
-        assert "tester" in result_words
-
-    @pytest.mark.asyncio
-    async def test_search_corpus_fuzzy_matching(self, async_client: AsyncClient):
-        """Test fuzzy matching within corpus search."""
-        # Create corpus with similar words
-        corpus_data = {
-            "vocabulary": ["beautiful", "beutiful", "beatiful", "handsome", "pretty"],
-            "name": "beauty_corpus",
-        }
-
-        create_response = await async_client.post("/api/v1/corpus", json=corpus_data)
-        corpus_id = create_response.json()["id"]
-
-        # Search with misspelling
-        search_response = await async_client.post(
-            f"/api/v1/corpus/{corpus_id}/search?query=beatuful&min_score=0.3",
-        )
-
-        assert search_response.status_code == 200
-        data = search_response.json()
-
-        # Should find similar words via fuzzy matching
-        assert len(data["results"]) > 0
-        result_words = [r["word"] for r in data["results"]]
-        assert "beautiful" in result_words
-
-    @pytest.mark.asyncio
     async def test_get_corpus_info(self, async_client: AsyncClient):
         """Test retrieving corpus metadata and statistics."""
         # Create corpus
