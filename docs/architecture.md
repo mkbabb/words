@@ -1,6 +1,6 @@
 # System Architecture
 
-Floridify's architecture separates raw dictionary data from synthesized entries. Multiple dictionary providers feed into an AI synthesis pipeline that deduplicates, clusters, and enhances definitions. The result is a single unified entry per word, stored with full version history.
+Floridify separates raw dictionary data from synthesized entries. Multiple dictionary providers feed into an AI synthesis pipeline that deduplicates, clusters, and enhances definitions. Synthesized entries are stored with version history via SHA-256 content-addressable chains.
 
 ## Data Models
 
@@ -166,7 +166,7 @@ Three tiers:
 
 **L2 Disk** (`filesystem.py`): DiskCache backend, 10GB limit. Per-namespace TTL and optional compression (ZSTD, LZ4, GZIP). ~5ms hit.
 
-**L3 Versioned MongoDB** (`manager.py`): Content-addressable via SHA-256 hashing—identical content reuses versions. `supersedes`/`superseded_by` chains for history. Inline storage for <16KB, external for larger payloads. Per-resource locking (3-5x throughput vs global lock).
+**L3 Versioned MongoDB** (`manager.py`): Content-addressable via SHA-256 hashing—identical content reuses versions. `supersedes`/`superseded_by` chains for history. Inline storage for <16KB, external for larger payloads. Per-resource locking via `TreeCorpusManager`.
 
 ## Storage (`storage/mongodb.py`)
 

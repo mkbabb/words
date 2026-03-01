@@ -1,6 +1,6 @@
 # Floridify
 
-An AI-enhanced dictionary and word-collecting tool. Look up a word and it fetches from Wiktionary, Oxford, Apple Dictionary, and Free Dictionary in parallel, then synthesizes the lot—deduplicating, clustering by semantic sense, generating pronunciation, etymology, and usage à fond.
+AI-enhanced dictionary and word-collecting tool. Fetches from Wiktionary, Oxford, Apple Dictionary, and Free Dictionary in parallel, then synthesizes the lot—deduplicating, clustering by semantic sense, generating pronunciation, etymology, and usage.
 
 [words.babb.dev](https://words.babb.dev)
 
@@ -30,7 +30,7 @@ floridify lookup perspicacious
 
 ## Features
 
-Synthesis runs through a three-tier GPT-5 pipeline (Nano/Mini/Full) that deduplicates definitions, clusters them by meaning, and enhances each cluster with synonyms, examples, CEFR levels, and collocations—all concurrently via `asyncio.gather`. The result is a single entry where "sanction" yields two distinct senses (approval; penalty), each with its own etymology and usage context.
+Synthesis runs through a three-tier GPT-5 pipeline (Nano/Mini/Full) that deduplicates definitions, clusters them by meaning, and enhances each cluster with synonyms, examples, CEFR levels, and collocations—all concurrently via `asyncio.gather`.
 
 Search cascades with early termination: exact match via marisa-trie and Bloom filter (<1ms), fuzzy via RapidFuzz for typos (10–50ms), semantic via FAISS HNSW with Qwen3-0.6B embeddings (50–200ms). Three tiers of caching sit behind it all—in-memory LRU, DiskCache with ZSTD compression, and content-addressable MongoDB with SHA-256 versioning.
 
@@ -118,7 +118,7 @@ Push to `main` triggers GitHub Actions: test, build, deploy, SSL auto-renewal vi
 
 ## Why
 
-I've been collecting and cataloguing words for years—2,100+ entries and counting. An expanded lexicon is to the interlocutor as an expanded palette is to a painter: it lets you say precisely what you mean, à fond, without circumlocution. Existing dictionaries scatter their definitions across sources and order them by historical accident. Floridify pulls from all of them, deduplicates, clusters by meaning, and produces something you can actually learn from. Spaced repetition and Anki export so the words stick.
+I've been collecting and cataloguing words for years—2,100+ entries and counting. Existing dictionaries scatter their definitions across sources and order them by historical accident; Floridify pulls from all of them, deduplicates, clusters by meaning, and produces something you can actually learn from. Spaced repetition and Anki export so the words stick.
 
 Architecture docs, module guides, and technical references live in [`CLAUDE.md`](CLAUDE.md), the per-module `CLAUDE.md` files, and [`docs/`](docs/).
 
