@@ -37,12 +37,11 @@ from typing import Any, Literal
 
 import faiss
 import numpy as np
-
-from ...caching.filesystem import safe_pickle_loads
 import torch
 from sentence_transformers import SentenceTransformer
 
 from ...caching.core import get_global_cache
+from ...caching.filesystem import safe_pickle_loads
 from ...caching.models import CacheNamespace, VersionConfig
 from ...corpus.core import Corpus
 from ...utils.logging import get_logger
@@ -327,7 +326,9 @@ class SemanticSearch:
                 )
 
             compressed_bytes = binary_data["embeddings_compressed_bytes"]
-            logger.debug(f"Decompressing gzip embeddings ({len(compressed_bytes) / 1024 / 1024:.1f}MB compressed)")
+            logger.debug(
+                f"Decompressing gzip embeddings ({len(compressed_bytes) / 1024 / 1024:.1f}MB compressed)"
+            )
             embeddings_bytes = gzip.decompress(compressed_bytes)
             self.sentence_embeddings = safe_pickle_loads(embeddings_bytes)
             logger.debug(
@@ -364,7 +365,7 @@ class SemanticSearch:
             logger.debug(f"Decompressed FAISS index: {len(index_bytes) / 1024 / 1024:.1f}MB")
 
             # Write bytes to temp file and load with FAISS native read
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.faiss') as tmp_file:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".faiss") as tmp_file:
                 tmp_file.write(index_bytes)
                 tmp_path = tmp_file.name
 
@@ -474,32 +475,32 @@ class SemanticSearch:
         # Schedule debounced flush to L2
         self._schedule_query_cache_flush()
 
-    def _get_result_cache_key(self, query: str, max_results: int, min_score: float) -> str:
-        """Generate cache key for search results."""
-        # Include all search parameters in cache key
-        cache_str = f"{query}|{max_results}|{min_score:.3f}"
-        return hashlib.md5(cache_str.encode()).hexdigest()
+    def _get_result_cache_key(self, query: str) -> str:
+        """Generate cache key for search results (query-only for max reuse)."""
+        return hashlib.md5(query.encode()).hexdigest()
 
     def _get_cached_results(
         self, query: str, max_results: int, min_score: float
     ) -> list[SearchResult] | None:
-        """Get cached search results using LRU eviction."""
-        cache_key = self._get_result_cache_key(query, max_results, min_score)
+        """Get cached search results using LRU eviction. Truncates from full cache."""
+        cache_key = self._get_result_cache_key(query)
 
         if cache_key in self.result_cache:
             # Move to end of LRU order (most recently used)
             if cache_key in self.result_cache_order:
                 self.result_cache_order.remove(cache_key)
             self.result_cache_order.append(cache_key)
-            return self.result_cache[cache_key]
+            # Filter and truncate from cached full result set
+            cached = self.result_cache[cache_key]
+            return [r for r in cached if r.score >= min_score][:max_results]
 
         return None
 
     def _cache_results(
         self, query: str, max_results: int, min_score: float, results: list[SearchResult]
     ) -> None:
-        """Cache search results with LRU eviction."""
-        cache_key = self._get_result_cache_key(query, max_results, min_score)
+        """Cache search results with LRU eviction. Stores full result set."""
+        cache_key = self._get_result_cache_key(query)
 
         # LRU eviction if cache is full
         if len(self.result_cache) >= self.result_cache_size:
@@ -579,10 +580,14 @@ class SemanticSearch:
 
         # CRITICAL: Multi-process encoding requires float32 precision
         # Int8 quantization causes shared state issues across processes
-        will_use_multiprocessing = use_multiprocessing and len(texts) > 5000 and self.device == "cpu"
+        will_use_multiprocessing = (
+            use_multiprocessing and len(texts) > 5000 and self.device == "cpu"
+        )
         precision: Literal["float32", "int8", "uint8", "binary", "ubinary"] = (
-            "float32" if will_use_multiprocessing else  # Process-safe precision
-            (QUANTIZATION_PRECISION if use_quantization else "float32")
+            "float32"
+            if will_use_multiprocessing
+            # Process-safe precision
+            else (QUANTIZATION_PRECISION if use_quantization else "float32")
         )
 
         # Multi-process encoding for large corpora on CPU
@@ -624,10 +629,13 @@ class SemanticSearch:
             # Use spawn on macOS (fork is unsafe with threads/CoreFoundation)
             # Use fork on Linux (efficient copy-on-write memory sharing)
             import platform
+
             mp_method = "spawn" if platform.system() == "Darwin" else "fork"
             ctx = mp.get_context(mp_method)
 
-            logger.info(f"Starting multiprocessing.Pool with {num_workers} workers ({mp_method} method)...")
+            logger.info(
+                f"Starting multiprocessing.Pool with {num_workers} workers ({mp_method} method)..."
+            )
             start_time = time.perf_counter()
 
             with ctx.Pool(processes=num_workers) as pool:
@@ -811,10 +819,8 @@ class SemanticSearch:
         # Create trivial identity mapping since we're using lemmas directly
         variant_mapping = {i: i for i in range(len(embedding_vocabulary))}
 
-        # Store in index
-        self.index.variant_mapping = {str(k): v for k, v in variant_mapping.items()}
-        self.index.vocabulary = self.corpus.vocabulary
-        self.index.lemmatized_vocabulary = self.corpus.lemmatized_vocabulary
+        # Store int→int variant mapping directly (no str conversion)
+        self.index.variant_mapping = variant_mapping
 
         logger.info(
             f"🔄 Using {len(embedding_vocabulary)} lemmatized embeddings directly (no re-normalization)",
@@ -879,7 +885,9 @@ class SemanticSearch:
             )
         else:
             # Small vocabulary - use thread-based parallel encoding
-            logger.info(f"🔄 Processing {len(embedding_vocabulary):,} lemmas (small corpus, no batching)")
+            logger.info(
+                f"🔄 Processing {len(embedding_vocabulary):,} lemmas (small corpus, no batching)"
+            )
             self.sentence_embeddings = self._encode(embedding_vocabulary, use_multiprocessing=True)
 
         # Safety check for empty embeddings
@@ -889,7 +897,9 @@ class SemanticSearch:
         # CRITICAL FIX: Explicitly normalize embeddings to unit length
         # Some models (e.g., GTE-Qwen2) don't normalize despite normalize_embeddings=True
         norms_before = np.linalg.norm(self.sentence_embeddings, axis=1, keepdims=True)
-        logger.info(f"Embedding norms before normalization - min: {norms_before.min():.6f}, max: {norms_before.max():.6f}, mean: {norms_before.mean():.6f}")
+        logger.info(
+            f"Embedding norms before normalization - min: {norms_before.min():.6f}, max: {norms_before.max():.6f}, mean: {norms_before.mean():.6f}"
+        )
 
         # Normalize to unit length (L2 norm = 1.0)
         self.sentence_embeddings = self.sentence_embeddings / norms_before
@@ -897,11 +907,15 @@ class SemanticSearch:
         # Verify normalization
         norms_after = np.linalg.norm(self.sentence_embeddings, axis=1)
         is_normalized = np.allclose(norms_after, 1.0, atol=0.01)
-        logger.info(f"Embedding norms after normalization - min: {norms_after.min():.6f}, max: {norms_after.max():.6f}, mean: {norms_after.mean():.6f}")
+        logger.info(
+            f"Embedding norms after normalization - min: {norms_after.min():.6f}, max: {norms_after.max():.6f}, mean: {norms_after.mean():.6f}"
+        )
         logger.info(f"✅ Embeddings normalized: {is_normalized}")
 
         if not is_normalized:
-            logger.warning("⚠️ Embeddings not properly normalized after normalization step - L2 distances may be inaccurate")
+            logger.warning(
+                "⚠️ Embeddings not properly normalized after normalization step - L2 distances may be inaccurate"
+            )
 
         # Ensure C-contiguous memory layout for optimal FAISS performance
         if not self.sentence_embeddings.flags.c_contiguous:
@@ -932,7 +946,6 @@ class SemanticSearch:
         # Update index statistics
         self.index.num_embeddings = vocab_count
         self.index.embedding_dimension = dimension
-        self.index.embeddings_per_second = embeddings_per_sec
 
         logger.info(
             f"✅ Semantic embeddings complete: {vocab_count:,} embeddings, dim={dimension} ({total_time:.1f}s, {embeddings_per_sec:.0f} emb/s)",
@@ -971,7 +984,7 @@ class SemanticSearch:
             logger.info("Serializing FAISS index using native disk I/O (not pickle)...")
 
             # Write FAISS index directly to temp file using optimized C++ serialization
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.faiss') as tmp_file:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".faiss") as tmp_file:
                 tmp_path = tmp_file.name
 
             try:
@@ -979,7 +992,7 @@ class SemanticSearch:
                 faiss.write_index(self.sentence_index, tmp_path)
 
                 # Read the serialized bytes from disk
-                with open(tmp_path, 'rb') as f:
+                with open(tmp_path, "rb") as f:
                     index_bytes = f.read()
 
                 index_size_mb = len(index_bytes) / 1024 / 1024
@@ -999,11 +1012,6 @@ class SemanticSearch:
 
         # Update statistics
         self.index.build_time_seconds = build_time
-        self.index.memory_usage_mb = (
-            (self.sentence_embeddings.nbytes / (1024 * 1024))
-            if self.sentence_embeddings is not None
-            else 0.0
-        )
 
         # Detect and store index type
         if self.sentence_index is not None:
@@ -1030,12 +1038,14 @@ class SemanticSearch:
                 corpus_uuid=self.corpus.corpus_uuid if self.corpus else self.index.corpus_uuid,
                 binary_data=binary_data,
             )
-            logger.info("✅ Semantic index saved successfully (metadata in MongoDB, data in cache backend)")
+            logger.info(
+                "✅ Semantic index saved successfully (metadata in MongoDB, data in cache backend)"
+            )
         except Exception as e:
             logger.error(f"Failed to save semantic index: {e}")
             raise RuntimeError(
                 f"Semantic index persistence failed. This may be due to size limits or corruption. "
-                f"Embeddings size: {self.index.memory_usage_mb:.2f}MB. Error: {e}"
+                f"Error: {e}"
             ) from e
 
     def _load_index_from_data(self, index_data: SemanticIndex) -> None:
@@ -1061,7 +1071,9 @@ class SemanticSearch:
             self.sentence_embeddings = safe_pickle_loads(embeddings_bytes)
             logger.debug(f"Loaded embeddings: {len(embeddings_bytes) / 1024 / 1024:.2f}MB")
         except Exception as e:
-            raise RuntimeError(f"Corrupted embeddings data for '{self.index.corpus_name}': {e}") from e
+            raise RuntimeError(
+                f"Corrupted embeddings data for '{self.index.corpus_name}': {e}"
+            ) from e
 
         # Load FAISS index - compressed bytes with native serialization only
         if "index_compressed_bytes" not in binary_data:
@@ -1082,7 +1094,7 @@ class SemanticSearch:
             logger.debug(f"Decompressed FAISS index: {len(index_bytes) / 1024 / 1024:.1f}MB")
 
             # Write bytes to temp file and load with FAISS native read
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.faiss') as tmp_file:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".faiss") as tmp_file:
                 tmp_file.write(index_bytes)
                 tmp_path = tmp_file.name
 
@@ -1094,7 +1106,9 @@ class SemanticSearch:
                     os.unlink(tmp_path)
 
         except Exception as e:
-            raise RuntimeError(f"Corrupted FAISS index data for '{self.index.corpus_name}': {e}") from e
+            raise RuntimeError(
+                f"Corrupted FAISS index data for '{self.index.corpus_name}': {e}"
+            ) from e
 
     def _configure_faiss_threading(self) -> None:
         """Configure FAISS OpenMP threading for optimal performance.
@@ -1289,6 +1303,37 @@ class SemanticSearch:
             return min(2048, max(sqrt_n, vocab_size // 50))
         return min(4096, max(sqrt_n * 2, vocab_size // 50))
 
+    def _lookup_vocab_embedding(self, normalized_query: str) -> np.ndarray | None:
+        """Look up pre-computed embedding for in-vocabulary queries.
+
+        Three O(1) lookups: vocabulary_to_index → word_to_lemma_indices → sentence_embeddings.
+        Returns None for out-of-vocabulary queries (which fall through to transformer encoding).
+        """
+        if self.corpus is None or self.sentence_embeddings is None:
+            return None
+
+        # Corpus vocabulary_to_index uses batch_normalize (lowercased) keys,
+        # but semantic search() only does query.strip(). Lowercase here to match.
+        lookup_key = normalized_query.lower()
+
+        # O(1) dict lookup: normalized word → vocabulary index
+        word_idx = self.corpus.vocabulary_to_index.get(lookup_key)
+        if word_idx is None:
+            return None
+
+        # O(1) dict lookup: word index → lemma index
+        lemma_idx = self.corpus.word_to_lemma_indices.get(word_idx)
+        if lemma_idx is None:
+            return None
+
+        # O(1) array access: lemma index → pre-computed embedding
+        # variant_mapping is embedding_idx→lemma_idx, but currently always identity.
+        # Use lemma_idx directly as embedding index (embeddings are stored in lemma order).
+        if lemma_idx < 0 or lemma_idx >= len(self.sentence_embeddings):
+            return None
+
+        return self.sentence_embeddings[lemma_idx]
+
     async def search(
         self,
         query: str,
@@ -1329,8 +1374,12 @@ class SemanticSearch:
             if cached_results is not None:
                 return cached_results
 
-            # Check embedding cache
-            query_embedding = self._get_cached_query_embedding(normalized_query)
+            # Fast path: look up pre-computed embedding for in-vocabulary words (~0.001ms)
+            query_embedding = self._lookup_vocab_embedding(normalized_query)
+
+            if query_embedding is None:
+                # Check embedding cache
+                query_embedding = self._get_cached_query_embedding(normalized_query)
 
             if query_embedding is None:
                 # Cache miss - generate embedding asynchronously (releases GIL)
@@ -1347,7 +1396,7 @@ class SemanticSearch:
             distances, indices = await asyncio.to_thread(
                 self.sentence_index.search,
                 query_embedding.astype("float32").reshape(1, -1),
-                max_results * 2,  # Get extra results for filtering
+                max_results + min(max_results, 10),  # Adaptive buffer for score filtering
             )
 
             # Convert distances to similarity scores (1 - normalized_distance)
@@ -1368,10 +1417,8 @@ class SemanticSearch:
             results = []
             lemma_to_word_indices = self.corpus.lemma_to_word_indices
 
-            # Get variant mapping from index if available
-            variant_mapping = (
-                {int(k): v for k, v in self.index.variant_mapping.items()} if self.index else {}
-            )
+            # Get variant mapping from index if available (already int→int)
+            variant_mapping = self.index.variant_mapping if self.index else {}
 
             for embedding_idx, similarity in zip(
                 valid_embedding_indices,
@@ -1461,7 +1508,7 @@ class SemanticSearch:
 
         return {
             "initialized": self.sentence_index is not None,
-            "vocabulary_size": len(self.index.lemmatized_vocabulary),
+            "vocabulary_size": self.index.num_embeddings,
             "embedding_dim": self.index.embedding_dimension,
             "model_name": self.index.model_name,
             "corpus_name": self.index.corpus_name,
