@@ -228,9 +228,6 @@ class TestMongoDBVersioning:
                 ),
                 vocabulary_hash="vocab_hash",
                 corpus_uuid=corpus.uuid,
-                has_trie=True,
-                has_fuzzy=True,
-                has_semantic=False,
                 content_inline={"config": {"min_score": 0.5}},
             )
         )
@@ -369,11 +366,6 @@ class TestMongoDBVersioning:
                 ),
                 vocabulary_hash="vocab_hash",
                 corpus_uuid=corpus_uuid,
-                has_trie=True,
-                has_fuzzy=True,
-                has_semantic=True,
-                trie_index_id=PydanticObjectId(),
-                semantic_index_id=PydanticObjectId(),
                 content_inline={
                     "config": {
                         "min_score": 0.5,
@@ -385,7 +377,6 @@ class TestMongoDBVersioning:
         )
 
         assert search.id is not None
-        assert search.has_trie and search.has_fuzzy and search.has_semantic
 
         # Update with new component versions
         updated_search = await version_manager.save_versioned_data(
@@ -401,11 +392,6 @@ class TestMongoDBVersioning:
                 ),
                 vocabulary_hash="vocab_hash_2",
                 corpus_uuid=corpus_uuid,
-                has_trie=True,
-                has_fuzzy=True,
-                has_semantic=True,
-                trie_index_id=PydanticObjectId(),  # New component version
-                semantic_index_id=PydanticObjectId(),  # New component version
                 content_inline={
                     "config": {
                         "min_score": 0.6,  # Updated config

@@ -146,9 +146,6 @@ class TestCrashRecovery:
             corpus_uuid=test_corpus.corpus_uuid,
             corpus_name=test_corpus.corpus_name,
             vocabulary_hash=test_corpus.vocabulary_hash,
-            has_trie=True,
-            has_fuzzy=True,
-            has_semantic=False,
             trie_index_id=PydanticObjectId(),  # Reference to non-existent trie
         )
 

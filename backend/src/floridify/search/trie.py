@@ -81,7 +81,7 @@ class TrieSearch:
         self._load_from_index()
 
     def _load_from_index(self) -> None:
-        """Load trie from the index model and build Bloom filter."""
+        """Load trie from the index model. Restore persisted Bloom filter or rebuild."""
         if not self.index or not self.index.trie_data:
             return
 
@@ -89,30 +89,45 @@ class TrieSearch:
         self._trie = marisa_trie.Trie(self.index.trie_data)
         logger.debug(f"Loaded trie with {self.index.word_count} words")
 
-        # CRITICAL FIX: Build Bloom filter with adaptive error rate based on corpus size
-        # Larger corpora use higher error rates to save memory while maintaining good performance
-        # Small (<10k): 0.001 (0.1%) - high accuracy, minimal memory savings
-        # Medium (10k-100k): 0.01 (1%) - balanced accuracy/memory
-        # Large (>100k): 0.05 (5%) - memory-efficient, still 95% accurate
         from .bloom import BloomFilter
 
+        # Try to restore persisted Bloom filter
+        if self.index.bloom_bits and self.index.bloom_num_bits > 0:
+            bloom = BloomFilter.__new__(BloomFilter)
+            bloom.capacity = self.index.word_count
+            bloom.error_rate = self.index.bloom_error_rate
+            bloom.bit_count = self.index.bloom_num_bits
+            bloom.hash_count = self.index.bloom_num_hashes
+            bloom.bits = bytearray(self.index.bloom_bits)
+            bloom.item_count = self.index.bloom_count
+            self._bloom_filter = bloom
+            logger.debug(f"Restored persisted Bloom filter ({len(bloom.bits)} bytes)")
+            return
+
+        # No persisted data — build from scratch
         word_count = self.index.word_count
         if word_count < 10000:
-            error_rate = 0.001  # High accuracy for small corpora
+            error_rate = 0.001
         elif word_count < 100000:
-            error_rate = 0.01  # Balanced for medium corpora
+            error_rate = 0.01
         else:
-            error_rate = 0.05  # Memory-efficient for large corpora
+            error_rate = 0.05
 
         self._bloom_filter = BloomFilter(capacity=word_count, error_rate=error_rate)
         self._bloom_filter.add_many(self.index.trie_data)
+
+        # Persist into index for next load
+        self.index.bloom_bits = bytes(self._bloom_filter.bits)
+        self.index.bloom_num_bits = self._bloom_filter.bit_count
+        self.index.bloom_num_hashes = self._bloom_filter.hash_count
+        self.index.bloom_count = self._bloom_filter.item_count
+        self.index.bloom_error_rate = self._bloom_filter.error_rate
 
         bloom_stats = self._bloom_filter.get_stats()
         logger.debug(
             f"Built Bloom filter: {bloom_stats['memory_bytes'] // 1024}KB "
             f"({bloom_stats['fill_rate'] * 100:.1f}% full, "
-            f"~{bloom_stats['estimated_error_rate'] * 100:.2f}% FP rate, "
-            f"target={error_rate * 100:.1f}%)"
+            f"~{bloom_stats['estimated_error_rate'] * 100:.2f}% FP rate)"
         )
 
     def search_exact(self, query: str) -> str | None:

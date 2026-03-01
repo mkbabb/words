@@ -152,7 +152,7 @@ async def mongodb_client(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClie
         client.close()
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def mongodb_client_session(mongodb_server: str) -> AsyncGenerator[AsyncIOMotorClient]:
     """Create session-scoped MongoDB client for expensive setup (like semantic indices)."""
     client = AsyncIOMotorClient(mongodb_server, serverSelectionTimeoutMS=500)
@@ -185,7 +185,7 @@ async def test_db(mongodb_client: AsyncIOMotorClient):
     await mongodb_client.drop_database(db_name)
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def test_db_session(mongodb_client_session: AsyncIOMotorClient):
     """Create session-scoped test database for expensive setup (like semantic indices).
 

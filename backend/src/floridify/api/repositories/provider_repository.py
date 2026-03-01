@@ -197,19 +197,24 @@ class ProviderDataRepository(
         if not data:
             return False
 
-        # Unmark current latest
-        await self.model.find(
+        # Atomic: unmark all others then mark target in a single bulk write
+        from ..core.query import BulkOperationBuilder
+
+        bulk = BulkOperationBuilder(self.model)
+        bulk.update_many(
             {
                 "word_id": data.word_id,
                 "provider": data.provider,
                 "version_info.is_latest": True,
                 "_id": {"$ne": data_id},
             },
-        ).update_many({"$set": {"version_info.is_latest": False}})
-
-        # Mark this as latest
-        data.version_info.is_latest = True
-        await data.save()
+            {"$set": {"version_info.is_latest": False}},
+        )
+        bulk.update_one(
+            {"_id": data_id},
+            {"$set": {"version_info.is_latest": True}},
+        )
+        await bulk.execute()
 
         return True
 
@@ -232,39 +237,40 @@ class ProviderDataRepository(
         """
         cutoff_date = datetime.now(UTC) - timedelta(days=older_than_days)
 
-        # Get all words with this provider
+        # Use aggregation to find deletable version IDs in a single query
         pipeline = [
             {"$match": {"provider": provider}},
-            {"$group": {"_id": "$word_id"}},
+            {"$sort": {"created_at": -1}},
+            {
+                "$group": {
+                    "_id": "$word_id",
+                    "versions": {"$push": {"id": "$_id", "created_at": "$created_at"}},
+                }
+            },
+            {
+                "$project": {
+                    "to_delete": {
+                        "$filter": {
+                            "input": {
+                                "$slice": ["$versions", keep_versions, {"$size": "$versions"}]
+                            },
+                            "as": "v",
+                            "cond": {"$lt": ["$$v.created_at", cutoff_date]},
+                        }
+                    }
+                }
+            },
+            {"$unwind": "$to_delete"},
+            {"$group": {"_id": None, "ids": {"$push": "$to_delete.id"}}},
         ]
 
-        word_ids = await self.model.aggregate(pipeline).to_list()
-        total_deleted = 0
+        results = await self.model.aggregate(pipeline).to_list()
+        if not results or not results[0].get("ids"):
+            return 0
 
-        for word_doc in word_ids:
-            word_id = word_doc["_id"]
-
-            # Get all versions for this word, sorted by date
-            versions = (
-                await self.model.find(
-                    {"word_id": word_id, "provider": provider},
-                )
-                .sort("-created_at")
-                .to_list()
-            )
-
-            # Keep the latest N versions and any recent ones
-            to_delete = []
-            for idx, version in enumerate(versions):
-                if idx >= keep_versions and version.created_at < cutoff_date:
-                    to_delete.append(version.id)
-
-            # Delete old versions
-            if to_delete:
-                result = await self.model.find(
-                    {"_id": {"$in": to_delete}},
-                ).delete()
-                total_deleted += result.deleted_count
+        ids_to_delete = results[0]["ids"]
+        result = await self.model.find({"_id": {"$in": ids_to_delete}}).delete()
+        total_deleted = result.deleted_count if result else 0
 
         logger.info(f"Cleaned up {total_deleted} old versions for {provider.value}")
         return total_deleted

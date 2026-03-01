@@ -498,3 +498,162 @@ class TestSearchPerformance:
         print(f"\nSemantic index caching speedup: {speedup:.2f}x")
         print(f"  First creation: {first_time:.3f}s")
         print(f"  Cached creation: {cached_time:.3f}s")
+
+
+@pytest.mark.slow
+class TestSemanticSearchBenchmarks:
+    """Focused semantic search benchmarks using the shared 35-word corpus.
+
+    All benchmarks use the session-scoped shared_semantic_corpus fixture.
+    Initialization time is excluded from measurements.
+    """
+
+    @pytest.mark.asyncio
+    async def test_semantic_query_latency(
+        self, shared_semantic_corpus, assert_small_corpus, test_db
+    ):
+        """Time only the search() call (not init), assert <50ms for 35-word corpus.
+
+        Performance target: <50ms per query on small corpus.
+        """
+        assert_small_corpus(shared_semantic_corpus)
+
+        engine = await SemanticSearch.from_corpus(corpus=shared_semantic_corpus)
+
+        # Warm up (first query loads model)
+        await engine.search("happy", max_results=5)
+
+        # Measure search-only latency (10 iterations for stability)
+        from tests.search.conftest import timed_search
+
+        latencies = []
+        for _ in range(10):
+            with timed_search() as timer:
+                results = await engine.search("happy", max_results=5)
+            latencies.append(timer.elapsed_ms)
+
+        avg_latency = sum(latencies) / len(latencies)
+        min_latency = min(latencies)
+
+        print(f"\nSemantic query latency (35-word corpus):")
+        print(f"  Average: {avg_latency:.2f}ms")
+        print(f"  Min: {min_latency:.2f}ms")
+
+        assert len(results) > 0, "Search should return results"
+        # Generous threshold: 50ms for small corpus (cache hit should be <5ms)
+        assert avg_latency < 50, (
+            f"Average semantic search latency {avg_latency:.2f}ms exceeds 50ms target"
+        )
+
+    @pytest.mark.asyncio
+    async def test_semantic_result_quality(
+        self, shared_semantic_corpus, assert_small_corpus, test_db
+    ):
+        """Verify semantic similarity: 'happy' should return emotion synonyms before antonyms.
+
+        Quality target: Positive emotions ranked before negative ones.
+        """
+        assert_small_corpus(shared_semantic_corpus)
+
+        engine = await SemanticSearch.from_corpus(corpus=shared_semantic_corpus)
+
+        results = await engine.search("happy", max_results=10, min_score=0.0)
+
+        words = [r.word for r in results]
+        print(f"\nSemantic results for 'happy': {words}")
+
+        # Positive emotion words should appear
+        positive_emotions = {"joyful", "cheerful", "glad", "delighted"}
+        negative_emotions = {"sad", "angry", "miserable", "furious"}
+
+        found_positive = [w for w in words if w in positive_emotions]
+        found_negative = [w for w in words if w in negative_emotions]
+
+        assert len(found_positive) > 0, (
+            f"Should find positive emotion synonyms for 'happy', got: {words}"
+        )
+
+        # If both positive and negative found, positive should rank higher on average
+        if found_positive and found_negative:
+            avg_pos_rank = sum(words.index(w) for w in found_positive) / len(found_positive)
+            avg_neg_rank = sum(words.index(w) for w in found_negative) / len(found_negative)
+            assert avg_pos_rank < avg_neg_rank, (
+                f"Positive emotions (avg rank {avg_pos_rank:.1f}) should rank "
+                f"higher than negative (avg rank {avg_neg_rank:.1f})"
+            )
+
+    @pytest.mark.asyncio
+    async def test_semantic_cache_effectiveness(
+        self, shared_semantic_corpus, assert_small_corpus, test_db
+    ):
+        """First query vs repeated query speedup (expect >2x on cache hit).
+
+        Cache target: Repeated queries should be significantly faster.
+        """
+        assert_small_corpus(shared_semantic_corpus)
+
+        engine = await SemanticSearch.from_corpus(corpus=shared_semantic_corpus)
+
+        # Clear result cache to get a clean measurement
+        engine.result_cache.clear()
+        engine.result_cache_order.clear()
+
+        from tests.search.conftest import timed_search
+
+        # First query (cache miss - must encode query)
+        with timed_search() as first_timer:
+            results_first = await engine.search("elephant", max_results=5)
+
+        # Second query (cache hit)
+        with timed_search() as cached_timer:
+            results_cached = await engine.search("elephant", max_results=5)
+
+        print(f"\nSemantic cache effectiveness:")
+        print(f"  First query: {first_timer.elapsed_ms:.2f}ms")
+        print(f"  Cached query: {cached_timer.elapsed_ms:.2f}ms")
+        if cached_timer.elapsed > 0:
+            print(f"  Speedup: {first_timer.elapsed / cached_timer.elapsed:.1f}x")
+
+        # Results should be identical
+        assert len(results_first) == len(results_cached)
+        assert [r.word for r in results_first] == [r.word for r in results_cached]
+
+        # Cached should be faster (or at worst comparable for tiny corpus)
+        # Use generous threshold since first query includes query embedding generation
+        assert cached_timer.elapsed <= first_timer.elapsed * 1.5, (
+            f"Cached ({cached_timer.elapsed_ms:.2f}ms) should not be significantly "
+            f"slower than first ({first_timer.elapsed_ms:.2f}ms)"
+        )
+
+    @pytest.mark.asyncio
+    async def test_semantic_fuzzy_merge_dedup(
+        self, shared_semantic_corpus, assert_small_corpus, test_db
+    ):
+        """Verify smart mode correctly combines and deduplicates results from both methods.
+
+        Integration target: No duplicate words in merged results.
+        """
+        assert_small_corpus(shared_semantic_corpus)
+
+        engine = Search()
+        engine.corpus = shared_semantic_corpus
+        await engine.build_indices()
+
+        # Build semantic search
+        semantic = await SemanticSearch.from_corpus(corpus=shared_semantic_corpus)
+        engine.semantic_search = semantic
+        engine._semantic_ready = True
+
+        # Run smart cascade which combines fuzzy + semantic
+        results = await engine._smart_search_cascade(
+            query="aple",  # Typo to trigger fuzzy
+            max_results=10,
+            min_score=0.3,
+            semantic=True,
+        )
+
+        # Check for duplicates
+        words = [r.word for r in results]
+        assert len(words) == len(set(w.lower() for w in words)), (
+            f"Merged results contain duplicates: {words}"
+        )

@@ -102,15 +102,20 @@ class ExampleRepository(BaseRepository[Example, ExampleCreate, ExampleUpdate]):
         return await Example.find(query).to_list()
 
     async def update_quality_scores(self, scores: list[tuple[PydanticObjectId, float]]) -> int:
-        """Batch update quality scores."""
-        updated = 0
+        """Batch update quality scores using bulk operations."""
+        if not scores:
+            return 0
+
+        from ..core.query import BulkOperationBuilder
+
+        bulk = BulkOperationBuilder(Example)
         for example_id, score in scores:
-            example = await self.get(example_id, raise_on_missing=False)
-            if example:
-                example.quality_score = score
-                await example.save()
-                updated += 1
-        return updated
+            bulk.update_one(
+                {"_id": example_id},
+                {"$set": {"quality_score": score}},
+            )
+        result = await bulk.execute()
+        return result.get("modifiedCount", 0)
 
     async def _cascade_delete(self, example: Example) -> None:
         """No cascade needed for examples."""

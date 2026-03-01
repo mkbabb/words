@@ -20,7 +20,6 @@ from ..caching.models import (
     VersionConfig,
 )
 from ..corpus.core import Corpus
-from ..corpus.utils import get_vocabulary_hash
 from ..models.base import Language
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod
@@ -94,9 +93,20 @@ class TrieIndex(BaseModel):
     normalized_to_original: dict[str, str] = Field(default_factory=dict)
 
     # Statistics
-    word_count: int = 0
     max_frequency: int = 0
     build_time_seconds: float = 0.0
+
+    # Persisted Bloom filter (avoids rebuilding on every load)
+    bloom_bits: bytes | None = Field(default=None, exclude=True)
+    bloom_num_bits: int = 0
+    bloom_num_hashes: int = 0
+    bloom_count: int = 0
+    bloom_error_rate: float = 0.01
+
+    @property
+    def word_count(self) -> int:
+        """Computed from trie_data length."""
+        return len(self.trie_data)
 
     class Metadata(
         BaseVersionedData,
@@ -155,7 +165,9 @@ class TrieIndex(BaseModel):
             from ..corpus.manager import get_tree_corpus_manager
 
             corpus_manager = get_tree_corpus_manager()
-            corpus = await corpus_manager.get_corpus(corpus_name=corpus_name, config=effective_config)
+            corpus = await corpus_manager.get_corpus(
+                corpus_name=corpus_name, config=effective_config
+            )
             if not corpus or not corpus.corpus_uuid:
                 return None
             resource_id = f"{corpus.corpus_uuid}:trie"
@@ -231,11 +243,10 @@ class TrieIndex(BaseModel):
             corpus_uuid=corpus.corpus_uuid,
             corpus_name=corpus.corpus_name,
             vocabulary_hash=corpus.vocabulary_hash,
-            trie_data=sorted(corpus.vocabulary),  # Sorted for marisa-trie
+            trie_data=list(corpus.vocabulary),  # Already sorted by Corpus.create()
             word_frequencies=word_frequencies,
             original_vocabulary=corpus.original_vocabulary,
             normalized_to_original=normalized_to_original,
-            word_count=len(corpus.vocabulary),
             max_frequency=max_frequency,
             build_time_seconds=build_time,
         )
@@ -364,14 +375,23 @@ class SearchIndex(BaseModel):
     trie_index_id: PydanticObjectId | None = None
     semantic_index_id: PydanticObjectId | None = None
 
-    # Component states
-    has_trie: bool = False
-    has_fuzzy: bool = False
-    has_semantic: bool = False
-
     # Statistics
     vocabulary_size: int = 0
-    total_indices: int = 0
+
+    @property
+    def has_trie(self) -> bool:
+        """Whether a trie index exists (computed from ID)."""
+        return self.trie_index_id is not None
+
+    @property
+    def has_semantic(self) -> bool:
+        """Whether a semantic index exists (computed from ID)."""
+        return self.semantic_index_id is not None
+
+    @property
+    def has_fuzzy(self) -> bool:
+        """Fuzzy search is always available when trie is built."""
+        return self.has_trie
 
     class Metadata(
         BaseVersionedData,
@@ -388,11 +408,6 @@ class SearchIndex(BaseModel):
 
         corpus_uuid: str
         vocabulary_hash: str = ""
-        has_trie: bool = False
-        has_fuzzy: bool = False
-        has_semantic: bool = False
-        trie_index_id: PydanticObjectId | None = None
-        semantic_index_id: PydanticObjectId | None = None
 
     @classmethod
     async def get(
@@ -435,7 +450,9 @@ class SearchIndex(BaseModel):
             from ..corpus.manager import get_tree_corpus_manager
 
             corpus_manager = get_tree_corpus_manager()
-            corpus = await corpus_manager.get_corpus(corpus_name=corpus_name, config=effective_config)
+            corpus = await corpus_manager.get_corpus(
+                corpus_name=corpus_name, config=effective_config
+            )
             if not corpus or not corpus.corpus_uuid:
                 logger.warning(f"Corpus '{corpus_name}' not found or missing uuid")
                 return None
@@ -489,14 +506,11 @@ class SearchIndex(BaseModel):
         return cls(
             corpus_uuid=corpus.corpus_uuid,
             corpus_name=corpus.corpus_name,
-            vocabulary_hash=get_vocabulary_hash(corpus.vocabulary),
+            vocabulary_hash=corpus.vocabulary_hash,
             min_score=min_score,
             semantic_enabled=semantic,
             semantic_model=semantic_model or _get_default_semantic_model(),
             vocabulary_size=len(corpus.vocabulary),
-            has_trie=True,  # Always build trie for exact/prefix search
-            has_fuzzy=True,  # Always enable fuzzy
-            has_semantic=semantic,
         )
 
     @classmethod
@@ -528,11 +542,10 @@ class SearchIndex(BaseModel):
                 corpus_name=corpus.corpus_name,
                 config=config,
             )
-            if existing and existing.vocabulary_hash == get_vocabulary_hash(corpus.vocabulary):
+            if existing and existing.vocabulary_hash == corpus.vocabulary_hash:
                 # Upgrade semantic if requested but not currently enabled
                 if semantic and not existing.semantic_enabled:
                     existing.semantic_enabled = True
-                    existing.has_semantic = True
                     await existing.save(config)
                 return existing
         except RuntimeError as e:
@@ -578,13 +591,6 @@ class SearchIndex(BaseModel):
                 metadata={
                     "corpus_uuid": self.corpus_uuid,
                     "vocabulary_hash": self.vocabulary_hash,
-                    "has_trie": self.has_trie,
-                    "has_fuzzy": self.has_fuzzy,
-                    "has_semantic": self.has_semantic,
-                    "trie_index_id": str(self.trie_index_id) if self.trie_index_id else None,
-                    "semantic_index_id": str(self.semantic_index_id)
-                    if self.semantic_index_id
-                    else None,
                 },
             )
 
@@ -599,9 +605,9 @@ class SearchIndex(BaseModel):
                 )
 
             # Verify component references are intact
-            if self.has_trie and saved.trie_index_id != self.trie_index_id:
+            if self.trie_index_id and saved.trie_index_id != self.trie_index_id:
                 raise ValueError("Trie index reference mismatch after save")
-            if self.has_semantic and saved.semantic_index_id != self.semantic_index_id:
+            if self.semantic_index_id and saved.semantic_index_id != self.semantic_index_id:
                 raise ValueError("Semantic index reference mismatch after save")
 
             logger.info(f"Successfully saved and verified search index for {resource_id}")
@@ -633,7 +639,7 @@ class SearchIndex(BaseModel):
         )
 
         # Step 1: Delete TrieIndex if it exists
-        if self.has_trie and self.trie_index_id:
+        if self.trie_index_id:
             try:
                 logger.info(f"Deleting TrieIndex {self.trie_index_id}...")
                 trie_index = await TrieIndex.get(corpus_uuid=self.corpus_uuid)
@@ -648,7 +654,7 @@ class SearchIndex(BaseModel):
                 # Continue with deletion even if TrieIndex deletion fails
 
         # Step 2: Delete SemanticIndex if it exists
-        if self.has_semantic and self.semantic_index_id:
+        if self.semantic_index_id:
             try:
                 logger.info(f"Deleting SemanticIndex {self.semantic_index_id}...")
                 from ..search.semantic.models import SemanticIndex
@@ -702,4 +708,3 @@ __all__ = [
     "SearchResult",
     "TrieIndex",
 ]
-

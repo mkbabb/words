@@ -30,7 +30,7 @@ from floridify.search.core import Search
 from floridify.search.models import SearchIndex
 from floridify.search.semantic.core import SemanticSearch
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def shared_semantic_corpus(test_db_session):
     """Session-scoped corpus with pre-built semantic index.
 
@@ -220,3 +220,51 @@ async def await_semantic_ready(engine: Search, timeout: float = 60.0) -> None:
 async def semantic_ready_helper():
     """Provide helper function to wait for semantic initialization."""
     return await_semantic_ready
+
+
+# --- Phase 6 additions: Benchmark guardrails and utilities ---
+
+import time
+from contextlib import contextmanager
+
+
+@contextmanager
+def timed_search():
+    """Context manager that measures only search execution time, excluding initialization.
+
+    Usage:
+        with timed_search() as timer:
+            results = engine.search_exact("apple")
+        print(f"Search took {timer.elapsed_ms:.2f}ms")
+    """
+
+    class Timer:
+        def __init__(self):
+            self.elapsed: float = 0.0
+
+        @property
+        def elapsed_ms(self) -> float:
+            return self.elapsed * 1000
+
+    timer = Timer()
+    start = time.perf_counter()
+    yield timer
+    timer.elapsed = time.perf_counter() - start
+
+
+@pytest.fixture
+def assert_small_corpus():
+    """Fixture that asserts no corpus larger than 200 words is used in semantic tests.
+
+    Use this in semantic benchmark tests to prevent accidentally triggering
+    production-scale embedding generation.
+    """
+
+    def _assert(corpus):
+        assert len(corpus.vocabulary) <= 200, (
+            f"Semantic benchmark test uses corpus with {len(corpus.vocabulary)} words. "
+            f"Maximum allowed is 200 to prevent slow embedding generation in tests. "
+            f"Use the shared_semantic_corpus fixture (35 words) instead."
+        )
+
+    return _assert

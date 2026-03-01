@@ -95,12 +95,6 @@ DEFAULT_CONFIGS: dict[CacheNamespace, NamespaceCacheConfig] = {
         disk_ttl=timedelta(hours=24),
         compression=CompressionType.ZSTD,
     ),
-    CacheNamespace.API: NamespaceCacheConfig(
-        namespace=CacheNamespace.API,
-        memory_limit=100,
-        memory_ttl=timedelta(hours=1),
-        disk_ttl=timedelta(hours=12),
-    ),
     CacheNamespace.LANGUAGE: NamespaceCacheConfig(
         namespace=CacheNamespace.LANGUAGE,
         memory_limit=100,
@@ -115,12 +109,6 @@ DEFAULT_CONFIGS: dict[CacheNamespace, NamespaceCacheConfig] = {
         disk_ttl=timedelta(days=7),
         compression=CompressionType.ZSTD,
     ),
-    CacheNamespace.LEXICON: NamespaceCacheConfig(
-        namespace=CacheNamespace.LEXICON,
-        memory_limit=100,
-        memory_ttl=timedelta(days=7),
-        disk_ttl=timedelta(days=30),
-    ),
     CacheNamespace.WOTD: NamespaceCacheConfig(
         namespace=CacheNamespace.WOTD,
         memory_limit=50,
@@ -128,6 +116,10 @@ DEFAULT_CONFIGS: dict[CacheNamespace, NamespaceCacheConfig] = {
         disk_ttl=timedelta(days=7),
     ),
 }
+
+# Namespace aliases: API uses DEFAULT config, LEXICON uses LANGUAGE config
+DEFAULT_CONFIGS[CacheNamespace.API] = DEFAULT_CONFIGS[CacheNamespace.DEFAULT]
+DEFAULT_CONFIGS[CacheNamespace.LEXICON] = DEFAULT_CONFIGS[CacheNamespace.LANGUAGE]
 
 # String -> CacheNamespace mapping (all 13 namespaces + legacy aliases)
 NAMESPACE_MAP: dict[str, CacheNamespace] = {

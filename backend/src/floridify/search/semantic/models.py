@@ -50,10 +50,11 @@ class SemanticIndex(BaseModel):
     # These fields are removed to prevent double storage and MongoDB size issues
     # Data is accessed via get_versioned_content() from the metadata object
 
-    # Vocabulary and mappings
-    vocabulary: list[str] = Field(default_factory=list)
-    lemmatized_vocabulary: list[str] = Field(default_factory=list)
-    variant_mapping: dict[str, int] = Field(default_factory=dict)  # embedding idx -> lemma idx
+    # Vocabulary reference (hash check instead of duplicating full lists from Corpus)
+    # Full vocabulary and lemmatized_vocabulary are loaded from Corpus when needed
+    variant_mapping: dict[int, int] = Field(
+        default_factory=dict
+    )  # embedding idx -> lemma idx (int keys)
     lemma_to_embeddings: dict[str, list[int]] = Field(
         default_factory=dict,
     )  # lemma idx -> embedding idxs
@@ -66,8 +67,6 @@ class SemanticIndex(BaseModel):
     num_embeddings: int = 0
     embedding_dimension: int = 0
     build_time_seconds: float = 0.0
-    memory_usage_mb: float = 0.0
-    embeddings_per_second: float = 0.0
 
     # CRITICAL FIX: Binary data storage field
     # This field holds embeddings and FAISS index data (bytes or base64 strings)
@@ -218,8 +217,6 @@ class SemanticIndex(BaseModel):
             vocabulary_hash=corpus.vocabulary_hash,
             model_name=model_name,
             batch_size=batch_size,
-            vocabulary=corpus.vocabulary,
-            lemmatized_vocabulary=corpus.lemmatized_vocabulary,
         )
 
     @classmethod
@@ -349,7 +346,7 @@ class SemanticIndex(BaseModel):
                     versioned.resource_type,
                     versioned.resource_id,
                     "content",
-                    versioned.version_info.data_hash[:8]
+                    versioned.version_info.data_hash[:8],
                 )
 
                 # Merge binary data with content - diskcache will pickle the bytes directly
@@ -360,7 +357,9 @@ class SemanticIndex(BaseModel):
                 if isinstance(namespace, str):
                     namespace = CacheNamespace(namespace)
 
-                logger.info(f"Storing large binary data to cache for {resource_id} (pickle will handle bytes)")
+                logger.info(
+                    f"Storing large binary data to cache for {resource_id} (pickle will handle bytes)"
+                )
                 await cache.set(
                     namespace=namespace,
                     key=cache_key,
@@ -476,5 +475,3 @@ class SemanticIndex(BaseModel):
     def model_load(cls, data: dict[str, Any]) -> SemanticIndex:
         """Deserialize index from cached dictionary."""
         return cls.model_validate(data)
-
-

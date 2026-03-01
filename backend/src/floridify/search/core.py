@@ -63,7 +63,9 @@ class Search:
         # Track semantic initialization separately with proper synchronization
         self._semantic_ready = False
         self._semantic_init_task: asyncio.Task[None] | None = None
-        self._semantic_init_lock: asyncio.Lock = asyncio.Lock()  # CRITICAL FIX: Prevent race conditions
+        self._semantic_init_lock: asyncio.Lock = (
+            asyncio.Lock()
+        )  # CRITICAL FIX: Prevent race conditions
         self._semantic_init_error: str | None = None  # Track initialization errors
 
         self._initialized = False
@@ -212,7 +214,6 @@ class Search:
 
             # Restore semantic settings after rebuild
             self.index.semantic_enabled = semantic_was_enabled
-            self.index.has_semantic = semantic_was_enabled
 
             # Save updated index
             # PATHOLOGICAL REMOVAL: No hasattr - direct method call
@@ -225,7 +226,9 @@ class Search:
                 logger.info("Re-initializing semantic search after vocabulary rebuild")
                 async with self._semantic_init_lock:
                     if not self._semantic_ready and self._semantic_init_task is None:
-                        self._semantic_init_task = asyncio.create_task(self._initialize_semantic_background())
+                        self._semantic_init_task = asyncio.create_task(
+                            self._initialize_semantic_background()
+                        )
 
             return  # Skip rest of initialization since build_indices() already did it
 
@@ -248,7 +251,9 @@ class Search:
             async with self._semantic_init_lock:
                 # Double-check after acquiring lock
                 if not self._semantic_ready and self._semantic_init_task is None:
-                    self._semantic_init_task = asyncio.create_task(self._initialize_semantic_background())
+                    self._semantic_init_task = asyncio.create_task(
+                        self._initialize_semantic_background()
+                    )
 
         self._initialized = True
 
@@ -425,18 +430,17 @@ class Search:
                 corpus_uuid=self.corpus.corpus_uuid or "",  # Use empty string if None
                 vocabulary_hash=self.corpus.vocabulary_hash,
                 min_score=DEFAULT_MIN_SCORE,
-                has_trie=True,
-                has_fuzzy=True,
                 semantic_enabled=False,
             )
 
         # Build trie index
         self.trie_search = await TrieSearch.from_corpus(self.corpus)
-        self.index.has_trie = True
+        # Store trie index ID reference
+        if self.trie_search.index:
+            self.index.trie_index_id = self.trie_search.index.index_id
 
-        # Build fuzzy index
+        # Build fuzzy index (always available when trie is built)
         self.fuzzy_search = FuzzySearch(min_score=self.index.min_score)
-        self.index.has_fuzzy = True
 
         self._initialized = True
 
@@ -513,9 +517,9 @@ class Search:
                     result.word = self._get_original_word(result.word)
                 return results
 
-        # Otherwise use smart mode
+        # Otherwise use smart mode (pass already-normalized query)
         return await self.search_with_mode(
-            query=query,
+            query=normalized_query,
             mode=SearchMode.SMART,
             max_results=max_results,
             min_score=min_score,
@@ -778,36 +782,13 @@ class Search:
         # 2. Fuzzy search (most comprehensive for misspellings)
         fuzzy_results = self.search_fuzzy(query, max_results, min_score)
 
-        # 3. Semantic search - quality-based gating for optimal performance
+        # 3. Semantic search - quality-based gating
         semantic_results = []
-        if semantic:
-            # CRITICAL FIX: In SMART mode, only use semantic if already ready - don't block!
-            # This allows search to return immediately with exact/fuzzy results
-            # while semantic builds in background
-            if self._semantic_ready and self.semantic_search:
-                # Quality-based gating: skip semantic if fuzzy found high-quality results
-                high_quality_fuzzy = [r for r in fuzzy_results if r.score >= 0.7]
-                sufficient_high_quality = len(high_quality_fuzzy) >= max_results // 3
-
-                if sufficient_high_quality:
-                    # Skip semantic - fuzzy found enough high-quality matches
-                    logger.debug(
-                        f"Skipping semantic search: {len(high_quality_fuzzy)} high-quality fuzzy matches (≥0.7 score)"
-                    )
-                elif len(fuzzy_results) >= max_results // 2:
-                    # Fuzzy found results but lower quality - supplement with semantic
-                    semantic_limit = max_results // 2
-                    semantic_results = await self.search_semantic(query, semantic_limit, min_score)
-                    logger.debug(
-                        f"Supplementing {len(fuzzy_results)} fuzzy results with semantic search"
-                    )
-                else:
-                    # Fuzzy struggled - rely on semantic
-                    semantic_limit = max_results
-                    semantic_results = await self.search_semantic(query, semantic_limit, min_score)
-                    logger.debug(
-                        f"Fuzzy found only {len(fuzzy_results)} results, using full semantic search"
-                    )
+        if semantic and self._semantic_ready and self.semantic_search:
+            high_quality = [r for r in fuzzy_results if r.score >= 0.7]
+            semantic_limit = max(0, max_results - len(high_quality))
+            if semantic_limit > 0:
+                semantic_results = await self.search_semantic(query, semantic_limit, min_score)
 
         # 4. Merge and deduplicate with memory-efficient generators
         fuzzy_gen = (r for r in fuzzy_results if r.score >= min_score)
@@ -849,14 +830,15 @@ class Search:
         return normalized_word
 
     def _deduplicate_results(self, results: list[SearchResult]) -> list[SearchResult]:
-        """Remove duplicates, preferring exact matches."""
+        """Remove duplicates, preferring exact matches. Case-insensitive dedup keys."""
         word_to_result: dict[str, SearchResult] = {}
 
         for result in results:
-            if result.word not in word_to_result:
-                word_to_result[result.word] = result
+            key = result.word.lower()
+            if key not in word_to_result:
+                word_to_result[key] = result
             else:
-                existing = word_to_result[result.word]
+                existing = word_to_result[key]
                 # Prefer higher priority methods, then higher scores
                 result_priority = self.METHOD_PRIORITY.get(result.method, 0)
                 existing_priority = self.METHOD_PRIORITY.get(existing.method, 0)
@@ -864,7 +846,7 @@ class Search:
                 if (result_priority > existing_priority) or (
                     result_priority == existing_priority and result.score > existing.score
                 ):
-                    word_to_result[result.word] = result
+                    word_to_result[key] = result
 
         return list(word_to_result.values())
 
