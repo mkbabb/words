@@ -62,16 +62,11 @@ class TestGetSubclassFields:
         assert "resource_type" not in fields
 
     def test_search_index_fields(self):
-        """SearchIndex.Metadata should have 7 specific fields."""
+        """SearchIndex.Metadata should have 2 specific fields."""
         fields = get_subclass_fields(SearchIndex.Metadata, BaseVersionedData)
 
         assert "corpus_uuid" in fields
         assert "vocabulary_hash" in fields
-        assert "has_trie" in fields
-        assert "has_fuzzy" in fields
-        assert "has_semantic" in fields
-        assert "trie_index_id" in fields
-        assert "semantic_index_id" in fields
 
     def test_auto_detect_base_class(self):
         """Should auto-detect BaseVersionedData if base_cls not provided."""
@@ -183,18 +178,12 @@ class TestExtractMetadataParams:
         metadata = {
             "corpus_uuid": "abc",
             "vocabulary_hash": "hash",
-            "has_trie": True,
-            "has_fuzzy": True,
-            "has_semantic": False,
-            "trie_index_id": "trie123",
-            "semantic_index_id": None,
             "custom_metric": 0.95,
         }
 
         typed, generic = extract_metadata_params(metadata, SearchIndex.Metadata)
 
-        assert typed["has_trie"] is True
-        assert typed["has_semantic"] is False
+        assert typed["vocabulary_hash"] == "hash"
         assert "custom_metric" in generic
 
     def test_empty_metadata(self):

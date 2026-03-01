@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from beanie import Document
 from pydantic import Field
+from pymongo import IndexModel
 
 
 class User(Document):
@@ -24,7 +25,7 @@ class User(Document):
     class Settings:
         name = "users"
         indexes = [
-            "clerk_id",
+            IndexModel([("clerk_id", 1)], unique=True),
             "email",
         ]
 

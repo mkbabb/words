@@ -77,7 +77,7 @@ class TestCascadeDeletion:
         # Create SearchIndex that references the TrieIndex
         search_index = await SearchIndex.create(corpus=test_corpus, semantic=False)
         search_index.trie_index_id = trie_index.index_id
-        search_index.has_trie = True
+        # trie_index_id is already set above; has_trie is computed from it
         await search_index.save()
 
         # Verify both exist
@@ -116,7 +116,7 @@ class TestCascadeDeletion:
             semantic_model="all-MiniLM-L6-v2",
         )
         search_index.semantic_index_id = semantic_index.index_id
-        search_index.has_semantic = True
+        # semantic_index_id is already set above; has_semantic is computed from it
         await search_index.save()
 
         # Verify both exist
@@ -165,9 +165,9 @@ class TestCascadeDeletion:
             semantic_model="all-MiniLM-L6-v2",
         )
         search_index.trie_index_id = trie_index.index_id
-        search_index.has_trie = True
+        # trie_index_id is already set above; has_trie is computed from it
         search_index.semantic_index_id = semantic_index.index_id
-        search_index.has_semantic = True
+        # semantic_index_id is already set above; has_semantic is computed from it
         await search_index.save()
 
         # Verify all exist
@@ -255,7 +255,7 @@ class TestCascadeDeletion:
         from beanie import PydanticObjectId
 
         search_index = await SearchIndex.create(corpus=test_corpus, semantic=False)
-        search_index.has_trie = True
+        # trie_index_id is already set above; has_trie is computed from it
         search_index.trie_index_id = PydanticObjectId()  # Fake reference
         await search_index.save()
 
@@ -279,7 +279,7 @@ class TestCascadeDeletion:
             semantic=True,
             semantic_model="all-MiniLM-L6-v2",
         )
-        search_index.has_semantic = True
+        # semantic_index_id is already set above; has_semantic is computed from it
         search_index.semantic_index_id = PydanticObjectId()  # Fake reference
         await search_index.save()
 
@@ -324,9 +324,9 @@ class TestCascadeDeletion:
             semantic_model="all-MiniLM-L6-v2",
         )
         search_index.trie_index_id = trie_index.index_id
-        search_index.has_trie = True
+        # trie_index_id is already set above; has_trie is computed from it
         search_index.semantic_index_id = semantic_index.index_id
-        search_index.has_semantic = True
+        # semantic_index_id is already set above; has_semantic is computed from it
         await search_index.save()
 
         # Delete the corpus

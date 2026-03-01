@@ -468,12 +468,28 @@ class VersionedDataManager:
         # Apply deltas from snapshot toward the target version
         # chain = [target_delta, ..., intermediate_delta, snapshot]
         # We apply deltas from second-to-last back to first
+        chain_length = len(chain) - 1  # Exclude the snapshot itself
         result = dict(snapshot.content_inline)
         for delta_ver in reversed(chain[:-1]):
             if delta_ver.content_inline is None:
                 logger.error(f"Delta v{delta_ver.version_info.version} has no content")
                 return None
             result = apply_delta(result, delta_ver.content_inline)
+
+        # Auto-resnapshot: if chain was long, save reconstructed as new snapshot
+        # to prevent unbounded delta chain traversal on subsequent reads
+        if chain_length > 20:
+            try:
+                delta_version.content_inline = result
+                delta_version.version_info.storage_mode = "snapshot"
+                delta_version.version_info.delta_base_id = None
+                await delta_version.save()
+                logger.info(
+                    f"Auto-resnapshotted v{delta_version.version_info.version} "
+                    f"(chain was {chain_length} deep)"
+                )
+            except Exception as e:
+                logger.warning(f"Auto-resnapshot failed (non-fatal): {e}")
 
         return result
 
@@ -923,12 +939,16 @@ class VersionedDataManager:
             resource_type = group["_id"]["resource_type"]
 
             # Get all versions for this resource, sorted newest first
-            versions = await collection.find(
-                {
-                    "resource_id": resource_id,
-                    "resource_type": resource_type,
-                },
-            ).sort([("version_info.created_at", -1), ("_id", -1)]).to_list(length=None)
+            versions = (
+                await collection.find(
+                    {
+                        "resource_id": resource_id,
+                        "resource_type": resource_type,
+                    },
+                )
+                .sort([("version_info.created_at", -1), ("_id", -1)])
+                .to_list(length=None)
+            )
 
             total_versions = len(versions)
             if total_versions <= keep_minimum:
@@ -988,13 +1008,15 @@ class VersionedDataManager:
             if deleted_count > 0:
                 total_deleted += deleted_count
                 resources_affected += 1
-                details.append({
-                    "resource_id": resource_id,
-                    "resource_type": resource_type,
-                    "versions_before": total_versions,
-                    "versions_deleted": deleted_count,
-                    "versions_after": total_versions - deleted_count,
-                })
+                details.append(
+                    {
+                        "resource_id": resource_id,
+                        "resource_type": resource_type,
+                        "versions_before": total_versions,
+                        "versions_deleted": deleted_count,
+                        "versions_after": total_versions - deleted_count,
+                    }
+                )
 
         return {
             "total_deleted": total_deleted,

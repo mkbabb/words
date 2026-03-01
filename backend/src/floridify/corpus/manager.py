@@ -119,7 +119,9 @@ class TreeCorpusManager:
         """
         # Clean self-references before saving using extracted helper
         # Use UUID for comparison since child_uuids contains UUID strings
-        metadata.child_uuids = self._remove_self_references(metadata.child_uuids, corpus_uuid=metadata.uuid)
+        metadata.child_uuids = self._remove_self_references(
+            metadata.child_uuids, corpus_uuid=metadata.uuid
+        )
 
         await metadata.save()
         return metadata
@@ -190,9 +192,7 @@ class TreeCorpusManager:
             # Preserve is_master flag: use explicit value if provided, otherwise get from corpus
             # PATHOLOGICAL REMOVAL: No getattr - direct attribute access only
             is_master = (
-                is_master
-                if is_master is not None
-                else (corpus.is_master if corpus else False)
+                is_master if is_master is not None else (corpus.is_master if corpus else False)
             )
 
             # Clean self-references from child_uuids immediately using extracted helper
@@ -288,14 +288,16 @@ class TreeCorpusManager:
             if saved_content:
                 # Merge metadata into content - use ENUM OBJECTS, not string values
                 # This ensures Pydantic doesn't need to convert them
-                saved_content.update({
-                    "corpus_name": corpus_name or "",
-                    "corpus_type": corpus_type,  # Pass enum object, not string
-                    "language": language,  # Pass enum object, not string
-                    "parent_uuid": parent_uuid,
-                    "child_uuids": child_uuids if child_uuids is not None else [],
-                    "is_master": is_master if is_master is not None else False,
-                })
+                saved_content.update(
+                    {
+                        "corpus_name": corpus_name or "",
+                        "corpus_type": corpus_type,  # Pass enum object, not string
+                        "language": language,  # Pass enum object, not string
+                        "parent_uuid": parent_uuid,
+                        "child_uuids": child_uuids if child_uuids is not None else [],
+                        "is_master": is_master if is_master is not None else False,
+                    }
+                )
                 # Preserve original corpus_id if updating, otherwise use new ID
                 if corpus_id:
                     # We're updating an existing corpus, preserve its ID
@@ -307,7 +309,9 @@ class TreeCorpusManager:
                 saved_content["corpus_uuid"] = saved.uuid
                 # PATHOLOGICAL REMOVAL: No try/except - let validation errors propagate
                 result = Corpus.model_validate(saved_content)
-                logger.info(f"✅ Saved corpus '{resource_id}' with {len(result.vocabulary):,} words")
+                logger.info(
+                    f"✅ Saved corpus '{resource_id}' with {len(result.vocabulary):,} words"
+                )
                 return result
         logger.warning("save_corpus: saved_content is None, returning None")
         return None
@@ -665,7 +669,6 @@ class TreeCorpusManager:
         # Get child vocabularies recursively in parallel
         child_ids = corpus.child_uuids or []
         if child_ids:
-
             # Fetch all child vocabularies concurrently
             child_vocabs = await asyncio.gather(
                 *[
@@ -699,7 +702,6 @@ class TreeCorpusManager:
         # Update the parent corpus with aggregated vocabulary if requested
         if update_parent and aggregated != corpus.vocabulary:
             corpus.vocabulary = aggregated
-            corpus.unique_word_count = len(aggregated)
             corpus.total_word_count = len(aggregated)
 
             # Update vocabulary stats and indices
@@ -832,7 +834,9 @@ class TreeCorpusManager:
         # BUG FIX: Compare UUID strings, not UUID with ObjectId
         # child.parent_uuid is str, parent.corpus_uuid is str (compatible types)
         if child.parent_uuid != parent.corpus_uuid:
-            logger.info(f"Setting parent UUID {parent.corpus_uuid} (ID: {parent_id}) for child {child_id}")
+            logger.info(
+                f"Setting parent UUID {parent.corpus_uuid} (ID: {parent_id}) for child {child_id}"
+            )
             # Save through save_corpus to create new version - MUST preserve all corpus fields!
             await self.save_corpus(
                 corpus_id=child_id,
@@ -948,7 +952,9 @@ class TreeCorpusManager:
             True if deleted successfully
 
         """
-        corpus = await self.get_corpus(corpus_id=corpus_id, corpus_uuid=corpus_uuid, corpus_name=corpus_name, config=config)
+        corpus = await self.get_corpus(
+            corpus_id=corpus_id, corpus_uuid=corpus_uuid, corpus_name=corpus_name, config=config
+        )
         if not corpus or not corpus.corpus_id:
             return False
 
@@ -1147,7 +1153,9 @@ class TreeCorpusManager:
 
         """
         # Get the parent corpus
-        parent = await self.get_corpus(corpus_id=parent_corpus_id, corpus_uuid=parent_corpus_uuid, config=config)
+        parent = await self.get_corpus(
+            corpus_id=parent_corpus_id, corpus_uuid=parent_corpus_uuid, config=config
+        )
         if not parent:
             return None
 
@@ -1172,7 +1180,6 @@ class TreeCorpusManager:
         # Create a copy of the parent corpus with the aggregated vocabulary
         aggregated_corpus_data = parent.model_dump()
         aggregated_corpus_data["vocabulary"] = aggregated_vocab
-        aggregated_corpus_data["unique_word_count"] = len(aggregated_vocab)
         aggregated_corpus_data["total_word_count"] = len(aggregated_vocab)
 
         # Rebuild vocabulary index
@@ -1295,7 +1302,9 @@ class TreeCorpusManager:
         # Remove from parent's children list (compare UUIDs)
         removed = False
         if child.corpus_uuid in parent.child_uuids:
-            logger.info(f"Removing child UUID {child.corpus_uuid} (ID: {child_id}) from parent {parent_id} children list")
+            logger.info(
+                f"Removing child UUID {child.corpus_uuid} (ID: {child_id}) from parent {parent_id} children list"
+            )
             parent.child_uuids.remove(child.corpus_uuid)
             removed = True
         else:
@@ -1360,5 +1369,3 @@ def get_tree_corpus_manager() -> TreeCorpusManager:
     if _tree_corpus_manager is None:
         _tree_corpus_manager = TreeCorpusManager()
     return _tree_corpus_manager
-
-
