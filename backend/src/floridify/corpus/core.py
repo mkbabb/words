@@ -75,6 +75,7 @@ class Corpus(BaseModel):
 
     # Lemmatization maps
     lemmatized_vocabulary: list[str] = Field(default_factory=list)
+    lemma_text_to_index: dict[str, int] = Field(default_factory=dict)
     word_to_lemma_indices: dict[int, int] = Field(default_factory=dict)
     lemma_to_word_indices: dict[int, list[int]] = Field(default_factory=dict)
 
@@ -86,11 +87,8 @@ class Corpus(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     vocabulary_stats: dict[str, Any] = Field(default_factory=dict)
     vocabulary_hash: str = ""
-    vocabulary_indices: list[int] | None = None
-
     # Sources
     sources: list[str] = Field(default_factory=list)
-    unique_word_count: int = 0
     total_word_count: int = 0
     last_updated: float = Field(default_factory=time.time)
 
@@ -103,6 +101,11 @@ class Corpus(BaseModel):
 
     # Word frequency data
     word_frequencies: dict[str, int] = Field(default_factory=dict)
+
+    @property
+    def unique_word_count(self) -> int:
+        """Computed from vocabulary length."""
+        return len(self.vocabulary)
 
     # Version tracking (populated from metadata when loaded)
     version_info: VersionInfo | None = None
@@ -252,7 +255,6 @@ class Corpus(BaseModel):
             normalized_to_original_indices=normalized_to_original_indices,
             vocabulary_to_index=vocabulary_to_index,
             language=language,
-            unique_word_count=len(unique_normalized),
             total_word_count=len(vocabulary),
             vocabulary_hash=get_vocabulary_hash(unique_normalized),
         )
@@ -319,6 +321,7 @@ class Corpus(BaseModel):
 
         # Clear lemmatization data to force rebuild
         self.lemmatized_vocabulary = []
+        self.lemma_text_to_index = {}
         self.word_to_lemma_indices = {}
         self.lemma_to_word_indices = {}
 
@@ -326,7 +329,6 @@ class Corpus(BaseModel):
         await self._create_unified_indices()
 
         # Update metadata
-        self.unique_word_count = len(self.vocabulary)
         self.vocabulary_hash = get_vocabulary_hash(self.vocabulary)
 
         logger.info(f"Rebuilt indices for corpus {self.corpus_name}")
@@ -352,8 +354,9 @@ class Corpus(BaseModel):
 
         self.lemmatized_vocabulary = unique_lemmas
 
-        # Create lemma index mapping
+        # Create lemma index mapping (persisted for O(1) lookup in get_candidates)
         lemma_to_idx = {lemma: i for i, lemma in enumerate(unique_lemmas)}
+        self.lemma_text_to_index = lemma_to_idx
 
         # Build word-to-lemma and lemma-to-words mappings
         for word_idx, (word, lemma) in enumerate(zip(self.vocabulary, lemmas, strict=False)):
@@ -522,6 +525,10 @@ class Corpus(BaseModel):
     ) -> list[int]:
         """Get candidate word indices for a query.
 
+        Accumulates candidates from ALL four stages (direct, lemma, signature,
+        length buckets). High-priority candidates (stages 1-3) are always kept;
+        length-bucket candidates fill remaining slots up to max_results.
+
         Args:
             query: Search query
             max_results: Maximum number of results
@@ -533,8 +540,6 @@ class Corpus(BaseModel):
             List of vocabulary indices
 
         """
-        candidates = set()
-
         # Handle empty query
         if not query or not query.strip():
             return []
@@ -544,46 +549,68 @@ class Corpus(BaseModel):
             return []
         normalized_query = normalized_queries[0]
 
-        # Direct lookup
-        if normalized_query in self.vocabulary_to_index:
-            candidates.add(self.vocabulary_to_index[normalized_query])
-            if len(candidates) >= max_results:
-                return list(candidates)[:max_results]
+        # High-priority candidates: direct + lemma + signature
+        # These are always kept when truncating to max_results.
+        priority: set[int] = set()
 
-        # Lemma-based lookup
-        if use_lemmas and self.lemmatized_vocabulary:
+        # Stage 1: Direct lookup
+        if normalized_query in self.vocabulary_to_index:
+            priority.add(self.vocabulary_to_index[normalized_query])
+
+        # Stage 2: Lemma-based lookup (O(1) via lemma_text_to_index)
+        if use_lemmas and self.lemma_text_to_index:
             query_lemmas, _, _ = batch_lemmatize([normalized_query])
             query_lemma: str = query_lemmas[0]
 
-            # Find all words with the same lemma
-            for lemma_idx, lemma in enumerate(self.lemmatized_vocabulary):
-                if lemma == query_lemma:
-                    # Add all words that have this lemma
-                    if word_indices := self.lemma_to_word_indices.get(lemma_idx):
-                        candidates.update(word_indices)
-                        if len(candidates) >= max_results:
-                            return list(candidates)[:max_results]
+            lemma_idx = self.lemma_text_to_index.get(query_lemma)
+            if lemma_idx is not None:
+                if word_indices := self.lemma_to_word_indices.get(lemma_idx):
+                    priority.update(word_indices)
 
-        # Signature-based candidates
+        # Stage 3: Signature-based candidates
         if use_signatures and self.signature_buckets:
             query_sig = get_word_signature(normalized_query)
             if query_sig in self.signature_buckets:
-                sig_candidates = self.signature_buckets[query_sig]
-                candidates.update(sig_candidates[:max_results])
-                if len(candidates) >= max_results:
-                    return list(candidates)[:max_results]
+                priority.update(self.signature_buckets[query_sig])
 
-        # Length-based candidates
+        # Stage 4: Length-based candidates (ALWAYS runs — critical for typo correction)
+        # Each individual length bucket (len-1, len, len+1, len-2, len+2, …) is
+        # a separate stream. Round-robin interleaving ensures no single bucket
+        # (e.g. exact-length with 9K+ entries at 278K) drowns out adjacent
+        # buckets where the actual typo target lives.
+        per_bucket_cap = max_results
+        length_streams: list[list[int]] = []
         query_len = len(normalized_query)
         for length_diff in range(length_tolerance + 1):
             for length in [query_len - length_diff, query_len + length_diff]:
                 if length > 0 and length in self.length_buckets:
-                    length_candidates = self.length_buckets[length]
-                    candidates.update(length_candidates)
-                    if len(candidates) >= max_results:
-                        return list(candidates)[:max_results]
+                    bucket = self.length_buckets[length]
+                    length_streams.append(bucket[:per_bucket_cap])
 
-        return list(candidates)[:max_results]
+        # Merge: priority candidates first, then round-robin fill from length streams
+        result = list(priority)[:max_results]
+        if len(result) < max_results and length_streams:
+            remaining = max_results - len(result)
+            seen = set(result)
+            # Round-robin: take one unseen candidate from each stream per round
+            iterators = [iter(s) for s in length_streams]
+            while remaining > 0 and iterators:
+                exhausted = []
+                for i, it in enumerate(iterators):
+                    for idx in it:
+                        if idx not in seen:
+                            result.append(idx)
+                            seen.add(idx)
+                            remaining -= 1
+                            break
+                    else:
+                        exhausted.append(i)
+                    if remaining <= 0:
+                        break
+                for i in reversed(exhausted):
+                    iterators.pop(i)
+
+        return result
 
     def _build_signature_index(self) -> None:
         """Build signature-based index for efficient searching."""
@@ -620,7 +647,7 @@ class Corpus(BaseModel):
         BACKWARD COMPATIBILITY: Ensures both corpus_id and corpus_uuid are in responses.
         The corpus_id may be None for unsaved corpora, while corpus_uuid is always set.
         """
-        data = super().model_dump(exclude={"vocabulary_indices"}, **kwargs)
+        data = super().model_dump(**kwargs)
 
         # Ensure corpus_id is present for backward compatibility with tests/API consumers
         # If corpus_id is None but corpus_uuid exists, keep both fields in response
@@ -641,10 +668,6 @@ class Corpus(BaseModel):
 
         """
         return cls.model_validate(data)
-
-
-
-
 
     def update_version(self, change_description: str = "") -> None:
         """Mark the corpus for version update on next save.
@@ -728,7 +751,7 @@ class Corpus(BaseModel):
                 f"No metadata found for corpus {self.corpus_name}, may already be deleted"
             )
 
-    async def save(self) -> "Corpus":
+    async def save(self) -> Corpus:
         """Persist corpus via TreeCorpusManager (convenience wrapper).
 
         Delegates to TreeCorpusManager.save_corpus() which handles versioning,
