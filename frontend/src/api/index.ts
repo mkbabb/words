@@ -13,6 +13,7 @@ import { mediaApi } from './media';
 import { wordlistsApi } from './wordlists';
 import { healthApi } from './health';
 import { versionsApi } from './versions';
+import { audioApi } from './audio';
 
 // Isomorphic API exports - mirrors backend structure
 export { lookupApi } from './lookup';         // /lookup/*
@@ -23,6 +24,7 @@ export { definitionsApi } from './definitions'; // /definitions/*
 export { examplesApi } from './examples';     // /examples/*
 export { entriesApi } from './entries';       // /words/entries/*
 export { mediaApi } from './media';           // /images/*, /audio/*
+export { audioApi } from './audio';           // /audio/tts/*
 export { wordlistsApi } from './wordlists';   // /wordlists/*
 export { healthApi } from './health';         // /health
 export { versionsApi } from './versions';     // /words/{word}/versions/*
@@ -49,6 +51,7 @@ export default {
   examples: examplesApi,
   entries: entriesApi,
   media: mediaApi,
+  audio: audioApi,
   wordlists: wordlistsApi,
   health: healthApi,
   versions: versionsApi,

@@ -68,6 +68,11 @@ macos = [
 audio = [
     "google-cloud-texttospeech>=2.14.0",
 ]
+# Local TTS via KittenTTS
+kitten-tts = [
+    "kittentts>=0.1.0",
+    "soundfile>=0.12.1",
+]
 
 [project.scripts]
 floridify = "floridify.cli:cli"
@@ -137,6 +142,8 @@ module = [
     "google.cloud.*",
     "google.oauth2.*",
     "CoreServices.*",
+    "kittentts.*",
+    "soundfile.*",
 ]
 ignore_missing_imports = true
 

@@ -43,6 +43,60 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/audio", tags=["audio"])
 
 
+class TTSGenerateRequest(BaseModel):
+    """Request body for TTS generation."""
+
+    word: str = Field(..., min_length=1, max_length=200, description="Word to synthesize")
+    accent: Literal["american", "british"] = Field("american", description="Voice accent")
+    voice_gender: Literal["male", "female"] = Field("male", description="Voice gender")
+
+
+@router.post("/tts/generate", response_model=ResourceResponse, status_code=201)
+async def generate_tts(body: TTSGenerateRequest) -> ResourceResponse:
+    """Generate TTS audio for a word on demand.
+
+    Body:
+        - word: The word to synthesize
+        - accent: Voice accent (american or british)
+        - voice_gender: Voice gender (male or female)
+
+    Returns:
+        Audio metadata with content URL for playback.
+    """
+    from ....audio import AudioSynthesizer
+
+    synthesizer = AudioSynthesizer()
+    audio = await synthesizer.synthesize_word(
+        word=body.word,
+        accent=body.accent,
+        voice_gender=body.voice_gender,
+    )
+
+    if not audio:
+        raise NotFoundException(resource="TTS audio", identifier=body.word)
+
+    # Extract cache path info for content URL
+    file_path = Path(audio.url)
+    subdir = file_path.parent.name
+    filename = file_path.name
+
+    return ResourceResponse(
+        data={
+            "id": f"tts-{subdir}-{filename}",
+            "url": audio.url,
+            "format": audio.format,
+            "size_bytes": audio.size_bytes,
+            "duration_ms": audio.duration_ms,
+            "accent": audio.accent,
+            "quality": audio.quality,
+            "content_url": f"/api/v1/audio/cache/{subdir}/{filename}",
+        },
+        links={
+            "content": f"/audio/cache/{subdir}/{filename}",
+        },
+    )
+
+
 def get_audio_repo() -> AudioRepository:
     """Dependency to get audio repository."""
     return AudioRepository()
