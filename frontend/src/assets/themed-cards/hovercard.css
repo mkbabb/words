@@ -1,0 +1,59 @@
+/* Themed hovercard: metallic overlay + content z-index */
+
+[data-theme='default'] .themed-hovercard {
+    @apply bg-popover/90 text-popover-foreground;
+}
+
+[data-theme]:not([data-theme='default']) .themed-hovercard {
+    position: relative;
+    background: var(--theme-gradient-start);
+    color: var(--theme-text);
+}
+
+/* Tiled gradient system for hover cards with paper texture */
+[data-theme]:not([data-theme='default']) .themed-hovercard::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+        var(--paper-clean-texture),
+        repeating-linear-gradient(
+            132deg,
+            color-mix(in srgb, var(--theme-gradient-mid), transparent 82%) 0px,
+            color-mix(in srgb, var(--theme-gradient-mid), transparent 82%) 34px,
+            color-mix(in srgb, var(--theme-gradient-end), transparent 86%) 68px,
+            transparent 102px
+        ),
+        repeating-linear-gradient(
+            -38deg,
+            color-mix(in srgb, var(--theme-gradient-start), transparent 86%) 0px,
+            color-mix(in srgb, var(--theme-gradient-start), transparent 86%) 48px,
+            color-mix(in srgb, var(--theme-gradient-mid), transparent 88%) 96px,
+            transparent 144px
+        ),
+        linear-gradient(
+            135deg,
+            var(--theme-gradient-start) 0%,
+            var(--theme-gradient-mid) 50%,
+            var(--theme-gradient-end) 100%
+        );
+    background-position:
+        center,
+        calc(var(--gradient-offset-1, 0px)) calc(var(--gradient-offset-1, 0px)),
+        calc(var(--gradient-offset-2, 0px)) calc(var(--gradient-offset-2, 0px)),
+        center;
+    filter: blur(0.3px) saturate(1.03);
+    opacity: 0.6;
+    border-radius: inherit;
+}
+
+/* Ensure hover card content appears above the gradient overlay */
+[data-theme]:not([data-theme='default']) .themed-hovercard > *:not(.absolute) {
+    position: relative;
+    z-index: 1;
+}

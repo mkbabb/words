@@ -58,7 +58,7 @@ export interface WordList {
 
 // UI-specific types merged from wordlist-ui.ts
 export type MasteryLevel = 'default' | 'bronze' | 'silver' | 'gold';
-export type Temperature = 'hot' | 'warm' | 'cold';
+export type Temperature = 'hot' | 'cold';
 
 // Const objects for runtime usage (dual type/value export)
 export const MasteryLevel = {
@@ -70,7 +70,6 @@ export const MasteryLevel = {
 
 export const Temperature = {
   HOT: 'hot' as const,
-  WARM: 'warm' as const,
   COLD: 'cold' as const
 } as const;
 

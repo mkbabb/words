@@ -389,7 +389,7 @@ onUnmounted(() => {
 /* Image fade transitions using Tailwind utilities */
 .image-fade-enter-active,
 .image-fade-leave-active {
-    transition: all 0.3s ease-out;
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 
 .image-fade-leave-active {

@@ -7,7 +7,7 @@ import { logger } from '@/utils/logger';
 
 // Import Tailwind CSS and custom styles
 import './assets/index.css';
-import './styles/ios-pwa.css';
+// iOS PWA styles loaded conditionally in useIOSPWA composable
 
 // Create app
 const app = createApp(App);

@@ -179,26 +179,23 @@ export function useScrollTracking({
         elementsInReadingZone.delete(id);
     };
     
-    // Check scroll position periodically for edge cases
-    let scrollCheckInterval: number | null = null;
-    
+    // Handle scroll for edge cases not caught by IntersectionObserver
+    const handleScroll = () => {
+        const currentScrollY = window.scrollY;
+        if (Math.abs(currentScrollY - lastScrollY) > 50) {
+            lastScrollY = currentScrollY;
+            updateActiveElements();
+        }
+    };
+
     onMounted(() => {
-        // Check scroll position every 200ms
-        scrollCheckInterval = window.setInterval(() => {
-            const currentScrollY = window.scrollY;
-            if (Math.abs(currentScrollY - lastScrollY) > 50) {
-                lastScrollY = currentScrollY;
-                updateActiveElements();
-            }
-        }, 200);
+        window.addEventListener('scroll', handleScroll, { passive: true });
         setupObserver();
     });
-    
+
     onUnmounted(() => {
         observer.value?.disconnect();
-        if (scrollCheckInterval) {
-            clearInterval(scrollCheckInterval);
-        }
+        window.removeEventListener('scroll', handleScroll);
     });
     
     return {

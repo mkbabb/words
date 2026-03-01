@@ -1,0 +1,22 @@
+/* Transitions: Vue transition classes for result list animation */
+
+@layer utilities {
+  .result-list-enter-active,
+  .result-list-leave-active {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .result-list-enter-from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+
+  .result-list-leave-to {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+
+  .result-list-move {
+    transition: transform 0.3s ease;
+  }
+}

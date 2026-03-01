@@ -354,8 +354,8 @@ export const aiApi = {
   async synthesizeEntry(word: string, options?: {
     components?: string[];
     force?: boolean;
-  }): Promise<any> {
-    const response = await api.post('/ai/synthesize', {
+  }): Promise<DictionaryEntryResponse> {
+    const response = await api.post<DictionaryEntryResponse>('/ai/synthesize', {
       word,
       components: options?.components || ['all'],
       force: options?.force || false

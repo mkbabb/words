@@ -47,8 +47,6 @@ export interface Word extends BaseMetadata {
   normalized: string;
   language: Language;
   homograph_number?: number;
-  offensive_flag: boolean;
-  first_known_use?: string;
 }
 
 // Relationship Models
@@ -84,8 +82,10 @@ export interface Collocation {
 // Etymology
 export interface Etymology {
   text: string;
-  language?: string;
-  period?: string;
+  origin_language?: string;
+  root_words?: string[];
+  first_known_use?: string;
+  period?: string; // Legacy frontend field, not in backend
 }
 
 // Model Info (for AI-generated content)
@@ -120,9 +120,11 @@ export interface Example extends BaseMetadata {
 export interface AudioFile {
   id: string;
   url: string;
-  mime_type: string;
-  accent?: string;
-  gender?: string;
+  format: string; // mp3, wav, ogg
+  size_bytes: number;
+  duration_ms: number;
+  accent?: string; // us, uk, au
+  quality?: 'low' | 'standard' | 'high';
 }
 
 export interface ImageMedia extends BaseMetadata {
@@ -265,14 +267,18 @@ export interface SearchResult {
   word: string;
   score: number; // 0.0-1.0
   method: SearchMethod;
-  is_phrase: boolean;
+  lemmatized_word?: string;
+  language?: Language;
+  metadata?: Record<string, any>;
 }
 
 export interface SearchResponse {
   query: string;
   results: SearchResult[];
   total_found: number;
-  language: Language;
+  languages: Language[];
+  mode: string;
+  metadata: Record<string, any>;
 }
 
 // Streaming Progress Types

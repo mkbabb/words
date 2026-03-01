@@ -50,22 +50,3 @@ withDefaults(defineProps<Props>(), {
 });
 </script>
 
-<style scoped>
-.scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--border) / 0.3) transparent;
-}
-
-.scrollbar-thin::-webkit-scrollbar {
-    width: 4px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-    background: hsl(var(--border) / 0.3);
-    border-radius: 2px;
-}
-</style>

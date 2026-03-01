@@ -292,22 +292,11 @@ const loadRecentWordlists = async () => {
             sort_order: 'desc'
         });
         
-        recentWordlists.value = response.items.map((item: any) => ({
-            id: item._id || item.id,
-            name: item.name,
-            description: item.description,
-            hash_id: item.hash_id,
-            words: item.words || [],
-            total_words: item.total_words,
-            unique_words: item.unique_words,
-            learning_stats: item.learning_stats,
-            last_accessed: item.last_accessed,
-            created_at: item.created_at,
-            updated_at: item.updated_at,
+        recentWordlists.value = response.items.map((item) => ({
+            ...item,
+            id: (item as any)._id || item.id,
             metadata: item.metadata || {},
             tags: item.tags || [],
-            is_public: item.is_public || false,
-            owner_id: item.owner_id,
         }));
     } catch (error) {
         logger.error('Failed to load recent wordlists:', error);

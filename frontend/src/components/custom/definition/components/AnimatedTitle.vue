@@ -2,8 +2,7 @@
     <component
         :is="animationComponent"
         v-bind="animationProps"
-        class="pb-2 text-[clamp(1.5rem,10vw,4.5rem)] leading-tight font-bold"
-        style="font-family: 'Fraunces', serif"
+        class="pb-2 text-[clamp(1.5rem,10vw,4.5rem)] leading-tight font-bold font-serif"
     />
 </template>
 
@@ -13,17 +12,11 @@ import { TypewriterText } from '@/components/custom/typewriter';
 
 interface AnimatedTitleProps {
     text: string;
-    animationType?: string;
-    animationKey: number;
 }
 
-const props = withDefaults(defineProps<AnimatedTitleProps>(), {
-    animationType: 'typewriter',
-});
+const props = defineProps<AnimatedTitleProps>();
 
-const animationComponent = computed(() => {
-    return TypewriterText;
-});
+const animationComponent = TypewriterText;
 
 const animationProps = computed(() => ({
     text: props.text,

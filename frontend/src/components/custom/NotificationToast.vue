@@ -67,7 +67,7 @@ const iconClasses = {
 <style scoped>
 .notification-enter-active,
 .notification-leave-active {
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: opacity 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .notification-enter-from {

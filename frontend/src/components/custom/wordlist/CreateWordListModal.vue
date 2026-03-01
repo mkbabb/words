@@ -370,9 +370,9 @@ const handleCreate = async () => {
       description: `Wordlist "${form.value.name}" created successfully`,
     });
     
-    if (wordlist) {
-      // Emit the created event
-      emit('created', wordlist);
+    if (wordlist?.data) {
+      // Emit the created event (unwrap response envelope)
+      emit('created', wordlist.data);
       
       // Close modal
       closeModal();

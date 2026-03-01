@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, readonly, computed, shallowRef } from 'vue'
-import { wordlistsApi } from '@/api'
+import { wordlistApi } from '@/api'
 import type { ModeHandler } from '@/stores/types/mode-types'
 import type { SearchMode, WordListItem, WordlistFilters as WordlistFiltersType, MasteryLevel, Temperature } from '@/types'
 import {
@@ -239,7 +239,7 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
     abortController = new AbortController()
     
     try {
-      const response = await wordlistsApi.getWordlistWords(wordlistId, {
+      const response = await wordlistApi.getWordlistWords(wordlistId, {
         offset,
         limit
       })
@@ -279,17 +279,18 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
     abortController = new AbortController()
     
     try {
-      const response = await wordlistsApi.searchWordlist(wordlistId, {
+      const response = await wordlistApi.searchWordlist(wordlistId, {
         query,
         max_results: limit,
         min_score: filters.value.minScore,
         offset,
         limit
       })
-      
-      const items = response.items || []
+
+      // Search results are a subset of full WordListItem; cast for display compatibility
+      const items = (response.items || []) as unknown as WordListItem[]
       const replace = offset === 0
-      
+
       // Update pagination
       pagination.value = {
         offset: offset + items.length,
@@ -297,7 +298,7 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
         total: response.total || items.length,
         hasMore: (response.total || 0) > offset + items.length
       }
-      
+
       setResults(items, replace)
       return items
       
@@ -392,42 +393,6 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
       currentWord: '',
       errors: []
     }
-  }
-  
-  // ==========================================================================
-  // STATE MANAGEMENT
-  // ==========================================================================
-  
-  const getConfig = () => ({
-    filters: { ...wordlistFilters.value },
-    sortCriteria: [...wordlistSortCriteria.value],
-    selectedWordlist: selectedWordlist.value
-  })
-  
-  const setConfig = (config: any) => {
-    if (config.filters) setWordlistFilters(config.filters)
-    if (config.sortCriteria) setWordlistSortCriteria(config.sortCriteria)
-    if (config.selectedWordlist !== undefined) setWordlist(config.selectedWordlist)
-  }
-  
-  const getSearchBarState = () => ({
-    batchMode: batchMode.value,
-    processingQueue: [...processingQueue.value]
-  })
-  
-  const setSearchBarState = (state: any) => {
-    if (state.batchMode !== undefined) setBatchMode(state.batchMode)
-    if (state.processingQueue) processingQueue.value = [...state.processingQueue]
-  }
-  
-  const getUIState = () => ({
-    viewMode: viewMode.value,
-    itemsPerPage: itemsPerPage.value
-  })
-  
-  const setUIState = (state: any) => {
-    if (state.viewMode) setViewMode(state.viewMode)
-    if (state.itemsPerPage !== undefined) setItemsPerPage(state.itemsPerPage)
   }
   
   const reset = () => {
@@ -546,12 +511,6 @@ export const useWordlistMode = defineStore('wordlistMode', () => {
     resetBatchProcessing,
     
     // State Management
-    getConfig,
-    setConfig,
-    getSearchBarState,
-    setSearchBarState,
-    getUIState,
-    setUIState,
     reset,
     
     // Mode Handler

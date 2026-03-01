@@ -21,10 +21,6 @@
 
 <script setup>
 import { changeTheme, isDark } from ".";
-
-const { size } = defineProps({
-    size: { type: String, default: "2rem" },
-});
 </script>
 
 <style scoped lang="scss">
@@ -38,7 +34,7 @@ const { size } = defineProps({
     isolation: isolate;
     background: 0;
 
-    transition: all !important;
+    transition: opacity 200ms, background 200ms, transform 200ms;
 
     z-index: 999;
 

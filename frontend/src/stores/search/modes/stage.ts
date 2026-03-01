@@ -31,16 +31,6 @@ export function useStageModeConfig() {
     testMode.value = enabled
   }
   
-  const getConfig = (): StageConfig => ({
-    debugLevel: debugLevel.value,
-    testMode: testMode.value
-  })
-  
-  const setConfig = (config: Partial<StageConfig>) => {
-    if (config.debugLevel) setDebugLevel(config.debugLevel)
-    if (config.testMode !== undefined) setTestMode(config.testMode)
-  }
-  
   const reset = () => {
     debugLevel.value = DEFAULT_DEBUG_LEVEL
     testMode.value = false
@@ -84,8 +74,6 @@ export function useStageModeConfig() {
     setTestMode,
     
     // Config management
-    getConfig,
-    setConfig,
     reset,
     
     // Mode handler

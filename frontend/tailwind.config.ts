@@ -56,17 +56,19 @@ const config: Config = {
           DEFAULT: 'var(--color-card)',
           foreground: 'var(--color-card-foreground)',
         },
-        bronze: {
-          100: '#fed7aa',
-          200: '#fdba74', 
-          300: '#fb923c',
-          400: '#f97316',
-          500: '#ea580c',
-          600: '#dc2626',
-          700: '#c2410c',
-          800: '#9a3412',
-          900: '#7c2d12',
-        },
+      },
+      zIndex: {
+        'overlay': '0',
+        'content': '1',
+        'float': '10',
+        'bar': '30',
+        'dropdown': '40',
+        'modal': '50',
+        'mobile-nav': '60',
+        'hovercard': '80',
+        'critical': '100',
+        'toggle': '999',
+        'max': '9999',
       },
       borderRadius: {
         xl: 'calc(var(--radius) + 4px)',
@@ -141,18 +143,6 @@ const config: Config = {
           '80%': { transform: 'scale(0.98)' },
           '100%': { transform: 'scale(1)' },
         },
-        'scroll-shrink': {
-          '0%': { 
-            transform: 'scale(1)',
-            opacity: '1',
-            maxWidth: '24rem'
-          },
-          '100%': { 
-            transform: 'scale(0.85)',
-            opacity: '0.9',
-            maxWidth: '18rem'
-          },
-        },
         'icon-fade': {
           '0%': { 
             opacity: '1',
@@ -201,7 +191,6 @@ const config: Config = {
         'bounce-in': 'bounce-in 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
         'bounce-out': 'bounce-out 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
         'shrink-bounce': 'shrink-bounce 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-        'scroll-shrink': 'scroll-shrink 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
         'icon-fade': 'icon-fade 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         'elastic-bounce': 'elastic-bounce 0.6s cubic-bezier(0.25, 0.1, 0.25, 1)',
         'spin-slow': 'spin-slow 3s linear infinite',
@@ -235,12 +224,6 @@ const config: Config = {
         'card-hover': '0 8px 24px rgba(0, 0, 0, 0.12)',
         'subtle': '0 2px 8px rgba(0, 0, 0, 0.04)',
         'glow': '0 0 20px rgba(var(--color-primary), 0.3)',
-      },
-      backgroundImage: {
-        'paper-clean': 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.9" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%" height="100%" filter="url(%23noise)" opacity="0.03"/%3E%3C/svg%3E")',
-        'paper-aged': 'url("data:image/svg+xml,%3Csvg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.7" numOctaves="4" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%" height="100%" filter="url(%23noise)" opacity="0.05"/%3E%3C/svg%3E")',
-        'paper-handmade': 'url("data:image/svg+xml,%3Csvg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.5" numOctaves="5" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%" height="100%" filter="url(%23noise)" opacity="0.04"/%3E%3C/svg%3E")',
-        'paper-kraft': 'url("data:image/svg+xml,%3Csvg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.6" numOctaves="4" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%" height="100%" filter="url(%23noise)" opacity="0.06"/%3E%3C/svg%3E")',
       },
     },
   },
@@ -372,15 +355,6 @@ const config: Config = {
       }
       addUtilities(newUtilities, ['responsive', 'hover'])
       
-      // Dynamic transition timing utilities
-      matchUtilities(
-        {
-          'transition-timing': (value: string) => ({
-            'transition-timing-function': value,
-          }),
-        },
-        { values: theme('transitionTimingFunction') }
-      )
     }
   ],
 };

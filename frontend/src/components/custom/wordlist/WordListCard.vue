@@ -62,15 +62,8 @@
                 <Edit2 class="h-3 w-3 mr-2" />
                 Edit Notes
               </DropdownMenuItem>
-              <DropdownMenuItem @click.stop="markAsVisited">
-                <Eye class="h-3 w-3 mr-2" />
-                Mark Visited
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem @click.stop="removeFromList" class="text-destructive">
-                <Trash2 class="h-3 w-3 mr-2" />
-                Remove
-              </DropdownMenuItem>
+              <!-- TODO: Implement mark visited and remove from list API calls -->
+
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -173,12 +166,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { 
-  BookOpen, 
-  Edit2, 
-  Eye, 
-  MoreVertical, 
-  Trash2 
+import {
+  BookOpen,
+  Edit2,
+  MoreVertical,
 } from 'lucide-vue-next';
 import { ThemedCard } from '@/components/custom/card';
 import { Button } from '@/components/ui/button';
@@ -192,7 +183,6 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   DropdownMenuItem,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import type { WordListItem, MasteryLevel } from '@/types';
 import { Temperature } from '@/types';
@@ -259,13 +249,6 @@ const startReview = () => {
   emit('review', props.word, 4);
 };
 
-const markAsVisited = () => {
-  // Mark word as visited without formal review
-};
-
-const removeFromList = () => {
-  // Remove word from wordlist
-};
 </script>
 
 <style scoped>

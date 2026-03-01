@@ -250,7 +250,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStores } from '@/stores';
 import { Button } from '@/components/ui';
@@ -423,28 +423,9 @@ const keydownHandler = (e: KeyboardEvent) => {
     }
 };
 
-// Setup enter key handling when component mounts or when show prop changes
-const setupEnterKeyHandling = async () => {
-    await nextTick();
-    
-    // No need to focus, as it might interfere with button clicks
-};
-
-// Watch for when controls are shown
-watch(() => props.show, async (newVal) => {
-    if (newVal) {
-        await setupEnterKeyHandling();
-    }
-});
-
 onMounted(() => {
     // Use capture phase to catch events before they bubble
     document.addEventListener('keydown', keydownHandler, true);
-    
-    // Setup initial handling if already shown
-    if (props.show) {
-        setupEnterKeyHandling();
-    }
 });
 
 onUnmounted(() => {

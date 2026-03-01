@@ -374,51 +374,6 @@ export const useLookupMode = defineStore(
             );
         };
 
-        // ==========================================================================
-        // STATE MANAGEMENT
-        // ==========================================================================
-
-        const getConfig = () => ({
-            selectedSources: selectedSources.value,
-            selectedLanguages: selectedLanguages.value,
-            noAI: noAI.value,
-            searchMode: searchMode.value,
-        });
-
-        const setConfig = (config: any) => {
-            if (config.selectedSources) setSources(config.selectedSources);
-            if (config.selectedLanguages)
-                setLanguages(config.selectedLanguages);
-            if (config.noAI !== undefined) noAI.value = config.noAI;
-            if (config.searchMode !== undefined)
-                searchMode.value = config.searchMode;
-        };
-
-        const getSearchBarState = () => ({
-            isAIQuery: isAIQuery.value,
-            showSparkle: showSparkle.value,
-            aiSuggestions: [...aiSuggestions.value],
-        });
-
-        const setSearchBarState = (state: any) => {
-            if (state.isAIQuery !== undefined) setAIQuery(state.isAIQuery);
-            if (state.showSparkle !== undefined)
-                setShowSparkle(state.showSparkle);
-            if (state.aiSuggestions) setAISuggestions(state.aiSuggestions);
-        };
-
-        const getUIState = () => ({
-            selectedCardVariant: selectedCardVariant.value,
-            pronunciationMode: pronunciationMode.value,
-        });
-
-        const setUIState = (state: any) => {
-            if (state.selectedCardVariant)
-                setCardVariant(state.selectedCardVariant);
-            if (state.pronunciationMode)
-                setPronunciationMode(state.pronunciationMode);
-        };
-
         const reset = () => {
             // Reset config
             selectedSources.value = DEFAULT_SOURCES;
@@ -542,12 +497,6 @@ export const useLookupMode = defineStore(
             findResultByWord,
 
             // State Management
-            getConfig,
-            setConfig,
-            getSearchBarState,
-            setSearchBarState,
-            getUIState,
-            setUIState,
             reset,
 
             // Utilities

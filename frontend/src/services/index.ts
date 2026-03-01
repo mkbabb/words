@@ -1,2 +1,1 @@
-// PWA service
-export * from './pwa.service'
+// Services barrel export

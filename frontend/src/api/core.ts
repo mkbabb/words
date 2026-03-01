@@ -23,17 +23,24 @@ export interface APIError {
 }
 
 // Transform error responses to consistent format
-export function transformError(error: any): APIError {
-  if (error.response?.data?.error) {
+export function transformError(error: unknown): APIError {
+  if (error instanceof Error && 'response' in error) {
+    const axiosError = error as { response?: { data?: { error?: string; details?: any } }; code?: string };
+    if (axiosError.response?.data?.error) {
+      return {
+        message: axiosError.response.data.error,
+        details: axiosError.response.data.details,
+      };
+    }
     return {
-      message: error.response.data.error,
-      details: error.response.data.details,
+      message: error.message || 'An unknown error occurred',
+      code: axiosError.code,
     };
   }
-  return {
-    message: error.message || 'An unknown error occurred',
-    code: error.code,
-  };
+  if (error instanceof Error) {
+    return { message: error.message };
+  }
+  return { message: 'An unknown error occurred' };
 }
 
 // Request interceptor

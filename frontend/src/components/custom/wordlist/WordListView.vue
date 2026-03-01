@@ -307,23 +307,24 @@ const loadWordlistMeta = async (id: string) => {
   isLoadingMeta.value = true;
   try {
     const response = await wordlistApi.getWordlist(id);
-    
+    const wl = response.data;
+
     currentWordlistData.value = {
-      id: response.data._id || response.data.id,
-      name: response.data.name,
-      description: response.data.description,
-      hash_id: response.data.hash_id,
+      id: (wl as any)._id || wl.id,
+      name: wl.name,
+      description: wl.description,
+      hash_id: wl.hash_id,
       words: [], // Words loaded separately
-      total_words: response.data.total_words,
-      unique_words: response.data.unique_words,
-      learning_stats: response.data.learning_stats,
-      last_accessed: response.data.last_accessed,
-      created_at: response.data.created_at,
-      updated_at: response.data.updated_at,
-      metadata: response.data.metadata || {},
-      tags: response.data.tags || [],
-      is_public: response.data.is_public || false,
-      owner_id: response.data.owner_id,
+      total_words: wl.total_words,
+      unique_words: wl.unique_words,
+      learning_stats: wl.learning_stats,
+      last_accessed: wl.last_accessed,
+      created_at: wl.created_at,
+      updated_at: wl.updated_at,
+      metadata: wl.metadata || {},
+      tags: wl.tags || [],
+      is_public: wl.is_public || false,
+      owner_id: wl.owner_id,
     };
   } catch (error) {
     logger.error('Failed to load wordlist metadata:', error);
@@ -376,7 +377,7 @@ const triggerWordlistSearch = async () => {
       // Update currentWords with filtered results
       currentWords.value = filteredResults.map((item: any, index: number) => ({
         ...item,
-        _uniqueId: `${item.word}-${index}-${Date.now()}` // Add unique key for Vue
+        _uniqueId: `${item.word}-${index}` // Add unique key for Vue
       }));
       totalWords.value = filteredResults.length;
       
@@ -442,7 +443,7 @@ watch(filters, async () => {
     // Update displayed words
     currentWords.value = filteredResults.map((item: any, index: number) => ({
       ...item,
-      _uniqueId: `${item.word}-${index}-${Date.now()}`
+      _uniqueId: `${item.word}-${index}`
     }));
     totalWords.value = filteredResults.length;
   }
@@ -545,7 +546,7 @@ watch(() => wordlistMode.results, (results) => {
       // Search results - update display
       const newItems = results.map((item: any, idx: number) => ({
         ...item,
-        _uniqueId: `${item.word}-${item.added_date || Date.now()}-${idx}`
+        _uniqueId: `${item.word}-${item.added_date || ''}-${idx}`
       }));
       currentWords.value = newItems;
       totalWords.value = results.length;
@@ -553,33 +554,7 @@ watch(() => wordlistMode.results, (results) => {
   }
 }, { immediate: true });
 
-// Watch for empty queries to reload all words
-watch(() => searchBar.searchQuery, (newQuery) => {
-  if (searchBarStore.searchMode === 'wordlist' && wordlistMode.selectedWordlist && !newQuery.trim()) {
-    // Empty query - orchestrator will call getWordlistWords
-    // Results will come through wordlistSearchResults watcher
-    // Empty query - orchestrator will call getWordlistWords
-  }
-});
 
-
-// TEMPORARILY DISABLED - these watchers were causing infinite loops
-// watch(() => filters.value, () => {
-//   if (wordlistMode.selectedWordlist) {
-//     currentPage.value = 0;
-//     loadWordlistWords(wordlistMode.selectedWordlist, 0, false);
-//   }
-// }, { deep: true });
-
-// watch(() => sortCriteria.value, () => {
-//   if (wordlistMode.selectedWordlist) {
-//     currentPage.value = 0;
-//     loadWordlistWords(wordlistMode.selectedWordlist, 0, false);
-//   }
-// }, { deep: true });
-
-// Only restart observer when wordlist changes, not on every data append
-// Removing this watcher as it causes scroll position issues
 </script>
 
 <style scoped>

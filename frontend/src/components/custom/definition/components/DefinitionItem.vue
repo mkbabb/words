@@ -64,7 +64,7 @@
                 }"
             >
                 <template #display>
-                    <p class="text-base leading-relaxed" style="font-family: 'Fraunces', serif;">
+                    <p class="text-base leading-relaxed font-serif">
                         {{ definition.definition || definition.text }}
                     </p>
                 </template>

@@ -8,9 +8,9 @@
             <p class="text-base leading-relaxed text-foreground">
                 {{ etymology.text }}
             </p>
-            <div v-if="etymology.language || etymology.period" class="flex flex-wrap gap-2 text-sm">
-                <span v-if="etymology.language" class="text-muted-foreground/80">
-                    <span class="font-medium">Origin:</span> {{ etymology.language }}
+            <div v-if="etymology.origin_language || etymology.period" class="flex flex-wrap gap-2 text-sm">
+                <span v-if="etymology.origin_language" class="text-muted-foreground/80">
+                    <span class="font-medium">Origin:</span> {{ etymology.origin_language }}
                 </span>
                 <span v-if="etymology.period" class="text-muted-foreground/80">
                     <span class="font-medium">Period:</span> {{ etymology.period }}

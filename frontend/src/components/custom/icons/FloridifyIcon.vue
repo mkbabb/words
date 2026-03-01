@@ -31,7 +31,6 @@
           'scale-x-100 opacity-100': expanded,
         })
       "
-      style="font-family: 'Fraunces', serif; font-weight: 600"
     >
       loridify
     </span>
