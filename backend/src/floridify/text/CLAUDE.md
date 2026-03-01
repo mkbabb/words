@@ -9,8 +9,8 @@ text/
 └── phrase.py (24)          # Phrase detection
 ```
 
-- `normalize_basic()` — lowercase + strip
-- `normalize_comprehensive()` — diacritics, Unicode, contractions, LRU cached
-- `lemmatize_comprehensive()` — base form (running → run)
-- `batch_normalize()` / `batch_lemmatize()` — parallel for large vocabularies
-- `get_word_signature()` — consonant-only signature for fuzzy search bucketing
+- `normalize_basic()`—lowercase + strip
+- `normalize_comprehensive()`—diacritics, Unicode, contractions, LRU cached
+- `lemmatize_comprehensive()`—base form (running -> run)
+- `batch_normalize()` / `batch_lemmatize()`—parallel for large vocabularies
+- `get_word_signature()`—consonant-only signature for fuzzy search bucketing

@@ -15,11 +15,11 @@ corpus/
 
 ## Corpus Model
 
-`vocabulary`, `original_vocabulary`, `lemmatized_vocabulary`. Signature and length buckets for fuzzy search candidate selection. UUID parent-child relationships (not ObjectIds — stable across versions).
+`vocabulary`, `original_vocabulary`, `lemmatized_vocabulary`. Signature and length buckets for fuzzy search candidate selection. UUID parent-child relationships (not ObjectIds—stable across versions).
 
 ## TreeCorpusManager
 
-Recursive aggregation across parent → child hierarchy. Per-resource locking (3-5x throughput vs global lock). N+1 query fix. Cascade deletion. CRUD with vocabulary diff tracking.
+Recursive aggregation across parent -> child hierarchy. Per-resource locking. N+1 query fix. Cascade deletion. CRUD with vocabulary diff tracking.
 
 ## Parsers
 

@@ -10,7 +10,7 @@ models/
 ├── parameters.py (462)     # CLI/API shared params (isomorphic with frontend)
 ├── responses.py (416)      # LookupResponse, SearchResponse, CorpusResponse
 ├── literature.py (102)     # AuthorInfo, Genre/Period enums
-├── registry.py (46)        # ResourceType → Model mapping
+├── registry.py (46)        # ResourceType -> Model mapping
 └── user.py (33)            # User(Document) for OAuth
 ```
 

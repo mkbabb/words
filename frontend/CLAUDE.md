@@ -1,6 +1,6 @@
 # Floridify Frontend
 
-Vue 3.5 TypeScript SPA. Pinia state management. shadcn/ui + Tailwind CSS. ~34K LOC.
+Vue 3.5 TypeScript SPA. Pinia state management. shadcn/ui + Tailwind CSS. ~36K LOC.
 
 ## Structure
 
@@ -13,7 +13,9 @@ frontend/src/
 │   └── NotFound.vue (12)           # 404
 │
 ├── components/
-│   ├── ui/                         # 123 shadcn/ui components (Radix Vue)
+│   ├── PWAInstallPrompt.vue        # Legacy PWA prompt (root-level)
+│   │
+│   ├── ui/                         # 123 shadcn/ui .vue components (Radix Vue)
 │   │   ├── accordion/, alert/, avatar/, badge/, button/, card/
 │   │   ├── carousel/, collapsible/, combobox/, command/, dialog/
 │   │   ├── dropdown-menu/, hover-card/, input/, label/
@@ -22,91 +24,118 @@ frontend/src/
 │   │   ├── tabs/, textarea/, toast/, tooltip/
 │   │   └── infinite-scroll.vue, infinite-scroll-improved.vue
 │   │
-│   └── custom/                     # 50 application components
-│       ├── search/                 # Search bar system (28 files, 2,739 LOC)
-│       │   ├── SearchBar.vue (735) # Primary interface, scroll-responsive
+│   └── custom/                     # 105 application .vue components
+│       ├── ConfirmDialog.vue, ErrorBoundary.vue, Modal.vue
+│       ├── NotificationToast.vue, Sidebar.vue
+│       │
+│       ├── search/                 # Search bar system (32 files, 4,814 LOC)
+│       │   ├── SearchBar.vue (737) # Primary interface, scroll-responsive
 │       │   ├── SearchHistoryContent.vue
 │       │   ├── components/         # SearchInput, SearchControls, SearchResults
 │       │   │                       # ActionsRow, ExpandModal, AutocompleteOverlay
-│       │   │                       # ModeToggle, RegenerateButton, progress bars
+│       │   │                       # ModeToggle, RegenerateButton, ActionButton
+│       │   │                       # HamburgerButton, SparkleIndicator
+│       │   │                       # RainbowProgressBar, ThinLoadingProgress
 │       │   ├── composables/        # useSearchOrchestrator (371), useAutocomplete
 │       │   │                       # useSearchBarNavigation, useSearchBarScroll
 │       │   │                       # useFocusManagement, useModalManagement
+│       │   │                       # useSearchBarUI
 │       │   ├── constants/          # Stage config, provider sources
 │       │   ├── types/              # SearchBar-specific interfaces
 │       │   └── utils/              # Keyboard handlers, scroll, AI query
 │       │
-│       ├── definition/             # Definition display (39 files, 3,297 LOC)
-│       │   ├── DefinitionDisplay.vue (605) # Main presenter
+│       ├── definition/             # Definition display (42 files, 4,880 LOC)
+│       │   ├── DefinitionDisplay.vue (732) # Main presenter
+│       │   ├── DefinitionSkeleton.vue
 │       │   ├── WordSuggestionDisplay.vue
 │       │   ├── components/         # DefinitionCluster, DefinitionItem, WordHeader
 │       │   │                       # EditableField, ImageCarousel, ImageUploader
 │       │   │                       # AddToWordlistModal, Etymology, ExampleList
-│       │   │                       # SynonymList, ProviderIcons, ThemeSelector
+│       │   │                       # ExampleListEditable, SynonymList, SynonymListEditable
+│       │   │                       # ProviderIcons, ProviderTabs, ProviderDataTab
+│       │   │                       # ThemeSelector, ThesaurusView, AnimatedTitle
+│       │   │                       # EmptyState, ErrorState, EntryImage
+│       │   │                       # VersionBadge, VersionHistory
 │       │   ├── composables/        # useDefinitionEditMode (317), useImageManagement
-│       │   ├── skeletons/          # Loading placeholders
+│       │   │                       # useDefinitionGroups, useProviders
+│       │   ├── constants/          # Provider configuration
+│       │   ├── skeletons/          # DefinitionClusterSkeleton, DefinitionItemSkeleton
+│       │   ├── types/              # Definition-specific interfaces
 │       │   └── utils/              # Clustering, formatting, provider helpers
 │       │
-│       ├── wordlist/               # Wordlist management (9 files, 3,088 LOC)
+│       ├── wordlist/               # Wordlist management (12 files, 3,516 LOC)
 │       │   ├── WordListView.vue (586)
+│       │   ├── WordListView-simplified.vue
 │       │   ├── WordListCard.vue, CreateWordListModal.vue
 │       │   ├── WordListUploadModal.vue (760) # File upload + parsing
 │       │   ├── WordListSortBuilder.vue, WordlistSelectionModal.vue
+│       │   ├── EditWordNotesModal.vue
 │       │   └── composables/        # useWordlistOperations, useWordlistFiltering
+│       │                           # useWordlistStats
 │       │
-│       ├── sidebar/                # App sidebar (13 files, 1,493 LOC)
+│       ├── sidebar/                # App sidebar (16 files, 1,873 LOC)
 │       │   ├── SidebarContent.vue (329), SidebarHeader.vue, SidebarFooter.vue
 │       │   ├── SidebarLookupView.vue, SidebarWordListView.vue
 │       │   ├── SidebarWordListItem.vue, SidebarRecentItem.vue
-│       │   └── RecentItem.vue, RecentLookupItem.vue, RecentSearchItem.vue
+│       │   ├── SidebarSection.vue, GoldenSidebarSection.vue
+│       │   ├── RecentItem.vue, RecentItemWithHover.vue
+│       │   ├── RecentLookupItem.vue, RecentSearchItem.vue
+│       │   ├── VocabularySuggestionItem.vue, YoshiAvatar.vue
 │       │
-│       ├── navigation/             # Progressive sidebar (8 files, 617 LOC)
-│       │   ├── ProgressiveSidebar.vue # Definition cluster navigation
+│       ├── navigation/             # Progressive sidebar (14 files, 923 LOC)
+│       │   ├── ProgressiveSidebar.vue, ProgressiveSidebarBase.vue
 │       │   ├── components/         # SidebarCluster, SidebarPartOfSpeech
-│       │   └── composables/        # useScrollTracking, useActiveTracking
+│       │   │                       # SidebarHoverCard, PartOfSpeechPreview
+│       │   ├── composables/        # useScrollTracking, useActiveTracking
+│       │   │                       # useSidebarNavigation, useSidebarState
+│       │   └── types/              # Navigation-specific interfaces
 │       │
 │       ├── loading/                # Progress display
 │       │   ├── LoadingModal.vue, LoadingProgress.vue
 │       │   └── pipeline-stages.ts
 │       ├── pwa/                    # PWAInstallPrompt, PWANotificationPrompt
-│       ├── animation/              # AnimatedText, BorderShimmer, BouncyToggle
-│       ├── icons/                  # FloridifyIcon, provider icons (8 files)
+│       ├── animation/              # AnimatedText, AnimationControls, BorderShimmer
+│       │                           # BouncyToggle, ShimmerText
+│       ├── icons/                  # FloridifyIcon, FancyF + 6 provider icons (8 files)
 │       ├── texture/                # TextureBackground, TextureCard, TextureOverlay
-│       ├── typewriter/             # TypewriterText + composable
+│       ├── typewriter/             # TypewriterText + composable + utils
+│       ├── text-animations/        # TypewriterText (alternate)
+│       ├── latex/                  # LaTeX rendering component
 │       ├── card/                   # Card, ThemedCard, GradientBorder
 │       ├── dark-mode-toggle/       # DarkModeToggle
-│       └── common/                 # RefreshButton, ConfirmDialog, ErrorBoundary
+│       └── common/                 # RefreshButton
 │
-├── stores/                         # 12 Pinia stores
+├── stores/                         # 7 Pinia stores + composables + mode configs
 │   ├── index.ts                    # useStores() aggregator
+│   ├── auth.ts (21)               # Auth store
 │   ├── search/
-│   │   ├── search-bar.ts (507)     # Mode router: delegates to lookup/wordlist
+│   │   ├── search-bar.ts (508)     # Mode router: delegates to lookup/wordlist
 │   │   └── modes/
-│   │       ├── lookup.ts (525)     # Lookup search ops, provider/language selection
+│   │       ├── lookup.ts (574)     # Lookup search ops, provider/language selection
 │   │       ├── wordlist.ts (564)   # Wordlist search, sort, filter
-│   │       ├── word-of-the-day.ts  # WOTD mode
-│   │       └── stage.ts            # Debug/test mode
+│   │       ├── word-of-the-day.ts (98)  # WOTD mode config
+│   │       └── stage.ts (93)       # Debug/test mode config
 │   ├── content/
-│   │   ├── content.ts (328)        # Displayed content, streaming support
+│   │   ├── content.ts (324)        # Displayed content, streaming support
 │   │   ├── history.ts (374)        # Recent searches/lookups, vocab suggestions
-│   │   └── modes/                  # lookup.ts, wordlist.ts
+│   │   └── modes/                  # lookup.ts (257), wordlist.ts (118)
 │   ├── ui/
-│   │   ├── ui-state.ts (109)       # Theme, sidebar collapse
+│   │   ├── ui-state.ts (107)       # Theme, sidebar collapse
 │   │   └── loading.ts (155)        # Global loading + progress
-│   ├── composables/                # useNotifications, useRouterSync
-│   └── types/                      # Mode types, theme constants
+│   ├── composables/                # useNotifications (103), useRouterSync (21)
+│   └── types/                      # mode-types.ts (192), constants.ts (175)
 │
-├── api/                            # 14 API modules
+├── api/                            # 13 modules
 │   ├── core.ts (70)                # Axios instance, interceptors, 60s timeout
 │   ├── index.ts                    # Unified export
 │   ├── lookup.ts (126)             # Standard + SSE streaming lookup
-│   ├── search.ts (140)             # Multi-method search
-│   ├── ai.ts (414)                 # 40+ AI synthesis endpoints
+│   ├── search.ts (146)             # Multi-method search
+│   ├── ai.ts (414)                 # AI synthesis endpoints
 │   ├── wordlists.ts (289)          # Wordlist CRUD + reviews
 │   ├── entries.ts (177)            # Dictionary entry ops
 │   ├── definitions.ts, media.ts, examples.ts, suggestions.ts
 │   ├── health.ts, versions.ts
-│   └── sse/SSEClient.ts (300)      # EventSource: config, progress, complete events
+│   └── sse/SSEClient.ts (344)      # Fetch-based SSE: retry, chunked assembly, timeout
 │
 ├── composables/                    # Global composables
 │   ├── useIOSPWA.ts (346)          # Standalone mode, swipe nav, safe areas
@@ -115,24 +144,26 @@ frontend/src/
 │   └── useSlugGeneration.ts (51)   # URL slug generation
 │
 ├── types/                          # TypeScript definitions
-│   ├── api.ts (405)                # Isomorphic: mirrors backend Pydantic exactly
+│   ├── api.ts (418)                # Isomorphic: mirrors backend Pydantic models
 │   ├── index.ts (274)              # Frontend-specific: SearchResult, error types
 │   ├── modes.ts (336)              # Centralized: SearchMode, LookupMode, ErrorType
 │   └── wordlist.ts (288)           # Wordlist, MasteryLevel, ReviewData
 │
 ├── router/
-│   └── index.ts (67)               # 7 routes: /, /search/:q, /definition/:word,
-│                                    #   /thesaurus/:word, /wordlist/:id, 404
+│   └── index.ts (67)               # 7 routes (see Routes table below)
+│
 ├── utils/
 │   ├── index.ts (71)               # cn(), debounce(), formatDate(), normalizeWord()
-│   ├── logger.ts, guards.ts, time.ts, textToPath.ts
-│   └── animations/                 # Spring, easing, keyframe utilities
+│   ├── animations.ts, logger.ts, guards.ts, time.ts, textToPath.ts
+│   └── animations/                 # animations.ts, constants.ts
 │
 ├── services/
 │   └── pwa.service.ts (318)        # PWA: install, notifications, push subscription
 │
 ├── assets/
-│   └── index.css                   # Tailwind base + CSS vars (light/dark themes)
+│   ├── index.css                   # Tailwind base + CSS vars (light/dark themes)
+│   ├── themed-cards.css            # Card theme styles
+│   ├── images/, yoshi/             # Static assets
 │
 └── styles/
     └── ios-pwa.css                 # iOS-specific safe areas, viewport
@@ -140,53 +171,63 @@ frontend/src/
 
 ## Design Principles
 
-- **Isomorphic types**: `types/api.ts` mirrors backend Pydantic models exactly
+- **Isomorphic types**: `types/api.ts` mirrors backend Pydantic models
 - **Mode-based state**: SearchBarStore delegates to mode-specific stores with onEnter/onExit lifecycle
 - **No API calls in stores**: All network operations in composables (useSearchOrchestrator)
 - **Component co-location**: Each feature groups components, composables, types, utils together
-- **Strict TypeScript**: 100% strict mode, no `any` types
+- **Strict TypeScript**: strict mode, 7 path aliases (`@/*` -> `src/*`)
 
 ## State Architecture
 
 ```
 useStores()
 ├── useSearchBarStore → useLookupMode / useWordlistMode (mode delegation)
-├── useContentStore → useLookupContent / useWordlistContent
+├── useContentStore → useLookupContentState / useWordlistContentState
 ├── useHistoryStore (recent searches, vocab suggestions with 1h cache)
 ├── useUIStore (theme, sidebar)
-└── useLoadingState (progress, stages)
+├── useLoadingState (progress, stages)
+└── useLookupMode (provider/language selection)
 ```
 
-**Persistence**: pinia-plugin-persistedstate → localStorage for searchMode, history, theme.
+7 actual Pinia stores (defineStore): auth, search-bar, lookup, wordlist, content, history, ui-state. The remaining modules (loading, stage, word-of-the-day, content modes) are composable-style state functions.
+
+**Persistence**: pinia-plugin-persistedstate -> localStorage for searchMode, history, theme.
 
 ## SSE Streaming
 
+Uses `fetch()` with `ReadableStream`, not `EventSource`. Implements retry with exponential backoff (max 3 retries, 1s base delay). Progressive timeout resets on each received event.
+
 ```
-EventSource(/api/v1/lookup/{word}/stream)
-├── event: config   → stage weights
-├── event: progress → { stage, progress, message }
-├── event: completion_chunk → partial results (>32KB)
-└── event: complete → final SynthesizedDictionaryEntry
+fetch(/api/v1/lookup/{word}/stream, Accept: text/event-stream)
+├── event: config            → stage weights (ConfigEvent)
+├── event: progress          → { stage, progress, message, is_complete }
+├── event: completion_start  → begins chunked mode
+├── event: completion_chunk  → { chunk_type, definition_index, data }
+├── event: partial           → partial results (onPartialResult callback)
+├── event: complete          → final SynthesizedDictionaryEntry
+└── event: error             → { message }
 ```
+
+Chunked completion assembles basic_info + definition + examples chunks into a final result. Heartbeat pings (lines starting with `:`) are skipped.
 
 ## Design System
 
-**Fonts**: Fraunces (display), Fira Code (mono)
-**Textures**: 4 SVG noise patterns (clean, aged, handmade, kraft)
-**Easings**: Apple-inspired (default, smooth, spring, elastic)
+**Fonts**: Fraunces (sans + serif), Fira Code (mono)
+**Textures**: 4 SVG noise patterns (paper-clean, paper-aged, paper-handmade, paper-kraft) + 3 intensity levels (subtle, medium, strong)
+**Easings**: 8 Apple-inspired cubic-beziers (apple-default, apple-smooth, apple-spring, apple-elastic, apple-ease-in, apple-ease-out, apple-bounce-in, apple-bounce-out)
 **Colors**: Warm off-white light, warm dark. CSS variables throughout.
-**Animations**: 45+ keyframes. Apple-inspired transition durations.
+**Keyframes**: 30 `@keyframes` across 15 files.
 
 ## Config
 
 | File | Purpose |
 |------|---------|
 | `vite.config.ts` | Port 3000, API proxy to :8000, Vue + Tailwind plugins |
-| `tsconfig.json` | Strict mode, 7 path aliases (`@/*` → `src/*`) |
-| `tailwind.config.ts` | 389 LOC: design system, textures, animations, easings |
+| `tsconfig.json` | Strict mode, 7 path aliases (`@/*` -> `src/*`) |
+| `tailwind.config.ts` | 388 LOC: design system, textures, animations, easings |
 | `components.json` | shadcn/ui: default style, slate base, Radix Vue |
 | `nginx.conf` | Production: rate limiting, SSE buffering off, security headers |
-| `Dockerfile` | 6-stage: base → deps → dev → build → production (nginx:alpine) |
+| `Dockerfile` | 6-stage: base -> dependencies -> dev-dependencies -> development -> build -> production (nginx:alpine) |
 
 ## Routes
 
@@ -197,6 +238,7 @@ EventSource(/api/v1/lookup/{word}/stream)
 | `/definition/:word` | Definition | Deep link |
 | `/thesaurus/:word` | Thesaurus | Synonym view |
 | `/wordlist/:wordlistId` | Wordlist | List detail |
+| `/wordlist/:wordlistId/search/:query?` | WordlistSearch | Scoped search within wordlist |
 | `/:pathMatch(.*)*` | NotFound | 404 |
 
 ## Development
@@ -212,4 +254,4 @@ prettier --write .   # Format
 
 ## Gap
 
-Frontend tests: Vitest configured but zero tests written. No component, composable, or store tests.
+No frontend tests. Vitest is configured in package.json (`"test": "vitest"`) but no vitest config file exists and zero test files have been written.

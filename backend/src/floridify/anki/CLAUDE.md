@@ -10,6 +10,6 @@ anki/
 └── constants.py (21)
 ```
 
-Card types: fill-in-the-blank (cloze), multiple choice, definition→word, word→definition.
+Card types: fill-in-the-blank (cloze), multiple choice, definition->word, word->definition.
 
 `export_wordlist_to_anki()` generates .apkg with deck config, card styling, and media embedding. Uses AI synthesis for card content generation.
