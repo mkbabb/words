@@ -118,7 +118,7 @@ Push to `main` triggers GitHub Actions: test, build, deploy, SSL auto-renewal vi
 
 ## Why
 
-I've been collecting and cataloguing words for years—2,100+ entries and counting. Existing dictionaries scatter their definitions across sources and order them by historical accident; Floridify pulls from all of them, deduplicates, clusters by meaning, and produces something you can actually learn from. Spaced repetition and Anki export so the words stick.
+I've been collecting and cataloguing words for years—2,100+ entries and counting. An expanded lexicon is to the interlocutor as an expanded palette is to a painter: it lets you say precisely what you mean. Existing dictionaries scatter their definitions across sources and order them by historical accident; Floridify pulls from all of them, deduplicates, clusters by meaning, and produces something you can actually learn from. Spaced repetition and Anki export so the words stick.
 
 Architecture docs, module guides, and technical references live in [`CLAUDE.md`](CLAUDE.md), the per-module `CLAUDE.md` files, and [`docs/`](docs/).
 
