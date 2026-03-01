@@ -4,11 +4,11 @@
             <!-- Container for invisible text and overlay -->
             <div class="relative">
                 <!-- Invisible text to reserve space -->
-                <span class="text-[clamp(1.5rem,10vw,4.5rem)] leading-tight font-bold invisible" 
+                <span class="text-[clamp(1.5rem,10vw,4.5rem)] leading-tight font-bold invisible"
                       style="font-family: 'Fraunces', serif;">
                     {{ word }}
                 </span>
-                
+
                 <!-- Animated text overlay with extra space for cursor -->
                 <div class="absolute left-0 top-0 w-[calc(100%+2ch)]">
                     <AnimatedTitle
@@ -19,11 +19,11 @@
                     />
                 </div>
             </div>
-            
+
             <!-- Plus button flows after invisible text -->
             <HoverCard>
                 <HoverCardTrigger as-child>
-                    <button 
+                    <button
                         @click="showAddToWordlistModal = true"
                         class="ml-3 group flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-muted/30 hover:bg-muted hover:border-border transition-all duration-200 opacity-60 hover:opacity-100 flex-shrink-0"
                     >
@@ -49,31 +49,37 @@
             <span class="text-lg text-muted-foreground" style="font-family: 'Fira Code', monospace;">
                 {{ currentPronunciation }}
             </span>
-            
+
+            <!-- Audio Playback Button -->
+            <AudioPlaybackButton
+                :state="audioState"
+                @play="playAudio"
+            />
+
             <button
                 @click="$emit('toggle-pronunciation')"
                 class="h-6 px-2 py-1 text-xs transition-all duration-200 rounded-md bg-muted/50 hover:bg-muted border border-border/50 hover:border-border text-foreground/80 hover:text-foreground min-w-[60px] text-center"
             >
                 {{ pronunciationMode === 'phonetic' ? 'IPA' : 'Phonetic' }}
             </button>
-            
+
             <!-- Provider Source Icons -->
             <ProviderIcons
                 :providers="providers"
                 :word="word"
             />
-            
+
             <!-- AI Synthesis Indicator -->
             <HoverCard v-if="isAISynthesized">
                 <HoverCardTrigger as-child>
                     <div class="relative inline-flex items-center justify-center cursor-help opacity-60">
                         <div class="relative">
-                            <Sparkles 
-                                :size="16" 
+                            <Sparkles
+                                :size="16"
                                 class="text-amber-600 dark:text-amber-400 animate-pulse drop-shadow-lg fill-amber-600 dark:fill-amber-400"
                             />
-                            <Sparkles 
-                                :size="16" 
+                            <Sparkles
+                                :size="16"
                                 class="absolute inset-0 text-amber-300 dark:text-amber-600 opacity-50 animate-spin-slow fill-amber-300 dark:fill-amber-600"
                             />
                         </div>
@@ -86,14 +92,14 @@
                             <h4 class="font-semibold">AI Enhanced</h4>
                         </div>
                         <p class="text-sm opacity-90">
-                            This content has been enhanced using AI to provide clearer definitions, 
+                            This content has been enhanced using AI to provide clearer definitions,
                             better examples, and improved organization of meanings.
                         </p>
                     </div>
                 </HoverCardContent>
             </HoverCard>
         </div>
-        
+
         <!-- Add to Wordlist Modal -->
         <AddToWordlistModal
             v-model="showAddToWordlistModal"
@@ -104,20 +110,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, toRef } from 'vue';
 import { CardHeader, CardTitle } from '@/components/ui/card';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Sparkles, Plus } from 'lucide-vue-next';
 import AnimatedTitle from './AnimatedTitle.vue';
+import AudioPlaybackButton from './AudioPlaybackButton.vue';
 import ProviderIcons from './ProviderIcons.vue';
 import AddToWordlistModal from './AddToWordlistModal.vue';
+import { useAudioPlayback } from '../composables/useAudioPlayback';
 import type { PronunciationMode } from '@/types';
+import type { AudioFile } from '@/types/api';
 
 interface WordHeaderProps {
     word: string;
     pronunciation?: {
         phonetic: string;
         ipa: string;
+        audio_files?: AudioFile[];
     };
     pronunciationMode: PronunciationMode;
     providers: string[];
@@ -138,6 +148,11 @@ const handleWordAdded = (_wordlistName: string) => {
     showAddToWordlistModal.value = false;
 };
 
+// Audio playback
+const wordRef = toRef(props, 'word');
+const audioFilesRef = computed(() => props.pronunciation?.audio_files);
+const { state: audioState, play: playAudio } = useAudioPlayback(wordRef, audioFilesRef);
+
 // Check if we have valid pronunciation data
 const hasPronunciation = computed(() => {
     if (!props.pronunciation) return false;
@@ -149,10 +164,10 @@ const hasPronunciation = computed(() => {
 // Get the current pronunciation to display
 const currentPronunciation = computed(() => {
     if (!props.pronunciation) return '';
-    
+
     const phonetic = props.pronunciation.phonetic;
     const ipa = props.pronunciation.ipa;
-    
+
     // Check what mode we're in
     if (props.pronunciationMode === 'phonetic') {
         // If phonetic is valid, use it; otherwise fall back to IPA
@@ -169,7 +184,7 @@ const currentPronunciation = computed(() => {
             return phonetic;
         }
     }
-    
+
     return '';
 });
 </script>
@@ -188,4 +203,3 @@ const currentPronunciation = computed(() => {
     animation: spin-slow 3s linear infinite;
 }
 </style>
-

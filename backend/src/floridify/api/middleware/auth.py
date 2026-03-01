@@ -68,6 +68,14 @@ def _is_public_endpoint(path: str, method: str) -> bool:
         if path in PUBLIC_EXACT:
             return True
 
+    # TTS generation is public (POST)
+    if method == "POST" and path == "/api/v1/audio/tts/generate":
+        return True
+
+    # Audio cache serving is public (GET)
+    if method == "GET" and path.startswith("/api/v1/audio/cache/"):
+        return True
+
     return False
 
 

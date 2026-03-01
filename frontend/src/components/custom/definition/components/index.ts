@@ -1,4 +1,5 @@
 export { default as AnimatedTitle } from './AnimatedTitle.vue';
+export { default as AudioPlaybackButton } from './AudioPlaybackButton.vue';
 export { default as DefinitionCluster } from './DefinitionCluster.vue';
 export { default as DefinitionItem } from './DefinitionItem.vue';
 export { default as ImageCarousel } from './ImageCarousel.vue';
