@@ -61,7 +61,7 @@ import { changeTheme, isDark } from ".";
     background: currentColor;
     pointer-events: none;
     z-index: -1;
-    animation: pulseToDark 650ms ease-out;
+    animation: pulseToDark 650ms ease-out forwards;
 }
 
 .toggle-sun {
@@ -76,7 +76,7 @@ import { changeTheme, isDark } from ".";
 
 .dark {
     .dark-mode-toggle-button::before {
-        animation: pulseToLight 650ms ease-out;
+        animation: pulseToLight 650ms ease-out forwards;
     }
 
     .toggle-sun {
