@@ -538,7 +538,6 @@ def batch_lemmatize(
     return unique_lemmas, word_to_lemma_indices, lemma_to_word_indices
 
 
-
 def clear_lemma_cache() -> None:
     """Clear the lemmatization cache.
 

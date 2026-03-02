@@ -2,27 +2,12 @@
 
 from __future__ import annotations
 
-# CRITICAL: Configure parallelism BEFORE any torch/faiss imports.
-# These env vars MUST be set before torch or faiss load libomp.dylib,
-# otherwise macOS will SIGSEGV from triple-libomp conflict
-# (PyTorch + scikit-learn + FAISS each load separate libomp.dylib).
-# This duplicates the setup in embedding.py — both are needed because
-# either module could be the first import in a given code path.
-import os
-import platform
-
-if platform.system() == "Darwin":
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    os.environ["LOKY_MAX_CPU_COUNT"] = "1"
-    os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
-    os.environ.setdefault("OMP_NUM_THREADS", "1")
-else:
-    os.environ["TOKENIZERS_PARALLELISM"] = "true"
-
 import asyncio
 import hashlib
 import math
 import multiprocessing as mp
+import os
+import platform
 import time
 from typing import Any, Literal
 
@@ -34,6 +19,7 @@ from sentence_transformers import SentenceTransformer
 from ...caching.core import get_global_cache
 from ...caching.models import CacheNamespace, VersionConfig
 from ...corpus.core import Corpus
+from ...corpus.manager import get_tree_corpus_manager
 from ...utils.logging import get_logger
 from ..constants import SearchMethod
 from ..result import SearchResult
@@ -92,8 +78,9 @@ class SemanticSearch:
         self.result_cache_order: list[str] = []
         self.result_cache_size = 500  # Cache up to 500 unique searches
 
-        # Debounced flush task for persisting query cache to L2
+        # Debounced flush tasks for persisting caches to L2
         self._flush_task: asyncio.Task[None] | None = None
+        self._result_flush_task: asyncio.Task[None] | None = None
 
         # Note: _load_from_index is now async, caller must await it after construction
         # This is handled in from_corpus() and from_index() class methods
@@ -208,8 +195,9 @@ class SemanticSearch:
                 load_faiss_index_from_binary_data, binary_data, corpus_name
             )
 
-            # Restore persisted query embeddings from L2 cache
+            # Restore persisted caches from L2
             await self._load_query_cache_from_l2()
+            await self._load_result_cache_from_l2()
 
         except Exception as e:
             logger.error(f"Failed to load embeddings/index from cache: {e}", exc_info=True)
@@ -345,6 +333,9 @@ class SemanticSearch:
         self.result_cache[cache_key] = results
         self.result_cache_order.append(cache_key)
 
+        # Schedule debounced flush to L2
+        self._schedule_result_cache_flush()
+
     def _query_cache_l2_key(self) -> str:
         """L2 cache key for this index's query embedding cache."""
         return f"query_embed_cache:{self.index.corpus_uuid}:{self.index.model_name}"
@@ -392,6 +383,59 @@ class SemanticSearch:
             value=serializable,
         )
         logger.debug(f"Flushed {len(serializable)} query embeddings to L2")
+
+    # --- Result cache L2 persistence ---
+
+    def _result_cache_l2_key(self) -> str:
+        """L2 cache key for this index's result cache."""
+        return f"result_cache:{self.index.corpus_uuid}:{self.index.model_name}"
+
+    async def _load_result_cache_from_l2(self) -> None:
+        """Load persisted search results from L2 cache on startup."""
+        if not self.index:
+            return
+        cache = await get_global_cache()
+        cached = await cache.get(
+            namespace=CacheNamespace.SEMANTIC,
+            key=self._result_cache_l2_key(),
+        )
+        if not isinstance(cached, dict):
+            return
+        count = 0
+        for key, results_data in cached.items():
+            if isinstance(results_data, list):
+                self.result_cache[key] = [SearchResult.model_validate(r) for r in results_data]
+                self.result_cache_order.append(key)
+                count += 1
+        if count > 0:
+            logger.debug(f"Loaded {count} cached search results from L2")
+
+    def _schedule_result_cache_flush(self) -> None:
+        """Schedule a debounced (5s) flush of result cache to L2."""
+        if self._result_flush_task and not self._result_flush_task.done():
+            self._result_flush_task.cancel()
+        try:
+            loop = asyncio.get_running_loop()
+            self._result_flush_task = loop.create_task(self._debounced_result_flush())
+        except RuntimeError:
+            pass
+
+    async def _debounced_result_flush(self) -> None:
+        """Wait 5s then persist result cache to L2."""
+        await asyncio.sleep(5.0)
+        if not self.index or not self.result_cache:
+            return
+        cache = await get_global_cache()
+        serializable = {
+            k: [r.model_dump(mode="json") for r in results]
+            for k, results in self.result_cache.items()
+        }
+        await cache.set(
+            namespace=CacheNamespace.SEMANTIC,
+            key=self._result_cache_l2_key(),
+            value=serializable,
+        )
+        logger.debug(f"Flushed {len(serializable)} search result sets to L2")
 
     def _encode(self, texts: list[str], use_multiprocessing: bool = True) -> np.ndarray:
         """Encode texts with optimizations (quantization + GPU acceleration + multiprocessing).
@@ -523,8 +567,6 @@ class SemanticSearch:
         if not self.corpus:
             # Try to load corpus from index - use corpus_uuid for lookup
             # CRITICAL: use_cache=False to avoid loading stale corpus after test modifications
-            from ...corpus.manager import get_tree_corpus_manager
-
             manager = get_tree_corpus_manager()
             self.corpus = await manager.get_corpus(
                 corpus_uuid=self.index.corpus_uuid,
@@ -584,6 +626,8 @@ class SemanticSearch:
             # Clear existing runtime data to force rebuild
             self.sentence_embeddings = None
             self.sentence_index = None
+            self.result_cache.clear()
+            self.result_cache_order.clear()
 
             await self._build_embeddings_from_corpus()
         else:

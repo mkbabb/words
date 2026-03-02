@@ -155,9 +155,7 @@ class _GoogleCloudTTSSynthesizer:
             from google.cloud import texttospeech_v1 as texttospeech
 
             synthesis_input = texttospeech.SynthesisInput(ssml=ssml_text)
-            voice = texttospeech.VoiceSelectionParams(
-                language_code=language_code, name=voice_name
-            )
+            voice = texttospeech.VoiceSelectionParams(language_code=language_code, name=voice_name)
             audio_config = texttospeech.AudioConfig(
                 audio_encoding=self.config.audio_encoding,
                 speaking_rate=self.config.speaking_rate,
@@ -220,9 +218,7 @@ class _GoogleCloudTTSSynthesizer:
             from google.cloud import texttospeech_v1 as texttospeech
 
             synthesis_input = texttospeech.SynthesisInput(text=synthesis_text)
-            voice = texttospeech.VoiceSelectionParams(
-                language_code=language_code, name=voice_name
-            )
+            voice = texttospeech.VoiceSelectionParams(language_code=language_code, name=voice_name)
             audio_config = texttospeech.AudioConfig(
                 audio_encoding=self.config.audio_encoding,
                 speaking_rate=self.config.speaking_rate,

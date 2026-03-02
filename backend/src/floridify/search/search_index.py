@@ -16,7 +16,6 @@ from ..caching.models import (
     VersionConfig,
 )
 from ..corpus.core import Corpus
-from ..corpus.utils import get_vocabulary_hash
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE
 from .trie_index import TrieIndex

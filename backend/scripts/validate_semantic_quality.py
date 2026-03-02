@@ -12,10 +12,10 @@ from __future__ import annotations
 
 import os
 
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+from floridify.utils.threading_config import configure_threading
+
+configure_threading()
+
 os.environ["LOG_LEVEL"] = "WARNING"
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"

@@ -26,6 +26,7 @@ from ...models.relationships import (
     UsageNote,
     WordForm,
 )
+from ...storage.dictionary import save_definitions_batch_versioned, save_entry_versioned
 from ...utils.logging import get_logger
 from ..batch_processor import batch_synthesis
 from ..connector import OpenAIConnector
@@ -364,8 +365,8 @@ async def enhance_definitions_parallel(
 
         successes += 1
 
-    # Save all enhanced definitions
-    await asyncio.gather(*[d.save() for d in definitions])
+    # Save all enhanced definitions with version history
+    await save_definitions_batch_versioned(definitions, word.text)
 
     logger.info(
         f"Enhanced {len(definitions)} definitions: {successes} successes, {failures} failures",
@@ -480,8 +481,8 @@ async def enhance_synthesized_entry(
                     fact.id for fact in cast("list[Fact]", result) if fact.id is not None
                 ]
 
-        # Save updated entry
-        await entry.save()
+        # Save updated entry with version history
+        await save_entry_versioned(entry, word.text)
 
         # Log results
         successes = sum(1 for r in results if r and not isinstance(r, Exception))

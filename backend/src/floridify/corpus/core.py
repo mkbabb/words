@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any, ClassVar
 
 import coolname
+import numpy as np
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field, field_validator
 
@@ -22,8 +23,6 @@ from ..caching.models import (
     VersionInfo,
 )
 from ..models.base import Language
-import numpy as np
-
 from ..text.normalize import batch_lemmatize, batch_normalize
 from ..utils.logging import get_logger
 from .models import CorpusType
@@ -594,7 +593,7 @@ class Corpus(BaseModel):
                 above = np.where(counts >= threshold)[0]
                 if len(above) > 0:
                     order = np.argsort(-counts[above])
-                    trigram_candidates = above[order][: max_results].tolist()
+                    trigram_candidates = above[order][:max_results].tolist()
                     priority.update(trigram_candidates)
 
         # Stage 4: Length-based candidates (ALWAYS runs — critical for typo correction)

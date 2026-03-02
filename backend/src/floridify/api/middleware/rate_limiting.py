@@ -13,6 +13,8 @@ from fastapi import HTTPException, Request, Response
 from fastapi.routing import APIRoute
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from ...caching.core import get_global_cache
+from ...caching.models import CacheNamespace
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -381,7 +383,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 
 class SpendingTracker:
-    """Tracks AI API spending with daily and hourly budget caps."""
+    """Tracks AI API spending with daily and hourly budget caps.
+
+    Persists spend history to L2 cache so budget caps survive restarts.
+    """
+
+    _L2_KEY = "spending_tracker:history"
 
     def __init__(
         self,
@@ -393,6 +400,52 @@ class SpendingTracker:
         self._hourly_spend: list[tuple[float, float]] = []  # (timestamp, cost)
         self._daily_spend: list[tuple[float, float]] = []
         self._lock = asyncio.Lock()
+        self._loaded_from_l2 = False
+        self._flush_task: asyncio.Task[None] | None = None
+
+    async def _ensure_loaded(self) -> None:
+        """Load spend history from L2 on first access. Idempotent."""
+        if self._loaded_from_l2:
+            return
+        self._loaded_from_l2 = True
+
+        cache = await get_global_cache()
+        cached = await cache.get(namespace=CacheNamespace.API, key=self._L2_KEY)
+        if not isinstance(cached, dict):
+            return
+
+        now = time.time()
+        hourly = cached.get("hourly", [])
+        daily = cached.get("daily", [])
+        # Restore only non-expired entries
+        self._hourly_spend = [(t, c) for t, c in hourly if now - t < 3600]
+        self._daily_spend = [(t, c) for t, c in daily if now - t < 86400]
+
+        total_restored = len(self._hourly_spend) + len(self._daily_spend)
+        if total_restored > 0:
+            logger.info(f"Restored {total_restored} spend entries from L2")
+
+    def _schedule_flush(self) -> None:
+        """Schedule a debounced (3s) flush of spend history to L2."""
+        if self._flush_task and not self._flush_task.done():
+            self._flush_task.cancel()
+        try:
+            loop = asyncio.get_running_loop()
+            self._flush_task = loop.create_task(self._debounced_flush())
+        except RuntimeError:
+            pass
+
+    async def _debounced_flush(self) -> None:
+        """Wait 3s then persist spend history to L2."""
+        await asyncio.sleep(3.0)
+
+        cache = await get_global_cache()
+        async with self._lock:
+            data = {
+                "hourly": list(self._hourly_spend),
+                "daily": list(self._daily_spend),
+            }
+        await cache.set(namespace=CacheNamespace.API, key=self._L2_KEY, value=data)
 
     def _estimate_cost(self, model: str, total_tokens: int) -> float:
         """Estimate cost in dollars for a request."""
@@ -407,6 +460,7 @@ class SpendingTracker:
 
     async def check_budget(self) -> tuple[bool, str | None]:
         """Check if spending is within budget. Returns (allowed, reason)."""
+        await self._ensure_loaded()
         async with self._lock:
             now = time.time()
 
@@ -445,12 +499,14 @@ class SpendingTracker:
             return True, None
 
     async def record_spend(self, model: str, total_tokens: int) -> None:
-        """Record actual API spend."""
+        """Record actual API spend and schedule L2 flush."""
+        await self._ensure_loaded()
         cost = self._estimate_cost(model, total_tokens)
         async with self._lock:
             now = time.time()
             self._hourly_spend.append((now, cost))
             self._daily_spend.append((now, cost))
+        self._schedule_flush()
 
 
 # Global spending tracker

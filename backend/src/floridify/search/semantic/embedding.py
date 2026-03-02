@@ -5,29 +5,6 @@ Handles model loading, caching, and text encoding with multiprocessing support.
 
 from __future__ import annotations
 
-# CRITICAL: Configure parallelism BEFORE any imports
-import os
-import platform
-
-# macOS-specific workaround: Prevent semaphore leaks and libomp conflicts
-# ONLY apply on macOS - Linux/Docker uses proper multiprocessing
-if platform.system() == "Darwin":
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Disable in macOS only
-    os.environ["LOKY_MAX_CPU_COUNT"] = "1"
-    # NOTE: Do NOT set JOBLIB_START_METHOD=threading — invalid in Python 3.13+
-    # and causes "cannot find context for 'threading'" crash on import.
-    # Instead, rely on LOKY_MAX_CPU_COUNT=1 to prevent multiprocessing.
-    # CRITICAL: KMP_DUPLICATE_LIB_OK prevents libomp conflict crash
-    # (PyTorch + scikit-learn + FAISS each load separate libomp.dylib)
-    os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
-    # OMP_NUM_THREADS must stay at 1 to prevent triple-libomp segfault.
-    # torch.set_num_threads() is also unsafe when multiple OpenMP runtimes are loaded.
-    # The main throughput lever is batch_size (32→128 gives 42% speedup).
-    os.environ.setdefault("OMP_NUM_THREADS", "1")
-else:
-    # Linux/Docker: Enable tokenizer parallelism for better performance
-    os.environ["TOKENIZERS_PARALLELISM"] = "true"
-
 import asyncio
 import time
 from typing import Any
@@ -152,3 +129,36 @@ async def get_cached_model(
         logger.info(f"✅ Model loaded and cached in {elapsed:.2f}s: {model_name} on {device}")
 
         return model
+
+
+def get_cached_model_sync(
+    model_name: str,
+    device: str = "cpu",
+) -> SentenceTransformer:
+    """Synchronous model load, shares _model_cache with async get_cached_model().
+
+    Used by WOTD embeddings and other sync contexts that need the same model.
+
+    Args:
+        model_name: HuggingFace model name
+        device: Device to load model on (cpu, cuda, mps)
+
+    Returns:
+        Cached or newly loaded SentenceTransformer model
+    """
+    cache_key = f"{model_name}:{device}:False"
+
+    if cache_key in _model_cache:
+        logger.debug(f"✅ Model cache HIT (sync): {model_name} on {device}")
+        return _model_cache[cache_key]
+
+    logger.info(f"⏳ Loading model {model_name} on {device} (sync, will be cached)")
+    start_time = time.perf_counter()
+
+    model = SentenceTransformer(model_name, trust_remote_code=True).to(device)
+    _model_cache[cache_key] = model
+
+    elapsed = time.perf_counter() - start_time
+    logger.info(f"✅ Model loaded and cached in {elapsed:.2f}s: {model_name} on {device}")
+
+    return model

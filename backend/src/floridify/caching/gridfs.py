@@ -51,9 +51,7 @@ async def get_gridfs_bucket() -> AsyncIOMotorGridFSBucket:
     return _bucket
 
 
-async def gridfs_put(
-    filename: str, data: bytes, metadata: dict[str, Any] | None = None
-) -> str:
+async def gridfs_put(filename: str, data: bytes, metadata: dict[str, Any] | None = None) -> str:
     """Upload bytes to GridFS.
 
     Args:

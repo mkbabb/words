@@ -18,6 +18,7 @@ from ...models.dictionary import (
     Word,
 )
 from ...models.relationships import Collocation, UsageNote
+from ...storage.dictionary import save_definition_versioned, save_entry_versioned
 from ...utils.logging import get_logger
 from ..core import BaseConnector, ConnectorConfig
 from .models import DictionaryProviderEntry
@@ -168,7 +169,7 @@ class DictionaryConnector(BaseConnector):
                     for n in def_data.get("usage_notes", [])
                 ],
             )
-            await definition.save()
+            await save_definition_versioned(definition, word.text)
 
             # Save examples if present
             example_ids: list[PydanticObjectId] = []
@@ -185,7 +186,7 @@ class DictionaryConnector(BaseConnector):
             # Update definition with example IDs
             if example_ids:
                 definition.example_ids = example_ids
-                await definition.save()
+                await save_definition_versioned(definition, word.text)
 
             if definition.id:
                 definition_ids.append(definition.id)
@@ -214,6 +215,6 @@ class DictionaryConnector(BaseConnector):
             etymology=etymology,
             raw_data=provider_entry.raw_data,
         )
-        await dict_entry.save()
+        await save_entry_versioned(dict_entry, word.text)
 
         return dict_entry

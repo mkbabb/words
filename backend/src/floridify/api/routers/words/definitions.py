@@ -25,6 +25,7 @@ from ....ai.synthesis import (
     usage_note_generation,
 )
 from ....models import Definition, Word
+from ....storage.dictionary import _resolve_word_text, save_definition_versioned
 from ...core import (
     ErrorDetail,
     ErrorResponse,
@@ -39,6 +40,7 @@ from ...core import (
     get_pagination,
     get_sort,
 )
+from ...core.protocols import TypedFieldUpdater
 from ...repositories import (
     DefinitionCreate,
     DefinitionFilter,
@@ -437,15 +439,13 @@ async def regenerate_components(
             else:
                 # Update definition field with AI result
                 definition_data = {component: result}
-                from ....api.core.protocols import TypedFieldUpdater
-
                 TypedFieldUpdater.update_fields(definition, definition_data)
 
             updates[component] = result
 
-    # Save definition
+    # Save definition with version history
     definition.version += 1
-    await definition.save()
+    await save_definition_versioned(definition, word.text)
 
     return ResourceResponse(
         data=definition.model_dump(mode="json"),
@@ -519,10 +519,11 @@ async def batch_regenerate_components(
         # enhance_definitions_parallel modifies definitions in place
         all_results[str(word_id)] = {"processed": len(word_definitions)}
 
-    # Save all definitions
+    # Save all definitions with version history
     for definition in definitions:
         definition.version += 1
-        await definition.save()
+        word_text = await _resolve_word_text(definition.word_id)
+        await save_definition_versioned(definition, word_text)
 
     return {
         "processed": len(definitions),

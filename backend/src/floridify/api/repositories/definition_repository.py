@@ -16,6 +16,7 @@ from ...models import (
     UsageNote,
     WordForm,
 )
+from ...storage.dictionary import _resolve_word_text, save_definition_versioned
 from ..core.base import BaseRepository
 
 
@@ -136,6 +137,11 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
     def __init__(self) -> None:
         super().__init__(Definition)
 
+    async def _save_def_versioned(self, definition: Definition) -> None:
+        """Save definition with version history, resolving word text."""
+        word_text = await _resolve_word_text(definition.word_id)
+        await save_definition_versioned(definition, word_text)
+
     # Core queries matching Definition model relationships
     async def find_by_word(
         self,
@@ -153,7 +159,9 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         """Find definitions in the same meaning cluster."""
         return await Definition.find({"meaning_cluster.cluster_id": cluster_id}).to_list()
 
-    async def find_by_provider(self, dictionary_entry_id: PydanticObjectId | str) -> list[Definition]:
+    async def find_by_provider(
+        self, dictionary_entry_id: PydanticObjectId | str
+    ) -> list[Definition]:
         """Find definitions from a specific provider."""
         entry_oid = (
             PydanticObjectId(dictionary_entry_id)
@@ -185,7 +193,7 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         if example.id and example.id not in definition.example_ids:
             definition.example_ids.append(example.id)
             definition.version += 1
-            await definition.save()
+            await self._save_def_versioned(definition)
 
         return example
 
@@ -201,7 +209,7 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         if example_id in definition.example_ids:
             definition.example_ids.remove(example_id)
             definition.version += 1
-            await definition.save()
+            await self._save_def_versioned(definition)
 
             # Delete the example
             example = await Example.get(example_id)
@@ -222,7 +230,7 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         if image_id not in definition.image_ids:
             definition.image_ids.append(image_id)
             definition.version += 1
-            await definition.save()
+            await self._save_def_versioned(definition)
 
         return definition
 
@@ -238,7 +246,7 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         if image_id in definition.image_ids:
             definition.image_ids.remove(image_id)
             definition.version += 1
-            await definition.save()
+            await self._save_def_versioned(definition)
 
         return definition
 
@@ -346,7 +354,7 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         new_example_ids = [ex.id for ex in examples if ex.id]
         definition.example_ids.extend(new_example_ids)
         definition.version += 1
-        await definition.save()
+        await self._save_def_versioned(definition)
 
         return examples
 
@@ -372,5 +380,5 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
             definition.usage_notes = usage_notes
 
         definition.version += 1
-        await definition.save()
+        await self._save_def_versioned(definition)
         return definition

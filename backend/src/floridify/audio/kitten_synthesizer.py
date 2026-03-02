@@ -61,16 +61,11 @@ class KittenTTSSynthesizer:
             if KittenTTSSynthesizer._model is not None:
                 return KittenTTSSynthesizer._model
 
-            # Prevent OpenMP crashes on macOS
-            os.environ.setdefault("OMP_NUM_THREADS", "1")
-            os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
-
             try:
                 from kittentts import KittenTTS
             except ImportError as e:
                 raise ImportError(
-                    "kittentts is required for local TTS. "
-                    "Install with: uv sync --extra kitten-tts"
+                    "kittentts is required for local TTS. Install with: uv sync --extra kitten-tts"
                 ) from e
 
             logger.info("Loading KittenTTS model (auto-download from HuggingFace)...")

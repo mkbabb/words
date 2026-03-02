@@ -370,9 +370,7 @@ class SemanticIndex(BaseModel):
 
                 # Upload to GridFS — pickle directly (SEMANTIC data already contains
                 # gzip'd bytes, so no ZSTD re-compression)
-                pickled = pickle.dumps(
-                    content_with_binary, protocol=pickle.HIGHEST_PROTOCOL
-                )
+                pickled = pickle.dumps(content_with_binary, protocol=pickle.HIGHEST_PROTOCOL)
                 gridfs_file_id = await gridfs_put(
                     filename=resource_id,
                     data=pickled,
@@ -381,9 +379,7 @@ class SemanticIndex(BaseModel):
                         "corpus_uuid": corpus_uuid or self.corpus_uuid,
                     },
                 )
-                logger.info(
-                    f"Stored {binary_size:,} bytes to GridFS for {resource_id}"
-                )
+                logger.info(f"Stored {binary_size:,} bytes to GridFS for {resource_id}")
 
                 # Warm L1/L2 cache for immediate reads
                 await cache.set(

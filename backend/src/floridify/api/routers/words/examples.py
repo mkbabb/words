@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from ....ai import get_openai_connector
 from ....ai.synthesis import generate_examples
 from ....models import Definition, Example, Word
+from ....storage.dictionary import save_definition_versioned
 from ...core import (
     FieldSelection,
     ListResponse,
@@ -252,7 +253,7 @@ async def generate_examples_for_definition(
 
     # Update definition with new example IDs
     definition.example_ids.extend([ex.id for ex in created_examples if ex.id is not None])
-    await definition.save()
+    await save_definition_versioned(definition, word.text)
 
     return responses
 

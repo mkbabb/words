@@ -36,6 +36,7 @@ from ..search.trie_index import TrieIndex
 from ..utils.config import Config
 from ..utils.logging import get_logger
 from ..wordlist.models import WordList
+from .dictionary import _resolve_word_text, save_entry_versioned
 
 logger = get_logger(__name__)
 
@@ -358,25 +359,10 @@ async def get_synthesized_entry(word_text: str) -> DictionaryEntry | None:
 
 
 async def save_synthesized_entry(entry: DictionaryEntry) -> None:
-    """Save synthesized dictionary entry."""
+    """Save synthesized dictionary entry with version history."""
     try:
         await _ensure_initialized()
-        existing = await DictionaryEntry.find_one(
-            DictionaryEntry.word_id == entry.word_id,
-            DictionaryEntry.provider == DictionaryProvider.SYNTHESIS,
-        )
-
-        if existing:
-            # Update existing entry
-            existing.pronunciation_id = entry.pronunciation_id
-            existing.definition_ids = entry.definition_ids
-            existing.etymology = entry.etymology
-            existing.fact_ids = entry.fact_ids
-            existing.model_info = entry.model_info
-            existing.updated_at = datetime.now()
-            existing.version += 1
-            await existing.save()
-        else:
-            await entry.create()
+        word_text = await _resolve_word_text(entry.word_id)
+        await save_entry_versioned(entry, word_text)
     except Exception as e:
         logger.error(f"Error saving synthesized entry: {e}")

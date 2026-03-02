@@ -22,6 +22,7 @@ from ....models.relationships import (
     Collocation,
     UsageNote,
 )
+from ....storage.dictionary import _resolve_word_text, save_definition_versioned
 from ....utils.logging import get_logger
 from .wikitext_cleaner import WikitextCleaner
 
@@ -64,6 +65,7 @@ async def extract_definitions(
 ) -> list[Definition]:
     """Extract definitions using new model structure."""
     definitions = []
+    word_text = await _resolve_word_text(word_id)
 
     for subsection in section.sections:
         if not subsection.title:
@@ -120,14 +122,14 @@ async def extract_definitions(
             )
 
             # Save definition to get ID
-            await definition.save()
+            await save_definition_versioned(definition, word_text)
             assert definition.id is not None  # After save(), id is guaranteed to be not None
 
             # Extract and save examples from both the definition and the full subsection
             # This ensures we capture quotations that appear after the definition
             example_objs = await extract_examples(subsection_text, definition.id)
             definition.example_ids = [ex.id for ex in example_objs if ex.id is not None]
-            await definition.save()  # Update with example IDs
+            await save_definition_versioned(definition, word_text)  # Update with example IDs
 
             definitions.append(definition)
 

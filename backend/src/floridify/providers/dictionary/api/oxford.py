@@ -17,6 +17,7 @@ from ....models.dictionary import (
     Pronunciation,
     Word,
 )
+from ....storage.dictionary import _resolve_word_text, save_definition_versioned
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ..core import DictionaryConnector
@@ -233,6 +234,7 @@ class OxfordConnector(DictionaryConnector):
 
         """
         definitions: list[Definition] = []
+        word_text = await _resolve_word_text(word_id)
 
         try:
             results = raw_data.get("results", [])
@@ -295,7 +297,7 @@ class OxfordConnector(DictionaryConnector):
                                 )
 
                                 # Save definition to get ID
-                                await definition.save()
+                                await save_definition_versioned(definition, word_text)
 
                                 # Extract and save examples
                                 oxford_examples = sense.get("examples", [])
@@ -317,7 +319,7 @@ class OxfordConnector(DictionaryConnector):
                                         definition.example_ids.append(example_obj.id)
 
                                 # Update definition with example IDs
-                                await definition.save()
+                                await save_definition_versioned(definition, word_text)
                                 definitions.append(definition)
 
         except Exception as e:

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from ...models import Etymology, ImageMedia, ModelInfo
 from ...models.dictionary import Definition, DictionaryEntry, Fact, Pronunciation
+from ...storage.dictionary import _resolve_word_text, save_entry_versioned
 from ..core.base import BaseRepository
 
 
@@ -114,6 +115,11 @@ class SynthesisRepository(
         ).to_list()
 
     # CRUD for related definitions
+    async def _save_entry_versioned(self, entry: DictionaryEntry) -> None:
+        """Save entry with version history, resolving word text."""
+        word_text = await _resolve_word_text(entry.word_id)
+        await save_entry_versioned(entry, word_text)
+
     async def add_definition(
         self,
         entry_id: PydanticObjectId,
@@ -126,7 +132,7 @@ class SynthesisRepository(
         if definition_id not in entry.definition_ids:
             entry.definition_ids.append(definition_id)
             entry.version += 1
-            await entry.save()
+            await self._save_entry_versioned(entry)
 
         return entry
 
@@ -142,7 +148,7 @@ class SynthesisRepository(
         if definition_id in entry.definition_ids:
             entry.definition_ids.remove(definition_id)
             entry.version += 1
-            await entry.save()
+            await self._save_entry_versioned(entry)
 
         return entry
 
@@ -158,7 +164,7 @@ class SynthesisRepository(
         if fact_id not in entry.fact_ids:
             entry.fact_ids.append(fact_id)
             entry.version += 1
-            await entry.save()
+            await self._save_entry_versioned(entry)
 
         return entry
 
@@ -173,7 +179,7 @@ class SynthesisRepository(
 
         entry.pronunciation_id = pronunciation_id
         entry.version += 1
-        await entry.save()
+        await self._save_entry_versioned(entry)
 
         return entry
 
@@ -340,7 +346,7 @@ class SynthesisRepository(
         if new_ids:
             entry.definition_ids.extend(new_ids)
             entry.version += 1
-            await entry.save()
+            await self._save_entry_versioned(entry)
 
         return entry
 

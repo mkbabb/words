@@ -18,6 +18,7 @@ from ....models.dictionary import (
     Pronunciation,
     Word,
 )
+from ....storage.dictionary import _resolve_word_text, save_definition_versioned
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ..core import DictionaryConnector
@@ -410,6 +411,7 @@ class AppleDictionaryConnector(DictionaryConnector):
         if "raw_definition" not in raw_data:
             return []
 
+        word_text = await _resolve_word_text(word_id)
         raw_definition = raw_data["raw_definition"]
 
         # Parse raw definition text into structured definitions
@@ -445,7 +447,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             )
 
             # Save definition to get ID
-            await definition.save()
+            await save_definition_versioned(definition, word_text)
             assert definition.id is not None  # After save(), id is guaranteed to be not None
 
             # Create and save examples
@@ -461,7 +463,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
             # Update definition with example IDs if any were added
             if definition.example_ids:
-                await definition.save()
+                await save_definition_versioned(definition, word_text)
 
             parsed_defs.append(definition)
 

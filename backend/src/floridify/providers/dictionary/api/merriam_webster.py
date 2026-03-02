@@ -19,6 +19,7 @@ from ....models.dictionary import (
     Pronunciation,
     Word,
 )
+from ....storage.dictionary import _resolve_word_text, save_definition_versioned
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ..core import DictionaryConnector
@@ -159,6 +160,7 @@ class MerriamWebsterConnector(DictionaryConnector):
 
         """
         definitions: list[Definition] = []
+        word_text = await _resolve_word_text(word_id)
 
         try:
             # Get part of speech directly
@@ -198,7 +200,7 @@ class MerriamWebsterConnector(DictionaryConnector):
                             )
 
                             # Save definition to get ID
-                            await definition.save()
+                            await save_definition_versioned(definition, word_text)
 
                             # Parse and save examples
                             example_texts = self._extract_examples(dt)
@@ -216,7 +218,7 @@ class MerriamWebsterConnector(DictionaryConnector):
 
                             # Update definition with example IDs
                             definition.example_ids = example_ids
-                            await definition.save()
+                            await save_definition_versioned(definition, word_text)
 
                             definitions.append(definition)
 

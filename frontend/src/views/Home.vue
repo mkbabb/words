@@ -182,7 +182,9 @@ watch(() => route.fullPath, async () => {
         searchBar.setSubMode('lookup', 'dictionary');
         searchBar.setQuery(word);
 
-        if (!content.currentEntry || content.currentEntry.word !== word) {
+        // Skip if selectResult (navigation) is already handling this lookup —
+        // two competing SSE streams cause the definition to flash then vanish.
+        if (!searchBar.isDirectLookup && (!content.currentEntry || content.currentEntry.word !== word)) {
             searchBar.setDirectLookup(true);
             try {
                 const definition = await orchestrator.getDefinition(word, {
@@ -204,7 +206,7 @@ watch(() => route.fullPath, async () => {
         searchBar.setSubMode('lookup', 'thesaurus');
         searchBar.setQuery(word);
 
-        if (!content.currentEntry || content.currentEntry.word !== word) {
+        if (!searchBar.isDirectLookup && (!content.currentEntry || content.currentEntry.word !== word)) {
             searchBar.setDirectLookup(true);
             try {
                 await orchestrator.getThesaurusData(word);

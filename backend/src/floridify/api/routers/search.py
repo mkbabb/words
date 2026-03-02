@@ -189,7 +189,12 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
                 logger.warning(f"Multi-mode search failed for mode '{mode_str}': {e}")
 
         # Sort by score with small method bonus for tiebreaking
-        _METHOD_BONUS = {SearchMethod.EXACT: 0.03, SearchMethod.PREFIX: 0.02, SearchMethod.SEMANTIC: 0.01, SearchMethod.FUZZY: 0.0}
+        _METHOD_BONUS = {
+            SearchMethod.EXACT: 0.03,
+            SearchMethod.PREFIX: 0.02,
+            SearchMethod.SEMANTIC: 0.01,
+            SearchMethod.FUZZY: 0.0,
+        }
         all_results.sort(
             key=lambda r: r.score + _METHOD_BONUS.get(r.method, 0.0),
             reverse=True,

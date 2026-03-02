@@ -28,47 +28,14 @@ Supported Models:
 
 from __future__ import annotations
 
-import multiprocessing
-import os
 import platform
 from enum import Enum
-
-# Apple Silicon specific configuration
-if platform.machine() == "arm64" and platform.system() == "Darwin":
-    # Apple Silicon: Use optimized threading for M-series chips
-    # These settings work with Apple's Accelerate framework
-    os.environ["VECLIB_MAXIMUM_THREADS"] = "4"  # Optimal for M-series efficiency cores
-    os.environ["OMP_NUM_THREADS"] = "4"  # Match VECLIB setting
-    os.environ["MKL_NUM_THREADS"] = "1"  # Disable Intel MKL on Apple Silicon
-    os.environ["OPENBLAS_NUM_THREADS"] = "1"  # Not used on Apple Silicon
-else:
-    # Intel/AMD: Standard multi-threading
-
-    num_cores = multiprocessing.cpu_count()
-    os.environ["OMP_NUM_THREADS"] = str(min(4, num_cores))  # Cap at 4 for stability
-    os.environ["MKL_NUM_THREADS"] = str(min(4, num_cores))
-    os.environ["OPENBLAS_NUM_THREADS"] = str(min(4, num_cores))
-
-# Disable problematic parallelism
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-# Don't disable CUDA completely - let PyTorch decide
-if "CUDA_VISIBLE_DEVICES" not in os.environ:
-    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"  # Enable MPS fallback on Apple Silicon
 
 import numpy as np
 import torch
 import torch.nn.functional as F  # noqa: N812
 
-# Import sentence transformers after environment configuration
-try:
-    from sentence_transformers import SentenceTransformer
-except ImportError as e:
-    raise ImportError(
-        "sentence-transformers is required for embedding computation. "
-        "Install with: pip install sentence-transformers",
-    ) from e
-
-
+from ..search.semantic.embedding import get_cached_model_sync
 from ..utils.logging import get_logger
 from .constants import (
     DEFAULT_EMBEDDING_MODEL,
@@ -169,11 +136,9 @@ class Embedder:
         # Initialize current dimension to full dimension
         self._current_dim = self.full_dim
 
-        # Load model with careful device and precision handling
+        # Load model from shared cache (avoids duplicate ~600MB loads)
         try:
-            self.model = SentenceTransformer(
-                self.model_name, device=self.device, trust_remote_code=True
-            )
+            self.model = get_cached_model_sync(self.model_name, device=self.device)
 
             # Only use fp16 on CUDA devices
             if self.use_fp16:
@@ -190,9 +155,7 @@ class Embedder:
                 logger.info("🔄 Falling back to CPU device")
                 self.device = "cpu"
                 self.use_fp16 = False
-                self.model = SentenceTransformer(
-                    self.model_name, device="cpu", trust_remote_code=True
-                )
+                self.model = get_cached_model_sync(self.model_name, device="cpu")
                 logger.info(f"✅ Loaded {self.model_name} ({self.full_dim}D) on CPU (fallback)")
             else:
                 raise

@@ -17,6 +17,7 @@ from ....models.dictionary import (
     Pronunciation,
     Word,
 )
+from ....storage.dictionary import _resolve_word_text, save_definition_versioned
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
 from ...http_client import respectful_scraper
@@ -153,6 +154,7 @@ class WordHippoConnector(DictionaryConnector):
 
         """
         definitions = []
+        word_text = await _resolve_word_text(word_id)
 
         try:
             # WordHippo structures definitions in div.relatedwords sections
@@ -205,7 +207,7 @@ class WordHippoConnector(DictionaryConnector):
                     )
 
                     # Save definition to get ID
-                    await definition.save()
+                    await save_definition_versioned(definition, word_text)
 
                     # Look for examples in nearby elements
                     if definition.id is not None:
@@ -215,7 +217,7 @@ class WordHippoConnector(DictionaryConnector):
                         )
                         if examples:
                             definition.example_ids = [ex.id for ex in examples if ex.id]
-                            await definition.save()
+                            await save_definition_versioned(definition, word_text)
 
                     definitions.append(definition)
 
@@ -235,7 +237,7 @@ class WordHippoConnector(DictionaryConnector):
                             antonyms=[],
                             example_ids=[],
                         )
-                        await definition.save()
+                        await save_definition_versioned(definition, word_text)
                         definitions.append(definition)
 
         except Exception as e:
@@ -531,6 +533,8 @@ class WordHippoConnector(DictionaryConnector):
 
         """
         try:
+            word_text = await _resolve_word_text(definitions[0].word_id) if definitions else ""
+
             # Distribute synonyms and antonyms across definitions
             for i, definition in enumerate(definitions):
                 # Add synonyms (distribute evenly)
@@ -567,7 +571,7 @@ class WordHippoConnector(DictionaryConnector):
                             definition.example_ids.append(example.id)
 
                 # Save updated definition
-                await definition.save()
+                await save_definition_versioned(definition, word_text)
 
         except Exception as e:
             logger.error(f"Error enhancing definitions with additional data: {e}")

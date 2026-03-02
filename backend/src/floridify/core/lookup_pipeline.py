@@ -18,6 +18,7 @@ from ..models.dictionary import (
     Word,
 )
 from ..providers.factory import create_connector
+from ..storage.dictionary import save_entry_versioned
 from ..storage.mongodb import get_storage, get_synthesized_entry
 from ..utils.logging import (
     get_logger,
@@ -229,6 +230,7 @@ async def lookup_word_pipeline(
                     word=best_match,
                     provider_data=providers_data[0],  # Use first provider only
                     state_tracker=state_tracker,
+                    no_ai=no_ai,
                 )
             logger.warning("No provider data available for non-AI synthesis")
             return None
@@ -365,10 +367,13 @@ async def _create_provider_mapped_entry(
     word: str,
     provider_data: DictionaryEntry,
     state_tracker: StateTracker | None = None,
+    no_ai: bool = False,
 ) -> DictionaryEntry | None:
     """Create a synthesized entry from provider data without full AI synthesis.
 
-    Uses AI only for deduplication and clustering, but not for content generation.
+    When no_ai=True, skips all AI calls (dedup + clustering) and uses raw provider
+    definitions directly. When no_ai=False, uses AI for deduplication and clustering
+    but not for content generation.
     """
     logger.info(f"📦 Creating provider-mapped entry for '{word}' from {provider_data.provider}")
 
@@ -390,53 +395,60 @@ async def _create_provider_mapped_entry(
             logger.warning("No definitions found for provider data")
             return None
 
-        # Use AI for deduplication only
-        logger.info(f"🔍 Deduplicating {len(all_definitions)} definitions (AI-assisted)")
-        synthesizer = get_definition_synthesizer()
+        if no_ai:
+            # Skip all AI operations — use raw provider definitions as-is
+            logger.info(
+                f"⚡ no_ai=True: using {len(all_definitions)} raw provider definitions (no dedup/clustering)",
+            )
+            final_def_ids = [d.id for d in all_definitions if d.id is not None]
+        else:
+            # Use AI for deduplication only
+            logger.info(f"🔍 Deduplicating {len(all_definitions)} definitions (AI-assisted)")
+            synthesizer = get_definition_synthesizer()
 
-        dedup_response = await synthesizer.ai.deduplicate_definitions(
-            word=word,
-            definitions=all_definitions,
-        )
+            dedup_response = await synthesizer.ai.deduplicate_definitions(
+                word=word,
+                definitions=all_definitions,
+            )
 
-        # Create unique definitions list from deduplication results
-        unique_definitions: list[Definition] = []
-        processed_indices: set[int] = set()
+            # Create unique definitions list from deduplication results
+            unique_definitions: list[Definition] = []
+            processed_indices: set[int] = set()
 
-        for dedup_def in dedup_response.deduplicated_definitions:
-            # Use the first source index as the primary definition
-            primary_idx = dedup_def.source_indices[0]
-            primary_def = all_definitions[primary_idx]
+            for dedup_def in dedup_response.deduplicated_definitions:
+                # Use the first source index as the primary definition
+                primary_idx = dedup_def.source_indices[0]
+                primary_def = all_definitions[primary_idx]
 
-            # Keep original definition text (no AI rewriting)
-            unique_definitions.append(primary_def)
+                # Keep original definition text (no AI rewriting)
+                unique_definitions.append(primary_def)
 
-            # Track all processed indices
-            processed_indices.update(dedup_def.source_indices)
+                # Track all processed indices
+                processed_indices.update(dedup_def.source_indices)
 
-        logger.info(
-            f"✅ Deduplicated {len(all_definitions)} → {len(unique_definitions)} definitions",
-        )
+            logger.info(
+                f"✅ Deduplicated {len(all_definitions)} → {len(unique_definitions)} definitions",
+            )
 
-        # Use AI for clustering only
-        if state_tracker:
-            await state_tracker.update_stage(Stages.AI_CLUSTERING)
+            # Use AI for clustering only
+            if state_tracker:
+                await state_tracker.update_stage(Stages.AI_CLUSTERING)
 
-        logger.info("📊 Clustering definitions (AI-assisted)")
+            logger.info("📊 Clustering definitions (AI-assisted)")
 
-        clustered_definitions = await cluster_definitions(
-            word_obj,
-            unique_definitions,
-            synthesizer.ai,
-            state_tracker,
-        )
+            clustered_definitions = await cluster_definitions(
+                word_obj,
+                unique_definitions,
+                synthesizer.ai,
+                state_tracker,
+            )
 
-        # Save the clustered definitions to persist meaning_cluster assignments
-        for definition in clustered_definitions:
-            await definition.save()
+            # Save the clustered definitions to persist meaning_cluster assignments
+            for definition in clustered_definitions:
+                await definition.save()
 
-        # Update definition IDs with clustered definitions
-        clustered_def_ids = [d.id for d in clustered_definitions if d.id is not None]
+            # Update definition IDs with clustered definitions
+            final_def_ids = [d.id for d in clustered_definitions if d.id is not None]
 
         # Extract etymology if available
         etymology = None
@@ -449,18 +461,18 @@ async def _create_provider_mapped_entry(
             provider=DictionaryProvider.SYNTHESIS,
             word_id=provider_data.word_id,
             pronunciation_id=provider_data.pronunciation_id,
-            definition_ids=clustered_def_ids,  # Use deduplicated and clustered definitions
+            definition_ids=final_def_ids,
             etymology=provider_data.etymology or etymology,
             fact_ids=[],  # No facts in non-AI mode
             model_info=None,  # No AI model info
         )
 
-        # Save the entry
-        await synthesized_entry.save()
+        # Save the entry with version history
+        await save_entry_versioned(synthesized_entry, word)
 
         logger.info(
             f"✅ Created provider-mapped entry for '{word}' with "
-            f"{len(synthesized_entry.definition_ids)} clustered definitions",
+            f"{len(synthesized_entry.definition_ids)} definitions",
         )
 
         if state_tracker:

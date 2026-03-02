@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useContentStore } from '@/stores/content/content';
 import { useHistoryStore } from '@/stores/content/history';
+import { useLoadingState } from '@/stores/ui/loading';
 import { useSearchOrchestrator } from './useSearchOrchestrator';
 import { showError } from '@/plugins/toast';
 import { extractWordCount } from '../utils/ai-query';
@@ -25,6 +26,7 @@ interface UseSearchBarNavigationOptions {
 export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
     const searchBar = useSearchBarStore();
     const contentStore = useContentStore();
+    const loading = useLoadingState();
     const router = useRouter();
     const orchestrator = useSearchOrchestrator({
         query: computed(() => searchBar.searchQuery),
@@ -134,9 +136,15 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
                             await orchestrator.getThesaurusData(result.word);
                         contentStore.setCurrentThesaurus(thesaurusData);
                     } else {
-                        // Fetch definition data
+                        // Fetch definition data via SSE stream for progress updates
                         const definition = await orchestrator.getDefinition(
-                            result.word
+                            result.word,
+                            {
+                                onProgress: (stage, progress) => {
+                                    loading.setLoadingStage(stage);
+                                    loading.setLoadingProgress(progress);
+                                },
+                            }
                         );
                         contentStore.setCurrentEntry(definition);
                     }
@@ -211,9 +219,14 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
                                 await orchestrator.getThesaurusData(query);
                             contentStore.setCurrentThesaurus(thesaurusData);
                         } else {
-                            // Fetch definition data
+                            // Fetch definition data via SSE stream for progress updates
                             const definition =
-                                await orchestrator.getDefinition(query);
+                                await orchestrator.getDefinition(query, {
+                                    onProgress: (stage, progress) => {
+                                        loading.setLoadingStage(stage);
+                                        loading.setLoadingProgress(progress);
+                                    },
+                                });
                             contentStore.setCurrentEntry(definition);
                         }
                     } finally {
