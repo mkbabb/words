@@ -220,9 +220,9 @@ class SearchIndex(BaseModel):
                 config=config,
             )
             if existing and existing.vocabulary_hash == corpus.vocabulary_hash:
-                # Upgrade semantic if requested but not currently enabled
-                if semantic and not existing.semantic_enabled:
-                    existing.semantic_enabled = True
+                # Sync semantic_enabled with the requested value
+                if existing.semantic_enabled != semantic:
+                    existing.semantic_enabled = semantic
                     await existing.save(config)
                 return existing
         except RuntimeError as e:
