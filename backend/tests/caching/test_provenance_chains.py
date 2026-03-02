@@ -47,7 +47,7 @@ class TestProvenanceChains:
             vocabulary=["word1", "word2"],
             original_vocabulary=["word1", "word2"],
         )
-        corpus._build_signature_index()
+        corpus._build_candidate_index()
 
         saved = await corpus_manager.save_corpus(corpus)
 
@@ -75,7 +75,7 @@ class TestProvenanceChains:
             vocabulary=["word1", "word2"],
             original_vocabulary=["word1", "word2"],
         )
-        corpus_v1._build_signature_index()
+        corpus_v1._build_candidate_index()
         v1 = await corpus_manager.save_corpus(corpus_v1)
 
         # Create v2 (update)
@@ -86,7 +86,7 @@ class TestProvenanceChains:
             vocabulary=["word1", "word2", "word3"],  # Added word3
             original_vocabulary=["word1", "word2", "word3"],
         )
-        corpus_v2._build_signature_index()
+        corpus_v2._build_candidate_index()
         v2 = await corpus_manager.save_corpus(corpus_v2)
 
         # Get versions from DB
@@ -124,19 +124,19 @@ class TestProvenanceChains:
             vocabulary=["word1"],
             original_vocabulary=["word1"],
         )
-        corpus._build_signature_index()
+        corpus._build_candidate_index()
         await corpus_manager.save_corpus(corpus)
 
         # Create v2
         corpus.vocabulary = ["word1", "word2"]
         corpus.original_vocabulary = ["word1", "word2"]
-        corpus._build_signature_index()
+        corpus._build_candidate_index()
         await corpus_manager.save_corpus(corpus)
 
         # Create v3
         corpus.vocabulary = ["word1", "word2", "word3"]
         corpus.original_vocabulary = ["word1", "word2", "word3"]
-        corpus._build_signature_index()
+        corpus._build_candidate_index()
         await corpus_manager.save_corpus(corpus)
 
         # Get versions from DB
@@ -181,7 +181,7 @@ class TestProvenanceChains:
                 vocabulary=[f"word{j}" for j in range(i + 1)],
                 original_vocabulary=[f"word{j}" for j in range(i + 1)],
             )
-            corpus._build_signature_index()
+            corpus._build_candidate_index()
             await corpus_manager.save_corpus(corpus)
 
         # Get all versions
@@ -234,7 +234,7 @@ class TestProvenanceChains:
                 vocabulary=[f"word{j}" for j in range(i + 1)],
                 original_vocabulary=[f"word{j}" for j in range(i + 1)],
             )
-            corpus._build_signature_index()
+            corpus._build_candidate_index()
             await corpus_manager.save_corpus(corpus)
 
             # After each save, check that only one is latest
@@ -258,7 +258,7 @@ class TestProvenanceChains:
             vocabulary=["word1"],
             original_vocabulary=["word1"],
         )
-        corpus._build_signature_index()
+        corpus._build_candidate_index()
         await corpus_manager.save_corpus(corpus)
 
         # Create v2 with force_rebuild (same content, but should create new version)
@@ -293,13 +293,13 @@ class TestProvenanceChains:
             vocabulary=["word1"],
             original_vocabulary=["word1"],
         )
-        corpus._build_signature_index()
+        corpus._build_candidate_index()
         await corpus_manager.save_corpus(corpus)
 
         # Create v2 with different content
         corpus.vocabulary = ["word1", "word2"]
         corpus.original_vocabulary = ["word1", "word2"]
-        corpus._build_signature_index()
+        corpus._build_candidate_index()
         await corpus_manager.save_corpus(corpus)
 
         # Get versions

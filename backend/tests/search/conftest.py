@@ -89,7 +89,7 @@ async def shared_semantic_corpus(test_db_session):
         lemmatized_vocabulary=sorted_vocab,
     )
     corpus.vocabulary_to_index = {word: i for i, word in enumerate(sorted_vocab)}
-    corpus._build_signature_index()
+    corpus._build_candidate_index()
 
     manager = TreeCorpusManager()
     saved = await manager.save_corpus(corpus)

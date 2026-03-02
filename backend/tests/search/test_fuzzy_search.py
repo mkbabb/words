@@ -18,6 +18,77 @@ from floridify.search.fuzzy import FuzzySearch
 from floridify.search.utils import apply_length_correction
 
 
+class TestBigramCandidateSelection:
+    """Tests that the trigram index produces quality candidates for typo queries."""
+
+    @pytest_asyncio.fixture
+    async def typo_corpus(self):
+        """Corpus with common misspelling targets."""
+        vocabulary = [
+            "ephemeral", "accommodate", "definitely", "separate",
+            "occurrence", "recommend", "necessary", "environment",
+            "beautiful", "beginning", "experience", "government",
+            "restaurant", "technology", "development", "knowledge",
+            "particular", "information", "understand", "philosophy",
+            "psychology", "pneumonia", "mnemonic", "rhythm",
+        ]
+        corpus = await Corpus.create(
+            corpus_name="test_typo_corpus",
+            vocabulary=vocabulary,
+            language=Language.ENGLISH,
+        )
+        if not corpus.corpus_uuid:
+            corpus.corpus_uuid = str(uuid.uuid4())
+        return corpus
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "typo,expected",
+        [
+            ("ephemrerl", "ephemeral"),
+            ("accomodate", "accommodate"),
+            ("definately", "definitely"),
+            ("seperate", "separate"),
+            ("occurence", "occurrence"),
+            ("recomend", "recommend"),
+            ("necesary", "necessary"),
+            ("enviroment", "environment"),
+        ],
+    )
+    async def test_typo_in_candidates(self, typo_corpus, typo, expected):
+        """Verify target word is in get_candidates() output for typo queries."""
+        candidates = typo_corpus.get_candidates(typo.lower(), max_results=1500)
+        candidate_words = typo_corpus.get_words_by_indices(candidates)
+        assert expected in candidate_words, (
+            f"'{expected}' not found in candidates for typo '{typo}'. "
+            f"Got {len(candidate_words)} candidates: {candidate_words[:20]}"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "typo,expected",
+        [
+            ("ephemrerl", "ephemeral"),
+            ("accomodate", "accommodate"),
+            ("definately", "definitely"),
+            ("seperate", "separate"),
+            ("occurence", "occurrence"),
+            ("recomend", "recommend"),
+            ("necesary", "necessary"),
+            ("enviroment", "environment"),
+        ],
+    )
+    async def test_typo_fuzzy_search_finds_target(self, typo_corpus, typo, expected):
+        """Full fuzzy search finds the correct word for common misspellings."""
+        search = FuzzySearch(min_score=0.3)
+        results = search.search(typo, corpus=typo_corpus, max_results=10)
+        result_words = [r.word for r in results]
+        assert expected in result_words[:5], (
+            f"'{expected}' not in top 5 fuzzy results for '{typo}'. "
+            f"Got: {result_words[:10]}"
+        )
+
+
 class TestFuzzySearchCorrectness:
     """Focused correctness tests for fuzzy search gaps identified in audit."""
 

@@ -33,7 +33,7 @@ async def semantic_engine(test_db, words_with_definitions):
 
     # Build necessary indices for semantic search
     corpus.vocabulary_to_index = {word: i for i, word in enumerate(vocabulary)}
-    corpus._build_signature_index()
+    corpus._build_candidate_index()
 
     manager = TreeCorpusManager()
     saved_corpus = await manager.save_corpus(corpus)
@@ -285,7 +285,7 @@ class TestSemanticSearch:
 
         # Build indices and save corpus before updating
         new_corpus.vocabulary_to_index = {word: i for i, word in enumerate(new_vocabulary)}
-        new_corpus._build_signature_index()
+        new_corpus._build_candidate_index()
 
         manager = TreeCorpusManager()
         saved_new_corpus = await manager.save_corpus(new_corpus)

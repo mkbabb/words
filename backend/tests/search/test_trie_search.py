@@ -49,7 +49,7 @@ async def trie_corpus(test_db):
 
     # Build indices
     corpus.vocabulary_to_index = {word: i for i, word in enumerate(sorted(vocabulary))}
-    corpus._build_signature_index()
+    corpus._build_candidate_index()
 
     manager = TreeCorpusManager()
     saved = await manager.save_corpus(corpus)

@@ -74,7 +74,7 @@ class TestSemanticSearchEndToEnd:
 
         # Build indices
         corpus.vocabulary_to_index = {word: i for i, word in enumerate(sorted(vocabulary))}
-        corpus._build_signature_index()
+        corpus._build_candidate_index()
 
         manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
@@ -149,7 +149,7 @@ class TestSemanticSearchEndToEnd:
         )
 
         corpus.vocabulary_to_index = {word: i for i, word in enumerate(sorted(set(vocabulary)))}
-        corpus._build_signature_index()
+        corpus._build_candidate_index()
 
         manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
@@ -216,7 +216,7 @@ class TestSemanticSearchEndToEnd:
         )
 
         corpus.vocabulary_to_index = {word: i for i, word in enumerate(sorted(vocabulary))}
-        corpus._build_signature_index()
+        corpus._build_candidate_index()
 
         manager = TreeCorpusManager()
         return await manager.save_corpus(corpus)
@@ -397,7 +397,7 @@ class TestSemanticSearchEndToEnd:
         )
 
         corpus.vocabulary_to_index = {word: i for i, word in enumerate(sorted(vocabulary))}
-        corpus._build_signature_index()
+        corpus._build_candidate_index()
 
         manager = TreeCorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
@@ -447,7 +447,7 @@ class TestSemanticSearchEndToEnd:
                 lemmatized_vocabulary=sorted(vocab),
             )
             corpus.vocabulary_to_index = {word: idx for idx, word in enumerate(sorted(vocab))}
-            corpus._build_signature_index()
+            corpus._build_candidate_index()
 
             manager = TreeCorpusManager()
             saved = await manager.save_corpus(corpus)
@@ -528,7 +528,7 @@ class TestSemanticSearchEndToEnd:
                 lemmatized_vocabulary=vocab,
             )
             corpus.vocabulary_to_index = {word: i for i, word in enumerate(vocab)}
-            corpus._build_signature_index()
+            corpus._build_candidate_index()
 
             manager = TreeCorpusManager()
             saved_corpus = await manager.save_corpus(corpus)

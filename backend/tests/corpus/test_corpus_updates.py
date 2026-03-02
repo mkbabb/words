@@ -138,14 +138,14 @@ class TestCorpusAddWords:
         assert len(base_corpus.lemma_to_word_indices) > 0
 
     @pytest.mark.asyncio
-    async def test_add_words_updates_signature_index(self, base_corpus: Corpus) -> None:
-        """Test that signature buckets are rebuilt."""
+    async def test_add_words_updates_candidate_index(self, base_corpus: Corpus) -> None:
+        """Test that trigram index is rebuilt."""
         # Add words
         new_words = ["xyz", "abc", "def"]
         await base_corpus.add_words(new_words)
 
-        # Verify signature buckets contain new words
-        assert len(base_corpus.signature_buckets) > 0
+        # Verify trigram index contains new words
+        assert len(base_corpus.trigram_index) > 0
         assert len(base_corpus.length_buckets) > 0
 
         # Verify new words are indexed

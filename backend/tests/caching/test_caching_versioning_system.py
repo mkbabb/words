@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
-from floridify.caching.core import GlobalCacheManager, get_versioned_content, set_versioned_content
+from floridify.caching.core import GlobalCacheManager, get_global_cache, get_versioned_content, set_versioned_content
 from floridify.caching.filesystem import FilesystemBackend
 from floridify.caching.models import CacheNamespace, VersionInfo
 from floridify.models.base import Language
@@ -150,8 +150,8 @@ class TestDictionaryEntryCaching:
 
     @pytest.mark.asyncio
     async def test_large_content_external_storage(self, test_db, sample_word):
-        """Test automatic external storage for large dictionary content."""
-        # Create large content (> 1MB threshold)
+        """Test automatic GridFS-backed external storage for large dictionary content."""
+        # Create large content (> 16KB threshold)
         large_definitions = []
         for i in range(1000):
             large_definitions.append(
@@ -180,21 +180,60 @@ class TestDictionaryEntryCaching:
             version_info=version_info,
         )
 
-        # Set large content (should trigger external storage)
+        # Large content goes to GridFS with L1/L2 cache warmed
         await set_versioned_content(entry, large_content)
         await entry.save()
 
-        # Verify external storage was used
+        # Content should be stored externally in GridFS (not inline)
         assert entry.content_inline is None
         assert entry.content_location is not None
-        assert entry.content_location.storage_type == "cache"
-        assert entry.content_location.size_bytes > 1_000_000
+        assert entry.content_location.storage_type == "database"
+        assert entry.content_location.path is not None
+        # path should be a valid ObjectId string
+        from bson import ObjectId
 
-        # Verify content can be retrieved
+        ObjectId(entry.content_location.path)  # Raises if invalid
+
+        # Verify content can be retrieved via get_versioned_content (from L1/L2 cache)
         retrieved_content = await get_versioned_content(entry)
         assert retrieved_content is not None
         assert len(retrieved_content["definitions"]) == 1000
         assert retrieved_content["etymology"] == large_content["etymology"]
+
+    @pytest.mark.asyncio
+    async def test_large_content_gridfs_recovery(self, test_db, sample_word):
+        """Test that large content survives L1/L2 cache eviction via GridFS fallback."""
+        large_content = {
+            "definitions": [{"text": f"Def {i}: " + "X" * 500} for i in range(100)],
+            "notes": "Y" * 20000,
+        }
+
+        data_hash = hashlib.sha256(json.dumps(large_content, sort_keys=True).encode()).hexdigest()
+        version_info = VersionInfo(version="1.0.0", data_hash=data_hash, is_latest=True)
+
+        entry = DictionaryProviderEntry.Metadata(
+            resource_id=sample_word.text + "_recovery",
+            word=sample_word.text + "_recovery",
+            provider=DictionaryProvider.WIKTIONARY.value,
+            language=sample_word.language,
+            version_info=version_info,
+        )
+
+        await set_versioned_content(entry, large_content)
+        await entry.save()
+
+        assert entry.content_location is not None
+        assert entry.content_location.storage_type == "database"
+
+        # Clear L1/L2 cache to simulate restart / cache expiry
+        cache = await get_global_cache()
+        await cache.clear()
+
+        # Content should still be recoverable from GridFS
+        recovered = await get_versioned_content(entry)
+        assert recovered is not None
+        assert len(recovered["definitions"]) == 100
+        assert recovered["notes"] == large_content["notes"]
 
     @pytest.mark.asyncio
     async def test_dictionary_cache_invalidation(self, cache_manager, sample_word):
@@ -402,7 +441,7 @@ class TestLiteratureEntryCaching:
 
     @pytest.mark.asyncio
     async def test_large_literature_external_storage(self, test_db, sample_author):
-        """Test external storage for large literature files."""
+        """Test GridFS-backed external storage for large literature files."""
         # Create a large literary work
         chapters = []
         full_text_parts = []
@@ -444,17 +483,17 @@ class TestLiteratureEntryCaching:
             version_info=version_info,
         )
 
-        # Should trigger external storage
+        # Large content goes to GridFS
         await set_versioned_content(entry, large_content)
         await entry.save()
 
-        # Verify external storage
-        assert entry.content_location is not None
-        assert entry.content_location.storage_type == "cache"
-        assert entry.content_location.size_bytes > 1_000_000
+        # Content should be stored externally via GridFS
         assert entry.content_inline is None
+        assert entry.content_location is not None
+        assert entry.content_location.storage_type == "database"
+        assert entry.content_location.path is not None
 
-        # Verify retrieval
+        # Verify retrieval via get_versioned_content
         retrieved_content = await get_versioned_content(entry)
         assert retrieved_content is not None
         assert len(retrieved_content["chapters"]) == 50
