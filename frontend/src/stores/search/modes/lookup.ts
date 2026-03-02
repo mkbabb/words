@@ -252,7 +252,9 @@ export const useLookupMode = defineStore(
                 const normalized = query.trim().toLowerCase();
                 const searchResults = await searchApi.search(normalized, {
                     signal: abortController.signal,
-                    mode: searchMode.value.join(','),
+                    mode: Array.isArray(searchMode.value)
+                        ? searchMode.value.join(',')
+                        : String(searchMode.value || 'smart'),
                 });
 
                 // Only update state if this is still the latest request
