@@ -112,7 +112,7 @@ async def aggregate_vocabularies(
         # Rebuild unified indices (lemmatization, etc.) for the aggregated vocabulary
         logger.info(f"Rebuilding indices for aggregated corpus {corpus_id}")
         await corpus._create_unified_indices()
-        corpus._build_signature_index()
+        corpus._build_candidate_index()
 
         # Save the entire corpus with all rebuilt indices
         # This ensures lemmatization, signatures, etc. are persisted

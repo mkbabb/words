@@ -287,10 +287,10 @@ def build_corpus_sync(vocabulary: list[str]) -> Corpus:
     We manually replicate the essential steps of Corpus.create() that the
     FuzzySearch pipeline needs:
       - vocabulary, vocabulary_to_index
-      - signature_buckets, length_buckets  (for get_candidates)
+      - trigram_index, length_buckets  (for get_candidates)
       - original_vocabulary, normalized_to_original_indices
     """
-    from floridify.text.normalize import batch_normalize, get_word_signature
+    from floridify.text.normalize import batch_normalize
 
     # Normalize
     normalized = batch_normalize(vocabulary)
@@ -315,20 +315,8 @@ def build_corpus_sync(vocabulary: list[str]) -> Corpus:
         vocabulary_to_index=vocabulary_to_index,
     )
 
-    # Build signature + length buckets (needed by get_candidates)
-    corpus.signature_buckets = {}
-    corpus.length_buckets = {}
-    for idx, word in enumerate(unique_normalized):
-        sig = get_word_signature(word)
-        corpus.signature_buckets.setdefault(sig, []).append(idx)
-        length = len(word)
-        corpus.length_buckets.setdefault(length, []).append(idx)
-
-    # Sort buckets
-    for bucket in corpus.signature_buckets.values():
-        bucket.sort()
-    for bucket in corpus.length_buckets.values():
-        bucket.sort()
+    # Build trigram + length buckets (needed by get_candidates)
+    corpus._build_candidate_index()
 
     return corpus
 
@@ -442,26 +430,25 @@ def test_prefix_matching(fuzzy: FuzzySearch, corpus: Corpus) -> TestSuite:
         )
     )
 
-    # -- Test 3: Known limitation -- short prefix vs long word --
+    # -- Test 3: Bigram index can find prefix-like matches across length gaps --
     # "straw" (5 chars) -> "strawberry" (10 chars) -- 2x length ratio
-    # The candidate selection's length_tolerance=2 means length buckets
-    # only cover 3-7 chars, so "strawberry" is never even a candidate.
-    # This is by design: fuzzy search is for typo correction, not prefix.
+    # The trigram index finds "strawberry" via shared trigrams (##s, #st, str, tra, raw, aw#, w##)
+    # even though length buckets wouldn't cover it. This is an improvement over
+    # the old signature-based approach.
     results_straw = run_fuzzy_search(fuzzy, corpus, "straw", max_results=10)
     top_straw = [w for w, _ in results_straw]
     straw_finds_strawberry = "strawberry" in top_straw
 
     suite.results.append(
         TestResult(
-            name="Prefix/known_gap: 'straw' does NOT find 'strawberry' (5 vs 10 chars -- trie's job)",
+            name="Prefix/trigram_reach: 'straw' finds 'strawberry' via trigram overlap",
             query="straw",
-            # This PASSES if strawberry is NOT found -- it's a known architectural gap
-            passed=not straw_finds_strawberry,
+            passed=straw_finds_strawberry,
             top_results=results_straw[:5],
             reason=(
                 ""
-                if not straw_finds_strawberry
-                else "Unexpectedly found 'strawberry' -- candidate selection has changed"
+                if straw_finds_strawberry
+                else "'strawberry' not found -- trigram index should surface it"
             ),
         )
     )
@@ -741,8 +728,6 @@ def run_candidate_diagnostics(corpus: Corpus) -> None:
 
     This is informational only -- helps understand WHY certain queries fail.
     """
-    from floridify.text.normalize import get_word_signature
-
     print(f"\n{'=' * 72}")
     print("  CANDIDATE SELECTION DIAGNOSTICS")
     print(f"{'=' * 72}")
@@ -750,22 +735,24 @@ def run_candidate_diagnostics(corpus: Corpus) -> None:
     diagnostic_queries = ["aple", "comp", "comput", "elefant", "straw", "banan", "definately"]
 
     for query in diagnostic_queries:
-        candidates = corpus.get_candidates(query.lower(), max_results=800)
+        candidates = corpus.get_candidates(query.lower(), max_results=1500)
         candidate_words = corpus.get_words_by_indices(candidates) if candidates else []
 
-        query_sig = get_word_signature(query.lower())
+        query_trigrams = Corpus._word_trigrams(query.lower())
         query_len = len(query)
 
-        # Check what buckets matched
-        sig_match = query_sig in corpus.signature_buckets
+        # Check what length buckets matched
         len_matches = []
         for diff in range(3):
             for length in [query_len - diff, query_len + diff]:
                 if length > 0 and length in corpus.length_buckets:
                     len_matches.append(length)
 
+        # Count trigram hits
+        trigram_hits = sum(1 for tg in query_trigrams if tg in corpus.trigram_index)
+
         print(f"\n  Query: '{query}'")
-        print(f"    Signature: '{query_sig}' (bucket exists: {sig_match})")
+        print(f"    Trigrams: {query_trigrams} ({trigram_hits}/{len(query_trigrams)} in index)")
         print(f"    Length: {query_len}, matching length buckets: {sorted(set(len_matches))}")
         print(f"    Candidates returned: {len(candidates)}")
         if candidate_words:
@@ -788,7 +775,7 @@ def main() -> int:
     corpus = build_corpus_sync(VOCABULARY)
     build_time = (time.perf_counter() - t0) * 1000
     print(f"  Corpus built: {len(corpus.vocabulary)} unique normalized words ({build_time:.1f}ms)")
-    print(f"  Signature buckets: {len(corpus.signature_buckets)}")
+    print(f"  Trigram index entries: {len(corpus.trigram_index)}")
     print(f"  Length buckets: {len(corpus.length_buckets)}")
 
     # Create fuzzy search engine

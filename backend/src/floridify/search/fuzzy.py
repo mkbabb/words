@@ -35,7 +35,7 @@ class FuzzySearch:
         self,
         corpus: Corpus,
         query: str,
-        sample_size: int = 500,
+        sample_size: int = 1500,
     ) -> list[str]:
         """Get words of similar length to the query as fallback candidates.
 
@@ -76,8 +76,8 @@ class FuzzySearch:
         """Robust fuzzy search with balanced performance and accuracy."""
         min_score_threshold = min_score if min_score is not None else self.min_score
 
-        # Reduced candidate count — Opt 1 fix improves candidate quality
-        max_candidates = max_results * 15
+        # Bigram index provides high-quality candidates; use a large pool
+        max_candidates = max(1500, max_results * 75)
 
         # Try to get candidates with normalized query
         candidates = corpus.get_candidates(query.lower(), max_results=max_candidates)

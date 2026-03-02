@@ -169,7 +169,7 @@ async def semantic_engine(test_db) -> SemanticSearch:
         lemmatized_vocabulary=ALL_WORDS,
     )
     corpus.vocabulary_to_index = {w: i for i, w in enumerate(ALL_WORDS)}
-    corpus._build_signature_index()
+    corpus._build_candidate_index()
 
     manager = TreeCorpusManager()
     saved = await manager.save_corpus(corpus)

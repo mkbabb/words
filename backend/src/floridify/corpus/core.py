@@ -22,7 +22,9 @@ from ..caching.models import (
     VersionInfo,
 )
 from ..models.base import Language
-from ..text.normalize import batch_lemmatize, batch_normalize, get_word_signature
+import numpy as np
+
+from ..text.normalize import batch_lemmatize, batch_normalize
 from ..utils.logging import get_logger
 from .models import CorpusType
 from .utils import get_vocabulary_hash
@@ -79,8 +81,8 @@ class Corpus(BaseModel):
     word_to_lemma_indices: dict[int, int] = Field(default_factory=dict)
     lemma_to_word_indices: dict[int, list[int]] = Field(default_factory=dict)
 
-    # Signature maps for efficient searching
-    signature_buckets: dict[str, list[int]] = Field(default_factory=dict)
+    # Bigram inverted index for fuzzy candidate selection
+    trigram_index: dict[str, list[int]] = Field(default_factory=dict)
     length_buckets: dict[int, list[int]] = Field(default_factory=dict)
 
     # Metadata
@@ -263,7 +265,7 @@ class Corpus(BaseModel):
         await corpus._create_unified_indices()
 
         # Build signature index
-        corpus._build_signature_index()
+        corpus._build_candidate_index()
 
         # Create semantic index if requested
         if semantic:
@@ -317,7 +319,7 @@ class Corpus(BaseModel):
                     )
 
         # Rebuild signature index
-        self._build_signature_index()
+        self._build_candidate_index()
 
         # Clear lemmatization data to force rebuild
         self.lemmatized_vocabulary = []
@@ -515,17 +517,23 @@ class Corpus(BaseModel):
             if (word := self.get_original_word_by_index(idx)) is not None
         ]
 
+    @staticmethod
+    def _word_trigrams(word: str) -> list[str]:
+        """Extract character trigrams from a word with sentinel padding."""
+        padded = f"##{word}##"
+        return [padded[i : i + 3] for i in range(len(padded) - 2)]
+
     def get_candidates(
         self,
         query: str,
         max_results: int = 50,
         use_lemmas: bool = True,
-        use_signatures: bool = True,
+        use_trigrams: bool = True,
         length_tolerance: int = 2,
     ) -> list[int]:
         """Get candidate word indices for a query.
 
-        Accumulates candidates from ALL four stages (direct, lemma, signature,
+        Accumulates candidates from ALL four stages (direct, lemma, trigram,
         length buckets). High-priority candidates (stages 1-3) are always kept;
         length-bucket candidates fill remaining slots up to max_results.
 
@@ -533,7 +541,7 @@ class Corpus(BaseModel):
             query: Search query
             max_results: Maximum number of results
             use_lemmas: Whether to include lemma matches
-            use_signatures: Whether to use signature matching
+            use_trigrams: Whether to use trigram index matching
             length_tolerance: Length difference tolerance
 
         Returns:
@@ -549,7 +557,7 @@ class Corpus(BaseModel):
             return []
         normalized_query = normalized_queries[0]
 
-        # High-priority candidates: direct + lemma + signature
+        # High-priority candidates: direct + lemma + trigram
         # These are always kept when truncating to max_results.
         priority: set[int] = set()
 
@@ -567,11 +575,27 @@ class Corpus(BaseModel):
                 if word_indices := self.lemma_to_word_indices.get(lemma_idx):
                     priority.update(word_indices)
 
-        # Stage 3: Signature-based candidates
-        if use_signatures and self.signature_buckets:
-            query_sig = get_word_signature(normalized_query)
-            if query_sig in self.signature_buckets:
-                priority.update(self.signature_buckets[query_sig])
+        # Stage 3: Trigram overlap candidates
+        if use_trigrams and self.trigram_index:
+            query_trigrams = self._word_trigrams(normalized_query)
+            vocab_size = len(self.vocabulary)
+
+            # Collect all word indices that share any trigram with the query
+            all_indices = []
+            for tg in query_trigrams:
+                if tg in self.trigram_index:
+                    all_indices.extend(self.trigram_index[tg])
+
+            if all_indices:
+                # Count shared trigrams per vocabulary word using numpy
+                counts = np.bincount(all_indices, minlength=vocab_size)
+                threshold = max(2, len(query_trigrams) // 3)
+                # Get indices above threshold, sorted by overlap descending
+                above = np.where(counts >= threshold)[0]
+                if len(above) > 0:
+                    order = np.argsort(-counts[above])
+                    trigram_candidates = above[order][: max_results].tolist()
+                    priority.update(trigram_candidates)
 
         # Stage 4: Length-based candidates (ALWAYS runs — critical for typo correction)
         # Each individual length bucket (len-1, len, len+1, len-2, len+2, …) is
@@ -612,17 +636,17 @@ class Corpus(BaseModel):
 
         return result
 
-    def _build_signature_index(self) -> None:
-        """Build signature-based index for efficient searching."""
-        self.signature_buckets.clear()
+    def _build_candidate_index(self) -> None:
+        """Build trigram inverted index and length buckets for candidate selection."""
+        self.trigram_index.clear()
         self.length_buckets.clear()
 
         for idx, word in enumerate(self.vocabulary):
-            # Signature bucket
-            signature = get_word_signature(word)
-            if signature not in self.signature_buckets:
-                self.signature_buckets[signature] = []
-            self.signature_buckets[signature].append(idx)
+            # Trigram index
+            for tg in self._word_trigrams(word):
+                if tg not in self.trigram_index:
+                    self.trigram_index[tg] = []
+                self.trigram_index[tg].append(idx)
 
             # Length bucket
             length = len(word)
@@ -631,13 +655,13 @@ class Corpus(BaseModel):
             self.length_buckets[length].append(idx)
 
         # Sort buckets for consistent ordering
-        for bucket in self.signature_buckets.values():
+        for bucket in self.trigram_index.values():
             bucket.sort()
         for bucket in self.length_buckets.values():
             bucket.sort()
 
         logger.info(
-            f"Built signature index: {len(self.signature_buckets)} signatures, "
+            f"Built candidate index: {len(self.trigram_index)} trigrams, "
             f"{len(self.length_buckets)} length buckets",
         )
 
