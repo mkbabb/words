@@ -58,4 +58,4 @@ ENV PATH="${APP_PATH}/.venv/bin:$PATH"
 USER appuser
 
 # Default command (can be overridden)
-CMD ["python", "-m", "uvicorn", "src.floridify.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "floridify.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

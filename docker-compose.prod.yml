@@ -5,7 +5,7 @@ services:
     build:
       target: production
     image: floridify-backend:latest
-    command: ["uvicorn", "src.floridify.api.main:app",
+    command: ["uvicorn", "floridify.api.main:app",
               "--host", "0.0.0.0",
               "--port", "8000",
               "--workers", "${BACKEND_WORKERS:-1}",

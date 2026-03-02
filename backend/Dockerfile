@@ -60,13 +60,13 @@ COPY --from=uv-installer /bin/uv /bin/uv
 COPY --from=builder /app /app
 
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH="/app/src:$PYTHONPATH"
+ENV PYTHONPATH="/app/src"
 
 # Install with dev dependencies
 RUN --mount=type=cache,target=/opt/uv-cache \
     uv sync --frozen
 
-CMD ["uvicorn", "src.floridify.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "floridify.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 # Production stage
 FROM base AS production
@@ -84,7 +84,7 @@ RUN mkdir -p /app/logs && chown appuser:appuser /app/logs
 
 # Set PATH
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH="/app/src:$PYTHONPATH"
+ENV PYTHONPATH="/app/src"
 
 # Switch to non-root user
 USER appuser
@@ -97,7 +97,7 @@ HEALTHCHECK --interval=30s --timeout=15s --start-period=300s --retries=5 \
 EXPOSE 8000
 
 # Production command with proper worker configuration
-CMD ["uvicorn", "src.floridify.api.main:app", \
+CMD ["uvicorn", "floridify.api.main:app", \
      "--host", "0.0.0.0", \
      "--port", "8000", \
      "--proxy-headers", \
