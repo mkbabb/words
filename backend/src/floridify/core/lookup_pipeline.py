@@ -8,7 +8,7 @@ import time
 import traceback
 
 from ..ai import get_definition_synthesizer
-from ..ai.synthesis_functions import cluster_definitions
+from ..ai.synthesis import cluster_definitions
 from ..models import Etymology
 from ..models.base import Language
 from ..models.dictionary import (

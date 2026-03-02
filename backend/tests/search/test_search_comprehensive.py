@@ -184,9 +184,7 @@ async def search_engine_literature(literature_corpus):
 @pytest_asyncio.fixture
 async def search_engine_with_semantic(language_corpus_small):
     """Create search engine with semantic search enabled."""
-    engine = await Search.from_corpus(
-        corpus_name=language_corpus_small.corpus_name, semantic=True
-    )
+    engine = await Search.from_corpus(corpus_name=language_corpus_small.corpus_name, semantic=True)
 
     # Wait for semantic initialization to complete
     if engine.semantic_search and hasattr(engine, "_semantic_init_task"):

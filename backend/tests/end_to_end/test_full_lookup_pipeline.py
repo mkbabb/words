@@ -20,10 +20,8 @@ import pytest
 import pytest_asyncio
 from beanie import PydanticObjectId
 
-from floridify.ai.connector import OpenAIConnector
-from floridify.ai.synthesizer import DefinitionSynthesizer
 from floridify.caching.core import get_global_cache
-from floridify.caching.models import CacheNamespace, ResourceType, VersionConfig
+from floridify.caching.models import CacheNamespace
 from floridify.models.dictionary import (
     Definition,
     DictionaryEntry,
@@ -89,12 +87,8 @@ class TestFullLookupPipeline:
                                 {
                                     "senses": [
                                         {
-                                            "definitions": [
-                                                "Lasting for a very short time"
-                                            ],
-                                            "examples": [
-                                                {"text": "Fashions are ephemeral"}
-                                            ],
+                                            "definitions": ["Lasting for a very short time"],
+                                            "examples": [{"text": "Fashions are ephemeral"}],
                                         }
                                     ]
                                 }
@@ -180,9 +174,7 @@ class TestFullLookupPipeline:
 
         # Mock pronunciation response
         pronunciation_response = MagicMock()
-        pronunciation_response.choices = [
-            MagicMock(message=MagicMock(content="/ɪˈfɛm.ər.əl/"))
-        ]
+        pronunciation_response.choices = [MagicMock(message=MagicMock(content="/ɪˈfɛm.ər.əl/"))]
 
         # Configure mock to return different responses based on call
         call_count = {"value": 0}
@@ -221,16 +213,12 @@ class TestFullLookupPipeline:
         # Mock embeddings
         mock_embedding_response = MagicMock()
         mock_embedding_response.data = [MagicMock(embedding=[0.1] * 768)]
-        mock_client.embeddings.create = AsyncMock(
-            return_value=mock_embedding_response
-        )
+        mock_client.embeddings.create = AsyncMock(return_value=mock_embedding_response)
 
         return mock_client
 
     @pytest.mark.asyncio
-    async def test_unknown_word_full_pipeline(
-        self, test_db, mock_providers, mock_openai
-    ):
+    async def test_unknown_word_full_pipeline(self, test_db, mock_providers, mock_openai):
         """
         Test the complete pipeline for an unknown word:
         1. Verify word doesn't exist in database
@@ -253,15 +241,12 @@ class TestFullLookupPipeline:
         initial_word = await Word.find_one(Word.text == test_word)
         assert initial_word is None, "Word should not exist in database initially"
 
-        initial_entries = await DictionaryEntry.find(
-            {"word_id": {"$exists": True}}
-        ).to_list()
+        initial_entries = await DictionaryEntry.find({"word_id": {"$exists": True}}).to_list()
         initial_entry_count = len(initial_entries)
 
         # ====================================================================
         # STEP 2: Set up provider mocks and fetch from providers
         # ====================================================================
-        from floridify.providers.dictionary.models import DictionaryProviderEntry
 
         # Create mock provider entries that will be returned
         word_obj = Word(text=test_word, language="en")
@@ -271,13 +256,15 @@ class TestFullLookupPipeline:
         provider_entries = []
         providers_attempted = []
 
-        with patch(
-            "floridify.providers.dictionary.api.free_dictionary.FreeDictionaryConnector"
-        ) as mock_free, patch(
-            "floridify.providers.dictionary.scraper.wiktionary.WiktionaryConnector"
-        ) as mock_wikt, patch(
-            "floridify.providers.dictionary.api.oxford.OxfordConnector"
-        ) as mock_oxf:
+        with (
+            patch(
+                "floridify.providers.dictionary.api.free_dictionary.FreeDictionaryConnector"
+            ) as mock_free,
+            patch(
+                "floridify.providers.dictionary.scraper.wiktionary.WiktionaryConnector"
+            ) as mock_wikt,
+            patch("floridify.providers.dictionary.api.oxford.OxfordConnector") as mock_oxf,
+        ):
             # Set up the mocks
             mock_free.return_value = mock_providers["free_dictionary"]
             mock_wikt.return_value = mock_providers["wiktionary"]
@@ -333,9 +320,7 @@ class TestFullLookupPipeline:
                     # Create provider entry
                     provider_entry = DictionaryEntry(
                         word_id=word_obj.id,
-                        provider=DictionaryProvider[
-                            provider_name.upper().replace("_", "")
-                        ]
+                        provider=DictionaryProvider[provider_name.upper().replace("_", "")]
                         if provider_name != "free_dictionary"
                         else DictionaryProvider.FREE_DICTIONARY,
                         definition_ids=[d.id for d in definitions],
@@ -344,9 +329,9 @@ class TestFullLookupPipeline:
                     provider_entries.append(provider_entry)
 
         # Verify we attempted 3+ providers
-        assert (
-            len(providers_attempted) >= 3
-        ), f"Should attempt 3+ providers, attempted: {providers_attempted}"
+        assert len(providers_attempted) >= 3, (
+            f"Should attempt 3+ providers, attempted: {providers_attempted}"
+        )
 
         # Verify provider entries were created
         assert len(provider_entries) >= 3, "Should have entries from 3+ providers"
@@ -380,18 +365,16 @@ class TestFullLookupPipeline:
         ai_call_count = 3  # Simulated
 
         # Verify synthesis occurred
-        assert (
-            synthesized_entry is not None
-        ), "AI synthesis should produce a synthesized entry"
+        assert synthesized_entry is not None, "AI synthesis should produce a synthesized entry"
         assert (
             synthesized_entry.provider == DictionaryProvider.SYNTHESIS.value
             or synthesized_entry.provider == DictionaryProvider.SYNTHESIS
         ), f"Entry should be marked as synthesized, got provider={synthesized_entry.provider}"
 
         # Verify AI synthesis would have been called (simulated in this test)
-        assert (
-            ai_call_count >= 3
-        ), f"AI synthesis should involve multiple steps (dedup, clustering, synthesis)"
+        assert ai_call_count >= 3, (
+            "AI synthesis should involve multiple steps (dedup, clustering, synthesis)"
+        )
 
         # ====================================================================
         # STEP 4: Verify MongoDB storage
@@ -403,9 +386,7 @@ class TestFullLookupPipeline:
         assert isinstance(stored_word.id, PydanticObjectId)
 
         # Verify Definition documents exist
-        stored_definitions = await Definition.find(
-            Definition.word_id == stored_word.id
-        ).to_list()
+        stored_definitions = await Definition.find(Definition.word_id == stored_word.id).to_list()
         assert len(stored_definitions) >= 3, "Should have definitions from providers"
 
         # Verify provider DictionaryEntry documents exist
@@ -413,9 +394,7 @@ class TestFullLookupPipeline:
             DictionaryEntry.word_id == stored_word.id,
             DictionaryEntry.provider != DictionaryProvider.SYNTHESIS,
         ).to_list()
-        assert (
-            len(provider_entries_stored) >= 3
-        ), "Should have entries from 3+ providers"
+        assert len(provider_entries_stored) >= 3, "Should have entries from 3+ providers"
 
         # Verify synthesized DictionaryEntry exists
         synthesized_stored = await DictionaryEntry.find_one(
@@ -432,11 +411,7 @@ class TestFullLookupPipeline:
 
         # Manually populate L1 cache as would happen during lookup
         word_cache_key = f"word:{test_word}"
-        await cache_manager.set(
-            CacheNamespace.DICTIONARY,
-            word_cache_key,
-            stored_word
-        )
+        await cache_manager.set(CacheNamespace.DICTIONARY, word_cache_key, stored_word)
 
         # Verify L1 cache population
         cached_word = await cache_manager.get(CacheNamespace.DICTIONARY, word_cache_key)
@@ -444,7 +419,6 @@ class TestFullLookupPipeline:
 
         # The versioned data system already stores entries in MongoDB (L2-equivalent)
         # Verify we can retrieve the synthesized entry
-        from floridify.caching.manager import get_version_manager
 
         # Check MongoDB directly as our L2 cache
         cached_synthesis = await DictionaryEntry.find_one(
@@ -452,9 +426,9 @@ class TestFullLookupPipeline:
             DictionaryEntry.provider == DictionaryProvider.SYNTHESIS.value,
         )
 
-        assert (
-            cached_synthesis is not None
-        ), "Synthesized entry should be retrievable from MongoDB (L2 storage)"
+        assert cached_synthesis is not None, (
+            "Synthesized entry should be retrievable from MongoDB (L2 storage)"
+        )
 
         # ====================================================================
         # STEP 6: Second query should hit cache (<100ms)
@@ -477,23 +451,17 @@ class TestFullLookupPipeline:
         query_time_ms = (end_time - start_time) * 1000
 
         # Verify cache hit
-        assert (
-            cached_result is not None
-        ), "Second query should return cached synthesized entry"
-        assert (
-            cached_result.id == synthesized_stored.id
-        ), "Should be the same entry as before"
+        assert cached_result is not None, "Second query should return cached synthesized entry"
+        assert cached_result.id == synthesized_stored.id, "Should be the same entry as before"
 
         # Verify performance (<100ms for cached query)
-        assert (
-            query_time_ms < 100
-        ), f"Cached query should take <100ms, took {query_time_ms:.2f}ms"
+        assert query_time_ms < 100, f"Cached query should take <100ms, took {query_time_ms:.2f}ms"
 
         # Verify providers were NOT called again
         for provider_name, mock_provider in mock_providers.items():
-            assert (
-                mock_provider.fetch.call_count == 0
-            ), f"{provider_name} should not be called on cached query"
+            assert mock_provider.fetch.call_count == 0, (
+                f"{provider_name} should not be called on cached query"
+            )
 
         # ====================================================================
         # STEP 7: Verify all intermediate steps
@@ -534,14 +502,15 @@ class TestFullLookupPipeline:
         test_word = "concurrent_test"
 
         # Patch providers and OpenAI
-        with patch(
-            "floridify.providers.dictionary.api.free_dictionary.FreeDictionaryConnector"
-        ) as mock_free, patch(
-            "floridify.providers.dictionary.scraper.wiktionary.WiktionaryConnector"
-        ) as mock_wikt, patch(
-            "openai.AsyncOpenAI"
-        ) as mock_openai_class:
-
+        with (
+            patch(
+                "floridify.providers.dictionary.api.free_dictionary.FreeDictionaryConnector"
+            ) as mock_free,
+            patch(
+                "floridify.providers.dictionary.scraper.wiktionary.WiktionaryConnector"
+            ) as mock_wikt,
+            patch("openai.AsyncOpenAI") as mock_openai_class,
+        ):
             mock_free.return_value = mock_providers["free_dictionary"]
             mock_wikt.return_value = mock_providers["wiktionary"]
             mock_openai_class.return_value = mock_openai
@@ -597,14 +566,15 @@ class TestFullLookupPipeline:
             ],
         }
 
-        with patch(
-            "floridify.providers.dictionary.api.free_dictionary.FreeDictionaryConnector"
-        ) as mock_free, patch(
-            "floridify.providers.dictionary.scraper.wiktionary.WiktionaryConnector"
-        ) as mock_wikt, patch(
-            "openai.AsyncOpenAI"
-        ) as mock_openai_class:
-
+        with (
+            patch(
+                "floridify.providers.dictionary.api.free_dictionary.FreeDictionaryConnector"
+            ) as mock_free,
+            patch(
+                "floridify.providers.dictionary.scraper.wiktionary.WiktionaryConnector"
+            ) as mock_wikt,
+            patch("openai.AsyncOpenAI") as mock_openai_class,
+        ):
             # First provider fails, second succeeds
             mock_free.return_value = failing_provider
             mock_wikt.return_value = working_provider

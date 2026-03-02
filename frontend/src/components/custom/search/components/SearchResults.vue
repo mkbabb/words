@@ -15,10 +15,7 @@
             @click="$emit('interaction')"
         >
             <!-- Loading State -->
-            <div
-                v-if="loading && results.length === 0 && !aiMode"
-                class="p-4"
-            >
+            <div v-if="loading && results.length === 0 && !aiMode" class="p-4">
                 <div class="flex items-center gap-2">
                     <div class="flex gap-1">
                         <span
@@ -30,13 +27,19 @@
                             }"
                         />
                     </div>
-                    <span class="text-sm text-muted-foreground">Searching...</span>
+                    <span class="text-sm text-muted-foreground"
+                        >Searching...</span
+                    >
                 </div>
             </div>
 
             <!-- Wordlist Search Results -->
             <div
-                v-else-if="wordlistMode && wordlistResults && wordlistResults.length > 0"
+                v-else-if="
+                    wordlistMode &&
+                    wordlistResults &&
+                    wordlistResults.length > 0
+                "
                 ref="searchResultsContainer"
                 class="max-h-64 overflow-y-auto bg-background/20 backdrop-blur-3xl"
             >
@@ -45,19 +48,27 @@
                     :key="result.word"
                     :ref="(el) => setResultRef(el as HTMLButtonElement, index)"
                     :class="[
-                        'flex w-full items-center justify-between px-4 py-3 text-left transition-all duration-300 ease-apple-spring',
+                        'ease-apple-spring flex w-full items-center justify-between px-4 py-3 text-left transition-all duration-300',
                         'border-muted-foreground/50 active:scale-[0.97]',
                         index === selectedIndex
                             ? 'scale-[1.02] border-l-8 bg-accent/60 pl-4 shadow-md'
-                            : 'border-l-0 pl-4 hover:bg-accent/20 hover:scale-[1.01]',
+                            : 'border-l-0 pl-4 hover:scale-[1.01] hover:bg-accent/20',
                     ]"
-                    @click="$emit('select-result', { word: result.word, score: result.score || 1.0, method: SearchMethod.EXACT, is_phrase: false })"
+                    @click="
+                        $emit('select-result', {
+                            word: result.word,
+                            score: result.score || 1.0,
+                            method: SearchMethod.EXACT,
+                            is_phrase: false,
+                        })
+                    "
                     @mouseenter="selectedIndex = index"
                 >
                     <span
                         :class="[
                             'transition-all duration-200',
-                            index === selectedIndex && 'font-semibold text-primary',
+                            index === selectedIndex &&
+                                'font-semibold text-primary',
                         ]"
                     >
                         {{ result.word.toLowerCase() }}
@@ -65,12 +76,16 @@
                     <div class="flex items-center gap-2 text-xs">
                         <span
                             :class="[
-                                'inline-block px-2 py-0.5 rounded',
-                                result.mastery_level === 'gold' && 'bg-amber-300/10 text-amber-600 dark:text-amber-400',
-                                result.mastery_level === 'silver' && 'bg-gray-300/10 text-gray-600 dark:text-gray-400',
-                                result.mastery_level === 'bronze' && 'bg-orange-300/10 text-orange-600 dark:text-orange-400',
-                                result.mastery_level === 'default' && 'bg-muted text-muted-foreground',
-                                index === selectedIndex && 'font-semibold'
+                                'inline-block rounded px-2 py-0.5',
+                                result.mastery_level === 'gold' &&
+                                    'bg-amber-300/10 text-amber-600 dark:text-amber-400',
+                                result.mastery_level === 'silver' &&
+                                    'bg-gray-300/10 text-gray-600 dark:text-gray-400',
+                                result.mastery_level === 'bronze' &&
+                                    'bg-orange-300/10 text-orange-600 dark:text-orange-400',
+                                result.mastery_level === 'default' &&
+                                    'bg-muted text-muted-foreground',
+                                index === selectedIndex && 'font-semibold',
                             ]"
                         >
                             {{ result.mastery_level }}
@@ -78,15 +93,17 @@
                         <span
                             :class="[
                                 'text-muted-foreground',
-                                index === selectedIndex && 'font-semibold text-primary',
+                                index === selectedIndex &&
+                                    'font-semibold text-primary',
                             ]"
                         >
                             {{ result.frequency }}x
                         </span>
                         <span
                             :class="[
-                                'text-muted-foreground font-medium',
-                                index === selectedIndex && 'font-semibold text-primary',
+                                'font-medium text-muted-foreground',
+                                index === selectedIndex &&
+                                    'font-semibold text-primary',
                             ]"
                         >
                             {{ Math.round(result.score * 100) }}%
@@ -106,11 +123,11 @@
                     :key="result.word"
                     :ref="(el) => setResultRef(el as HTMLButtonElement, index)"
                     :class="[
-                        'flex w-full items-center justify-between px-4 py-3 text-left transition-all duration-300 ease-apple-spring',
+                        'ease-apple-spring flex w-full items-center justify-between px-4 py-3 text-left transition-all duration-300',
                         'border-muted-foreground/50 active:scale-[0.97]',
                         index === selectedIndex
                             ? 'scale-[1.02] border-l-8 bg-accent/60 pl-4 shadow-md'
-                            : 'border-l-0 pl-4 hover:bg-accent/20 hover:scale-[1.01]',
+                            : 'border-l-0 pl-4 hover:scale-[1.01] hover:bg-accent/20',
                     ]"
                     @click="$emit('select-result', result)"
                     @mouseenter="selectedIndex = index"
@@ -118,7 +135,8 @@
                     <span
                         :class="[
                             'transition-all duration-200',
-                            index === selectedIndex && 'font-semibold text-primary',
+                            index === selectedIndex &&
+                                'font-semibold text-primary',
                         ]"
                     >
                         {{ result.word }}
@@ -127,7 +145,8 @@
                         <span
                             :class="[
                                 'text-muted-foreground',
-                                index === selectedIndex && 'font-semibold text-primary',
+                                index === selectedIndex &&
+                                    'font-semibold text-primary',
                             ]"
                         >
                             {{ result.method }}
@@ -135,7 +154,8 @@
                         <span
                             :class="[
                                 'text-muted-foreground',
-                                index === selectedIndex && 'font-semibold text-primary',
+                                index === selectedIndex &&
+                                    'font-semibold text-primary',
                             ]"
                         >
                             {{ Math.round(result.score * 100) }}%
@@ -149,7 +169,8 @@
                 v-if="semanticBuilding && results.length > 0 && !wordlistMode"
                 class="border-t border-border/30 px-4 py-1.5 text-xs text-muted-foreground/60"
             >
-                Semantic search building in background — results are exact + fuzzy only
+                Semantic search building in background — results are exact +
+                fuzzy only
             </p>
 
             <!-- No Results Messages -->
@@ -163,7 +184,11 @@
                 v-else-if="!loading && query.length >= 2 && !aiMode"
                 class="bg-background/50 p-4 text-center text-sm text-muted-foreground backdrop-blur-sm"
             >
-                {{ wordlistMode ? 'No words found in wordlist' : 'No matches found' }}
+                {{
+                    wordlistMode
+                        ? 'No words found in wordlist'
+                        : 'No matches found'
+                }}
             </div>
         </div>
     </Transition>
@@ -192,7 +217,7 @@ const selectedIndex = defineModel<number>('selectedIndex', { required: true });
 
 const emit = defineEmits<{
     'select-result': [result: SearchResult];
-    'interaction': [];
+    interaction: [];
 }>();
 
 const searchResultsContainer = ref<HTMLDivElement>();
@@ -209,6 +234,6 @@ void emit;
 defineExpose({
     container: searchResultsContainer,
     element: searchResultsDropdown,
-    resultRefs
+    resultRefs,
 });
 </script>

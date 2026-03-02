@@ -21,7 +21,7 @@ from ...models.responses import SearchResponse
 from ...search.constants import SearchMode
 from ...search.core import Search
 from ...search.language import get_language_search
-from ...search.models import SearchIndex
+from ...search.search_index import SearchIndex
 from ...text import clear_lemma_cache, get_lemma_cache_stats
 from ...utils.logging import get_logger
 from ...utils.sanitization import sanitize_mongodb_input
@@ -147,7 +147,9 @@ def parse_search_params(
     force_rebuild: bool = Query(default=False, description="Force rebuild indices"),
     corpus_id: str | None = Query(default=None, description="Specific corpus ID"),
     corpus_name: str | None = Query(default=None, description="Specific corpus name"),
-    semantic: bool = Query(default=True, description="Enable semantic search (disable to avoid model load)"),
+    semantic: bool = Query(
+        default=True, description="Enable semantic search (disable to avoid model load)"
+    ),
 ) -> SearchParams:
     """Parse and validate search parameters using shared model."""
     # Use the shared model's validators
@@ -243,7 +245,9 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
 
             # Get language search instance (respect semantic flag to avoid model load crash)
             semantic = getattr(params, "_semantic", True)
-            language_search = await get_language_search(languages=params.languages, semantic=semantic)
+            language_search = await get_language_search(
+                languages=params.languages, semantic=semantic
+            )
 
             # Perform search with specified mode
             results = await language_search.search_with_mode(
@@ -409,7 +413,9 @@ async def get_semantic_status() -> SemanticStatusResponse:
         elif ready:
             message = "Semantic search is ready"
         elif building:
-            message = "Semantic search is building in background (search still works with exact/fuzzy)"
+            message = (
+                "Semantic search is building in background (search still works with exact/fuzzy)"
+            )
         else:
             message = "Semantic search is not initialized"
 

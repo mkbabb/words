@@ -136,6 +136,7 @@ class TestCachingInfrastructure:
     async def test_compression_verification(self, cache_manager):
         """Test that compression reduces storage size for compressible data."""
         import json
+
         from floridify.caching.core import CacheNamespace
 
         # Use CORPUS namespace (has ZSTD compression)
@@ -175,6 +176,7 @@ class TestCachingInfrastructure:
         """Test that memory (L1) TTL expiration works correctly."""
         import asyncio
         from datetime import timedelta
+
         from floridify.caching.core import CacheNamespace
 
         # Use DICTIONARY namespace

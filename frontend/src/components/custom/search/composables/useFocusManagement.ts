@@ -2,142 +2,176 @@ import { ref, nextTick, onMounted, onUnmounted, Ref } from 'vue';
 import { useStores } from '@/stores';
 
 interface UseFocusManagementOptions {
-  searchInputComponent: Ref<any>;
-  emit: (event: string, ...args: any[]) => void;
+    searchInputComponent: Ref<any>;
+    searchContainer?: Ref<HTMLDivElement | undefined>;
+    emit: (event: string, ...args: any[]) => void;
 }
 
 /**
  * Manages focus state and textarea resizing for the search input
- * Handles session restoration and interaction tracking
+ * Handles session restoration, interaction tracking, and click-outside behavior
  */
 export function useFocusManagement(options: UseFocusManagementOptions) {
-  const { searchBar } = useStores();
-  const { searchInputComponent, emit } = options;
+    const { searchBar } = useStores();
+    const { searchInputComponent, searchContainer, emit } = options;
 
-  const isInteractingWithSearchArea = ref(false);
-  const blurTimer = ref<ReturnType<typeof setTimeout> | undefined>();
+    const isInteractingWithSearchArea = ref(false);
+    const blurTimer = ref<ReturnType<typeof setTimeout> | undefined>();
 
-  /**
-   * Handle focus event with textarea resizing and session restoration
-   */
-  const handleFocus = () => {
-    searchBar.setFocused(true);
-    emit('focus');
+    /**
+     * Handle focus event with textarea resizing and session restoration
+     */
+    const handleFocus = () => {
+        searchBar.setFocused(true);
+        emit('focus');
 
-    // Force textarea resize on focus
-    nextTick(() => {
-      if (searchInputComponent.value?.element?.value) {
-        const textarea = searchInputComponent.value.element.value;
-        if (textarea && textarea.style) {
-          textarea.style.height = 'auto';
-          const scrollHeight = textarea.scrollHeight;
-          textarea.style.height = `${scrollHeight}px`;
+        // Force textarea resize on focus
+        nextTick(() => {
+            if (searchInputComponent.value?.element?.value) {
+                const textarea = searchInputComponent.value.element.value;
+                if (textarea && textarea.style) {
+                    textarea.style.height = 'auto';
+                    const scrollHeight = textarea.scrollHeight;
+                    textarea.style.height = `${scrollHeight}px`;
+                }
+            }
+        });
+
+        // Only restore search results if we're in lookup mode and there's an active query
+        // Don't auto-show results when just switching modes or focusing
+        const currentResults = searchBar.currentResults;
+
+        if (
+            searchBar.searchMode === 'lookup' &&
+            currentResults?.length > 0 &&
+            searchBar.searchQuery.length >= 2 &&
+            !searchBar.isDirectLookup // Don't show if we're doing a direct lookup
+        ) {
+            // Search results are already stored, just show the dropdown
+            searchBar.openDropdown();
         }
-      }
+    };
+
+    /**
+     * Handle blur event with delayed hiding
+     */
+    const handleBlur = () => {
+        if (blurTimer.value) {
+            clearTimeout(blurTimer.value);
+        }
+
+        blurTimer.value = setTimeout(() => {
+            // If user is still interacting with search area, don't blur
+            if (isInteractingWithSearchArea.value) return;
+
+            searchBar.setFocused(false);
+            emit('blur');
+
+            // Hide results on blur only if we're not interacting with search area
+            searchBar.hideDropdown();
+            searchBar.clearResults();
+        }, 200); // Increased delay to 200ms for better UX
+    };
+
+    /**
+     * Track interaction with search area to prevent blur
+     */
+    const handleSearchAreaInteraction = () => {
+        isInteractingWithSearchArea.value = true;
+        // Clear any existing timer
+        if (blurTimer.value) {
+            clearTimeout(blurTimer.value);
+        }
+        // Reset interaction flag after a longer delay to ensure clicks are processed
+        setTimeout(() => {
+            isInteractingWithSearchArea.value = false;
+        }, 300);
+    };
+
+    /**
+     * Focus the search input programmatically
+     */
+    const focusInput = () => {
+        searchInputComponent.value?.focus();
+    };
+
+    /**
+     * Handle clicks outside the search container to close controls and blur
+     */
+    const handleClickOutside = (event: MouseEvent) => {
+        if (!searchContainer?.value) return;
+
+        const target = event.target as HTMLElement;
+
+        // If click is outside the search container, handle blur behavior
+        if (!searchContainer.value.contains(target)) {
+            // Close controls
+            searchBar.hideControls();
+
+            // Trigger blur behavior if search bar is focused
+            if (searchBar.isFocused) {
+                // Don't set interaction flag since this is an outside click
+                isInteractingWithSearchArea.value = false;
+
+                // Immediately trigger blur
+                searchBar.setFocused(false);
+                emit('blur');
+
+                // Hide search results
+                searchBar.hideDropdown();
+                searchBar.clearResults();
+            }
+        }
+    };
+
+    /**
+     * Global Cmd+K / Ctrl+K shortcut to focus search bar
+     */
+    const handleGlobalKeydown = (e: KeyboardEvent) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            focusInput();
+            // Select all text for easy replacement
+            nextTick(() => {
+                const textarea = searchInputComponent.value?.element?.value;
+                if (textarea) {
+                    textarea.select();
+                }
+            });
+        }
+    };
+
+    onMounted(() => {
+        window.addEventListener('keydown', handleGlobalKeydown);
+        document.addEventListener('click', handleClickOutside);
     });
 
-    // Only restore search results if we're in lookup mode and there's an active query
-    // Don't auto-show results when just switching modes or focusing
-    const currentResults = searchBar.currentResults;
+    onUnmounted(() => {
+        window.removeEventListener('keydown', handleGlobalKeydown);
+        document.removeEventListener('click', handleClickOutside);
+    });
 
-    if (
-      searchBar.searchMode === 'lookup' &&
-      currentResults?.length > 0 &&
-      searchBar.searchQuery.length >= 2 &&
-      !searchBar.isDirectLookup // Don't show if we're doing a direct lookup
-    ) {
-      // Search results are already stored, just show the dropdown
-      searchBar.openDropdown();
-    }
-  };
-
-  /**
-   * Handle blur event with delayed hiding
-   */
-  const handleBlur = () => {
-    if (blurTimer.value) {
-      clearTimeout(blurTimer.value);
-    }
-
-    blurTimer.value = setTimeout(() => {
-      // If user is still interacting with search area, don't blur
-      if (isInteractingWithSearchArea.value) return;
-
-      searchBar.setFocused(false);
-      emit('blur');
-
-      // Hide results on blur only if we're not interacting with search area
-      searchBar.hideDropdown();
-      searchBar.clearResults();
-    }, 200); // Increased delay to 200ms for better UX
-  };
-
-  /**
-   * Track interaction with search area to prevent blur
-   */
-  const handleSearchAreaInteraction = () => {
-    isInteractingWithSearchArea.value = true;
-    // Clear any existing timer
-    if (blurTimer.value) {
-      clearTimeout(blurTimer.value);
-    }
-    // Reset interaction flag after a longer delay to ensure clicks are processed
-    setTimeout(() => {
-      isInteractingWithSearchArea.value = false;
-    }, 300);
-  };
-
-  /**
-   * Focus the search input programmatically
-   */
-  const focusInput = () => {
-    searchInputComponent.value?.focus();
-  };
-
-  /**
-   * Global Cmd+K / Ctrl+K shortcut to focus search bar
-   */
-  const handleGlobalKeydown = (e: KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-      e.preventDefault();
-      focusInput();
-      // Select all text for easy replacement
-      nextTick(() => {
-        const textarea = searchInputComponent.value?.element?.value;
-        if (textarea) {
-          textarea.select();
+    /**
+     * Cleanup timers and event listeners
+     */
+    const cleanup = () => {
+        if (blurTimer.value) {
+            clearTimeout(blurTimer.value);
         }
-      });
-    }
-  };
+        window.removeEventListener('keydown', handleGlobalKeydown);
+        document.removeEventListener('click', handleClickOutside);
+    };
 
-  onMounted(() => {
-    window.addEventListener('keydown', handleGlobalKeydown);
-  });
+    return {
+        // State
+        isInteractingWithSearchArea,
 
-  onUnmounted(() => {
-    window.removeEventListener('keydown', handleGlobalKeydown);
-  });
-
-  /**
-   * Cleanup timers
-   */
-  const cleanup = () => {
-    if (blurTimer.value) {
-      clearTimeout(blurTimer.value);
-    }
-    window.removeEventListener('keydown', handleGlobalKeydown);
-  };
-
-  return {
-    // State
-    isInteractingWithSearchArea,
-    
-    // Methods
-    handleFocus,
-    handleBlur,
-    handleSearchAreaInteraction,
-    focusInput,
-    cleanup,
-  };
+        // Methods
+        handleFocus,
+        handleBlur,
+        handleSearchAreaInteraction,
+        handleClickOutside,
+        focusInput,
+        cleanup,
+    };
 }

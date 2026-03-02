@@ -115,7 +115,14 @@ app.add_middleware(
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allow_headers=["Content-Type", "Authorization", "X-Request-ID", "Accept", "Cache-Control", "If-None-Match"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "X-Request-ID",
+        "Accept",
+        "Cache-Control",
+        "If-None-Match",
+    ],
     expose_headers=["ETag", "Cache-Control", "X-Process-Time", "X-Request-ID"],
     max_age=3600,  # Cache preflight responses for 1 hour
 )

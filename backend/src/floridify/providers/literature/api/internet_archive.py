@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 from ....models.literature import LiteratureProvider
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
-from ...utils import respectful_scraper
+from ...http_client import respectful_scraper
 from ..core import LiteratureConnector
 
 logger = get_logger(__name__)

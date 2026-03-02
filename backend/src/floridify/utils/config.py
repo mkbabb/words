@@ -214,8 +214,7 @@ class Config:
         # Load database config with validation
         if "database" not in data:
             raise ValueError(
-                f"Missing [database] section in {config_path}\n"
-                f"Please add database configuration.",
+                f"Missing [database] section in {config_path}\nPlease add database configuration.",
             )
 
         db_data = data["database"]
@@ -257,7 +256,9 @@ class Config:
                 project_id=gc_data.get("project_id"),
                 tts_american_voice=gc_data.get("tts_american_voice", "en-US-Wavenet-D"),
                 tts_british_voice=gc_data.get("tts_british_voice", "en-GB-Wavenet-B"),
-                tts_american_voice_female=gc_data.get("tts_american_voice_female", "en-US-Wavenet-F"),
+                tts_american_voice_female=gc_data.get(
+                    "tts_american_voice_female", "en-US-Wavenet-F"
+                ),
                 tts_british_voice_female=gc_data.get("tts_british_voice_female", "en-GB-Wavenet-A"),
             )
 

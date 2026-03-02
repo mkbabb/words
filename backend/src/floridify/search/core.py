@@ -15,7 +15,8 @@ from ..text import normalize
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod, SearchMode
 from .fuzzy import FuzzySearch  # Using RapidFuzz implementation
-from .models import SearchIndex, SearchResult
+from .result import SearchResult
+from .search_index import SearchIndex
 from .semantic.constants import DEFAULT_SENTENCE_MODEL, SemanticModel
 from .semantic.core import SemanticSearch
 from .trie import TrieSearch
@@ -63,7 +64,9 @@ class Search:
         # Track semantic initialization separately with proper synchronization
         self._semantic_ready = False
         self._semantic_init_task: asyncio.Task[None] | None = None
-        self._semantic_init_lock: asyncio.Lock = asyncio.Lock()  # CRITICAL FIX: Prevent race conditions
+        self._semantic_init_lock: asyncio.Lock = (
+            asyncio.Lock()
+        )  # CRITICAL FIX: Prevent race conditions
         self._semantic_init_error: str | None = None  # Track initialization errors
 
         self._initialized = False
@@ -225,7 +228,9 @@ class Search:
                 logger.info("Re-initializing semantic search after vocabulary rebuild")
                 async with self._semantic_init_lock:
                     if not self._semantic_ready and self._semantic_init_task is None:
-                        self._semantic_init_task = asyncio.create_task(self._initialize_semantic_background())
+                        self._semantic_init_task = asyncio.create_task(
+                            self._initialize_semantic_background()
+                        )
 
             return  # Skip rest of initialization since build_indices() already did it
 
@@ -248,7 +253,9 @@ class Search:
             async with self._semantic_init_lock:
                 # Double-check after acquiring lock
                 if not self._semantic_ready and self._semantic_init_task is None:
-                    self._semantic_init_task = asyncio.create_task(self._initialize_semantic_background())
+                    self._semantic_init_task = asyncio.create_task(
+                        self._initialize_semantic_background()
+                    )
 
         self._initialized = True
 

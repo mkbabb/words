@@ -5,17 +5,13 @@ Tests cover platform compatibility, PyObjC integration, regex parsing, and full 
 
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from floridify.models.dictionary import DictionaryProvider
 from floridify.providers.dictionary.local.apple_dictionary import (
     AppleDictionaryConnector,
-    AppleDictionaryError,
-    DependencyImportError as AppleDictionaryImportError,
-    PlatformError,
 )
 
 # Sample raw definition from Apple Dictionary (realistic format)
@@ -46,7 +42,9 @@ class TestAppleDictionaryPlatformCompatibility:
 
         # Mock the CoreServices import to avoid actual dependency
         mock_dict_service = MagicMock()
-        with patch.dict("sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}):
+        with patch.dict(
+            "sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}
+        ):
             connector = AppleDictionaryConnector()
 
             assert connector._platform_compatible is True
@@ -75,7 +73,9 @@ class TestAppleDictionaryPlatformCompatibility:
         monkeypatch.setattr("platform.system", lambda: "Darwin")
 
         mock_dict_service = MagicMock()
-        with patch.dict("sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}):
+        with patch.dict(
+            "sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}
+        ):
             connector = AppleDictionaryConnector()
 
             assert connector._is_available() is True
@@ -121,10 +121,14 @@ class TestAppleDictionaryTextCleaning:
         """Create connector instance (platform-agnostic for testing)."""
         monkeypatch.setattr("platform.system", lambda: "Darwin")
         mock_dict_service = MagicMock()
-        with patch.dict("sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}):
+        with patch.dict(
+            "sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}
+        ):
             return AppleDictionaryConnector()
 
-    def test_clean_definition_text_removes_pronunciation(self, connector: AppleDictionaryConnector) -> None:
+    def test_clean_definition_text_removes_pronunciation(
+        self, connector: AppleDictionaryConnector
+    ) -> None:
         """Test that pronunciation markers are removed."""
         text = "apple |ˈapəl| noun a round fruit"
         result = connector._clean_definition_text(text)
@@ -133,7 +137,9 @@ class TestAppleDictionaryTextCleaning:
         assert "apple" in result
         assert "noun" in result
 
-    def test_clean_definition_text_normalizes_whitespace(self, connector: AppleDictionaryConnector) -> None:
+    def test_clean_definition_text_normalizes_whitespace(
+        self, connector: AppleDictionaryConnector
+    ) -> None:
         """Test whitespace normalization."""
         text = "word   with    extra     spaces"
         result = connector._clean_definition_text(text)
@@ -161,7 +167,9 @@ class TestAppleDictionaryTextCleaning:
 
         assert result == "move at a speed faster than a walk"
 
-    def test_extract_main_definition_with_adjective(self, connector: AppleDictionaryConnector) -> None:
+    def test_extract_main_definition_with_adjective(
+        self, connector: AppleDictionaryConnector
+    ) -> None:
         """Test extracting definition after 'adjective' marker."""
         text = "happy adjective feeling or showing pleasure"
         result = connector._extract_main_definition(text)
@@ -184,7 +192,9 @@ class TestAppleDictionaryExampleExtraction:
         """Create connector instance."""
         monkeypatch.setattr("platform.system", lambda: "Darwin")
         mock_dict_service = MagicMock()
-        with patch.dict("sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}):
+        with patch.dict(
+            "sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}
+        ):
             return AppleDictionaryConnector()
 
     def test_extract_examples_with_quotes(self, connector: AppleDictionaryConnector) -> None:
@@ -203,7 +213,9 @@ class TestAppleDictionaryExampleExtraction:
         # Should extract something (exact match may vary due to regex)
         assert isinstance(examples, list)
 
-    def test_extract_examples_filters_short_matches(self, connector: AppleDictionaryConnector) -> None:
+    def test_extract_examples_filters_short_matches(
+        self, connector: AppleDictionaryConnector
+    ) -> None:
         """Test that very short matches are filtered out."""
         text = 'a fruit: "an" or "the"'
         examples = connector._extract_examples(text)
@@ -218,7 +230,9 @@ class TestAppleDictionaryExampleExtraction:
 
         assert examples == []
 
-    def test_remove_examples_from_definition_quotes(self, connector: AppleDictionaryConnector) -> None:
+    def test_remove_examples_from_definition_quotes(
+        self, connector: AppleDictionaryConnector
+    ) -> None:
         """Test removal of quoted examples."""
         text = 'a round fruit: "she picked an apple"'
         result = connector._remove_examples_from_definition(text)
@@ -242,7 +256,9 @@ class TestAppleDictionaryPronunciationExtraction:
         """Create connector instance."""
         monkeypatch.setattr("platform.system", lambda: "Darwin")
         mock_dict_service = MagicMock()
-        with patch.dict("sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}):
+        with patch.dict(
+            "sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}
+        ):
             return AppleDictionaryConnector()
 
     @pytest.mark.asyncio
@@ -264,7 +280,9 @@ class TestAppleDictionaryPronunciationExtraction:
         assert pronunciation.phonetic is not None
 
     @pytest.mark.asyncio
-    async def test_extract_pronunciation_no_ipa(self, connector: AppleDictionaryConnector, test_db) -> None:
+    async def test_extract_pronunciation_no_ipa(
+        self, connector: AppleDictionaryConnector, test_db
+    ) -> None:
         """Test pronunciation extraction when no IPA present."""
         from floridify.models.dictionary import Word
 
@@ -302,7 +320,9 @@ class TestAppleDictionaryPronunciationExtraction:
         assert "æ" not in phonetic
         assert "ə" not in phonetic
 
-    def test_ipa_to_phonetic_with_various_symbols(self, connector: AppleDictionaryConnector) -> None:
+    def test_ipa_to_phonetic_with_various_symbols(
+        self, connector: AppleDictionaryConnector
+    ) -> None:
         """Test IPA conversion with various phonetic symbols."""
         test_cases = [
             ("æ", "a"),  # ash
@@ -326,11 +346,15 @@ class TestAppleDictionaryDefinitionExtraction:
         """Create connector instance."""
         monkeypatch.setattr("platform.system", lambda: "Darwin")
         mock_dict_service = MagicMock()
-        with patch.dict("sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}):
+        with patch.dict(
+            "sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}
+        ):
             return AppleDictionaryConnector()
 
     @pytest.mark.asyncio
-    async def test_extract_definitions_noun(self, connector: AppleDictionaryConnector, test_db) -> None:
+    async def test_extract_definitions_noun(
+        self, connector: AppleDictionaryConnector, test_db
+    ) -> None:
         """Test definition extraction for noun."""
         from floridify.models.dictionary import Word
 
@@ -346,7 +370,9 @@ class TestAppleDictionaryDefinitionExtraction:
         assert len(definitions[0].text) > 0
 
     @pytest.mark.asyncio
-    async def test_extract_definitions_verb(self, connector: AppleDictionaryConnector, test_db) -> None:
+    async def test_extract_definitions_verb(
+        self, connector: AppleDictionaryConnector, test_db
+    ) -> None:
         """Test definition extraction for verb."""
         from floridify.models.dictionary import Word
 
@@ -395,7 +421,9 @@ class TestAppleDictionaryDefinitionExtraction:
         assert definitions == []
 
     @pytest.mark.asyncio
-    async def test_extract_definitions_minimal(self, connector: AppleDictionaryConnector, test_db) -> None:
+    async def test_extract_definitions_minimal(
+        self, connector: AppleDictionaryConnector, test_db
+    ) -> None:
         """Test definition extraction with minimal data."""
         from floridify.models.dictionary import Word
 
@@ -418,7 +446,9 @@ class TestAppleDictionaryEtymologyExtraction:
         """Create connector instance."""
         monkeypatch.setattr("platform.system", lambda: "Darwin")
         mock_dict_service = MagicMock()
-        with patch.dict("sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}):
+        with patch.dict(
+            "sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}
+        ):
             return AppleDictionaryConnector()
 
     @pytest.mark.asyncio
@@ -455,7 +485,9 @@ class TestAppleDictionaryLookup:
         """Create connector instance."""
         monkeypatch.setattr("platform.system", lambda: "Darwin")
         mock_dict_service = MagicMock(return_value="test definition")
-        with patch.dict("sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}):
+        with patch.dict(
+            "sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}
+        ):
             connector = AppleDictionaryConnector()
             connector._dictionary_service = mock_dict_service
             return connector
@@ -493,14 +525,18 @@ class TestAppleDictionaryFetchFromProvider:
         """Create connector instance with mocked lookup."""
         monkeypatch.setattr("platform.system", lambda: "Darwin")
         mock_dict_service = MagicMock()
-        with patch.dict("sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}):
+        with patch.dict(
+            "sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}
+        ):
             connector = AppleDictionaryConnector()
             # Mock the lookup method
             connector._lookup_definition = MagicMock(return_value=SAMPLE_RAW_DEFINITION)
             return connector
 
     @pytest.mark.asyncio
-    async def test_fetch_from_provider_success(self, connector: AppleDictionaryConnector, test_db) -> None:
+    async def test_fetch_from_provider_success(
+        self, connector: AppleDictionaryConnector, test_db
+    ) -> None:
         """Test successful fetch from provider."""
         result = await connector._fetch_from_provider("apple")
 
@@ -511,14 +547,18 @@ class TestAppleDictionaryFetchFromProvider:
         assert len(result["definitions"]) > 0
 
     @pytest.mark.asyncio
-    async def test_fetch_from_provider_empty_word(self, connector: AppleDictionaryConnector, test_db) -> None:
+    async def test_fetch_from_provider_empty_word(
+        self, connector: AppleDictionaryConnector, test_db
+    ) -> None:
         """Test fetch with empty word."""
         result = await connector._fetch_from_provider("")
 
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_fetch_from_provider_not_found(self, connector: AppleDictionaryConnector, test_db) -> None:
+    async def test_fetch_from_provider_not_found(
+        self, connector: AppleDictionaryConnector, test_db
+    ) -> None:
         """Test fetch when word not found."""
         connector._lookup_definition = MagicMock(return_value=None)
 
@@ -562,7 +602,9 @@ class TestAppleDictionaryServiceInfo:
         monkeypatch.setattr("platform.mac_ver", lambda: ("14.0", ("", "", ""), ""))
 
         mock_dict_service = MagicMock()
-        with patch.dict("sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}):
+        with patch.dict(
+            "sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}
+        ):
             connector = AppleDictionaryConnector()
 
             info = connector.get_service_info()
@@ -592,7 +634,9 @@ class TestAppleDictionaryIntegration:
         monkeypatch.setattr("platform.system", lambda: "Darwin")
 
         mock_dict_service = MagicMock(return_value=SAMPLE_RAW_DEFINITION)
-        with patch.dict("sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}):
+        with patch.dict(
+            "sys.modules", {"CoreServices": MagicMock(DCSCopyTextDefinition=mock_dict_service)}
+        ):
             connector = AppleDictionaryConnector()
             connector._dictionary_service = mock_dict_service
 

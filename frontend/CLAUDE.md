@@ -101,12 +101,20 @@ frontend/src/
 │   ├── index.ts                    # Unified export
 │   ├── lookup.ts (126)             # Standard + SSE streaming lookup
 │   ├── search.ts (140)             # Multi-method search
-│   ├── ai.ts (414)                 # 40+ AI synthesis endpoints
+│   ├── ai/                         # AI synthesis endpoints (split from ai.ts)
+│   │   ├── index.ts                # Barrel assembling aiApi object
+│   │   ├── synthesize.ts           # synthesize namespace (synonyms, antonyms, pronunciation)
+│   │   ├── generate.ts             # generate namespace (examples, facts, wordForms)
+│   │   ├── assess.ts               # assess namespace (7 assessment methods)
+│   │   └── suggestions.ts          # validateQuery, suggestWords, synthesizeEntry, etc.
 │   ├── wordlists.ts (289)          # Wordlist CRUD + reviews
 │   ├── entries.ts (177)            # Dictionary entry ops
 │   ├── definitions.ts, media.ts, examples.ts, suggestions.ts
 │   ├── health.ts, versions.ts
-│   └── sse/SSEClient.ts (300)      # EventSource: config, progress, complete events
+│   └── sse/                        # SSE streaming (types extracted)
+│       ├── index.ts                # Barrel export
+│       ├── types.ts                # ProgressEvent, ConfigEvent, SSEOptions, SSEHandlers
+│       └── SSEClient.ts (300)      # EventSource: config, progress, complete events
 │
 ├── composables/                    # Global composables
 │   ├── useIOSPWA.ts (346)          # Standalone mode, swipe nav, safe areas
@@ -115,7 +123,12 @@ frontend/src/
 │   └── useSlugGeneration.ts (51)   # URL slug generation
 │
 ├── types/                          # TypeScript definitions
-│   ├── api.ts (405)                # Isomorphic: mirrors backend Pydantic exactly
+│   ├── api/                        # Isomorphic: mirrors backend Pydantic (split from api.ts)
+│   │   ├── index.ts                # Barrel: re-exports all sub-modules
+│   │   ├── models.ts               # Enums, core entities (Word, Definition, etc.)
+│   │   ├── responses.ts            # API envelopes (ListResponse, ErrorResponse, etc.)
+│   │   ├── guards.ts               # Type guard functions (isWord, isDefinition, etc.)
+│   │   └── versions.ts             # Version history types (VersionSummary, etc.)
 │   ├── index.ts (274)              # Frontend-specific: SearchResult, error types
 │   ├── modes.ts (336)              # Centralized: SearchMode, LookupMode, ErrorType
 │   └── wordlist.ts (288)           # Wordlist, MasteryLevel, ReviewData
@@ -140,7 +153,7 @@ frontend/src/
 
 ## Design Principles
 
-- **Isomorphic types**: `types/api.ts` mirrors backend Pydantic models exactly
+- **Isomorphic types**: `types/api/` directory mirrors backend Pydantic models exactly
 - **Mode-based state**: SearchBarStore delegates to mode-specific stores with onEnter/onExit lifecycle
 - **No API calls in stores**: All network operations in composables (useSearchOrchestrator)
 - **Component co-location**: Each feature groups components, composables, types, utils together

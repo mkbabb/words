@@ -560,7 +560,9 @@ class TestCorpusLifecycle:
         )
 
         # Aggregate vocabulary from children
-        aggregated = await tree_manager.aggregate_from_children(parent_corpus_uuid=parent.corpus_uuid)
+        aggregated = await tree_manager.aggregate_from_children(
+            parent_corpus_uuid=parent.corpus_uuid
+        )
         assert aggregated is not None
 
         # Should include vocabularies from all children

@@ -21,7 +21,7 @@ from ..storage.mongodb import get_storage
 from ..utils.logging import get_logger
 from .connector import OpenAIConnector
 from .constants import SynthesisComponent
-from .synthesis_functions import (
+from .synthesis import (
     cluster_definitions,
     enhance_definitions_parallel,
     generate_facts,

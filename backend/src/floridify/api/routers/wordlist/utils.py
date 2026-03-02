@@ -99,7 +99,9 @@ async def search_words_in_wordlist(
     # Determine whether to use semantic search:
     # - Explicit parameter takes precedence
     # - Otherwise, enable for wordlists above the threshold
-    use_semantic = semantic if semantic is not None else len(word_texts) > SEMANTIC_SEARCH_WORD_COUNT_THRESHOLD
+    use_semantic = (
+        semantic if semantic is not None else len(word_texts) > SEMANTIC_SEARCH_WORD_COUNT_THRESHOLD
+    )
 
     # Create/get corpus for this wordlist
     corpus_name = f"wordlist_{wordlist_id}"

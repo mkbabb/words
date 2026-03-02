@@ -2,7 +2,7 @@
     <div
         :class="[
             'flex flex-shrink-0 items-center justify-center overflow-hidden transition-all ease-out',
-            `duration-${animationDuration}`
+            `duration-${animationDuration}`,
         ]"
         :style="{
             opacity: opacity,
@@ -18,11 +18,11 @@
             :clickable="canToggle"
             :class="[
                 'transition-colors duration-200',
-                { 
+                {
                     'text-amber-950 dark:text-amber-300': aiMode,
-                    'opacity-50 cursor-not-allowed': !canToggle,
-                    'cursor-pointer hover:scale-110': canToggle
-                }
+                    'cursor-not-allowed opacity-50': !canToggle,
+                    'cursor-pointer hover:scale-110': canToggle,
+                },
             ]"
             @toggle-mode="handleToggle"
         />
@@ -57,7 +57,7 @@ const props = withDefaults(defineProps<ModeToggleProps>(), {
     opacityThreshold: 0.1,
     expandedWidth: 48,
     spacing: 2,
-    animationDuration: 300
+    animationDuration: 300,
 });
 
 // Using defineModel for two-way binding (modern Vue 3.4+) with centralized type
@@ -87,20 +87,24 @@ const handleToggle = async () => {
     // Simple state machine with clear transitions using centralized types
     const transitions: Record<LookupMode, LookupMode> = {
         // From dictionary
-        'dictionary': 'thesaurus',
+        dictionary: 'thesaurus',
 
         // From thesaurus
-        'thesaurus': content.wordSuggestions ? 'suggestions' : 'dictionary',
+        thesaurus: content.wordSuggestions ? 'suggestions' : 'dictionary',
 
         // From suggestions
-        'suggestions': 'dictionary'
+        suggestions: 'dictionary',
     };
 
     const newMode = transitions[current] || 'dictionary';
     modelValue.value = newMode;
 
     // Handle router navigation for definition/thesaurus/suggestions toggle
-    if (searchBar.searchMode === 'lookup' && searchBar.searchQuery && searchBar.searchQuery.trim()) {
+    if (
+        searchBar.searchMode === 'lookup' &&
+        searchBar.searchQuery &&
+        searchBar.searchQuery.trim()
+    ) {
         const currentWord = searchBar.searchQuery;
 
         // Use the enhanced router navigation with router instance

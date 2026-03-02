@@ -24,7 +24,18 @@ class TestLargeCorpusSearch:
 
         # Common English words (simulate frequency distribution)
         common_prefixes = ["pre", "post", "anti", "un", "re", "de", "dis", "mis", "over", "under"]
-        common_roots = ["act", "form", "struct", "port", "dict", "ject", "duct", "vene", "cede", "mit"]
+        common_roots = [
+            "act",
+            "form",
+            "struct",
+            "port",
+            "dict",
+            "ject",
+            "duct",
+            "vene",
+            "cede",
+            "mit",
+        ]
         common_suffixes = ["ing", "ed", "er", "est", "ly", "ness", "ment", "tion", "able", "ful"]
 
         # Generate 100k words with patterns
@@ -217,7 +228,7 @@ class TestLargeCorpusSearch:
         exact_time = time.perf_counter() - start
 
         # Exact search should be very fast (<10ms even on 100k corpus)
-        assert exact_time < 0.01, f"Exact search took {exact_time*1000:.2f}ms, expected <10ms"
+        assert exact_time < 0.01, f"Exact search took {exact_time * 1000:.2f}ms, expected <10ms"
 
         # Test prefix search performance
         start = time.perf_counter()
@@ -225,7 +236,7 @@ class TestLargeCorpusSearch:
         prefix_time = time.perf_counter() - start
 
         # Prefix search should be fast (<100ms)
-        assert prefix_time < 0.1, f"Prefix search took {prefix_time*1000:.2f}ms, expected <100ms"
+        assert prefix_time < 0.1, f"Prefix search took {prefix_time * 1000:.2f}ms, expected <100ms"
 
         # Test fuzzy search performance (more expensive)
         start = time.perf_counter()

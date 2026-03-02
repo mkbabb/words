@@ -7,7 +7,7 @@
     >
         <div
             v-if="show"
-            class="absolute -bottom-2 left-2 right-2 h-1.5 bg-background/80 backdrop-blur-sm rounded-full overflow-hidden shadow-sm"
+            class="absolute right-2 -bottom-2 left-2 h-1.5 overflow-hidden rounded-full bg-background/80 shadow-sm backdrop-blur-sm"
         >
             <div
                 class="h-full rounded-full transition-all duration-300 ease-out"
@@ -37,12 +37,12 @@ const props = withDefaults(defineProps<Props>(), {
 const rainbowGradient = computed(() => {
     const colors = [];
     const hueStep = 360 / props.segments;
-    
+
     for (let i = 0; i < props.segments; i++) {
         const hue = (i * hueStep) % 360;
         colors.push(`hsl(${hue}, 85%, 55%)`);
     }
-    
+
     return `linear-gradient(90deg, ${colors.join(', ')})`;
 });
 </script>

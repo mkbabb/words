@@ -30,8 +30,9 @@ from ..providers.batch import BatchOperation
 from ..providers.dictionary.models import DictionaryProviderEntry
 from ..providers.language.models import LanguageEntry
 from ..providers.literature.models import LiteratureEntry
-from ..search.models import SearchIndex, TrieIndex
+from ..search.search_index import SearchIndex
 from ..search.semantic.models import SemanticIndex
+from ..search.trie_index import TrieIndex
 from ..utils.config import Config
 from ..utils.logging import get_logger
 from ..wordlist.models import WordList
@@ -70,7 +71,13 @@ class MongoDBStorage:
         # Detect if connecting to localhost or Docker internal MongoDB (no TLS needed)
         is_localhost = any(
             host in self.connection_string
-            for host in ["localhost:27017", "mongodb:27017", "127.0.0.1:27017", "host.docker.internal:27017", "floridify-mongodb:27017"]
+            for host in [
+                "localhost:27017",
+                "mongodb:27017",
+                "127.0.0.1:27017",
+                "host.docker.internal:27017",
+                "floridify-mongodb:27017",
+            ]
         )
 
         # Build connection kwargs

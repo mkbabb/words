@@ -15,7 +15,7 @@ from typing import Any
 
 import httpx
 import jwt
-from fastapi import Depends, HTTPException, Request, Response, status
+from fastapi import HTTPException, Request, Response, status
 from jwt.algorithms import RSAAlgorithm
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -29,29 +29,35 @@ _jwks_cache_time: float = 0
 
 # Endpoint tier classification
 # Tier 1: Public (no auth required)
-PUBLIC_PREFIXES = frozenset({
-    "/api/v1/lookup/",
-    "/api/v1/search",
-    "/api/v1/suggestions",
-    "/api/v1/health",
-    "/api",
-})
-PUBLIC_EXACT = frozenset({
-    "/api/v1/health",
-    "/api",
-})
+PUBLIC_PREFIXES = frozenset(
+    {
+        "/api/v1/lookup/",
+        "/api/v1/search",
+        "/api/v1/suggestions",
+        "/api/v1/health",
+        "/api",
+    }
+)
+PUBLIC_EXACT = frozenset(
+    {
+        "/api/v1/health",
+        "/api",
+    }
+)
 
 # Tier 4: Admin-only endpoints
-ADMIN_PREFIXES = frozenset({
-    "/api/v1/cache/clear",
-    "/api/v1/cache/prune",
-    "/api/v1/config",
-    "/api/v1/corpus/rebuild",
-    "/api/v1/database/cleanup",
-    "/api/v1/database/stats",
-    "/api/v1/providers/circuit-status",
-    "/api/v1/metrics",
-})
+ADMIN_PREFIXES = frozenset(
+    {
+        "/api/v1/cache/clear",
+        "/api/v1/cache/prune",
+        "/api/v1/config",
+        "/api/v1/corpus/rebuild",
+        "/api/v1/database/cleanup",
+        "/api/v1/database/stats",
+        "/api/v1/providers/circuit-status",
+        "/api/v1/metrics",
+    }
+)
 
 
 def _is_public_endpoint(path: str, method: str) -> bool:
@@ -177,7 +183,7 @@ class ClerkAuthMiddleware(BaseHTTPMiddleware):
                 content='{"detail":"Token expired"}',
                 status_code=401,
                 media_type="application/json",
-                headers={"WWW-Authenticate": "Bearer error=\"invalid_token\""},
+                headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
             )
         except jwt.InvalidTokenError as e:
             logger.warning(f"Invalid JWT: {e}")
@@ -185,7 +191,7 @@ class ClerkAuthMiddleware(BaseHTTPMiddleware):
                 content='{"detail":"Invalid authentication token"}',
                 status_code=401,
                 media_type="application/json",
-                headers={"WWW-Authenticate": "Bearer error=\"invalid_token\""},
+                headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
             )
         except httpx.HTTPError as e:
             logger.error(f"Failed to fetch JWKS: {e}")

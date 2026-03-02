@@ -59,7 +59,7 @@ async def trie_corpus(test_db):
 @pytest_asyncio.fixture
 async def trie_search(trie_corpus):
     """Create TrieSearch instance with corpus."""
-    from floridify.search.models import TrieIndex
+    from floridify.search.trie_index import TrieIndex
 
     # Create trie index from corpus
     index = await TrieIndex.get_or_create(corpus=trie_corpus)
@@ -197,7 +197,7 @@ class TestTrieSearch:
     @pytest.mark.asyncio
     async def test_trie_index_creation(self, test_db):
         """Test creating trie index from corpus."""
-        from floridify.search.models import TrieIndex
+        from floridify.search.trie_index import TrieIndex
 
         vocabulary = ["test", "testing", "tester"]
 
@@ -233,7 +233,7 @@ class TestTrieSearch:
         manager = TreeCorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
 
-        from floridify.search.models import TrieIndex
+        from floridify.search.trie_index import TrieIndex
 
         # Create index from empty corpus
         index = await TrieIndex.get_or_create(corpus=saved_corpus)

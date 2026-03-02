@@ -68,7 +68,9 @@ class TestDiacriticsPreservation:
         )
 
         # Verify corpus has diacritic words in original vocabulary
-        assert "café" in diacritics_corpus.original_vocabulary, "café should be in original_vocabulary"
+        assert "café" in diacritics_corpus.original_vocabulary, (
+            "café should be in original_vocabulary"
+        )
         # And normalized form in normalized vocabulary
         assert "cafe" in diacritics_corpus.vocabulary, "cafe should be in vocabulary"
 

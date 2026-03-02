@@ -25,7 +25,7 @@ from ....models.dictionary import DictionaryEntry, DictionaryProvider, Word
 from ....utils.logging import get_logger
 from ...batch import BatchOperation
 from ...core import ConnectorConfig
-from ...utils import RateLimitConfig
+from ...rate_limiting import RateLimitConfig
 from ..core import DictionaryConnector
 
 logger = get_logger(__name__)

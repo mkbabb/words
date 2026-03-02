@@ -144,11 +144,7 @@ class TestSearchPerformance:
         def search_fuzzy():
             results = []
             for query in queries:
-                results.extend(fuzzy_engine.search(
-                    query,
-                    corpus=medium_corpus,
-                    max_results=5
-                ))
+                results.extend(fuzzy_engine.search(query, corpus=medium_corpus, max_results=5))
             return results
 
         results = benchmark(search_fuzzy)
@@ -167,7 +163,7 @@ class TestSearchPerformance:
 
         assert isinstance(result, list)
         assert len(result) > 0
-        print(f"\nSemantic search took {elapsed*1000:.2f}ms")
+        print(f"\nSemantic search took {elapsed * 1000:.2f}ms")
 
     @pytest.mark.asyncio
     async def test_trie_prefix_search_large_corpus(self, benchmark, large_corpus, test_db):
@@ -196,7 +192,7 @@ class TestSearchPerformance:
         # Initialize engine asynchronously
         engine = await Search.from_corpus(
             corpus_name=medium_corpus.corpus_name,
-            semantic=False  # Disable semantic for performance testing
+            semantic=False,  # Disable semantic for performance testing
         )
 
         # Test with queries that trigger different search methods
@@ -239,10 +235,7 @@ class TestSearchPerformance:
         await cache_manager.clear()
 
         # Initialize engine asynchronously
-        engine = await Search.from_corpus(
-            corpus_name=small_corpus.corpus_name,
-            semantic=False
-        )
+        engine = await Search.from_corpus(corpus_name=small_corpus.corpus_name, semantic=False)
 
         query = "apple"  # Valid word in small_corpus
 
@@ -271,23 +264,20 @@ class TestSearchPerformance:
 
         # Cached should be faster or at least comparable
         # For small queries, difference may not be dramatic
-        print(f"\nNon-cached avg: {non_cached_avg*1e6:.2f}µs")
-        print(f"Cached avg: {cached_avg*1e6:.2f}µs")
-        print(f"Speedup: {non_cached_avg/cached_avg:.2f}x")
+        print(f"\nNon-cached avg: {non_cached_avg * 1e6:.2f}µs")
+        print(f"Cached avg: {cached_avg * 1e6:.2f}µs")
+        print(f"Speedup: {non_cached_avg / cached_avg:.2f}x")
 
         # Basic sanity check - cached shouldn't be significantly slower
         assert cached_avg <= non_cached_avg * 2.0, (
-            f"Cached ({cached_avg*1e6:.2f}µs) is slower than non-cached ({non_cached_avg*1e6:.2f}µs)"
+            f"Cached ({cached_avg * 1e6:.2f}µs) is slower than non-cached ({non_cached_avg * 1e6:.2f}µs)"
         )
 
     @pytest.mark.asyncio
     async def test_batch_search_performance(self, benchmark, large_corpus, test_db):
         """Benchmark batch search operations."""
         # Initialize engine asynchronously
-        engine = await Search.from_corpus(
-            corpus_name=large_corpus.corpus_name,
-            semantic=False
-        )
+        engine = await Search.from_corpus(corpus_name=large_corpus.corpus_name, semantic=False)
 
         # Generate 100 queries - use pattern that exists (i % 4 == 3 gives "word_")
         queries = [f"word_{i:05d}" for i in range(3, 10000, 100)]  # 3, 103, 203, ...
@@ -308,10 +298,7 @@ class TestSearchPerformance:
     async def test_concurrent_search_performance(self, benchmark, medium_corpus, test_db):
         """Benchmark concurrent search operations."""
         # Initialize engine asynchronously
-        engine = await Search.from_corpus(
-            corpus_name=medium_corpus.corpus_name,
-            semantic=False
-        )
+        engine = await Search.from_corpus(corpus_name=medium_corpus.corpus_name, semantic=False)
 
         queries = [f"word_{i:04d}" for i in range(20)]
 
@@ -394,10 +381,7 @@ class TestSearchPerformance:
         manager = TreeCorpusManager()
         saved_corpus = await manager.save_corpus(corpus)
 
-        engine = await Search.from_corpus(
-            corpus_name=saved_corpus.corpus_name,
-            semantic=False
-        )
+        engine = await Search.from_corpus(corpus_name=saved_corpus.corpus_name, semantic=False)
 
         # Search for base forms should find inflected forms
         def search_inflected():
@@ -494,7 +478,7 @@ class TestSearchPerformance:
         assert len(results1) == len(results2)
 
         # Log the speedup for reference
-        speedup = first_time / cached_time if cached_time > 0 else float('inf')
+        speedup = first_time / cached_time if cached_time > 0 else float("inf")
         print(f"\nSemantic index caching speedup: {speedup:.2f}x")
         print(f"  First creation: {first_time:.3f}s")
         print(f"  Cached creation: {cached_time:.3f}s")

@@ -1,26 +1,30 @@
 <template>
-    <div class="flex flex-col items-center justify-center min-h-[400px] px-6 text-center">
+    <div
+        class="flex min-h-[400px] flex-col items-center justify-center px-6 text-center"
+    >
         <div class="mb-6">
-            <div class="relative inline-flex items-center justify-center w-16 h-16 mb-4 rounded-full bg-destructive/10">
-                <component 
-                    :is="errorIcon" 
-                    :size="32" 
+            <div
+                class="relative mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10"
+            >
+                <component
+                    :is="errorIcon"
+                    :size="32"
                     class="text-destructive"
                 />
             </div>
         </div>
-        
-        <h3 class="text-xl font-semibold mb-2 text-foreground">
+
+        <h3 class="mb-2 text-xl font-semibold text-foreground">
             {{ title }}
         </h3>
-        
-        <p class="text-muted-foreground mb-6 max-w-md leading-relaxed">
+
+        <p class="mb-6 max-w-md leading-relaxed text-muted-foreground">
             {{ message }}
         </p>
-        
+
         <div class="flex items-center gap-3">
-            <Button 
-                v-if="retryable" 
+            <Button
+                v-if="retryable"
                 @click="$emit('retry')"
                 variant="default"
                 size="sm"
@@ -29,9 +33,9 @@
                 <RotateCcw :size="16" class="mr-2" />
                 Try Again
             </Button>
-            
-            <Button 
-                v-if="showHelp" 
+
+            <Button
+                v-if="showHelp"
                 @click="$emit('help')"
                 variant="outline"
                 size="sm"
@@ -40,7 +44,7 @@
                 Get Help
             </Button>
         </div>
-        
+
         <!-- Optional additional content slot -->
         <div v-if="$slots.default" class="mt-6">
             <slot />
@@ -51,19 +55,25 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Button } from '@/components/ui/button';
-import { 
-    AlertTriangle, 
-    Wifi, 
-    Search, 
-    ServerCrash, 
-    RotateCcw, 
-    HelpCircle 
+import {
+    AlertTriangle,
+    Wifi,
+    Search,
+    ServerCrash,
+    RotateCcw,
+    HelpCircle,
 } from 'lucide-vue-next';
 
 interface ErrorStateProps {
     title?: string;
     message?: string;
-    errorType?: 'network' | 'not-found' | 'server' | 'ai-failed' | 'empty' | 'unknown';
+    errorType?:
+        | 'network'
+        | 'not-found'
+        | 'server'
+        | 'ai-failed'
+        | 'empty'
+        | 'unknown';
     retryable?: boolean;
     showHelp?: boolean;
 }
@@ -73,7 +83,7 @@ const props = withDefaults(defineProps<ErrorStateProps>(), {
     message: 'An unexpected error occurred. Please try again.',
     errorType: 'unknown',
     retryable: true,
-    showHelp: false
+    showHelp: false,
 });
 
 defineEmits<{

@@ -1,6 +1,6 @@
 /**
  * Scroll Progress and Animation Utilities
- * 
+ *
  * Functions for calculating scroll progress and icon opacity
  */
 
@@ -26,14 +26,17 @@ export function calculateDocumentHeight(): number {
  * @param documentHeight Total document height
  * @returns Scroll progress from 0 to 1
  */
-export function calculateScrollProgress(scrollY: number, documentHeight: number): number {
+export function calculateScrollProgress(
+    scrollY: number,
+    documentHeight: number
+): number {
     const maxScroll = Math.max(documentHeight - window.innerHeight, 1);
-    
+
     // Don't engage scrolling behavior if there's nothing to scroll
     if (maxScroll <= 10) {
         return 0;
     }
-    
+
     // Simple continuous progress calculation
     return Math.min(scrollY / maxScroll, 1);
 }
@@ -161,9 +164,13 @@ export function determineNextState(
         return 'focused';
     } else if (isHovered && currentState !== 'hovering' && !isFocused) {
         return 'hovering';
-    } else if (!isFocused && !isHovered && (currentState === 'focused' || currentState === 'hovering')) {
+    } else if (
+        !isFocused &&
+        !isHovered &&
+        (currentState === 'focused' || currentState === 'hovering')
+    ) {
         return 'normal';
     }
-    
+
     return null;
 }

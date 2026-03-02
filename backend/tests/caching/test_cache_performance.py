@@ -45,11 +45,11 @@ class TestCachePerformance:
             min_time = min(timings)
             max_time = max(timings)
 
-            print(f"\nL1 Cache Performance:")
+            print("\nL1 Cache Performance:")
             print(f"  Average: {avg_time:.4f}ms")
             print(f"  Min:     {min_time:.4f}ms")
             print(f"  Max:     {max_time:.4f}ms")
-            print(f"  Target:  0.5ms")
+            print("  Target:  0.5ms")
 
             # L1 cache should be extremely fast (< 0.5ms average)
             assert avg_time < 0.5, f"L1 cache too slow: {avg_time:.4f}ms (target: 0.5ms)"
@@ -92,11 +92,11 @@ class TestCachePerformance:
             min_time = min(timings)
             max_time = max(timings)
 
-            print(f"\nL2 Cache Performance:")
+            print("\nL2 Cache Performance:")
             print(f"  Average: {avg_time:.4f}ms")
             print(f"  Min:     {min_time:.4f}ms")
             print(f"  Max:     {max_time:.4f}ms")
-            print(f"  Target:  <10ms")
+            print("  Target:  <10ms")
 
             # L2 cache should be reasonable (< 10ms average)
             assert avg_time < 10.0, f"L2 cache too slow: {avg_time:.4f}ms"
@@ -131,11 +131,11 @@ class TestCachePerformance:
 
             speedup = uncached_time / cached_time
 
-            print(f"\nCache Speedup Test:")
+            print("\nCache Speedup Test:")
             print(f"  Uncached: {uncached_time:.2f}ms")
             print(f"  Cached:   {cached_time:.2f}ms")
             print(f"  Speedup:  {speedup:.1f}x")
-            print(f"  Target:   >10x")
+            print("  Target:   >10x")
 
             # Cache should provide at least 10x speedup
             assert speedup >= 10.0, f"Insufficient speedup: {speedup:.1f}x (target: 10x)"
@@ -176,7 +176,7 @@ class TestCachePerformance:
             hit_rate = hits / (hits + misses)
             assert abs(hit_rate - 0.666) < 0.01, f"Hit rate {hit_rate:.3f} != 0.666"
 
-            print(f"\nCache Hit Rate Test:")
+            print("\nCache Hit Rate Test:")
             print(f"  Hits:     {hits}")
             print(f"  Misses:   {misses}")
             print(f"  Hit Rate: {hit_rate:.1%}")
@@ -212,7 +212,7 @@ class TestCachePerformance:
             avg_time = sum(timings) / len(timings)
             throughput = 1000 * len(tasks) / total_time  # ops/sec
 
-            print(f"\nConcurrent Cache Performance:")
+            print("\nConcurrent Cache Performance:")
             print(f"  Total Time:  {total_time:.2f}ms")
             print(f"  Avg Per Op:  {avg_time:.4f}ms")
             print(f"  Throughput:  {throughput:.0f} ops/sec")
@@ -254,7 +254,7 @@ class TestCachePerformance:
 
             assert result == large_data
 
-            print(f"\nCompression Performance:")
+            print("\nCompression Performance:")
             print(f"  Set Time: {set_time:.2f}ms")
             print(f"  Get Time: {get_time:.2f}ms")
 

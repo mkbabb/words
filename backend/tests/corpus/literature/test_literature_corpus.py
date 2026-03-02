@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from floridify.corpus.literature.core import LiteratureCorpus
-from floridify.corpus.manager import TreeCorpusManager, get_tree_corpus_manager
+from floridify.corpus.manager import get_tree_corpus_manager
 from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
 from floridify.models.literature import AuthorInfo, Genre, Period

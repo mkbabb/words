@@ -61,13 +61,17 @@ async def apply_wordlist_filters_and_sort(
 
     # Apply filters (use _get_attr to support both dicts and Pydantic models)
     if params.mastery_levels:
-        filtered = [w for w in filtered if str(_get_attr(w, "mastery_level", "")) in params.mastery_levels]
+        filtered = [
+            w for w in filtered if str(_get_attr(w, "mastery_level", "")) in params.mastery_levels
+        ]
     if params.hot_only:
         filtered = [w for w in filtered if _get_attr(w, "temperature", "") == "hot"]
     if params.due_only:
         filtered = [
-            w for w in filtered
-            if hasattr(w, "is_due_for_review") and w.is_due_for_review()
+            w
+            for w in filtered
+            if hasattr(w, "is_due_for_review")
+            and w.is_due_for_review()
             or _get_attr(w, "is_due", False)
         ]
     if params.min_views is not None:
@@ -76,8 +80,7 @@ async def apply_wordlist_filters_and_sort(
         filtered = [w for w in filtered if _get_attr(w, "frequency", 0) <= params.max_views]
     if params.reviewed is not None:
         filtered = [
-            w for w in filtered
-            if (_get_attr(w, "last_visited") is not None) == params.reviewed
+            w for w in filtered if (_get_attr(w, "last_visited") is not None) == params.reviewed
         ]
 
     # Apply sorting
@@ -91,7 +94,9 @@ async def apply_wordlist_filters_and_sort(
     # Sort by multiple fields
     for field, order in reversed(list(zip(sort_fields, sort_orders, strict=False))):
         reverse = order.lower() == "desc"
-        filtered = sorted(filtered, key=lambda x: _get_attr(x, field.strip(), "") or "", reverse=reverse)
+        filtered = sorted(
+            filtered, key=lambda x: _get_attr(x, field.strip(), "") or "", reverse=reverse
+        )
 
     return filtered
 

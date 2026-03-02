@@ -1,28 +1,29 @@
 <template>
-    <div v-if="(images && images.length > 0) || editMode" class="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
-        <div class="relative group" @mouseenter="handleMouseEnter">
+    <div
+        v-if="(images && images.length > 0) || editMode"
+        class="absolute top-2 right-2 z-10 sm:top-4 sm:right-4"
+    >
+        <div class="group relative" @mouseenter="handleMouseEnter">
             <Carousel
                 v-slot="{ canScrollNext, canScrollPrev }"
-                class="w-32 sm:w-40 md:w-48 max-w-xs"
+                class="w-32 max-w-xs sm:w-40 md:w-48"
                 :opts="{
                     align: 'center',
                     loop: true,
                     skipSnaps: false,
-                    dragFree: false
+                    dragFree: false,
                 }"
                 @init-api="onCarouselInit"
             >
                 <CarouselContent class="-ml-1">
                     <!-- Upload box as first item in edit mode -->
-                    <CarouselItem 
-                        v-if="editMode"
-                        key="upload-box"
-                        class="pl-1"
-                    >
-                        <div class="relative h-32 sm:h-40 md:h-48 bg-muted/10 rounded-lg overflow-hidden border-2 border-dashed border-muted-foreground/30">
-                            <ImageUploader 
+                    <CarouselItem v-if="editMode" key="upload-box" class="pl-1">
+                        <div
+                            class="relative h-32 overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/10 sm:h-40 md:h-48"
+                        >
+                            <ImageUploader
                                 :synth-entry-id="synthEntryId"
-                                class="w-full h-full"
+                                class="h-full w-full"
                                 size="lg"
                                 variant="empty"
                                 @upload-success="handleUploadSuccess"
@@ -30,30 +31,54 @@
                             />
                         </div>
                     </CarouselItem>
-                    
+
                     <!-- Regular image items -->
-                    <CarouselItem 
-                        v-for="(image, index) in images" 
+                    <CarouselItem
+                        v-for="(image, index) in images"
                         :key="image.id"
                         class="pl-1"
                     >
-                        <div class="relative h-32 sm:h-40 md:h-48 bg-muted/10 rounded-lg overflow-hidden group">
+                        <div
+                            class="group relative h-32 overflow-hidden rounded-lg bg-muted/10 sm:h-40 md:h-48"
+                        >
                             <!-- Delete button (only in edit mode) -->
                             <button
                                 v-if="editMode"
                                 @click="handleDeleteImage(image.id, index)"
                                 :disabled="deletingImages.has(image.id)"
-                                class="absolute bottom-1 right-1 z-10 w-6 h-6 bg-destructive hover:bg-destructive/80 text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                class="absolute right-1 bottom-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:scale-110 hover:bg-destructive/80 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
                                 :aria-label="`Delete image ${index + 1}`"
                             >
-                                <svg v-if="!deletingImages.has(image.id)" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                <svg
+                                    v-if="!deletingImages.has(image.id)"
+                                    class="h-3 w-3"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
                                 </svg>
-                                <svg v-else class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                <svg
+                                    v-else
+                                    class="h-3 w-3 animate-spin"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                                    />
                                 </svg>
                             </button>
-                            
+
                             <!-- Lazy Loading Implementation -->
                             <template v-if="shouldLoadImage(index)">
                                 <!-- Image Loaded State -->
@@ -65,80 +90,124 @@
                                     >
                                         <HoverCard v-if="image.description">
                                             <HoverCardTrigger as-child>
-                                                <img 
+                                                <img
                                                     :src="image.url"
-                                                    :alt="image.alt_text || fallbackText"
-                                                    class="w-full h-full object-contain"
+                                                    :alt="
+                                                        image.alt_text ||
+                                                        fallbackText
+                                                    "
+                                                    class="h-full w-full object-contain"
                                                 />
                                             </HoverCardTrigger>
-                                            <HoverCardContent class="w-auto px-2 py-1" side="left" :sideOffset="8">
-                                                <p class="text-sm font-medium whitespace-nowrap">{{ image.description }}</p>
+                                            <HoverCardContent
+                                                class="w-auto px-2 py-1"
+                                                side="left"
+                                                :sideOffset="8"
+                                            >
+                                                <p
+                                                    class="text-sm font-medium whitespace-nowrap"
+                                                >
+                                                    {{ image.description }}
+                                                </p>
                                             </HoverCardContent>
                                         </HoverCard>
-                                        <img 
+                                        <img
                                             v-else
                                             :src="image.url"
-                                            :alt="image.alt_text || fallbackText"
-                                            class="w-full h-full object-contain"
+                                            :alt="
+                                                image.alt_text || fallbackText
+                                            "
+                                            class="h-full w-full object-contain"
                                         />
                                     </Transition>
                                 </template>
-                                
+
                                 <!-- Image Loading State -->
                                 <template v-else>
-                                    <div class="absolute inset-0 bg-muted/20 animate-pulse flex items-center justify-center">
-                                        <svg class="w-8 h-8 text-muted-foreground/50 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2z"/>
+                                    <div
+                                        class="absolute inset-0 flex animate-pulse items-center justify-center bg-muted/20"
+                                    >
+                                        <svg
+                                            class="h-8 w-8 animate-bounce text-muted-foreground/50"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="2"
+                                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2z"
+                                            />
                                         </svg>
                                     </div>
                                     <!-- Hidden image for loading -->
                                     <img
                                         :src="image.url"
                                         :alt="image.alt_text || fallbackText"
-                                        class="absolute inset-0 w-full h-full object-contain opacity-0"
+                                        class="absolute inset-0 h-full w-full object-contain opacity-0"
                                         @load="() => onImageLoad(index)"
-                                        @error="(e) => handleImageError(e, index)"
+                                        @error="
+                                            (e) => handleImageError(e, index)
+                                        "
                                     />
                                 </template>
                             </template>
-                            
+
                             <!-- Not loaded yet (placeholder) -->
                             <template v-else>
-                                <div class="absolute inset-0 bg-muted/10 flex items-center justify-center">
-                                    <svg class="w-6 h-6 text-muted-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2z"/>
+                                <div
+                                    class="absolute inset-0 flex items-center justify-center bg-muted/10"
+                                >
+                                    <svg
+                                        class="h-6 w-6 text-muted-foreground/40"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2z"
+                                        />
                                     </svg>
                                 </div>
                             </template>
-
                         </div>
                     </CarouselItem>
                 </CarouselContent>
-                
+
                 <!-- Navigation Controls (show when there are scrollable items) -->
                 <template v-if="totalCarouselItems > 1">
                     <CarouselPrevious
                         v-show="showControls"
-                        class="absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8 bg-black/50 border-none hover:bg-black/70 transition-all duration-300 hover:scale-110 backdrop-blur-sm hover:backdrop-blur-md"
-                        :class="{ 'opacity-0 group-hover:opacity-100': !showControls }"
+                        class="absolute top-1/2 left-1 h-8 w-8 -translate-y-1/2 border-none bg-black/50 backdrop-blur-sm transition-all duration-300 hover:scale-110 hover:bg-black/70 hover:backdrop-blur-md"
+                        :class="{
+                            'opacity-0 group-hover:opacity-100': !showControls,
+                        }"
                         @mouseenter="showControls = true"
                         @mouseleave="scheduleHideControls"
                         :disabled="!canScrollPrev"
                     />
                     <CarouselNext
                         v-show="showControls"
-                        class="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 bg-black/50 border-none hover:bg-black/70 transition-all duration-300 hover:scale-110 backdrop-blur-sm hover:backdrop-blur-md"
-                        :class="{ 'opacity-0 group-hover:opacity-100': !showControls }"
+                        class="absolute top-1/2 right-1 h-8 w-8 -translate-y-1/2 border-none bg-black/50 backdrop-blur-sm transition-all duration-300 hover:scale-110 hover:bg-black/70 hover:backdrop-blur-md"
+                        :class="{
+                            'opacity-0 group-hover:opacity-100': !showControls,
+                        }"
                         @mouseenter="showControls = true"
                         @mouseleave="scheduleHideControls"
                         :disabled="!canScrollNext"
                     />
-                    
+
                     <!-- Image Counter -->
-                    <div 
+                    <div
                         v-show="showControls"
-                        class="absolute bottom-1 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded-full transition-all duration-300 backdrop-blur-sm"
-                        :class="{ 'opacity-0 group-hover:opacity-100': !showControls }"
+                        class="absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-2 py-1 text-xs text-white backdrop-blur-sm transition-all duration-300"
+                        :class="{
+                            'opacity-0 group-hover:opacity-100': !showControls,
+                        }"
                         @mouseenter="showControls = true"
                         @mouseleave="scheduleHideControls"
                     >
@@ -148,13 +217,22 @@
             </Carousel>
         </div>
     </div>
-
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import {
+    HoverCard,
+    HoverCardContent,
+    HoverCardTrigger,
+} from '@/components/ui/hover-card';
+import {
+    Carousel,
+    CarouselContent,
+    CarouselItem,
+    CarouselNext,
+    CarouselPrevious,
+} from '@/components/ui/carousel';
 import type { CarouselApi } from '@/components/ui/carousel';
 import ImageUploader from './ImageUploader.vue';
 import { logger } from '@/utils/logger';
@@ -210,31 +288,34 @@ const isImageLoaded = (index: number): boolean => {
 // Update visible range based on current position
 const updateVisibleRange = () => {
     if (!props.images || props.images.length === 0) return;
-    
+
     // Account for upload box offset in edit mode
     const imageIndexOffset = props.editMode ? 1 : 0;
     const currentImageIndex = currentIndex.value - imageIndexOffset;
-    
+
     // Only calculate range if we're viewing actual images (not upload box)
     if (currentImageIndex < 0) return;
-    
+
     const buffer = 1; // Load 1 image before and after current
     const start = Math.max(0, currentImageIndex - buffer);
-    const end = Math.min(props.images.length - 1, currentImageIndex + buffer + 1);
-    
+    const end = Math.min(
+        props.images.length - 1,
+        currentImageIndex + buffer + 1
+    );
+
     visibleRange.value = { start, end };
 };
 
 // Carousel API handlers
 const onCarouselInit = (api: CarouselApi) => {
     carouselApi.value = api;
-    
+
     if (api) {
         api.on('select', () => {
             currentIndex.value = api.selectedScrollSnap();
             updateVisibleRange();
         });
-        
+
         // Initialize
         currentIndex.value = api.selectedScrollSnap();
         updateVisibleRange();
@@ -248,7 +329,10 @@ const onImageLoad = (index: number) => {
 };
 
 const handleImageError = (event: Event, index: number) => {
-    logger.error('Failed to load image:', (event.target as HTMLImageElement).src);
+    logger.error(
+        'Failed to load image:',
+        (event.target as HTMLImageElement).src
+    );
     loadingImages.value.delete(index);
     emit('image-error', event, index);
 };
@@ -270,18 +354,18 @@ const handleDeleteImage = async (imageId: string, index: number) => {
     if (deletingImages.value.has(imageId)) {
         return;
     }
-    
+
     try {
         // Mark image as being deleted
         deletingImages.value.add(imageId);
-        
+
         await mediaApi.deleteImage(imageId);
         emit('image-deleted', imageId);
-        
+
         // Remove from loaded images set
         loadedImages.value.delete(index);
         loadingImages.value.delete(index);
-        
+
         // Adjust carousel if needed
         if (carouselApi.value && props.images && props.images.length > 1) {
             // If we deleted the last image, go to previous
@@ -322,7 +406,7 @@ const handleMouseEnter = () => {
 // Keyboard navigation
 const handleKeydown = (event: KeyboardEvent) => {
     if (totalCarouselItems.value <= 1 || !carouselApi.value) return;
-    
+
     switch (event.key) {
         case 'ArrowLeft':
             event.preventDefault();
@@ -336,24 +420,28 @@ const handleKeydown = (event: KeyboardEvent) => {
 };
 
 // Reset loading state when images change
-watch(() => props.images, () => {
-    loadedImages.value.clear();
-    loadingImages.value.clear();
-    deletingImages.value.clear(); // Clear deletion state
-    currentIndex.value = 0;
-    
-    if (carouselApi.value) {
-        carouselApi.value.scrollTo(0);
-        // Force carousel to recompute scroll state
+watch(
+    () => props.images,
+    () => {
+        loadedImages.value.clear();
+        loadingImages.value.clear();
+        deletingImages.value.clear(); // Clear deletion state
+        currentIndex.value = 0;
+
+        if (carouselApi.value) {
+            carouselApi.value.scrollTo(0);
+            // Force carousel to recompute scroll state
+            nextTick(() => {
+                carouselApi.value?.reInit();
+            });
+        }
+
         nextTick(() => {
-            carouselApi.value?.reInit();
+            updateVisibleRange();
         });
-    }
-    
-    nextTick(() => {
-        updateVisibleRange();
-    });
-}, { immediate: true });
+    },
+    { immediate: true }
+);
 
 // Watch for changes in total carousel items to refresh controls
 watch(totalCarouselItems, (newCount, oldCount) => {
@@ -365,12 +453,19 @@ watch(totalCarouselItems, (newCount, oldCount) => {
 });
 
 // Preload first image immediately
-watch(() => props.images, (newImages) => {
-    if (newImages && newImages.length > 0) {
-        // Immediately start loading the first image
-        visibleRange.value = { start: 0, end: Math.min(1, newImages.length - 1) };
-    }
-}, { immediate: true });
+watch(
+    () => props.images,
+    (newImages) => {
+        if (newImages && newImages.length > 0) {
+            // Immediately start loading the first image
+            visibleRange.value = {
+                start: 0,
+                end: Math.min(1, newImages.length - 1),
+            };
+        }
+    },
+    { immediate: true }
+);
 
 // Lifecycle
 onMounted(() => {

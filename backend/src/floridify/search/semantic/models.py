@@ -349,7 +349,7 @@ class SemanticIndex(BaseModel):
                     versioned.resource_type,
                     versioned.resource_id,
                     "content",
-                    versioned.version_info.data_hash[:8]
+                    versioned.version_info.data_hash[:8],
                 )
 
                 # Merge binary data with content - diskcache will pickle the bytes directly
@@ -360,7 +360,9 @@ class SemanticIndex(BaseModel):
                 if isinstance(namespace, str):
                     namespace = CacheNamespace(namespace)
 
-                logger.info(f"Storing large binary data to cache for {resource_id} (pickle will handle bytes)")
+                logger.info(
+                    f"Storing large binary data to cache for {resource_id} (pickle will handle bytes)"
+                )
                 await cache.set(
                     namespace=namespace,
                     key=cache_key,
@@ -476,5 +478,3 @@ class SemanticIndex(BaseModel):
     def model_load(cls, data: dict[str, Any]) -> SemanticIndex:
         """Deserialize index from cached dictionary."""
         return cls.model_validate(data)
-
-

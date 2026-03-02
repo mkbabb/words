@@ -1,11 +1,10 @@
 <template>
-    <div
-        v-if="examples && examples.length > 0"
-        class="mt-8 mb-6"
-    >
+    <div v-if="examples && examples.length > 0" class="mt-8 mb-6">
         <!-- Examples header -->
         <div class="mb-2">
-            <span class="text-sm font-medium tracking-wide text-muted-foreground uppercase">
+            <span
+                class="text-sm font-medium tracking-wide text-muted-foreground uppercase"
+            >
                 Examples
             </span>
         </div>
@@ -23,20 +22,27 @@
                     :edit-mode="editMode"
                     :can-regenerate="example.type === 'generated'"
                     :is-regenerating="regeneratingIndex === index"
-                    @update:model-value="(val) => updateExample(index, String(val))"
+                    @update:model-value="
+                        (val) => updateExample(index, String(val))
+                    "
                     @regenerate="() => regenerateExample(index)"
                 >
                     <template #display>
                         <p
                             :class="[
-                                'text-base leading-relaxed text-foreground italic px-3 py-2 rounded-md border border-border/30 bg-muted/5 transition-all duration-200',
-                                editMode ? 'hover:border-border/50 hover:bg-muted/10' : ''
+                                'rounded-md border border-border/30 bg-muted/5 px-3 py-2 text-base leading-relaxed text-foreground italic transition-all duration-200',
+                                editMode
+                                    ? 'hover:border-border/50 hover:bg-muted/10'
+                                    : '',
                             ]"
                         >
-                            "<span v-html="formatExampleHTML(example.text, word)"></span>"
+                            "<span
+                                v-html="formatExampleHTML(example.text, word)"
+                            ></span
+                            >"
                             <!-- Type indicator for literature examples -->
-                            <span 
-                                v-if="example.type === 'literature'" 
+                            <span
+                                v-if="example.type === 'literature'"
                                 class="ml-2 text-xs text-muted-foreground/60"
                                 title="Literature example"
                             >

@@ -1,5 +1,5 @@
 <template>
-    <div class="flex items-center justify-evenly w-full">
+    <div class="flex w-full items-center justify-evenly">
         <!-- AI Mode Toggle -->
         <HoverCard :open-delay="200" :close-delay="100">
             <HoverCardTrigger as-child>
@@ -8,55 +8,68 @@
                     @keydown.enter.stop="handleAIToggle"
                     :variant="!noAI ? 'primary' : 'default'"
                 >
-                    <Wand2 
-                        :size="20" 
+                    <Wand2
+                        :size="20"
                         :class="[
                             'transition-all duration-300',
-                            aiAnimating && 'animate-sparkle'
+                            aiAnimating && 'animate-sparkle',
                         ]"
                     />
                 </ActionButton>
             </HoverCardTrigger>
             <HoverCardContent class="w-auto p-2" side="top">
-                <p class="text-sm">{{ !noAI ? 'AI synthesis enabled' : 'Raw provider data only' }}</p>
+                <p class="text-sm">
+                    {{
+                        !noAI
+                            ? 'AI synthesis enabled'
+                            : 'Raw provider data only'
+                    }}
+                </p>
             </HoverCardContent>
         </HoverCard>
 
         <!-- Force Refresh Toggle -->
-        <HoverCard v-if="showRefreshButton" :open-delay="200" :close-delay="100">
+        <HoverCard
+            v-if="showRefreshButton"
+            :open-delay="200"
+            :close-delay="100"
+        >
             <HoverCardTrigger as-child>
                 <ActionButton
                     @click="handleRefreshClick"
                     @keydown.enter.stop="handleRefreshClick"
                     :variant="forceRefreshMode ? 'primary' : 'default'"
                 >
-                    <RefreshCw 
-                        :size="20" 
+                    <RefreshCw
+                        :size="20"
                         :class="[
                             'transition-all duration-300',
                             'group-hover:rotate-180',
-                            refreshAnimating && 'animate-rotate-once'
+                            refreshAnimating && 'animate-rotate-once',
                         ]"
                     />
                 </ActionButton>
             </HoverCardTrigger>
             <HoverCardContent class="w-auto p-2" side="top">
-                <p class="text-sm">{{ forceRefreshMode ? 'Force refresh mode ON' : 'Toggle force refresh mode' }}</p>
+                <p class="text-sm">
+                    {{
+                        forceRefreshMode
+                            ? 'Force refresh mode ON'
+                            : 'Toggle force refresh mode'
+                    }}
+                </p>
             </HoverCardContent>
         </HoverCard>
-            
+
         <!-- Clear Storage (Debug) -->
         <HoverCard v-if="isDevelopment" :open-delay="200" :close-delay="100">
             <HoverCardTrigger as-child>
-                <ActionButton
-                    @click="handleClearStorage"
-                    variant="danger"
-                >
-                    <Trash2 
-                        :size="20" 
+                <ActionButton @click="handleClearStorage" variant="danger">
+                    <Trash2
+                        :size="20"
                         :class="[
                             'transition-all duration-300',
-                            trashAnimating && 'animate-wiggle'
+                            trashAnimating && 'animate-wiggle',
                         ]"
                     />
                 </ActionButton>
@@ -65,19 +78,16 @@
                 <p class="text-sm">Clear All Storage</p>
             </HoverCardContent>
         </HoverCard>
-        
+
         <!-- PWA Install Debug -->
         <HoverCard v-if="isDevelopment" :open-delay="200" :close-delay="100">
             <HoverCardTrigger as-child>
-                <ActionButton
-                    @click="handleShowPWAPrompt"
-                    variant="secondary"
-                >
-                    <Download 
-                        :size="20" 
+                <ActionButton @click="handleShowPWAPrompt" variant="secondary">
+                    <Download
+                        :size="20"
                         :class="[
                             'transition-all duration-300',
-                            pwaInstallAnimating && 'animate-bounce-in'
+                            pwaInstallAnimating && 'animate-bounce-in',
                         ]"
                     />
                 </ActionButton>
@@ -86,7 +96,7 @@
                 <p class="text-sm">Show PWA Install Prompt</p>
             </HoverCardContent>
         </HoverCard>
-        
+
         <!-- Test Notification Debug -->
         <HoverCard v-if="isDevelopment" :open-delay="200" :close-delay="100">
             <HoverCardTrigger as-child>
@@ -94,11 +104,11 @@
                     @click="handleSendNotification"
                     variant="secondary"
                 >
-                    <Bell 
-                        :size="20" 
+                    <Bell
+                        :size="20"
                         :class="[
                             'transition-all duration-300',
-                            notificationAnimating && 'animate-ring'
+                            notificationAnimating && 'animate-ring',
                         ]"
                     />
                 </ActionButton>
@@ -107,7 +117,7 @@
                 <p class="text-sm">Send Test Notification</p>
             </HoverCardContent>
         </HoverCard>
-        
+
         <!-- Notification Prompt Debug -->
         <HoverCard v-if="isDevelopment" :open-delay="200" :close-delay="100">
             <HoverCardTrigger as-child>
@@ -115,11 +125,11 @@
                     @click="handleShowNotificationPrompt"
                     variant="secondary"
                 >
-                    <BellDot 
-                        :size="20" 
+                    <BellDot
+                        :size="20"
                         :class="[
                             'transition-all duration-300',
-                            notificationPromptAnimating && 'animate-pulse'
+                            notificationPromptAnimating && 'animate-pulse',
                         ]"
                     />
                 </ActionButton>
@@ -133,8 +143,19 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { Trash2, RefreshCw, Wand2, Download, Bell, BellDot } from 'lucide-vue-next';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import {
+    Trash2,
+    RefreshCw,
+    Wand2,
+    Download,
+    Bell,
+    BellDot,
+} from 'lucide-vue-next';
+import {
+    HoverCard,
+    HoverCardContent,
+    HoverCardTrigger,
+} from '@/components/ui/hover-card';
 import ActionButton from './ActionButton.vue';
 // import { usePWA } from '@/composables';
 import { useStores } from '@/stores';
@@ -180,7 +201,6 @@ const handleAIToggle = () => {
     }, 600);
 };
 
-
 const handleClearStorage = () => {
     trashAnimating.value = true;
     setTimeout(() => {
@@ -203,7 +223,7 @@ const handleShowPWAPrompt = () => {
     setTimeout(() => {
         pwaInstallAnimating.value = false;
     }, 600);
-    
+
     // Force show PWA install prompt
     const event = new Event('show-pwa-prompt');
     window.dispatchEvent(event);
@@ -211,29 +231,29 @@ const handleShowPWAPrompt = () => {
 
 const handleSendNotification = async () => {
     notificationAnimating.value = true;
-    
+
     try {
         // Check if notifications are supported
         if (!('Notification' in window)) {
             notifications.showNotification({
                 type: 'error',
-                message: 'Notifications not supported'
+                message: 'Notifications not supported',
             });
             return;
         }
-        
+
         // Request permission if needed
         if (Notification.permission === 'default') {
             const permission = await Notification.requestPermission();
             if (permission !== 'granted') {
                 notifications.showNotification({
                     type: 'error',
-                    message: 'Notification permission denied'
+                    message: 'Notification permission denied',
                 });
                 return;
             }
         }
-        
+
         // Send test notification
         // new Notification('Floridify Test', {
         //     body: 'PWA notifications are working! 🎉',
@@ -242,17 +262,17 @@ const handleSendNotification = async () => {
         //     tag: 'test-notification',
         //     renotify: true
         // });
-        
+
         // Just show in-app notification
         notifications.showNotification({
             type: 'success',
-            message: 'Notifications are enabled! 🎉'
+            message: 'Notifications are enabled! 🎉',
         });
     } catch (error) {
         logger.error('Notification error:', error);
         notifications.showNotification({
             type: 'error',
-            message: 'Failed to send notification'
+            message: 'Failed to send notification',
         });
     } finally {
         setTimeout(() => {
@@ -266,7 +286,7 @@ const handleShowNotificationPrompt = () => {
     setTimeout(() => {
         notificationPromptAnimating.value = false;
     }, 600);
-    
+
     // Show notification permission prompt
     const event = new Event('show-notification-prompt');
     window.dispatchEvent(event);
@@ -278,7 +298,7 @@ const handleShowNotificationPrompt = () => {
 //         // Check if we have a push subscription
 //         const registration = await navigator.serviceWorker.ready;
 //         const subscription = await registration.pushManager.getSubscription();
-//         
+//
 //         if (!subscription) {
 //             store.showNotification({
 //                 type: 'error',
@@ -286,7 +306,7 @@ const handleShowNotificationPrompt = () => {
 //             });
 //             return;
 //         }
-//         
+//
 //         // Send test push via backend
 //         const response = await fetch(`${window.location.origin}/notifications/api/test`, {
 //             method: 'POST',
@@ -297,7 +317,7 @@ const handleShowNotificationPrompt = () => {
 //                 endpoint: subscription.endpoint
 //             })
 //         });
-//         
+//
 //         if (response.ok) {
 //             store.showNotification({
 //                 type: 'success',
@@ -332,7 +352,8 @@ onUnmounted(() => {
 
 <style scoped>
 @keyframes sparkle {
-    0%, 100% {
+    0%,
+    100% {
         transform: scale(1) rotate(0deg);
         filter: brightness(1);
     }
@@ -351,7 +372,8 @@ onUnmounted(() => {
 }
 
 @keyframes wiggle {
-    0%, 100% {
+    0%,
+    100% {
         transform: rotate(0deg);
     }
     10% {
@@ -410,13 +432,16 @@ onUnmounted(() => {
 }
 
 @keyframes ring {
-    0%, 100% {
+    0%,
+    100% {
         transform: rotate(0deg);
     }
-    10%, 30% {
+    10%,
+    30% {
         transform: rotate(-10deg);
     }
-    20%, 40% {
+    20%,
+    40% {
         transform: rotate(10deg);
     }
 }

@@ -129,7 +129,7 @@ class SearchResponse(BaseResponse):
     query: str = Field(..., description="Original search query")
     results: list[Any] = Field(
         ..., description="Search results"
-    )  # SearchResult from ..search.models
+    )  # SearchResult from ..search.result
     total_found: int = Field(..., description="Total matches")
     languages: list[Language] = Field(..., description="Languages searched")
     mode: str = Field(..., description="Search mode used")

@@ -35,8 +35,11 @@ AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. Mong
 │   │   ├── components/         # 173 total: 123 shadcn/ui + 50 custom
 │   │   ├── stores/             # 12 Pinia stores, mode-based delegation
 │   │   ├── api/                # Axios client, SSE streaming, 14 modules
+│   │   │   ├── ai/             # synthesize, generate, assess, suggestions (split)
+│   │   │   └── sse/            # SSEClient, types (split)
 │   │   ├── composables/        # 20+ composables (search, PWA, texture)
 │   │   ├── types/              # Isomorphic types mirroring backend Pydantic
+│   │   │   └── api/            # models, responses, guards, versions (split)
 │   │   ├── router/             # 7 routes, SPA deep linking
 │   │   ├── views/              # Home.vue (SPA root), NotFound.vue
 │   │   └── utils/              # cn(), debounce, animations
@@ -114,7 +117,7 @@ Dedup (47→23 defs, 50%) → Cluster (3-4 groups) → Parallel enhance (12 task
 
 ## Design Decisions
 
-- **Isomorphic types**: Frontend TypeScript mirrors backend Pydantic exactly (`types/api.ts` ↔ `models/`)
+- **Isomorphic types**: Frontend TypeScript mirrors backend Pydantic exactly (`types/api/` ↔ `models/`)
 - **Async-first**: All I/O async. Motor, httpx, asyncio.gather. 80+ async test fixtures
 - **Real integration tests**: Actual MongoDB per test, real FAISS indices. Only external APIs mocked
 - **Dedup before cluster**: 50% token savings by deduplicating before AI synthesis

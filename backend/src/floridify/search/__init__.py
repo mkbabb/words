@@ -10,7 +10,7 @@ from ..models.base import Language
 from .constants import SearchMethod
 from .core import Search
 from .fuzzy import FuzzySearch
-from .models import SearchResult
+from .result import SearchResult
 
 # Semantic search with graceful degradation when dependencies unavailable
 from .semantic.core import SemanticSearch

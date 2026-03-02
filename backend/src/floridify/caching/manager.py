@@ -923,12 +923,16 @@ class VersionedDataManager:
             resource_type = group["_id"]["resource_type"]
 
             # Get all versions for this resource, sorted newest first
-            versions = await collection.find(
-                {
-                    "resource_id": resource_id,
-                    "resource_type": resource_type,
-                },
-            ).sort([("version_info.created_at", -1), ("_id", -1)]).to_list(length=None)
+            versions = (
+                await collection.find(
+                    {
+                        "resource_id": resource_id,
+                        "resource_type": resource_type,
+                    },
+                )
+                .sort([("version_info.created_at", -1), ("_id", -1)])
+                .to_list(length=None)
+            )
 
             total_versions = len(versions)
             if total_versions <= keep_minimum:
@@ -988,13 +992,15 @@ class VersionedDataManager:
             if deleted_count > 0:
                 total_deleted += deleted_count
                 resources_affected += 1
-                details.append({
-                    "resource_id": resource_id,
-                    "resource_type": resource_type,
-                    "versions_before": total_versions,
-                    "versions_deleted": deleted_count,
-                    "versions_after": total_versions - deleted_count,
-                })
+                details.append(
+                    {
+                        "resource_id": resource_id,
+                        "resource_type": resource_type,
+                        "versions_before": total_versions,
+                        "versions_deleted": deleted_count,
+                        "versions_after": total_versions - deleted_count,
+                    }
+                )
 
         return {
             "total_deleted": total_deleted,

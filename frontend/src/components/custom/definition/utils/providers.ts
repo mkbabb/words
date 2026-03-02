@@ -27,11 +27,13 @@ export function getProviderSearchUrl(provider: string, word: string): string {
 /**
  * Extracts unique providers from definitions
  */
-export function extractUniqueProviders(definitions: Array<Definition & { providers_data: any[] }>): string[] {
+export function extractUniqueProviders(
+    definitions: Array<Definition & { providers_data: any[] }>
+): string[] {
     if (!definitions) return [];
-    
+
     const providers = new Set<string>();
-    
+
     // Check providers_data array for each definition
     definitions.forEach((def) => {
         if (def.providers_data && Array.isArray(def.providers_data)) {
@@ -42,6 +44,6 @@ export function extractUniqueProviders(definitions: Array<Definition & { provide
             });
         }
     });
-    
+
     return Array.from(providers);
 }

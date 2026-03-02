@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.append("/opt/ml/code")
 
 from wotd.core import TrainingConfig
-from wotd.trainer import train_wotd_pipeline
+from wotd.training import train_wotd_pipeline
 
 
 def parse_args() -> argparse.Namespace:
@@ -49,7 +49,9 @@ def parse_args() -> argparse.Namespace:
 
     # Model configuration
     parser.add_argument("--base-model", type=str, default="microsoft/Phi-3.5-mini-instruct")
-    parser.add_argument("--embedding-model", type=str, default="Alibaba-NLP/gte-Qwen2-1.5B-instruct")
+    parser.add_argument(
+        "--embedding-model", type=str, default="Alibaba-NLP/gte-Qwen2-1.5B-instruct"
+    )
 
     return parser.parse_args()
 

@@ -97,7 +97,6 @@ class URLLanguageConnector(LanguageConnector):
             # Extract idioms from parsed JSON data
             if parser_type == ParserType.JSON_VOCABULARY and isinstance(content, str):
                 try:
-
                     json_data = json.loads(content)
                     if isinstance(json_data, dict) and "idioms" in json_data:
                         idioms = list(dict.fromkeys(json_data.get("idioms", [])))

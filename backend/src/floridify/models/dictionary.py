@@ -168,7 +168,9 @@ class Definition(Document, BaseMetadata):
     word_forms: list[WordForm] = []  # List of WordForm objects
 
     # Examples and relationships
-    example_ids: list[PydanticObjectId] = Field(default_factory=list, max_length=20)  # FK to Example documents
+    example_ids: list[PydanticObjectId] = Field(
+        default_factory=list, max_length=20
+    )  # FK to Example documents
     synonyms: list[str] = Field(default_factory=list, max_length=50)
     antonyms: list[str] = Field(default_factory=list, max_length=50)
 

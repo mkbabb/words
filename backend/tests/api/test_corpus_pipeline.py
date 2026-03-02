@@ -3,7 +3,6 @@ Tests TTL-based corpus management, search within corpus, and cache behavior.
 """
 
 import asyncio
-from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient

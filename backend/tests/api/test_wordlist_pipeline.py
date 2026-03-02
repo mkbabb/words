@@ -5,7 +5,6 @@ Tests CRUD operations, file upload, spaced repetition, learning analytics, and s
 import asyncio
 import io
 
-import pytest
 from httpx import AsyncClient
 
 from floridify.wordlist.models import WordList

@@ -7,28 +7,30 @@ import { logger } from '@/utils/logger';
  * Composable for managing images from synthesized dictionary entries
  * Abstracts the logic for collecting and processing images from different sources
  */
-export function useImageManagement(entry: ComputedRef<SynthesizedDictionaryEntry | null>) {
+export function useImageManagement(
+    entry: ComputedRef<SynthesizedDictionaryEntry | null>
+) {
     /**
      * Collects all images from the entry, prioritizing synth entry images
      * then falling back to definition images
      */
     const allImages = computed<ImageMedia[] | null>(() => {
         if (!entry.value) return null;
-        
+
         const images: ImageMedia[] = [];
-        
+
         // First add synth entry images (highest priority)
         if (entry.value.images && entry.value.images.length > 0) {
             for (const image of entry.value.images) {
                 if (image.id) {
                     images.push({
                         ...image,
-                        url: `${import.meta.env.BASE_URL}api/v1/images/${image.id}/content`
+                        url: `${import.meta.env.BASE_URL}api/v1/images/${image.id}/content`,
                     });
                 }
             }
         }
-        
+
         // Then add definition images (if no synth entry images exist)
         if (images.length === 0 && entry.value.definitions) {
             for (const def of entry.value.definitions) {
@@ -37,7 +39,7 @@ export function useImageManagement(entry: ComputedRef<SynthesizedDictionaryEntry
                         if (image.id) {
                             images.push({
                                 ...image,
-                                url: `${import.meta.env.BASE_URL}api/v1/images/${image.id}/content`
+                                url: `${import.meta.env.BASE_URL}api/v1/images/${image.id}/content`,
                             });
                         }
                     }
@@ -45,7 +47,7 @@ export function useImageManagement(entry: ComputedRef<SynthesizedDictionaryEntry
                 }
             }
         }
-        
+
         return images.length > 0 ? images : null;
     });
 
@@ -54,9 +56,11 @@ export function useImageManagement(entry: ComputedRef<SynthesizedDictionaryEntry
      */
     const primaryImage = computed<ImageMedia | null>(() => {
         if (!allImages.value || allImages.value.length === 0) return null;
-        
+
         // Prefer images with descriptions
-        const imageWithDescription = allImages.value.find(img => img.description);
+        const imageWithDescription = allImages.value.find(
+            (img) => img.description
+        );
         return imageWithDescription || allImages.value[0];
     });
 
@@ -87,7 +91,10 @@ export function useImageManagement(entry: ComputedRef<SynthesizedDictionaryEntry
      * Helper to handle image error events
      */
     const handleImageError = (event: Event) => {
-        logger.error('Failed to load image:', (event.target as HTMLImageElement).src);
+        logger.error(
+            'Failed to load image:',
+            (event.target as HTMLImageElement).src
+        );
         // Hide the failed image
         (event.target as HTMLImageElement).style.display = 'none';
     };

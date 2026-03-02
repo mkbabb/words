@@ -1,8 +1,8 @@
-import { 
+import {
     AppleIcon,
-    WiktionaryIcon, 
-    OxfordIcon, 
-    DictionaryIcon 
+    WiktionaryIcon,
+    OxfordIcon,
+    DictionaryIcon,
 } from '@/components/custom/icons';
 import { RefreshCw } from 'lucide-vue-next';
 import type { Component } from 'vue';
@@ -17,17 +17,20 @@ export const PROVIDER_CONFIG: Record<string, ProviderConfig> = {
     wiktionary: {
         name: 'Wiktionary',
         icon: WiktionaryIcon,
-        url: (word: string) => `https://en.wiktionary.org/wiki/${encodeURIComponent(word)}`,
+        url: (word: string) =>
+            `https://en.wiktionary.org/wiki/${encodeURIComponent(word)}`,
     },
     oxford: {
         name: 'Oxford Dictionary',
         icon: OxfordIcon,
-        url: (word: string) => `https://www.oxfordlearnersdictionaries.com/definition/english/${encodeURIComponent(word)}`,
+        url: (word: string) =>
+            `https://www.oxfordlearnersdictionaries.com/definition/english/${encodeURIComponent(word)}`,
     },
     dictionary_com: {
         name: 'Dictionary.com',
         icon: DictionaryIcon,
-        url: (word: string) => `https://www.dictionary.com/browse/${encodeURIComponent(word)}`,
+        url: (word: string) =>
+            `https://www.dictionary.com/browse/${encodeURIComponent(word)}`,
     },
     apple_dictionary: {
         name: 'Apple Dictionary',

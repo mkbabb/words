@@ -16,7 +16,8 @@ from ..models.base import Language
 from ..utils.logging import get_logger
 from .constants import SearchMode
 from .core import Search
-from .models import SearchIndex, SearchResult
+from .result import SearchResult
+from .search_index import SearchIndex
 from .semantic.constants import DEFAULT_SENTENCE_MODEL
 
 logger = get_logger(__name__)
@@ -237,4 +238,9 @@ async def reset_language_search() -> None:
     logger.info("Language search cache reset")
 
 
-__all__ = ["LanguageSearch", "get_language_search", "reset_language_search", "_semantic_search_enabled"]
+__all__ = [
+    "LanguageSearch",
+    "get_language_search",
+    "reset_language_search",
+    "_semantic_search_enabled",
+]

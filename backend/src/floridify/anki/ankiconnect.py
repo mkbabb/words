@@ -306,9 +306,7 @@ class AnkiDirectIntegration:
 
         return await self.ankiconnect.is_available()
 
-    async def export_cards_directly(
-        self, cards: list[Any], deck_name: str
-    ) -> tuple[int, int]:
+    async def export_cards_directly(self, cards: list[Any], deck_name: str) -> tuple[int, int]:
         """Export cards directly to running Anki instance.
 
         Args:

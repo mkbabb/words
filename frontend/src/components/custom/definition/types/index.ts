@@ -30,13 +30,13 @@ export interface DefinitionSharedState {
     animationKey: number;
     selectedAnimation: string;
     animationTimeout: NodeJS.Timeout | null;
-    
+
     // UI state
     showThemeDropdown: boolean;
     showAnimationDropdown: boolean;
     regeneratingIndex: number | null;
     pronunciationMode: 'phonetic' | 'ipa';
-    
+
     // Component mount state
     isMounted: boolean;
 }

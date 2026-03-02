@@ -9,16 +9,16 @@
     >
         <div
             v-if="show"
-            class="absolute -top-2 -left-2 z-50 pointer-events-none"
+            class="pointer-events-none absolute -top-2 -left-2 z-50"
         >
             <div class="relative">
-                <Sparkles 
-                    :size="size" 
-                    class="text-amber-600 dark:text-amber-400 animate-pulse drop-shadow-lg fill-amber-600 dark:fill-amber-400"
+                <Sparkles
+                    :size="size"
+                    class="animate-pulse fill-amber-600 text-amber-600 drop-shadow-lg dark:fill-amber-400 dark:text-amber-400"
                 />
-                <Sparkles 
-                    :size="size" 
-                    class="absolute inset-0 text-amber-300 dark:text-amber-600 opacity-50 animate-spin-slow fill-amber-300 dark:fill-amber-600"
+                <Sparkles
+                    :size="size"
+                    class="animate-spin-slow absolute inset-0 fill-amber-300 text-amber-300 opacity-50 dark:fill-amber-600 dark:text-amber-600"
                 />
             </div>
         </div>
@@ -34,7 +34,7 @@ interface SparkleIndicatorProps {
 }
 
 withDefaults(defineProps<SparkleIndicatorProps>(), {
-    size: 28
+    size: 28,
 });
 </script>
 

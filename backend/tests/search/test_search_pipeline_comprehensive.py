@@ -11,8 +11,8 @@ from floridify.corpus.core import Corpus
 from floridify.corpus.manager import TreeCorpusManager
 from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
+from floridify.search.constants import SearchMethod
 from floridify.search.core import Search
-from floridify.search.models import SearchMethod
 
 
 class TestSearchPipelineComprehensive:
@@ -380,7 +380,9 @@ class TestSearchPipelineComprehensive:
         for _, expected in test_cases:
             if expected not in vocab:
                 print(f"WARNING: Expected word '{expected}' not in vocabulary!")
-                print(f"  Similar words in vocab: {[w for w in vocab if len(w) == len(expected)][:10]}")
+                print(
+                    f"  Similar words in vocab: {[w for w in vocab if len(w) == len(expected)][:10]}"
+                )
 
         for typo, expected in test_cases:
             results = engine.search_fuzzy(typo, max_results=10)  # Get more results for debugging

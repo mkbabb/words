@@ -642,10 +642,6 @@ class Corpus(BaseModel):
         """
         return cls.model_validate(data)
 
-
-
-
-
     def update_version(self, change_description: str = "") -> None:
         """Mark the corpus for version update on next save.
 
@@ -688,7 +684,7 @@ class Corpus(BaseModel):
         )
 
         # Step 1: Delete all dependent SearchIndex documents (which will cascade to their indices)
-        from ..search.models import SearchIndex
+        from ..search.search_index import SearchIndex
 
         try:
             # Get the SearchIndex for this corpus
@@ -728,7 +724,7 @@ class Corpus(BaseModel):
                 f"No metadata found for corpus {self.corpus_name}, may already be deleted"
             )
 
-    async def save(self) -> "Corpus":
+    async def save(self) -> Corpus:
         """Persist corpus via TreeCorpusManager (convenience wrapper).
 
         Delegates to TreeCorpusManager.save_corpus() which handles versioning,

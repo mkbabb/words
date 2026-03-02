@@ -10,7 +10,7 @@ from ...caching.core import CacheNamespace, get_global_cache
 from ...models.dictionary import DictionaryProvider
 from ...models.parameters import ProviderStatusParams
 from ...models.responses import ProviderListResponse, ProviderStatusResponse
-from ...providers.utils import get_all_circuit_statuses
+from ...providers.rate_limiting import get_all_circuit_statuses
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)

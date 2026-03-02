@@ -1,70 +1,115 @@
 <template>
-    <div
-        :data-cluster-id="cluster.clusterId"
-        class="text-2xl space-y-1"
-    >
+    <div :data-cluster-id="cluster.clusterId" class="space-y-1 text-2xl">
         <!-- Cluster header with gradient divider -->
         <div
             v-if="totalClusters > 1"
             :class="clusterIndex === 0 ? 'pb-3' : 'mt-0 pb-3'"
         >
             <!-- Separator between clusters (not before first) -->
-            <hr
-                v-if="clusterIndex > 0"
-                class="my-4 border-border/50"
-            />
+            <hr v-if="clusterIndex > 0" class="my-4 border-border/50" />
             <HoverCard :open-delay="600" :close-delay="100">
                 <HoverCardTrigger as-child>
                     <EditableField
                         :model-value="formatClusterLabel(cluster.clusterId)"
                         field-name="cluster name"
                         :edit-mode="props.editModeEnabled"
-                        @update:model-value="(val) => emit('update:cluster-name', cluster.clusterId, String(val))"
+                        @update:model-value="
+                            (val) =>
+                                emit(
+                                    'update:cluster-name',
+                                    cluster.clusterId,
+                                    String(val)
+                                )
+                        "
                     >
                         <template #display>
                             <h4
-                                class="text-sm font-semibold tracking-wide uppercase inline-block px-3 py-1.5 rounded-md bg-muted/30 border border-border/50 hover:bg-muted/50 hover:border-border transition-all duration-200 cursor-help"
+                                class="inline-block cursor-help rounded-md border border-border/50 bg-muted/30 px-3 py-1.5 text-sm font-semibold tracking-wide uppercase transition-all duration-200 hover:border-border hover:bg-muted/50"
                             >
                                 {{ formatClusterLabel(cluster.clusterId) }}
                             </h4>
                         </template>
                     </EditableField>
                 </HoverCardTrigger>
-                        <HoverCardContent 
-                            :class="cn(
-                                'themed-hovercard w-96 z-[80]',
-                                cardVariant !== 'default' ? 'themed-shadow-sm' : ''
-                            )"
-                            :data-theme="cardVariant || 'default'"
-                            side="top"
-                            align="start"
-                        >
+                <HoverCardContent
+                    :class="
+                        cn(
+                            'themed-hovercard z-[80] w-96',
+                            cardVariant !== 'default' ? 'themed-shadow-sm' : ''
+                        )
+                    "
+                    :data-theme="cardVariant || 'default'"
+                    side="top"
+                    align="start"
+                >
                     <div class="space-y-4">
                         <div>
-                            <h4 class="text-base font-semibold mb-2">{{ formatClusterLabel(cluster.clusterId) }}</h4>
-                            <p class="text-sm text-muted-foreground mb-4">{{ cluster.clusterDescription }}</p>
+                            <h4 class="mb-2 text-base font-semibold">
+                                {{ formatClusterLabel(cluster.clusterId) }}
+                            </h4>
+                            <p class="mb-4 text-sm text-muted-foreground">
+                                {{ cluster.clusterDescription }}
+                            </p>
                             <div class="space-y-2">
-                                <div class="flex justify-between items-center py-1.5 border-b border-border/30">
-                                    <span class="text-sm text-muted-foreground">Cluster ID</span>
-                                    <span class="text-sm font-mono">{{ cluster.clusterId }}</span>
+                                <div
+                                    class="flex items-center justify-between border-b border-border/30 py-1.5"
+                                >
+                                    <span class="text-sm text-muted-foreground"
+                                        >Cluster ID</span
+                                    >
+                                    <span class="font-mono text-sm">{{
+                                        cluster.clusterId
+                                    }}</span>
                                 </div>
-                                <div class="flex justify-between items-center py-1.5 border-b border-border/30">
-                                    <span class="text-sm text-muted-foreground">Relevance Score</span>
-                                    <span class="text-sm font-medium">{{ Math.round((cluster.maxRelevancy || 1.0) * 100) }}%</span>
+                                <div
+                                    class="flex items-center justify-between border-b border-border/30 py-1.5"
+                                >
+                                    <span class="text-sm text-muted-foreground"
+                                        >Relevance Score</span
+                                    >
+                                    <span class="text-sm font-medium"
+                                        >{{
+                                            Math.round(
+                                                (cluster.maxRelevancy || 1.0) *
+                                                    100
+                                            )
+                                        }}%</span
+                                    >
                                 </div>
-                                <div class="flex justify-between items-center py-1.5 border-b border-border/30">
-                                    <span class="text-sm text-muted-foreground">Total Definitions</span>
-                                    <span class="text-sm font-medium">{{ cluster.definitions.length }}</span>
+                                <div
+                                    class="flex items-center justify-between border-b border-border/30 py-1.5"
+                                >
+                                    <span class="text-sm text-muted-foreground"
+                                        >Total Definitions</span
+                                    >
+                                    <span class="text-sm font-medium">{{
+                                        cluster.definitions.length
+                                    }}</span>
                                 </div>
-                                <div v-if="cluster.definitions[0]?.meaning_cluster?.relevance" 
-                                     class="flex justify-between items-center py-1.5">
-                                    <span class="text-sm text-muted-foreground">Confidence</span>
-                                    <span class="text-sm font-medium">{{ Math.round(cluster.definitions[0].meaning_cluster.relevance * 100) }}%</span>
-                                </div>
+                                <div
+                                    v-if="
+                                        cluster.definitions[0]?.meaning_cluster
+                                            ?.relevance
+                                    "
+                                    class="flex items-center justify-between py-1.5"
+                                >
+                                    <span class="text-sm text-muted-foreground"
+                                        >Confidence</span
+                                    >
+                                    <span class="text-sm font-medium"
+                                        >{{
+                                            Math.round(
+                                                cluster.definitions[0]
+                                                    .meaning_cluster.relevance *
+                                                    100
+                                            )
+                                        }}%</span
+                                    >
                                 </div>
                             </div>
                         </div>
-                        </HoverCardContent>
+                    </div>
+                </HoverCardContent>
             </HoverCard>
         </div>
 
@@ -74,7 +119,11 @@
 </template>
 
 <script setup lang="ts">
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import {
+    HoverCard,
+    HoverCardContent,
+    HoverCardTrigger,
+} from '@/components/ui/hover-card';
 import { cn } from '@/utils';
 import { formatClusterLabel } from '../utils/clustering';
 import type { GroupedDefinition } from '../types';

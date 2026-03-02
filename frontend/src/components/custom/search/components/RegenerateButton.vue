@@ -3,7 +3,7 @@
         v-if="showButton"
         :class="[
             'flex flex-shrink-0 items-center justify-center overflow-hidden transition-all ease-out',
-            `duration-${animationDuration}`
+            `duration-${animationDuration}`,
         ]"
         :style="{
             opacity: opacity,
@@ -21,13 +21,13 @@
                 'flex h-12 w-12 items-center justify-center rounded-lg',
                 'transition-all duration-200 ease-out',
                 aiMode
-                    ? 'hover:bg-amber-100/60 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                    ? 'text-amber-700 hover:bg-amber-100/60 dark:text-amber-300 dark:hover:bg-amber-900/30'
                     : 'hover:bg-muted/50',
                 forceRefreshMode && aiMode
                     ? 'bg-amber-200/60 text-amber-800 dark:bg-amber-800/40 dark:text-amber-200'
                     : forceRefreshMode
-                    ? 'bg-primary/20 text-primary'
-                    : ''
+                      ? 'bg-primary/20 text-primary'
+                      : '',
             ]"
             :title="
                 forceRefreshMode
@@ -39,7 +39,8 @@
                 :size="20"
                 :style="{
                     transform: `rotate(${rotation}deg)`,
-                    transition: 'transform 700ms cubic-bezier(0.175, 0.885, 0.32, 1.4)',
+                    transition:
+                        'transform 700ms cubic-bezier(0.175, 0.885, 0.32, 1.4)',
                 }"
             />
         </button>
@@ -70,14 +71,16 @@ const props = withDefaults(defineProps<RegenerateButtonProps>(), {
     opacityThreshold: 0.1,
     expandedWidth: 48,
     spacing: 8,
-    animationDuration: 300
+    animationDuration: 300,
 });
 
 // Using defineModel for two-way binding of forceRefreshMode
-const forceRefreshMode = defineModel<boolean>('forceRefreshMode', { required: true });
+const forceRefreshMode = defineModel<boolean>('forceRefreshMode', {
+    required: true,
+});
 
 const emit = defineEmits<{
-    'regenerate': [];
+    regenerate: [];
 }>();
 
 const rotation = ref(0);
@@ -98,6 +101,6 @@ void emit;
 defineExpose({
     rotate: (degrees: number) => {
         rotation.value += degrees;
-    }
+    },
 });
 </script>

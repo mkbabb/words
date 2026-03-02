@@ -6,8 +6,7 @@ that the lookup pipeline needs, while keeping the REST layer and MongoDB real.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest_asyncio
 
@@ -22,7 +21,7 @@ from floridify.models.dictionary import (
 )
 from floridify.models.parameters import SearchParams
 from floridify.models.responses import SearchResponse
-from floridify.search.models import SearchResult
+from floridify.search.result import SearchResult
 
 
 @pytest_asyncio.fixture

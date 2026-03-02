@@ -15,8 +15,9 @@ from floridify.corpus.core import Corpus
 from floridify.corpus.manager import TreeCorpusManager, get_tree_corpus_manager
 from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
-from floridify.search.models import SearchIndex, TrieIndex
+from floridify.search.search_index import SearchIndex
 from floridify.search.semantic.models import SemanticIndex
+from floridify.search.trie_index import TrieIndex
 
 
 class TestCascadeDeletion:
@@ -385,7 +386,6 @@ class TestCascadeDeletion:
         self, tree_manager: TreeCorpusManager, test_db
     ):
         """Test that deletion fails gracefully for SearchIndex without ID."""
-        from beanie import PydanticObjectId
 
         search_index = SearchIndex(
             corpus_uuid="invalid-uuid",

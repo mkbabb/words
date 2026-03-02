@@ -1,6 +1,6 @@
 /**
  * Search Bar Utilities
- * 
+ *
  * Central export file for all search bar utility functions
  */
 

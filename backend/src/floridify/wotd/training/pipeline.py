@@ -48,303 +48,28 @@ import json
 import time
 from pathlib import Path
 
-import numpy as np
 import torch
 
-from ..ai import get_openai_connector
-from ..literature import LiteratureSourceManager
-from ..utils.logging import get_logger
-from ..utils.paths import get_cache_directory
-from .constants import (
-    DEFAULT_EMBEDDING_MODEL,
-    QWEN_25_7B,
-    USE_BINARY_EMBEDDINGS,
-    USE_INT8_EMBEDDINGS,
-)
-from .core import (
+from ...ai import get_openai_connector
+from ...literature import LiteratureSourceManager
+from ...utils.logging import get_logger
+from ...utils.paths import get_cache_directory
+from ..core import (
     Author,
-    CorpusDict,
     SemanticIDDict,
     TrainingConfig,
     TrainingResults,
     WOTDCorpus,
     WOTDWord,
 )
-from .embeddings import EmbeddingMode, get_embedder
-from .encoders import get_semantic_encoder
-from .generator import generate_training_data
-from .literature import LiteratureCorpusBuilder
-from .storage import get_wotd_storage
+from ..encoders import get_semantic_encoder
+from ..generator import generate_training_data
+from ..literature import LiteratureCorpusBuilder
+from ..storage import get_wotd_storage
+from .dsl_trainer import DSLTrainer
+from .embedder import WOTDEmbedder
 
 logger = get_logger(__name__)
-
-
-class WOTDEmbedder:
-    """Stage 2: Embedding extraction with multi-model support.
-
-    This class handles the conversion of text into high-dimensional vector
-    representations using state-of-the-art embedding models. It supports
-    various optimization techniques for efficiency.
-
-    Process Flow:
-        1. Load pre-trained sentence transformer model
-        2. Encode word lists into embeddings
-        3. Apply optional quantization or truncation
-        4. Average pool to create corpus-level representation
-        5. Cache results for reuse
-
-    Supported Models:
-        - GTE-Qwen2: 4096D with Matryoshka support (recommended)
-        - E5-Multilingual: 1024D efficient alternative
-        - SFR-Embedding-2: 4096D research model
-
-    Optimization Techniques:
-        - Matryoshka truncation: Reduce dimensions dynamically
-        - Binary quantization: 32x memory reduction
-        - INT8 quantization: 4x memory reduction
-        - Caching: Avoid redundant computation
-    """
-
-    def __init__(self, model_name: str | None = None) -> None:
-        """Initialize embedder with specified model.
-
-        Args:
-            model_name: Model to use (defaults to DEFAULT_EMBEDDING_MODEL)
-
-        """
-        self.model_name = model_name or DEFAULT_EMBEDDING_MODEL
-        self.embedder = get_embedder(model_name=self.model_name, device="cpu")
-        self.use_binary = USE_BINARY_EMBEDDINGS
-        self.use_int8 = USE_INT8_EMBEDDINGS
-
-    @property
-    def current_dim(self) -> int:
-        """Get the current effective embedding dimension."""
-        return self.embedder.current_dim
-
-    async def encode_corpus(
-        self,
-        corpus: WOTDCorpus,
-        cache_embeddings: bool = True,
-        mode: EmbeddingMode = EmbeddingMode.FULL,
-        target_dim: int | None = None,
-    ) -> torch.Tensor:
-        """Convert word collection to preference vector with encoding.
-
-        The encoding process transforms a collection of words into a single
-        high-dimensional vector that captures the semantic essence of the
-        entire corpus. This is achieved through:
-
-        1. **Individual Encoding**: Each word is encoded to a vector
-        2. **Pooling**: Vectors are averaged to create corpus representation
-        3. **Post-processing**: Optional quantization or truncation
-
-        The resulting preference vector serves as input to the semantic
-        encoder, which will compress it to a 4D semantic ID.
-
-        Process:
-            Words → Individual Embeddings → Average Pool → Preference Vector
-
-        Args:
-            corpus: Collection of words with semantic metadata
-            cache_embeddings: Whether to cache/retrieve from storage
-            mode: Embedding mode (full, elastic, binary, int8)
-            target_dim: Target dimension for elastic mode
-
-        Returns:
-            Preference vector as torch tensor
-            Shape: [embedding_dim] (e.g., 4096D for GTE-Qwen2)
-
-        """
-        words = [word.word for word in corpus.words]
-
-        # Determine embedding mode
-        if self.use_binary:
-            mode = EmbeddingMode.BINARY
-        elif self.use_int8:
-            mode = EmbeddingMode.INT8
-
-        # Use cached embeddings if available
-        if cache_embeddings:
-            embeddings = await self.embedder.embed_corpus_with_cache(
-                corpus.id,
-                words,
-                mode=mode,
-                target_dim=target_dim,
-            )
-        else:
-            result = self.embedder.embed(words, mode=mode, target_dim=target_dim, normalize=True)
-            if isinstance(result, np.ndarray | torch.Tensor):
-                embeddings = result
-            else:
-                embeddings = torch.tensor(result)
-
-        # Average pool to create corpus-level preference vector
-        # This aggregates individual word embeddings into a single
-        # representation that captures the semantic center of the corpus
-        if isinstance(embeddings, dict):  # Handle quantized format
-            embeddings = embeddings["values"]
-
-        # Ensure tensor is in proper format for processing
-        if not isinstance(embeddings, torch.Tensor):
-            embeddings = torch.tensor(embeddings, dtype=torch.float32)
-
-        # Ensure consistent data type
-        if embeddings.dtype != torch.float32:
-            embeddings = embeddings.to(torch.float32)
-
-        # Ensure tensor is on CPU for consistent processing
-        if embeddings.device.type != "cpu":
-            embeddings = embeddings.cpu()
-
-        # Ensure contiguous memory layout
-        if not embeddings.is_contiguous():
-            embeddings = embeddings.contiguous()
-
-        # Detach from computation graph
-        embeddings = embeddings.detach()
-
-        # Validate tensor shape and perform mean pooling
-        if embeddings.dim() == 0 or embeddings.size(0) == 0:
-            logger.warning(f"Empty or invalid tensor shape: {embeddings.shape}, using zero vector")
-            # Create fallback vector with appropriate dimensions
-            target_dim = embeddings.size(-1) if embeddings.dim() > 0 else 384
-            preference_vector = torch.zeros(target_dim, dtype=torch.float32).contiguous()
-        else:
-            # Perform mean pooling to create corpus-level representation
-            preference_vector = torch.mean(embeddings, dim=0, dtype=torch.float32)
-
-            # Ensure result is contiguous
-            if not preference_vector.is_contiguous():
-                preference_vector = preference_vector.contiguous()
-
-        return preference_vector
-
-
-class DSLTrainer:
-    """Stage 4: DSL fine-tuning with language models.
-
-    This class handles the fine-tuning of large language models to generate
-    text conditioned on semantic IDs. It uses parameter-efficient fine-tuning
-    techniques to adapt pre-trained models for controlled generation.
-
-    Architecture:
-        Semantic ID → Instruction Format → LLM → Generated Words
-
-    The model learns to interpret semantic IDs as generation constraints,
-    producing words that match the specified style, complexity, era, and
-    variation attributes.
-
-    Supported Models:
-        - Qwen-2.5-7B: State-of-the-art 7B model with 32K context
-        - Phi-4: Microsoft's 14B reasoning model with 128K context
-        - Mistral Nemo: 12B Apache-licensed model with 128K context
-
-    Training Approach:
-        - LoRA (Low-Rank Adaptation): Adds trainable rank decomposition
-          matrices to transformer layers, reducing parameters by 99%
-        - Instruction tuning: Formats data as instruction-response pairs
-        - Multi-template training: Uses various phrasings to improve
-          generalization and prevent overfitting to specific formats
-    """
-
-    def __init__(self, config: TrainingConfig):
-        self.config = config
-        self.model_name = config.base_model
-
-        # Determine model type
-        self.is_qwen_or_phi4 = self.model_name in [
-            QWEN_25_7B,
-            "microsoft/Phi-4",
-            "mistralai/Mistral-Nemo-Instruct-2407",
-        ]
-
-    def create_training_examples(
-        self,
-        corpora_dict: CorpusDict,
-        semantic_ids: SemanticIDDict,
-    ) -> list[dict[str, str]]:
-        """Generate training examples mapping semantic IDs to word lists.
-
-        This method creates the training data for teaching the language model
-        to understand the relationship between semantic IDs and word characteristics.
-
-        Data Format:
-            Each example consists of:
-            - Instruction: Contains semantic ID and generation prompt
-            - Response: Target word list from the corpus
-
-        Template Variations:
-            Multiple templates are used to prevent the model from memorizing
-            a single format. This improves robustness at inference time.
-
-        Example:
-            Input: "[2,1,3,0] Generate classical beautiful modernist words"
-            Output: "eloquent, sophisticated, nuanced, contemplative..."
-
-        The semantic ID [2,1,3,0] encodes:
-            - Style: 2 (classical)
-            - Complexity: 1 (beautiful/simple)
-            - Era: 3 (modernist)
-            - Variation: 0 (base form)
-
-        Args:
-            corpora_dict: Mapping of corpus IDs to word collections
-            semantic_ids: Mapping of corpus IDs to semantic IDs
-
-        Returns:
-            List of instruction-response pairs for training
-
-        """
-        examples = []
-
-        for corpus_id, corpus in corpora_dict.items():
-            if corpus_id in semantic_ids:
-                semantic_id = semantic_ids[corpus_id]
-                id_str = f"[{','.join(map(str, semantic_id))}]"
-
-                # Get sample words from corpus
-                sample_words = [w.word for w in corpus.words[:5]]
-                word_list = ", ".join(sample_words)
-
-                # Create training examples with appropriate formats
-                if self.is_qwen_or_phi4:
-                    # Enhanced templates for newer models
-                    templates = [
-                        f"Generate {id_str} words with style={corpus.style.value}, "
-                        f"complexity={corpus.complexity.value}, era={corpus.era.value}: {word_list}",
-                        f"Create semantic {id_str} vocabulary: {word_list}",
-                        f"Words matching pattern {id_str}: {word_list}",
-                        f"<semantic>{id_str}</semantic> Generate: {word_list}",
-                    ]
-                else:
-                    # Standard templates
-                    templates = [
-                        f"Generate {id_str} words: {word_list}",
-                        f"Create {id_str}: {word_list}",
-                        f"Words like {id_str}: {word_list}",
-                    ]
-
-                for template in templates:
-                    examples.append(
-                        {
-                            "input": template.split(":")[0] + ":",  # Prompt part
-                            "output": word_list,  # Expected output
-                        },
-                    )
-
-        # Add wildcard examples for flexibility
-        wildcard_examples = [
-            "Generate [0,*,*,*] words: classical, elegant, timeless, noble",
-            "Create [*,0,*,*]: beautiful, lovely, gorgeous, stunning",
-            "Words like [*,*,0,*]: shakespearean, elizabethan, archaic",
-            "Find [1,1,*,*] vocabulary: modern, simple, clear, direct",
-        ]
-
-        for example in wildcard_examples:
-            examples.append({"input": example, "output": example})
-
-        return examples
 
 
 class WOTDTrainer:
@@ -464,11 +189,11 @@ class WOTDTrainer:
                 pref_vector = torch.tensor(pref_vector, dtype=torch.float32)
             preference_vectors[corpus_id] = pref_vector
 
-        # Stage 3: Train semantic encoder (high-D → 4D compression using FSQ)
+        # Stage 3: Train semantic encoder (high-D -> 4D compression using FSQ)
         logger.info("🔢 Stage 3: Training FSQ semantic encoder")
         semantic_ids = await self._train_semantic_encoder(preference_vectors)
 
-        # Stage 4: Generate DSL training examples (semantic IDs → word generation)
+        # Stage 4: Generate DSL training examples (semantic IDs -> word generation)
         logger.info("📚 Stage 4: Creating DSL training examples")
         training_examples = self.dsl_trainer.create_training_examples(corpora_dict, semantic_ids)
         logger.info(f"Created {len(training_examples)} DSL training examples")
@@ -761,7 +486,7 @@ class WOTDTrainer:
 
         # Use lightweight model if requested (still use QWEN-based models)
         if use_lightweight_model:
-            from ..search.semantic.constants import QWEN3_0_6B_MODEL
+            from ...search.semantic.constants import QWEN3_0_6B_MODEL
 
             self.config.embedding_model = QWEN3_0_6B_MODEL  # 1024D lightweight QWEN
             self.embedder = WOTDEmbedder(model_name=self.config.embedding_model)
@@ -795,7 +520,7 @@ class WOTDTrainer:
 
             if works:
                 # Create Author object for corpus building
-                from ..literature.models import Author as LitAuthor, Genre, Period
+                from ...literature.models import Author as LitAuthor, Genre, Period
 
                 lit_author = LitAuthor(
                     name=author_name,
@@ -899,9 +624,9 @@ class WOTDTrainer:
         semantic IDs and vocabulary characteristics.
 
         Variations Generated:
-            - Style shifts (formal → casual, poetic → technical)
-            - Complexity adjustments (simple → complex)
-            - Era transformations (archaic → modern)
+            - Style shifts (formal -> casual, poetic -> technical)
+            - Complexity adjustments (simple -> complex)
+            - Era transformations (archaic -> modern)
             - Thematic variations
 
         Args:
@@ -912,7 +637,7 @@ class WOTDTrainer:
             Dictionary of augmented corpora with variation IDs
 
         """
-        from .core import Complexity, Era, Style
+        from ..core import Complexity, Era, Style
 
         ai_connector = get_openai_connector()
         augmented_corpora = {}
@@ -946,7 +671,7 @@ class WOTDTrainer:
 
         # Process variations in batches for efficiency
 
-        from ..ai.models import LiteratureAugmentationRequest
+        from ...ai.models import LiteratureAugmentationRequest
 
         async def process_variation(variation):
             try:
@@ -1120,7 +845,7 @@ class WOTDTrainer:
             TrainingResults with training metrics
 
         """
-        from .core import Complexity, Era, Style, WOTDCorpus, WOTDWord
+        from ..core import Complexity, Era, Style, WOTDCorpus, WOTDWord
 
         logger.info("🎲 Training from synthetic data...")
 
@@ -1190,7 +915,7 @@ class WOTDTrainer:
         logger.info("🔬 Stage 1: Generating embeddings...")
 
         # Create a dummy corpus with all words for embedding
-        from .core import Complexity, Era, Style, WOTDCorpus, WOTDWord
+        from ..core import Complexity, Era, Style, WOTDCorpus, WOTDWord
 
         words_objs = [
             WOTDWord(
@@ -1248,7 +973,9 @@ class WOTDTrainer:
         semantic_targets = torch.tensor(semantic_targets, dtype=torch.float32)
 
         # Train encoder
-        encoder_loss = await self._train_semantic_encoder(word_embeddings, semantic_targets)
+        encoder_loss = await self._train_semantic_encoder_with_targets(
+            word_embeddings, semantic_targets
+        )
         logger.info(f"✅ Semantic encoder trained (loss: {encoder_loss:.4f})")
 
         # Save models and metadata
@@ -1272,7 +999,7 @@ class WOTDTrainer:
         logger.info(f"💾 Saved models to {output_path}")
 
         # Return results
-        from .core import TrainingResults
+        from ..core import TrainingResults
 
         return TrainingResults(
             config=self.config,
@@ -1286,7 +1013,7 @@ class WOTDTrainer:
             },
         )
 
-    async def _train_semantic_encoder(
+    async def _train_semantic_encoder_with_targets(
         self,
         embeddings: torch.Tensor,
         targets: torch.Tensor,

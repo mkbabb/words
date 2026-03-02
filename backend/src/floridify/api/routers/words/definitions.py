@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from ....ai import get_openai_connector
 from ....ai.constants import SynthesisComponent
-from ....ai.synthesis_functions import (
+from ....ai.synthesis import (
     assess_collocations,
     assess_definition_cefr,
     assess_definition_domain,

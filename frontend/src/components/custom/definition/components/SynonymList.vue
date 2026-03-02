@@ -1,12 +1,12 @@
 <template>
     <div
         v-if="synonyms && synonyms.length > 0"
-        class="flex flex-wrap gap-1.5 mt-5"
+        class="mt-5 flex flex-wrap gap-1.5"
     >
         <span
             v-for="synonym in synonyms"
             :key="synonym"
-            class="text-sm px-2 py-1 rounded-md bg-muted/50 hover:bg-muted text-foreground/80 hover:text-foreground cursor-pointer transition-all duration-200 border border-border/50 hover:border-border"
+            class="cursor-pointer rounded-md border border-border/50 bg-muted/50 px-2 py-1 text-sm text-foreground/80 transition-all duration-200 hover:border-border hover:bg-muted hover:text-foreground"
             @click="$emit('synonym-click', synonym)"
         >
             {{ synonym }}

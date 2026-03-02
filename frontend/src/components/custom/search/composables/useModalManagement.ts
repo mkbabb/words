@@ -5,43 +5,46 @@ import { ref, nextTick } from 'vue';
  * Handles modal visibility and query submission
  */
 export function useModalManagement() {
-  const showExpandModal = ref(false);
-  const expandedQuery = ref('');
+    const showExpandModal = ref(false);
+    const expandedQuery = ref('');
 
-  /**
-   * Open the expand modal
-   */
-  const handleExpandClick = () => {
-    showExpandModal.value = true;
-  };
+    /**
+     * Open the expand modal
+     */
+    const handleExpandClick = () => {
+        showExpandModal.value = true;
+    };
 
-  /**
-   * Close the expand modal
-   */
-  const closeExpandModal = () => {
-    showExpandModal.value = false;
-    expandedQuery.value = '';
-  };
+    /**
+     * Close the expand modal
+     */
+    const closeExpandModal = () => {
+        showExpandModal.value = false;
+        expandedQuery.value = '';
+    };
 
-  /**
-   * Submit the expanded query
-   */
-  const submitExpandedQuery = async (query: string, onSubmit: () => Promise<void>) => {
-    expandedQuery.value = query;
-    showExpandModal.value = false;
-    
-    await nextTick();
-    await onSubmit();
-  };
+    /**
+     * Submit the expanded query
+     */
+    const submitExpandedQuery = async (
+        query: string,
+        onSubmit: () => Promise<void>
+    ) => {
+        expandedQuery.value = query;
+        showExpandModal.value = false;
 
-  return {
-    // State
-    showExpandModal,
-    expandedQuery,
-    
-    // Methods
-    handleExpandClick,
-    closeExpandModal,
-    submitExpandedQuery,
-  };
+        await nextTick();
+        await onSubmit();
+    };
+
+    return {
+        // State
+        showExpandModal,
+        expandedQuery,
+
+        // Methods
+        handleExpandClick,
+        closeExpandModal,
+        submitExpandedQuery,
+    };
 }

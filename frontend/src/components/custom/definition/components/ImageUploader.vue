@@ -3,16 +3,25 @@
         <!-- Upload Button/Icon -->
         <button
             v-if="variant === 'empty'"
-            class="flex flex-col items-center justify-center w-full h-full text-muted-foreground hover:text-foreground transition-all duration-300 hover:scale-105"
+            class="flex h-full w-full flex-col items-center justify-center text-muted-foreground transition-all duration-300 hover:scale-105 hover:text-foreground"
             @click="triggerFileInput"
             :disabled="isUploading"
         >
             <Transition name="upload-icon" mode="out-in">
-                <LoaderIcon v-if="isUploading" class="w-8 h-8 mb-2 animate-spin" />
-                <CameraIcon v-else class="w-8 h-8 mb-2" />
+                <LoaderIcon
+                    v-if="isUploading"
+                    class="mb-2 h-8 w-8 animate-spin"
+                />
+                <CameraIcon v-else class="mb-2 h-8 w-8" />
             </Transition>
-            <span class="text-sm font-medium">{{ isUploading ? 'Uploading...' : 'Add Image' }}</span>
-            <span v-if="isUploading" class="text-xs text-muted-foreground mt-1 animate-pulse">Please wait...</span>
+            <span class="text-sm font-medium">{{
+                isUploading ? 'Uploading...' : 'Add Image'
+            }}</span>
+            <span
+                v-if="isUploading"
+                class="mt-1 animate-pulse text-xs text-muted-foreground"
+                >Please wait...</span
+            >
         </button>
 
         <button
@@ -23,7 +32,11 @@
             :title="isUploading ? 'Uploading...' : 'Add image'"
         >
             <Transition name="upload-icon" mode="out-in">
-                <LoaderIcon v-if="isUploading" class="animate-spin" :class="iconClasses" />
+                <LoaderIcon
+                    v-if="isUploading"
+                    class="animate-spin"
+                    :class="iconClasses"
+                />
                 <CameraIcon v-else :class="iconClasses" />
             </Transition>
         </button>
@@ -40,9 +53,9 @@
 
         <!-- Upload Progress (if needed) -->
         <Transition name="progress-fade">
-            <div 
+            <div
                 v-if="isUploading && showProgress"
-                class="absolute inset-x-0 bottom-0 bg-black/50 text-white text-xs text-center py-1 rounded-b-lg backdrop-blur-sm"
+                class="absolute inset-x-0 bottom-0 rounded-b-lg bg-black/50 py-1 text-center text-xs text-white backdrop-blur-sm"
             >
                 {{ uploadProgress }}%
             </div>
@@ -89,18 +102,19 @@ const { toast } = useToast();
 
 // Computed classes
 const buttonClasses = computed(() => {
-    const base = "flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110";
+    const base =
+        'flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110';
     const sizes = {
-        sm: "w-8 h-8 bg-black/50 hover:bg-black/70 p-1",
-        lg: "w-12 h-12 bg-primary/80 hover:bg-primary"
+        sm: 'w-8 h-8 bg-black/50 hover:bg-black/70 p-1',
+        lg: 'w-12 h-12 bg-primary/80 hover:bg-primary',
     };
     return `${base} ${sizes[props.size]}`;
 });
 
 const iconClasses = computed(() => {
     const sizes = {
-        sm: "w-4 h-4",
-        lg: "w-6 h-6"
+        sm: 'w-4 h-4',
+        lg: 'w-6 h-6',
     };
     return `${sizes[props.size]} text-white`;
 });
@@ -115,39 +129,40 @@ const triggerFileInput = () => {
 const handleFileSelect = async (event: Event) => {
     const input = event.target as HTMLInputElement;
     const files = input.files;
-    
+
     if (!files || files.length === 0) return;
-    
+
     // We need either synthEntryId or definitionId
     if (!props.synthEntryId && !props.definitionId) {
         toast({
-            title: "Error",
-            description: "No ID provided for image upload",
-            variant: "destructive",
+            title: 'Error',
+            description: 'No ID provided for image upload',
+            variant: 'destructive',
         });
         return;
     }
 
     // Validate files
-    const validFiles = Array.from(files).filter(file => {
+    const validFiles = Array.from(files).filter((file) => {
         if (!file.type.startsWith('image/')) {
             toast({
-                title: "Invalid File",
+                title: 'Invalid File',
                 description: `${file.name} is not an image file`,
-                variant: "destructive",
+                variant: 'destructive',
             });
             return false;
         }
-        
-        if (file.size > 10 * 1024 * 1024) { // 10MB limit
+
+        if (file.size > 10 * 1024 * 1024) {
+            // 10MB limit
             toast({
-                title: "File Too Large",
+                title: 'File Too Large',
                 description: `${file.name} is larger than 10MB`,
-                variant: "destructive",
+                variant: 'destructive',
             });
             return false;
         }
-        
+
         return true;
     });
 
@@ -163,21 +178,22 @@ const handleFileSelect = async (event: Event) => {
         // Upload files sequentially to avoid overwhelming the server
         for (let i = 0; i < validFiles.length; i++) {
             const file = validFiles[i];
-            
+
             try {
                 const result = await uploadSingleFile(file);
                 uploadedImages.push(result);
-                
+
                 // Update progress
-                uploadProgress.value = Math.round(((i + 1) / validFiles.length) * 100);
+                uploadProgress.value = Math.round(
+                    ((i + 1) / validFiles.length) * 100
+                );
                 emit('upload-progress', uploadProgress.value);
-                
             } catch (error) {
                 logger.error(`Failed to upload ${file.name}:`, error);
                 toast({
-                    title: "Upload Failed",
+                    title: 'Upload Failed',
                     description: `Failed to upload ${file.name}`,
-                    variant: "destructive",
+                    variant: 'destructive',
                 });
             }
         }
@@ -185,24 +201,26 @@ const handleFileSelect = async (event: Event) => {
         if (uploadedImages.length > 0) {
             emit('upload-success', uploadedImages);
             toast({
-                title: "Upload Successful",
+                title: 'Upload Successful',
                 description: `Successfully uploaded ${uploadedImages.length} image${uploadedImages.length > 1 ? 's' : ''}`,
-                variant: "default",
+                variant: 'default',
             });
         }
-
     } catch (error) {
         logger.error('Upload error:', error);
-        emit('upload-error', error instanceof Error ? error.message : 'Upload failed');
+        emit(
+            'upload-error',
+            error instanceof Error ? error.message : 'Upload failed'
+        );
         toast({
-            title: "Upload Error",
-            description: "An unexpected error occurred during upload",
-            variant: "destructive",
+            title: 'Upload Error',
+            description: 'An unexpected error occurred during upload',
+            variant: 'destructive',
         });
     } finally {
         isUploading.value = false;
         uploadProgress.value = 0;
-        
+
         // Clear the input so the same file can be selected again
         if (input) {
             input.value = '';
@@ -214,22 +232,26 @@ const uploadSingleFile = async (file: File): Promise<ImageMedia> => {
     try {
         // First upload the image
         const uploadedImage = await imageApi.uploadImage(file, {
-            alt_text: file.name.replace(/\.[^/.]+$/, ""), // Remove extension for alt text
+            alt_text: file.name.replace(/\.[^/.]+$/, ''), // Remove extension for alt text
         });
 
         // Bind image to definition or synthesized entry
         if (props.definitionId) {
             // Direct definition binding
-            await imageApi.bindImageToDefinition(props.definitionId, uploadedImage.id);
+            await imageApi.bindImageToDefinition(
+                props.definitionId,
+                uploadedImage.id
+            );
         } else if (props.synthEntryId) {
             // Bind image directly to synthesized entry using the new API
-            await entriesApi.addImagesToEntry(props.synthEntryId, [uploadedImage.id]);
+            await entriesApi.addImagesToEntry(props.synthEntryId, [
+                uploadedImage.id,
+            ]);
             // Emit event to notify parent that images were updated
             emit('images-updated');
         }
-        
+
         return uploadedImage;
-        
     } catch (error) {
         logger.error('Upload error:', error);
         throw error;

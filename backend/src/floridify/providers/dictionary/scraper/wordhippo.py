@@ -19,7 +19,7 @@ from ....models.dictionary import (
 )
 from ....utils.logging import get_logger
 from ...core import ConnectorConfig, RateLimitPresets
-from ...utils import respectful_scraper
+from ...http_client import respectful_scraper
 from ..core import DictionaryConnector
 from ..models import DictionaryProviderEntry
 

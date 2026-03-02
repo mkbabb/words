@@ -1,15 +1,26 @@
 <template>
-    <div v-if="isMounted" class="absolute top-2 right-2 z-50 flex items-center gap-2">
+    <div
+        v-if="isMounted"
+        class="absolute top-2 right-2 z-50 flex items-center gap-2"
+    >
         <!-- Edit Mode Toggle Button -->
         <button
             @click="$emit('toggle-edit-mode')"
             class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-1.5 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
             :title="editModeEnabled ? 'Exit edit mode' : 'Enter edit mode'"
         >
-            <Edit2 v-if="!editModeEnabled" :size="14" class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground" />
-            <Check v-else :size="14" class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground" />
+            <Edit2
+                v-if="!editModeEnabled"
+                :size="14"
+                class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground"
+            />
+            <Check
+                v-else
+                :size="14"
+                class="text-muted-foreground transition-colors duration-200 group-hover:text-foreground"
+            />
         </button>
-        
+
         <!-- Custom dropdown with controlled animations -->
         <div class="relative">
             <button
@@ -52,7 +63,8 @@
                                 'flex w-full items-center rounded-sm px-2 py-1.5 text-sm',
                                 'transition-colors hover:bg-accent hover:text-accent-foreground',
                                 'focus:bg-accent focus:text-accent-foreground focus:outline-none',
-                                modelValue === option.value && 'bg-accent text-accent-foreground',
+                                modelValue === option.value &&
+                                    'bg-accent text-accent-foreground',
                             ]"
                         >
                             <div class="flex items-center gap-2">

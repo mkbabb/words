@@ -2,14 +2,17 @@
     <div
         :class="[
             'flex-shrink-0 overflow-hidden transition-all ease-out',
-            `duration-${animationDuration}`
+            `duration-${animationDuration}`,
         ]"
         :style="{
             opacity: opacity,
             transform: `scale(${minScale + opacity * (maxScale - minScale)})`,
             pointerEvents: opacity > opacityThreshold ? 'auto' : 'none',
             width: opacity > opacityThreshold ? `${expandedWidth}px` : '0px',
-            marginLeft: showRegenerateButton && opacity > opacityThreshold ? `${spacing}px` : '0px',
+            marginLeft:
+                showRegenerateButton && opacity > opacityThreshold
+                    ? `${spacing}px`
+                    : '0px',
         }"
     >
         <HamburgerIcon
@@ -44,7 +47,7 @@ const props = withDefaults(defineProps<HamburgerButtonProps>(), {
     opacityThreshold: 0.1,
     expandedWidth: 48,
     spacing: 8,
-    animationDuration: 300
+    animationDuration: 300,
 });
 
 // Using defineModel for two-way binding (modern Vue 3.4+)

@@ -16,7 +16,7 @@ from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.base import Language
 from floridify.search.constants import SearchMethod, SearchMode
 from floridify.search.core import Search
-from floridify.search.models import SearchIndex
+from floridify.search.search_index import SearchIndex
 
 
 @pytest_asyncio.fixture

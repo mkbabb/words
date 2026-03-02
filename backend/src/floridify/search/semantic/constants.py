@@ -67,7 +67,7 @@ MODEL_BATCH_SIZES = {
     BGE_M3_MODEL: 64,  # 1024D embeddings
     MINI_LM_MODEL: 128,  # 384D embeddings (lightweight)
     GTE_QWEN2_MODEL: 24,  # 1536D embeddings (memory-heavy)
-    QWEN3_8B_MODEL: 8,   # 8B model, 4096D embeddings
+    QWEN3_8B_MODEL: 8,  # 8B model, 4096D embeddings
     QWEN3_4B_MODEL: 16,  # 4B model, 2560D embeddings
     QWEN3_0_6B_MODEL: 128,  # 0.6B model, 1024D — profiled optimal for M-series
 }
