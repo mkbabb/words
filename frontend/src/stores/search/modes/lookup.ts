@@ -68,6 +68,7 @@ export const useLookupMode = defineStore(
         const cursorPosition = ref(0);
         const searchMethod = ref<SearchMethod>('smart');
         let abortController: AbortController | null = null;
+        let searchGeneration = 0;
 
         // ==========================================================================
         // COMPUTED
@@ -244,6 +245,7 @@ export const useLookupMode = defineStore(
 
         const search = async (query: string): Promise<SearchResult[]> => {
             cancelSearch();
+            const myGeneration = ++searchGeneration;
             abortController = new AbortController();
 
             try {
@@ -253,20 +255,30 @@ export const useLookupMode = defineStore(
                     mode: searchMode.value.join(','),
                 });
 
+                // Only update state if this is still the latest request
+                if (myGeneration !== searchGeneration) {
+                    return searchResults;
+                }
+
                 const method = detectSearchMethod(searchResults, normalized);
                 setResults(searchResults, method);
                 return searchResults;
             } catch (error: any) {
                 if (
                     error.name === 'AbortError' ||
+                    error.name === 'CanceledError' ||
                     error.code === 'ERR_CANCELED'
                 ) {
                     return [];
                 }
-                clearResults();
+                if (myGeneration === searchGeneration) {
+                    clearResults();
+                }
                 throw error;
             } finally {
-                abortController = null;
+                if (myGeneration === searchGeneration) {
+                    abortController = null;
+                }
             }
         };
 

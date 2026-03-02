@@ -137,7 +137,10 @@ defineEmits<{
 }>();
 
 const { lookupMode } = useStores();
-const currentSearchMode = computed(() => lookupMode.searchMode);
+const currentSearchMode = computed(() => {
+    const mode = lookupMode.searchMode;
+    return Array.isArray(mode) ? mode[0] || 'smart' : mode;
+});
 
 // Search mode descriptions
 const searchModeDescriptions: Record<string, string> = {

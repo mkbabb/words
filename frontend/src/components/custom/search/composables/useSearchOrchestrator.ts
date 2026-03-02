@@ -51,7 +51,6 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
         const mode = searchBar.searchMode;
 
         _searchError.value = null;
-        loading.startOperation();
 
         try {
             let results: any[] = [];
@@ -85,8 +84,6 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
             searchBar.clearResults();
             searchBar.hideDropdown();
             return [];
-        } finally {
-            loading.endOperation();
         }
     };
 
@@ -103,13 +100,19 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
             return [];
         }
 
-        searchBar.clearResults();
         const results = await lookupMode.search(queryText);
+
+        // Don't update UI if query changed while we were waiting (stale response)
+        const currentQuery = query.value?.trim() || '';
+        if (currentQuery !== queryText) {
+            return results;
+        }
 
         if (results.length > 0) {
             searchBar.openDropdown();
             searchBar.setSelectedIndex(-1);
         } else {
+            searchBar.clearResults();
             searchBar.hideDropdown();
         }
 

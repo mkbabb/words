@@ -166,15 +166,15 @@
                 fuzzy only
             </p>
 
-            <!-- No Results Messages -->
+            <!-- No Results Messages (only when there are truly no results) -->
             <div
-                v-else-if="!loading && query.length < 2"
+                v-if="!loading && results.length === 0 && query.length < 2 && !aiMode"
                 class="bg-background/50 p-4 text-center text-sm text-muted-foreground backdrop-blur-sm"
             >
                 Type at least 2 characters to search...
             </div>
             <div
-                v-else-if="!loading && query.length >= 2 && !aiMode"
+                v-else-if="!loading && results.length === 0 && query.length >= 2 && !aiMode"
                 class="bg-background/50 p-4 text-center text-sm text-muted-foreground backdrop-blur-sm"
             >
                 {{

@@ -30,7 +30,11 @@ export const searchApi = {
         signal: options?.signal,
       });
       return response.data.results || [];
-    } catch (error) {
+    } catch (error: any) {
+      // Rethrow cancel errors so callers can handle them without overwriting fresh results
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        throw error;
+      }
       logger.error('Search API error:', error);
       return [];
     }
