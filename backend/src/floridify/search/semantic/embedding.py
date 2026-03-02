@@ -122,18 +122,22 @@ async def get_cached_model(
         logger.info(f"⏳ Loading model {model_name} on {device} (one-time load, will be cached)")
         start_time = time.perf_counter()
 
-        # Initialize model with ONNX optimization if requested
-        if use_onnx:
-            try:
-                model = SentenceTransformer(model_name, backend="onnx", trust_remote_code=True)
-                logger.info("✅ ONNX backend enabled")
-            except Exception as e:
-                logger.warning(f"Failed to load ONNX model: {e}. Falling back to PyTorch")
-                model = SentenceTransformer(model_name, trust_remote_code=True)
-        else:
-            model = SentenceTransformer(model_name, trust_remote_code=True)
+        # CRITICAL FIX: Offload blocking model loading to a thread pool.
+        # SentenceTransformer() loads ~600MB of weights from disk (or downloads
+        # them), which blocks the event loop for 1-3s and stalls HTTP requests.
+        def _load_model() -> SentenceTransformer:
+            if use_onnx:
+                try:
+                    m = SentenceTransformer(model_name, backend="onnx", trust_remote_code=True)
+                    logger.info("✅ ONNX backend enabled")
+                    return m
+                except Exception as e:
+                    logger.warning(f"Failed to load ONNX model: {e}. Falling back to PyTorch")
+            return SentenceTransformer(model_name, trust_remote_code=True)
 
-        # Set device for GPU acceleration
+        model = await asyncio.to_thread(_load_model)
+
+        # Set device for GPU acceleration (fast, no I/O)
         model = model.to(device)
 
         # NOTE: torch.set_num_threads() is UNSAFE when multiple OpenMP runtimes

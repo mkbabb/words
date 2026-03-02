@@ -196,12 +196,16 @@ class SemanticSearch:
             )
 
         # Load embeddings and FAISS index - current format only, no legacy support
+        # CRITICAL FIX: Offload blocking gzip decompression and FAISS deserialization
+        # to a thread pool so the event loop stays responsive. For 278K-word corpora
+        # this can take several seconds of CPU-bound decompression.
         try:
-            self.sentence_embeddings = load_embeddings_from_binary_data(
-                binary_data, self.index.corpus_name
+            corpus_name = self.index.corpus_name
+            self.sentence_embeddings = await asyncio.to_thread(
+                load_embeddings_from_binary_data, binary_data, corpus_name
             )
-            self.sentence_index = load_faiss_index_from_binary_data(
-                binary_data, self.index.corpus_name
+            self.sentence_index = await asyncio.to_thread(
+                load_faiss_index_from_binary_data, binary_data, corpus_name
             )
 
             # Restore persisted query embeddings from L2 cache
@@ -608,7 +612,10 @@ class SemanticSearch:
         logger.info("Building new semantic embeddings using pre-computed lemmas")
 
         start_time = time.perf_counter()
-        self._build_embeddings()
+        # CRITICAL FIX: Offload blocking embedding work to a thread pool so
+        # the async event loop stays responsive for HTTP requests while the
+        # (potentially minutes-long) encoding runs in background.
+        await asyncio.to_thread(self._build_embeddings)
         build_time_seconds = time.perf_counter() - start_time
 
         logger.info(f"Built semantic embeddings in {build_time_seconds * 1000:.1f}ms")
