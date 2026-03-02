@@ -10,7 +10,7 @@ from rapidfuzz import fuzz, process
 from ..corpus.core import Corpus
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod
-from .models import SearchResult
+from .result import SearchResult
 from .utils import apply_length_correction
 
 logger = get_logger(__name__)

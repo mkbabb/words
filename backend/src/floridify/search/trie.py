@@ -20,7 +20,7 @@ from ..caching.models import VersionConfig
 from ..corpus.core import Corpus
 from ..text import normalize
 from ..utils.logging import get_logger
-from .models import TrieIndex
+from .trie_index import TrieIndex
 
 if TYPE_CHECKING:
     from .bloom import BloomFilter

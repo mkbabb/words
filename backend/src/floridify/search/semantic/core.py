@@ -36,7 +36,7 @@ from ...caching.models import CacheNamespace, VersionConfig
 from ...corpus.core import Corpus
 from ...utils.logging import get_logger
 from ..constants import SearchMethod
-from ..models import SearchResult
+from ..result import SearchResult
 from .constants import (
     DEFAULT_SENTENCE_MODEL,
     ENABLE_GPU_ACCELERATION,

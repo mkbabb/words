@@ -424,7 +424,7 @@ class Search:
 
         # Create minimal index if not present
         if not self.index:
-            from .models import SearchIndex
+            from .search_index import SearchIndex
 
             self.index = SearchIndex(
                 corpus_name=self.corpus.corpus_name,

@@ -169,7 +169,7 @@ class Definition(Document, BaseMetadata):
 
     # Examples and relationships
     example_ids: list[PydanticObjectId] = Field(
-        default_factory=list, max_length=20
+        default_factory=list, max_length=50
     )  # FK to Example documents
     synonyms: list[str] = Field(default_factory=list, max_length=50)
     antonyms: list[str] = Field(default_factory=list, max_length=50)
