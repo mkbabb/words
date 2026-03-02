@@ -31,7 +31,7 @@
             </div>
             <!-- Right: Dark Mode + Hamburger -->
             <div class="flex items-center gap-3">
-                <DarkModeToggle class="h-7 w-7 transition-all duration-500 ease-apple-smooth" />
+                <DarkModeToggle class="h-7 w-7" />
                 <HamburgerIcon
                     :is-open="mobile ? ui.sidebarOpen : !collapsed"
                     :class="cn(

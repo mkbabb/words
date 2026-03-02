@@ -1,6 +1,6 @@
 <template>
     <!-- Credit to Kevin Powell at https://codepen.io/kevinpowell/pen/PomqjxO -->
-    <button class="dark-mode-toggle-button" v-bind="$attrs" :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'" @click="changeTheme()">
+    <button :class="['dark-mode-toggle-button', { pulsing }]" v-bind="$attrs" :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'" @click="handleClick">
         <svg
             xmlns="http://www.w3.org/2000/svg"
             width="472.39"
@@ -20,7 +20,18 @@
 </template>
 
 <script setup>
+import { ref } from 'vue';
 import { changeTheme, isDark } from ".";
+
+const pulsing = ref(false);
+
+function handleClick() {
+    pulsing.value = true;
+    changeTheme();
+    setTimeout(() => {
+        pulsing.value = false;
+    }, 650);
+}
 </script>
 
 <style scoped lang="scss">
@@ -61,6 +72,10 @@ import { changeTheme, isDark } from ".";
     background: currentColor;
     pointer-events: none;
     z-index: -1;
+    opacity: 0;
+}
+
+.dark-mode-toggle-button.pulsing::before {
     animation: pulseToDark 650ms ease-out forwards;
 }
 
@@ -75,7 +90,7 @@ import { changeTheme, isDark } from ".";
 }
 
 .dark {
-    .dark-mode-toggle-button::before {
+    .dark-mode-toggle-button.pulsing::before {
         animation: pulseToLight 650ms ease-out forwards;
     }
 
