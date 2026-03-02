@@ -18,7 +18,7 @@ from ...corpus.models import CorpusType
 from ...models.base import Language
 from ...models.parameters import SearchParams
 from ...models.responses import SearchResponse
-from ...search.constants import SearchMode
+from ...search.constants import SearchMethod, SearchMode
 from ...search.core import Search
 from ...search.language import get_language_search
 from ...search.search_index import SearchIndex
@@ -188,8 +188,12 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
             except Exception as e:
                 logger.warning(f"Multi-mode search failed for mode '{mode_str}': {e}")
 
-        # Sort by score descending, limit to max_results
-        all_results.sort(key=lambda r: r.score, reverse=True)
+        # Sort by score with small method bonus for tiebreaking
+        _METHOD_BONUS = {SearchMethod.EXACT: 0.03, SearchMethod.PREFIX: 0.02, SearchMethod.SEMANTIC: 0.01, SearchMethod.FUZZY: 0.0}
+        all_results.sort(
+            key=lambda r: r.score + _METHOD_BONUS.get(r.method, 0.0),
+            reverse=True,
+        )
         all_results = all_results[: params.max_results]
 
         return SearchResponse(

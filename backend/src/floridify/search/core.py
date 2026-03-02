@@ -33,11 +33,21 @@ class Search:
     Optimized for 100k-1M word searches with minimal overhead.
     """
 
-    # Method priority for deduplication (higher = preferred)
+    # Method priority for deduplication (higher = preferred when same word appears)
     METHOD_PRIORITY = {
-        SearchMethod.EXACT: 3,
+        SearchMethod.EXACT: 4,
+        SearchMethod.PREFIX: 3,
         SearchMethod.SEMANTIC: 2,
         SearchMethod.FUZZY: 1,
+    }
+
+    # Small bonus added to score for sorting — tiebreaker only, never overrides score.
+    # A fuzzy match at 0.95 still beats a semantic match at 0.80.
+    METHOD_SORT_BONUS = {
+        SearchMethod.EXACT: 0.03,
+        SearchMethod.PREFIX: 0.02,
+        SearchMethod.SEMANTIC: 0.01,
+        SearchMethod.FUZZY: 0.0,
     }
 
     def __init__(
@@ -236,12 +246,14 @@ class Search:
         combined_vocab = self.corpus.vocabulary
         logger.debug(f"Corpus loaded with {len(combined_vocab)} vocabulary items")
 
-        # High-performance search components - only initialize if needed
-        if self.index.has_trie:
-            logger.debug("Building/updating Trie index")
+        # Always build trie + fuzzy when corpus has vocabulary.
+        # The trie is cheap (<1ms for small corpora) and required for exact/prefix/fuzzy.
+        if combined_vocab:
+            logger.debug("Building Trie index")
             self.trie_search = await TrieSearch.from_corpus(self.corpus)
+            if self.trie_search and self.trie_search.index:
+                self.index.trie_index_id = self.trie_search.index.index_id
 
-        if self.index.has_fuzzy:
             logger.debug("Initializing Fuzzy search")
             self.fuzzy_search = FuzzySearch(min_score=self.index.min_score)
 
@@ -766,6 +778,11 @@ class Search:
 
         return results if results else []
 
+    # Minimum semantic score when there are no exact/fuzzy/prefix results to anchor to.
+    # Prevents garbage semantic results for partial words like "exampl" → "table" (0.73)
+    # while keeping useful matches like "wise" → "acute" (0.81).
+    SEMANTIC_FALLBACK_MIN_SCORE = 0.75
+
     async def _smart_search_cascade(
         self,
         query: str,
@@ -780,28 +797,56 @@ class Search:
             logger.debug(f"Early exit: {len(exact_results)} exact matches found")
             return exact_results
 
-        # 2. Fuzzy search (most comprehensive for misspellings)
+        # 2. Prefix search — catches partial words ("exampl" → "example")
+        prefix_results: list[SearchResult] = []
+        prefix_words = self.search_prefix(query, max_results=max_results)
+        if prefix_words:
+            prefix_results = [
+                SearchResult(
+                    word=word,
+                    lemmatized_word=None,
+                    score=max(0.85, 1.0 - 0.02 * abs(len(word) - len(query))),
+                    method=SearchMethod.PREFIX,
+                    language=None,
+                    metadata=None,
+                )
+                for word in prefix_words
+            ]
+            if len(prefix_results) >= max_results:
+                logger.debug(f"Early exit: {len(prefix_results)} prefix matches found")
+                return prefix_results[:max_results]
+
+        # 3. Fuzzy search (most comprehensive for misspellings)
         fuzzy_results = self.search_fuzzy(query, max_results, min_score)
 
-        # 3. Semantic search - quality-based gating
+        # 4. Semantic search - quality-based gating
+        # Only supplement when exact/fuzzy provide some anchor results.
+        # When there are NO text-based results, require a much higher semantic
+        # score to avoid garbage (e.g., "exampl" → "table" at 73%).
         semantic_results = []
+        has_text_results = bool(prefix_results or fuzzy_results)
         if semantic and self._semantic_ready and self.semantic_search:
             high_quality = [r for r in fuzzy_results if r.score >= 0.7]
-            semantic_limit = max(0, max_results - len(high_quality))
+            semantic_limit = max(0, max_results - len(high_quality) - len(prefix_results))
             if semantic_limit > 0:
-                semantic_results = await self.search_semantic(query, semantic_limit, min_score)
+                semantic_min = min_score if has_text_results else self.SEMANTIC_FALLBACK_MIN_SCORE
+                semantic_results = await self.search_semantic(query, semantic_limit, semantic_min)
 
-        # 4. Merge and deduplicate with memory-efficient generators
+        # 5. Merge and deduplicate with memory-efficient generators
         fuzzy_gen = (r for r in fuzzy_results if r.score >= min_score)
         semantic_gen = (r for r in semantic_results if r.score >= min_score)
 
         # Chain all results without creating intermediate lists
-        all_results = list(itertools.chain(exact_results, fuzzy_gen, semantic_gen))
+        all_results = list(itertools.chain(exact_results, prefix_results, fuzzy_gen, semantic_gen))
 
         # Deduplicate and sort
         unique_results = self._deduplicate_results(all_results)
 
-        return sorted(unique_results, key=lambda r: r.score, reverse=True)[:max_results]
+        return sorted(
+            unique_results,
+            key=lambda r: r.score + self.METHOD_SORT_BONUS.get(r.method, 0.0),
+            reverse=True,
+        )[:max_results]
 
     async def find_best_match(self, word: str) -> SearchResult | None:
         """Find single best matching word (for word resolution)."""
