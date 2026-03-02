@@ -2,13 +2,17 @@
     <div
         v-if="suggestion && suggestion !== query"
         :class="[
-            'pointer-events-none absolute top-0 right-0 left-0 flex h-12 items-center text-lg transition-all duration-300 ease-out',
-            'truncate text-muted-foreground/50',
+            'pointer-events-none absolute inset-0 overflow-hidden whitespace-nowrap text-lg',
+            'text-muted-foreground/50',
         ]"
         :style="{
             paddingLeft: paddingLeft,
             paddingRight: paddingRight,
+            paddingTop: '0.75rem',
+            paddingBottom: '0.75rem',
             textAlign: textAlign,
+            lineHeight: '1.4',
+            minHeight: '48px',
         }"
     >
         <span class="invisible whitespace-pre">{{ query }}</span

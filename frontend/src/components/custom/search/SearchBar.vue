@@ -633,15 +633,19 @@ watch(
         // Trigger search immediately for all modes
         performSearch();
 
-        // Update autocomplete
+        // Immediately recompute autocomplete for the new query.
+        // This clears stale suggestions right away (e.g. if the new query
+        // no longer matches the old suggestion prefix).
         updateAutocomplete();
         searchBar.setAutocompleteText(autocompleteText.value);
     }
 );
 
-// Watch search results for autocomplete updates
+// Watch search results for autocomplete updates.
+// Use a single watcher on currentResults (covers both lookup and wordlist modes)
+// instead of only watching lookup results.
 watch(
-    () => searchBar.getResults('lookup'),
+    () => searchBar.currentResults,
     () => {
         updateAutocomplete();
         searchBar.setAutocompleteText(autocompleteText.value);

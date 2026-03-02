@@ -790,17 +790,25 @@ class Search:
         min_score: float,
         semantic: bool,
     ) -> list[SearchResult]:
-        """Sequential search cascade with smart early termination for optimal performance."""
-        # 1. Exact search first (fastest) - perfect match early termination
-        exact_results = self.search_exact(query)
-        if exact_results:
-            logger.debug(f"Early exit: {len(exact_results)} exact matches found")
-            return exact_results
+        """Sequential search cascade that always includes prefix results for autocomplete.
 
-        # 2. Prefix search — catches partial words ("exampl" → "example")
+        Unlike a pure cascade with early termination, this always runs prefix search
+        alongside exact search. For a search dropdown/autocomplete, users expect to see
+        words that START WITH their query, not just an exact match.
+
+        Order: exact (if any) → prefix matches → fuzzy → semantic.
+        """
+        # 1. Exact search (fastest — marisa-trie O(m))
+        exact_results = self.search_exact(query)
+
+        # 2. ALWAYS run prefix search — this is cheap (marisa-trie) and essential for
+        #    autocomplete UX. "de" should show "deer", "dear", "deep", etc.
         prefix_results: list[SearchResult] = []
         prefix_words = self.search_prefix(query, max_results=max_results)
         if prefix_words:
+            # Build a set of exact-match words to avoid duplicating them in prefix results
+            exact_words = {r.word.lower() for r in exact_results}
+
             prefix_results = [
                 SearchResult(
                     word=word,
@@ -811,23 +819,37 @@ class Search:
                     metadata=None,
                 )
                 for word in prefix_words
+                if word.lower() not in exact_words
             ]
-            if len(prefix_results) >= max_results:
-                logger.debug(f"Early exit: {len(prefix_results)} prefix matches found")
-                return prefix_results[:max_results]
+
+        # Early exit: if exact + prefix already fill max_results, no need for fuzzy/semantic
+        combined_count = len(exact_results) + len(prefix_results)
+        if combined_count >= max_results:
+            logger.debug(
+                f"Early exit: {len(exact_results)} exact + {len(prefix_results)} prefix matches"
+            )
+            all_results = list(itertools.chain(exact_results, prefix_results))
+            unique_results = self._deduplicate_results(all_results)
+            return sorted(
+                unique_results,
+                key=lambda r: r.score + self.METHOD_SORT_BONUS.get(r.method, 0.0),
+                reverse=True,
+            )[:max_results]
 
         # 3. Fuzzy search (most comprehensive for misspellings)
         fuzzy_results = self.search_fuzzy(query, max_results, min_score)
 
-        # 4. Semantic search - quality-based gating
-        # Only supplement when exact/fuzzy provide some anchor results.
+        # 4. Semantic search — quality-based gating
+        # Only supplement when exact/fuzzy/prefix provide some anchor results.
         # When there are NO text-based results, require a much higher semantic
         # score to avoid garbage (e.g., "exampl" → "table" at 73%).
         semantic_results = []
-        has_text_results = bool(prefix_results or fuzzy_results)
+        has_text_results = bool(exact_results or prefix_results or fuzzy_results)
         if semantic and self._semantic_ready and self.semantic_search:
             high_quality = [r for r in fuzzy_results if r.score >= 0.7]
-            semantic_limit = max(0, max_results - len(high_quality) - len(prefix_results))
+            semantic_limit = max(
+                0, max_results - len(high_quality) - len(prefix_results) - len(exact_results)
+            )
             if semantic_limit > 0:
                 semantic_min = min_score if has_text_results else self.SEMANTIC_FALLBACK_MIN_SCORE
                 semantic_results = await self.search_semantic(query, semantic_limit, semantic_min)

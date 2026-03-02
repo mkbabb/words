@@ -1,4 +1,4 @@
-import { ref, watch, nextTick, type Ref } from 'vue';
+import { ref, nextTick, type Ref } from 'vue';
 import type { SearchResult } from '@/types';
 
 interface UseAutocompleteOptions {
@@ -131,14 +131,11 @@ export function useAutocomplete({
         autocompleteText.value = '';
     };
 
-    // Watchers
-    watch(searchResults, () => {
-        updateAutocomplete();
-    });
-
-    watch(query, () => {
-        updateAutocomplete();
-    });
+    // Note: No internal watchers here. The parent component (SearchBar.vue)
+    // is responsible for calling updateAutocomplete() and syncing to the store.
+    // Having watchers both here and in the parent caused double-firing race
+    // conditions where stale autocomplete text would briefly overlap with
+    // the new suggestion.
 
     return {
         // State
