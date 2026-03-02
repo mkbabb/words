@@ -51,7 +51,7 @@ class DefinitionCreate(BaseModel):
 
     # Media and provenance
     image_ids: list[PydanticObjectId] = Field(default_factory=list)
-    provider_data_id: PydanticObjectId | None = None
+    dictionary_entry_id: PydanticObjectId | None = None
 
 
 class DefinitionUpdate(BaseModel):
@@ -85,7 +85,7 @@ class DefinitionUpdate(BaseModel):
 
     # Media and provenance
     image_ids: list[PydanticObjectId] | None = None
-    provider_data_id: PydanticObjectId | None = None
+    dictionary_entry_id: PydanticObjectId | None = None
 
 
 class DefinitionFilter(BaseModel):
@@ -153,14 +153,14 @@ class DefinitionRepository(BaseRepository[Definition, DefinitionCreate, Definiti
         """Find definitions in the same meaning cluster."""
         return await Definition.find({"meaning_cluster.cluster_id": cluster_id}).to_list()
 
-    async def find_by_provider(self, provider_data_id: PydanticObjectId | str) -> list[Definition]:
+    async def find_by_provider(self, dictionary_entry_id: PydanticObjectId | str) -> list[Definition]:
         """Find definitions from a specific provider."""
-        provider_oid = (
-            PydanticObjectId(provider_data_id)
-            if isinstance(provider_data_id, str)
-            else provider_data_id
+        entry_oid = (
+            PydanticObjectId(dictionary_entry_id)
+            if isinstance(dictionary_entry_id, str)
+            else dictionary_entry_id
         )
-        return await Definition.find({"provider_data_id": provider_oid}).to_list()
+        return await Definition.find({"dictionary_entry_id": entry_oid}).to_list()
 
     # Generic CRUD for related entities
     async def add_example(

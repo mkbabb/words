@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Coroutine
+from enum import Enum
 from typing import Any, cast
 
 from beanie import PydanticObjectId
@@ -91,12 +92,17 @@ async def cluster_definitions(
             # Get provider name from provider data
             provider_name = "unknown"
 
-            if definition.provider_data_id:
+            if definition.dictionary_entry_id:
                 provider_data = await DictionaryEntry.get(definition.dictionary_entry_id)
 
                 if provider_data:
                     # Convert enum to string for display
-                    provider_name = provider_data.provider.value
+                    # Note: use_enum_values=True in BaseMetadata means provider may already be a string
+                    provider_name = (
+                        provider_data.provider.value
+                        if isinstance(provider_data.provider, Enum)
+                        else provider_data.provider
+                    )
 
             definition_tuples.append(
                 (

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -237,11 +238,15 @@ class DefinitionSynthesizer:
             def_dicts = []
             for d in cluster_defs:
                 provider = d.providers[0] if d.providers else DictionaryProvider.WIKTIONARY
+                # use_enum_values=True means provider may already be a string
+                provider_str = (
+                    provider.value if isinstance(provider, Enum) else provider
+                )
                 def_dicts.append(
                     {
                         "text": d.text,
                         "part_of_speech": d.part_of_speech,
-                        "provider": provider.value,
+                        "provider": provider_str,
                     },
                 )
 
@@ -377,7 +382,11 @@ class DefinitionSynthesizer:
         manager = get_version_manager()
 
         # Create resource ID based on word and provider
-        resource_id = f"{word}:{entry.provider.value}"
+        # Note: use_enum_values=True in BaseMetadata means provider may already be a string
+        provider_value = (
+            entry.provider.value if isinstance(entry.provider, Enum) else entry.provider
+        )
+        resource_id = f"{word}:{provider_value}"
 
         # Convert entry to dict format for storage
         entry_dict = entry.model_dump(mode="json")
@@ -385,7 +394,7 @@ class DefinitionSynthesizer:
         # Prepare metadata
         metadata: dict[str, Any] = {
             "word": word,
-            "provider": entry.provider.value,
+            "provider": provider_value,
             "word_id": str(entry.word_id) if entry.word_id else None,
         }
 
