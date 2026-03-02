@@ -132,7 +132,7 @@ def normalize_comprehensive(
 
     # Fast punctuation normalization for fuzzy search consistency
     # Remove apostrophes and normalize hyphens to spaces for signature matching
-    text = text.replace("'", "").replace("-", " ")
+    text = text.replace("'", " ").replace("-", " ")
 
     # Single regex for punctuation removal and whitespace normalization
     text = COMBINED_CLEANUP_PATTERN.sub(" ", text).strip()

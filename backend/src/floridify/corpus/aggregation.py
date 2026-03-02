@@ -95,13 +95,13 @@ async def aggregate_vocabularies(
 
     aggregated = sorted(vocabulary)
     logger.info(
-        f"aggregate_vocabularies: corpus_uuid={corpus.corpus_uuid}, is_master={corpus.is_master}, child_ids={child_ids}, aggregated={aggregated}, update_parent={update_parent}"
+        f"aggregate_vocabularies: corpus_uuid={corpus.corpus_uuid}, is_master={corpus.is_master}, child_ids={child_ids}, aggregated_count={len(aggregated)}, update_parent={update_parent}"
     )
 
     # Update the parent corpus with aggregated vocabulary if requested
     if update_parent and aggregated != corpus.vocabulary:
         corpus.vocabulary = aggregated
-        corpus.unique_word_count = len(aggregated)
+        # unique_word_count is a computed @property (len(vocabulary)), so don't set it
         corpus.total_word_count = len(aggregated)
 
         # Update vocabulary stats and indices
@@ -211,7 +211,8 @@ async def aggregate_from_children(
     # Create a copy of the parent corpus with the aggregated vocabulary
     aggregated_corpus_data = parent.model_dump()
     aggregated_corpus_data["vocabulary"] = aggregated_vocab
-    aggregated_corpus_data["unique_word_count"] = len(aggregated_vocab)
+    # unique_word_count is a computed @property (len(vocabulary)), so don't set it
+    aggregated_corpus_data.pop("unique_word_count", None)
     aggregated_corpus_data["total_word_count"] = len(aggregated_vocab)
 
     # Rebuild vocabulary index

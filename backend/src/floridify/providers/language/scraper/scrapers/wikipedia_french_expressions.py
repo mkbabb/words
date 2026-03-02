@@ -37,12 +37,14 @@ async def scrape_french_expressions(
 
     logger.info(f"Scraping French expressions from: {target_url}")
 
+    headers = {"User-Agent": "Floridify/1.0 (dictionary app; https://words.babb.dev)"}
+
     if session:
-        response = await session.get(target_url)
+        response = await session.get(target_url, headers=headers)
         response.raise_for_status()
         html_text = response.text
     else:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
             response = await client.get(target_url)
             response.raise_for_status()
             html_text = response.text
