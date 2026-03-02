@@ -334,14 +334,15 @@ class SemanticIndex(BaseModel):
                 },
             )
 
-            # CRITICAL FIX: Store binary_data separately after metadata is saved
-            # For large compressed bytes, store directly to cache using pickle
-            # This avoids base64 encoding which creates massive strings (392MB -> 523MB)
+            # Store binary_data via GridFS for durable persistence
+            # Falls back to L1/L2 cache for fast subsequent reads
             if binary_data_to_store:
-                # Write large binary data directly to cache without JSON/base64 encoding
+                import pickle
+
+                from ...caching.gridfs import gridfs_put
+
                 cache = await get_global_cache()
 
-                # Generate cache key for this content
                 cache_key = _generate_cache_key(
                     versioned.resource_type,
                     versioned.resource_id,
@@ -349,31 +350,17 @@ class SemanticIndex(BaseModel):
                     versioned.version_info.data_hash[:8],
                 )
 
-                # Merge binary data with content - diskcache will pickle the bytes directly
                 content_with_binary = {**content, "binary_data": binary_data_to_store}
 
-                # Ensure namespace is CacheNamespace enum
                 namespace = versioned.namespace
                 if isinstance(namespace, str):
                     namespace = CacheNamespace(namespace)
 
-                logger.info(
-                    f"Storing large binary data to cache for {resource_id} (pickle will handle bytes)"
-                )
-                await cache.set(
-                    namespace=namespace,
-                    key=cache_key,
-                    value=content_with_binary,
-                    ttl_override=versioned.ttl,
-                )
-
-                # Estimate size (rough calculation to avoid full JSON encoding)
+                # Estimate size and reject excessively large data
                 binary_size = sum(
                     len(v) if isinstance(v, bytes) else len(str(v))
                     for v in binary_data_to_store.values()
                 )
-
-                # Reject excessively large binary data (>8GB)
                 max_binary_size = 8 * 1024 * 1024 * 1024  # 8GB
                 if binary_size > max_binary_size:
                     raise ValueError(
@@ -381,7 +368,32 @@ class SemanticIndex(BaseModel):
                         f"Maximum allowed: 8GB"
                     )
 
-                content_size = binary_size + 1000  # Add overhead estimate
+                # Upload to GridFS — pickle directly (SEMANTIC data already contains
+                # gzip'd bytes, so no ZSTD re-compression)
+                pickled = pickle.dumps(
+                    content_with_binary, protocol=pickle.HIGHEST_PROTOCOL
+                )
+                gridfs_file_id = await gridfs_put(
+                    filename=resource_id,
+                    data=pickled,
+                    metadata={
+                        "version": versioned.version_info.version,
+                        "corpus_uuid": corpus_uuid or self.corpus_uuid,
+                    },
+                )
+                logger.info(
+                    f"Stored {binary_size:,} bytes to GridFS for {resource_id}"
+                )
+
+                # Warm L1/L2 cache for immediate reads
+                await cache.set(
+                    namespace=namespace,
+                    key=cache_key,
+                    value=content_with_binary,
+                    ttl_override=versioned.ttl,
+                )
+
+                content_size = binary_size + 1000
 
                 binary_crc = 0
                 for value in binary_data_to_store.values():
@@ -391,15 +403,15 @@ class SemanticIndex(BaseModel):
                         binary_crc = zlib.crc32(value.encode("utf-8"), binary_crc)
 
                 versioned.content_location = ContentLocation(
+                    storage_type=StorageType.DATABASE,
+                    path=gridfs_file_id,
                     cache_namespace=versioned.namespace,
                     cache_key=cache_key,
-                    storage_type=StorageType.CACHE,
                     size_bytes=content_size,
                     checksum=f"crc32:{binary_crc & 0xFFFFFFFF:08x}",
                 )
                 versioned.content_inline = None
 
-                # Save the updated versioned object with content_location
                 await versioned.save()
 
                 # Re-cache metadata so get_latest() returns updated content_location

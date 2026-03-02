@@ -19,6 +19,7 @@ from .models import (
     CacheNamespace,
     CompressionType,
     ContentLocation,
+    ResourceType,
     StorageType,
     VersionConfig,
 )
@@ -530,22 +531,55 @@ async def get_versioned_content(
     # External content
     if versioned_data.content_location:
         location = versioned_data.content_location
-        if location.cache_key and location.cache_namespace:
-            cache = await get_global_cache()
-            # Ensure namespace is CacheNamespace enum (handle string from MongoDB)
-            namespace = location.cache_namespace
-            if isinstance(namespace, str):
-                namespace = CacheNamespace(namespace)
 
-            # Respect use_cache flag from config
+        # Ensure namespace is CacheNamespace enum (handle string from MongoDB)
+        namespace = location.cache_namespace
+        if isinstance(namespace, str):
+            namespace = CacheNamespace(namespace)
+
+        # 1. Try L1/L2 cache first (works for both DATABASE and CACHE storage types)
+        if location.cache_key and namespace:
+            cache = await get_global_cache()
             use_cache = True if not config else config.use_cache
             cached_content = await cache.get(
                 namespace=namespace, key=location.cache_key, use_cache=use_cache
             )
-            # Cast to expected return type
-            if isinstance(cached_content, dict):
-                return cached_content
-            return None if cached_content is None else dict(cached_content)
+            if cached_content is not None:
+                if isinstance(cached_content, dict):
+                    return cached_content
+                return dict(cached_content)
+
+        # 2. GridFS fallback for DATABASE storage
+        storage_type = location.storage_type
+        if isinstance(storage_type, str):
+            storage_type = StorageType(storage_type)
+
+        if storage_type == StorageType.DATABASE and location.path:
+            from .gridfs import gridfs_get
+
+            raw = await gridfs_get(location.path)
+            if raw is not None:
+                # Use the compression type recorded at write time
+                # force_external writes use pickle only (no compression);
+                # normal large content uses ZSTD
+                compression = location.compression
+                if isinstance(compression, str):
+                    compression = CompressionType(compression)
+                content = decompress_data(raw, compression)
+                # Promote to L1/L2 for future reads
+                if location.cache_key and namespace:
+                    cache = await get_global_cache()
+                    await cache.set(namespace, location.cache_key, content)
+                if isinstance(content, dict):
+                    return content
+                return dict(content) if content is not None else None
+
+        # 3. Legacy CACHE-only path (for old entries not yet migrated to GridFS)
+        # If we haven't returned yet and it's a CACHE type, the data is gone
+        logger.warning(
+            f"External content unavailable for {versioned_data.resource_id}: "
+            f"storage_type={location.storage_type}, path={location.path}"
+        )
 
     return None
 
@@ -556,13 +590,18 @@ async def set_versioned_content(
     *,
     force_external: bool = False,
 ) -> None:
-    """Store versioned content using inline or external storage."""
+    """Store versioned content using inline or GridFS-backed external storage.
+
+    Small content (<16KB) is stored inline in MongoDB. Large content is uploaded
+    to GridFS (durable, no TTL) with L1/L2 cache warmed for fast reads.
+    """
+    import pickle
+
+    from .gridfs import gridfs_put
+
     # CRITICAL FIX: Skip expensive JSON encoding when force_external=True
     # This prevents hanging on large binary data (e.g., 1290MB embeddings)
     if force_external:
-        # Store externally without size check
-        cache = await get_global_cache()
-        # Use pure function from keys module
         cache_key = generate_resource_key(
             versioned_data.resource_type,
             versioned_data.resource_id,
@@ -570,11 +609,30 @@ async def set_versioned_content(
             versioned_data.version_info.data_hash[:8],
         )
 
-        # Ensure namespace is CacheNamespace enum (handle string from MongoDB)
         namespace = versioned_data.namespace
         if isinstance(namespace, str):
             namespace = CacheNamespace(namespace)
 
+        # Upload to GridFS — pickle the content directly (no ZSTD for force_external
+        # since SEMANTIC data is already gzip'd internally)
+        pickled = pickle.dumps(content, protocol=pickle.HIGHEST_PROTOCOL)
+
+        resource_type = versioned_data.resource_type
+        if isinstance(resource_type, str):
+            resource_type = ResourceType(resource_type)
+
+        file_id = await gridfs_put(
+            filename=f"{resource_type.value}:{versioned_data.resource_id}",
+            data=pickled,
+            metadata={
+                "resource_type": resource_type.value,
+                "resource_id": versioned_data.resource_id,
+                "data_hash": versioned_data.version_info.data_hash[:8],
+            },
+        )
+
+        # Warm L1/L2 cache for immediate reads
+        cache = await get_global_cache()
         await cache.set(
             namespace=namespace,
             key=cache_key,
@@ -582,14 +640,13 @@ async def set_versioned_content(
             ttl_override=versioned_data.ttl,
         )
 
-        # Calculate size and checksum efficiently using pure functions
-        # For large binary data, estimate without full JSON encoding
         content_size, checksum = estimate_binary_size(content)
 
         versioned_data.content_location = ContentLocation(
             cache_namespace=versioned_data.namespace,
             cache_key=cache_key,
-            storage_type=StorageType.CACHE,
+            storage_type=StorageType.DATABASE,
+            path=file_id,
             size_bytes=content_size,
             checksum=checksum,
         )
@@ -606,8 +663,7 @@ async def set_versioned_content(
         versioned_data.content_location = None
         return
 
-    cache = await get_global_cache()
-    # Use pure function from keys module
+    # Large content → GridFS (durable) + L1/L2 cache (fast reads)
     cache_key = generate_resource_key(
         versioned_data.resource_type,
         versioned_data.resource_id,
@@ -615,11 +671,29 @@ async def set_versioned_content(
         versioned_data.version_info.data_hash[:8],
     )
 
-    # Ensure namespace is CacheNamespace enum (handle string from MongoDB)
     namespace = versioned_data.namespace
     if isinstance(namespace, str):
         namespace = CacheNamespace(namespace)
 
+    resource_type = versioned_data.resource_type
+    if isinstance(resource_type, str):
+        resource_type = ResourceType(resource_type)
+
+    # Compress with ZSTD then upload to GridFS
+    compressed = compress_data(content, CompressionType.ZSTD)
+    file_id = await gridfs_put(
+        filename=f"{resource_type.value}:{versioned_data.resource_id}",
+        data=compressed,
+        metadata={
+            "resource_type": resource_type.value,
+            "resource_id": versioned_data.resource_id,
+            "data_hash": versioned_data.version_info.data_hash[:8],
+            "compression": CompressionType.ZSTD.value,
+        },
+    )
+
+    # Warm L1/L2 cache with uncompressed content
+    cache = await get_global_cache()
     await cache.set(
         namespace=namespace,
         key=cache_key,
@@ -630,8 +704,11 @@ async def set_versioned_content(
     versioned_data.content_location = ContentLocation(
         cache_namespace=versioned_data.namespace,
         cache_key=cache_key,
-        storage_type=StorageType.CACHE,
+        storage_type=StorageType.DATABASE,
+        path=file_id,
+        compression=CompressionType.ZSTD,
         size_bytes=serialized.size_bytes,
+        size_compressed=len(compressed),
         checksum=serialized.content_hash,
     )
     versioned_data.content_inline = None

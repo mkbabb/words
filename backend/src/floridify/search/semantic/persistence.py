@@ -197,7 +197,7 @@ async def save_embeddings_and_index(
 
     # Update statistics
     index.build_time_seconds = build_time
-    index.memory_usage_mb = (
+    memory_usage_mb = (
         (sentence_embeddings.nbytes / (1024 * 1024)) if sentence_embeddings is not None else 0.0
     )
 
@@ -233,5 +233,5 @@ async def save_embeddings_and_index(
         logger.error(f"Failed to save semantic index: {e}")
         raise RuntimeError(
             f"Semantic index persistence failed. This may be due to size limits or corruption. "
-            f"Embeddings size: {index.memory_usage_mb:.2f}MB. Error: {e}"
+            f"Embeddings size: {memory_usage_mb:.2f}MB. Error: {e}"
         ) from e
