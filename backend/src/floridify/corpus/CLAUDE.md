@@ -15,7 +15,7 @@ corpus/
 
 ## Corpus Model
 
-`vocabulary`, `original_vocabulary`, `lemmatized_vocabulary`. Signature and length buckets for fuzzy search candidate selection. UUID parent-child relationships (not ObjectIds—stable across versions).
+`vocabulary`, `original_vocabulary`, `lemmatized_vocabulary`. Trigram inverted index and length buckets for fuzzy search candidate selection. UUID parent-child relationships (not ObjectIds—stable across versions).
 
 ## TreeCorpusManager
 
