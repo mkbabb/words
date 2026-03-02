@@ -100,8 +100,6 @@ export const useUIStore = defineStore('ui', () => {
     key: 'ui-state',
     pick: [
       'theme',
-      'sidebarOpen',
-      'sidebarCollapsed',
     ]
   }
 })

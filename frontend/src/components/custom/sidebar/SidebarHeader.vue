@@ -33,7 +33,7 @@
             <div class="flex items-center gap-3">
                 <DarkModeToggle class="h-7 w-7 transition-all duration-500 ease-apple-smooth" />
                 <HamburgerIcon
-                    :is-open="mobile || !collapsed"
+                    :is-open="mobile ? ui.sidebarOpen : !collapsed"
                     :class="cn(
                         'transition-all duration-300 ease-apple-smooth',
                         mobile ? 'cursor-pointer' : 'cursor-ew-resize'
