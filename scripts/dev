@@ -80,11 +80,13 @@ check_env_file() {
     fi
 }
 
-# SSH tunnel for MongoDB access on EC2 (MongoDB bound to 127.0.0.1)
+# SSH tunnel for MongoDB access on deployment server (MongoDB bound to 127.0.0.1)
 manage_ssh_tunnel() {
     local action="$1"
     local tunnel_port="27018"
-    local ec2_host="3.225.200.137"
+    local deploy_host="${DEPLOY_HOST:-mbabb.fridayinstitute.net}"
+    local deploy_port="${DEPLOY_PORT:-1022}"
+    local deploy_user="${DEPLOY_USER:-mbabb}"
 
     case "$action" in
         "start")
@@ -93,13 +95,13 @@ manage_ssh_tunnel() {
                 return 0
             fi
 
-            echo "📡 Creating SSH tunnel to MongoDB on EC2..."
-            ssh -o StrictHostKeyChecking=no -f -N -L $tunnel_port:localhost:27017 ubuntu@$ec2_host
+            echo "📡 Creating SSH tunnel to MongoDB on $deploy_host..."
+            ssh -o StrictHostKeyChecking=no -f -N -L $tunnel_port:localhost:27017 -p $deploy_port $deploy_user@$deploy_host
             
             if [ $? -eq 0 ]; then
                 sleep 2
                 if lsof -Pi :$tunnel_port -sTCP:LISTEN -t >/dev/null 2>&1; then
-                    echo "✅ SSH tunnel established: localhost:$tunnel_port -> EC2 MongoDB"
+                    echo "✅ SSH tunnel established: localhost:$tunnel_port -> server MongoDB"
                 else
                     echo "❌ SSH tunnel failed to start"
                     return 1
@@ -142,7 +144,7 @@ display_config_info() {
         local mongo_info=""
         if grep -q "url.*mongodb" "$ROOT_DIR/auth/config.toml" 2>/dev/null; then
             if grep -q "localhost:27017\|mongodb:27017" "$ROOT_DIR/auth/config.toml" 2>/dev/null; then
-                mongo_info="MongoDB (Self-hosted on EC2)"
+                mongo_info="MongoDB (Self-hosted)"
             elif grep -q "localhost:27018" "$ROOT_DIR/auth/config.toml" 2>/dev/null; then
                 mongo_info="MongoDB via SSH tunnel (Development)"
             else
@@ -167,9 +169,9 @@ display_config_info() {
         # Check SSH tunnel status for remote MongoDB access
         manage_ssh_tunnel status >/dev/null 2>&1
         if [ $? -eq 0 ]; then
-            echo "  SSH Tunnel: ✅ active (EC2 MongoDB accessible)"
+            echo "  SSH Tunnel: ✅ active (remote MongoDB accessible)"
         else
-            echo "  SSH Tunnel: ❌ inactive (EC2 MongoDB not accessible)"
+            echo "  SSH Tunnel: ❌ inactive (remote MongoDB not accessible)"
         fi
         
     else
@@ -186,10 +188,10 @@ start_docker_servers() {
     check_docker
     check_env_file
     
-    # Start SSH tunnel for EC2 MongoDB access
+    # Start SSH tunnel for remote MongoDB access
     manage_ssh_tunnel start
     if [ $? -ne 0 ]; then
-        echo "Warning: SSH tunnel failed - EC2 MongoDB will not be accessible"
+        echo "Warning: SSH tunnel failed - remote MongoDB will not be accessible"
     fi
     
     # Build images if requested
@@ -213,7 +215,7 @@ start_docker_servers() {
     echo "🚀 Floridify servers are running in Docker!"
     echo "  Backend:  http://localhost:8000"
     echo "  Frontend: http://localhost:3000"
-    echo "  MongoDB:  EC2 MongoDB via SSH tunnel (localhost:27018)"
+    echo "  MongoDB:  Remote MongoDB via SSH tunnel (localhost:27018)"
     echo ""
     echo "Useful commands:"
     echo "  docker-compose ps          - Show container status"
@@ -224,7 +226,6 @@ start_docker_servers() {
     echo "  docker-compose exec backend bash - Shell into backend"
     echo ""
     echo "Production deployment:"
-    echo "  ./scripts/setup            - Configure GitHub secrets and EC2"
     echo "  ./scripts/deploy           - Deploy to production"
     echo ""
     
@@ -320,10 +321,6 @@ start_native_servers() {
     if command -v uv &>/dev/null; then
         cd ./backend
         unset VIRTUAL_ENV
-        # Prevent libomp conflict on macOS (PyTorch + scikit-learn + FAISS)
-        # OMP=1 at import prevents segfault; parallelism via torch.set_num_threads()
-        export KMP_DUPLICATE_LIB_OK=TRUE
-        export OMP_NUM_THREADS=1
         uv run ./scripts/run_api.py &
         BACKEND_PID=$!
         echo "Backend started with PID $BACKEND_PID"

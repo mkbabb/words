@@ -71,8 +71,7 @@ After:
 allow_origins=[
     "http://localhost:3000",
     "http://localhost:8080",
-    "https://words.babb.dev",
-    "https://www.words.babb.dev",
+    "https://mbabb.fi.ncsu.edu",
 ],
 allow_credentials=True,
 allow_methods=["GET", "POST", "PUT", "DELETE"],

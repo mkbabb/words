@@ -15,10 +15,10 @@ api_key = "your-oxford-api-key"
 authorization = "your-dictionary-com-authorization-token"
 
 [database]
-# Production: MongoDB in Docker on same EC2 host (backend connects via Docker network)
+# Production: MongoDB in Docker on same host (backend connects via Docker network)
 production_url = "mongodb://admin:password@mongodb:27017/floridify?authSource=admin"
 
-# Development via SSH tunnel to EC2 (localhost:27018 -> EC2:27017)
+# Development via SSH tunnel to production server (localhost:27018 -> server:27017)
 development_url = "mongodb://admin:password@localhost:27018/floridify?authSource=admin&directConnection=true"
 
 # Docker development: same Docker network

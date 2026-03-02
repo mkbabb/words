@@ -2,7 +2,7 @@
 
 AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. MongoDB storage, OpenAI GPT-5 synthesis, FAISS semantic search.
 
-**Production**: https://words.babb.dev
+**Production**: https://mbabb.fi.ncsu.edu/words/
 
 ## Project Structure
 
@@ -54,7 +54,7 @@ AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. Mong
 │
 ├── scripts/                    # Development orchestration
 │   ├── dev                     # Docker/native mode launcher, SSH tunnel management
-│   ├── deploy                  # AWS EC2 deployment via SSH
+│   ├── deploy                  # SSH deployment to production server
 │   ├── deploy-pwa.sh           # PWA + notification server deployment
 │   ├── install-floridify       # CLI installer with ZSH autocomplete
 │   ├── backup-mongodb.sh       # MongoDB backup script
@@ -71,7 +71,7 @@ AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. Mong
 │   ├── word-of-the-day/        # WOTD ML pipeline docs
 │   └── texture-research/       # Paper texture implementation
 │
-├── .github/workflows/deploy.yml  # CI/CD: test → deploy on push to main
+├── .github/                      # (no CI/CD — server behind VPN)
 ├── docker-compose.yml          # Dev: backend, frontend, mongo, notifications
 ├── docker-compose.prod.yml     # Prod: configurable workers, nginx, SSL
 └── .env / .env.production      # Environment config (not in git)
@@ -90,7 +90,7 @@ User Query → Multi-Method Search → Provider Fetch (parallel) → AI Synthesi
 **Search**: marisa-trie (exact), RapidFuzz (fuzzy), FAISS HNSW (semantic), Bloom filter
 **Cache**: OrderedDict LRU (L1) → DiskCache + ZSTD (L2) → MongoDB versioned (L3, SHA-256)
 **Frontend**: Vue ^3.5, TypeScript ^5.9, Pinia ^3.0, shadcn/ui (Reka UI), Tailwind CSS ^4.2, Vite ^7.3
-**Infra**: Docker multi-stage, AWS EC2 + self-hosted MongoDB, nginx + Let's Encrypt, GitHub Actions
+**Infra**: Docker multi-stage, self-hosted (mbabb.fridayinstitute.net:1022, behind VPN), MongoDB, nginx
 
 ## Key Pipelines
 
@@ -172,10 +172,10 @@ prettier --write .               # Format
 ## Deployment
 
 ```bash
-./scripts/deploy                 # SSH to EC2, sync secrets, build, deploy
-# Auto: push to main → GitHub Actions → test → deploy → health check
-# SSL: Let's Encrypt via nginx-certbot, auto-renewal
-# URL: https://words.babb.dev
+./scripts/deploy                 # SSH to server, sync secrets, build, deploy
+# Server: mbabb@mbabb.fridayinstitute.net -p 1022 (behind VPN)
+# No CI/CD — deploy manually
+# URL: https://mbabb.fi.ncsu.edu/words/
 ```
 
 ## macOS Note

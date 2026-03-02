@@ -99,7 +99,7 @@ services:
     profiles:
       - dev
 
-  # MongoDB - self-hosted on EC2 (replaces AWS DocumentDB)
+  # MongoDB - self-hosted
   mongodb:
     image: mongo:7.0
     container_name: floridify-mongodb

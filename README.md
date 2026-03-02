@@ -2,7 +2,7 @@
 
 AI-enhanced dictionary and word-collecting tool. Fetches from Wiktionary, Oxford, Apple Dictionary, and Free Dictionary in parallel, then synthesizes the lot—deduplicating, clustering by semantic sense, generating pronunciation, etymology, and usage.
 
-[words.babb.dev](https://words.babb.dev)
+[mbabb.fi.ncsu.edu/words/](https://mbabb.fi.ncsu.edu/words/)
 
 ## Quick Start
 
@@ -67,7 +67,7 @@ GET  /api/v1/wordlist/{id}/due          # due words for review
 **Search**: marisa-trie, RapidFuzz, FAISS HNSW, Bloom filter
 **Cache**: OrderedDict LRU, DiskCache + ZSTD, MongoDB versioned (SHA-256)
 **Frontend**: Vue 3.5, TypeScript 5.9 strict, Pinia, shadcn/ui (Reka UI), Tailwind CSS 4.2, Vite 7.3
-**Infra**: Docker multi-stage, AWS EC2, nginx + Let's Encrypt, GitHub Actions
+**Infra**: Docker multi-stage, self-hosted (mbabb.fridayinstitute.net:1022, behind VPN), nginx
 
 ## Development
 
@@ -111,10 +111,10 @@ development_url = "mongodb://localhost:27018/..."
 ## Deployment
 
 ```bash
-./scripts/deploy    # SSH to EC2, sync secrets, build, deploy, health check
+./scripts/deploy    # SSH to server, sync secrets, build, deploy, health check
 ```
 
-Push to `main` triggers GitHub Actions: test, build, deploy, SSL auto-renewal via Let's Encrypt.
+Server: `mbabb@mbabb.fridayinstitute.net -p 1022` (behind VPN). No CI/CD — deploy manually.
 
 ## Why
 
@@ -124,4 +124,4 @@ Architecture docs, module guides, and technical references live in [`CLAUDE.md`]
 
 ---
 
-**License**: MIT | **Author**: Mike Babb (mike@babb.dev) | **Production**: [words.babb.dev](https://words.babb.dev)
+**License**: MIT | **Author**: Mike Babb (mike@babb.dev) | **Production**: [mbabb.fi.ncsu.edu/words/](https://mbabb.fi.ncsu.edu/words/)

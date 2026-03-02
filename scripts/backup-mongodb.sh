@@ -1,26 +1,26 @@
 #!/bin/bash
 # Daily MongoDB backup script
-# Run via cron: 0 3 * * * /home/ubuntu/floridify/scripts/backup-mongodb.sh
+# Run via cron: 0 3 * * * ~/floridify/scripts/backup-mongodb.sh
 #
-# Setup on EC2:
-#   chmod +x /home/ubuntu/floridify/scripts/backup-mongodb.sh
-#   mkdir -p /home/ubuntu/backups
+# Setup on server:
+#   chmod +x ~/floridify/scripts/backup-mongodb.sh
+#   mkdir -p ~/backups
 #   crontab -e  # Add the cron line above
 
 set -e
 
-BACKUP_DIR="/home/ubuntu/backups"
+BACKUP_DIR="${HOME}/backups"
 RETENTION_DAYS=14
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 ARCHIVE_NAME="floridify-${TIMESTAMP}.archive"
 
 # Read password from .env file if available
-if [ -f /home/ubuntu/floridify/.env ]; then
-    MONGO_PASSWORD=$(grep '^MONGO_PASSWORD=' /home/ubuntu/floridify/.env | cut -d'=' -f2-)
+if [ -f ~/floridify/.env ]; then
+    MONGO_PASSWORD=$(grep '^MONGO_PASSWORD=' ~/floridify/.env | cut -d'=' -f2-)
 fi
 
 if [ -z "$MONGO_PASSWORD" ]; then
-    echo "Error: MONGO_PASSWORD not set. Set it in /home/ubuntu/floridify/.env"
+    echo "Error: MONGO_PASSWORD not set. Set it in ~/floridify/.env"
     exit 1
 fi
 
