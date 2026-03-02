@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from ....ai import get_openai_connector
-from ....ai.synthesis_functions import generate_examples
+from ....ai.synthesis import generate_examples
 from ....models import Definition, Example, Word
 from ...core import (
     FieldSelection,

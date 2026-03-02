@@ -5,10 +5,8 @@ without requiring full database initialization.
 """
 
 import asyncio
-import hashlib
-import json
 import tempfile
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -17,11 +15,6 @@ from floridify.caching.core import GlobalCacheManager
 from floridify.caching.filesystem import FilesystemBackend
 from floridify.caching.models import (
     CacheNamespace,
-    CompressionType,
-    ContentLocation,
-    StorageType,
-    VersionConfig,
-    VersionInfo,
 )
 
 

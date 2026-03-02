@@ -12,12 +12,11 @@ Mocks MongoDB operations as needed.
 import asyncio
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from floridify.caching.core import GlobalCacheManager, get_global_cache
-from floridify.caching.decorators import _active_calls, deduplicated
+from floridify.caching.core import GlobalCacheManager
+from floridify.caching.decorators import deduplicated
 from floridify.caching.filesystem import FilesystemBackend
 from floridify.caching.models import CacheNamespace
 
@@ -64,9 +63,7 @@ class TestL1CacheConcurrentReadWrite:
             await manager.set(namespace, key, expected)
 
             # Launch 50 concurrent reads
-            results = await asyncio.gather(
-                *[manager.get(namespace, key) for _ in range(50)]
-            )
+            results = await asyncio.gather(*[manager.get(namespace, key) for _ in range(50)])
 
             # All reads should return the same value
             for result in results:
@@ -139,9 +136,7 @@ class TestL1CacheConcurrentReadWrite:
             async def write_to_namespace(ns: CacheNamespace, value: str):
                 await manager.set(ns, key, {"namespace": value})
 
-            await asyncio.gather(
-                *[write_to_namespace(ns, ns.value) for ns in namespaces]
-            )
+            await asyncio.gather(*[write_to_namespace(ns, ns.value) for ns in namespaces])
 
             # Each namespace should have its own value
             for ns in namespaces:
@@ -286,9 +281,7 @@ class TestVersionedDataConcurrency:
                             v["is_latest"] = False
 
         # Run 5 concurrent saves for the same resource
-        await asyncio.gather(
-            *[simulated_save_with_chain("test_word", i) for i in range(5)]
-        )
+        await asyncio.gather(*[simulated_save_with_chain("test_word", i) for i in range(5)])
 
         # Check invariant: exactly 1 version has is_latest=True
         latest_versions = [v for v in version_store if v["is_latest"]]
@@ -319,9 +312,7 @@ class TestDedupDecorator:
             return {"word": word, "result": "computed"}
 
         # Launch 5 concurrent calls with the same argument
-        results = await asyncio.gather(
-            *[expensive_operation("ephemeral") for _ in range(5)]
-        )
+        results = await asyncio.gather(*[expensive_operation("ephemeral") for _ in range(5)])
 
         # Only 1 actual execution should have happened
         assert call_count == 1, (
@@ -380,6 +371,7 @@ class TestDedupDecorator:
     @pytest.mark.asyncio
     async def test_dedup_cleanup_after_completion(self):
         """Test that _active_calls is cleaned up after the call completes."""
+
         @deduplicated
         async def quick_op(key: str) -> str:
             return f"done_{key}"

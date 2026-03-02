@@ -21,7 +21,7 @@ from ...models.responses import SearchResponse
 from ...search.constants import SearchMode
 from ...search.core import Search
 from ...search.language import get_language_search
-from ...search.models import SearchIndex
+from ...search.search_index import SearchIndex
 from ...text import clear_lemma_cache, get_lemma_cache_stats
 from ...utils.logging import get_logger
 from ...utils.sanitization import sanitize_mongodb_input

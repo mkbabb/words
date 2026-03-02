@@ -108,5 +108,8 @@ export function formatPercent(value: number): string {
 export function formatExampleUsage(example: string): string {
     // Escape HTML first, then convert markdown bold to HTML bold
     const safe = escapeHTML(example);
-    return safe.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-foreground">$1</strong>');
+    return safe.replace(
+        /\*\*(.*?)\*\*/g,
+        '<strong class="font-bold text-foreground">$1</strong>'
+    );
 }

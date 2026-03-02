@@ -14,9 +14,10 @@ from beanie import PydanticObjectId
 from floridify.caching.models import VersionConfig
 from floridify.corpus.core import Corpus
 from floridify.models.base import Language
-from floridify.search.models import SearchIndex, TrieIndex
+from floridify.search.search_index import SearchIndex
 from floridify.search.semantic.core import SemanticSearch
 from floridify.search.semantic.models import SemanticIndex
+from floridify.search.trie_index import TrieIndex
 from floridify.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -100,9 +101,9 @@ class TestCrashRecovery:
         # Build a FAISS index for complete binary_data
         index = faiss.IndexFlatL2(384)
         index.add(fake_embeddings)
-        with tempfile.NamedTemporaryFile(suffix='.faiss', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".faiss", delete=False) as tmp:
             faiss.write_index(index, tmp.name)
-            with open(tmp.name, 'rb') as f:
+            with open(tmp.name, "rb") as f:
                 index_bytes = f.read()
         index_compressed = gzip.compress(index_bytes, compresslevel=1)
 
@@ -284,9 +285,9 @@ class TestCrashRecovery:
         # Build a FAISS index for complete binary_data
         index = faiss.IndexFlatL2(3)
         index.add(original_embeddings)
-        with tempfile.NamedTemporaryFile(suffix='.faiss', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".faiss", delete=False) as tmp:
             faiss.write_index(index, tmp.name)
-            with open(tmp.name, 'rb') as f:
+            with open(tmp.name, "rb") as f:
                 index_bytes = f.read()
         index_compressed = gzip.compress(index_bytes, compresslevel=1)
 

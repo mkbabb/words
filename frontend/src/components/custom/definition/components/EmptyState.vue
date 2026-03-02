@@ -1,30 +1,35 @@
 <template>
-    <div class="flex flex-col items-center justify-center min-h-[400px] px-6 text-center">
+    <div
+        class="flex min-h-[400px] flex-col items-center justify-center px-6 text-center"
+    >
         <div class="mb-6">
-            <div class="relative inline-flex items-center justify-center mb-4">
+            <div class="relative mb-4 inline-flex items-center justify-center">
                 <img
                     :src="heartBubble"
                     alt="Yoshi heart speech bubble"
-                    class="w-20 h-20 object-contain opacity-60"
+                    class="h-20 w-20 object-contain opacity-60"
                     draggable="false"
                 />
             </div>
         </div>
-        
-        <h3 class="text-xl font-semibold mb-2 text-foreground">
+
+        <h3 class="mb-2 text-xl font-semibold text-foreground">
             {{ title }}
         </h3>
-        
-        <p class="text-muted-foreground mb-6 max-w-md leading-relaxed">
+
+        <p class="mb-6 max-w-md leading-relaxed text-muted-foreground">
             {{ message }}
         </p>
-        
+
         <!-- Action buttons slot -->
-        <div v-if="$slots.actions || showSuggestions" class="flex items-center gap-3">
+        <div
+            v-if="$slots.actions || showSuggestions"
+            class="flex items-center gap-3"
+        >
             <slot name="actions" />
-            
-            <Button 
-                v-if="showSuggestions" 
+
+            <Button
+                v-if="showSuggestions"
                 @click="$emit('suggest-alternatives')"
                 variant="default"
                 size="sm"
@@ -33,7 +38,7 @@
                 Suggest alternatives
             </Button>
         </div>
-        
+
         <!-- Optional additional content -->
         <div v-if="$slots.default" class="mt-6">
             <slot />
@@ -57,7 +62,7 @@ const props = withDefaults(defineProps<EmptyStateProps>(), {
     title: 'No results found',
     message: 'Try searching for a different word or check your spelling.',
     emptyType: 'no-results',
-    showSuggestions: false
+    showSuggestions: false,
 });
 
 defineEmits<{

@@ -18,7 +18,7 @@ import pytest
 import pytest_asyncio
 
 from floridify.caching.manager import VersionedDataManager
-from floridify.caching.models import BaseVersionedData, CacheNamespace, ResourceType, VersionConfig
+from floridify.caching.models import VersionConfig
 from floridify.corpus.core import Corpus, CorpusType
 from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.base import Language
@@ -90,9 +90,13 @@ class TestProvenanceChains:
         v2 = await corpus_manager.save_corpus(corpus_v2)
 
         # Get versions from DB
-        versions = await Corpus.Metadata.find(
-            Corpus.Metadata.resource_id == "test_chain",
-        ).sort("+version_info.created_at").to_list()
+        versions = (
+            await Corpus.Metadata.find(
+                Corpus.Metadata.resource_id == "test_chain",
+            )
+            .sort("+version_info.created_at")
+            .to_list()
+        )
 
         assert len(versions) == 2
 
@@ -136,10 +140,13 @@ class TestProvenanceChains:
         await corpus_manager.save_corpus(corpus)
 
         # Get versions from DB
-        versions = await Corpus.Metadata.find(
-            Corpus.Metadata.resource_id == corpus_name,
-            
-        ).sort("+version_info.created_at").to_list()
+        versions = (
+            await Corpus.Metadata.find(
+                Corpus.Metadata.resource_id == corpus_name,
+            )
+            .sort("+version_info.created_at")
+            .to_list()
+        )
 
         assert len(versions) == 3
 
@@ -178,10 +185,13 @@ class TestProvenanceChains:
             await corpus_manager.save_corpus(corpus)
 
         # Get all versions
-        versions = await Corpus.Metadata.find(
-            Corpus.Metadata.resource_id == corpus_name,
-            
-        ).sort("+version_info.created_at").to_list()
+        versions = (
+            await Corpus.Metadata.find(
+                Corpus.Metadata.resource_id == corpus_name,
+            )
+            .sort("+version_info.created_at")
+            .to_list()
+        )
 
         assert len(versions) == 5
 
@@ -230,7 +240,6 @@ class TestProvenanceChains:
             # After each save, check that only one is latest
             versions = await Corpus.Metadata.find(
                 Corpus.Metadata.resource_id == corpus_name,
-                
             ).to_list()
 
             latest_count = sum(1 for v in versions if v.version_info.is_latest)
@@ -259,7 +268,6 @@ class TestProvenanceChains:
         # Get versions
         versions = await Corpus.Metadata.find(
             Corpus.Metadata.resource_id == corpus_name,
-            
         ).to_list()
 
         # Should have 2 versions even with same content
@@ -295,10 +303,13 @@ class TestProvenanceChains:
         await corpus_manager.save_corpus(corpus)
 
         # Get versions
-        versions = await Corpus.Metadata.find(
-            Corpus.Metadata.resource_id == corpus_name,
-            
-        ).sort("+version_info.created_at").to_list()
+        versions = (
+            await Corpus.Metadata.find(
+                Corpus.Metadata.resource_id == corpus_name,
+            )
+            .sort("+version_info.created_at")
+            .to_list()
+        )
 
         assert len(versions) == 2
 

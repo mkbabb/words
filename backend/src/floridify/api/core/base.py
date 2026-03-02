@@ -70,8 +70,7 @@ def safe_parse_objectid(id_str: str, field_name: str = "id") -> PydanticObjectId
         return PydanticObjectId(id_str)
     except (InvalidId, ValueError) as e:
         raise ValueError(
-            f"Failed to parse ObjectId for field '{field_name}': '{id_str}'. "
-            f"Error: {e}"
+            f"Failed to parse ObjectId for field '{field_name}': '{id_str}'. Error: {e}"
         ) from e
 
 

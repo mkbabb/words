@@ -7,14 +7,11 @@ focus on SSE event generation, heartbeat pings, and timeout behavior.
 
 import asyncio
 import json
-import time
 
 import pytest
 
 from floridify.core.state_tracker import PipelineState, Stages, StateTracker
 from floridify.core.streaming import (
-    SSE_HEARTBEAT_INTERVAL,
-    SSE_STREAM_TIMEOUT,
     SSEEvent,
     create_streaming_response,
 )
@@ -287,7 +284,9 @@ class TestStreamingResponse:
 
         # Should have an error event
         error_events = [e for e in events if e["type"] == "error"]
-        assert len(error_events) >= 1, f"Expected error event, got types: {[e['type'] for e in events]}"
+        assert len(error_events) >= 1, (
+            f"Expected error event, got types: {[e['type'] for e in events]}"
+        )
 
         error_data = error_events[0]["data"]
         assert "message" in error_data

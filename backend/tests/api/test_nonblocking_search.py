@@ -83,9 +83,7 @@ class TestHealthEndpointNonBlocking:
         manager._initializing = False
 
     @pytest.mark.asyncio
-    async def test_health_shows_error_on_init_failure(
-        self, async_client, reset_search_manager
-    ):
+    async def test_health_shows_error_on_init_failure(self, async_client, reset_search_manager):
         """Health shows 'error' and 'degraded' when init failed."""
         manager = reset_search_manager
         manager._init_error = "Test error: model load failed"
@@ -105,9 +103,7 @@ class TestSemanticStatusEndpointNonBlocking:
     """Semantic status endpoint should not trigger search engine init."""
 
     @pytest.mark.asyncio
-    async def test_semantic_status_returns_without_init(
-        self, async_client, reset_search_manager
-    ):
+    async def test_semantic_status_returns_without_init(self, async_client, reset_search_manager):
         """Semantic status returns immediately without triggering init."""
         manager = reset_search_manager
         assert manager._engine is None

@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from markupsafe import Markup
 
 
 def _sanitize_user_input(value: str) -> str:
@@ -22,19 +21,21 @@ def _sanitize_user_input(value: str) -> str:
         value = value[:500]
 
     # Strip control characters (except newlines and tabs)
-    value = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', value)
+    value = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", value)
 
     # Neutralize common prompt injection delimiters
     # Replace triple backticks and system-like prefixes
-    value = value.replace('```', '`​`​`')  # Insert zero-width spaces
+    value = value.replace("```", "`​`​`")  # Insert zero-width spaces
     value = re.sub(
-        r'(?i)(system\s*:|assistant\s*:|user\s*:|<\|im_start\|>|<\|im_end\|>)',
-        lambda m: m.group(0).replace(':', ':\u200B'),  # Zero-width space after colon
+        r"(?i)(system\s*:|assistant\s*:|user\s*:|<\|im_start\|>|<\|im_end\|>)",
+        lambda m: m.group(0).replace(":", ":\u200b"),  # Zero-width space after colon
         value,
     )
 
     # Neutralize XML-style injection attempts
-    value = re.sub(r'</?(?:system|tool|function|assistant|human)\b[^>]*>', '', value, flags=re.IGNORECASE)
+    value = re.sub(
+        r"</?(?:system|tool|function|assistant|human)\b[^>]*>", "", value, flags=re.IGNORECASE
+    )
 
     return value
 
@@ -120,8 +121,7 @@ class PromptManager:
                 sanitized[key] = _sanitize_user_input(value)
             elif isinstance(value, list):
                 sanitized[key] = [
-                    _sanitize_user_input(item) if isinstance(item, str) else item
-                    for item in value
+                    _sanitize_user_input(item) if isinstance(item, str) else item for item in value
                 ]
             elif isinstance(value, dict):
                 sanitized[key] = self._sanitize_context(value)

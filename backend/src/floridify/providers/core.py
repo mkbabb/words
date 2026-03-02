@@ -19,7 +19,7 @@ from ..caching.manager import get_version_manager
 from ..caching.models import CacheNamespace, ResourceType, VersionConfig
 from ..core.state_tracker import StateTracker
 from ..utils.logging import get_logger
-from .utils import AdaptiveRateLimiter, RateLimitConfig
+from .rate_limiting import AdaptiveRateLimiter, RateLimitConfig
 
 logger = get_logger(__name__)
 

@@ -8,7 +8,6 @@ while keeping real MongoDB documents and the full API response serialization.
 
 import asyncio
 import json
-from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient

@@ -5,10 +5,8 @@ Tests cover search, metadata parsing, content fetching, format preferences, and 
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 
 from floridify.models.literature import LiteratureProvider
@@ -188,7 +186,9 @@ class TestInternetArchiveSearch:
         assert call_args.kwargs["params"]["rows"] == 5
 
     @pytest.mark.asyncio
-    async def test_search_works_includes_metadata(self, connector: InternetArchiveConnector) -> None:
+    async def test_search_works_includes_metadata(
+        self, connector: InternetArchiveConnector
+    ) -> None:
         """Test that search results include all expected metadata."""
         mock_response = MagicMock()
         mock_response.json.return_value = SAMPLE_SEARCH_RESPONSE
@@ -312,9 +312,7 @@ class TestInternetArchiveMetadata:
 
     def test_parse_archive_metadata_simple(self, connector: InternetArchiveConnector) -> None:
         """Test parsing simple metadata."""
-        result = connector._parse_archive_metadata(
-            SAMPLE_METADATA_RESPONSE, "test-id", None, None
-        )
+        result = connector._parse_archive_metadata(SAMPLE_METADATA_RESPONSE, "test-id", None, None)
 
         assert result["title"] == "Pride and Prejudice"
         assert result["author"] == "Jane Austen"
@@ -475,7 +473,9 @@ class TestInternetArchiveFetchFromProvider:
     async def test_fetch_from_provider_success(self, connector: InternetArchiveConnector) -> None:
         """Test successful fetch from provider."""
         # Mock metadata
-        connector._fetch_work_metadata = AsyncMock(return_value={"title": "Test", "author": "Author"})
+        connector._fetch_work_metadata = AsyncMock(
+            return_value={"title": "Test", "author": "Author"}
+        )
         # Mock content
         connector._fetch_work_content = AsyncMock(return_value="Test content")
 

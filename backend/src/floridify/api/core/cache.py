@@ -50,4 +50,3 @@ def generate_cache_key(request: Request, config: APICacheConfig, prefix: str = "
     # Create hash of all parts
     key_string = ":".join(parts)
     return hashlib.sha256(key_string.encode()).hexdigest()
-

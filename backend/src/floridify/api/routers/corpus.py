@@ -17,14 +17,11 @@ from ...models.parameters import CorpusCreateParams, CorpusListParams, Paginatio
 from ...models.responses import CorpusListResponse, CorpusResponse
 from ...search.constants import SearchMode
 from ...search.core import Search
-from ...search.models import SearchIndex
+from ...search.search_index import SearchIndex
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
-
-
-
 
 
 def parse_corpus_list_params(
@@ -209,15 +206,19 @@ async def get_corpus(
         if corpus.corpus_uuid:
             search_index = await SearchIndex.get(corpus_uuid=corpus.corpus_uuid)
 
-        stats_dict = {
-            "vocabulary_hash": corpus.vocabulary_hash,
-            "is_master": corpus.is_master,
-            "child_count": len(corpus.child_uuids),
-            "parent_id": corpus.parent_uuid,
-            "has_trie": search_index.has_trie if search_index else False,
-            "ttl_hours": metadata.ttl_hours,
-            "search_count": metadata.search_count,
-        } if include_stats else {}
+        stats_dict = (
+            {
+                "vocabulary_hash": corpus.vocabulary_hash,
+                "is_master": corpus.is_master,
+                "child_count": len(corpus.child_uuids),
+                "parent_id": corpus.parent_uuid,
+                "has_trie": search_index.has_trie if search_index else False,
+                "ttl_hours": metadata.ttl_hours,
+                "search_count": metadata.search_count,
+            }
+            if include_stats
+            else {}
+        )
 
         corpus_data = {
             "id": corpus_id,

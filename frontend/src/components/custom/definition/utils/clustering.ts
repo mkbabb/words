@@ -5,7 +5,9 @@ import { PART_OF_SPEECH_ORDER } from '../constants';
 /**
  * Groups definitions by their meaning cluster
  */
-export function groupDefinitionsByCluster(definitions: Definition[]): GroupedDefinition[] {
+export function groupDefinitionsByCluster(
+    definitions: Definition[]
+): GroupedDefinition[] {
     if (!definitions || definitions.length === 0) return [];
 
     // Group definitions by meaning cluster
@@ -13,7 +15,8 @@ export function groupDefinitionsByCluster(definitions: Definition[]): GroupedDef
 
     definitions.forEach((definition) => {
         const clusterId = definition.meaning_cluster?.id || 'default';
-        const clusterDescription = definition.meaning_cluster?.description || 'General';
+        const clusterDescription =
+            definition.meaning_cluster?.description || 'General';
 
         if (!clusters.has(clusterId)) {
             clusters.set(clusterId, {
@@ -51,7 +54,9 @@ export function groupDefinitionsByCluster(definitions: Definition[]): GroupedDef
 /**
  * Sorts definitions by part of speech and relevancy
  */
-export function sortDefinitions(definitions: TransformedDefinition[]): TransformedDefinition[] {
+export function sortDefinitions(
+    definitions: TransformedDefinition[]
+): TransformedDefinition[] {
     return definitions.sort((a, b) => {
         // First, sort by word type (nouns first, verbs second, etc.)
         const aTypeOrder =

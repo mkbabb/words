@@ -1,6 +1,6 @@
 /**
  * Keyboard Navigation and Input Utilities
- * 
+ *
  * Functions for handling keyboard interactions and navigation
  */
 
@@ -19,14 +19,8 @@ export function calculateNavigationIndex(
     totalResults: number
 ): number {
     if (totalResults === 0) return 0;
-    
-    return Math.max(
-        0,
-        Math.min(
-            totalResults - 1,
-            currentIndex + direction
-        )
-    );
+
+    return Math.max(0, Math.min(totalResults - 1, currentIndex + direction));
 }
 
 /**
@@ -64,18 +58,20 @@ export function shouldAcceptAutocomplete(
  * @param textarea The textarea element
  * @returns The calculated height for the search bar
  */
-export function calculateTextareaHeight(textarea: HTMLTextAreaElement | null): number {
+export function calculateTextareaHeight(
+    textarea: HTMLTextAreaElement | null
+): number {
     if (!textarea) return 64; // Default height
-    
+
     // Reset height to auto to get the natural height
     textarea.style.height = 'auto';
-    
+
     // Get the scroll height (content height)
     const scrollHeight = textarea.scrollHeight;
-    
+
     // Set the textarea height directly
     textarea.style.height = `${scrollHeight}px`;
-    
+
     // Simple height calculation
     const padding = 32; // Account for search bar padding
     return Math.max(64, scrollHeight + padding);
@@ -117,11 +113,14 @@ export function findAutocompleteMatch(
     const queryLower = query.toLowerCase();
     const wordLower = topMatch.word.toLowerCase();
 
-    if (wordLower.startsWith(queryLower) && topMatch.word.length > query.length) {
+    if (
+        wordLower.startsWith(queryLower) &&
+        topMatch.word.length > query.length
+    ) {
         // Use the top match for completion
         return topMatch.word;
     }
-    
+
     // No suitable completion available
     return '';
 }
@@ -141,13 +140,13 @@ export function handleSpaceKeyPress(
     if (hasAutocomplete && autocompleteText) {
         return {
             preventDefault: true,
-            newQuery: autocompleteText + ' '
+            newQuery: autocompleteText + ' ',
         };
     }
-    
+
     return {
         preventDefault: false,
-        newQuery: currentQuery
+        newQuery: currentQuery,
     };
 }
 
@@ -166,10 +165,14 @@ export function handleArrowKeyPress(
     hasAutocomplete: boolean
 ): boolean {
     // If it's a right arrow and we're at the end of the current text
-    if (key === 'ArrowRight' && cursorPosition === queryLength && hasAutocomplete) {
+    if (
+        key === 'ArrowRight' &&
+        cursorPosition === queryLength &&
+        hasAutocomplete
+    ) {
         return true;
     }
-    
+
     return false;
 }
 
@@ -203,6 +206,6 @@ export function getDropdownsToClose(
 
     return {
         closeControls: !controlsArea,
-        closeResults: !resultsArea
+        closeResults: !resultsArea,
     };
 }

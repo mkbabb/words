@@ -1,4 +1,7 @@
-"""AI router module."""
+"""AI router module.
+
+The main router includes assess and generate sub-routers.
+"""
 
 from .main import router as main_router
 from .suggestions import router as suggestions_router

@@ -6,10 +6,7 @@
         class="space-y-2"
     >
         <!-- Separator for definitions within same cluster -->
-        <hr
-            v-if="isSeparatorNeeded"
-            class="my-2 border-border/50"
-        />
+        <hr v-if="isSeparatorNeeded" class="my-2 border-border/50" />
 
         <div class="flex items-center gap-2">
             <!-- Part of Speech with Progressive Loading -->
@@ -19,11 +16,13 @@
                     field-name="part of speech"
                     :edit-mode="props.editModeEnabled"
                     :errors="fields.part_of_speech.errors"
-                    @update:model-value="(value) => { 
-                        fields.part_of_speech.value = String(value);
-                        fields.part_of_speech.isDirty = true;
-                        save(); 
-                    }"
+                    @update:model-value="
+                        (value) => {
+                            fields.part_of_speech.value = String(value);
+                            fields.part_of_speech.isDirty = true;
+                            save();
+                        }
+                    "
                 >
                     <template #display>
                         <span class="text-2xl font-semibold text-primary">
@@ -33,16 +32,25 @@
                 </EditableField>
             </div>
             <!-- Part of Speech Skeleton -->
-            <div v-else-if="isStreaming" class="h-8 w-20 bg-muted rounded animate-pulse" />
-            
-            <sup class="text-sm font-normal text-muted-foreground">{{ definitionIndex + 1 }}</sup>
-            
+            <div
+                v-else-if="isStreaming"
+                class="h-8 w-20 animate-pulse rounded bg-muted"
+            />
+
+            <sup class="text-sm font-normal text-muted-foreground">{{
+                definitionIndex + 1
+            }}</sup>
+
             <!-- Streaming Indicator -->
-            <div v-if="isStreaming && isPartialDefinition" class="flex items-center gap-1 ml-2">
-                <div class="h-1.5 w-1.5 bg-blue-500 rounded-full animate-pulse" />
+            <div
+                v-if="isStreaming && isPartialDefinition"
+                class="ml-2 flex items-center gap-1"
+            >
+                <div
+                    class="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500"
+                />
                 <span class="text-xs text-blue-500">loading...</span>
             </div>
-            
         </div>
 
         <div class="border-l-2 border-accent pl-4">
@@ -54,26 +62,30 @@
                     :multiline="true"
                     :edit-mode="props.editModeEnabled"
                     :can-regenerate="canRegenerate('text')"
-                :is-regenerating="fields.text.isRegenerating"
-                :errors="fields.text.errors"
-                @regenerate="regenerateComponent('text')"
-                @update:model-value="(val: string | number | string[]) => { 
-                    fields.text.value = String(val);
-                    fields.text.isDirty = true;
-                    save(); 
-                }"
-            >
-                <template #display>
-                    <p class="text-base leading-relaxed font-serif">
-                        {{ definition.definition || definition.text }}
-                    </p>
-                </template>
+                    :is-regenerating="fields.text.isRegenerating"
+                    :errors="fields.text.errors"
+                    @regenerate="regenerateComponent('text')"
+                    @update:model-value="
+                        (val: string | number | string[]) => {
+                            fields.text.value = String(val);
+                            fields.text.isDirty = true;
+                            save();
+                        }
+                    "
+                >
+                    <template #display>
+                        <p
+                            class="text-base leading-relaxed font-serif"
+                        >
+                            {{ definition.definition || definition.text }}
+                        </p>
+                    </template>
                 </EditableField>
             </div>
             <!-- Definition Text Skeleton -->
-            <div v-else-if="isStreaming" class="space-y-2 animate-pulse">
-                <div class="h-6 w-full bg-muted rounded" />
-                <div class="h-4 w-4/5 bg-muted rounded" />
+            <div v-else-if="isStreaming" class="animate-pulse space-y-2">
+                <div class="h-6 w-full rounded bg-muted" />
+                <div class="h-4 w-4/5 rounded bg-muted" />
             </div>
 
             <!-- Progressive Examples -->
@@ -87,11 +99,20 @@
                 @regenerate:example="handleExampleRegenerate"
             />
             <!-- Examples Skeleton -->
-            <div v-else-if="isStreaming || isPartialDefinition" class="mt-4 space-y-2">
-                <div class="text-sm font-medium text-muted-foreground">Examples</div>
-                <div v-for="i in 2" :key="i" class="bg-muted/50 rounded p-3 animate-pulse">
-                    <div class="h-4 w-full bg-muted rounded mb-1" />
-                    <div class="h-4 w-3/4 bg-muted rounded" />
+            <div
+                v-else-if="isStreaming || isPartialDefinition"
+                class="mt-4 space-y-2"
+            >
+                <div class="text-sm font-medium text-muted-foreground">
+                    Examples
+                </div>
+                <div
+                    v-for="i in 2"
+                    :key="i"
+                    class="animate-pulse rounded bg-muted/50 p-3"
+                >
+                    <div class="mb-1 h-4 w-full rounded bg-muted" />
+                    <div class="h-4 w-3/4 rounded bg-muted" />
                 </div>
             </div>
 
@@ -102,21 +123,34 @@
                 :edit-mode="props.editModeEnabled"
                 :can-regenerate="canRegenerate('synonyms')"
                 :is-regenerating="fields.synonyms.isRegenerating"
-                @update:synonyms="(val) => { fields.synonyms.value = val; save(); }"
+                @update:synonyms="
+                    (val) => {
+                        fields.synonyms.value = val;
+                        save();
+                    }
+                "
                 @regenerate="regenerateComponent('synonyms')"
                 @synonym-click="emit('searchWord', $event)"
             />
             <!-- Synonyms Skeleton -->
-            <div v-else-if="isStreaming || isPartialDefinition" class="mt-4 space-y-2">
-                <div class="text-sm font-medium text-muted-foreground">Synonyms</div>
+            <div
+                v-else-if="isStreaming || isPartialDefinition"
+                class="mt-4 space-y-2"
+            >
+                <div class="text-sm font-medium text-muted-foreground">
+                    Synonyms
+                </div>
                 <div class="flex flex-wrap gap-1">
-                    <div v-for="i in 4" :key="i" class="h-6 w-16 bg-muted rounded animate-pulse" />
+                    <div
+                        v-for="i in 4"
+                        :key="i"
+                        class="h-6 w-16 animate-pulse rounded bg-muted"
+                    />
                 </div>
             </div>
         </div>
     </div>
 </template>
-
 
 <script setup lang="ts">
 import { computed } from 'vue';
@@ -145,32 +179,37 @@ const props = defineProps<DefinitionItemProps>();
 // Streaming indicators
 const isStreaming = computed(() => props.isStreaming || false);
 const isPartialDefinition = computed(() => {
-    return isStreaming.value && (!props.definition.text || !props.definition.examples?.length);
+    return (
+        isStreaming.value &&
+        (!props.definition.text || !props.definition.examples?.length)
+    );
 });
 
 // Create a ref for the definition to use with edit mode
 const definitionRef = computed(() => props.definition);
 
 // Use edit mode composable
-const {
-    fields,
-    save,
-    regenerateComponent,
-    canRegenerate,
-} = useDefinitionEditMode(definitionRef, {
-    onSave: async (updates) => {
-        if (props.definition.id) {
-            await contentStore.updateDefinition(props.definition.id, updates);
-        } else {
-            logger.error('[DefinitionItem] No definition ID available!');
-        }
-    },
-    onRegenerate: async (component) => {
-        if (props.definition.id) {
-            await contentStore.regenerateDefinitionComponent(props.definition.id, component as 'definition' | 'examples' | 'usage_notes');
-        }
-    },
-});
+const { fields, save, regenerateComponent, canRegenerate } =
+    useDefinitionEditMode(definitionRef, {
+        onSave: async (updates) => {
+            if (props.definition.id) {
+                await contentStore.updateDefinition(
+                    props.definition.id,
+                    updates
+                );
+            } else {
+                logger.error('[DefinitionItem] No definition ID available!');
+            }
+        },
+        onRegenerate: async (component) => {
+            if (props.definition.id) {
+                await contentStore.regenerateDefinitionComponent(
+                    props.definition.id,
+                    component as 'definition' | 'examples' | 'usage_notes'
+                );
+            }
+        },
+    });
 
 // Check if we need separator (not the first definition in the overall list)
 const isSeparatorNeeded = computed(() => props.definitionIndex > 0);
@@ -179,18 +218,23 @@ const isSeparatorNeeded = computed(() => props.definitionIndex > 0);
 const shouldShowSynonyms = computed(() => {
     if (props.isAISynthesized !== false) {
         // For AI entries or undefined, always show synonyms
-        return props.definition.synonyms && props.definition.synonyms.length > 0;
+        return (
+            props.definition.synonyms && props.definition.synonyms.length > 0
+        );
     }
     // For non-AI entries, only show on first definition
-    return props.isFirstInGroup && props.definition.synonyms && props.definition.synonyms.length > 0;
+    return (
+        props.isFirstInGroup &&
+        props.definition.synonyms &&
+        props.definition.synonyms.length > 0
+    );
 });
 
 const emit = defineEmits<{
-    'regenerate': [index: number];
-    'searchWord': [word: string];
-    'addToWordlist': [word: string];
+    regenerate: [index: number];
+    searchWord: [word: string];
+    addToWordlist: [word: string];
 }>();
-
 
 // Handle example updates
 async function handleExampleUpdate(index: number, value: string) {
@@ -199,15 +243,22 @@ async function handleExampleUpdate(index: number, value: string) {
         if (example.id) {
             try {
                 // Update via the examples API endpoint
-                await contentStore.updateExample(props.definition.id, example.id, value);
+                await contentStore.updateExample(
+                    props.definition.id,
+                    example.id,
+                    value
+                );
                 // Update local state after successful save
                 example.text = value;
             } catch (error) {
-                logger.error('[DefinitionItem] Failed to update example:', error);
+                logger.error(
+                    '[DefinitionItem] Failed to update example:',
+                    error
+                );
                 notificationStore.showNotification({
                     type: 'error',
                     message: 'Failed to update example',
-                    duration: 3000
+                    duration: 3000,
                 });
             }
         } else {
@@ -218,7 +269,11 @@ async function handleExampleUpdate(index: number, value: string) {
 
 // Handle individual example regeneration
 async function handleExampleRegenerate(index: number) {
-    if (props.definition.examples && props.definition.examples[index]?.type === 'generated' && props.definition.id) {
+    if (
+        props.definition.examples &&
+        props.definition.examples[index]?.type === 'generated' &&
+        props.definition.id
+    ) {
         // Call store method to regenerate single example
         emit('regenerate', props.definitionIndex);
     }

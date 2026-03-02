@@ -711,7 +711,7 @@ class Corpus(BaseModel):
         )
 
         # Step 1: Delete all dependent SearchIndex documents (which will cascade to their indices)
-        from ..search.models import SearchIndex
+        from ..search.search_index import SearchIndex
 
         try:
             # Get the SearchIndex for this corpus

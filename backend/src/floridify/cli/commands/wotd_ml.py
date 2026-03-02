@@ -31,7 +31,7 @@ from ...wotd.constants import (
 )
 from ...wotd.core import TrainingConfig
 from ...wotd.generator import SyntheticGenerator
-from ...wotd.trainer import train_from_literature, train_wotd_pipeline
+from ...wotd.training import train_from_literature, train_wotd_pipeline
 
 console = Console()
 logger = get_logger(__name__)
@@ -213,7 +213,6 @@ def benchmark(corpus_id: str):
     )
 
     async def run_benchmark():
-
         from ...wotd.embeddings import EmbeddingMode, get_embedder
         from ...wotd.encoders import get_semantic_encoder
         from ...wotd.storage import get_wotd_storage

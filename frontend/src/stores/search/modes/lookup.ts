@@ -1,8 +1,6 @@
 import { defineStore } from 'pinia';
-import { ref, readonly, computed, shallowRef, watch, type WatchStopHandle } from 'vue';
+import { ref, readonly, computed, shallowRef } from 'vue';
 import { searchApi } from '@/api';
-import { shouldTriggerAIMode } from '@/components/custom/search/utils/ai-query';
-import { useSearchBarStore } from '../search-bar';
 import type { ModeHandler } from '@/stores/types/mode-types';
 import type { SearchMode, SearchResult, CardVariant } from '@/types';
 import type { SemanticStatusResponse } from '@/types/api';
@@ -16,20 +14,20 @@ import {
     type DictionarySource,
     type Language,
 } from '@/stores/types/constants';
-import { logger } from '@/utils/logger';
 
 // Search mode type:
 export type SearchMethod = 'smart' | 'exact' | 'fuzzy' | 'semantic';
 
 /**
- * Unified lookup mode store
- * Combines configuration, search bar state, UI preferences, and search results
+ * Unified lookup mode store.
+ *
+ * Owns search execution (abort controller lifecycle) and state.
+ * AI query detection has been moved to useAIQueryDetection.
+ * Semantic status polling has been moved to useSemanticStatusPoller.
  */
 export const useLookupMode = defineStore(
     'lookupMode',
     () => {
-        // Get search bar store for query watching
-        const getSearchBarStore = () => useSearchBarStore();
         // ==========================================================================
         // CONFIGURATION STATE
         // ==========================================================================
@@ -47,86 +45,11 @@ export const useLookupMode = defineStore(
         const showSparkle = ref(false);
         const aiSuggestions = ref<string[]>([]);
 
-        // Watch for query changes to detect AI mode
-        // Store the stop handle so we can clean up on mode exit
-        let queryWatchStopHandle: WatchStopHandle | null = null;
-
-        const startQueryWatcher = () => {
-            // Stop any existing watcher before creating a new one
-            stopQueryWatcher();
-            queryWatchStopHandle = watch(
-                () => {
-                    const store = getSearchBarStore();
-                    return store?.searchQuery || '';
-                },
-                (newQuery) => {
-                    if (newQuery && newQuery.length > 0) {
-                        const shouldBeAI = shouldTriggerAIMode(newQuery);
-                        if (shouldBeAI !== isAIQuery.value) {
-                            setAIQuery(shouldBeAI);
-                            if (shouldBeAI) {
-                                setShowSparkle(true);
-                            }
-                        }
-                    } else {
-                        // Reset AI mode for empty queries
-                        if (isAIQuery.value) {
-                            setAIQuery(false);
-                            setShowSparkle(false);
-                        }
-                    }
-                }
-            );
-        };
-
-        const stopQueryWatcher = () => {
-            if (queryWatchStopHandle) {
-                queryWatchStopHandle();
-                queryWatchStopHandle = null;
-            }
-        };
-
-        // Start the watcher immediately (lookup is the default mode)
-        startQueryWatcher();
-
         // ==========================================================================
-        // SEMANTIC STATUS
+        // SEMANTIC STATUS (state only — polling is in useSemanticStatusPoller)
         // ==========================================================================
 
         const semanticStatus = ref<SemanticStatusResponse | null>(null);
-        let semanticPollTimer: ReturnType<typeof setInterval> | null = null;
-
-        const pollSemanticStatus = async () => {
-            try {
-                const status = await searchApi.getSemanticStatus();
-                semanticStatus.value = status;
-
-                // Stop polling when search engine is ready and semantic is either ready or disabled
-                if (status.ready || !status.enabled) {
-                    stopSemanticPolling();
-                }
-            } catch (e) {
-                logger.debug('Semantic status poll failed:', e);
-            }
-        };
-
-        const startSemanticPolling = () => {
-            stopSemanticPolling();
-            // Initial fetch
-            pollSemanticStatus();
-            // Poll every 5s
-            semanticPollTimer = setInterval(pollSemanticStatus, 5000);
-        };
-
-        const stopSemanticPolling = () => {
-            if (semanticPollTimer) {
-                clearInterval(semanticPollTimer);
-                semanticPollTimer = null;
-            }
-        };
-
-        // Start polling immediately (lookup is default mode)
-        startSemanticPolling();
 
         // ==========================================================================
         // UI STATE
@@ -154,7 +77,6 @@ export const useLookupMode = defineStore(
             hasResults: results.value.length > 0,
             resultCount: results.value.length,
             currentMethod: searchMethod.value,
-            isSearchActive: abortController !== null,
             isEmpty: results.value.length === 0,
         }));
 
@@ -216,7 +138,7 @@ export const useLookupMode = defineStore(
         };
 
         // ==========================================================================
-        // SEARCH BAR ACTIONS
+        // SEARCH BAR ACTIONS (pure state setters)
         // ==========================================================================
 
         const setAIQuery = (isAI: boolean) => {
@@ -250,6 +172,14 @@ export const useLookupMode = defineStore(
         };
 
         // ==========================================================================
+        // SEMANTIC STATUS SETTER (for useSemanticStatusPoller composable)
+        // ==========================================================================
+
+        const setSemanticStatus = (status: SemanticStatusResponse | null) => {
+            semanticStatus.value = status;
+        };
+
+        // ==========================================================================
         // UI ACTIONS
         // ==========================================================================
 
@@ -269,7 +199,7 @@ export const useLookupMode = defineStore(
         };
 
         // ==========================================================================
-        // RESULTS OPERATIONS
+        // RESULTS OPERATIONS (pure state management — no API calls)
         // ==========================================================================
 
         const setResults = (
@@ -313,28 +243,18 @@ export const useLookupMode = defineStore(
         };
 
         const search = async (query: string): Promise<SearchResult[]> => {
-            // Cancel any existing search
             cancelSearch();
-
-            // Create new abort controller
             abortController = new AbortController();
 
             try {
                 const normalized = query.trim().toLowerCase();
-
-                // Always perform dictionary search - AI mode is user-initiated only
                 const searchResults = await searchApi.search(normalized, {
                     signal: abortController.signal,
                     mode: searchMode.value.join(','),
                 });
 
-                // Store results with method detection
-                const method = detectSearchMethod(
-                    searchResults,
-                    normalized
-                );
+                const method = detectSearchMethod(searchResults, normalized);
                 setResults(searchResults, method);
-
                 return searchResults;
             } catch (error: any) {
                 if (
@@ -343,7 +263,6 @@ export const useLookupMode = defineStore(
                 ) {
                     return [];
                 }
-
                 clearResults();
                 throw error;
             } finally {
@@ -385,6 +304,9 @@ export const useLookupMode = defineStore(
             showSparkle.value = false;
             aiSuggestions.value = [];
 
+            // Reset semantic status
+            semanticStatus.value = null;
+
             // Reset UI
             selectedCardVariant.value = 'default';
             pronunciationMode.value = DEFAULT_PRONUNCIATION_MODE;
@@ -403,19 +325,15 @@ export const useLookupMode = defineStore(
                 isAIQuery.value = false;
                 showSparkle.value = false;
                 clearAISuggestions();
-                // Re-start the query watcher when entering lookup mode
-                startQueryWatcher();
-                // Resume semantic status polling
-                startSemanticPolling();
+                // NOTE: AI query detection and semantic polling are now
+                // started/stopped by the SearchBar component via composables
             },
 
             onExit: async (_nextMode: SearchMode) => {
                 // Clear AI suggestions when leaving
                 clearAISuggestions();
-                // Stop the query watcher to prevent memory leaks
-                stopQueryWatcher();
-                // Stop semantic polling
-                stopSemanticPolling();
+                // NOTE: AI query detection and semantic polling are now
+                // started/stopped by the SearchBar component via composables
             },
 
             validateConfig: (config: any) => {
@@ -480,18 +398,23 @@ export const useLookupMode = defineStore(
             addAISuggestion,
             clearAISuggestions,
 
+            // Semantic Status Setter
+            setSemanticStatus,
+
             // UI Actions
             setCardVariant,
             cycleCardVariant,
             togglePronunciation,
             setPronunciationMode,
 
+            // Search Operations
+            search,
+            cancelSearch,
+
             // Results Operations
             setResults,
             clearResults,
             addResults,
-            search,
-            cancelSearch,
             setCursorPosition,
             getResultAt,
             findResultByWord,

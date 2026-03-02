@@ -21,41 +21,43 @@ logger = get_logger(__name__)
 # Allowlisted modules for safe pickle deserialization.
 # Only known-safe modules from our own codebase and standard libraries
 # are permitted to prevent arbitrary code execution from tampered cache files.
-_SAFE_PICKLE_MODULES = frozenset({
-    "builtins",
-    "collections",
-    "datetime",
-    "decimal",
-    "enum",
-    "copy",
-    "copyreg",
-    "re",
-    "uuid",
-    # Pydantic & Beanie ODM
-    "pydantic",
-    "pydantic.main",
-    "pydantic._internal",
-    "pydantic._internal._model_construction",
-    "pydantic.fields",
-    "pydantic.v1",
-    "beanie",
-    "beanie.odm",
-    "beanie.odm.documents",
-    # BSON / MongoDB
-    "bson",
-    "bson.objectid",
-    "bson.decimal128",
-    "bson.binary",
-    "bson.regex",
-    # NumPy (for semantic embeddings)
-    "numpy",
-    "numpy.core",
-    "numpy.core.multiarray",
-    "numpy._core",
-    "numpy._core.multiarray",
-    # Application models
-    "floridify",
-})
+_SAFE_PICKLE_MODULES = frozenset(
+    {
+        "builtins",
+        "collections",
+        "datetime",
+        "decimal",
+        "enum",
+        "copy",
+        "copyreg",
+        "re",
+        "uuid",
+        # Pydantic & Beanie ODM
+        "pydantic",
+        "pydantic.main",
+        "pydantic._internal",
+        "pydantic._internal._model_construction",
+        "pydantic.fields",
+        "pydantic.v1",
+        "beanie",
+        "beanie.odm",
+        "beanie.odm.documents",
+        # BSON / MongoDB
+        "bson",
+        "bson.objectid",
+        "bson.decimal128",
+        "bson.binary",
+        "bson.regex",
+        # NumPy (for semantic embeddings)
+        "numpy",
+        "numpy.core",
+        "numpy.core.multiarray",
+        "numpy._core",
+        "numpy._core.multiarray",
+        # Application models
+        "floridify",
+    }
+)
 
 
 class RestrictedUnpickler(pickle.Unpickler):
@@ -78,6 +80,7 @@ class RestrictedUnpickler(pickle.Unpickler):
 def safe_pickle_loads(data: bytes) -> Any:
     """Safely deserialize pickled data using RestrictedUnpickler."""
     return RestrictedUnpickler(io.BytesIO(data)).load()
+
 
 # Constants
 DEFAULT_SIZE_LIMIT = 1024 * 1024 * 1024 * 10  # 10GB

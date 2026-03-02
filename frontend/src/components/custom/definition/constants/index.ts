@@ -12,9 +12,9 @@ export const PART_OF_SPEECH_ORDER: Record<string, number> = {
 };
 
 export const ANIMATION_CYCLE_DELAY = {
-    initial: 15000,  // 15 seconds initial delay
-    min: 60000,      // 60 seconds minimum between cycles
-    max: 90000,      // 90 seconds maximum between cycles
+    initial: 15000, // 15 seconds initial delay
+    min: 60000, // 60 seconds minimum between cycles
+    max: 90000, // 90 seconds maximum between cycles
 } as const;
 
 export const CARD_THEMES = [

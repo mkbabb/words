@@ -164,7 +164,9 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
                     logger.debug(f"Cache bypass: {namespace.value}:{key} (use_cache=False)")
                     return await loader()
                 except Exception as e:
-                    logger.error(f"Cache loader failed for {namespace.value}:{key}: {e}", exc_info=True)
+                    logger.error(
+                        f"Cache loader failed for {namespace.value}:{key}: {e}", exc_info=True
+                    )
                     return None
             return None
 
@@ -396,8 +398,7 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
             if evicted_count > 0:
                 total_evicted += evicted_count
                 logger.debug(
-                    f"TTL cleanup: evicted {evicted_count} expired entries "
-                    f"from {namespace.value}"
+                    f"TTL cleanup: evicted {evicted_count} expired entries from {namespace.value}"
                 )
 
         if total_evicted > 0:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 from datetime import datetime
 
@@ -19,9 +18,10 @@ from floridify.caching.models import (
 from floridify.corpus.core import Corpus
 from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
-from floridify.search.models import SearchIndex, TrieIndex
+from floridify.search.search_index import SearchIndex
 from floridify.search.semantic.constants import DEFAULT_SENTENCE_MODEL
 from floridify.search.semantic.models import SemanticIndex
+from floridify.search.trie_index import TrieIndex
 
 
 class TestMongoDBVersioning:
@@ -461,7 +461,7 @@ class TestMongoDBVersioning:
         self, version_manager: VersionedDataManager, test_db
     ):
         """Test retrieving specific versions with external content metadata."""
-        from floridify.caching.models import ContentLocation, StorageType, CompressionType
+        from floridify.caching.models import CompressionType, ContentLocation, StorageType
 
         resource_id = "external_content_test"
 

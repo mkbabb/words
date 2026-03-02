@@ -10,10 +10,8 @@ Tests all model functionality including:
 """
 
 import asyncio
-from datetime import UTC, datetime
 
 import pytest
-from beanie import PydanticObjectId
 from pydantic import ValidationError
 
 from floridify.caching.models import (
@@ -26,7 +24,7 @@ from floridify.corpus.models import CorpusType
 from floridify.models.base import Language
 from floridify.models.registry import get_model_class as get_versioned_model_class
 from floridify.providers.dictionary.models import DictionaryProviderEntry
-from floridify.search.models import SearchIndex
+from floridify.search.search_index import SearchIndex
 
 
 @pytest.mark.asyncio

@@ -2,36 +2,27 @@
 
 from __future__ import annotations
 
-# CRITICAL: Configure parallelism BEFORE any imports
+# CRITICAL: Configure parallelism BEFORE any torch/faiss imports.
+# These env vars MUST be set before torch or faiss load libomp.dylib,
+# otherwise macOS will SIGSEGV from triple-libomp conflict
+# (PyTorch + scikit-learn + FAISS each load separate libomp.dylib).
+# This duplicates the setup in embedding.py — both are needed because
+# either module could be the first import in a given code path.
 import os
 import platform
 
-# macOS-specific workaround: Prevent semaphore leaks and libomp conflicts
-# ONLY apply on macOS - Linux/Docker uses proper multiprocessing
 if platform.system() == "Darwin":
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Disable in macOS only
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
     os.environ["LOKY_MAX_CPU_COUNT"] = "1"
-    # NOTE: Do NOT set JOBLIB_START_METHOD=threading — invalid in Python 3.13+
-    # and causes "cannot find context for 'threading'" crash on import.
-    # Instead, rely on LOKY_MAX_CPU_COUNT=1 to prevent multiprocessing.
-    # CRITICAL: KMP_DUPLICATE_LIB_OK prevents libomp conflict crash
-    # (PyTorch + scikit-learn + FAISS each load separate libomp.dylib)
     os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
-    # OMP_NUM_THREADS must stay at 1 to prevent triple-libomp segfault.
-    # torch.set_num_threads() is also unsafe when multiple OpenMP runtimes are loaded.
-    # The main throughput lever is batch_size (32→128 gives 42% speedup).
     os.environ.setdefault("OMP_NUM_THREADS", "1")
 else:
-    # Linux/Docker: Enable tokenizer parallelism for better performance
     os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 import asyncio
-import gzip
 import hashlib
 import math
 import multiprocessing as mp
-import pickle
-import tempfile
 import time
 from typing import Any, Literal
 
@@ -41,7 +32,6 @@ import torch
 from sentence_transformers import SentenceTransformer
 
 from ...caching.core import get_global_cache
-from ...caching.filesystem import safe_pickle_loads
 from ...caching.models import CacheNamespace, VersionConfig
 from ...corpus.core import Corpus
 from ...utils.logging import get_logger
@@ -50,132 +40,21 @@ from ..models import SearchResult
 from .constants import (
     DEFAULT_SENTENCE_MODEL,
     ENABLE_GPU_ACCELERATION,
-    HNSW_EF_CONSTRUCTION,
-    HNSW_EF_SEARCH,
-    HNSW_M,
     L2_DISTANCE_NORMALIZATION,
-    LARGE_CORPUS_THRESHOLD,
-    MASSIVE_CORPUS_THRESHOLD,
-    MEDIUM_CORPUS_THRESHOLD,
     QUANTIZATION_PRECISION,
-    SMALL_CORPUS_THRESHOLD,
-    USE_HNSW,
     USE_QUANTIZATION,
     SemanticModel,
 )
+from .embedding import _encode_chunk_worker, get_cached_model
+from .index_builder import build_optimized_index, configure_faiss_threading
 from .models import SemanticIndex
+from .persistence import (
+    load_embeddings_from_binary_data,
+    load_faiss_index_from_binary_data,
+    save_embeddings_and_index,
+)
 
 logger = get_logger(__name__)
-
-
-def _encode_chunk_worker(
-    chunk: list[str],
-    model_name: str,
-    batch_size: int,
-    worker_id: int,
-) -> np.ndarray:
-    """Worker function for multiprocessing encoding.
-
-    Must be at module level for pickling. Each worker loads its own model instance
-    to avoid shared state and GIL contention.
-
-    Args:
-        chunk: List of texts to encode
-        model_name: Name/path of sentence transformer model
-        batch_size: Batch size for encoding
-        worker_id: Worker process ID for logging
-
-    Returns:
-        Numpy array of embeddings for the chunk
-    """
-    # Each worker loads its own model to avoid shared state
-    model = SentenceTransformer(model_name)
-
-    # Encode the chunk (single-process within this worker)
-    embeddings = model.encode(
-        sentences=chunk,
-        batch_size=batch_size,
-        show_progress_bar=False,  # Disable to avoid clutter from multiple workers
-        output_value="sentence_embedding",
-        precision="float32",
-        convert_to_numpy=True,
-        convert_to_tensor=False,
-        normalize_embeddings=True,
-    )
-
-    return embeddings
-
-
-# Global model cache using asyncio lock for thread-safety
-# Lazy import optimization: sentence_transformers loaded only when semantic search is used
-_model_cache: dict[str, Any] = {}  # Values are SentenceTransformer instances
-_model_cache_lock = asyncio.Lock()
-
-
-async def get_cached_model(
-    model_name: str,
-    device: str = "cpu",
-    use_onnx: bool = False,
-) -> Any:  # Returns SentenceTransformer
-    """Get or create cached sentence transformer model using global cache.
-
-    Models are cached in-memory with a singleton pattern to avoid reloading
-    the same model multiple times (critical performance optimization).
-
-    OPTIMIZATION: sentence_transformers is imported lazily only when this function
-    is called, reducing CLI boot time by ~1.3s (45% reduction).
-
-    Args:
-        model_name: HuggingFace model name
-        device: Device to load model on (cpu, cuda, mps)
-        use_onnx: Whether to use ONNX backend
-
-    Returns:
-        Cached or newly loaded SentenceTransformer model
-    """
-    cache_key = f"{model_name}:{device}:{use_onnx}"
-
-    # Fast path: check without lock
-    if cache_key in _model_cache:
-        logger.debug(f"✅ Model cache HIT: {model_name} on {device}")
-        return _model_cache[cache_key]
-
-    # Slow path: load model with lock (double-check pattern)
-    async with _model_cache_lock:
-        # Double-check after acquiring lock
-        if cache_key in _model_cache:
-            logger.debug(f"✅ Model cache HIT (after lock): {model_name} on {device}")
-            return _model_cache[cache_key]
-
-        logger.info(f"⏳ Loading model {model_name} on {device} (one-time load, will be cached)")
-        start_time = time.perf_counter()
-
-        # Initialize model with ONNX optimization if requested
-        if use_onnx:
-            try:
-                model = SentenceTransformer(model_name, backend="onnx", trust_remote_code=True)
-                logger.info("✅ ONNX backend enabled")
-            except Exception as e:
-                logger.warning(f"Failed to load ONNX model: {e}. Falling back to PyTorch")
-                model = SentenceTransformer(model_name, trust_remote_code=True)
-        else:
-            model = SentenceTransformer(model_name, trust_remote_code=True)
-
-        # Set device for GPU acceleration
-        model = model.to(device)
-
-        # NOTE: torch.set_num_threads() is UNSAFE when multiple OpenMP runtimes
-        # are loaded (PyTorch + FAISS + scikit-learn via floridify import chain).
-        # Increasing threads causes SIGSEGV in the OpenMP runtime on macOS.
-        # The batch_size increase (32→128) provides the main throughput gain instead.
-
-        # Cache the model
-        _model_cache[cache_key] = model
-
-        elapsed = time.perf_counter() - start_time
-        logger.info(f"✅ Model loaded and cached in {elapsed:.2f}s: {model_name} on {device}")
-
-        return model
 
 
 class SemanticSearch:
@@ -318,63 +197,12 @@ class SemanticSearch:
 
         # Load embeddings and FAISS index - current format only, no legacy support
         try:
-            # Load embeddings - compressed bytes format only
-            if "embeddings_compressed_bytes" not in binary_data:
-                raise RuntimeError(
-                    f"Invalid semantic index format for '{self.index.corpus_name}': "
-                    f"missing 'embeddings_compressed_bytes'. Legacy formats no longer supported."
-                )
-
-            compressed_bytes = binary_data["embeddings_compressed_bytes"]
-            logger.debug(
-                f"Decompressing gzip embeddings ({len(compressed_bytes) / 1024 / 1024:.1f}MB compressed)"
+            self.sentence_embeddings = load_embeddings_from_binary_data(
+                binary_data, self.index.corpus_name
             )
-            embeddings_bytes = gzip.decompress(compressed_bytes)
-            self.sentence_embeddings = safe_pickle_loads(embeddings_bytes)
-            logger.debug(
-                f"Loaded embeddings: {len(embeddings_bytes) / 1024 / 1024:.2f}MB, "
-                f"shape={self.sentence_embeddings.shape if self.sentence_embeddings is not None else 'none'}"
+            self.sentence_index = load_faiss_index_from_binary_data(
+                binary_data, self.index.corpus_name
             )
-
-            # Detect corrupted embeddings (all zeros)
-            if (
-                self.sentence_embeddings is not None
-                and self.sentence_embeddings.size > 0
-                and np.all(self.sentence_embeddings == 0)
-            ):
-                raise RuntimeError(
-                    f"Corrupted embeddings for '{self.index.corpus_name}': all values are zero"
-                )
-
-            # Load FAISS index - compressed bytes with native serialization only
-            if "index_compressed_bytes" not in binary_data:
-                raise RuntimeError(
-                    f"Invalid semantic index format for '{self.index.corpus_name}': "
-                    f"missing 'index_compressed_bytes'. Legacy formats no longer supported."
-                )
-
-            compressed = binary_data["index_compressed_bytes"]
-            if isinstance(compressed, str):
-                raise RuntimeError(
-                    f"Invalid index format for '{self.index.corpus_name}': "
-                    f"base64-encoded data no longer supported"
-                )
-
-            logger.debug("Decompressing gzip FAISS index")
-            index_bytes = gzip.decompress(compressed)
-            logger.debug(f"Decompressed FAISS index: {len(index_bytes) / 1024 / 1024:.1f}MB")
-
-            # Write bytes to temp file and load with FAISS native read
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".faiss") as tmp_file:
-                tmp_file.write(index_bytes)
-                tmp_path = tmp_file.name
-
-            try:
-                self.sentence_index = faiss.read_index(tmp_path)
-                logger.debug(f"Loaded FAISS index: {len(index_bytes) / 1024 / 1024:.1f}MB")
-            finally:
-                if os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
 
             # Restore persisted query embeddings from L2 cache
             await self._load_query_cache_from_l2()
@@ -603,7 +431,7 @@ class SemanticSearch:
 
             # Use 2 workers to avoid OOM (each worker loads ~600MB model with spawn method)
             # With spawn, each worker gets its own copy (no memory sharing)
-            # 2 workers × 600MB + main process = ~2GB total (safe under 7GB limit)
+            # 2 workers x 600MB + main process = ~2GB total (safe under 7GB limit)
             num_workers = 2
 
             logger.info(
@@ -628,8 +456,6 @@ class SemanticSearch:
 
             # Use spawn on macOS (fork is unsafe with threads/CoreFoundation)
             # Use fork on Linux (efficient copy-on-write memory sharing)
-            import platform
-
             mp_method = "spawn" if platform.system() == "Darwin" else "fork"
             ctx = mp.get_context(mp_method)
 
@@ -788,7 +614,13 @@ class SemanticSearch:
         logger.info(f"Built semantic embeddings in {build_time_seconds * 1000:.1f}ms")
 
         # Save embeddings to index
-        await self._save_embeddings_to_index(build_time_seconds)
+        await save_embeddings_and_index(
+            index=self.index,
+            sentence_embeddings=self.sentence_embeddings,
+            sentence_index=self.sentence_index,
+            build_time=build_time_seconds,
+            corpus_uuid=self.corpus.corpus_uuid if self.corpus else self.index.corpus_uuid,
+        )
 
     def _build_embeddings(self) -> None:
         """Build streamlined semantic embeddings - sentence transformers only."""
@@ -935,10 +767,10 @@ class SemanticSearch:
         )
 
         # Configure FAISS threading before building index
-        self._configure_faiss_threading()
+        configure_faiss_threading()
 
         # Model-aware optimized quantization strategy
-        self._build_optimized_index(dimension, vocab_size)
+        self.sentence_index = build_optimized_index(dimension, vocab_size, self.sentence_embeddings)
 
         total_time = time.time() - embedding_start
         embeddings_per_sec = vocab_count / total_time if total_time > 0 else 0
@@ -951,103 +783,6 @@ class SemanticSearch:
             f"✅ Semantic embeddings complete: {vocab_count:,} embeddings, dim={dimension} ({total_time:.1f}s, {embeddings_per_sec:.0f} emb/s)",
         )
 
-    async def _save_embeddings_to_index(self, build_time: float) -> None:
-        """Save embeddings to the index model (compression handled by storage layer)."""
-        if not self.index or not self.corpus:
-            raise ValueError("Index and corpus required")
-
-        # CRITICAL FIX: Store binary data DIRECTLY to disk, not through JSON
-        # User requirement: Metadata ONLY in MongoDB, binary content on disk
-        # Architecture: Write raw compressed bytes to cache filesystem using pickle
-        binary_data = {}
-
-        # Serialize and always compress embeddings (gzip level 1 is fast even for small data)
-        if self.sentence_embeddings is not None and self.sentence_embeddings.size > 0:
-            embeddings_bytes = pickle.dumps(self.sentence_embeddings)
-            embeddings_size_mb = len(embeddings_bytes) / 1024 / 1024
-
-            logger.info(f"Compressing embeddings ({embeddings_size_mb:.1f}MB)...")
-            compressed_bytes = gzip.compress(embeddings_bytes, compresslevel=1)
-            compressed_size_mb = len(compressed_bytes) / 1024 / 1024
-            compression_ratio = (1 - compressed_size_mb / embeddings_size_mb) * 100
-            logger.info(
-                f"Compressed embeddings: {embeddings_size_mb:.1f}MB -> {compressed_size_mb:.1f}MB "
-                f"({compression_ratio:.1f}% reduction)"
-            )
-            binary_data["embeddings_compressed_bytes"] = compressed_bytes
-            binary_data["embeddings_compressed"] = "gzip"
-
-        # CRITICAL FIX (2025-10-22): Use FAISS native disk I/O instead of pickle serialization
-        # pickle.dumps(faiss.serialize_index()) does DOUBLE serialization which hangs for 20+ mins
-        # FAISS's write_index() writes directly to disk using optimized C++ I/O
-        if self.sentence_index is not None:
-            logger.info("Serializing FAISS index using native disk I/O (not pickle)...")
-
-            # Write FAISS index directly to temp file using optimized C++ serialization
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".faiss") as tmp_file:
-                tmp_path = tmp_file.name
-
-            try:
-                # FAISS native write - fast, optimized C++ disk I/O
-                faiss.write_index(self.sentence_index, tmp_path)
-
-                # Read the serialized bytes from disk
-                with open(tmp_path, "rb") as f:
-                    index_bytes = f.read()
-
-                index_size_mb = len(index_bytes) / 1024 / 1024
-                logger.info(f"FAISS index serialized: {index_size_mb:.1f}MB using native disk I/O")
-
-                # Always compress FAISS index (gzip level 1 is fast even for small data)
-                logger.info(f"Compressing FAISS index ({index_size_mb:.1f}MB)...")
-                compressed_bytes = gzip.compress(index_bytes, compresslevel=1)
-                compressed_size_mb = len(compressed_bytes) / 1024 / 1024
-                logger.info(f"Compressed FAISS: {index_size_mb:.1f}MB → {compressed_size_mb:.1f}MB")
-                binary_data["index_compressed_bytes"] = compressed_bytes
-                binary_data["index_compressed"] = "gzip"
-            finally:
-                # Clean up temp file
-                if os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
-
-        # Update statistics
-        self.index.build_time_seconds = build_time
-
-        # Detect and store index type
-        if self.sentence_index is not None:
-            index_class_name = self.sentence_index.__class__.__name__
-            if "HNSW" in index_class_name:
-                self.index.index_type = "HNSW"
-            elif "IVFPQ" in index_class_name:
-                self.index.index_type = "IVFPQ"
-            elif "IVF" in index_class_name:
-                self.index.index_type = "IVF"
-            elif "ScalarQuantizer" in index_class_name:
-                self.index.index_type = "ScalarQuantizer"
-            else:
-                self.index.index_type = "Flat"
-
-        # CRITICAL FIX: Store large binary data externally via cache manager
-        # Architecture: MongoDB stores ONLY metadata, cache backend stores large content
-        # This prevents MongoDB size limits and hanging on 392MB compressed data
-        try:
-            logger.info("Storing semantic index data externally via cache manager...")
-            # Use SemanticIndex's own save method which handles versioned storage
-            await self.index.save(
-                config=VersionConfig(),
-                corpus_uuid=self.corpus.corpus_uuid if self.corpus else self.index.corpus_uuid,
-                binary_data=binary_data,
-            )
-            logger.info(
-                "✅ Semantic index saved successfully (metadata in MongoDB, data in cache backend)"
-            )
-        except Exception as e:
-            logger.error(f"Failed to save semantic index: {e}")
-            raise RuntimeError(
-                f"Semantic index persistence failed. This may be due to size limits or corruption. "
-                f"Error: {e}"
-            ) from e
-
     def _load_index_from_data(self, index_data: SemanticIndex) -> None:
         """Load index from data object - current format only."""
         binary_data = index_data.binary_data
@@ -1058,250 +793,10 @@ class SemanticSearch:
                 f"cache corrupted or invalid format"
             )
 
-        # Load embeddings - compressed bytes format only
-        if "embeddings_compressed_bytes" not in binary_data:
-            raise RuntimeError(
-                f"Invalid semantic index format for '{self.index.corpus_name}': "
-                f"missing 'embeddings_compressed_bytes'. Legacy formats no longer supported."
-            )
-
-        try:
-            compressed_bytes = binary_data["embeddings_compressed_bytes"]
-            embeddings_bytes = gzip.decompress(compressed_bytes)
-            self.sentence_embeddings = safe_pickle_loads(embeddings_bytes)
-            logger.debug(f"Loaded embeddings: {len(embeddings_bytes) / 1024 / 1024:.2f}MB")
-        except Exception as e:
-            raise RuntimeError(
-                f"Corrupted embeddings data for '{self.index.corpus_name}': {e}"
-            ) from e
-
-        # Load FAISS index - compressed bytes with native serialization only
-        if "index_compressed_bytes" not in binary_data:
-            raise RuntimeError(
-                f"Invalid semantic index format for '{self.index.corpus_name}': "
-                f"missing 'index_compressed_bytes'. Legacy formats no longer supported."
-            )
-
-        try:
-            compressed = binary_data["index_compressed_bytes"]
-            if isinstance(compressed, str):
-                raise RuntimeError(
-                    f"Invalid index format for '{self.index.corpus_name}': "
-                    f"base64-encoded data no longer supported"
-                )
-
-            index_bytes = gzip.decompress(compressed)
-            logger.debug(f"Decompressed FAISS index: {len(index_bytes) / 1024 / 1024:.1f}MB")
-
-            # Write bytes to temp file and load with FAISS native read
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".faiss") as tmp_file:
-                tmp_file.write(index_bytes)
-                tmp_path = tmp_file.name
-
-            try:
-                self.sentence_index = faiss.read_index(tmp_path)
-                logger.debug(f"Loaded FAISS index: {len(index_bytes) / 1024 / 1024:.1f}MB")
-            finally:
-                if os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
-
-        except Exception as e:
-            raise RuntimeError(
-                f"Corrupted FAISS index data for '{self.index.corpus_name}': {e}"
-            ) from e
-
-    def _configure_faiss_threading(self) -> None:
-        """Configure FAISS OpenMP threading for optimal performance.
-
-        Threading is controlled via environment variables (OMP_NUM_THREADS, etc.)
-        set before library initialization. No runtime calls needed.
-        """
-        # Environment variables (OMP_NUM_THREADS) handle threading
-        # No faiss.omp_set_num_threads() call to avoid OpenMP library conflicts
-        logger.debug("FAISS threading controlled by environment variables")
-
-    def _build_optimized_index(self, dimension: int, vocab_size: int) -> None:
-        """Build optimized FAISS index with model-aware quantization strategies.
-
-        Quantization strategies by corpus size:
-
-        SMALL (<10k): Exact search - no compression
-          • 10k @ BGE-M3: 40MB  |  10k @ MiniLM: 15MB
-
-        MEDIUM (10-25k): FP16 - 50% compression, <0.5% quality loss
-          • 25k @ BGE-M3: 100MB→50MB  |  25k @ MiniLM: 38MB→19MB
-
-        LARGE (25-50k): INT8 - 75% compression, ~1-2% quality loss
-          • 50k @ BGE-M3: 200MB→50MB  |  50k @ MiniLM: 75MB→19MB
-
-        MASSIVE (50-250k): HNSW (if enabled) or IVF-PQ
-          HNSW: Graph-based navigation, 3-5x speedup, ~2-3% quality loss
-          • 100k @ BGE-M3: 400MB→450MB  |  100k @ MiniLM: 150MB→165MB
-          • 250k @ BGE-M3: 1GB→1.1GB  |  250k @ MiniLM: 375MB→410MB
-          IVF-PQ: 90% compression, ~5-10% quality loss
-          • 100k @ BGE-M3: 400MB→40MB  |  100k @ MiniLM: 150MB→15MB
-          • 250k @ BGE-M3: 1GB→100MB  |  250k @ MiniLM: 375MB→38MB
-
-        EXTREME (>250k): OPQ+IVF-PQ - 97% compression, ~10-15% quality loss
-          • 500k @ BGE-M3: 2GB→60MB  |  500k @ MiniLM: 750MB→23MB
-          • 1M @ BGE-M3: 4GB→120MB  |  1M @ MiniLM: 1.5GB→45MB
-
-        FAISS parameters:
-        - nlist: Number of IVF clusters (sqrt(N) to 4*sqrt(N))
-        - nprobe: Clusters searched at query time (nlist/16 to nlist/32)
-        - m: PQ subquantizers dividing vector into subspaces
-        - nbits: Bits per subquantizer (8 for quality/size balance)
-        - M: HNSW connections per node (bidirectional links)
-        - efConstruction: HNSW build-time search depth
-        - efSearch: HNSW query-time search depth (tunable)
-        """
-        # Handle empty corpus
-        if (
-            vocab_size == 0
-            or self.sentence_embeddings is None
-            or self.sentence_embeddings.size == 0
-        ):
-            logger.warning("No embeddings to index - creating empty index")
-            self.sentence_index = faiss.IndexFlatL2(dimension)
-            return
-
-        # Memory baseline: FP32 vectors
-        base_memory_mb = (vocab_size * dimension * 4) / (1024 * 1024)
-        model_type = "BGE-M3" if dimension == 1024 else "MiniLM" if dimension == 384 else "Custom"
-
-        logger.info(
-            f"🔄 Building {model_type} optimized index (dim: {dimension}, vocab: {vocab_size:,}, baseline: {base_memory_mb:.1f}MB)",
+        self.sentence_embeddings = load_embeddings_from_binary_data(
+            binary_data, self.index.corpus_name
         )
-
-        if vocab_size <= SMALL_CORPUS_THRESHOLD:
-            # Exact L2 search - no compression
-            self.sentence_index = faiss.IndexFlatL2(dimension)
-            self.sentence_index.add(self.sentence_embeddings)
-            actual_memory_mb = base_memory_mb
-            logger.info(
-                f"✅ IndexFlatL2: exact search, {actual_memory_mb:.1f}MB (100% of baseline)",
-            )
-
-        elif vocab_size <= MEDIUM_CORPUS_THRESHOLD:
-            # IVF-Flat - 3-5x faster than FlatL2, minimal quality loss (<0.1%)
-            nlist = max(64, int(math.sqrt(vocab_size)))  # 70-122 clusters for 5k-15k
-            quantizer = faiss.IndexFlatL2(dimension)
-            self.sentence_index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_L2)
-
-            logger.info(f"🔄 Training IVF-Flat index (nlist={nlist} clusters)...")
-            self.sentence_index.train(self.sentence_embeddings)
-            self.sentence_index.add(self.sentence_embeddings)
-
-            # Optimize for latency: search 25% of clusters
-            self.sentence_index.nprobe = max(16, nlist // 4)
-
-            expected_memory_mb = base_memory_mb * 1.05  # 5% overhead for index structure
-            logger.info(
-                f"✅ IVF-Flat: {expected_memory_mb:.1f}MB (~100% of {base_memory_mb:.1f}MB), "
-                f"nlist={nlist}, nprobe={self.sentence_index.nprobe}, <0.1% quality loss, 3-5x speedup"
-            )
-
-        elif vocab_size <= LARGE_CORPUS_THRESHOLD:
-            # INT8 quantization - 4x compression, small quality loss
-            self.sentence_index = faiss.IndexScalarQuantizer(
-                dimension,
-                faiss.ScalarQuantizer.QT_8bit,
-            )
-            self.sentence_index.train(self.sentence_embeddings)
-            self.sentence_index.add(self.sentence_embeddings)
-            expected_memory_mb = base_memory_mb * 0.25
-            logger.info(
-                f"✅ INT8 Quantization: {expected_memory_mb:.1f}MB (25% of {base_memory_mb:.1f}MB), ~1-2% quality loss",
-            )
-
-        elif vocab_size <= MASSIVE_CORPUS_THRESHOLD:
-            # Choose between HNSW and IVF-PQ based on configuration
-            if USE_HNSW:
-                # HNSW - faster than IVF-PQ with minimal quality loss
-                # 3-5x speedup with graph-based navigation
-                self.sentence_index = faiss.IndexHNSWFlat(dimension, HNSW_M)
-
-                # Set build-time search depth
-                self.sentence_index.hnsw.efConstruction = HNSW_EF_CONSTRUCTION
-
-                logger.info(
-                    f"🔄 Building HNSW index (M={HNSW_M}, efConstruction={HNSW_EF_CONSTRUCTION})..."
-                )
-                self.sentence_index.add(self.sentence_embeddings)
-
-                # Set query-time search depth (tunable for latency/quality)
-                self.sentence_index.hnsw.efSearch = HNSW_EF_SEARCH
-
-                # HNSW memory: ~(4 + M * 2) bytes per connection
-                # For M=32: ~68 bytes per vector + original vectors
-                hnsw_overhead_per_vec = 4 + HNSW_M * 2
-                hnsw_overhead_mb = (vocab_size * hnsw_overhead_per_vec) / (1024 * 1024)
-                expected_memory_mb = base_memory_mb + hnsw_overhead_mb
-                compression_ratio = expected_memory_mb / base_memory_mb
-
-                logger.info(
-                    f"✅ HNSW: {expected_memory_mb:.1f}MB ({compression_ratio * 100:.0f}% of {base_memory_mb:.1f}MB), "
-                    f"efSearch={HNSW_EF_SEARCH}, ~2-3% quality loss, 3-5x speedup"
-                )
-            else:
-                # IVF with Product Quantization - high compression
-                nlist = self._calculate_optimal_nlist(vocab_size)
-                # Adjust m based on dimension: more subquantizers for higher dims
-                m = 64 if dimension >= 1024 else 32 if dimension >= 512 else 16
-                nbits = 8  # 8 bits per subquantizer for quality
-
-                quantizer = faiss.IndexFlatL2(dimension)
-                self.sentence_index = faiss.IndexIVFPQ(quantizer, dimension, nlist, m, nbits)
-
-                logger.info(f"🔄 Training IVF-PQ (nlist={nlist} clusters, m={m} subquantizers)...")
-                self.sentence_index.train(self.sentence_embeddings)
-                self.sentence_index.add(self.sentence_embeddings)
-
-                # nprobe: search top k% of clusters
-                self.sentence_index.nprobe = min(nlist // 16, 128)
-                compression_ratio = (m * nbits) / (dimension * 32)
-                expected_memory_mb = base_memory_mb * compression_ratio
-                logger.info(
-                    f"✅ IVF-PQ: {expected_memory_mb:.1f}MB ({compression_ratio * 100:.0f}% of {base_memory_mb:.1f}MB), ~5-10% quality loss",
-                )
-
-        else:
-            # OPQ + IVF-PQ - maximum compression for huge corpora
-            nlist = min(8192, vocab_size // 25)
-            m = 64 if dimension >= 768 else 32
-            nbits = 8
-
-            # OPQ: Optimized Product Quantization - rotates space for better quantization
-            quantizer = faiss.IndexFlatL2(dimension)
-            opq_transform = faiss.OPQMatrix(dimension, m)
-            pq_index = faiss.IndexIVFPQ(quantizer, dimension, nlist, m, nbits)
-            self.sentence_index = faiss.IndexPreTransform(opq_transform, pq_index)
-
-            logger.info(f"🔄 Training OPQ+IVF-PQ (nlist={nlist}, m={m})...")
-            self.sentence_index.train(self.sentence_embeddings)
-            self.sentence_index.add(self.sentence_embeddings)
-
-            # More aggressive nprobe for large indices
-            base_index = faiss.downcast_index(self.sentence_index.index)
-            base_index.nprobe = min(nlist // 32, 256)
-            compression_ratio = 0.03  # ~3% of original size
-            expected_memory_mb = base_memory_mb * compression_ratio
-            logger.info(
-                f"✅ OPQ+IVF-PQ: {expected_memory_mb:.1f}MB ({compression_ratio * 100:.0f}% of {base_memory_mb:.1f}MB), ~10-15% quality loss",
-            )
-
-    def _calculate_optimal_nlist(self, vocab_size: int) -> int:
-        """Calculate optimal number of IVF clusters.
-
-        Rule of thumb: sqrt(N) to 4*sqrt(N) clusters
-        More clusters = faster search but slower indexing
-        """
-        sqrt_n = int(math.sqrt(vocab_size))
-        if vocab_size <= 100000:
-            return min(1024, max(sqrt_n, vocab_size // 50))
-        if vocab_size <= 250000:
-            return min(2048, max(sqrt_n, vocab_size // 50))
-        return min(4096, max(sqrt_n * 2, vocab_size // 50))
+        self.sentence_index = load_faiss_index_from_binary_data(binary_data, self.index.corpus_name)
 
     def _lookup_vocab_embedding(self, normalized_query: str) -> np.ndarray | None:
         """Look up pre-computed embedding for in-vocabulary queries.

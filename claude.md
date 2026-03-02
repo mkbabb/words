@@ -35,8 +35,11 @@ AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. Mong
 │   │   ├── components/         # 229 .vue files: 123 shadcn/ui + 106 custom
 │   │   ├── stores/             # 14 Pinia store files, mode-based delegation
 │   │   ├── api/                # Axios client, SSE streaming, 14 modules
+│   │   │   ├── ai/             # synthesize, generate, assess, suggestions (split)
+│   │   │   └── sse/            # SSEClient, types (split)
 │   │   ├── composables/        # 5 global composables (iOS PWA, PWA, texture, slug)
 │   │   ├── types/              # Isomorphic types mirroring backend Pydantic
+│   │   │   └── api/            # models, responses, guards, versions (split)
 │   │   ├── router/             # 7 routes, SPA deep linking
 │   │   ├── views/              # Home.vue (SPA root), NotFound.vue
 │   │   └── utils/              # cn(), debounce, animations
@@ -102,8 +105,8 @@ Dedup → Cluster → Parallel enhance (4 word-level + 11 definition-level compo
 
 ## Design Decisions
 
-- **Isomorphic types**: Frontend TypeScript mirrors backend Pydantic exactly (`types/api.ts` ↔ `models/`)
-- **Async-first**: All I/O async. Motor, httpx, asyncio.gather
+- **Isomorphic types**: Frontend TypeScript mirrors backend Pydantic exactly (`types/api/` ↔ `models/`)
+- **Async-first**: All I/O async. Motor, httpx, asyncio.gather. 80+ async test fixtures
 - **Real integration tests**: Actual MongoDB per test, real FAISS indices. Only external APIs mocked
 - **Dedup before cluster**: Deduplicate provider definitions before AI clustering to reduce token usage
 - **Mode-based state**: SearchBarStore delegates to mode-specific stores with onEnter/onExit lifecycle

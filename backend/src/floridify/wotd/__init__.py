@@ -15,7 +15,7 @@ from .core import (
 from .generator import SyntheticGenerator, generate_training_data
 from .sagemaker import SageMakerDeployer, deploy_complete_wotd_pipeline
 from .storage import WOTDStorage, get_wotd_storage
-from .trainer import WOTDTrainer, train_wotd_pipeline
+from .training import WOTDTrainer, train_wotd_pipeline
 
 __all__ = [
     # Core types

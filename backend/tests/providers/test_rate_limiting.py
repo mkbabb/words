@@ -180,7 +180,7 @@ class TestRateLimitBehavior:
 
     def test_rate_limit_config_has_required_fields(self) -> None:
         """Test that RateLimitConfig has all required fields."""
-        from floridify.providers.utils import RateLimitConfig
+        from floridify.providers.rate_limiting import RateLimitConfig
 
         config = RateLimitConfig(
             base_requests_per_second=1.0,
@@ -196,7 +196,7 @@ class TestRateLimitBehavior:
 
     def test_rate_limit_config_validates_positive_values(self) -> None:
         """Test that RateLimitConfig validates positive values."""
-        from floridify.providers.utils import RateLimitConfig
+        from floridify.providers.rate_limiting import RateLimitConfig
 
         # Valid config
         config = RateLimitConfig(
@@ -213,14 +213,13 @@ class TestRateLimitBehavior:
 
     def test_adaptive_rate_limiter_exists(self) -> None:
         """Test that AdaptiveRateLimiter is available."""
-        from floridify.providers.utils import AdaptiveRateLimiter
+        from floridify.providers.rate_limiting import AdaptiveRateLimiter
 
         config = RateLimitPresets.API_STANDARD.value
         limiter = AdaptiveRateLimiter(config)
 
         assert limiter is not None
         assert limiter.config == config
-
 
 
 class TestProviderRateLimitIntegration:
@@ -258,5 +257,3 @@ class TestProviderRateLimitIntegration:
 
         # At least some should initialize
         assert initialized >= len(ALL_PROVIDERS) // 2
-
-

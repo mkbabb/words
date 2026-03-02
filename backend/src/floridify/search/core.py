@@ -15,7 +15,8 @@ from ..text import normalize
 from ..utils.logging import get_logger
 from .constants import DEFAULT_MIN_SCORE, SearchMethod, SearchMode
 from .fuzzy import FuzzySearch  # Using RapidFuzz implementation
-from .models import SearchIndex, SearchResult
+from .result import SearchResult
+from .search_index import SearchIndex
 from .semantic.constants import DEFAULT_SENTENCE_MODEL, SemanticModel
 from .semantic.core import SemanticSearch
 from .trie import TrieSearch

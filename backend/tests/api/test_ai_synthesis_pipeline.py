@@ -384,7 +384,9 @@ class TestAISynthesisPipelineAPI:
         assert len(responses) == 20
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Fixture-level mock_openai_client overrides local mocker.patch - needs test refactor to use separate fixture")
+    @pytest.mark.skip(
+        reason="Fixture-level mock_openai_client overrides local mocker.patch - needs test refactor to use separate fixture"
+    )
     async def test_ai_error_handling(self, async_client: AsyncClient, mocker):
         """Test AI endpoint error handling when OpenAI fails."""
         # Create failing mock

@@ -5,26 +5,26 @@ import { useStores } from '@/stores';
 const uiState = reactive({
     // Visual feedback
     isContainerHovered: false,
-    
+
     // Modal state
     showExpandModal: false,
-    
+
     // Scroll state
     scrollProgress: 0,
     documentHeight: 0,
     externalShrinkPercentage: 0,
-    
+
     // Dimensions
     searchBarHeight: 64,
     expandButtonVisible: false,
-    
+
     // Dev mode
-    isDevelopment: import.meta.env.DEV
+    isDevelopment: import.meta.env.DEV,
 });
 
 export function useSearchBarUI() {
     const { searchBar } = useStores();
-    
+
     // Icon opacity based on store state and local UI state
     const iconOpacity = computed(() => {
         // Always full opacity when focused or hovered
@@ -52,9 +52,9 @@ export function useSearchBarUI() {
             return 1 - easedProgress * 0.9;
         }
     });
-    
+
     return {
         uiState,
-        iconOpacity
+        iconOpacity,
     };
 }

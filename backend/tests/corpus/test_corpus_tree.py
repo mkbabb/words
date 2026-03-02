@@ -1,7 +1,6 @@
 """Test corpus tree structure operations."""
 
 import pytest
-from beanie import PydanticObjectId
 
 from floridify.caching.models import CacheNamespace, ResourceType, VersionInfo
 from floridify.corpus.core import Corpus

@@ -16,7 +16,7 @@ from flask import Flask, Response, jsonify, request
 sys.path.append("/opt/ml/code")
 
 from wotd.core import GenerateRequest, GenerateResponse, SemanticID
-from wotd.trainer import SemanticEncoder
+from wotd.encoders import UnifiedSemanticEncoder as SemanticEncoder
 
 
 class WOTDInferenceHandler:

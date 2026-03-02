@@ -418,17 +418,29 @@ class SpendingTracker:
             daily_total = sum(c for _, c in self._daily_spend)
 
             if daily_total >= self.daily_budget:
-                return False, f"Daily spending limit reached (${daily_total:.2f}/${self.daily_budget:.2f})"
+                return (
+                    False,
+                    f"Daily spending limit reached (${daily_total:.2f}/${self.daily_budget:.2f})",
+                )
             if hourly_total >= self.hourly_budget:
-                return False, f"Hourly spending limit reached (${hourly_total:.2f}/${self.hourly_budget:.2f})"
+                return (
+                    False,
+                    f"Hourly spending limit reached (${hourly_total:.2f}/${self.hourly_budget:.2f})",
+                )
 
             # Log warnings at thresholds
             if daily_total >= self.daily_budget * 0.9:
-                logger.warning(f"AI spending at 90% of daily budget: ${daily_total:.2f}/${self.daily_budget:.2f}")
+                logger.warning(
+                    f"AI spending at 90% of daily budget: ${daily_total:.2f}/${self.daily_budget:.2f}"
+                )
             elif daily_total >= self.daily_budget * 0.75:
-                logger.warning(f"AI spending at 75% of daily budget: ${daily_total:.2f}/${self.daily_budget:.2f}")
+                logger.warning(
+                    f"AI spending at 75% of daily budget: ${daily_total:.2f}/${self.daily_budget:.2f}"
+                )
             elif daily_total >= self.daily_budget * 0.5:
-                logger.info(f"AI spending at 50% of daily budget: ${daily_total:.2f}/${self.daily_budget:.2f}")
+                logger.info(
+                    f"AI spending at 50% of daily budget: ${daily_total:.2f}/${self.daily_budget:.2f}"
+                )
 
             return True, None
 

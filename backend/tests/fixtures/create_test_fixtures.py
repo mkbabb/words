@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import ebooklib
 from ebooklib import epub
 from pypdf import PdfWriter
 
@@ -74,10 +73,6 @@ def create_test_epub(output_path: Path) -> None:
 
 def create_test_pdf(output_path: Path) -> None:
     """Create a minimal PDF file for testing using pypdf."""
-    from io import BytesIO
-
-    from pypdf import PdfWriter
-    from pypdf.generic import NameObject, TextStringObject
 
     writer = PdfWriter()
 

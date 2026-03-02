@@ -27,7 +27,7 @@ from floridify.corpus.core import Corpus, CorpusType
 from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.dictionary import Definition, DictionaryProvider, Language, Word
 from floridify.search.core import Search
-from floridify.search.models import SearchIndex
+from floridify.search.search_index import SearchIndex
 from floridify.search.semantic.core import SemanticSearch
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
@@ -39,16 +39,44 @@ async def shared_semantic_corpus(test_db_session):
     """
     vocabulary = [
         # Emotion words
-        "happy", "joyful", "cheerful", "glad", "delighted",
-        "sad", "unhappy", "sorrowful", "miserable", "dejected",
-        "angry", "furious", "irate", "enraged", "irritated",
-        "calm", "peaceful", "serene", "tranquil", "relaxed",
+        "happy",
+        "joyful",
+        "cheerful",
+        "glad",
+        "delighted",
+        "sad",
+        "unhappy",
+        "sorrowful",
+        "miserable",
+        "dejected",
+        "angry",
+        "furious",
+        "irate",
+        "enraged",
+        "irritated",
+        "calm",
+        "peaceful",
+        "serene",
+        "tranquil",
+        "relaxed",
         # Animal words
-        "dog", "cat", "elephant", "tiger", "lion",
+        "dog",
+        "cat",
+        "elephant",
+        "tiger",
+        "lion",
         # Food words
-        "apple", "banana", "orange", "bread", "cheese",
+        "apple",
+        "banana",
+        "orange",
+        "bread",
+        "cheese",
         # Action words
-        "run", "walk", "jump", "swim", "fly",
+        "run",
+        "walk",
+        "jump",
+        "swim",
+        "fly",
     ]
 
     sorted_vocab = sorted(vocabulary)
@@ -209,9 +237,7 @@ async def await_semantic_ready(engine: Search, timeout: float = 60.0) -> None:
 
     while engine._semantic_init_task and not engine._semantic_init_task.done():
         if asyncio.get_event_loop().time() - start_time > timeout:
-            raise TimeoutError(
-                f"Semantic search initialization timed out after {timeout}s"
-            )
+            raise TimeoutError(f"Semantic search initialization timed out after {timeout}s")
         await asyncio.sleep(0.1)  # Check every 100ms
 
 
