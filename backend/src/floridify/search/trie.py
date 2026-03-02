@@ -209,12 +209,8 @@ class TrieSearch:
                 top_indices = np.argsort(-frequencies)[:max_results]
                 matches = [matches[i] for i in top_indices]
 
-        # Return original words with diacritics if available
-        if self.index and self.index.normalized_to_original:
-            return [
-                self.index.normalized_to_original.get(word, word) for word in matches[:max_results]
-            ]
-
+        # Return normalized words — caller handles mapping to original forms
+        # (consistent with search_exact which also returns normalized words)
         return matches[:max_results]
 
     @classmethod

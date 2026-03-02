@@ -44,6 +44,13 @@ class TrieIndex(BaseModel):
     original_vocabulary: list[str] = Field(default_factory=list)
     normalized_to_original: dict[str, str] = Field(default_factory=dict)
 
+    # Bloom filter persistence
+    bloom_bits: bytes | None = None
+    bloom_num_bits: int = 0
+    bloom_num_hashes: int = 0
+    bloom_count: int = 0
+    bloom_error_rate: float = 0.01
+
     # Statistics
     word_count: int = 0
     max_frequency: int = 0
@@ -168,12 +175,14 @@ class TrieIndex(BaseModel):
             word_frequencies[word] = freq
             max_frequency = max(max_frequency, freq)
 
-        # Build normalized to original mapping
+        # Build normalized to original mapping using the corpus's index-based mapping
+        # (vocabulary is sorted; original_vocabulary is insertion-order — zip is WRONG)
         normalized_to_original = {}
-        for norm_word, orig_word in zip(
-            corpus.vocabulary, corpus.original_vocabulary, strict=False
-        ):
-            normalized_to_original[norm_word] = orig_word
+        for norm_idx, orig_indices in corpus.normalized_to_original_indices.items():
+            if 0 <= norm_idx < len(corpus.vocabulary) and orig_indices:
+                norm_word = corpus.vocabulary[norm_idx]
+                orig_word = corpus.original_vocabulary[orig_indices[0]]
+                normalized_to_original[norm_word] = orig_word
 
         build_time = time.perf_counter() - start_time
 
