@@ -20,6 +20,11 @@ export interface GenerateAudioResponse {
 
 export const audioApi = {
   getAudioContentUrl(contentUrl: string): string {
+    // External URLs (provider audio) are used directly
+    if (contentUrl.startsWith('http://') || contentUrl.startsWith('https://')) {
+      return contentUrl;
+    }
+    // Internal URLs: strip /api/v1 prefix and prepend our base URL
     return `${API_BASE_URL}${contentUrl.replace(/^\/api\/v1/, '')}`;
   },
 

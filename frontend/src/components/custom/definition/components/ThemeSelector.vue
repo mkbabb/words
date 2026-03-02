@@ -1,6 +1,6 @@
 <template>
     <div
-        v-if="isMounted"
+        v-if="isMounted && isAdmin"
         class="absolute top-2 right-2 z-50 flex items-center gap-2"
     >
         <!-- Edit Mode Toggle Button -->
@@ -23,7 +23,7 @@
 
         <!-- Admin: Version History Button -->
         <button
-            v-if="isAdmin && editModeEnabled"
+            v-if="editModeEnabled"
             @click="$emit('toggle-version-history')"
             class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-1.5 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
             title="Version History"
@@ -36,7 +36,7 @@
 
         <!-- Admin: Re-synthesize Button -->
         <button
-            v-if="isAdmin && editModeEnabled"
+            v-if="editModeEnabled"
             @click="$emit('resynthesize')"
             class="group mt-1 rounded-lg border-2 border-border bg-background/80 p-1.5 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-background focus:ring-0 focus:outline-none"
             title="Re-synthesize with AI"

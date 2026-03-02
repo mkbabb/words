@@ -11,10 +11,10 @@
                 </span>
 
                 <!-- Animated text overlay with extra space for cursor -->
-                <div class="absolute top-0 left-0 w-[calc(100%+2ch)]">
+                <div class="absolute top-0 left-0 whitespace-nowrap">
                     <AnimatedTitle
                         :text="word"
-                        class="block"
+                        class="inline"
                     />
                 </div>
             </div>

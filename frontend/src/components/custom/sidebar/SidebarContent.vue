@@ -1,8 +1,17 @@
 <template>
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div class="min-h-0 flex-1 overflow-y-auto p-4 overscroll-contain">
+            <Transition
+                mode="out-in"
+                enter-active-class="transition-opacity duration-200 ease-apple-smooth"
+                enter-from-class="opacity-0"
+                enter-to-class="opacity-100"
+                leave-active-class="transition-opacity duration-150 ease-apple-smooth"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0"
+            >
             <!-- Show different views based on search mode -->
-            <template v-if="!collapsed">
+            <div v-if="!collapsed" key="expanded">
                 <Transition
                     mode="out-in"
                     enter-active-class="transition-all duration-300 ease-out"
@@ -12,15 +21,15 @@
                     leave-from-class="opacity-100 translate-x-0"
                     leave-to-class="opacity-0 -translate-x-4"
                 >
-                    <component 
-                        :is="currentView" 
+                    <component
+                        :is="currentView"
                         :key="searchBarStore.searchMode"
                     />
                 </Transition>
-            </template>
-            
+            </div>
+
             <!-- Collapsed state -->
-            <div v-else class="flex flex-col items-center gap-2">
+            <div v-else key="collapsed" class="flex flex-col items-center gap-2">
                 <!-- Recent words for lookup mode -->
                 <template v-if="searchBarStore.searchMode === 'lookup'">
                     <HoverCard v-for="item in combinedRecentItems" :key="item.id">
@@ -104,6 +113,7 @@
                     </TooltipProvider>
                 </template>
             </div>
+            </Transition>
         </div>
     </div>
 </template>
