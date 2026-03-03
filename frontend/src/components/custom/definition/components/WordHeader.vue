@@ -107,6 +107,7 @@ import type { AudioFile } from '@/types/api';
 
 interface WordHeaderProps {
     word: string;
+    language?: string;
     pronunciation?: {
         phonetic: string;
         ipa: string;
@@ -136,7 +137,8 @@ const handleWordAdded = (_wordlistName: string) => {
 // Audio playback
 const wordRef = toRef(props, 'word');
 const audioFilesRef = computed(() => props.pronunciation?.audio_files);
-const { state: audioState, errorMessage: audioError, play: playAudio } = useAudioPlayback(wordRef, audioFilesRef);
+const languageRef = toRef(() => props.language ?? 'en');
+const { state: audioState, errorMessage: audioError, play: playAudio } = useAudioPlayback(wordRef, audioFilesRef, languageRef);
 
 // Check if we have valid pronunciation data
 const hasPronunciation = computed(() => {

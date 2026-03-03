@@ -78,6 +78,7 @@
             <WordHeader
                 v-if="entry.word"
                 :word="entry.word"
+                :language="entry.language || 'en'"
                 :pronunciation="entry.pronunciation"
                 :pronunciationMode="lookupMode.pronunciationMode"
                 :providers="usedProviders"

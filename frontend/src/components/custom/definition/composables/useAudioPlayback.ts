@@ -7,6 +7,7 @@ export type AudioPlaybackState = 'idle' | 'loading' | 'playing' | 'error';
 export function useAudioPlayback(
   word: Ref<string>,
   audioFiles: Ref<AudioFile[] | undefined>,
+  language: Ref<string> = ref('en'),
 ) {
   const state = ref<AudioPlaybackState>('idle');
   const errorMessage = ref('');
@@ -37,21 +38,10 @@ export function useAudioPlayback(
       }
     }
 
-    // Free dictionary API fallback — no credentials needed
-    const freeUrl = `https://api.dictionaryapi.dev/media/pronunciations/en/${encodeURIComponent(word.value)}-us.mp3`;
-    try {
-      const resp = await fetch(freeUrl, { method: 'HEAD' });
-      if (resp.ok) {
-        cachedUrl = freeUrl;
-        return cachedUrl;
-      }
-    } catch {
-      // Fall through to TTS endpoint
-    }
-
-    // Generate via backend TTS as last resort
+    // Generate via backend TTS (language-aware)
     const result: GenerateAudioResponse = await audioApi.generateAudio({
       word: word.value,
+      language: language.value,
     });
     cachedUrl = audioApi.getAudioContentUrl(result.content_url);
     return cachedUrl;

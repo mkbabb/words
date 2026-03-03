@@ -199,6 +199,7 @@ export interface SynthesizedDictionaryEntry extends BaseMetadata {
     id: string;
     word_id: string;
     word: string; // The word text (populated in responses)
+    language?: string; // ISO language code: "en", "fr", "es", etc.
     pronunciation_id?: string;
     pronunciation?: Pronunciation; // Populated in responses
     definition_ids: string[];

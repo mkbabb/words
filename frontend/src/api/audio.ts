@@ -5,6 +5,7 @@ export interface GenerateAudioParams {
   word: string;
   accent?: 'american' | 'british';
   voice_gender?: 'male' | 'female';
+  language?: string; // ISO language code, defaults to "en"
 }
 
 export interface GenerateAudioResponse {
@@ -33,6 +34,7 @@ export const audioApi = {
       word: params.word,
       accent: params.accent ?? 'american',
       voice_gender: params.voice_gender ?? 'male',
+      language: params.language ?? 'en',
     });
     return response.data.data as GenerateAudioResponse;
   },
