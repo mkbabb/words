@@ -115,9 +115,11 @@ deploy_on_server() {
         echo "Configuration files verified"
 
         # Build and deploy with Docker Compose
+        # Note: SSL is handled by the host's Apache reverse proxy, not Docker nginx.
+        # Use --profile ssl only if no external reverse proxy is available.
         echo "Building and deploying with Docker Compose..."
         docker compose -f docker-compose.yml -f docker-compose.prod.yml build
-        docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile ssl up -d
+        docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
         # Show container status
         echo ""
