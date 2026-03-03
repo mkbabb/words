@@ -4,19 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import os
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..utils.paths import get_project_root
 from .synthesizer import TTSResult
-
-if TYPE_CHECKING:
-    import numpy as np
+from .utils import audio_to_mp3
 
 
 # Voice mapping: (accent, gender) → KittenTTS voice name
@@ -91,42 +88,6 @@ class KittenTTSSynthesizer:
         """Map (accent, gender) to a KittenTTS voice name."""
         return VOICE_MAP.get((accent, voice_gender), DEFAULT_VOICE)
 
-    def _audio_to_mp3(self, audio_array: np.ndarray, sample_rate: int) -> bytes:
-        """Convert numpy audio array to MP3 bytes via WAV → ffmpeg."""
-        import subprocess
-        import tempfile
-
-        import numpy as np
-        import soundfile as sf
-
-        # Normalize to [-1, 1] float32
-        if audio_array.dtype != np.float32:
-            audio_array = audio_array.astype(np.float32)
-        peak = np.abs(audio_array).max()
-        if peak > 0:
-            audio_array = audio_array / peak
-
-        # Write WAV to temp file, convert with ffmpeg
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as wav_f:
-            sf.write(wav_f.name, audio_array, sample_rate)
-            wav_path = wav_f.name
-
-        mp3_path = wav_path.replace(".wav", ".mp3")
-        try:
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", wav_path, "-b:a", "128k", "-f", "mp3", mp3_path],
-                capture_output=True,
-                check=True,
-            )
-            with open(mp3_path, "rb") as f:
-                return f.read()
-        finally:
-            for p in (wav_path, mp3_path):
-                try:
-                    os.unlink(p)
-                except OSError:
-                    pass
-
     def _synthesize_sync(self, text: str, voice: str) -> tuple[bytes, int]:
         """Synchronous synthesis — runs in executor.
 
@@ -140,7 +101,7 @@ class KittenTTSSynthesizer:
         audio_array = np.asarray(audio_array).squeeze()
         sample_rate = self.config.sample_rate
         duration_ms = int(len(audio_array) / sample_rate * 1000)
-        mp3_bytes = self._audio_to_mp3(audio_array, sample_rate)
+        mp3_bytes = audio_to_mp3(audio_array, sample_rate)
         return mp3_bytes, duration_ms
 
     async def synthesize_word(
@@ -148,8 +109,15 @@ class KittenTTSSynthesizer:
         word: str,
         accent: Literal["american", "british"] = "american",
         voice_gender: Literal["male", "female"] = "male",
+        language: str = "en",
     ) -> TTSResult | None:
-        """Synthesize audio for a word. Returns TTSResult or None on failure."""
+        """Synthesize audio for a word. Returns TTSResult or None on failure.
+
+        Only supports English — returns None for other languages.
+        """
+        if language != "en":
+            return None
+
         try:
             voice = self._resolve_voice(accent, voice_gender)
             cache_key = self._generate_cache_key(word, voice)
@@ -217,8 +185,12 @@ class KittenTTSSynthesizer:
         self,
         pronunciation: object,
         word_text: str,
+        language: str = "en",
     ) -> list[TTSResult]:
         """Generate audio files for a pronunciation entry."""
+        if language != "en":
+            return []
+
         results: list[TTSResult] = []
 
         ipa = getattr(pronunciation, "ipa", "")

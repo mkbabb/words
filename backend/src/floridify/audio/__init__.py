@@ -1,5 +1,5 @@
 """Audio synthesis module for Floridify."""
 
-from .synthesizer import AudioSynthesisConfig, AudioSynthesizer, TTSResult
+from .synthesizer import AudioSynthesizer, TTSResult
 
-__all__ = ["AudioSynthesisConfig", "AudioSynthesizer", "TTSResult"]
+__all__ = ["AudioSynthesizer", "TTSResult"]
