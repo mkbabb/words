@@ -17,11 +17,7 @@
       :size="expanded ? 'lg' : 'base'"
       :clickable="clickable"
       :show-subscript="showSubscript"
-      :class="cn('transition-all duration-300', {
-        '-translate-y-px': expanded,
-        '-translate-x-1': expanded && showSubscript,
-        'translate-x-0.5': expanded && !showSubscript,
-      })"
+      class="transition-all duration-300"
       @toggle-mode="$emit('toggle-mode')"
     />
 
@@ -29,12 +25,9 @@
     <span
       v-if="expanded"
       :class="
-        cn('text-foreground transform font-serif transition-all duration-300', {
-          'text-xl': expanded,
+        cn('text-foreground font-serif text-xl transition-all duration-300', {
           'scale-x-0 opacity-0': !expanded,
           'scale-x-100 opacity-100': expanded,
-          '-ml-1.5': showSubscript,
-          '-ml-0.5': !showSubscript,
         })
       "
     >

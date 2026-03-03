@@ -13,11 +13,11 @@
                 <!-- Left: Floridify + @mbabb -->
                 <div class="flex items-center gap-3">
                     <FloridifyIcon :expanded="true" :mode="searchBarStore.getSubMode('lookup') as any" :clickable="canToggleMode" :show-subscript="canToggleMode" @toggle-mode="() => searchBarStore.setSubMode('lookup', searchBarStore.getSubMode('lookup') === 'dictionary' ? 'thesaurus' : 'dictionary')" />
-                    <HoverCard :open-delay="600">
-                        <HoverCardTrigger>
+                    <Popover>
+                        <PopoverTrigger as-child>
                             <Button variant="link" class="h-auto p-0 font-mono text-sm">@mbabb</Button>
-                        </HoverCardTrigger>
-                        <HoverCardContent>
+                        </PopoverTrigger>
+                        <PopoverContent class="w-72">
                             <div class="flex gap-4">
                                 <Avatar>
                                     <AvatarImage src="https://avatars.githubusercontent.com/u/2848617?v=4" />
@@ -35,8 +35,8 @@
                                     </a>
                                 </div>
                             </div>
-                        </HoverCardContent>
-                    </HoverCard>
+                        </PopoverContent>
+                    </Popover>
                 </div>
                 <!-- Right: Dark Mode + Hamburger -->
                 <div class="flex items-center gap-3">
@@ -71,7 +71,7 @@ import { useSearchBarStore } from '@/stores/search/search-bar';
 import { cn } from '@/utils';
 import { FloridifyIcon, HamburgerIcon } from '@/components/custom/icons';
 import { DarkModeToggle } from '@/components/custom/dark-mode-toggle';
-import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Avatar, AvatarImage, Button } from '@/components/ui';
 import { PanelRight } from 'lucide-vue-next';
 
