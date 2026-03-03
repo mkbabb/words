@@ -68,7 +68,7 @@
                 <ModeToggle
                     :model-value="searchBar.getSubMode('lookup') as any"
                     :can-toggle="canToggleMode"
-                    :opacity="iconOpacity"
+                    :opacity="canToggleMode ? iconOpacity : 0"
                     :ai-mode="searchBar.isAIQuery"
                     @update:model-value="
                         (value: any) => searchBar.setSubMode('lookup', value)
@@ -180,37 +180,43 @@
 
             <!-- Dropdowns Container -->
             <div class="absolute top-full right-0 left-0 z-40 pt-2">
-                <!-- Controls Dropdown -->
-                <SearchControls
-                    :show="searchBar.showSearchControls"
-                    v-model:selected-sources="selectedSources"
-                    v-model:selected-languages="selectedLanguages"
-                    v-model:no-a-i="noAI"
-                    v-model:wordlist-filters="wordlistFilters"
-                    :wordlist-sort-criteria="wordlistSortCriteria"
-                    @update:wordlist-sort-criteria="
-                        (value: any) => (wordlistSortCriteria = value)
-                    "
-                    :ai-suggestions="searchBar.aiSuggestions as string[]"
-                    :is-development="uiState.isDevelopment"
-                    :show-refresh-button="
-                        !!content.currentEntry &&
-                        searchBar.searchMode === 'lookup'
-                    "
-                    :force-refresh-mode="loading.forceRefreshMode.value"
-                    @word-select="selectWord"
-                    @clear-storage="clearAllStorage"
-                    @interaction="handleSearchAreaInteraction"
-                    @toggle-sidebar="ui.toggleSidebar()"
-                    @toggle-refresh="handleForceRegenerate"
-                    @execute-search="handleEnterWrapped"
-                />
+                <!-- Controls Dropdown — height transition wrapper -->
+                <div
+                    class="overflow-hidden transition-all duration-350 ease-apple-spring"
+                    :style="{
+                        maxHeight: searchBar.showSearchControls ? '500px' : '0px',
+                        opacity: searchBar.showSearchControls ? 1 : 0,
+                        marginBottom: searchBar.showSearchControls ? '0.5rem' : '0px',
+                    }"
+                >
+                    <SearchControls
+                        :show="true"
+                        v-model:selected-sources="selectedSources"
+                        v-model:selected-languages="selectedLanguages"
+                        v-model:no-a-i="noAI"
+                        v-model:wordlist-filters="wordlistFilters"
+                        :wordlist-sort-criteria="wordlistSortCriteria"
+                        @update:wordlist-sort-criteria="
+                            (value: any) => (wordlistSortCriteria = value)
+                        "
+                        :ai-suggestions="searchBar.aiSuggestions as string[]"
+                        :is-development="uiState.isDevelopment"
+                        :show-refresh-button="
+                            !!content.currentEntry &&
+                            searchBar.searchMode === 'lookup'
+                        "
+                        :force-refresh-mode="loading.forceRefreshMode.value"
+                        @word-select="selectWord"
+                        @clear-storage="clearAllStorage"
+                        @interaction="handleSearchAreaInteraction"
+                        @toggle-sidebar="ui.toggleSidebar()"
+                        @toggle-refresh="handleForceRegenerate"
+                        @execute-search="handleEnterWrapped"
+                    />
+                </div>
 
                 <!-- Search Results Container -->
-                <div
-                    :style="resultsContainerStyle"
-                    class="ease-apple-spring transition-all duration-350"
-                >
+                <div>
                     <SearchResults
                         ref="searchResultsComponent"
                         :show="searchBar.showDropdown"
@@ -226,6 +232,7 @@
                         :semantic-building="
                             lookupMode.semanticStatus?.building ?? false
                         "
+                        :recent-searches="historyStore.recentSearches as any[]"
                         @select-result="selectResult"
                         @interaction="handleSearchAreaInteraction"
                     />
@@ -261,6 +268,7 @@ import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
 import { useContentStore } from '@/stores/content/content';
+import { useHistoryStore } from '@/stores/content/history';
 import { useUIStore } from '@/stores/ui/ui-state';
 import { useLoadingStore } from '@/stores/ui/loading';
 // Maximize2 and X moved to SearchInputActions component
@@ -321,6 +329,7 @@ const searchBar = useSearchBarStore();
 const lookupMode = useLookupMode();
 const wordlistMode = useWordlistMode();
 const content = useContentStore();
+const historyStore = useHistoryStore();
 const ui = useUIStore();
 const loading = useLoadingStore();
 const { iconOpacity, uiState } = useSearchBarUI();
@@ -359,11 +368,7 @@ const placeholder = computed(() => {
         : 'synonyms';
 });
 
-const resultsContainerStyle = computed(() => ({
-    paddingTop: '0px',
-    marginTop: searchBar.showSearchControls ? '0.5rem' : '0px',
-    transition: 'all 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-}));
+// Results container style — controls wrapper handles its own spacing now
 
 // Computed properties for v-model bindings
 const searchQuery = computed({
@@ -652,13 +657,20 @@ watch(
     }
 );
 
-// Hide dropdown when focus is lost or query is empty
+// Hide dropdown when focus is lost; show recent searches on empty focus
 watchEffect(() => {
     const focused = searchBar.isFocused;
     const query = searchBar.searchQuery;
 
-    if (!focused || !query || query.length === 0) {
+    if (!focused) {
         if (searchBar.showDropdown) {
+            searchBar.hideDropdown();
+        }
+    } else if (!query || query.length === 0) {
+        // Show dropdown for recent searches when focused with empty query
+        if (historyStore.recentSearches.length > 0) {
+            searchBar.openDropdown();
+        } else if (searchBar.showDropdown) {
             searchBar.hideDropdown();
         }
     }

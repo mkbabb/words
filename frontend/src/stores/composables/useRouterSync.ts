@@ -9,9 +9,9 @@ export function useRouterSync() {
 
   const navigateToLookupMode = (word: string, subMode: string = 'dictionary') => {
     const routeName = subMode === 'thesaurus' ? 'Thesaurus' : 'Definition'
-    router.push({ name: routeName, params: { word } }).catch(() => {
-      // Fallback if named route doesn't exist
-      router.push({ path: `/definition/${encodeURIComponent(word)}` })
+    // Use replace to avoid triggering the route watcher re-fetch
+    router.replace({ name: routeName, params: { word } }).catch(() => {
+      router.replace({ path: `/definition/${encodeURIComponent(word)}` })
     })
   }
 

@@ -1,5 +1,6 @@
 import { ref, nextTick, onMounted, onUnmounted, Ref } from 'vue';
 import { useStores } from '@/stores';
+import { useHistoryStore } from '@/stores/content/history';
 
 interface UseFocusManagementOptions {
     searchInputComponent: Ref<any>;
@@ -13,6 +14,7 @@ interface UseFocusManagementOptions {
  */
 export function useFocusManagement(options: UseFocusManagementOptions) {
     const { searchBar } = useStores();
+    const history = useHistoryStore();
     const { searchInputComponent, searchContainer, emit } = options;
 
     const isInteractingWithSearchArea = ref(false);
@@ -48,6 +50,13 @@ export function useFocusManagement(options: UseFocusManagementOptions) {
             !searchBar.isDirectLookup // Don't show if we're doing a direct lookup
         ) {
             // Search results are already stored, just show the dropdown
+            searchBar.openDropdown();
+        } else if (
+            searchBar.searchMode === 'lookup' &&
+            searchBar.searchQuery.length === 0 &&
+            history.recentSearches.length > 0
+        ) {
+            // Show recent searches dropdown when focusing with empty query
             searchBar.openDropdown();
         }
     };

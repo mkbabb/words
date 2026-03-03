@@ -37,7 +37,19 @@ export function useAudioPlayback(
       }
     }
 
-    // Generate on demand
+    // Free dictionary API fallback — no credentials needed
+    const freeUrl = `https://api.dictionaryapi.dev/media/pronunciations/en/${encodeURIComponent(word.value)}-us.mp3`;
+    try {
+      const resp = await fetch(freeUrl, { method: 'HEAD' });
+      if (resp.ok) {
+        cachedUrl = freeUrl;
+        return cachedUrl;
+      }
+    } catch {
+      // Fall through to TTS endpoint
+    }
+
+    // Generate via backend TTS as last resort
     const result: GenerateAudioResponse = await audioApi.generateAudio({
       word: word.value,
     });
@@ -81,7 +93,8 @@ export function useAudioPlayback(
       state.value = 'playing';
     } catch (e) {
       state.value = 'error';
-      errorMessage.value = e instanceof Error ? e.message : 'Audio playback failed';
+      errorMessage.value =
+        e instanceof Error ? e.message : 'No pronunciation audio available';
     }
   }
 

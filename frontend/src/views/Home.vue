@@ -206,10 +206,16 @@ watch(() => route.fullPath, async () => {
         searchBar.setSubMode('lookup', 'thesaurus');
         searchBar.setQuery(word);
 
-        if (!searchBar.isDirectLookup && (!content.currentEntry || content.currentEntry.word !== word)) {
+        // Check for existing thesaurus data for this word
+        const hasThesaurus = content.currentThesaurus &&
+            content.currentThesaurus.word === word;
+        if (!searchBar.isDirectLookup && !hasThesaurus) {
             searchBar.setDirectLookup(true);
             try {
-                await orchestrator.getThesaurusData(word);
+                const data = await orchestrator.getThesaurusData(word);
+                if (data) {
+                    content.setCurrentThesaurus(data);
+                }
             } finally {
                 searchBar.setDirectLookup(false);
             }

@@ -2,6 +2,8 @@ import { Ref, computed, ref } from 'vue';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useWordlistMode } from '@/stores/search/modes/wordlist';
+import { useHistoryStore } from '@/stores/content/history';
+import { useContentStore } from '@/stores/content/content';
 import { useLoadingState } from '@/stores/ui/loading';
 import { lookupApi, aiApi, wordlistApi } from '@/api';
 import { logger } from '@/utils/logger';
@@ -30,6 +32,8 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
     const searchBar = useSearchBarStore();
     const lookupMode = useLookupMode();
     const wordlistMode = useWordlistMode();
+    const history = useHistoryStore();
+    const contentStore = useContentStore();
     const loading = useLoadingState();
     const { query, onSearchComplete } = options;
 
@@ -110,7 +114,8 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
 
         if (results.length > 0) {
             searchBar.openDropdown();
-            searchBar.setSelectedIndex(-1);
+            searchBar.setSelectedIndex(0);
+            history.addToHistory(queryText, results);
         } else {
             searchBar.clearResults();
             searchBar.hideDropdown();
@@ -170,6 +175,19 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
     };
 
     const getThesaurusData = async (word: string): Promise<any> => {
+        // In no_ai mode, extract synonyms from provider definitions
+        if (lookupMode.noAI) {
+            const entry = contentStore.currentEntry;
+            if (entry?.definitions) {
+                const synonyms = (entry.definitions as any[])
+                    .flatMap((d: any) => d.synonyms || [])
+                    .filter((s: string, i: number, arr: string[]) => arr.indexOf(s) === i)
+                    .map((word: string) => ({ word, score: 0.8 }));
+                return { word, synonyms, confidence: synonyms.length > 0 ? 0.7 : 0 };
+            }
+            return { word, synonyms: [], confidence: 0 };
+        }
+
         loading.startOperation();
         try {
             return await aiApi.synthesize.synonyms(word);

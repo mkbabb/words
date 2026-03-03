@@ -1,21 +1,12 @@
 <template>
-    <Transition
-        enter-active-class="transition-all duration-350 ease-apple-elastic"
-        leave-active-class="transition-all duration-200 ease-apple-bounce-in"
-        enter-from-class="opacity-0 scale-90 -translate-y-6 -rotate-1"
-        enter-to-class="opacity-100 scale-100 translate-y-0 rotate-0"
-        leave-from-class="opacity-100 scale-100 translate-y-0 rotate-0"
-        leave-to-class="opacity-0 scale-90 -translate-y-6 -rotate-1"
+    <div
+        ref="controlsDropdown"
+        class="dropdown-element cartoon-shadow-sm mb-2 origin-top overflow-hidden rounded-2xl border-2 border-border bg-background/20 backdrop-blur-3xl"
+        tabindex="0"
+        @mousedown.prevent
+        @click="$emit('interaction')"
+        @keydown.enter="handleEnterKey"
     >
-        <div
-            v-if="show"
-            ref="controlsDropdown"
-            class="dropdown-element cartoon-shadow-sm mb-2 origin-top overflow-hidden rounded-2xl border-2 border-border bg-background/20 backdrop-blur-3xl"
-            tabindex="0"
-            @mousedown.prevent
-            @click="$emit('interaction')"
-            @keydown.enter="handleEnterKey"
-        >
             <!-- Header: Sidebar Toggle + Search Mode Toggle -->
             <div
                 class="flex items-center justify-between border-border/50 px-4 py-3 lg:justify-center"
@@ -67,8 +58,7 @@
                 v-model:wordlist-filters="wordlistFilters"
                 v-model:wordlist-sort-criteria="wordlistSortCriteria"
             />
-        </div>
-    </Transition>
+    </div>
 </template>
 
 <script setup lang="ts">

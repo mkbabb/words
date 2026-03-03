@@ -51,14 +51,19 @@
             <span class="text-lg text-muted-foreground font-mono">
                 {{ currentPronunciation }}
             </span>
+            <span v-if="!hasMultiplePronunciations && hasPronunciation" class="text-xs text-muted-foreground/60">
+                {{ pronunciationMode === 'ipa' || (!pronunciation?.phonetic || pronunciation?.phonetic === 'unknown') ? '(IPA)' : '(Phonetic)' }}
+            </span>
 
             <!-- Audio Playback Button -->
             <AudioPlaybackButton
                 :state="audioState"
+                :error-message="audioError"
                 @play="playAudio"
             />
 
             <button
+                v-if="hasMultiplePronunciations"
                 @click="$emit('toggle-pronunciation')"
                 class="h-6 min-w-[60px] rounded-md border border-border/50 bg-muted/50 px-2 py-1 text-center text-xs text-foreground/80 transition-all duration-200 hover:border-border hover:bg-muted hover:text-foreground"
             >
@@ -160,7 +165,7 @@ const handleWordAdded = (_wordlistName: string) => {
 // Audio playback
 const wordRef = toRef(props, 'word');
 const audioFilesRef = computed(() => props.pronunciation?.audio_files);
-const { state: audioState, play: playAudio } = useAudioPlayback(wordRef, audioFilesRef);
+const { state: audioState, errorMessage: audioError, play: playAudio } = useAudioPlayback(wordRef, audioFilesRef);
 
 // Check if we have valid pronunciation data
 const hasPronunciation = computed(() => {
@@ -171,6 +176,14 @@ const hasPronunciation = computed(() => {
     const ipaValid =
         props.pronunciation.ipa && props.pronunciation.ipa !== 'unknown';
     return phoneticValid || ipaValid;
+});
+
+// Only show toggle when both formats exist and differ
+const hasMultiplePronunciations = computed(() => {
+    if (!props.pronunciation) return false;
+    const pValid = props.pronunciation.phonetic && props.pronunciation.phonetic !== 'unknown';
+    const iValid = props.pronunciation.ipa && props.pronunciation.ipa !== 'unknown';
+    return pValid && iValid;
 });
 
 // Get the current pronunciation to display

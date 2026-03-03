@@ -238,10 +238,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useContentStore } from '@/stores';
 import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useSearchBarStore } from '@/stores/search/search-bar';
+import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -275,6 +276,26 @@ import { normalizeEtymology } from '@/utils/guards';
 const contentStore = useContentStore();
 const lookupMode = useLookupMode();
 const searchBar = useSearchBarStore();
+
+// Orchestrator for auto-fetching thesaurus data
+const orchestrator = useSearchOrchestrator({
+    query: computed(() => searchBar.searchQuery),
+});
+
+// Auto-fetch thesaurus when switching to thesaurus submode
+watch(() => searchBar.getSubMode('lookup'), async (newSubMode) => {
+    if (
+        newSubMode === 'thesaurus' &&
+        contentStore.currentEntry &&
+        !contentStore.currentThesaurus
+    ) {
+        const word = contentStore.currentEntry.word;
+        const data = await orchestrator.getThesaurusData(word);
+        if (data) {
+            contentStore.setCurrentThesaurus(data);
+        }
+    }
+});
 
 // Reactive state
 const isMounted = ref(true);
@@ -340,12 +361,26 @@ const selectedCardVariant = computed({
 // Convert readonly thesaurus to mutable type for component compatibility
 const thesaurusData = computed(() => {
     const data = contentStore.currentThesaurus;
-    if (!data) return null;
-    return {
-        word: data.word,
-        synonyms: [...data.synonyms],
-        confidence: data.confidence,
-    };
+    if (data) {
+        return {
+            word: data.word,
+            synonyms: [...data.synonyms],
+            confidence: data.confidence,
+        };
+    }
+
+    // Fallback: extract synonyms from provider definitions (useful in no_ai mode)
+    if (entry.value?.definitions) {
+        const synonyms = (entry.value.definitions as any[])
+            .flatMap((d: any) => d.synonyms || [])
+            .filter((s: string, i: number, arr: string[]) => arr.indexOf(s) === i)
+            .map((word: string) => ({ word, score: 0.8 }));
+        if (synonyms.length > 0) {
+            return { word: entry.value.word, synonyms, confidence: 0.7 };
+        }
+    }
+
+    return null;
 });
 
 // Smart skeleton logic

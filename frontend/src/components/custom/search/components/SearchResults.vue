@@ -166,9 +166,39 @@
                 fuzzy only
             </p>
 
+            <!-- Recent Searches (shown when query is empty and we have history) -->
+            <div
+                v-if="!loading && results.length === 0 && query.length === 0 && recentSearches && recentSearches.length > 0"
+                class="max-h-64 overflow-y-auto bg-background/20 backdrop-blur-3xl"
+            >
+                <div class="px-4 py-2 text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">Recent</div>
+                <button
+                    v-for="(search, index) in recentSearches.slice(0, 8)"
+                    :key="search.query"
+                    :class="[
+                        'ease-apple-spring flex w-full items-center px-4 py-2.5 text-left transition-all duration-300',
+                        'border-muted-foreground/50 active:scale-[0.97]',
+                        index === selectedIndex
+                            ? 'scale-[1.02] border-l-8 bg-accent/60 pl-4 shadow-md'
+                            : 'border-l-0 pl-4 hover:scale-[1.01] hover:bg-accent/20',
+                    ]"
+                    @click="$emit('select-result', { word: search.query, score: 1.0, method: SearchMethod.EXACT, is_phrase: false })"
+                    @mouseenter="selectedIndex = index"
+                >
+                    <span
+                        :class="[
+                            'transition-all duration-200 text-sm',
+                            index === selectedIndex && 'font-semibold text-primary',
+                        ]"
+                    >
+                        {{ search.query }}
+                    </span>
+                </button>
+            </div>
+
             <!-- No Results Messages (only when there are truly no results) -->
             <div
-                v-if="!loading && results.length === 0 && query.length < 2 && !aiMode"
+                v-if="!loading && results.length === 0 && query.length < 2 && query.length > 0 && !aiMode && !(recentSearches && recentSearches.length > 0 && query.length === 0)"
                 class="bg-background/50 p-4 text-center text-sm text-muted-foreground backdrop-blur-sm"
             >
                 Type at least 2 characters to search...
@@ -201,6 +231,7 @@ interface SearchResultsProps {
     wordlistMode?: boolean;
     wordlistResults?: any[];
     semanticBuilding?: boolean;
+    recentSearches?: Array<{ query: string }>;
 }
 
 defineProps<SearchResultsProps>();
