@@ -12,7 +12,7 @@
             <div v-if="!collapsed" key="expanded" class="flex items-center justify-between w-full">
                 <!-- Left: Floridify + @mbabb -->
                 <div class="flex items-center gap-3">
-                    <FloridifyIcon :expanded="true" :mode="searchBarStore.getSubMode('lookup') as any" clickable @toggle-mode="() => searchBarStore.setSubMode('lookup', searchBarStore.getSubMode('lookup') === 'dictionary' ? 'thesaurus' : 'dictionary')" />
+                    <FloridifyIcon :expanded="true" :mode="searchBarStore.getSubMode('lookup') as any" :clickable="canToggleMode" :show-subscript="canToggleMode" @toggle-mode="() => searchBarStore.setSubMode('lookup', searchBarStore.getSubMode('lookup') === 'dictionary' ? 'thesaurus' : 'dictionary')" />
                     <HoverCard :open-delay="600">
                         <HoverCardTrigger>
                             <Button variant="link" class="h-auto p-0 font-mono text-sm">@mbabb</Button>
@@ -65,6 +65,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useStores } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { cn } from '@/utils';
@@ -81,6 +82,15 @@ interface Props {
 
 defineProps<Props>();
 
-const { ui } = useStores();
+const { ui, searchBar, content } = useStores();
 const searchBarStore = useSearchBarStore();
+
+const canToggleMode = computed(() => {
+    if (searchBar.searchMode === 'wordlist') return false;
+    const hasWordQuery = !!content.currentEntry;
+    const hasSuggestionQuery = !!content.wordSuggestions;
+    if (!hasWordQuery && !hasSuggestionQuery) return false;
+    if (hasSuggestionQuery && !hasWordQuery) return false;
+    return true;
+});
 </script>
