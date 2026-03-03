@@ -155,8 +155,11 @@ backend/src/floridify/
 │   ├── ankiconnect.py      # AnkiConnect API client
 │   └── constants.py        # Anki constants
 │
-├── audio/                  # Speech synthesis
-│   └── synthesizer.py      # Google Cloud TTS
+├── audio/                  # Multi-language TTS
+│   ├── synthesizer.py      # AudioSynthesizer facade — language-based routing
+│   ├── kitten_synthesizer.py  # KittenTTS (English, 15M params)
+│   ├── kokoro_synthesizer.py  # Kokoro-ONNX (non-English, 82M params, 8 languages)
+│   └── utils.py            # Shared audio_to_mp3() WAV→MP3 conversion
 │
 └── utils/                  # Shared utilities
     ├── logging.py          # Loguru + Rich structured logging

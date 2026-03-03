@@ -1,14 +1,18 @@
 # audio/
 
-Google Cloud TTS integration for pronunciation audio.
+Multi-language TTS with language-based routing. All local, no cloud dependencies.
 
 ```
 audio/
-└── synthesizer.py (403)    # AudioSynthesizer
+├── synthesizer.py          # AudioSynthesizer facade — routes by language
+├── kitten_synthesizer.py   # KittenTTS (English, 15M params, fast)
+├── kokoro_synthesizer.py   # Kokoro-ONNX (non-English, 82M params, 7 languages)
+└── utils.py                # Shared audio_to_mp3() WAV→MP3 conversion
 ```
 
-- `synthesize_audio()`—generate from IPA/phonetic text
-- Accents: US, UK, Australian
-- Formats: MP3, WAV. Quality: Standard, Premium (WaveNet)
-- Storage: MongoDB GridFS. Cached via GlobalCacheManager
-- Lazy loading: Google Cloud SDK imported only when needed
+- **English** → KittenTTS (local, ~15M params)
+- **French, Spanish, German, Italian, Japanese, Mandarin, Hindi, Portuguese** → Kokoro-ONNX (82M params)
+- Unsupported languages → `None` (graceful "no audio available")
+- MP3 format, MD5-based file caching with subdirectory bucketing
+- Lazy model loading with thread-safe double-check locking
+- Kokoro models auto-downloaded from GitHub releases (`kokoro-v1.0.onnx` + `voices-v1.0.bin`)

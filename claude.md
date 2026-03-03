@@ -24,7 +24,7 @@ AI-enhanced dictionary. Python FastAPI backend + Vue 3 TypeScript frontend. Mong
 │   │   ├── wordlist/           # SM-2 spaced repetition, file parsers
 │   │   ├── wotd/               # Word-of-the-Day ML pipeline
 │   │   ├── anki/               # .apkg flashcard export
-│   │   ├── audio/              # Google Cloud TTS
+│   │   ├── audio/              # Multi-language TTS (KittenTTS + Kokoro-ONNX)
 │   │   └── utils/              # Logging, config, paths, validation
 │   ├── tests/                  # 65 files, ~21K lines, 720 tests
 │   ├── scripts/                # run_api.py, benchmark_performance.py
