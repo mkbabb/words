@@ -682,6 +682,10 @@ kitten-tts = [
     { name = "kittentts" },
     { name = "soundfile" },
 ]
+kokoro-tts = [
+    { name = "kokoro-onnx" },
+    { name = "soundfile" },
+]
 macos = [
     { name = "pyobjc-framework-coreservices" },
 ]
@@ -728,6 +732,7 @@ requires-dist = [
     { name = "httpx", extras = ["http2"], specifier = ">=0.28.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "kittentts", marker = "extra == 'kitten-tts'", specifier = ">=0.1.0" },
+    { name = "kokoro-onnx", marker = "extra == 'kokoro-tts'", specifier = ">=0.5.0" },
     { name = "loguru", specifier = ">=0.7.0" },
     { name = "lz4", specifier = ">=4.4.4" },
     { name = "marisa-trie", specifier = ">=1.2.0" },
@@ -746,6 +751,7 @@ requires-dist = [
     { name = "rich", specifier = ">=13.0.0" },
     { name = "sentence-transformers", specifier = ">=3.0.0" },
     { name = "soundfile", marker = "extra == 'kitten-tts'", specifier = ">=0.12.1" },
+    { name = "soundfile", marker = "extra == 'kokoro-tts'", specifier = ">=0.12.1" },
     { name = "toml", specifier = ">=0.10.2" },
     { name = "torch", specifier = ">=2.1.0" },
     { name = "uvicorn", specifier = ">=0.24.0" },
@@ -754,7 +760,7 @@ requires-dist = [
     { name = "xxhash", specifier = ">=3.4.0" },
     { name = "zstandard", specifier = ">=0.22.0" },
 ]
-provides-extras = ["macos", "audio", "kitten-tts"]
+provides-extras = ["macos", "audio", "kitten-tts", "kokoro-tts"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1211,6 +1217,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/34/a0/205826d5d3b962f1fa9ec10f860630454f196dda5259bd10485a7ca1cae3/kittentts-0.1.3.tar.gz", hash = "sha256:e48cc069f84c09817a38c77920e9567cf0b65ab980deb46ff94a61669364cf1a", size = 2275, upload-time = "2025-08-10T09:29:22.716Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/bc/3d24d68f666dcd853b38eda1a44e722ea3ddcfc9b415f18d9024bd477ef4/kittentts-0.1.3-py2.py3-none-any.whl", hash = "sha256:da41beef7e5a13201f849d5e688a978fabd8cdd196250816e7a07972d6aacf43", size = 2576, upload-time = "2025-08-10T09:29:21.769Z" },
+]
+
+[[package]]
+name = "kokoro-onnx"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "espeakng-loader" },
+    { name = "numpy" },
+    { name = "onnxruntime" },
+    { name = "phonemizer-fork" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6b/18/277bd18aeeceaf5c46a51bb50c1cbdccdad8cab7fd1d58f0173bbeeec708/kokoro_onnx-0.5.0.tar.gz", hash = "sha256:5beb15f085e2828ed8d493f792c079af857103ab2dceaa1e112b1760587ac96a", size = 84570, upload-time = "2026-01-30T03:05:45.6Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0d/55/0bfcb4aa50033c89e5ac132af3d07fac0543824ce6eaefd4d1bfdcc3795b/kokoro_onnx-0.5.0-py3-none-any.whl", hash = "sha256:4e1c38a296db5dbc1f722f69f5e3c13f2e2877b3e5b145287f56ec057013e357", size = 17448, upload-time = "2026-01-30T03:05:46.931Z" },
 ]
 
 [[package]]
@@ -1908,6 +1929,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c4/ff/3574c55a71b42ad6944a5bf0a7d59f0251ea2ba47e51a5c4005e32e9145c/phonemizer-3.3.0.tar.gz", hash = "sha256:5e0c38122effe0b331a24e674aff256874ece169d70a9cf1120337b56f8e3d0c", size = 88564, upload-time = "2024-08-01T14:29:50.299Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b6/23/e8d67c2052e132181c4c9027c2d8ed9e37e8acb27acfc13ed2d0c41ed850/phonemizer-3.3.0-py3-none-any.whl", hash = "sha256:17afaa98691fe73b025dd8d8727b0e67cc376c5e7ee27590853e457fb3f43602", size = 103800, upload-time = "2024-08-01T14:29:47.572Z" },
+]
+
+[[package]]
+name = "phonemizer-fork"
+version = "3.3.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "attrs" },
+    { name = "dlinfo" },
+    { name = "joblib" },
+    { name = "segments" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/42/fa/9294d2f11890ca49d0bdac7a4da60cbe5686629bfd4987cae0ad75e051cc/phonemizer_fork-3.3.2.tar.gz", hash = "sha256:10e16e827d0443b087062e21b55e805c00989cf1343b2e81e734cae5f6c0cf69", size = 300989, upload-time = "2025-01-30T13:02:31.201Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/64/f1/0dcce21b0ae16a82df4b6583f8f3ad8e55b35f7e98b6bf536a4dd225fa08/phonemizer_fork-3.3.2-py3-none-any.whl", hash = "sha256:97305c76f4183b3825dae8f4c032265fe78c9946ce58c47d4b62161349264b74", size = 82700, upload-time = "2025-01-30T13:02:28.667Z" },
 ]
 
 [[package]]
