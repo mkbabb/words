@@ -142,7 +142,7 @@ class DefinitionSynthesizer:
         # Run all synthesis operations in parallel with graceful degradation
         results = await asyncio.gather(
             self._synthesize_definitions(word_obj, clustered_definitions, state_tracker),
-            synthesize_pronunciation(word_obj.text, providers_data, self.ai, state_tracker),
+            synthesize_pronunciation(word_obj.text, providers_data, self.ai, state_tracker, language=word_obj.language),
             synthesize_etymology(word_obj, providers_data, self.ai, state_tracker),
             generate_facts(word_obj, unique_definitions, self.ai, self.facts_count, state_tracker),
             return_exceptions=True,

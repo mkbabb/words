@@ -26,14 +26,15 @@ async def synthesize_pronunciation(
     providers_data: list[dict[str, Any]] | list[DictionaryEntry],
     ai: OpenAIConnector,
     state_tracker: StateTracker | None = None,
+    language: str = "en",
 ) -> Pronunciation | None:
     """Synthesize pronunciation: enhance existing or create new."""
     # Find existing pronunciation
     existing_pronunciation = await _find_existing_pronunciation(providers_data)
 
     if existing_pronunciation:
-        return await _enhance_pronunciation(existing_pronunciation, word, ai, state_tracker)
-    return await _create_pronunciation(word, ai, state_tracker)
+        return await _enhance_pronunciation(existing_pronunciation, word, ai, state_tracker, language)
+    return await _create_pronunciation(word, ai, state_tracker, language)
 
 
 async def _find_existing_pronunciation(
@@ -56,6 +57,7 @@ async def _enhance_pronunciation(
     word: str,
     ai: OpenAIConnector,
     state_tracker: StateTracker | None,
+    language: str = "en",
 ) -> Pronunciation:
     """Enhance existing pronunciation with missing data."""
     needs_enhancement = not pronunciation.phonetic or not pronunciation.ipa
@@ -78,7 +80,7 @@ async def _enhance_pronunciation(
 
     # Generate audio if missing
     if not pronunciation.audio_file_ids:
-        await _generate_audio_files(pronunciation, word)
+        await _generate_audio_files(pronunciation, word, language)
 
     return pronunciation
 
@@ -87,6 +89,7 @@ async def _create_pronunciation(
     word: str,
     ai: OpenAIConnector,
     state_tracker: StateTracker | None,
+    language: str = "en",
 ) -> Pronunciation | None:
     """Create new pronunciation from scratch."""
     try:
@@ -113,7 +116,7 @@ async def _create_pronunciation(
         await pronunciation.save()
 
         # Generate audio files
-        await _generate_audio_files(pronunciation, word)
+        await _generate_audio_files(pronunciation, word, language)
 
         return pronunciation
 
@@ -122,11 +125,11 @@ async def _create_pronunciation(
         return None
 
 
-async def _generate_audio_files(pronunciation: Pronunciation, word: str) -> None:
+async def _generate_audio_files(pronunciation: Pronunciation, word: str, language: str = "en") -> None:
     """Generate audio files for pronunciation."""
     try:
         audio_synthesizer = AudioSynthesizer()
-        audio_files = await audio_synthesizer.synthesize_pronunciation(pronunciation, word)
+        audio_files = await audio_synthesizer.synthesize_pronunciation(pronunciation, word, language=language)
 
         if audio_files:
             pronunciation.audio_file_ids = [

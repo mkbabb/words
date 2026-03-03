@@ -445,7 +445,7 @@ async def enhance_synthesized_entry(
 
     if SynthesisComponent.PRONUNCIATION in components and (not entry.pronunciation_id or force):
         # Use the entry itself as provider data (it's a DictionaryEntry)
-        word_tasks.append(synthesize_pronunciation(word.text, [entry], ai, state_tracker))
+        word_tasks.append(synthesize_pronunciation(word.text, [entry], ai, state_tracker, language=word.language))
         task_types.append(SynthesisComponent.PRONUNCIATION)
 
     if SynthesisComponent.ETYMOLOGY in components and (not entry.etymology or force):
