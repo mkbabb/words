@@ -34,6 +34,7 @@ def _send_chunked_completion(result_data: dict[str, Any]) -> Generator[str]:
         "chunk_type": "basic_info",
         "data": {
             "word": result_data.get("word"),
+            "language": result_data.get("language", "en"),
             "id": result_data.get("id"),
             "last_updated": result_data.get("last_updated"),
             "model_info": result_data.get("model_info"),

@@ -49,6 +49,7 @@ class TTSGenerateRequest(BaseModel):
     word: str = Field(..., min_length=1, max_length=200, description="Word to synthesize")
     accent: Literal["american", "british"] = Field("american", description="Voice accent")
     voice_gender: Literal["male", "female"] = Field("male", description="Voice gender")
+    language: str = Field("en", description="ISO language code (en, fr, es, it, ja, zh, hi, pt)")
 
 
 @router.post("/tts/generate", response_model=ResourceResponse, status_code=201)
@@ -70,6 +71,7 @@ async def generate_tts(body: TTSGenerateRequest) -> ResourceResponse:
         word=body.word,
         accent=body.accent,
         voice_gender=body.voice_gender,
+        language=body.language,
     )
 
     if not audio:

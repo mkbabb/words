@@ -39,6 +39,7 @@ class DictionaryEntryResponse(BaseModel):
 
     # Entry metadata
     word: str = Field(..., description="The word that was looked up")
+    language: str = Field("en", description="ISO language code (en, fr, es, de, it)")
     id: str | None = Field(None, description="ID of the synthesized dictionary entry")
     last_updated: datetime = Field(..., description="When this entry was last updated")
     model_info: dict[str, Any] | None = Field(

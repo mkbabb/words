@@ -250,6 +250,7 @@ class DictionaryEntryLoader(DataLoader):
         # Build the response dictionary
         return {
             "word": word_obj.text,
+            "language": word_obj.language,
             "pronunciation": pronunciation,
             "definitions": definitions,
             "etymology": (entry.etymology.model_dump(mode="json") if entry.etymology else None),
