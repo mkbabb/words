@@ -35,7 +35,7 @@ import { changeTheme, isDark } from ".";
 
     transition: opacity 200ms, background 200ms, transform 200ms;
 
-    z-index: 999;
+    z-index: auto;
 
     svg {
         fill: var(--color-foreground);

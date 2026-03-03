@@ -3,7 +3,7 @@
     <!-- Desktop Sidebar -->
     <aside
       :class="cn(
-        'bg-background border-border fixed top-0 left-0 z-30 hidden h-full flex-col overflow-hidden border-r transition-all duration-500 ease-apple-smooth lg:flex',
+        'bg-background border-border fixed top-0 left-0 z-50 hidden h-full flex-col overflow-hidden border-r transition-all duration-500 ease-apple-smooth lg:flex',
         sidebarCollapsed ? 'w-16' : 'w-80'
       )"
     >
