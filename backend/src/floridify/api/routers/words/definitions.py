@@ -41,6 +41,7 @@ from ...core import (
     get_sort,
 )
 from ...core.protocols import TypedFieldUpdater
+from ...middleware.auth import require_admin, require_premium
 from ...repositories import (
     DefinitionCreate,
     DefinitionFilter,
@@ -159,6 +160,7 @@ async def list_definitions(
 @router.post("", response_model=ResourceResponse, status_code=201)
 async def create_definition(
     data: DefinitionCreate,
+    _admin: str = Depends(require_admin),
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
     """Create definition entry.
@@ -242,6 +244,7 @@ async def update_definition(
     definition_id: PydanticObjectId,
     data: DefinitionUpdate,
     version: int | None = Query(None, description="Version for optimistic locking"),
+    _admin: str = Depends(require_admin),
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
     """Update definition with version control.
@@ -270,6 +273,7 @@ async def update_definition(
 async def delete_definition(
     definition_id: PydanticObjectId,
     cascade: bool = Query(False, description="Delete related examples"),
+    _admin: str = Depends(require_admin),
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> None:
     """Delete definition.
@@ -284,6 +288,7 @@ async def delete_definition(
 async def update_definition_partial(
     definition_id: PydanticObjectId,
     update: DefinitionUpdate,
+    _admin: str = Depends(require_admin),
     repo: DefinitionRepository = Depends(get_definition_repo),
     if_match: str | None = Depends(check_etag),
 ) -> ResourceResponse:
@@ -313,6 +318,7 @@ async def update_definition_partial(
 async def regenerate_components(
     definition_id: PydanticObjectId,
     request: ComponentRegenerationRequest,
+    _premium: str = Depends(require_premium),
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> ResourceResponse:
     """AI-regenerate definition components.
@@ -460,6 +466,7 @@ async def regenerate_components(
 @router.post("/batch/regenerate", response_model=dict[str, Any])
 async def batch_regenerate_components(
     request: BatchComponentUpdate,
+    _premium: str = Depends(require_premium),
     repo: DefinitionRepository = Depends(get_definition_repo),
 ) -> dict[str, Any]:
     """Batch AI-regenerate components.

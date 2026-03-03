@@ -1,3 +1,6 @@
+// Auth store
+export { useAuthStore } from './auth'
+
 // Core stores
 export { useContentStore } from './content/content'
 export { useHistoryStore } from './content/history'
@@ -20,6 +23,7 @@ export type { Theme } from './types/constants'
 export type { Notification } from './composables/useNotifications'
 
 // Import for useStores function
+import { useAuthStore } from './auth'
 import { useContentStore } from './content/content'
 import { useHistoryStore } from './content/history'
 import { useSearchBarStore } from './search/search-bar'
@@ -31,6 +35,7 @@ import { useLookupMode } from './search/modes/lookup'
 // Store aggregator for components
 export function useStores() {
   return {
+    auth: useAuthStore(),
     content: useContentStore(),
     history: useHistoryStore(),
     searchBar: useSearchBarStore(),

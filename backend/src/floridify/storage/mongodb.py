@@ -25,6 +25,7 @@ from ..models.dictionary import (
     Pronunciation,
     Word,
 )
+from ..models.user import User, UserHistory
 from ..models.relationships import WordRelationship
 from ..providers.batch import BatchOperation
 from ..providers.dictionary.models import DictionaryProviderEntry
@@ -74,9 +75,12 @@ class MongoDBStorage:
             host in self.connection_string
             for host in [
                 "localhost:27017",
+                "localhost:27018",
                 "mongodb:27017",
                 "127.0.0.1:27017",
+                "127.0.0.1:27018",
                 "host.docker.internal:27017",
+                "host.docker.internal:27018",
                 "floridify-mongodb:27017",
             ]
         )
@@ -136,6 +140,9 @@ class MongoDBStorage:
                 SearchIndex.Metadata,
                 TrieIndex.Metadata,
                 SemanticIndex.Metadata,
+                # User models
+                User,
+                UserHistory,
                 # Legacy models (backward compatibility)
                 DictionaryEntry,
                 BatchOperation,

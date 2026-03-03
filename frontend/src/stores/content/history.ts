@@ -321,6 +321,46 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
+  // Merge remote history from backend (deduplicates by timestamp)
+  const mergeRemoteHistory = (remote: { search_history?: any[]; lookup_history?: any[] }) => {
+    if (remote.search_history?.length) {
+      const existingTs = new Set(searchHistory.value.map(s => s.timestamp))
+      for (const item of remote.search_history) {
+        if (item.timestamp && !existingTs.has(item.timestamp)) {
+          searchHistory.value.push({
+            id: generateId(),
+            query: item.query || '',
+            timestamp: item.timestamp,
+            mode: item.mode || 'dictionary',
+            results: [],
+          } as SearchHistory)
+        }
+      }
+      // Re-sort by timestamp descending and cap
+      searchHistory.value.sort((a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      )
+      searchHistory.value = searchHistory.value.slice(0, 100)
+    }
+
+    if (remote.lookup_history?.length) {
+      const existingTs = new Set(lookupHistory.value.map(l => l.timestamp))
+      for (const item of remote.lookup_history) {
+        if (item.timestamp && !existingTs.has(item.timestamp)) {
+          lookupHistory.value.push({
+            id: generateId(),
+            word: item.word || '',
+            timestamp: item.timestamp,
+          } as LookupHistory)
+        }
+      }
+      lookupHistory.value.sort((a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      )
+      lookupHistory.value = lookupHistory.value.slice(0, 100)
+    }
+  }
+
   // Reset all history
   const resetAllHistory = () => {
     searchHistory.value = []
@@ -360,6 +400,7 @@ export const useHistoryStore = defineStore('history', () => {
     getSearchHistoryByQuery,
     getLookupHistoryByWord,
     getHistoryStats,
+    mergeRemoteHistory,
     resetAllHistory
   }
 }, {

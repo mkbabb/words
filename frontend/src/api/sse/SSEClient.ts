@@ -1,4 +1,4 @@
-import type { AxiosInstance } from 'axios';
+import { getAuthToken } from '../core';
 import type {
     ChunkedCompletionChunk,
     CompletionEvent,
@@ -23,7 +23,8 @@ export class SSEClient {
     private static readonly MAX_RETRIES = 3;
     private static readonly BASE_RETRY_DELAY = 1000;
 
-    constructor(private axios: AxiosInstance) {}
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    constructor(_axios?: unknown) {}
 
     async stream<T>(
         url: string,
@@ -145,13 +146,19 @@ export class SSEClient {
         handlers: SSEHandlers<T>,
         resetTimeout?: () => void
     ): Promise<T> {
+        // Get auth token dynamically
+        const token = await getAuthToken();
+        const headers: Record<string, string> = {
+            Accept: 'text/event-stream',
+            'Cache-Control': 'no-cache',
+        };
+        if (token) {
+            headers.Authorization = `Bearer ${token}`;
+        }
+
         const response = await fetch(url, {
             method: 'GET',
-            headers: {
-                Accept: 'text/event-stream',
-                'Cache-Control': 'no-cache',
-                Authorization: `Bearer ${this.axios.defaults.headers.common['Authorization']}`,
-            },
+            headers,
             signal,
         });
 

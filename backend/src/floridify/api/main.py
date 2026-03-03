@@ -31,6 +31,7 @@ from .routers import (
     providers,
     search,
     suggestions,
+    users,
     word_versions,
     wordlist_reviews,
     wordlist_search,
@@ -109,6 +110,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:8080",
+        "https://mbabb.friday.institute",
         "https://mbabb.fi.ncsu.edu",
     ],
     allow_credentials=True,
@@ -163,6 +165,9 @@ app.include_router(providers, prefix=API_V1_PREFIX, tags=["providers"])
 app.include_router(corpus, prefix=API_V1_PREFIX, tags=["corpus"])
 app.include_router(cache, prefix=API_V1_PREFIX, tags=["cache"])
 app.include_router(config, prefix=API_V1_PREFIX, tags=["config"])
+
+# User management
+app.include_router(users, prefix=API_V1_PREFIX, tags=["users"])
 
 # Health check remains at root for monitoring
 app.include_router(health, prefix="", tags=["health"])

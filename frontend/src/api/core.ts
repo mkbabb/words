@@ -44,13 +44,47 @@ export function transformError(error: unknown): APIError {
   return { message: 'An unknown error occurred' };
 }
 
-// Request interceptor
+// --- Auth token injection ---
+
+type AuthTokenGetter = () => Promise<string | null>;
+let _tokenGetter: AuthTokenGetter | null = null;
+
+/**
+ * Set the function that returns the current auth token.
+ * Called once by the auth store during initialization.
+ */
+export function setAuthTokenGetter(getter: AuthTokenGetter): void {
+  _tokenGetter = getter;
+}
+
+/**
+ * Get the current auth token (for use outside axios, e.g. SSE).
+ */
+export async function getAuthToken(): Promise<string | null> {
+  if (!_tokenGetter) return null;
+  return _tokenGetter();
+}
+
+// Request interceptor — inject Bearer token
 api.interceptors.request.use(
-  config => {
+  async config => {
     logger.debug(
       `API Request: ${config.method?.toUpperCase()} ${config.url}`,
       config.params
     );
+
+    // Inject auth token if available
+    if (_tokenGetter) {
+      try {
+        const token = await _tokenGetter();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      } catch {
+        // Silent failure — request proceeds without auth
+      }
+    }
+
     return config;
   },
   error => Promise.reject(error)
@@ -74,6 +108,12 @@ api.interceptors.response.use(
       data: error.response?.data,
       message: error.message,
     });
+
+    // Dispatch auth:required event on 401 for login redirect
+    if (error.response?.status === 401) {
+      window.dispatchEvent(new CustomEvent('auth:required'));
+    }
+
     return Promise.reject(error);
   }
 );

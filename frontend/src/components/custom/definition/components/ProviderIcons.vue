@@ -1,92 +1,60 @@
 <template>
-    <HoverCard v-if="providers.length > 0">
-        <HoverCardTrigger as-child>
-            <div
-                class="relative ml-3 flex h-7 cursor-pointer items-center"
-                :style="{
-                    width: `${Math.min(providers.length, 2) * 20 + (providers.length > 2 ? 8 : 0)}px`,
-                }"
-            >
-                <!-- First provider (always visible) -->
-                <div
-                    class="absolute flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-background shadow-sm"
-                    :style="{ left: '0px', zIndex: 3 }"
-                >
-                    <component
-                        :is="getProviderIcon(providers[0])"
-                        :size="16"
-                        class="text-muted-foreground"
-                    />
-                </div>
+    <div
+        v-if="showSynthesis || providers.length > 0"
+        class="ml-3 flex items-center gap-1"
+    >
+        <!-- AI Synthesis source -->
+        <button
+            v-if="showSynthesis"
+            :title="'AI Synthesis'"
+            @click="$emit('select-source', 'synthesis')"
+            :class="[
+                'flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition-all duration-200',
+                activeSource === 'synthesis'
+                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:border-amber-400/40 dark:text-amber-400'
+                    : 'border-border/50 bg-background text-muted-foreground opacity-60 hover:border-border hover:opacity-100',
+            ]"
+        >
+            <Wand2 :size="14" />
+        </button>
 
-                <!-- Second provider (if exists) -->
-                <div
-                    v-if="providers.length > 1"
-                    class="absolute flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-background shadow-sm"
-                    :style="{ left: '12px', zIndex: 2 }"
-                >
-                    <component
-                        :is="getProviderIcon(providers[1])"
-                        :size="16"
-                        class="text-muted-foreground"
-                    />
-                </div>
-
-                <!-- Plus indicator for additional providers -->
-                <div
-                    v-if="providers.length > 2"
-                    class="absolute flex h-6 w-6 items-center justify-center rounded-full border border-border bg-muted shadow-sm"
-                    :style="{ left: '24px', zIndex: 1 }"
-                >
-                    <span class="text-xs font-medium text-muted-foreground"
-                        >+{{ providers.length - 2 }}</span
-                    >
-                </div>
-            </div>
-        </HoverCardTrigger>
-        <HoverCardContent class="w-auto max-w-xs p-2" side="top" align="center">
-            <div class="space-y-1">
-                <p class="mb-2 text-xs font-medium text-muted-foreground">
-                    Dictionary Sources
-                </p>
-                <a
-                    v-for="provider in providers"
-                    :key="provider"
-                    :href="getProviderSearchUrl(provider, word)"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-accent hover:text-accent-foreground"
-                >
-                    <component
-                        :is="getProviderIcon(provider)"
-                        :size="14"
-                        class="flex-shrink-0"
-                    />
-                    <span class="text-xs">{{
-                        getProviderDisplayName(provider)
-                    }}</span>
-                </a>
-            </div>
-        </HoverCardContent>
-    </HoverCard>
+        <!-- Provider source icons -->
+        <button
+            v-for="provider in providers"
+            :key="provider"
+            :title="getProviderDisplayName(provider)"
+            @click="$emit('select-source', provider)"
+            :class="[
+                'flex h-7 w-7 items-center justify-center rounded-full border shadow-sm transition-all duration-200',
+                activeSource === provider
+                    ? 'border-primary/40 bg-primary/10 text-foreground'
+                    : 'border-border/50 bg-background text-muted-foreground opacity-60 hover:border-border hover:opacity-100',
+            ]"
+        >
+            <component :is="getProviderIcon(provider)" :size="16" />
+        </button>
+    </div>
 </template>
 
 <script setup lang="ts">
-import {
-    HoverCard,
-    HoverCardContent,
-    HoverCardTrigger,
-} from '@/components/ui/hover-card';
+import { Wand2 } from 'lucide-vue-next';
 import {
     getProviderIcon,
-    getProviderSearchUrl,
     getProviderDisplayName,
 } from '../utils/providers';
 
 interface ProviderIconsProps {
     providers: string[];
-    word: string;
+    activeSource?: string;
+    showSynthesis?: boolean;
 }
 
-defineProps<ProviderIconsProps>();
+withDefaults(defineProps<ProviderIconsProps>(), {
+    activeSource: 'synthesis',
+    showSynthesis: true,
+});
+
+defineEmits<{
+    'select-source': [source: string];
+}>();
 </script>

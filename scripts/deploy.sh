@@ -9,7 +9,7 @@ set -e
 DEPLOY_HOST="${DEPLOY_HOST:-mbabb.fridayinstitute.net}"
 DEPLOY_PORT="${DEPLOY_PORT:-1022}"
 DEPLOY_USER="${DEPLOY_USER:-mbabb}"
-DOMAIN="${DOMAIN:-mbabb.fi.ncsu.edu}"
+DOMAIN="${DOMAIN:-mbabb.friday.institute}"
 CERTBOT_EMAIL="${CERTBOT_EMAIL:-mike@babb.dev}"
 
 SSH_CMD="ssh -o StrictHostKeyChecking=no -p $DEPLOY_PORT"
@@ -197,7 +197,7 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  DEPLOY_HOST   - Server hostname (default: mbabb.fridayinstitute.net)"
     echo "  DEPLOY_PORT   - SSH port (default: 1022)"
     echo "  DEPLOY_USER   - SSH username (default: mbabb)"
-    echo "  DOMAIN        - Domain name (default: mbabb.fi.ncsu.edu)"
+    echo "  DOMAIN        - Domain name (default: mbabb.friday.institute)"
     echo "  CERTBOT_EMAIL - Email for SSL certificates (default: mike@babb.dev)"
     echo ""
     echo "Files synced to server:"

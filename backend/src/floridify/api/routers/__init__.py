@@ -17,6 +17,7 @@ from .wordlist import (
     search_router as wordlist_search,
     words_router as wordlist_words,
 )
+from .users import router as users
 from .words import (
     definitions_router as definitions,
     examples_router as examples,
@@ -47,6 +48,7 @@ __all__ = [
     "wordlist_reviews",
     "wordlist_search",
     "wordlist_words",
+    "users",
     "wordlists",
     "word_versions",
     "words",

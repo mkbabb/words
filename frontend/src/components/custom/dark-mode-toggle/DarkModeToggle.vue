@@ -1,6 +1,6 @@
 <template>
     <!-- Credit to Kevin Powell at https://codepen.io/kevinpowell/pen/PomqjxO -->
-    <button :class="['dark-mode-toggle-button', { pulsing }]" v-bind="$attrs" :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'" @click="handleClick">
+    <button class="dark-mode-toggle-button" v-bind="$attrs" :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'" @click="changeTheme()">
         <svg
             xmlns="http://www.w3.org/2000/svg"
             width="472.39"
@@ -20,29 +20,17 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
 import { changeTheme, isDark } from ".";
-
-const pulsing = ref(false);
-
-function handleClick() {
-    pulsing.value = true;
-    changeTheme();
-    setTimeout(() => {
-        pulsing.value = false;
-    }, 650);
-}
 </script>
 
 <style scoped lang="scss">
 .dark-mode-toggle-button {
     cursor: pointer;
     border: 0;
-    opacity: 0.8;
+    opacity: 0.65;
     padding: 0;
     border-radius: 50%;
     position: relative;
-    isolation: isolate;
     background: 0;
 
     transition: opacity 200ms, background 200ms, transform 200ms;
@@ -62,21 +50,10 @@ function handleClick() {
         opacity: 1;
         background: hsl(0 0% 50% / 0.15);
     }
-}
 
-.dark-mode-toggle-button::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: currentColor;
-    pointer-events: none;
-    z-index: -1;
-    opacity: 0;
-}
-
-.dark-mode-toggle-button.pulsing::before {
-    animation: pulseToDark 650ms ease-out forwards;
+    &:active {
+        transform: scale(0.9);
+    }
 }
 
 .toggle-sun {
@@ -90,50 +67,12 @@ function handleClick() {
 }
 
 .dark {
-    .dark-mode-toggle-button.pulsing::before {
-        animation: pulseToLight 650ms ease-out forwards;
-    }
-
     .toggle-sun {
         transform: rotate(0.5turn);
     }
 
     .toggle-circle {
         transform: translateX(-15%);
-    }
-}
-
-@keyframes pulseToLight {
-    0% {
-        transform: scale(100);
-        opacity: 0.5;
-    }
-    10% {
-        transform: scale(1);
-    }
-    75% {
-        opacity: 1;
-    }
-    100% {
-        opacity: 0;
-        transform: scale(1);
-    }
-}
-
-@keyframes pulseToDark {
-    0% {
-        transform: scale(0);
-        opacity: 0.5;
-    }
-    10% {
-        transform: scale(1);
-    }
-    75% {
-        opacity: 1;
-    }
-    100% {
-        opacity: 0;
-        transform: scale(1);
     }
 }
 </style>

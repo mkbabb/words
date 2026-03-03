@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from ....models import Word
 from ....models.base import Language
+from ...middleware.auth import require_admin
 from ...core import (
     ErrorDetail,
     ErrorResponse,
@@ -114,6 +115,7 @@ async def list_words(
 @router.post("", response_model=ResourceResponse, status_code=201)
 async def create_word(
     data: WordCreate,
+    _admin: str = Depends(require_admin),
     repo: WordRepository = Depends(get_word_repo),
 ) -> ResourceResponse:
     """Create new word entry.
@@ -229,6 +231,7 @@ async def update_word(
     word_id: PydanticObjectId,
     data: WordUpdate,
     version: int | None = Query(None, description="Version for optimistic locking"),
+    _admin: str = Depends(require_admin),
     repo: WordRepository = Depends(get_word_repo),
 ) -> ResourceResponse:
     """Update word with optimistic concurrency control.
@@ -264,6 +267,7 @@ async def update_word(
 async def delete_word(
     word_id: PydanticObjectId,
     cascade: bool = Query(False, description="Delete related documents"),
+    _admin: str = Depends(require_admin),
     repo: WordRepository = Depends(get_word_repo),
 ) -> None:
     """Delete word and optionally cascade to related documents.

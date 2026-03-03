@@ -13,6 +13,7 @@
     "generate-favicon": "tsx scripts/favicon-generator/generate.ts"
   },
   "dependencies": {
+    "@clerk/vue": "^1.17.18",
     "@tailwindcss/vite": "^4.2.1",
     "@vueuse/core": "^14.2.1",
     "axios": "^1.13.5",

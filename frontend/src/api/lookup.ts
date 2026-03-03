@@ -62,6 +62,23 @@ export const lookupApi = {
     }
   },
 
+  // Re-synthesize a word (admin only) - POST /lookup/{word}/re-synthesize
+  async reSynthesize(word: string): Promise<SynthesizedDictionaryEntry> {
+    try {
+      const response = await api.post<DictionaryEntryResponse>(
+        `/lookup/${encodeURIComponent(word)}/re-synthesize`
+      );
+      return {
+        ...response.data,
+        lookup_count: 0,
+        regeneration_count: 0,
+        status: 'active'
+      } as SynthesizedDictionaryEntry;
+    } catch (error) {
+      throw transformError(error);
+    }
+  },
+
   // Streaming word lookup - GET /lookup/{word}/stream
   async lookupStream(
     word: string,

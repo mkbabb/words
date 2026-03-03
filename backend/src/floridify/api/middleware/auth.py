@@ -3,14 +3,19 @@
 Provides:
 - ClerkAuthMiddleware: Starlette middleware that validates JWTs and sets request.state.user_id
 - get_current_user: FastAPI dependency for authenticated endpoints
+- get_current_user_object: FastAPI dependency returning full User document
 - require_admin: FastAPI dependency for admin-only endpoints
-- Endpoint tier classification (public, authenticated, owner, admin)
+- require_premium: FastAPI dependency for premium-or-admin endpoints
+- get_optional_user: FastAPI dependency for optional auth
+- Endpoint tier classification (public, authenticated, premium, admin)
 """
 
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -19,6 +24,7 @@ from fastapi import HTTPException, Request, Response, status
 from jwt.algorithms import RSAAlgorithm
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from ...models.user import User, UserRole
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -26,6 +32,21 @@ logger = get_logger(__name__)
 # Cache JWKS keys in memory
 _jwks_cache: dict[str, Any] | None = None
 _jwks_cache_time: float = 0
+
+# Super admin emails (auto-promoted to admin on first login)
+_super_admins: frozenset[str] | None = None
+
+
+def _get_super_admins() -> frozenset[str]:
+    """Get super admin emails from environment."""
+    global _super_admins
+    if _super_admins is None:
+        raw = os.getenv("CLERK_SUPER_ADMINS", "")
+        _super_admins = frozenset(
+            email.strip().lower() for email in raw.split(",") if email.strip()
+        )
+    return _super_admins
+
 
 # Endpoint tier classification
 # Tier 1: Public (no auth required)
@@ -45,16 +66,27 @@ PUBLIC_EXACT = frozenset(
     }
 )
 
+# Tier 3: Premium endpoints (require premium or admin role)
+PREMIUM_PREFIXES = frozenset(
+    {
+        "/api/v1/ai/",
+    }
+)
+# Pattern-matched premium endpoints
+PREMIUM_PATTERNS = [
+    re.compile(r"^/api/v1/definitions/[^/]+/regenerate$"),
+    re.compile(r"^/api/v1/examples/[^/]+/generate$"),
+    re.compile(r"^/api/v1/audio/tts/generate$"),
+]
+
 # Tier 4: Admin-only endpoints
 ADMIN_PREFIXES = frozenset(
     {
-        "/api/v1/cache/clear",
-        "/api/v1/cache/prune",
+        "/api/v1/cache/",
         "/api/v1/config",
         "/api/v1/corpus/rebuild",
-        "/api/v1/database/cleanup",
-        "/api/v1/database/stats",
-        "/api/v1/providers/circuit-status",
+        "/api/v1/database/",
+        "/api/v1/providers/",
         "/api/v1/metrics",
     }
 )
@@ -74,14 +106,22 @@ def _is_public_endpoint(path: str, method: str) -> bool:
         if path in PUBLIC_EXACT:
             return True
 
-    # TTS generation is public (POST)
-    if method == "POST" and path == "/api/v1/audio/tts/generate":
-        return True
-
+    # Users/me is authenticated but should pass through middleware for token extraction
     # Audio cache serving is public (GET)
     if method == "GET" and path.startswith("/api/v1/audio/cache/"):
         return True
 
+    return False
+
+
+def _is_premium_endpoint(path: str) -> bool:
+    """Check if endpoint is Tier 3 (premium or admin required)."""
+    for prefix in PREMIUM_PREFIXES:
+        if path.startswith(prefix):
+            return True
+    for pattern in PREMIUM_PATTERNS:
+        if pattern.match(path):
+            return True
     return False
 
 
@@ -125,12 +165,49 @@ def _get_signing_key(jwks: dict[str, Any], token: str) -> str:
     raise jwt.InvalidTokenError(f"No matching key found for kid: {kid}")
 
 
+async def _upsert_user(
+    clerk_id: str, email: str | None, username: str | None, avatar_url: str | None
+) -> User:
+    """Find or create a User document after JWT validation."""
+    user = await User.find_one(User.clerk_id == clerk_id)
+
+    if user is None:
+        # Determine role: auto-promote super admins
+        role = UserRole.USER
+        if email and email.lower() in _get_super_admins():
+            role = UserRole.ADMIN
+            logger.info(f"Auto-promoting super admin: {email}")
+
+        user = User(
+            clerk_id=clerk_id,
+            email=email,
+            username=username,
+            avatar_url=avatar_url,
+            role=role,
+        )
+        await user.insert()
+        logger.info(f"Created new user: {clerk_id} ({email}) with role {role}")
+    else:
+        # Update last_login and any changed profile fields
+        user.last_login = datetime.now(UTC)
+        if email and user.email != email:
+            user.email = email
+        if username and user.username != username:
+            user.username = username
+        if avatar_url and user.avatar_url != avatar_url:
+            user.avatar_url = avatar_url
+        await user.save()
+
+    return user
+
+
 class ClerkAuthMiddleware(BaseHTTPMiddleware):
-    """Middleware that validates Clerk JWTs and populates request.state.user_id.
+    """Middleware that validates Clerk JWTs and populates request.state.
 
     - Tier 1 (public) endpoints bypass auth entirely
     - Other endpoints require a valid Bearer token
-    - Sets request.state.user_id and request.state.user_role on success
+    - Sets request.state.user_id, request.state.user_role, request.state.user on success
+    - In development without CLERK_DOMAIN, grants admin access for all requests
     """
 
     async def dispatch(
@@ -147,6 +224,17 @@ class ClerkAuthMiddleware(BaseHTTPMiddleware):
 
         # Tier 1: Public endpoints - no auth required
         if _is_public_endpoint(path, method):
+            # Still try to extract user if token is present (for optional auth)
+            await self._try_extract_user(request)
+            return await call_next(request)
+
+        # Dev passthrough: when CLERK_DOMAIN not set in development, grant admin access
+        clerk_domain = os.getenv("CLERK_DOMAIN", "")
+        environment = os.getenv("ENVIRONMENT", "development")
+        if not clerk_domain and environment == "development":
+            request.state.user_id = "dev_user"
+            request.state.user_role = UserRole.ADMIN
+            request.state.user = None  # No DB user in dev passthrough
             return await call_next(request)
 
         # Extract Bearer token
@@ -161,7 +249,6 @@ class ClerkAuthMiddleware(BaseHTTPMiddleware):
 
         token = auth_header[7:]  # Strip "Bearer "
 
-        clerk_domain = os.getenv("CLERK_DOMAIN", "")
         if not clerk_domain:
             # Fail-closed: deny access when auth is not configured
             logger.error("CLERK_DOMAIN not set - denying access to protected endpoint")
@@ -183,8 +270,26 @@ class ClerkAuthMiddleware(BaseHTTPMiddleware):
                 options={"verify_aud": False},  # Clerk doesn't always set aud
             )
 
-            request.state.user_id = payload.get("sub", "")
-            request.state.user_role = payload.get("metadata", {}).get("role", "user")
+            clerk_id = payload.get("sub", "")
+            # Extract profile info from Clerk JWT claims
+            email = payload.get("email")
+            username = payload.get("username") or payload.get("name")
+            avatar_url = payload.get("image_url") or payload.get("profile_image_url")
+
+            # Upsert user in database
+            try:
+                user = await _upsert_user(clerk_id, email, username, avatar_url)
+                request.state.user_id = clerk_id
+                request.state.user_role = user.role
+                request.state.user = user
+            except Exception as e:
+                # If DB upsert fails, still allow request with JWT claims
+                logger.warning(f"User upsert failed, using JWT claims: {e}")
+                request.state.user_id = clerk_id
+                request.state.user_role = UserRole(
+                    payload.get("metadata", {}).get("role", "user")
+                )
+                request.state.user = None
 
         except jwt.ExpiredSignatureError:
             return Response(
@@ -211,14 +316,80 @@ class ClerkAuthMiddleware(BaseHTTPMiddleware):
 
         # Tier 4: Admin check
         if _is_admin_endpoint(path):
-            if request.state.user_role != "admin":
+            if request.state.user_role != UserRole.ADMIN:
                 return Response(
                     content='{"detail":"Admin access required"}',
                     status_code=403,
                     media_type="application/json",
                 )
 
+        # Tier 3: Premium check
+        if _is_premium_endpoint(path):
+            if request.state.user_role not in (UserRole.PREMIUM, UserRole.ADMIN):
+                return Response(
+                    content='{"detail":"Premium access required"}',
+                    status_code=403,
+                    media_type="application/json",
+                )
+
         return await call_next(request)
+
+    async def _try_extract_user(self, request: Request) -> None:
+        """Try to extract user from Bearer token on public endpoints (optional auth)."""
+        # Dev passthrough: grant admin access when CLERK_DOMAIN not set in development
+        clerk_domain = os.getenv("CLERK_DOMAIN", "")
+        environment = os.getenv("ENVIRONMENT", "development")
+        if not clerk_domain and environment == "development":
+            request.state.user_id = "dev_user"
+            request.state.user_role = UserRole.ADMIN
+            request.state.user = None
+            return
+
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            request.state.user_id = None
+            request.state.user_role = None
+            request.state.user = None
+            return
+
+        token = auth_header[7:]
+
+        if not clerk_domain:
+            request.state.user_id = None
+            request.state.user_role = None
+            request.state.user = None
+            return
+
+        try:
+            jwks = await _get_jwks(clerk_domain)
+            signing_key = _get_signing_key(jwks, token)
+            payload = jwt.decode(
+                token,
+                signing_key,
+                algorithms=["RS256"],
+                issuer=f"https://{clerk_domain}",
+                options={"verify_aud": False},
+            )
+
+            clerk_id = payload.get("sub", "")
+            email = payload.get("email")
+            username = payload.get("username") or payload.get("name")
+            avatar_url = payload.get("image_url") or payload.get("profile_image_url")
+
+            try:
+                user = await _upsert_user(clerk_id, email, username, avatar_url)
+                request.state.user_id = clerk_id
+                request.state.user_role = user.role
+                request.state.user = user
+            except Exception:
+                request.state.user_id = clerk_id
+                request.state.user_role = UserRole.USER
+                request.state.user = None
+        except Exception:
+            # Silent failure on public endpoints — user just won't be authenticated
+            request.state.user_id = None
+            request.state.user_role = None
+            request.state.user = None
 
 
 async def get_current_user(request: Request) -> str:
@@ -236,17 +407,60 @@ async def get_current_user(request: Request) -> str:
     return user_id
 
 
+async def get_current_user_object(request: Request) -> User:
+    """FastAPI dependency: returns the full User document.
+
+    Use as Depends(get_current_user_object) on endpoints that need user details.
+    """
+    user = getattr(request.state, "user", None)
+    if user is not None:
+        return user
+
+    # Fallback: look up by user_id
+    user_id = await get_current_user(request)
+    user = await User.find_one(User.clerk_id == user_id)
+    if not user:
+        # Dev passthrough: create a synthetic admin user
+        if user_id == "dev_user":
+            return User(
+                clerk_id="dev_user",
+                email="dev@localhost",
+                username="dev_admin",
+                role=UserRole.ADMIN,
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    return user
+
+
 async def require_admin(request: Request) -> str:
     """FastAPI dependency: requires admin role.
 
     Use as Depends(require_admin) on admin-only endpoints.
     """
     user_id = await get_current_user(request)
-    role = getattr(request.state, "user_role", "user")
-    if role != "admin":
+    role = getattr(request.state, "user_role", UserRole.USER)
+    if role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
+        )
+    return user_id
+
+
+async def require_premium(request: Request) -> str:
+    """FastAPI dependency: requires premium or admin role.
+
+    Use as Depends(require_premium) on premium endpoints.
+    """
+    user_id = await get_current_user(request)
+    role = getattr(request.state, "user_role", UserRole.USER)
+    if role not in (UserRole.PREMIUM, UserRole.ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Premium access required",
         )
     return user_id
 
@@ -257,3 +471,8 @@ def get_optional_user(request: Request) -> str | None:
     Use for endpoints that work with or without auth (e.g., personalized results).
     """
     return getattr(request.state, "user_id", None)
+
+
+def get_optional_user_role(request: Request) -> UserRole | None:
+    """FastAPI dependency: returns user role if authenticated, None otherwise."""
+    return getattr(request.state, "user_role", None)

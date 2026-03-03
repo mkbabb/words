@@ -214,6 +214,34 @@ export interface SynthesizedDictionaryEntry extends BaseMetadata {
     last_updated: string; // Alias for updated_at for frontend compatibility
 }
 
+// User & Auth Types
+export type UserRole = 'user' | 'premium' | 'admin';
+
+export interface UserProfile {
+    clerk_id: string;
+    email: string | null;
+    username: string | null;
+    avatar_url: string | null;
+    role: UserRole;
+    preferences: UserPreferences;
+    created_at: string;
+    last_login: string;
+}
+
+export interface UserPreferences {
+    theme?: string;
+    searchMode?: string;
+    providers?: string[];
+    language?: string;
+    [key: string]: any;
+}
+
+export interface UserHistoryData {
+    search_history: Array<{ query: string; timestamp: string; [key: string]: any }>;
+    lookup_history: Array<{ word: string; timestamp: string; [key: string]: any }>;
+    updated_at?: string;
+}
+
 // Utility Types
 export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 export type RequiredFields<T, K extends keyof T> = Omit<T, K> &

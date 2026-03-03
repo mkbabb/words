@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import { createPersistedState } from 'pinia-plugin-persistedstate';
+import { clerkPlugin } from '@clerk/vue';
 import App from './App.vue';
 import router from './router';
 import { logger } from '@/utils/logger';
@@ -19,6 +20,18 @@ pinia.use(createPersistedState());
 // Use plugins
 app.use(pinia);
 app.use(router);
+
+// Initialize Clerk authentication
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+if (clerkPubKey) {
+  app.use(clerkPlugin, {
+    publishableKey: clerkPubKey,
+    routerPush: (to: string) => router.push(to),
+    routerReplace: (to: string) => router.replace(to),
+  });
+} else {
+  logger.warn('VITE_CLERK_PUBLISHABLE_KEY not set — auth disabled');
+}
 
 // Register service worker
 if ('serviceWorker' in navigator) {

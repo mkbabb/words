@@ -22,6 +22,7 @@ from ...core import (
     get_pagination,
     get_sort,
 )
+from ...middleware.auth import require_admin, require_premium
 from ...repositories.example_repository import (
     ExampleCreate,
     ExampleFilter,
@@ -114,6 +115,7 @@ async def list_examples(
 @router.post("", response_model=ResourceResponse, status_code=201)
 async def create_example(
     data: ExampleCreate,
+    _admin: str = Depends(require_admin),
     repo: ExampleRepository = Depends(get_example_repo),
 ) -> ResourceResponse:
     """Create a new example."""
@@ -175,6 +177,7 @@ async def get_example(
 async def update_example(
     example_id: PydanticObjectId,
     data: ExampleUpdate,
+    _admin: str = Depends(require_admin),
     repo: ExampleRepository = Depends(get_example_repo),
 ) -> ResourceResponse:
     """Update an example."""
@@ -192,6 +195,7 @@ async def update_example(
 @router.delete("/{example_id}", status_code=204, response_model=None)
 async def delete_example(
     example_id: PydanticObjectId,
+    _admin: str = Depends(require_admin),
     repo: ExampleRepository = Depends(get_example_repo),
 ) -> None:
     """Delete an example."""
@@ -202,6 +206,7 @@ async def delete_example(
 async def generate_examples_for_definition(
     definition_id: str,
     request: ExampleGenerationRequest,
+    _premium: str = Depends(require_premium),
     repo: ExampleRepository = Depends(get_example_repo),
 ) -> list[ResourceResponse]:
     """Generate new examples for a definition."""
@@ -261,6 +266,7 @@ async def generate_examples_for_definition(
 @router.post("/batch/update", response_model=dict[str, Any])
 async def batch_update_examples(
     request: BatchExampleUpdate,
+    _admin: str = Depends(require_admin),
     repo: ExampleRepository = Depends(get_example_repo),
 ) -> dict[str, Any]:
     """Batch update examples."""

@@ -70,44 +70,13 @@
                 {{ pronunciationMode === 'phonetic' ? 'IPA' : 'Phonetic' }}
             </button>
 
-            <!-- Provider Source Icons -->
-            <ProviderIcons :providers="providers" :word="word" />
-
-            <!-- AI Synthesis Indicator -->
-            <HoverCard v-if="isAISynthesized">
-                <HoverCardTrigger as-child>
-                    <div
-                        class="relative inline-flex cursor-help items-center justify-center opacity-60"
-                    >
-                        <div class="relative">
-                            <Sparkles
-                                :size="16"
-                                class="animate-pulse fill-amber-600 text-amber-600 drop-shadow-lg dark:fill-amber-400 dark:text-amber-400"
-                            />
-                            <Sparkles
-                                :size="16"
-                                class="animate-spin-slow absolute inset-0 fill-amber-300 text-amber-300 opacity-50 dark:fill-amber-600 dark:text-amber-600"
-                            />
-                        </div>
-                    </div>
-                </HoverCardTrigger>
-                <HoverCardContent class="w-80" side="top" :sideOffset="4">
-                    <div class="space-y-2">
-                        <div class="flex items-center gap-2">
-                            <Sparkles
-                                :size="16"
-                                class="text-amber-600 dark:text-amber-400"
-                            />
-                            <h4 class="font-semibold">AI Enhanced</h4>
-                        </div>
-                        <p class="text-sm opacity-90">
-                            This content has been enhanced using AI to provide
-                            clearer definitions, better examples, and improved
-                            organization of meanings.
-                        </p>
-                    </div>
-                </HoverCardContent>
-            </HoverCard>
+            <!-- Provider Source Icons (clickable source switcher) -->
+            <ProviderIcons
+                :providers="providers"
+                :active-source="activeSource"
+                :show-synthesis="isAISynthesized"
+                @select-source="$emit('select-source', $event)"
+            />
         </div>
 
         <!-- Add to Wordlist Modal -->
@@ -127,7 +96,7 @@ import {
     HoverCardContent,
     HoverCardTrigger,
 } from '@/components/ui/hover-card';
-import { Sparkles, Plus } from 'lucide-vue-next';
+import { Plus } from 'lucide-vue-next';
 import AnimatedTitle from './AnimatedTitle.vue';
 import AudioPlaybackButton from './AudioPlaybackButton.vue';
 import ProviderIcons from './ProviderIcons.vue';
@@ -146,12 +115,14 @@ interface WordHeaderProps {
     pronunciationMode: PronunciationMode;
     providers: string[];
     isAISynthesized?: boolean;
+    activeSource?: string;
 }
 
 const props = defineProps<WordHeaderProps>();
 
 defineEmits<{
     'toggle-pronunciation': [];
+    'select-source': [source: string];
 }>();
 
 // Modal state
@@ -214,17 +185,3 @@ const currentPronunciation = computed(() => {
 });
 </script>
 
-<style scoped>
-@keyframes spin-slow {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.animate-spin-slow {
-    animation: spin-slow 3s linear infinite;
-}
-</style>

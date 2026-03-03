@@ -20,8 +20,10 @@ from ...core.state_tracker import Stages, StateTracker
 from ...core.streaming import create_streaming_response
 from ...models.parameters import LookupParams
 from ...storage.mongodb import get_synthesized_entry
+from ...models.user import UserRole
 from ...utils.logging import get_logger
 from ...utils.sanitization import validate_word_input
+from ..middleware.auth import get_optional_user_role, require_admin
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -120,6 +122,7 @@ async def _cached_lookup(word: str, params: LookupParams) -> DictionaryEntryResp
 async def lookup_word(
     word: str,
     params: LookupParams = Depends(parse_lookup_params),
+    user_role: UserRole | None = Depends(get_optional_user_role),
 ) -> DictionaryEntryResponse:
     """Comprehensive word definition lookup with AI-enhanced synthesis.
 
@@ -151,6 +154,19 @@ async def lookup_word(
         word = validate_word_input(word)
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+    # Premium gating: free users can only get AI synthesis if it's already cached
+    is_premium = user_role in (UserRole.PREMIUM, UserRole.ADMIN) if user_role else False
+    if not is_premium and not params.no_ai:
+        # Check if synthesis is cached; if not, force no_ai
+        existing = await get_synthesized_entry(word)
+        if not existing:
+            params = LookupParams(
+                force_refresh=params.force_refresh,
+                providers=params.providers,
+                languages=params.languages,
+                no_ai=True,
+            )
 
     start_time = time.perf_counter()
 
@@ -297,6 +313,7 @@ async def _lookup_with_tracking(
 async def lookup_word_stream(
     word: str,
     params: LookupParams = Depends(parse_lookup_params),
+    user_role: UserRole | None = Depends(get_optional_user_role),
 ) -> StreamingResponse:
     """Stream word lookup progress via Server-Sent Events (SSE).
 
@@ -323,6 +340,18 @@ async def lookup_word_stream(
     """
     logger.info(f"Starting streaming lookup for word: {word}")
 
+    # Premium gating: free users can only get AI synthesis if it's already cached
+    is_premium = user_role in (UserRole.PREMIUM, UserRole.ADMIN) if user_role else False
+    if not is_premium and not params.no_ai:
+        existing = await get_synthesized_entry(word)
+        if not existing:
+            params = LookupParams(
+                force_refresh=params.force_refresh,
+                providers=params.providers,
+                languages=params.languages,
+                no_ai=True,
+            )
+
     # Create state tracker for lookup process
     state_tracker = StateTracker(category="lookup")
 
@@ -337,3 +366,113 @@ async def lookup_word_stream(
         include_stage_definitions=True,
         include_completion_data=True,
     )
+
+
+@router.post("/lookup/{word}/re-synthesize", response_model=DictionaryEntryResponse)
+async def re_synthesize_word(
+    word: str,
+    _admin: str = Depends(require_admin),
+) -> DictionaryEntryResponse:
+    """Re-synthesize a word entry (admin only).
+
+    Triggers the full lookup pipeline with force_refresh=True,
+    which re-fetches provider data and runs AI synthesis from scratch.
+    Increments the version in L3 cache.
+    """
+    try:
+        word = validate_word_input(word)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    logger.info(f"Admin re-synthesis requested for: {word}")
+
+    params = LookupParams(
+        force_refresh=True,
+        providers=["wiktionary"],
+        languages=["en"],
+        no_ai=False,
+    )
+
+    try:
+        entry = await lookup_word_pipeline(
+            word=word,
+            providers=params.providers,
+            languages=params.languages,
+            force_refresh=True,
+            no_ai=False,
+            state_tracker=None,
+        )
+
+        if not entry:
+            raise HTTPException(404, f"No definition found for word: {word}")
+
+        response_dict = await DictionaryEntryLoader.load_as_lookup_response(entry=entry)
+        return DictionaryEntryResponse(**response_dict)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Re-synthesis failed for {word}: {e}")
+        raise HTTPException(500, f"Re-synthesis failed: {e!s}")
+
+
+@router.get("/lookup/{word}/providers")
+async def get_word_providers(word: str) -> list[dict[str, Any]]:
+    """Get all provider entries for a word (public endpoint).
+
+    Returns raw provider data grouped by provider, including AI synthesis
+    as one of the providers if available.
+    """
+    try:
+        word = validate_word_input(word)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    from ...models.dictionary import (
+        Definition as DefModel,
+        DictionaryEntry as DictEntry,
+        Word as WordModel,
+    )
+
+    # Find the word
+    word_doc = await WordModel.find_one(WordModel.text == word)
+    if not word_doc:
+        raise HTTPException(404, f"Word '{word}' not found")
+
+    # Find all provider entries
+    entries = await DictEntry.find(DictEntry.word_id == word_doc.id).to_list()
+    if not entries:
+        raise HTTPException(404, f"No provider data found for '{word}'")
+
+    result = []
+    for entry in entries:
+        provider_str = entry.provider.value if hasattr(entry.provider, "value") else str(entry.provider) if entry.provider else "unknown"
+        provider_data: dict[str, Any] = {
+            "provider": provider_str,
+            "id": str(entry.id),
+            "etymology": entry.etymology.model_dump() if entry.etymology else None,
+            "model_info": entry.model_info.model_dump() if entry.model_info else None,
+        }
+
+        # Load definitions
+        definitions = []
+        if entry.definition_ids:
+            defs = await DefModel.find(
+                {"_id": {"$in": entry.definition_ids}}
+            ).to_list()
+            definitions = [
+                {
+                    "id": str(d.id),
+                    "part_of_speech": d.part_of_speech,
+                    "text": d.text,
+                    "synonyms": d.synonyms[:10] if d.synonyms else [],
+                    "antonyms": d.antonyms[:10] if d.antonyms else [],
+                    "examples": [],
+                }
+                for d in defs
+            ]
+
+        provider_data["definitions"] = definitions
+        result.append(provider_data)
+
+    return result

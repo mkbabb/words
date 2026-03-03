@@ -40,6 +40,24 @@ const router = createRouter({
       props: true,
     },
     {
+      path: '/admin',
+      name: 'Admin',
+      component: () => import('@/views/Admin.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/login',
+      name: 'Login',
+      component: () => import('@/views/Login.vue'),
+      meta: { requiresGuest: true },
+    },
+    {
+      path: '/signup',
+      name: 'Signup',
+      component: () => import('@/views/Signup.vue'),
+      meta: { requiresGuest: true },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
       component: () => import('@/views/NotFound.vue'),
@@ -51,12 +69,19 @@ const router = createRouter({
 router.beforeEach((to) => {
   const baseTitle = 'Floridify'
 
+  // Page titles
   if (to.name === 'Definition' && to.params.word) {
     document.title = `${to.params.word} - ${baseTitle}`
   } else if (to.name === 'Thesaurus' && to.params.word) {
     document.title = `${to.params.word} (Thesaurus) - ${baseTitle}`
   } else if (to.name === 'Search' && to.params.query) {
     document.title = `Search: ${to.params.query} - ${baseTitle}`
+  } else if (to.name === 'Admin') {
+    document.title = `Admin - ${baseTitle}`
+  } else if (to.name === 'Login') {
+    document.title = `Sign In - ${baseTitle}`
+  } else if (to.name === 'Signup') {
+    document.title = `Sign Up - ${baseTitle}`
   } else if (to.name === 'NotFound') {
     document.title = `Not Found - ${baseTitle}`
   } else {

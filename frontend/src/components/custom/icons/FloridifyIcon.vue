@@ -4,7 +4,6 @@
       cn(
         'flex cursor-pointer items-center transition-all duration-300 ease-out',
         {
-          'gap-1': expanded,
           'justify-center': !expanded,
         },
         className
@@ -13,11 +12,12 @@
     @click="$emit('click')"
   >
     <!-- Fancy F using reusable component -->
-    <FancyF 
-      :mode="mode" 
+    <FancyF
+      :mode="mode"
       :size="expanded ? 'lg' : 'base'"
       :clickable="clickable"
-      class="transition-all duration-300"
+      :show-subscript="showSubscript"
+      :class="cn('transition-all duration-300', { '-translate-y-px': expanded })"
       @toggle-mode="$emit('toggle-mode')"
     />
 
@@ -25,7 +25,7 @@
     <span
       v-if="expanded"
       :class="
-        cn('text-foreground transform font-serif transition-all duration-300 -m-1', {
+        cn('text-foreground transform font-serif transition-all duration-300 -ml-1', {
           'text-xl': expanded,
           'scale-x-0 opacity-0': !expanded,
           'scale-x-100 opacity-100': expanded,
@@ -47,9 +47,10 @@ interface FloridifyIconProps {
   className?: string;
   mode?: LookupMode;
   clickable?: boolean;
+  showSubscript?: boolean;
 }
 
-const { expanded = false, mode = 'dictionary', clickable = false } = defineProps<FloridifyIconProps>();
+const { expanded = false, mode = 'dictionary', clickable = false, showSubscript = true } = defineProps<FloridifyIconProps>();
 
 defineEmits<{
   click: [];

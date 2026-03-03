@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from ...middleware.auth import require_admin
 
 from ....caching.delta import compute_diff_between
 from ....caching.manager import get_version_manager
@@ -154,6 +156,7 @@ async def diff_word_versions(
 async def rollback_word_version(
     word: str,
     version: str = Query(..., description="Version to rollback to (e.g. 1.0.1)"),
+    _admin: str = Depends(require_admin),
 ) -> dict[str, Any]:
     """Rollback a word's synthesized entry to a previous version.
 

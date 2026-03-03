@@ -4,6 +4,7 @@ import { useContentStore, useNotificationStore } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useRouterSync } from '@/stores/composables/useRouterSync';
 import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
+import { lookupApi } from '@/api/lookup';
 import { logger } from '@/utils/logger';
 import type { ImageMedia } from '@/types/api';
 
@@ -30,6 +31,8 @@ export function useDefinitionActions(options: UseDefinitionActionsOptions) {
     const showWordlistModal = ref(false);
     const wordToAdd = ref('');
     const showThemeDropdown = ref(false);
+    const showVersionHistory = ref(false);
+    const isResynthesizing = ref(false);
 
     // Event handlers
     const handleRegenerateExamples = async (definitionIndex: number) => {
@@ -147,6 +150,37 @@ export function useDefinitionActions(options: UseDefinitionActionsOptions) {
         }
     };
 
+    // Re-synthesize word (admin only)
+    const handleReSynthesize = async () => {
+        const word = entry.value?.word;
+        if (!word) return;
+
+        isResynthesizing.value = true;
+        try {
+            const newEntry = await lookupApi.reSynthesize(word);
+            contentStore.setCurrentEntry(newEntry);
+            notificationStore.showNotification({
+                type: 'success',
+                message: `"${word}" re-synthesized with ${newEntry.definitions?.length || 0} definitions.`,
+                duration: 4000,
+            });
+        } catch (error) {
+            logger.error('Re-synthesis failed:', error);
+            notificationStore.showNotification({
+                type: 'error',
+                message: 'Re-synthesis failed. Please try again.',
+                duration: 4000,
+            });
+        } finally {
+            isResynthesizing.value = false;
+        }
+    };
+
+    // Toggle version history panel
+    const handleToggleVersionHistory = () => {
+        showVersionHistory.value = !showVersionHistory.value;
+    };
+
     // Save all changes function
     const saveAllChanges = () => {
         document.dispatchEvent(new CustomEvent('save-all-edits'));
@@ -213,6 +247,8 @@ export function useDefinitionActions(options: UseDefinitionActionsOptions) {
         showWordlistModal,
         wordToAdd,
         showThemeDropdown,
+        showVersionHistory,
+        isResynthesizing,
 
         // Methods
         handleRegenerateExamples,
@@ -226,6 +262,8 @@ export function useDefinitionActions(options: UseDefinitionActionsOptions) {
         handleShowHelp,
         handleSuggestAlternatives,
         handleRetryThesaurus,
+        handleReSynthesize,
+        handleToggleVersionHistory,
         saveAllChanges,
     };
 }

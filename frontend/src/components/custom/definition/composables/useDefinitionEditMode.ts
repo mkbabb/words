@@ -1,5 +1,5 @@
 import { ref, reactive, computed, watch, toRaw, type Ref } from 'vue';
-import { useContentStore } from '@/stores';
+import { useContentStore, useAuthStore } from '@/stores';
 import type { Definition } from '@/types/api';
 import { useDebounceFn } from '@vueuse/core';
 import { logger } from '@/utils/logger';
@@ -43,8 +43,12 @@ export function useDefinitionEditMode(
     >,
     options: EditModeOptions = {}
 ) {
+    const auth = useAuthStore();
     const contentStore = useContentStore();
     const { debounceMs = 500 } = options;
+
+    // Gate: non-admin users get disabled edit mode
+    const canEdit = computed(() => auth.isAdmin);
 
     // Core state
     const isEditMode = ref(false);
@@ -138,6 +142,7 @@ export function useDefinitionEditMode(
 
     // Start edit mode
     function startEdit() {
+        if (!canEdit.value) return;
         isEditMode.value = true;
         // Reset fields to current definition values
         fields.text.value = definition.value.text;
@@ -345,6 +350,7 @@ export function useDefinitionEditMode(
         hasErrors,
         fields,
         activeFieldId,
+        canEdit,
 
         // Actions
         startEdit,

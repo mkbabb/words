@@ -20,6 +20,7 @@ import { Toaster } from '@/components/ui/toast';
 import { PWAInstallPrompt, PWANotificationPrompt } from '@/components/custom/pwa';
 import NotificationToast from '@/components/custom/NotificationToast.vue';
 import { useIOSPWA, usePWA } from '@/composables';
+import { useStateSync } from '@/composables/useStateSync';
 
 // Sync UIStore resolvedTheme to <html> class (single source of truth)
 // Note: { immediate: true } is intentionally omitted to prevent FOUC.
@@ -34,6 +35,9 @@ watch(() => ui.resolvedTheme, (theme) => {
 // Initialize PWA features
 const { isIOS, isStandalone, handleSwipeNavigation, handleViewportResize } = useIOSPWA();
 const { registerServiceWorker } = usePWA();
+
+// Initialize state sync (preferences + history ↔ backend)
+useStateSync();
 
 // Add subtle paper texture to main background - simplified approach
 // App styles - only use background properties, not opacity/blend on the main container

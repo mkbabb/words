@@ -6,9 +6,12 @@
                 <ActionButton
                     @click="handleAIToggle"
                     @keydown.enter.stop="handleAIToggle"
-                    :variant="!noAI ? 'primary' : 'default'"
+                    :variant="!noAI && isPremium ? 'primary' : 'default'"
+                    :disabled="!isPremium"
                 >
+                    <Lock v-if="!isPremium" :size="20" class="text-muted-foreground" />
                     <Wand2
+                        v-else
                         :size="20"
                         :class="[
                             'transition-all duration-300',
@@ -20,17 +23,19 @@
             <HoverCardContent class="w-auto p-2" side="top">
                 <p class="text-sm">
                     {{
-                        !noAI
-                            ? 'AI synthesis enabled'
-                            : 'Raw provider data only'
+                        !isPremium
+                            ? 'Upgrade to Premium for AI synthesis'
+                            : !noAI
+                              ? 'AI synthesis enabled'
+                              : 'Raw provider data only'
                     }}
                 </p>
             </HoverCardContent>
         </HoverCard>
 
-        <!-- Force Refresh Toggle -->
+        <!-- Force Refresh Toggle (premium only) -->
         <HoverCard
-            v-if="showRefreshButton"
+            v-if="showRefreshButton && isPremium"
             :open-delay="200"
             :close-delay="100"
         >
@@ -143,10 +148,11 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Trash2, RefreshCw, Wand2, Download, Bell, BellDot } from 'lucide-vue-next';
+import { Trash2, RefreshCw, Wand2, Download, Bell, BellDot, Lock } from 'lucide-vue-next';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import ActionButton from './ActionButton.vue';
 import { useStores } from '@/stores';
+import { useAuthStore } from '@/stores/auth';
 import { logger } from '@/utils/logger';
 
 interface ActionsRowProps {
@@ -165,6 +171,10 @@ const emit = defineEmits<{
     'toggle-refresh': [];
 }>();
 
+// Auth
+const auth = useAuthStore();
+const isPremium = auth.isPremium;
+
 // PWA composables
 // const { subscribeToPush } = usePWA();
 const { notifications } = useStores();
@@ -179,6 +189,7 @@ const notificationPromptAnimating = ref(false);
 
 // Event handlers
 const handleAIToggle = () => {
+    if (!isPremium) return;
     noAI.value = !noAI.value;
     aiAnimating.value = true;
     setTimeout(() => {

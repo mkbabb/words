@@ -24,14 +24,13 @@
         }
       ]"
     />
-    <div 
+    <div
+      ref="subscriptWrapper"
       :class="[
-        'inline-flex items-baseline justify-center min-w-fit',
+        'inline-flex items-baseline justify-center subscript-wrapper',
         {
-          'w-1': size === 'sm',
-          'w-2': size === 'base', 
-          'w-3': size === 'lg',
-          'w-4': size === 'xl'
+          'subscript-hidden': !showSubscript,
+          'subscript-visible': showSubscript,
         }
       ]"
     >
@@ -54,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue';
+import { ref, watch, nextTick } from 'vue';
 import { gsap } from 'gsap';
 import { LaTeX } from '@/components/custom/latex';
 import type { LookupMode, ComponentSize } from '@/types';
@@ -63,11 +62,13 @@ interface FancyFProps {
   mode: LookupMode;
   size?: ComponentSize;
   clickable?: boolean;
+  showSubscript?: boolean;
 }
 
 const props = withDefaults(defineProps<FancyFProps>(), {
   size: 'base',
   clickable: false,
+  showSubscript: true,
 });
 
 const emit = defineEmits<{
@@ -78,14 +79,35 @@ const emit = defineEmits<{
 const fancyFButton = ref<HTMLButtonElement>(); void fancyFButton;
 const fancyFMain = ref<HTMLElement>();
 const fancyFSubscript = ref<HTMLElement>();
+const subscriptWrapper = ref<HTMLElement>();
+
+// Track whether the subscript has ever been shown (for entrance animation)
+const hasAnimatedIn = ref(false);
+
+// Animate subscript entrance on first show
+watch(() => props.showSubscript, (visible) => {
+  if (visible && !hasAnimatedIn.value && subscriptWrapper.value) {
+    hasAnimatedIn.value = true;
+    // Bounce-in entrance animation
+    gsap.fromTo(subscriptWrapper.value,
+      { scale: 0, opacity: 0 },
+      {
+        scale: 1,
+        opacity: 1,
+        duration: 0.5,
+        ease: "back.out(3)",
+      }
+    );
+  }
+});
 
 // Handle click with bouncy animation
 const handleClick = () => {
   if (!props.clickable || !fancyFMain.value || !fancyFSubscript.value) return;
-  
+
   // Ultra-bouncy click animation
   const timeline = gsap.timeline();
-  
+
   timeline
     // Squash on click
     .to([fancyFMain.value, fancyFSubscript.value], {
@@ -110,7 +132,7 @@ const handleClick = () => {
       ease: "elastic.out(1, 0.5)",
       stagger: 0.02
     });
-  
+
   // Emit the toggle event
   emit('toggle-mode');
 };
@@ -138,7 +160,7 @@ const getTooltipText = () => {
 // Continuous subtle breathing animation when not clicked
 const startBreathingAnimation = () => {
   if (!props.clickable || !fancyFMain.value || !fancyFSubscript.value) return;
-  
+
   gsap.to([fancyFMain.value, fancyFSubscript.value], {
     scale: 1.02,
     duration: 2,
@@ -156,3 +178,23 @@ nextTick(() => {
   }
 });
 </script>
+
+<style scoped>
+.subscript-wrapper {
+  transition: opacity 0.3s ease, max-width 0.3s ease, transform 0.3s ease;
+  transform-origin: left bottom;
+}
+
+.subscript-hidden {
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+  transform: scale(0);
+}
+
+.subscript-visible {
+  opacity: 1;
+  max-width: 2rem;
+  overflow: visible;
+}
+</style>

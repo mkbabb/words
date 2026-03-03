@@ -6,6 +6,8 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+
+from ..middleware.auth import require_admin
 from pydantic import BaseModel, Field
 
 from ...caching.core import CacheNamespace, get_global_cache
@@ -478,6 +480,7 @@ async def get_semantic_status() -> SemanticStatusResponse:
 @router.post("/search/rebuild", response_model=RebuildIndexResponse)
 async def rebuild_search_index(
     request: RebuildIndexRequest = RebuildIndexRequest(),
+    _admin: str = Depends(require_admin),
 ) -> RebuildIndexResponse:
     """Streamlined rebuild of search index with unified corpus management.
 

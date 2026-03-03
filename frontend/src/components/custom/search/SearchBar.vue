@@ -68,7 +68,8 @@
                 <ModeToggle
                     :model-value="searchBar.getSubMode('lookup') as any"
                     :can-toggle="canToggleMode"
-                    :opacity="canToggleMode ? iconOpacity : 0"
+                    :opacity="iconOpacity"
+                    :show-subscript="canToggleMode"
                     :ai-mode="searchBar.isAIQuery"
                     @update:model-value="
                         (value: any) => searchBar.setSubMode('lookup', value)

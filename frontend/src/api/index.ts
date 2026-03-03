@@ -14,6 +14,7 @@ import { wordlistApi } from './wordlists';
 import { healthApi } from './health';
 import { versionsApi } from './versions';
 import { audioApi } from './audio';
+import { usersApi } from './users';
 
 // Isomorphic API exports - mirrors backend structure
 export { lookupApi } from './lookup';         // /lookup/*
@@ -28,6 +29,7 @@ export { audioApi } from './audio';           // /audio/tts/*
 export { wordlistApi } from './wordlists';     // /wordlists/*
 export { healthApi } from './health';         // /health
 export { versionsApi } from './versions';     // /words/{word}/versions/*
+export { usersApi } from './users';           // /users/*
 
 
 
@@ -50,4 +52,5 @@ export default {
   wordlists: wordlistApi,
   health: healthApi,
   versions: versionsApi,
+  users: usersApi,
 };

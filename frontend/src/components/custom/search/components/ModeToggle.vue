@@ -16,6 +16,7 @@
             :mode="modelValue"
             size="lg"
             :clickable="canToggle"
+            :show-subscript="showSubscript"
             :class="[
                 'transition-colors duration-200',
                 {
@@ -41,6 +42,7 @@ interface ModeToggleProps {
     canToggle: boolean;
     opacity: number;
     aiMode?: boolean;
+    showSubscript?: boolean;
     // Animation parameters
     minScale?: number;
     maxScale?: number;
@@ -52,6 +54,7 @@ interface ModeToggleProps {
 
 const props = withDefaults(defineProps<ModeToggleProps>(), {
     aiMode: false,
+    showSubscript: true,
     minScale: 0.9,
     maxScale: 1.0,
     opacityThreshold: 0.1,

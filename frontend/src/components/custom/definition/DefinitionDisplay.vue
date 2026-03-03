@@ -58,6 +58,8 @@
                         !actions.showThemeDropdown.value
                 "
                 @toggle-edit-mode="editModeEnabled = !editModeEnabled"
+                @toggle-version-history="actions.handleToggleVersionHistory"
+                @resynthesize="actions.handleReSynthesize"
             />
 
             <!-- Image Carousel Display -->
@@ -80,7 +82,9 @@
                 :pronunciationMode="lookupMode.pronunciationMode"
                 :providers="usedProviders"
                 :isAISynthesized="!!entry.model_info"
+                :activeSource="activeSourceTab"
                 @toggle-pronunciation="lookupMode.togglePronunciation"
+                @select-source="activeSourceTab = $event"
             />
             <!-- Header Skeleton -->
             <div v-else-if="isStreaming" class="space-y-4 p-6">
@@ -99,6 +103,12 @@
                 class="h-px border-0 bg-gradient-to-r from-transparent via-muted-foreground/20 to-transparent dark:via-muted-foreground/30"
             />
 
+            <!-- Provider source tabs (AI Synthesis + raw provider data) -->
+            <ProviderViewTabs
+                v-model="activeSourceTab"
+                :word="entry?.word || ''"
+                :available-providers="usedProviders"
+            >
             <!-- Mode Content -->
             <CardContent class="space-y-4 px-4 sm:px-6">
                 <Transition name="mode-switch" mode="out-in">
@@ -226,7 +236,21 @@
                     </div>
                 </div>
             </div>
+            </ProviderViewTabs>
         </ThemedCard>
+
+        <!-- Version History Panel (admin only) -->
+        <div
+            v-if="actions.showVersionHistory.value && entry?.word"
+            class="mt-4 rounded-lg border border-border bg-background p-4"
+        >
+            <VersionHistory
+                :word="entry.word"
+                :currentVersion="entry.version"
+                @close="actions.handleToggleVersionHistory"
+                @rollback="handleVersionRollback"
+            />
+        </div>
 
         <!-- Add to Wordlist Modal -->
         <AddToWordlistModal
@@ -259,6 +283,8 @@ import {
 import DefinitionStreamingSkeleton from './skeletons/DefinitionStreamingSkeleton.vue';
 import { ThemedCard } from '@/components/custom/card';
 import AddToWordlistModal from './components/AddToWordlistModal.vue';
+import ProviderViewTabs from './components/ProviderViewTabs.vue';
+import VersionHistory from './components/VersionHistory.vue';
 import {
     useDefinitionGroups,
     useProviders,
@@ -271,11 +297,13 @@ import {
     getEmptyMessage,
 } from './utils/stateMessages';
 import { normalizeEtymology } from '@/utils/guards';
+import { useAuthStore } from '@/stores/auth';
 
 // Stores
 const contentStore = useContentStore();
 const lookupMode = useLookupMode();
 const searchBar = useSearchBarStore();
+const authStore = useAuthStore();
 
 // Orchestrator for auto-fetching thesaurus data
 const orchestrator = useSearchOrchestrator({
@@ -300,6 +328,12 @@ watch(() => searchBar.getSubMode('lookup'), async (newSubMode) => {
 // Reactive state
 const isMounted = ref(true);
 const editModeEnabled = ref(false);
+const activeSourceTab = ref('synthesis');
+
+// In dev mode, treat user as premium (matching backend's admin passthrough)
+const effectivelyPremium = computed(() =>
+    authStore.isPremium || import.meta.env.DEV
+);
 
 // Smart computed properties - merge streaming and complete data
 const entry = computed(() => {
@@ -415,6 +449,38 @@ const { usedProviders } = useProviders(entry);
 const { allImages, handleImageClick, handleImageError } =
     useImageManagement(entry);
 const actions = useDefinitionActions({ entry, editModeEnabled });
+
+// Default source tab: premium/admin → synthesis (if available), free → first provider
+watch(
+    () => entry.value?.word,
+    () => {
+        if (!entry.value) return;
+        const hasAISynthesis = !!entry.value.model_info;
+        if (hasAISynthesis && effectivelyPremium.value) {
+            activeSourceTab.value = 'synthesis';
+        } else if (usedProviders.value.length > 0) {
+            activeSourceTab.value = usedProviders.value[0];
+        } else {
+            activeSourceTab.value = 'synthesis';
+        }
+    },
+);
+
+// Version rollback handler: re-fetch the word after rollback
+const handleVersionRollback = async (_version: string) => {
+    if (entry.value?.word) {
+        // Re-fetch the word to get the rolled-back version
+        const orchestrator2 = useSearchOrchestrator({
+            query: computed(() => entry.value?.word || ''),
+        });
+        try {
+            await orchestrator2.getDefinition(entry.value.word);
+        } catch {
+            // Silently fail — user can manually refresh
+        }
+        actions.showVersionHistory.value = false;
+    }
+};
 
 // Helpers
 const getGlobalDefinitionIndex = (
