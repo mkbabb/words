@@ -59,9 +59,3 @@ const sidebarOpen = computed(() => ui.sidebarOpen);
 const sidebarCollapsed = computed(() => ui.sidebarCollapsed);
 </script>
 
-<style scoped>
-/* Ensure all sidebar descendants transition colors consistently when toggling dark mode */
-aside :deep(*) {
-  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
-}
-</style>

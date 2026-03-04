@@ -14,7 +14,7 @@
       ref="fancyFMain"
       :expression="'\\mathfrak{F}'"
       :class="[
-        'font-bold transition-all duration-300',
+        'font-bold transition-[transform,opacity] duration-300',
         {
           'text-lg': size === 'sm',
           'text-2xl': size === 'base',

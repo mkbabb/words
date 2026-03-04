@@ -1,6 +1,6 @@
 <template>
     <div
-        :class="{ dark: isDark, ios: isIOS, 'ios-standalone': isStandalone }"
+        :class="{ ios: isIOS, 'ios-standalone': isStandalone }"
         class="min-h-screen bg-background text-foreground"
         :style="appStyles"
     >
@@ -14,7 +14,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, watch } from 'vue';
-import { isDark } from '@/components/custom/dark-mode-toggle';
 import { useUIStore } from '@/stores/ui/ui-state';
 import { Toaster } from '@/components/ui/toast';
 import { PWAInstallPrompt, PWANotificationPrompt } from '@/components/custom/pwa';

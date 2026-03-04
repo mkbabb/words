@@ -2,7 +2,7 @@
   <div
     :class="
       cn(
-        'flex cursor-pointer items-center transition-all duration-300 ease-out',
+        'flex cursor-pointer items-center transition-[transform,opacity] duration-300 ease-out',
         {
           'justify-center': !expanded,
         },
@@ -17,7 +17,7 @@
       :size="expanded ? 'lg' : 'base'"
       :clickable="clickable"
       :show-subscript="showSubscript"
-      class="transition-all duration-300"
+      class="transition-[transform,opacity] duration-300"
       @toggle-mode="$emit('toggle-mode')"
     />
 
@@ -25,7 +25,7 @@
     <span
       v-if="expanded"
       :class="
-        cn('text-foreground font-serif text-xl transition-all duration-300', {
+        cn('text-foreground font-serif text-xl transition-[transform,opacity,max-width] duration-300', {
           'scale-x-0 opacity-0': !expanded,
           'scale-x-100 opacity-100': expanded,
         })

@@ -2,7 +2,7 @@
   <button
     :class="[
       'group relative flex h-10 w-10 items-center justify-center rounded-lg',
-      'transition-all duration-200 ease-apple-smooth',
+      'transition-[transform,opacity,background-color] duration-200 ease-apple-smooth',
       'active:scale-95',
       'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
       aiMode

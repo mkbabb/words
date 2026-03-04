@@ -12,7 +12,11 @@ const isDark = computed(() => {
 
 export const changeTheme = () => {
   const ui = useUIStore();
+  document.documentElement.classList.add('theme-transitioning');
   ui.toggleTheme();
+  setTimeout(() => {
+    document.documentElement.classList.remove('theme-transitioning');
+  }, 350);
 };
 
 export { isDark };
