@@ -54,9 +54,19 @@ class GenerationMixin:
             logger.debug(f"✏️  Generated example for '{word}': \"{truncated}\"")
         return result
 
-    async def pronunciation(self, word: str) -> PronunciationResponse:
+    async def pronunciation(self, word: str, language: str = "en") -> PronunciationResponse:
         """Generate pronunciation data."""
-        prompt = self.prompt_manager.render("synthesize/pronunciation", word=word)
+        language_names = {
+            "en": "English", "fr": "French", "es": "Spanish",
+            "de": "German", "it": "Italian", "pt": "Portuguese",
+            "ja": "Japanese", "zh": "Mandarin Chinese", "hi": "Hindi",
+        }
+        prompt = self.prompt_manager.render(
+            "synthesize/pronunciation",
+            word=word,
+            language=language,
+            language_name=language_names.get(language, "English"),
+        )
 
         return await self._make_structured_request(
             prompt,
