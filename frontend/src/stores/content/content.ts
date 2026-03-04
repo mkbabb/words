@@ -150,8 +150,11 @@ export const useContentStore = defineStore('content', () => {
   
   const setError = (error: DefinitionErrorState | null) => {
     definitionError.value = error
-    if (error && searchBarStore.searchMode === 'lookup') {
-      lookupContent.setCurrentEntry(null)
+    if (error) {
+      currentWord.value = null
+      if (searchBarStore.searchMode === 'lookup') {
+        lookupContent.setCurrentEntry(null)
+      }
     }
   }
   
