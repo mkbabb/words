@@ -56,12 +56,7 @@
         <BouncyToggle
             :model-value="currentSearchMode"
             @update:model-value="handleSearchModeChange"
-            :options="[
-                { label: 'Smart', value: 'smart', icon: 'Zap' },
-                { label: 'Exact', value: 'exact', icon: 'Target' },
-                { label: 'Fuzzy', value: 'fuzzy', icon: 'Sparkles' },
-                { label: 'Semantic', value: 'semantic', icon: 'Search' },
-            ]"
+            :options="searchModeOptions"
             class="text-sm font-medium"
         />
         <p class="mt-2 text-xs text-muted-foreground">
@@ -141,6 +136,27 @@ const currentSearchMode = computed(() => {
     const mode = lookupMode.searchMode;
     return Array.isArray(mode) ? mode[0] || 'smart' : mode;
 });
+
+// Semantic status computeds
+const semanticStatus = computed(() => lookupMode.semanticStatus);
+const semanticAvailable = computed(() => semanticStatus.value?.ready === true);
+const semanticUnavailable = computed(() => !semanticAvailable.value && semanticStatus.value !== null);
+
+const semanticTooltip = computed(() => {
+    const s = semanticStatus.value;
+    if (!s) return undefined;
+    if (s.ready) return undefined;
+    if (!s.enabled) return 'Semantic search is disabled';
+    if (s.building) return 'Semantic search building in background';
+    return s.message || 'Semantic search unavailable';
+});
+
+const searchModeOptions = computed(() => [
+    { label: 'Smart', value: 'smart', icon: 'Zap', tooltip: semanticTooltip.value },
+    { label: 'Exact', value: 'exact', icon: 'Target' },
+    { label: 'Fuzzy', value: 'fuzzy', icon: 'Sparkles' },
+    { label: 'Semantic', value: 'semantic', icon: 'Search', disabled: semanticUnavailable.value, tooltip: semanticTooltip.value },
+]);
 
 // Search mode descriptions
 const searchModeDescriptions: Record<string, string> = {

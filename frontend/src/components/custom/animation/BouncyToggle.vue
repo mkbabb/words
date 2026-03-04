@@ -16,27 +16,55 @@
     />
 
     <!-- Toggle buttons -->
-    <button
-      v-for="(option, index) in options"
-      :key="option.value"
-      ref="buttonRefs"
-      @click="handleSelect(option.value, index)"
-      :class="[
-        'relative z-10 px-3 py-1.5 rounded-lg font-medium transition-all duration-200',
-        isActive(option.value)
-          ? 'text-primary-foreground'
-          : 'text-muted-foreground hover:text-foreground',
-        inheritedClass
-      ]"
-    >
-      {{ option.label }}
-    </button>
+    <template v-for="(option, index) in options" :key="option.value">
+      <TooltipProvider v-if="option.tooltip" :delay-duration="200">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              ref="buttonRefs"
+              @click="handleSelect(option.value, index)"
+              :class="[
+                'relative z-10 px-3 py-1.5 rounded-lg font-medium transition-all duration-200',
+                option.disabled
+                  ? 'opacity-40 blur-[0.3px] cursor-not-allowed'
+                  : isActive(option.value)
+                    ? 'text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                inheritedClass
+              ]"
+            >
+              {{ option.label }}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="8">
+            {{ option.tooltip }}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <button
+        v-else
+        ref="buttonRefs"
+        @click="handleSelect(option.value, index)"
+        :class="[
+          'relative z-10 px-3 py-1.5 rounded-lg font-medium transition-all duration-200',
+          option.disabled
+            ? 'opacity-40 blur-[0.3px] cursor-not-allowed'
+            : isActive(option.value)
+              ? 'text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          inheritedClass
+        ]"
+      >
+        {{ option.label }}
+      </button>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, watch, useAttrs } from 'vue';
 import { gsap } from 'gsap';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 // Disable automatic attribute inheritance
 defineOptions({
@@ -47,6 +75,8 @@ interface ToggleOption {
   label: string;
   value: string;
   icon?: string;
+  disabled?: boolean;
+  tooltip?: string;
 }
 
 interface BouncyToggleProps {
@@ -139,6 +169,9 @@ const updateMultiSliders = (animate = true) => {
 };
 
 const handleSelect = (value: string, index: number) => {
+  const option = props.options[index];
+  if (option?.disabled) return;
+
   const activeButton = buttonRefs.value[index];
   if (!activeButton) return;
 
