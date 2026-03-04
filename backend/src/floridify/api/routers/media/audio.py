@@ -64,9 +64,9 @@ async def generate_tts(body: TTSGenerateRequest) -> ResourceResponse:
     Returns:
         Audio metadata with content URL for playback.
     """
-    from ....audio import AudioSynthesizer
+    from ....audio import get_audio_synthesizer
 
-    synthesizer = AudioSynthesizer()
+    synthesizer = get_audio_synthesizer()
     audio = await synthesizer.synthesize_word(
         word=body.word,
         accent=body.accent,

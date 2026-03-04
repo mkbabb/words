@@ -57,22 +57,16 @@ dependencies = [
     "ebooklib>=0.18",      # EPUB parsing
     # Authentication
     "PyJWT[crypto]>=2.8.0",  # JWT validation for Clerk auth
+    # TTS audio synthesis
+    "kittentts>=0.1.0",      # English TTS (15M params, local)
+    "kokoro-onnx>=0.5.0",    # Non-English TTS (82M params, 8 languages)
+    "soundfile>=0.12.1",     # Audio I/O for TTS
 ]
 
 [project.optional-dependencies]
 # macOS-specific dependencies for Apple Dictionary integration
 macos = [
     "pyobjc-framework-coreservices>=11.1",
-]
-# Local TTS via KittenTTS
-kitten-tts = [
-    "kittentts>=0.1.0",
-    "soundfile>=0.12.1",
-]
-# Non-English TTS via Kokoro-ONNX
-kokoro-tts = [
-    "kokoro-onnx>=0.5.0",
-    "soundfile>=0.12.1",
 ]
 
 [project.scripts]

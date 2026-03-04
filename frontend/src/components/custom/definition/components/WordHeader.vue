@@ -43,19 +43,19 @@
             </HoverCard>
         </CardTitle>
 
-        <!-- Pronunciation -->
-        <div
-            v-if="pronunciation && hasPronunciation"
-            class="flex items-center gap-3 pt-2"
-        >
-            <span class="text-lg text-muted-foreground font-mono">
-                {{ currentPronunciation }}
-            </span>
-            <span v-if="!hasMultiplePronunciations && hasPronunciation" class="text-xs text-muted-foreground/60">
-                {{ pronunciationMode === 'ipa' || (!pronunciation?.phonetic || pronunciation?.phonetic === 'unknown') ? '(IPA)' : '(Phonetic)' }}
-            </span>
+        <!-- Pronunciation & Audio Row -->
+        <div class="flex items-center gap-3 pt-2">
+            <!-- Pronunciation text (only when available) -->
+            <template v-if="pronunciation && hasPronunciation">
+                <span class="text-lg text-muted-foreground font-mono">
+                    {{ currentPronunciation }}
+                </span>
+                <span v-if="!hasMultiplePronunciations" class="text-xs text-muted-foreground/60">
+                    {{ pronunciationMode === 'ipa' || (!pronunciation?.phonetic || pronunciation?.phonetic === 'unknown') ? '(IPA)' : '(Phonetic)' }}
+                </span>
+            </template>
 
-            <!-- Audio Playback Button -->
+            <!-- Audio Playback Button — always visible -->
             <AudioPlaybackButton
                 :state="audioState"
                 :error-message="audioError"

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from ...audio import AudioSynthesizer
+from ...audio import get_audio_synthesizer
 from ...core.state_tracker import Stages, StateTracker
-from ...models import Etymology
+from ...models import AudioMedia, Etymology
 from ...models.dictionary import (
     Definition,
     DictionaryEntry,
@@ -70,7 +70,7 @@ async def _enhance_pronunciation(
                     message=f"Enhancing pronunciation for {word}",
                 )
 
-            response = await ai.pronunciation(word)
+            response = await ai.pronunciation(word, language=language)
             pronunciation.phonetic = response.phonetic
             pronunciation.ipa = response.ipa
             await pronunciation.save()
@@ -99,7 +99,7 @@ async def _create_pronunciation(
                 message=f"Generating pronunciation for {word}",
             )
 
-        response = await ai.pronunciation(word)
+        response = await ai.pronunciation(word, language=language)
 
         # Create Word object if we need word_id (assuming word parameter should be Word object)
         word_obj = await Word.find_one(Word.text == word)
@@ -126,17 +126,28 @@ async def _create_pronunciation(
 
 
 async def _generate_audio_files(pronunciation: Pronunciation, word: str, language: str = "en") -> None:
-    """Generate audio files for pronunciation."""
+    """Generate audio files for pronunciation and store as AudioMedia documents."""
     try:
-        audio_synthesizer = AudioSynthesizer()
-        audio_files = await audio_synthesizer.synthesize_pronunciation(pronunciation, word, language=language)
+        audio_synthesizer = get_audio_synthesizer()
+        audio_results = await audio_synthesizer.synthesize_pronunciation(pronunciation, word, language=language)
 
-        if audio_files:
-            pronunciation.audio_file_ids = [
-                audio.id for audio in audio_files if audio.id is not None
-            ]
+        if audio_results:
+            audio_ids = []
+            for result in audio_results:
+                audio_doc = AudioMedia(
+                    url=result.url,
+                    format=result.format,
+                    size_bytes=result.size_bytes,
+                    duration_ms=result.duration_ms,
+                    accent=result.accent,
+                    quality=result.quality,
+                )
+                await audio_doc.save()
+                audio_ids.append(audio_doc.id)
+
+            pronunciation.audio_file_ids = audio_ids
             await pronunciation.save()
-            logger.info(f"Generated {len(audio_files)} audio files for {word}")
+            logger.info(f"Generated {len(audio_results)} audio files for {word}")
 
     except Exception as audio_error:
         logger.warning(f"Failed to generate audio for {word}: {audio_error}")

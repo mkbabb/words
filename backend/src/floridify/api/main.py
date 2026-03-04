@@ -72,6 +72,15 @@ async def lifespan(app: FastAPI) -> Any:
         cache.start_ttl_cleanup_task(interval_seconds=60.0)
         print("✅ Background TTL cleanup task started (interval=60s)")
 
+        # Initialize TTS backends (downloads models on first run, cached after)
+        import asyncio
+
+        from ..audio import get_audio_synthesizer
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, lambda: get_audio_synthesizer().initialize())
+        print("✅ TTS backends initialized (KittenTTS + Kokoro-ONNX)")
+
         # Start search engine initialization in background (non-blocking)
         from ..core.search_pipeline import get_search_engine_manager
 

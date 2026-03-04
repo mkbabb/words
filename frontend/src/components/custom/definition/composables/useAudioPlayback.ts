@@ -13,6 +13,7 @@ export function useAudioPlayback(
   const errorMessage = ref('');
   let audioElement: HTMLAudioElement | null = null;
   let cachedUrl: string | null = null;
+  let triedExistingFiles = false;
 
   function cleanup() {
     if (audioElement) {
@@ -28,13 +29,16 @@ export function useAudioPlayback(
     // If we already have a cached URL for this word, reuse it
     if (cachedUrl) return cachedUrl;
 
-    // Check existing audio files from the word data
-    const files = audioFiles.value;
-    if (files && files.length > 0) {
-      const file = files[0];
-      if (file.url) {
-        cachedUrl = audioApi.getAudioContentUrl(file.url);
-        return cachedUrl;
+    // Check existing audio files from the word data (skip if a previous attempt failed)
+    if (!triedExistingFiles) {
+      const files = audioFiles.value;
+      if (files && files.length > 0) {
+        const file = files[0];
+        if (file.url) {
+          triedExistingFiles = true;
+          cachedUrl = audioApi.getAudioContentUrl(file.url);
+          return cachedUrl;
+        }
       }
     }
 
@@ -77,12 +81,14 @@ export function useAudioPlayback(
       audioElement.onerror = () => {
         state.value = 'error';
         errorMessage.value = 'Failed to play audio';
+        cachedUrl = null;
       };
 
       await audioElement.play();
       state.value = 'playing';
     } catch (e) {
       state.value = 'error';
+      cachedUrl = null;
       errorMessage.value =
         e instanceof Error ? e.message : 'No pronunciation audio available';
     }
@@ -95,6 +101,7 @@ export function useAudioPlayback(
     }
     state.value = 'idle';
     cachedUrl = null;
+    triedExistingFiles = false;
   });
 
   onUnmounted(() => {

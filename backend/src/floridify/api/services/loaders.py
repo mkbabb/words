@@ -61,7 +61,7 @@ class PronunciationLoader(DataLoader):
                     audio_dict = audio.model_dump(mode="json", exclude={"id"})
                     # Convert file path to API URL
                     if audio_dict.get("url", "").startswith("/"):
-                        audio_dict["url"] = f"/api/v1/audio/files/{audio_id!s}"
+                        audio_dict["url"] = f"/api/v1/audio/{audio_id!s}/content"
                     audio_files.append(audio_dict)
 
         pron_dict["audio_files"] = audio_files

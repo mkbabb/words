@@ -3,8 +3,12 @@ ARG PYTHON_VERSION=3.12
 FROM python:${PYTHON_VERSION}-slim-bookworm AS base
 
 # Runtime dependencies
+# - ffmpeg: TTS WAV→MP3 conversion
+# - espeak-ng: Kokoro-ONNX phonemization (required for non-English TTS)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    ffmpeg \
+    espeak-ng \
     && rm -rf /var/lib/apt/lists/*
 
 # Python environment

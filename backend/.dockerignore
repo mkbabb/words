@@ -36,6 +36,7 @@ coverage.xml
 
 # Project specific
 data/
+cache/
 logs/
 *.log
 .env

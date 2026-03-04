@@ -85,6 +85,30 @@ class KokoroSynthesizer:
                     "Install with: uv sync --extra kokoro-tts"
                 ) from e
 
+            # Patch phonemizer-fork compat: set_data_path was removed in 3.3.2,
+            # replaced by a property setter. Kokoro 0.5.0 still calls the old method.
+            try:
+                from phonemizer.backend.espeak.wrapper import EspeakWrapper
+
+                if not hasattr(EspeakWrapper, "set_data_path"):
+                    EspeakWrapper.set_data_path = classmethod(  # type: ignore[attr-defined]
+                        lambda cls, path: setattr(cls, "data_path", path)
+                    )
+            except ImportError:
+                pass
+
+            # Prefer system espeak-ng over bundled espeakng-loader (the bundled lib
+            # has hardcoded CI paths that fail on ARM/Docker). Setting the env var
+            # before Kokoro init makes it use the system library.
+            import ctypes.util
+            import os
+
+            if not os.environ.get("PHONEMIZER_ESPEAK_LIBRARY"):
+                sys_lib = ctypes.util.find_library("espeak-ng")
+                if sys_lib:
+                    os.environ["PHONEMIZER_ESPEAK_LIBRARY"] = sys_lib
+                    logger.debug(f"Using system espeak-ng: {sys_lib}")
+
             # Download model files to project data dir (cached after first download)
             models_dir = get_project_root() / "data" / "kokoro_models"
             model_path = self._download_file(KOKORO_MODEL_URL, models_dir / "kokoro-v1.0.onnx")

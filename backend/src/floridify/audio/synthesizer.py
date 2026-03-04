@@ -42,21 +42,36 @@ class AudioSynthesizer:
         cache_dir = get_project_root() / "data" / "audio_cache"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
+    def initialize(self) -> None:
+        """Eagerly load all TTS models. Call at startup for fast first-request."""
+        logger.info("Initializing TTS backends...")
+        try:
+            self._get_kitten()
+        except Exception as e:
+            logger.error(f"Failed to initialize KittenTTS: {e}")
+        try:
+            self._get_kokoro()
+        except Exception as e:
+            logger.error(f"Failed to initialize Kokoro: {e}")
+        logger.info("TTS backend initialization complete")
+
     def _get_kitten(self) -> object:
-        """Lazy-init KittenTTS backend."""
+        """Get KittenTTS backend (loads model on first call, cached after)."""
         if self._kitten is None:
             from .kitten_synthesizer import KittenTTSSynthesizer
 
             self._kitten = KittenTTSSynthesizer()
+            self._kitten._ensure_model()  # type: ignore[union-attr]
             logger.info("Initialized KittenTTS backend for English")
         return self._kitten
 
     def _get_kokoro(self) -> object:
-        """Lazy-init Kokoro backend."""
+        """Get Kokoro backend (loads model on first call, cached after)."""
         if self._kokoro is None:
             from .kokoro_synthesizer import KokoroSynthesizer
 
             self._kokoro = KokoroSynthesizer()
+            self._kokoro._ensure_model()  # type: ignore[union-attr]
             logger.info("Initialized Kokoro backend for non-English")
         return self._kokoro
 
@@ -100,3 +115,14 @@ class AudioSynthesizer:
             return await backend.synthesize_pronunciation(pronunciation, word_text, language=language)  # type: ignore[union-attr]
 
         return []
+
+
+_audio_synthesizer: AudioSynthesizer | None = None
+
+
+def get_audio_synthesizer() -> AudioSynthesizer:
+    """Get or create the singleton AudioSynthesizer instance."""
+    global _audio_synthesizer
+    if _audio_synthesizer is None:
+        _audio_synthesizer = AudioSynthesizer()
+    return _audio_synthesizer
