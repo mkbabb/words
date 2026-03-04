@@ -230,9 +230,6 @@
                         :wordlist-results="
                             (searchBar.getResults('wordlist') as any[]) || []
                         "
-                        :semantic-building="
-                            lookupMode.semanticStatus?.building ?? false
-                        "
                         :recent-searches="historyStore.recentSearches as any[]"
                         @select-result="selectResult"
                         @interaction="handleSearchAreaInteraction"
@@ -615,6 +612,16 @@ const submitExpandedQuery = (query: string) => {
 
 // Scroll state updates are handled by useSearchBarScroll composable
 // which already computes based on props
+
+// Close dropdown when loading modal appears (lookup initiated)
+watch(
+    () => loading.showLoadingModal.value,
+    (showModal) => {
+        if (showModal && searchBar.showDropdown) {
+            searchBar.hideDropdown();
+        }
+    }
+);
 
 // Reset selected index when results change
 watchEffect(() => {

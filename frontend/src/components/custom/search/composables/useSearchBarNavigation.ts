@@ -129,7 +129,6 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
                     lookupSubMode === 'thesaurus' ? 'Thesaurus' : 'Definition';
                 router.push({ name: routeName, params: { word: result.word } });
                 searchBar.setDirectLookup(true);
-                searchBar.hideDropdown();
                 try {
                     if (lookupSubMode === 'thesaurus') {
                         // Fetch thesaurus data
@@ -213,7 +212,6 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
                             : 'Definition';
                     router.push({ name: routeName, params: { word: query } });
                     searchBar.setDirectLookup(true);
-                    searchBar.hideDropdown();
                     try {
                         if (lookupSubMode === 'thesaurus') {
                             // Fetch thesaurus data
