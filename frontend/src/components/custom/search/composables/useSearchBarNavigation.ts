@@ -11,6 +11,25 @@ import { extractWordCount } from '../utils/ai-query';
 import { logger } from '@/utils/logger';
 import type { SearchResult } from '@/types';
 
+/**
+ * Classify a lookup error into a category for error state
+ */
+function classifyLookupError(error: any): 'network' | 'not-found' | 'server' | 'unknown' {
+    const message = (error?.message || '').toLowerCase();
+    const status = error?.response?.status || error?.status;
+
+    if (status === 404 || message.includes('not found')) return 'not-found';
+    if (status >= 500) return 'server';
+    if (
+        message.includes('network') ||
+        message.includes('fetch') ||
+        message.includes('timeout') ||
+        message.includes('aborted') ||
+        error?.code === 'ERR_NETWORK'
+    ) return 'network';
+    return 'unknown';
+}
+
 interface UseSearchBarNavigationOptions {
     searchInputRef: any;
     searchResultsComponent: Ref<any>;
@@ -148,6 +167,18 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
                         );
                         contentStore.setCurrentEntry(definition);
                     }
+                } catch (error: any) {
+                    const errorType = classifyLookupError(error);
+                    contentStore.setError({
+                        hasError: true,
+                        errorType,
+                        errorMessage: error.message || 'Failed to look up word',
+                        canRetry: errorType !== 'not-found',
+                        originalWord: result.word,
+                    });
+                    searchBar.triggerErrorAnimation();
+                    showError(error.message || 'Failed to look up word');
+                    logger.error('Lookup selectResult error:', error);
                 } finally {
                     searchBar.setDirectLookup(false);
                 }
@@ -229,6 +260,18 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
                                 });
                             contentStore.setCurrentEntry(definition);
                         }
+                    } catch (error: any) {
+                        const errorType = classifyLookupError(error);
+                        contentStore.setError({
+                            hasError: true,
+                            errorType,
+                            errorMessage: error.message || 'Failed to look up word',
+                            canRetry: errorType !== 'not-found',
+                            originalWord: query,
+                        });
+                        searchBar.triggerErrorAnimation();
+                        showError(error.message || 'Failed to look up word');
+                        logger.error('Lookup handleEnter error:', error);
                     } finally {
                         searchBar.setDirectLookup(false);
                     }

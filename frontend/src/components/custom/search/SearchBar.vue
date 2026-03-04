@@ -261,6 +261,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, watchEffect, onMounted, onUnmounted } from 'vue';
+import { showError } from '@/plugins/toast';
 // Modular stores - direct imports
 import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useLookupMode } from '@/stores/search/modes/lookup';
@@ -567,6 +568,15 @@ const selectWord = async (word: string) => {
         } else {
             await orchestrator.getDefinition(word);
         }
+    } catch (error: any) {
+        content.setError({
+            hasError: true,
+            errorType: 'unknown',
+            errorMessage: error.message || 'Failed to look up word',
+            canRetry: true,
+            originalWord: word,
+        });
+        showError(error.message || 'Failed to look up word');
     } finally {
         searchBar.setDirectLookup(false);
     }
