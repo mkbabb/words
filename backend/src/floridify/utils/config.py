@@ -72,8 +72,8 @@ class DatabaseConfig:
             # Fallback order: docker_development_url → development_url → local_mongodb_url
             url = self.docker_development_url or self.development_url or self.local_mongodb_url
         else:
-            # Running natively outside Docker - use native local MongoDB or development URL
-            url = self.native_local_url or self.development_url
+            # Running natively outside Docker - prefer development URL (SSH tunnel) over plain local
+            url = self.development_url or self.native_local_url
 
         if not url:
             raise ValueError(
