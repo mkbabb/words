@@ -5,8 +5,6 @@ versioned dictionary provider data with support for
 historical queries and version management.
 """
 
-from __future__ import annotations
-
 from datetime import UTC, datetime, timedelta
 from typing import Any
 

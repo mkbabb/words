@@ -1,7 +1,5 @@
 """AI generation endpoints: pronunciation, synonyms, antonyms, examples, facts, usage-notes, word-forms."""
 
-from __future__ import annotations
-
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request

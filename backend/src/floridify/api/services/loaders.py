@@ -1,7 +1,5 @@
 """Data loading services to reduce duplication across routers."""
 
-from __future__ import annotations
-
 from typing import Any, TypeVar
 
 from beanie import Document

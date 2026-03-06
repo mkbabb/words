@@ -1,7 +1,5 @@
 """Type-safe protocols for API operations."""
 
-from __future__ import annotations
-
 from datetime import datetime
 from typing import Any, Protocol, TypeVar, runtime_checkable
 

@@ -1,7 +1,5 @@
 """Base classes and utilities for API operations."""
 
-from __future__ import annotations
-
 import builtins
 import hashlib
 import json

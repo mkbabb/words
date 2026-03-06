@@ -1,7 +1,5 @@
 """FastAPI application for Floridify dictionary service."""
 
-from __future__ import annotations
-
 import asyncio
 import os
 from contextlib import asynccontextmanager
@@ -100,7 +98,7 @@ async def lifespan(app: FastAPI) -> Any:
         await shutdown_global_cache()
         print("✅ Cache cleanup task stopped and cache shut down")
     except Exception as e:
-        # TODO[MEDIUM]: Convert shutdown warning path to explicit shutdown failure policy.
+        # Shutdown errors are logged but non-fatal — resources will be reclaimed by OS
         print(f"⚠️ Cache shutdown error: {e}")
 
 

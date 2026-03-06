@@ -1,7 +1,5 @@
 """Lookup endpoints for word definitions."""
 
-from __future__ import annotations
-
 import hashlib
 import time
 from datetime import datetime, timedelta
@@ -25,8 +23,8 @@ from ...models.dictionary import (
     Word as WordModel,
 )
 from ...models.parameters import LookupParams
-from ...storage.mongodb import get_synthesized_entry
 from ...models.user import UserRole
+from ...storage.mongodb import get_synthesized_entry
 from ...utils.logging import get_logger
 from ...utils.sanitization import validate_word_input
 from ..middleware.auth import get_optional_user_role, require_admin
@@ -479,9 +477,7 @@ async def get_word_providers(word: str) -> list[dict[str, Any]]:
         # Load definitions
         definitions = []
         if entry.definition_ids:
-            defs = await DefModel.find(
-                {"_id": {"$in": entry.definition_ids}}
-            ).to_list()
+            defs = await DefModel.find({"_id": {"$in": entry.definition_ids}}).to_list()
             definitions = [
                 {
                     "id": str(d.id),

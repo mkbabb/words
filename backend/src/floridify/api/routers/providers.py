@@ -1,7 +1,5 @@
 """Provider status and monitoring endpoints (read-only)."""
 
-from __future__ import annotations
-
 import platform
 
 from fastapi import APIRouter, Depends, HTTPException, Path

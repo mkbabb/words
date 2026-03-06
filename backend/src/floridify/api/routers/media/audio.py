@@ -1,7 +1,5 @@
 """Audio API - Full CRUD operations for audio management."""
 
-from __future__ import annotations
-
 import asyncio
 import logging
 import os

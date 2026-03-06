@@ -1,7 +1,5 @@
 """Search endpoints for word discovery."""
 
-from __future__ import annotations
-
 import asyncio
 import json
 import time
@@ -9,8 +7,6 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-
-from ..middleware.auth import require_admin
 from pydantic import BaseModel, Field
 
 from ...caching.core import CacheNamespace, get_global_cache
@@ -18,6 +14,7 @@ from ...caching.models import VersionConfig
 from ...core.search_pipeline import (
     get_search_engine_manager,
 )
+from ...corpus.crud import get_stats as get_corpus_stats
 from ...corpus.manager import get_tree_corpus_manager
 from ...corpus.models import CorpusType
 from ...models.base import Language
@@ -29,6 +26,7 @@ from ...search.search_index import SearchIndex
 from ...text import clear_lemma_cache, get_lemma_cache_stats
 from ...utils.logging import get_logger
 from ...utils.sanitization import sanitize_mongodb_input
+from ..middleware.auth import require_admin
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -260,7 +258,9 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
                 )
 
             use_semantic = mode_enum == SearchMode.SEMANTIC or (
-                mode_enum == SearchMode.SMART and global_semantic_enabled and corpus_semantic_enabled
+                mode_enum == SearchMode.SMART
+                and global_semantic_enabled
+                and corpus_semantic_enabled
             )
             index = await SearchIndex.get_or_create(
                 corpus=corpus,
@@ -298,9 +298,7 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
             }
             if mode_enum == SearchMode.SMART and not use_semantic:
                 response_metadata["semantic_disabled_reason"] = (
-                    "corpus_policy"
-                    if not corpus_semantic_enabled
-                    else "global_toggle"
+                    "corpus_policy" if not corpus_semantic_enabled else "global_toggle"
                 )
 
             return SearchResponse(
@@ -681,7 +679,7 @@ async def rebuild_search_index(
         semantic_build_time = time.perf_counter() - semantic_start
 
         # Get corpus manager statistics
-        corpus_manager_stats = await corpus_manager.get_stats()
+        corpus_manager_stats = await get_corpus_stats()
 
         # Compression statistics
         compression_stats: dict[str, float] = {}

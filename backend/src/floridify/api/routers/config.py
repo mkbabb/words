@@ -1,7 +1,5 @@
 """Configuration management endpoints (read-only for API security)."""
 
-from __future__ import annotations
-
 from typing import Any
 
 import toml

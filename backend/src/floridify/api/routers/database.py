@@ -1,7 +1,5 @@
 """Database administration endpoints (read-only for API security)."""
 
-from __future__ import annotations
-
 from fastapi import APIRouter, Depends, HTTPException
 
 from ...models.dictionary import Definition, DictionaryEntry, Word

@@ -1,7 +1,5 @@
 """Health check endpoints."""
 
-from __future__ import annotations
-
 import time
 from datetime import UTC, datetime
 from typing import Any

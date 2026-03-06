@@ -1,7 +1,5 @@
 """AI assessment endpoints: CEFR, frequency, register, domain, collocations, grammar, regional."""
 
-from __future__ import annotations
-
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request

@@ -1,11 +1,8 @@
 """User management endpoints."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime
 from typing import Any
 
-from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 

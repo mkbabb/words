@@ -1,7 +1,5 @@
 """Repository for image operations."""
 
-from __future__ import annotations
-
 import builtins
 from datetime import datetime
 from typing import Any

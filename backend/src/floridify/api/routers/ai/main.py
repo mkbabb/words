@@ -1,7 +1,5 @@
 """AI endpoints: validate-query, suggest-words, suggestions, synthesize + sub-routers."""
 
-from __future__ import annotations
-
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request

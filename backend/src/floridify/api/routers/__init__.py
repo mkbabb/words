@@ -11,13 +11,13 @@ from .lookup import router as lookup
 from .media import audio_router as audio, images_router as images
 from .providers import router as providers
 from .search import router as search
+from .users import router as users
 from .wordlist import (
     main_router as wordlists,
     reviews_router as wordlist_reviews,
     search_router as wordlist_search,
     words_router as wordlist_words,
 )
-from .users import router as users
 from .words import (
     definitions_router as definitions,
     examples_router as examples,
