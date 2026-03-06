@@ -227,7 +227,7 @@ class TestDictionaryEntryCaching:
 
         # Clear L1/L2 cache to simulate restart / cache expiry
         cache = await get_global_cache()
-        await cache.clear()
+        await cache.clear_all()
 
         # Content should still be recoverable from GridFS
         recovered = await get_versioned_content(entry)

@@ -15,9 +15,7 @@ import pytest
 from floridify.core.search_pipeline import (
     SearchEngineManager,
     _CorpusFingerprint,
-    get_search_engine,
     get_search_engine_manager,
-    reset_search_engine,
 )
 from floridify.models.base import Language
 
@@ -184,38 +182,3 @@ class TestCorpusFingerprint:
         assert fp.corpus_name == "language_english"
         assert fp.vocabulary_hash == "abc123"
         assert fp.version == "1.0.5"
-
-
-class TestBackwardCompatibleWrappers:
-    """Tests for get_search_engine() and reset_search_engine() wrappers."""
-
-    async def test_get_search_engine_delegates(self):
-        """get_search_engine() delegates to the global SearchEngineManager."""
-        mock_engine = MagicMock()
-        mock_engine.languages = [Language.ENGLISH]
-
-        with patch(
-            "floridify.core.search_pipeline.get_language_search",
-            new_callable=AsyncMock,
-            return_value=mock_engine,
-        ):
-            engine = await get_search_engine(languages=[Language.ENGLISH])
-            assert engine is mock_engine
-
-    async def test_reset_search_engine_delegates(self):
-        """reset_search_engine() delegates to the global SearchEngineManager."""
-        mock_engine = MagicMock()
-        mock_engine.languages = [Language.ENGLISH]
-
-        with patch(
-            "floridify.core.search_pipeline.get_language_search",
-            new_callable=AsyncMock,
-            return_value=mock_engine,
-        ):
-            await get_search_engine(languages=[Language.ENGLISH])
-
-        mgr = get_search_engine_manager()
-        assert mgr._engine is not None
-
-        await reset_search_engine()
-        assert mgr._engine is None

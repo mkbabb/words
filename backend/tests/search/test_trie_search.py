@@ -96,10 +96,6 @@ class TestTrieSearch:
     @pytest.mark.asyncio
     async def test_marisa_trie_persistence(self, trie_search, tmp_path):
         """Test trie serialization/deserialization."""
-        # Ensure trie is built
-        if not trie_search._trie:
-            await trie_search.initialize()
-
         # Save trie
         trie_path = tmp_path / "test_trie.marisa"
         trie_search._trie.save(str(trie_path))
@@ -171,10 +167,6 @@ class TestTrieSearch:
         """Test memory efficiency of trie structure."""
         # Marisa trie should be memory efficient
         import sys
-
-        # Ensure trie is built
-        if not trie_search._trie:
-            await trie_search.initialize()
 
         # Get size of trie object
         trie_size = sys.getsizeof(trie_search._trie)

@@ -118,7 +118,7 @@ async def _clear_api_cache() -> None:
     which can return stale data from previous test runs (different test DBs).
     """
     cache = await get_global_cache()
-    await cache.clear()
+    await cache.clear_all()
 
 
 async def _build_synthesis_entry_for_word(word_text: str) -> DictionaryEntry | None:
