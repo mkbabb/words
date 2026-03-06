@@ -112,6 +112,17 @@ export function useSearchOrchestrator(options: UseSearchOrchestratorOptions) {
             return results;
         }
 
+        // Guard against mode switches while request was in flight.
+        if (searchBar.searchMode !== 'lookup') {
+            return results;
+        }
+
+        if (searchBar.isDirectLookup || !searchBar.isFocused) {
+            searchBar.clearResults();
+            searchBar.hideDropdown();
+            return results;
+        }
+
         if (results.length > 0) {
             searchBar.openDropdown();
             searchBar.setSelectedIndex(0);

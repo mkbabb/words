@@ -105,7 +105,10 @@ export const useLookupMode = defineStore(
                     (l) => l !== language
                 );
             } else {
-                selectedLanguages.value = [...languages, language];
+                selectedLanguages.value = [
+                    language,
+                    ...languages.filter((l) => l !== language),
+                ];
             }
         };
 
@@ -245,7 +248,7 @@ export const useLookupMode = defineStore(
 
         const search = async (query: string): Promise<SearchResult[]> => {
             cancelSearch();
-            const myGeneration = ++searchGeneration;
+            const myGeneration = searchGeneration;
             abortController = new AbortController();
 
             try {
@@ -285,6 +288,8 @@ export const useLookupMode = defineStore(
         };
 
         const cancelSearch = () => {
+            // Invalidate any in-flight/soon-to-resolve requests.
+            searchGeneration += 1;
             if (abortController) {
                 abortController.abort();
                 abortController = null;
@@ -346,6 +351,9 @@ export const useLookupMode = defineStore(
             onExit: async (_nextMode: SearchMode) => {
                 // Clear AI suggestions when leaving
                 clearAISuggestions();
+                // Abort and invalidate any in-flight lookup request so stale
+                // responses cannot repopulate UI after mode switch.
+                cancelSearch();
                 // NOTE: AI query detection and semantic polling are now
                 // started/stopped by the SearchBar component via composables
             },

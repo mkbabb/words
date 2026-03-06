@@ -38,8 +38,18 @@ export const useSearchBarStore = defineStore(
         // ==========================================================================
 
         const searchQuery = ref('');
-        const searchSelectedIndex = ref(0);
-        const showDropdown = ref(false);
+        const searchSelectedIndexByMode = ref<Record<SearchMode, number>>({
+            lookup: 0,
+            wordlist: 0,
+            'word-of-the-day': 0,
+            stage: 0,
+        });
+        const dropdownStateByMode = ref<Record<SearchMode, boolean>>({
+            lookup: false,
+            wordlist: false,
+            'word-of-the-day': false,
+            stage: false,
+        });
         const showSearchControls = ref(false);
         const isFocused = ref(false);
         const isHovered = ref(false);
@@ -78,6 +88,9 @@ export const useSearchBarStore = defineStore(
         // ==========================================================================
 
         const currentMode = computed(() => searchMode.value);
+        const searchSelectedIndex = computed(
+            () => searchSelectedIndexByMode.value[currentMode.value]
+        );
         
         // Get current mode's store
         const currentModeStore = computed(() => {
@@ -97,6 +110,22 @@ export const useSearchBarStore = defineStore(
         });
         
         const hasResults = computed(() => currentResults.value.length > 0);
+
+        const showDropdown = computed(() => {
+            const mode = currentMode.value;
+            const results =
+                mode === 'lookup'
+                    ? lookupMode.results
+                    : mode === 'wordlist'
+                      ? wordlistMode.results
+                      : [];
+
+            if (!results || (results as any[]).length === 0) {
+                return false;
+            }
+
+            return dropdownStateByMode.value[mode];
+        });
         
         // Mode-specific properties
         const isAIQuery = computed(() =>
@@ -145,7 +174,10 @@ export const useSearchBarStore = defineStore(
                 if (newModeStore?.handler?.onEnter) {
                     await newModeStore.handler.onEnter(previousMode.value);
                 }
-                
+
+                // Clear previous mode results so they don't bleed into new mode
+                previousModeStore?.clearResults?.();
+
                 // Trigger mode switch animation
                 triggerModeSwitchAnimation();
 
@@ -200,27 +232,28 @@ export const useSearchBarStore = defineStore(
 
         const clearQuery = () => {
             searchQuery.value = '';
-            searchSelectedIndex.value = 0;
+            searchSelectedIndexByMode.value[searchMode.value] = 0;
         };
 
         const setSelectedIndex = (index: number) => {
-            searchSelectedIndex.value = index;
+            searchSelectedIndexByMode.value[searchMode.value] = index;
         };
 
         const toggleDropdown = () => {
-            showDropdown.value = !showDropdown.value;
+            const mode = searchMode.value;
+            dropdownStateByMode.value[mode] = !dropdownStateByMode.value[mode];
         };
 
         const setDropdown = (show: boolean) => {
-            showDropdown.value = show;
+            dropdownStateByMode.value[searchMode.value] = show;
         };
 
         const openDropdown = () => {
-            showDropdown.value = true;
+            dropdownStateByMode.value[searchMode.value] = true;
         };
 
         const hideDropdown = () => {
-            showDropdown.value = false;
+            dropdownStateByMode.value[searchMode.value] = false;
         };
 
         const toggleSearchControls = () => {
@@ -234,7 +267,7 @@ export const useSearchBarStore = defineStore(
         const setFocused = (focused: boolean) => {
             isFocused.value = focused;
             if (!focused) {
-                showDropdown.value = false;
+                dropdownStateByMode.value[searchMode.value] = false;
             }
         };
 
@@ -255,7 +288,7 @@ export const useSearchBarStore = defineStore(
         };
 
         const resetSelection = () => {
-            searchSelectedIndex.value = 0;
+            searchSelectedIndexByMode.value[searchMode.value] = 0;
         };
 
         const triggerErrorAnimation = () => {
@@ -386,8 +419,18 @@ export const useSearchBarStore = defineStore(
             
             // Reset shared state
             searchQuery.value = '';
-            searchSelectedIndex.value = 0;
-            showDropdown.value = false;
+            searchSelectedIndexByMode.value = {
+                lookup: 0,
+                wordlist: 0,
+                'word-of-the-day': 0,
+                stage: 0,
+            };
+            dropdownStateByMode.value = {
+                lookup: false,
+                wordlist: false,
+                'word-of-the-day': false,
+                stage: false,
+            };
             showSearchControls.value = false;
             isFocused.value = false;
             isHovered.value = false;

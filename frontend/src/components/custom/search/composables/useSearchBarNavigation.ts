@@ -2,6 +2,7 @@ import { Ref, nextTick, computed } from 'vue';
 import { useMagicKeys, whenever } from '@vueuse/core';
 import { useRouter } from 'vue-router';
 import { useSearchBarStore } from '@/stores/search/search-bar';
+import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useContentStore } from '@/stores/content/content';
 import { useHistoryStore } from '@/stores/content/history';
 import { useLoadingState } from '@/stores/ui/loading';
@@ -44,6 +45,7 @@ interface UseSearchBarNavigationOptions {
  */
 export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
     const searchBar = useSearchBarStore();
+    const lookupMode = useLookupMode();
     const contentStore = useContentStore();
     const loading = useLoadingState();
     const router = useRouter();
@@ -57,6 +59,23 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
         onAutocompleteSpace,
         onAutocompleteArrow,
     } = options;
+
+    const closeSearchPanels = () => {
+        lookupMode.cancelSearch();
+        searchBar.hideDropdown();
+        searchBar.hideControls();
+        searchBar.clearResults();
+    };
+    const PANEL_CLOSE_ANIMATION_MS = 360;
+    const wait = (durationMs: number) =>
+        new Promise<void>((resolve) => {
+            setTimeout(resolve, durationMs);
+        });
+    const closeSearchPanelsBeforeNavigation = async () => {
+        closeSearchPanels();
+        await nextTick();
+        await wait(PANEL_CLOSE_ANIMATION_MS);
+    };
 
     /**
      * Get current results based on search mode
@@ -131,6 +150,7 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
             selectResult: async (_result: SearchResult) => {
                 searchBar.setQuery('');
                 searchBar.hideDropdown();
+                searchBar.hideControls();
                 searchBar.clearResults();
                 // TODO: Emit event to scroll to word in list
             },
@@ -146,8 +166,9 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
                 const lookupSubMode = searchBar.getSubMode('lookup');
                 const routeName =
                     lookupSubMode === 'thesaurus' ? 'Thesaurus' : 'Definition';
-                router.push({ name: routeName, params: { word: result.word } });
                 searchBar.setDirectLookup(true);
+                await closeSearchPanelsBeforeNavigation();
+                router.push({ name: routeName, params: { word: result.word } });
                 try {
                     if (lookupSubMode === 'thesaurus') {
                         // Fetch thesaurus data
@@ -206,6 +227,7 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
                             const historyStore = useHistoryStore();
                             historyStore.addToAIQueryHistory(query);
                             // Navigate to home to display suggestions
+                            await closeSearchPanelsBeforeNavigation();
                             router.push({ name: 'Home' });
                         } else {
                             searchBar.triggerErrorAnimation();
@@ -241,8 +263,9 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
                         lookupSubMode === 'thesaurus'
                             ? 'Thesaurus'
                             : 'Definition';
-                    router.push({ name: routeName, params: { word: query } });
                     searchBar.setDirectLookup(true);
+                    await closeSearchPanelsBeforeNavigation();
+                    router.push({ name: routeName, params: { word: query } });
                     try {
                         if (lookupSubMode === 'thesaurus') {
                             // Fetch thesaurus data
@@ -322,6 +345,9 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
             searchBar.setFocused(false);
             return;
         }
+
+        searchBar.hideControls();
+        searchBar.hideDropdown();
 
         // Execute mode-specific handler
         const handler =
