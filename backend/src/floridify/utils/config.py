@@ -74,8 +74,12 @@ class DatabaseConfig:
     def get_url(self, target: str = "runtime") -> str:
         """Return the best URL for a target database.
 
-        Prefers the tunnel URL when running outside Docker.
+        Priority: MONGODB_URL env var > tunnel URL (outside Docker) > config file URL.
         """
+        env_url = os.environ.get("MONGODB_URL")
+        if env_url and target == "runtime":
+            return env_url
+
         if target == "runtime":
             if self.tunnel_url and not self._in_docker():
                 return self.tunnel_url

@@ -31,6 +31,8 @@ services:
       MULTIPROCESSING_START_METHOD: "spawn"
       # Semantic search toggle (set false on low-memory servers to skip model loading)
       SEMANTIC_SEARCH_ENABLED: ${SEMANTIC_SEARCH_ENABLED:-true}
+      # Docker-internal MongoDB URL (overrides auth/config.toml runtime_url)
+      MONGODB_URL: ${MONGODB_URL:-}
       # Clerk Authentication
       CLERK_DOMAIN: ${CLERK_DOMAIN:-}
       CLERK_SUPER_ADMINS: ${CLERK_SUPER_ADMINS:-}
