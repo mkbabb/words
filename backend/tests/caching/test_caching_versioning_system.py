@@ -39,7 +39,7 @@ class TestDictionaryEntryCaching:
     @pytest_asyncio.fixture
     async def sample_word(self, test_db):
         """Create a sample word for testing."""
-        word = Word(text="cache_test", language=Language.ENGLISH)
+        word = Word(text="cache_test", languages=[Language.ENGLISH])
         await word.save()
         return word
 
@@ -90,7 +90,7 @@ class TestDictionaryEntryCaching:
             resource_id=sample_word.text,
             word=sample_word.text,
             provider=DictionaryProvider.WIKTIONARY.value,
-            language=sample_word.language,
+            language=sample_word.languages[0],
             version_info=version_info_v1,
         )
 
@@ -125,7 +125,7 @@ class TestDictionaryEntryCaching:
             resource_id=sample_word.text,
             word=sample_word.text,
             provider=DictionaryProvider.WIKTIONARY.value,
-            language=sample_word.language,
+            language=sample_word.languages[0],
             version_info=version_info_v2,
         )
 
@@ -176,7 +176,7 @@ class TestDictionaryEntryCaching:
             resource_id=sample_word.text + "_large",
             word=sample_word.text + "_large",
             provider=DictionaryProvider.WIKTIONARY.value,
-            language=sample_word.language,
+            language=sample_word.languages[0],
             version_info=version_info,
         )
 
@@ -215,7 +215,7 @@ class TestDictionaryEntryCaching:
             resource_id=sample_word.text + "_recovery",
             word=sample_word.text + "_recovery",
             provider=DictionaryProvider.WIKTIONARY.value,
-            language=sample_word.language,
+            language=sample_word.languages[0],
             version_info=version_info,
         )
 
@@ -548,7 +548,7 @@ class TestCacheVersioningIntegration:
     @pytest.mark.asyncio
     async def test_version_based_cache_keys(self, cache_manager, test_db):
         """Test that cache keys include version information."""
-        word = Word(text="version_test", language=Language.ENGLISH)
+        word = Word(text="version_test", languages=[Language.ENGLISH])
         await word.save()
 
         # Version 1
@@ -594,7 +594,7 @@ class TestCacheVersioningIntegration:
     @pytest.mark.asyncio
     async def test_concurrent_version_operations(self, test_db):
         """Test concurrent versioning operations."""
-        word = Word(text="concurrent_test", language=Language.ENGLISH)
+        word = Word(text="concurrent_test", languages=[Language.ENGLISH])
         await word.save()
 
         async def create_version(version_num: int):
@@ -616,7 +616,7 @@ class TestCacheVersioningIntegration:
                 resource_id=f"{word.text}_concurrent_{version_num}",
                 word=word.text,
                 provider=DictionaryProvider.WIKTIONARY.value,
-                language=word.language,
+                language=word.languages[0],
                 version_info=version_info,
             )
 
@@ -662,7 +662,7 @@ class TestCacheVersioningIntegration:
     @pytest.mark.asyncio
     async def test_content_deduplication(self, test_db):
         """Test that identical content is deduplicated across versions."""
-        word = Word(text="dedup_test", language=Language.ENGLISH)
+        word = Word(text="dedup_test", languages=[Language.ENGLISH])
         await word.save()
 
         # Same content, different version metadata
@@ -688,7 +688,7 @@ class TestCacheVersioningIntegration:
             resource_id=f"{word.text}_dedup_1",
             word=word.text,
             provider=DictionaryProvider.WIKTIONARY.value,
-            language=word.language,
+            language=word.languages[0],
             version_info=version_info_1,
         )
 
@@ -696,7 +696,7 @@ class TestCacheVersioningIntegration:
             resource_id=f"{word.text}_dedup_2",
             word=word.text,
             provider=DictionaryProvider.OXFORD.value,  # Different provider
-            language=word.language,
+            language=word.languages[0],
             version_info=version_info_2,
         )
 

@@ -119,7 +119,7 @@ uv run pytest tests/api/test_lookup_pipeline.py -v --tb=short
 - **Output**: Comprehensive reporting with HTML and XML outputs
 
 ### Environment Requirements
-- **MongoDB**: localhost:27017 for integration tests
+- **MongoDB**: remote `test_*` database on `mbabb.friday.institute:27017`
 - **Python**: 3.12+ with UV package manager
 - **Dependencies**: All dev dependencies via `uv sync --dev`
 

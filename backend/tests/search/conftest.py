@@ -128,7 +128,7 @@ async def search_test_words(test_db):
 
     created_words = []
     for word_data in words_data:
-        word = Word(**word_data, language=Language.ENGLISH)
+        word = Word(**word_data, languages=[Language.ENGLISH])
         await word.save()
 
         # Add a basic definition for each word

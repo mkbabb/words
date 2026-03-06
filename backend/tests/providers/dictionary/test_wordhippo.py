@@ -75,7 +75,7 @@ async def connector():
 @pytest_asyncio.fixture
 async def test_word(test_db):
     """Create a test word in the database."""
-    word = Word(text="test", language=Language.ENGLISH)
+    word = Word(text="test", languages=[Language.ENGLISH])
     await word.save()
     return word
 

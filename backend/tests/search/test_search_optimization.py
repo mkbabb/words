@@ -34,7 +34,7 @@ from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.base import Language
 from floridify.search.constants import SearchMode
 from floridify.search.core import Search
-from floridify.search.models import TrieIndex
+from floridify.search.trie_index import TrieIndex
 
 # ═══════════════════════════════════════════════════════════════════
 #  Vocabulary generation (deterministic, shared across all tests)
@@ -318,7 +318,7 @@ async def _make_engine(corpus: Corpus) -> Search:
     session-scoped fixtures that must not depend on Beanie global state.
     """
     from floridify.search.fuzzy import FuzzySearch
-    from floridify.search.models import SearchIndex
+    from floridify.search.search_index import SearchIndex
     from floridify.search.trie import TrieSearch
 
     engine = Search()

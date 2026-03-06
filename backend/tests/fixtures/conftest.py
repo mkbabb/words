@@ -99,7 +99,7 @@ async def word_factory(test_db):
         lang_enum = Language.ENGLISH if language == "en" else Language(language)
         word = Word(
             text=text,
-            language=lang_enum,
+            languages=[lang_enum],
             **kwargs,
         )
         await word.save()
@@ -176,7 +176,7 @@ async def wordlist_factory(test_db):
                 # Create Word document
                 word_doc = Word(
                     text=word_text,
-                    language=Language.ENGLISH,
+                    languages=[Language.ENGLISH],
                 )
                 await word_doc.save()
                 created_words.append(word_doc)

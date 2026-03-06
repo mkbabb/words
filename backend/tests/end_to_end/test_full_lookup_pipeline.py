@@ -249,7 +249,7 @@ class TestFullLookupPipeline:
         # ====================================================================
 
         # Create mock provider entries that will be returned
-        word_obj = Word(text=test_word, language="en")
+        word_obj = Word(text=test_word, languages=["en"])
         await word_obj.save()
 
         # Simulate provider fetching by creating provider entries
@@ -519,7 +519,7 @@ class TestFullLookupPipeline:
             async def lookup_word():
                 word_obj = await Word.find_one(Word.text == test_word)
                 if not word_obj:
-                    word_obj = Word(text=test_word, language="en")
+                    word_obj = Word(text=test_word, languages=["en"])
                     await word_obj.save()
                 return word_obj
 
@@ -581,7 +581,7 @@ class TestFullLookupPipeline:
             mock_openai_class.return_value = mock_openai
 
             # Should still succeed with working provider
-            word_obj = Word(text=test_word, language="en")
+            word_obj = Word(text=test_word, languages=["en"])
             await word_obj.save()
 
             # Attempt to fetch from failing provider (should handle gracefully)

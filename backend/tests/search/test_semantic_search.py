@@ -77,7 +77,7 @@ async def words_with_definitions(test_db):
 
     created_words = []
     for data in test_data:
-        word = Word(text=data["word"], language=Language.ENGLISH)
+        word = Word(text=data["word"], languages=[Language.ENGLISH])
         await word.save()
 
         definition = Definition(

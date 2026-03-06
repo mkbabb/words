@@ -64,7 +64,7 @@ async def mock_search_pipeline(test_db):
                         word=word_doc.text,
                         score=1.0,
                         method=SearchMethod.EXACT,
-                        language=word_doc.language,
+                        language=word_doc.languages[0],
                     )
                 )
             else:
@@ -76,7 +76,7 @@ async def mock_search_pipeline(test_db):
                             word=word_doc.text,
                             score=ratio,
                             method=SearchMethod.FUZZY,
-                            language=word_doc.language,
+                            language=word_doc.languages[0],
                         )
                     )
 
@@ -130,7 +130,7 @@ async def _build_synthesis_entry_for_word(word_text: str) -> DictionaryEntry | N
         pronunciation_id = pronunciation.id if pronunciation else None
     else:
         # Create new word
-        word_obj = Word(text=word_text, language=Language.ENGLISH)
+        word_obj = Word(text=word_text, languages=[Language.ENGLISH])
         await word_obj.save()
 
         # Create a default definition
@@ -157,7 +157,7 @@ async def _build_synthesis_entry_for_word(word_text: str) -> DictionaryEntry | N
         definition_ids=definition_ids,
         pronunciation_id=pronunciation_id,
         provider=DictionaryProvider.SYNTHESIS,
-        language=Language.ENGLISH,
+        languages=[Language.ENGLISH],
     )
     await synth.save()
     return synth
@@ -188,9 +188,19 @@ async def mock_lookup_pipeline(test_db):
     ):
         return await _build_synthesis_entry_for_word(word)
 
-    with patch(
-        "floridify.api.routers.lookup.lookup_word_pipeline",
-        side_effect=_mock_pipeline,
+    async def _mock_get_synthesized_entry(word_text):
+        """Skip global Mongo storage path in API lookup pre-check."""
+        return None
+
+    with (
+        patch(
+            "floridify.api.routers.lookup.lookup_word_pipeline",
+            side_effect=_mock_pipeline,
+        ),
+        patch(
+            "floridify.api.routers.lookup.get_synthesized_entry",
+            side_effect=_mock_get_synthesized_entry,
+        ),
     ):
         yield _mock_pipeline
 
@@ -222,9 +232,19 @@ async def mock_lookup_pipeline_with_ai(test_db):
             await entry.save()
         return entry
 
-    with patch(
-        "floridify.api.routers.lookup.lookup_word_pipeline",
-        side_effect=_mock_pipeline,
+    async def _mock_get_synthesized_entry(word_text):
+        """Skip global Mongo storage path in API lookup pre-check."""
+        return None
+
+    with (
+        patch(
+            "floridify.api.routers.lookup.lookup_word_pipeline",
+            side_effect=_mock_pipeline,
+        ),
+        patch(
+            "floridify.api.routers.lookup.get_synthesized_entry",
+            side_effect=_mock_get_synthesized_entry,
+        ),
     ):
         yield _mock_pipeline
 
