@@ -129,13 +129,19 @@ async def save_definition_versioned(
     """
     manager = get_version_manager()
 
-    resource_id = f"def:{word_text}:{definition.id or 'new'}"
+    # Ensure a stable identifier before creating version snapshots.
+    # Without this, first save uses "...:new" and later saves use "...:<id>",
+    # splitting history across different resource IDs.
+    if not definition.id:
+        await definition.save()
+
+    resource_id = f"def:{word_text}:{definition.id}"
 
     def_dict = definition.model_dump(mode="json")
 
     metadata: dict[str, Any] = {
         "word": word_text,
-        "definition_id": str(definition.id) if definition.id else None,
+        "definition_id": str(definition.id),
         "part_of_speech": definition.part_of_speech,
     }
 
@@ -151,14 +157,8 @@ async def save_definition_versioned(
 
     # Live document upsert
     async with _definition_upsert_locks[resource_id]:
-        if definition.id:
-            # Already persisted — just save updates
-            await definition.save()
-            logger.debug(f"Updated live Definition '{resource_id}'")
-        else:
-            # New definition — create
-            await definition.save()
-            logger.debug(f"Created live Definition '{resource_id}'")
+        await definition.save()
+        logger.debug(f"Saved live Definition '{resource_id}'")
 
 
 async def save_definitions_batch_versioned(
