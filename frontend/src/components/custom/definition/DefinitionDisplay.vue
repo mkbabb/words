@@ -19,6 +19,22 @@
     <!-- Empty State -->
     <div v-else-if="isEmpty && !isStreaming" class="relative">
         <ThemedCard :variant="selectedCardVariant" class="relative">
+            <!-- Show mode escape hatch when stuck in non-dictionary mode with no data -->
+            <div
+                v-if="searchBar.getSubMode('lookup') !== 'dictionary'"
+                class="flex items-center justify-center gap-3 border-b border-border/30 px-4 py-3"
+            >
+                <span class="text-sm text-muted-foreground">
+                    No {{ searchBar.getSubMode('lookup') }} data available.
+                </span>
+                <Button
+                    @click="searchBar.setSubMode('lookup', 'dictionary')"
+                    variant="outline"
+                    size="sm"
+                >
+                    Switch to Dictionary
+                </Button>
+            </div>
             <EmptyState
                 :title="
                     getEmptyTitle(contentStore.definitionError?.originalWord)
@@ -40,6 +56,24 @@
                     </div>
                 </template>
             </EmptyState>
+        </ThemedCard>
+    </div>
+
+    <!-- Stuck Mode Escape: no entry, no error, not empty — mode is stale -->
+    <div v-else-if="!entry && !isStreaming && searchBar.getSubMode('lookup') !== 'dictionary'" class="relative">
+        <ThemedCard :variant="selectedCardVariant" class="relative">
+            <div class="flex flex-col items-center gap-3 p-8 text-center">
+                <p class="text-sm text-muted-foreground">
+                    No data available for this mode.
+                </p>
+                <Button
+                    @click="searchBar.setSubMode('lookup', 'dictionary')"
+                    variant="outline"
+                    size="sm"
+                >
+                    Switch to Dictionary
+                </Button>
+            </div>
         </ThemedCard>
     </div>
 
@@ -165,6 +199,7 @@
                                     :isAISynthesized="!!entry.model_info"
                                     :editModeEnabled="editModeEnabled"
                                     :isStreaming="isStreaming"
+                                    :word="entry?.word"
                                     @regenerate="
                                         actions.handleRegenerateExamples
                                     "
@@ -191,6 +226,7 @@
                                 :cardVariant="selectedCardVariant"
                                 @word-click="actions.handleWordSearch"
                                 @retry-thesaurus="actions.handleRetryThesaurus"
+                                @switch-to-dictionary="searchBar.setSubMode('lookup', 'dictionary')"
                             />
                         </template>
 

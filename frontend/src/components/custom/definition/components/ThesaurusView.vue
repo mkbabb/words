@@ -15,6 +15,15 @@
             :retryable="true"
             @retry="$emit('retry-thesaurus')"
         />
+        <div class="flex justify-center">
+            <Button
+                variant="outline"
+                size="sm"
+                @click="$emit('switch-to-dictionary')"
+            >
+                Switch to Dictionary
+            </Button>
+        </div>
     </CardContent>
 
     <!-- Thesaurus Content -->
@@ -156,6 +165,7 @@
 
 <script setup lang="ts">
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
     HoverCard,
     HoverCardContent,
@@ -177,6 +187,7 @@ defineProps<ThesaurusViewProps>();
 defineEmits<{
     'word-click': [word: string];
     'retry-thesaurus': [];
+    'switch-to-dictionary': [];
 }>();
 
 // Helper functions for error states
