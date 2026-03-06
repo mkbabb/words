@@ -12,7 +12,7 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..utils.paths import get_project_root
-from .synthesizer import TTSResult
+from .types import TTSResult
 from .utils import audio_to_mp3
 
 
@@ -59,6 +59,7 @@ class KittenTTSSynthesizer:
                 return KittenTTSSynthesizer._model
 
             try:
+                # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
                 from kittentts import KittenTTS
             except ImportError as e:
                 raise ImportError(
@@ -96,6 +97,7 @@ class KittenTTSSynthesizer:
         model = self._ensure_model()
         audio_array = model.generate(text=text, voice=voice, speed=self.config.speaking_rate)
 
+        # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
         import numpy as np
 
         audio_array = np.asarray(audio_array).squeeze()
@@ -116,6 +118,7 @@ class KittenTTSSynthesizer:
         Only supports English — returns None for other languages.
         """
         if language != "en":
+            # TODO[MEDIUM]: Decide whether unsupported-language should be explicit failure instead of None.
             return None
 
         try:
@@ -160,6 +163,7 @@ class KittenTTSSynthesizer:
 
         except Exception as e:
             logger.error(f"KittenTTS failed for '{word}': {e}")
+            # TODO[HIGH]: Stop collapsing synthesis failures to None; raise typed audio-generation errors.
             return None
 
     async def synthesize_ipa(
@@ -193,7 +197,9 @@ class KittenTTSSynthesizer:
 
         results: list[TTSResult] = []
 
+        # TODO[CRITICAL]: Remove getattr-based pronunciation probing; require a typed pronunciation model.
         ipa = getattr(pronunciation, "ipa", "")
+        # TODO[CRITICAL]: Remove getattr-based pronunciation probing; require a typed pronunciation model.
         phonetic = getattr(pronunciation, "phonetic", "")
 
         if ipa:

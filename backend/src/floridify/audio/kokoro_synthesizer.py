@@ -12,7 +12,7 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..utils.paths import get_project_root
-from .synthesizer import TTSResult
+from .types import TTSResult
 from .utils import audio_to_mp3
 
 # Language → (kokoro_lang_code, female_voice, male_voice)
@@ -64,6 +64,7 @@ class KokoroSynthesizer:
             return dest
         dest.parent.mkdir(parents=True, exist_ok=True)
         logger.info(f"Downloading {url} → {dest}")
+        # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
         import urllib.request
         urllib.request.urlretrieve(url, str(dest))
         return dest
@@ -88,6 +89,7 @@ class KokoroSynthesizer:
             # Patch phonemizer-fork compat: set_data_path was removed in 3.3.2,
             # replaced by a property setter. Kokoro 0.5.0 still calls the old method.
             try:
+                # TODO[CRITICAL]: Remove runtime monkeypatch (`hasattr`/`setattr`) compatibility shim.
                 from phonemizer.backend.espeak.wrapper import EspeakWrapper
 
                 if not hasattr(EspeakWrapper, "set_data_path"):
@@ -95,11 +97,13 @@ class KokoroSynthesizer:
                         lambda cls, path: setattr(cls, "data_path", path)
                     )
             except ImportError:
+                # TODO[HIGH]: Fail explicitly when phonemizer integration is unavailable.
                 pass
 
             # Prefer system espeak-ng over bundled espeakng-loader (the bundled lib
             # has hardcoded CI paths that fail on ARM/Docker). Setting the env var
             # before Kokoro init makes it use the system library.
+            # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
             import ctypes.util
             import os
 
@@ -147,6 +151,7 @@ class KokoroSynthesizer:
 
         Returns (mp3_bytes, duration_ms).
         """
+        # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
         import numpy as np
 
         model = self._ensure_model()
@@ -171,6 +176,7 @@ class KokoroSynthesizer:
         """
         resolved = self._resolve_voice(language, voice_gender)
         if not resolved:
+            # TODO[MEDIUM]: Decide whether unsupported-language should be explicit failure instead of None.
             logger.debug(f"Kokoro: language '{language}' not supported")
             return None
 
@@ -217,6 +223,7 @@ class KokoroSynthesizer:
 
         except Exception as e:
             logger.error(f"Kokoro failed for '{word}' ({language}): {e}")
+            # TODO[HIGH]: Stop collapsing synthesis failures to None; raise typed audio-generation errors.
             return None
 
     async def synthesize_pronunciation(

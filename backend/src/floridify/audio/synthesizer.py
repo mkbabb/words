@@ -6,24 +6,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Literal
 
 from loguru import logger
 
 from ..utils.paths import get_project_root
-
-
-@dataclass
-class TTSResult:
-    """Lightweight result from TTS synthesis (no MongoDB dependency)."""
-
-    url: str
-    format: str
-    size_bytes: int
-    duration_ms: int
-    accent: str | None = None
-    quality: str = "standard"
+from .kitten_synthesizer import KittenTTSSynthesizer
+from .kokoro_synthesizer import KokoroSynthesizer
+from .types import TTSResult
 
 
 class AudioSynthesizer:
@@ -58,8 +48,6 @@ class AudioSynthesizer:
     def _get_kitten(self) -> object:
         """Get KittenTTS backend (loads model on first call, cached after)."""
         if self._kitten is None:
-            from .kitten_synthesizer import KittenTTSSynthesizer
-
             self._kitten = KittenTTSSynthesizer()
             self._kitten._ensure_model()  # type: ignore[union-attr]
             logger.info("Initialized KittenTTS backend for English")
@@ -68,8 +56,6 @@ class AudioSynthesizer:
     def _get_kokoro(self) -> object:
         """Get Kokoro backend (loads model on first call, cached after)."""
         if self._kokoro is None:
-            from .kokoro_synthesizer import KokoroSynthesizer
-
             self._kokoro = KokoroSynthesizer()
             self._kokoro._ensure_model()  # type: ignore[union-attr]
             logger.info("Initialized Kokoro backend for non-English")
@@ -88,13 +74,12 @@ class AudioSynthesizer:
             return await backend.synthesize_word(word, accent, voice_gender, language="en")  # type: ignore[union-attr]
 
         # Non-English: check Kokoro support
-        from .kokoro_synthesizer import KokoroSynthesizer
-
         if KokoroSynthesizer.supports_language(language):
             backend = self._get_kokoro()
             return await backend.synthesize_word(word, language=language, voice_gender=voice_gender)  # type: ignore[union-attr]
 
         logger.debug(f"No TTS backend for language '{language}'")
+        # TODO[MEDIUM]: Replace unsupported-language `None` fallback with explicit audio-capability error.
         return None
 
     async def synthesize_pronunciation(
@@ -108,12 +93,11 @@ class AudioSynthesizer:
             backend = self._get_kitten()
             return await backend.synthesize_pronunciation(pronunciation, word_text, language="en")  # type: ignore[union-attr]
 
-        from .kokoro_synthesizer import KokoroSynthesizer
-
         if KokoroSynthesizer.supports_language(language):
             backend = self._get_kokoro()
             return await backend.synthesize_pronunciation(pronunciation, word_text, language=language)  # type: ignore[union-attr]
 
+        # TODO[MEDIUM]: Replace unsupported-language empty-list fallback with explicit audio-capability error.
         return []
 
 
