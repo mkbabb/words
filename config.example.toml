@@ -15,19 +15,16 @@ api_key = "your-oxford-api-key"
 authorization = "your-dictionary-com-authorization-token"
 
 [database]
-# Production: MongoDB in Docker on same host (backend connects via Docker network)
-production_url = "mongodb://admin:password@mongodb:27017/floridify?authSource=admin"
+# Canonical remote MongoDB on mbabb.friday.institute.
+runtime_url = "mongodb://username:password@mbabb.friday.institute:27017/floridify?retryWrites=true"
+test_url    = "mongodb://username:password@mbabb.friday.institute:27017/test_floridify?retryWrites=true"
 
-# Development via SSH tunnel to production server (localhost:27018 -> server:27017)
-development_url = "mongodb://admin:password@localhost:27018/floridify?authSource=admin&directConnection=true"
+# Dev: SSH tunnel (localhost:27018 -> server 127.0.0.1:27017).
+# Used automatically when not running inside Docker.
+# tunnel_url      = "mongodb://username:password@localhost:27018/floridify?retryWrites=true"
+# tunnel_test_url = "mongodb://username:password@localhost:27018/test_floridify?retryWrites=true"
 
-# Docker development: same Docker network
-docker_development_url = "mongodb://admin:password@mongodb:27017/floridify?authSource=admin"
-
-# Native local development (no auth)
-native_local_url = "mongodb://localhost:27017/floridify"
-
-# Database name
+runtime_tls_required = false
 name = "floridify"
 
 # Connection settings

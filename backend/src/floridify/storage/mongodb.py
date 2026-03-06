@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
@@ -50,9 +52,10 @@ class MongoDBStorage:
 
     def __init__(
         self,
-        connection_string: str = "mongodb://localhost:27017",
-        database_name: str = "floridify",
+        connection_string: str,
+        database_name: str,
         cert_path: Path | None = None,
+        tls_required: bool | None = None,
     ) -> None:
         """Initialize MongoDB storage.
 
@@ -60,31 +63,41 @@ class MongoDBStorage:
             connection_string: MongoDB connection string
             database_name: Name of the database to use
             cert_path: Path to TLS certificate file
+            tls_required: Explicit TLS policy for this target (None = URI-driven)
 
         """
         self.connection_string = connection_string
         self.database_name = database_name
         self.cert_path = cert_path
+        self.tls_required = tls_required
         self.client: AsyncIOMotorClient | None = None  # type: ignore[type-arg]
         self._initialized = False
 
+    @staticmethod
+    def _parse_tls_from_uri(connection_string: str) -> bool | None:
+        """Parse TLS/SSL option from Mongo URI query params."""
+        parsed = urlparse(connection_string)
+        query_params = {key.lower(): value for key, value in parse_qs(parsed.query).items()}
+
+        def _parse_bool(value: str) -> bool | None:
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes"}:
+                return True
+            if normalized in {"0", "false", "no"}:
+                return False
+            return None
+
+        for key in ("tls", "ssl"):
+            raw_values = query_params.get(key)
+            if not raw_values:
+                continue
+            parsed_value = _parse_bool(raw_values[-1])
+            if parsed_value is not None:
+                return parsed_value
+        return None
+
     async def connect(self) -> None:
         """Connect to MongoDB and initialize Beanie with optimized connection pool."""
-        # Detect if connecting to localhost or Docker internal MongoDB (no TLS needed)
-        is_localhost = any(
-            host in self.connection_string
-            for host in [
-                "localhost:27017",
-                "localhost:27018",
-                "mongodb:27017",
-                "127.0.0.1:27017",
-                "127.0.0.1:27018",
-                "host.docker.internal:27017",
-                "host.docker.internal:27018",
-                "floridify-mongodb:27017",
-            ]
-        )
-
         # Build connection kwargs
         connection_kwargs = {
             # Connection Pool Settings
@@ -96,13 +109,24 @@ class MongoDBStorage:
             "socketTimeoutMS": 20000,  # Socket timeout (20s)
             "connectTimeoutMS": 10000,  # Connection timeout (10s)
             # Reliability Settings
-            "retryWrites": True,  # MongoDB 7.0 supports retry writes (DocumentDB did not)
+            "retryWrites": True,  # Hosted MongoDB supports retryable writes
             "waitQueueTimeoutMS": 5000,  # Queue timeout for connection pool
         }
 
-        # Only add TLS settings for non-localhost connections
-        if not is_localhost and self.cert_path:
-            connection_kwargs["tlsCAFile"] = str(self.cert_path)  # type: ignore[assignment]
+        uri_tls = self._parse_tls_from_uri(self.connection_string)
+        if self.tls_required is not None and uri_tls is not None and uri_tls != self.tls_required:
+            raise ValueError(
+                "MongoDB TLS mismatch: configured tls_required="
+                f"{self.tls_required} but URI sets tls={uri_tls}"
+            )
+
+        effective_tls = self.tls_required if self.tls_required is not None else uri_tls
+        if effective_tls is True:
+            connection_kwargs["tls"] = True  # type: ignore[assignment]
+            if self.cert_path:
+                connection_kwargs["tlsCAFile"] = str(self.cert_path)  # type: ignore[assignment]
+        elif effective_tls is False:
+            connection_kwargs["tls"] = False  # type: ignore[assignment]
 
         # Optimized connection pool configuration for production performance
         self.client = AsyncIOMotorClient(
@@ -143,6 +167,7 @@ class MongoDBStorage:
                 # User models
                 User,
                 UserHistory,
+                # TODO[CRITICAL]: Remove legacy-model registrations after data migration cutover.
                 # Legacy models (backward compatibility)
                 DictionaryEntry,
                 BatchOperation,
@@ -169,6 +194,7 @@ class MongoDBStorage:
         except Exception as e:
             logger.warning(f"MongoDB connection unhealthy: {e}")
             try:
+                # TODO[HIGH]: Reassess auto-reconnect fallback; fail explicitly when health checks fail.
                 await self.reconnect()
                 return True
             except Exception as reconnect_error:
@@ -307,9 +333,11 @@ async def _ensure_initialized() -> None:
         try:
             # Get database configuration
             config = Config.from_file()
-            mongodb_url = config.database.get_url()
+            db_target = os.getenv("FLORIDIFY_DB_TARGET", "runtime")
+            mongodb_url = config.database.get_url(db_target)
             database_name = config.database.name
             cert_path = config.database.cert_path
+            tls_required = config.database.runtime_tls_required if db_target == "runtime" else None
 
             logger.info(f"Initializing MongoDB: {database_name} at {mongodb_url[:50]}...")
 
@@ -317,6 +345,7 @@ async def _ensure_initialized() -> None:
                 connection_string=mongodb_url,
                 database_name=database_name,
                 cert_path=cert_path,
+                tls_required=tls_required,
             )
             await _storage.connect()
             logger.info("MongoDB initialized successfully")
@@ -358,7 +387,6 @@ async def get_synthesized_entry(word_text: str) -> DictionaryEntry | None:
     if not word:
         return None
 
-    # Then find the synthesized entry
     return await DictionaryEntry.find_one(
         DictionaryEntry.word_id == word.id,
         DictionaryEntry.provider == DictionaryProvider.SYNTHESIS,

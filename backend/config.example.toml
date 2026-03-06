@@ -12,10 +12,17 @@ api_key = "your-oxford-api-key"
 authorization = "your-dictionary-com-auth"
 
 [database]
-# Production MongoDB URL (e.g., MongoDB Atlas)
-production_url = "mongodb+srv://username:password@cluster.mongodb.net/floridify?retryWrites=true&w=majority"
-# Development MongoDB URL (local or SSH tunnel)
-development_url = "mongodb://localhost:27017/floridify"
+# Canonical remote MongoDB on mbabb.friday.institute.
+runtime_url = "mongodb://username:password@mbabb.friday.institute:27017/floridify?retryWrites=true"
+test_url    = "mongodb://username:password@mbabb.friday.institute:27017/test_floridify?retryWrites=true"
+
+# Dev: SSH tunnel (localhost:27018 -> server 127.0.0.1:27017).
+# Used automatically when not running inside Docker.
+# Start tunnel: ssh -N -f -L 27018:127.0.0.1:27017 -p 1022 mbabb@mbabb.fridayinstitute.net
+# tunnel_url      = "mongodb://username:password@localhost:27018/floridify?retryWrites=true"
+# tunnel_test_url = "mongodb://username:password@localhost:27018/test_floridify?retryWrites=true"
+
+runtime_tls_required = false
 name = "floridify"
 timeout = 30
 max_pool_size = 100

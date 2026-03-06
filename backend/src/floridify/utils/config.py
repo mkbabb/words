@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 import toml
 
@@ -47,48 +48,112 @@ class RateLimits:
 
 @dataclass
 class DatabaseConfig:
-    """Database configuration with environment-specific URLs."""
+    """Database configuration with strict target URLs.
 
-    production_url: str = ""
-    development_url: str = ""
-    docker_development_url: str = ""  # Docker with SSH tunnel
-    local_mongodb_url: str = ""
-    native_local_url: str = ""
+    In production (Docker), containers talk directly to MongoDB via the Docker
+    network using ``runtime_url`` / ``test_url``.
+
+    For local development, an optional ``tunnel_url`` / ``tunnel_test_url`` can
+    point at an SSH-tunnelled port (e.g. ``localhost:27018``).  When present
+    **and** not running inside Docker, the tunnel URLs take precedence.
+    """
+
+    runtime_url: str
+    test_url: str
+    runtime_tls_required: bool
     name: str = "floridify"
     timeout: int = 120
     max_pool_size: int = 100
+    tunnel_url: str | None = None
+    tunnel_test_url: str | None = None
 
-    def get_url(self) -> str:
-        """Get appropriate database URL based on environment."""
-        is_docker = os.path.exists("/.dockerenv")
-        is_ec2 = os.path.exists("/var/lib/cloud")
-        is_production = is_ec2 or os.getenv("ENVIRONMENT") == "production"
+    @staticmethod
+    def _in_docker() -> bool:
+        return os.path.exists("/.dockerenv")
 
-        # Get the appropriate URL
-        if is_production:
-            url = self.production_url
-        elif is_docker:
-            # Running in Docker - use development_url (SSH tunnel on host.docker.internal:27018)
-            # Fallback order: docker_development_url → development_url → local_mongodb_url
-            url = self.docker_development_url or self.development_url or self.local_mongodb_url
+    def get_url(self, target: str = "runtime") -> str:
+        """Return the best URL for a target database.
+
+        Prefers the tunnel URL when running outside Docker.
+        """
+        if target == "runtime":
+            if self.tunnel_url and not self._in_docker():
+                return self.tunnel_url
+            url = self.runtime_url
+        elif target == "test":
+            if self.tunnel_test_url and not self._in_docker():
+                return self.tunnel_test_url
+            url = self.test_url
         else:
-            # Running natively outside Docker - prefer development URL (SSH tunnel) over plain local
-            url = self.development_url or self.native_local_url
+            raise ValueError(f"Unsupported database target: {target}")
 
         if not url:
+            raise ValueError(f"Database URL for target '{target}' is empty")
+        return url
+
+    @staticmethod
+    def _extract_hosts(connection_string: str) -> list[str]:
+        """Extract hostnames from MongoDB URI netloc."""
+        parsed = urlparse(connection_string)
+        netloc = parsed.netloc.rsplit("@", 1)[-1]
+        if not netloc:
+            return []
+        hosts: list[str] = []
+        for host_part in netloc.split(","):
+            host = host_part.strip()
+            if not host:
+                continue
+            if host.startswith("["):
+                hosts.append(host.split("]", 1)[0].strip("[]").lower())
+            else:
+                hosts.append(host.split(":", 1)[0].lower())
+        return hosts
+
+    @classmethod
+    def _is_local_host(cls, host: str) -> bool:
+        local_hosts = {
+            "localhost",
+            "127.0.0.1",
+            "::1",
+            "mongodb",
+            "floridify-mongodb",
+            "host.docker.internal",
+        }
+        return host in local_hosts or host.endswith(".local")
+
+    def validate_runtime_target(self) -> None:
+        """Fail fast when runtime URL points at local Mongo hosts."""
+        hosts = self._extract_hosts(self.runtime_url)
+        if not hosts:
+            raise ValueError("Invalid database.runtime_url: no hosts parsed from URI")
+        local_hosts = [host for host in hosts if self._is_local_host(host)]
+        if local_hosts:
             raise ValueError(
-                f"No database URL configured for environment "
-                f"(production={is_production}, docker={is_docker}). "
-                f"Please check auth/config.toml",
+                "database.runtime_url must point to remote MongoDB hosts; "
+                f"found local hosts: {', '.join(local_hosts)}"
             )
 
-        return url
+    def validate_test_target(self) -> None:
+        """Fail fast when test URL points at local Mongo hosts."""
+        hosts = self._extract_hosts(self.test_url)
+        if not hosts:
+            raise ValueError("Invalid database.test_url: no hosts parsed from URI")
+        local_hosts = [host for host in hosts if self._is_local_host(host)]
+        if local_hosts:
+            raise ValueError(
+                "database.test_url must point to remote MongoDB hosts; "
+                f"found local hosts: {', '.join(local_hosts)}"
+            )
 
     @property
     def cert_path(self) -> Path | None:
-        """Certificate path for TLS connections. Returns None if cert doesn't exist."""
-        cert = get_project_root() / "auth" / "rds-ca-2019-root.pem"
-        return cert if cert.exists() else None
+        """Optional CA certificate path for TLS connections."""
+        project_root = get_project_root()
+        preferred = project_root / "auth" / "mongodb-ca.pem"
+        if preferred.exists():
+            return preferred
+        legacy = project_root / "auth" / "rds-ca-2019-root.pem"
+        return legacy if legacy.exists() else None
 
 
 @dataclass
@@ -218,16 +283,51 @@ class Config:
             )
 
         db_data = data["database"]
+        required_keys = ["runtime_url", "test_url", "runtime_tls_required"]
+        missing_keys = [key for key in required_keys if key not in db_data]
+        if missing_keys:
+            raise ValueError(
+                f"Missing required [database] keys in {config_path}: {', '.join(missing_keys)}",
+            )
+
+        legacy_keys = [
+            "production_url",
+            "development_url",
+            "docker_development_url",
+            "local_mongodb_url",
+            "native_local_url",
+        ]
+        present_legacy = [key for key in legacy_keys if key in db_data]
+        if present_legacy:
+            raise ValueError(
+                "Legacy [database] keys are not supported anymore. "
+                f"Remove: {', '.join(present_legacy)}"
+            )
+
+        runtime_tls_required = db_data["runtime_tls_required"]
+        if not isinstance(runtime_tls_required, bool):
+            raise ValueError("database.runtime_tls_required must be a boolean")
+
+        # Optional tunnel URLs for local development (SSH tunnel)
+        tunnel_url = db_data.get("tunnel_url")
+        tunnel_test_url = db_data.get("tunnel_test_url")
+        if tunnel_url:
+            tunnel_url = str(tunnel_url).strip()
+        if tunnel_test_url:
+            tunnel_test_url = str(tunnel_test_url).strip()
+
         database_config = DatabaseConfig(
-            production_url=db_data.get("production_url", ""),
-            development_url=db_data.get("development_url", ""),
-            docker_development_url=db_data.get("docker_development_url", ""),
-            local_mongodb_url=db_data.get("local_mongodb_url", ""),
-            native_local_url=db_data.get("native_local_url", ""),
+            runtime_url=str(db_data["runtime_url"]).strip(),
+            test_url=str(db_data["test_url"]).strip(),
+            runtime_tls_required=runtime_tls_required,
             name=db_data.get("name", "floridify"),
             timeout=db_data.get("timeout", 120),
             max_pool_size=db_data.get("max_pool_size", 100),
+            tunnel_url=tunnel_url,
+            tunnel_test_url=tunnel_test_url,
         )
+        database_config.validate_runtime_target()
+        database_config.validate_test_target()
 
         # Load rate limits with explicit defaults (not silent fallbacks)
         rate_limits_data = data.get("rate_limits", {})
