@@ -141,6 +141,7 @@ class ContentLocation(BaseModel):
     checksum: str
 
     def __eq__(self, other: object) -> bool:
+        # TODO[HIGH]: Remove string-comparison compatibility path; compare only typed ContentLocation values.
         """Allow comparison with strings for backward compatibility."""
         if isinstance(other, str):
             return self.path == other
@@ -162,6 +163,7 @@ class VersionInfo(BaseModel):
     supersedes: PydanticObjectId | None = None
     dependencies: list[PydanticObjectId] = Field(default_factory=list)
 
+    # TODO[MEDIUM]: Remove backward-compatible delta defaults after full storage-mode migration.
     # Delta versioning fields (backward-compatible defaults)
     storage_mode: Literal["snapshot", "delta"] = "snapshot"
     delta_base_id: PydanticObjectId | None = None  # Nearest snapshot this delta reconstructs from
@@ -240,18 +242,27 @@ class BaseVersionedData(Document):
             # UUID + Latest: Fast lookup of latest version by UUID
             IndexModel([("uuid", 1), ("version_info.is_latest", 1)], name="uuid_latest_idx"),
             # PRIMARY: Latest version lookup (most frequent query)
-            # Covers: resource_id + is_latest filter + _id sort
-            [("resource_id", 1), ("version_info.is_latest", 1), ("_id", -1)],
+            # Covers: resource_type + resource_id + is_latest filter + _id sort
+            IndexModel(
+                [("resource_type", 1), ("resource_id", 1), ("version_info.is_latest", 1), ("_id", -1)],
+                name="resource_type_id_latest_idx",
+            ),
             # Specific version lookup
-            # Covers: resource_id + exact version query
-            [("resource_id", 1), ("version_info.version", 1)],
+            # Covers: resource_type + resource_id + exact version query
+            IndexModel(
+                [("resource_type", 1), ("resource_id", 1), ("version_info.version", 1)],
+                name="resource_type_id_version_idx",
+            ),
             # Content hash deduplication
-            # Covers: resource_id + hash-based dedup during save
-            [("resource_id", 1), ("version_info.data_hash", 1)],
+            # Covers: resource_type + resource_id + hash-based dedup during save
+            IndexModel(
+                [("resource_type", 1), ("resource_id", 1), ("version_info.data_hash", 1)],
+                name="resource_type_id_hash_idx",
+            ),
             # Corpus.Metadata indices (sparse - only for Corpus documents)
             IndexModel([("corpus_name", 1)], sparse=True, name="corpus_name_sparse"),
             IndexModel([("vocabulary_hash", 1)], sparse=True, name="vocabulary_hash_sparse"),
-            IndexModel([("parent_corpus_id", 1)], sparse=True, name="parent_corpus_id_sparse"),
+            IndexModel([("parent_uuid", 1)], sparse=True, name="parent_uuid_sparse"),
             # Delta chain traversal (sparse - only for delta-stored versions)
             IndexModel(
                 [("version_info.delta_base_id", 1)],
@@ -259,7 +270,8 @@ class BaseVersionedData(Document):
                 name="delta_base_id_sparse",
             ),
             # Index metadata indices (sparse - for TrieIndex, SearchIndex, SemanticIndex)
-            IndexModel([("corpus_id", 1)], sparse=True, name="corpus_id_sparse"),
+            IndexModel([("corpus_uuid", 1)], sparse=True, name="corpus_uuid_sparse"),
+            IndexModel([("model_name", 1)], sparse=True, name="model_name_sparse"),
         ]
 
     def __init_subclass__(
@@ -295,6 +307,7 @@ class BaseVersionedData(Document):
             settings = cls.get_settings()
             settings.class_id = "_class_id"
         except Exception:
+            # TODO[MEDIUM]: Replace best-effort class-id sync with explicit initialization invariant.
             # get_settings may fail before Beanie initialization; best-effort update only
             pass
 

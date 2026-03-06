@@ -97,6 +97,7 @@ class CacheStats:
         return replace(self, evictions=self.evictions + count)
 
     def to_dict(self) -> dict[str, int]:
+        # TODO[LOW]: Remove compatibility serializer once all consumers use typed CacheStats directly.
         """Convert to dictionary for compatibility."""
         return {"hits": self.hits, "misses": self.misses, "evictions": self.evictions}
 

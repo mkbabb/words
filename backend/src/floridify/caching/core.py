@@ -314,6 +314,7 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
         await self.l2_backend.clear_pattern(pattern)
 
     async def clear(self) -> None:
+        # TODO[MEDIUM]: Remove test-compatibility shim once callers migrate to namespace-scoped invalidation.
         """Clear all caches (both L1 and L2).
 
         This is for backwards compatibility with tests.
@@ -450,6 +451,7 @@ class GlobalCacheManager(Generic[T]):  # noqa: UP046
             try:
                 await self._cleanup_task
             except asyncio.CancelledError:
+                # TODO[MEDIUM]: Replace cancellation swallow with explicit cancellation outcome logging.
                 pass
             logger.info("TTL cleanup task stopped")
         self._cleanup_task = None
@@ -549,12 +551,14 @@ async def get_versioned_content(
                     return cached_content
                 return dict(cached_content)
 
+        # TODO[CRITICAL]: Remove GridFS fallback semantics and require one canonical storage path contract.
         # 2. GridFS fallback for DATABASE storage
         storage_type = location.storage_type
         if isinstance(storage_type, str):
             storage_type = StorageType(storage_type)
 
         if storage_type == StorageType.DATABASE and location.path:
+            # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
             from .gridfs import gridfs_get
 
             raw = await gridfs_get(location.path)
@@ -574,6 +578,7 @@ async def get_versioned_content(
                     return content
                 return dict(content) if content is not None else None
 
+        # TODO[CRITICAL]: Delete legacy CACHE-only compatibility handling after migration deadline.
         # 3. Legacy CACHE-only path (for old entries not yet migrated to GridFS)
         # If we haven't returned yet and it's a CACHE type, the data is gone
         logger.warning(
@@ -595,8 +600,10 @@ async def set_versioned_content(
     Small content (<16KB) is stored inline in MongoDB. Large content is uploaded
     to GridFS (durable, no TTL) with L1/L2 cache warmed for fast reads.
     """
+    # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
     import pickle
 
+    # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
     from .gridfs import gridfs_put
 
     # CRITICAL FIX: Skip expensive JSON encoding when force_external=True

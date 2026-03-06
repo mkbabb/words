@@ -15,6 +15,7 @@ def generate_resource_key(resource_type: Any, resource_id: str, *qualifiers: Any
     """Generate cache key for versioned resources using colon-separated parts.
 
     Pure function - zero dependencies, zero side effects.
+    TODO[MEDIUM]: Remove legacy key-shape coupling once all manager consumers are migrated.
     Uses explicit colon joining for consistency with manager.py legacy behavior.
 
     Args:

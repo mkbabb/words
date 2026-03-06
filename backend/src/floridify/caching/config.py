@@ -118,9 +118,11 @@ DEFAULT_CONFIGS: dict[CacheNamespace, NamespaceCacheConfig] = {
 }
 
 # Namespace aliases: API uses DEFAULT config, LEXICON uses LANGUAGE config
+# TODO[MEDIUM]: Remove namespace aliasing once all call sites use canonical namespaces.
 DEFAULT_CONFIGS[CacheNamespace.API] = DEFAULT_CONFIGS[CacheNamespace.DEFAULT]
 DEFAULT_CONFIGS[CacheNamespace.LEXICON] = DEFAULT_CONFIGS[CacheNamespace.LANGUAGE]
 
+# TODO[MEDIUM]: Remove legacy alias acceptance after configuration migration is complete.
 # String -> CacheNamespace mapping (all 13 namespaces + legacy aliases)
 NAMESPACE_MAP: dict[str, CacheNamespace] = {
     "default": CacheNamespace.DEFAULT,

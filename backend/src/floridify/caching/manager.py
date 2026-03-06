@@ -71,6 +71,7 @@ class VersionedDataManager:
             loop = asyncio.get_running_loop()
             loop_id = id(loop)
         except RuntimeError:
+            # TODO[MEDIUM]: Replace no-loop fallback with explicit lifecycle guard for lock access.
             # No event loop running - just return lock from dict
             return self._locks[(resource_type, resource_id)]
 
@@ -144,6 +145,7 @@ class VersionedDataManager:
                     )
 
         except (OperationFailure, AttributeError, Exception) as e:
+            # TODO[CRITICAL]: Remove transaction fallback path; require transaction-capable deployment or fail hard.
             # Transactions not supported (single node or old MongoDB version)
             # Fall back to local lock approach
             logger.debug(
@@ -226,6 +228,7 @@ class VersionedDataManager:
                     use_cache=True,
                 )
             except RuntimeError as e:
+                # TODO[HIGH]: Stop suppressing corrupted-version metadata; bubble explicit migration/repair failure.
                 # Handle corrupted metadata gracefully during rebuild
                 logger.warning(
                     f"Could not load existing version during save (likely corrupted): {e}"
@@ -332,6 +335,7 @@ class VersionedDataManager:
                     await self.cache.set(namespace, cache_key, versioned, config.ttl)
                     logger.debug(f"Cache updated atomically for {cache_key[:16]}... inside lock")
                 except Exception as cache_error:
+                    # TODO[MEDIUM]: Decide fail-closed vs cache-optional policy; current behavior silently degrades.
                     logger.warning(
                         f"Cache update failed for {cache_key}, continuing without cache: {cache_error}"
                     )
@@ -344,6 +348,7 @@ class VersionedDataManager:
             try:
                 await self._convert_to_delta(latest, versioned, resource_type)
             except Exception as delta_err:
+                # TODO[HIGH]: Remove best-effort delta conversion; enforce deterministic storage-mode outcomes.
                 # Delta conversion is best-effort; failure leaves old version as full snapshot
                 logger.warning(
                     f"Delta conversion failed for {resource_id} v{latest.version_info.version}: {delta_err}"
@@ -614,9 +619,11 @@ class VersionedDataManager:
                         f"Failed to reconstruct delta version {result.version_info.version} "
                         f"for {resource_id}"
                     )
+                    # TODO[HIGH]: Avoid returning None on reconstruction failure; raise explicit data-integrity error.
                     return None
             except Exception as e:
                 logger.error(f"Delta reconstruction failed for {resource_id}: {e}")
+                # TODO[HIGH]: Avoid returning None on reconstruction failure; raise explicit data-integrity error.
                 return None
 
         # Validate external content if present
@@ -689,6 +696,7 @@ class VersionedDataManager:
             try:
                 await self.cache.set(namespace, cache_key, result, result.ttl)
             except Exception as cache_error:
+                # TODO[MEDIUM]: Decide fail-closed vs cache-optional policy; warning-only path hides degraded behavior.
                 # Log cache error but don't fail the operation
                 logger.warning(f"Failed to cache {cache_key}: {cache_error}")
 
@@ -774,6 +782,7 @@ class VersionedDataManager:
                     update_result = await collection.update_many(
                         {
                             "resource_id": resource_id,
+                            "resource_type": resource_type.value,
                             "version_info.is_latest": True,
                             "_id": {"$ne": metadata_obj.id},  # Exclude this version
                         },
@@ -1035,7 +1044,11 @@ class VersionedDataManager:
         model_class = self._get_model_class(resource_type)
         try:
             result = await model_class.find_one(
-                {"resource_id": resource_id, "version_info.data_hash": content_hash},
+                {
+                    "resource_id": resource_id,
+                    "resource_type": resource_type.value,
+                    "version_info.data_hash": content_hash,
+                },
             )
             if result:
                 return result
