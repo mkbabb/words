@@ -675,22 +675,6 @@ class Corpus(BaseModel):
             f"{len(self.length_buckets)} length buckets",
         )
 
-    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
-        """Dump model to dict, handling special fields.
-
-        BACKWARD COMPATIBILITY: Ensures both corpus_id and corpus_uuid are in responses.
-        The corpus_id may be None for unsaved corpora, while corpus_uuid is always set.
-        """
-        data = super().model_dump(**kwargs)
-
-        # TODO[MEDIUM]: Remove backward-compatibility corpus_id injection after API/test migration to corpus_uuid.
-        # Ensure corpus_id is present for backward compatibility with tests/API consumers
-        # If corpus_id is None but corpus_uuid exists, keep both fields in response
-        if "corpus_uuid" in data and "corpus_id" not in data:
-            data["corpus_id"] = self.corpus_id  # Will be None for unsaved corpora
-
-        return data
-
     @classmethod
     def model_load(cls, data: dict[str, Any]) -> Corpus:
         """Load corpus from dict data.

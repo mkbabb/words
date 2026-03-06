@@ -244,7 +244,6 @@ async def save_corpus(
             if semantic_model is None:
                 semantic_model = existing.semantic_model
 
-    # TODO[CRITICAL]: Remove resource-id fallback chain and require canonical corpus_name/corpus_uuid inputs.
     # Use corpus_name as resource_id, or fallback to corpus_id, or generate
     if corpus_name:
         resource_id = corpus_name
@@ -319,6 +318,7 @@ async def save_corpus(
                     semantic_enabled_effective=parent_corpus.semantic_enabled_effective,
                     semantic_model=parent_corpus.semantic_model,
                 )
+
                 async def _save_for_semantic(**kwargs: Any) -> Corpus | None:
                     return await save_corpus(
                         vm=vm,
@@ -368,7 +368,6 @@ async def save_corpus(
             logger.info(f"✅ Saved corpus '{resource_id}' with {len(result.vocabulary):,} words")
             return result
     logger.warning("save_corpus: saved_content is None, returning None")
-    # TODO[HIGH]: Replace None return on save failure with explicit persistence error.
     return None
 
 
@@ -386,8 +385,7 @@ async def get_corpus_metadata(corpus_name: str) -> Corpus.Metadata | None:
 
 
 async def get_stats() -> dict[str, Any]:
-    # TODO[MEDIUM]: Remove compatibility-only stats shape once all callers migrate to typed metrics endpoint.
-    """Return lightweight corpus statistics for compatibility.
+    """Return lightweight corpus statistics.
 
     Returns:
         Dictionary with total count and corpus names

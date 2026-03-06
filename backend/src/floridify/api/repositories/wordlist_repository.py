@@ -8,6 +8,7 @@ from beanie.odm.enums import SortDirection
 from beanie.operators import RegEx
 from pydantic import BaseModel, Field
 
+from ...corpus.core import Corpus
 from ...corpus.manager import TreeCorpusManager, get_tree_corpus_manager
 from ...models import Word
 from ...models.base import Language
@@ -298,10 +299,13 @@ class WordListRepository(BaseRepository[WordList, WordListCreate, WordListUpdate
         # Create unified corpus with automatic semantic embeddings for small corpora
         corpus_manager = await self._get_tree_corpus_manager()
         corpus_name = f"wordlist_{wordlist.id}"
-        corpus = await corpus_manager.create_corpus(
+        corpus = await Corpus.create(
             corpus_name=corpus_name,
             vocabulary=word_texts,
         )
+        corpus = await corpus_manager.save_corpus(corpus=corpus)
+        if not corpus:
+            raise ValueError(f"Failed to save corpus '{corpus_name}'")
         logger.debug(
             f"Created unified corpus {corpus.vocabulary_hash[:8]} for wordlist {wordlist.id} with {len(word_texts)} vocabulary items",
         )

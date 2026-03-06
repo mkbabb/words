@@ -1,7 +1,5 @@
 """Corpus management endpoints."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -181,8 +179,6 @@ async def get_corpus_stats() -> dict[str, Any]:
             "status": "success",
             "cache": {
                 "size": total_corpora,
-                # TODO[MEDIUM]: Remove compatibility alias after API consumers migrate to `size`.
-                "cache_size": total_corpora,  # Alias for compatibility
                 "max_size": 1000,  # Default max size
                 "total_searches": total_searches,
             },
@@ -403,7 +399,9 @@ async def update_corpus_semantic_policy(
             config=VersionConfig(use_cache=False),
         )
 
-        refreshed = await manager.get_corpus(corpus_id=obj_id, config=VersionConfig(use_cache=False))
+        refreshed = await manager.get_corpus(
+            corpus_id=obj_id, config=VersionConfig(use_cache=False)
+        )
         if not refreshed:
             raise HTTPException(status_code=404, detail=f"Corpus not found: {corpus_id}")
 
@@ -417,7 +415,9 @@ async def update_corpus_semantic_policy(
         raise
     except Exception as e:
         logger.error(f"Failed to update semantic policy for corpus {corpus_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to update corpus semantic policy: {e!s}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update corpus semantic policy: {e!s}"
+        )
 
 
 @router.post("/corpus/{corpus_id}/search")

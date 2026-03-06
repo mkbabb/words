@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ...corpus.core import Corpus
+from ...corpus.crud import get_stats as get_corpus_stats
 from ...corpus.manager import get_tree_corpus_manager
 from ...search.core import Search
 
@@ -38,10 +40,14 @@ class CorpusRepository:
 
     async def create(self, data: CorpusCreate) -> dict[str, Any]:
         """Create a new corpus."""
-        corpus = await self._manager.create_corpus(
+        corpus = await Corpus.create(
             corpus_name=data.name,
             vocabulary=data.vocabulary,
         )
+        saved = await self._manager.save_corpus(corpus=corpus)
+        if not saved:
+            raise ValueError(f"Failed to save corpus '{data.name}'")
+        corpus = saved
 
         return {
             "corpus_id": corpus.corpus_name,
@@ -111,11 +117,11 @@ class CorpusRepository:
 
     async def get_stats(self) -> dict[str, Any]:
         """Get statistics about all corpora."""
-        return await self._manager.get_stats()
+        return await get_corpus_stats()
 
     async def list_all(self) -> list[dict[str, Any]]:
         """List all available corpora."""
-        stats = await self._manager.get_stats()
+        stats = await get_corpus_stats()
         corpus_names = stats.get("corpus_names", [])
 
         corpora = []

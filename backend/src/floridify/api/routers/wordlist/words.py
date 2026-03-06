@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ....models import Word
+from ....wordlist.models import WordListItem
 from ...core import ListResponse, ResourceResponse
 from ...repositories import WordAddRequest, WordListRepository
 
@@ -42,48 +43,41 @@ class WordListQueryParams(BaseModel):
     limit: int = Field(20, ge=1, le=100, description="Maximum results")
 
 
-def _get_attr(item: Any, key: str, default: Any = None) -> Any:
-    """Get attribute from dict or Pydantic model uniformly."""
-    if isinstance(item, dict):
-        return item.get(key, default)
-    # TODO[CRITICAL]: Remove getattr-based polymorphism and normalize items to one concrete type.
-    return getattr(item, key, default)
+def _normalize_items(items: list[Any]) -> list[WordListItem]:
+    """Normalize all items to WordListItem instances."""
+    normalized = []
+    for item in items:
+        if isinstance(item, WordListItem):
+            normalized.append(item)
+        elif isinstance(item, dict):
+            normalized.append(WordListItem(**item))
+        else:
+            normalized.append(WordListItem(**item.model_dump()))
+    return normalized
 
 
 async def apply_wordlist_filters_and_sort(
     words: list[Any],
     params: WordListQueryParams,
-) -> list[Any]:
+) -> list[WordListItem]:
     """Apply filtering and sorting to wordlist items.
 
-    Handles both dict and Pydantic model objects (WordListItem).
+    Normalizes all items to WordListItem before filtering/sorting.
     """
-    filtered = words
+    filtered = _normalize_items(words)
 
-    # Apply filters (use _get_attr to support both dicts and Pydantic models)
     if params.mastery_levels:
-        filtered = [
-            w for w in filtered if str(_get_attr(w, "mastery_level", "")) in params.mastery_levels
-        ]
+        filtered = [w for w in filtered if str(w.mastery_level) in params.mastery_levels]
     if params.hot_only:
-        filtered = [w for w in filtered if _get_attr(w, "temperature", "") == "hot"]
+        filtered = [w for w in filtered if w.temperature == "hot"]
     if params.due_only:
-        filtered = [
-            w
-            for w in filtered
-            # TODO[HIGH]: Remove hasattr/runtime-method probing; require a stable review-state interface.
-            if hasattr(w, "is_due_for_review")
-            and w.is_due_for_review()
-            or _get_attr(w, "is_due", False)
-        ]
+        filtered = [w for w in filtered if w.is_due_for_review()]
     if params.min_views is not None:
-        filtered = [w for w in filtered if _get_attr(w, "frequency", 0) >= params.min_views]
+        filtered = [w for w in filtered if w.frequency >= params.min_views]
     if params.max_views is not None:
-        filtered = [w for w in filtered if _get_attr(w, "frequency", 0) <= params.max_views]
+        filtered = [w for w in filtered if w.frequency <= params.max_views]
     if params.reviewed is not None:
-        filtered = [
-            w for w in filtered if (_get_attr(w, "last_visited") is not None) == params.reviewed
-        ]
+        filtered = [w for w in filtered if (w.last_visited is not None) == params.reviewed]
 
     # Apply sorting
     sort_fields = params.sort_by.split(",")
@@ -97,7 +91,7 @@ async def apply_wordlist_filters_and_sort(
     for field, order in reversed(list(zip(sort_fields, sort_orders, strict=False))):
         reverse = order.lower() == "desc"
         filtered = sorted(
-            filtered, key=lambda x: _get_attr(x, field.strip(), "") or "", reverse=reverse
+            filtered, key=lambda x: getattr(x, field.strip(), "") or "", reverse=reverse
         )
 
     return filtered
@@ -115,16 +109,9 @@ async def convert_wordlist_items_to_response(
     if paginated:
         items = items[offset : offset + limit]
 
-    # Convert Pydantic models to dicts for JSON serialization
-    result = []
-    for item in items:
-        # TODO[HIGH]: Eliminate duck-typed model detection and enforce explicit response adapter contracts.
-        if hasattr(item, "model_dump"):
-            result.append(item.model_dump(mode="json"))
-        elif isinstance(item, dict):
-            result.append(item)
-        else:
-            result.append(dict(item))
+    # Convert WordListItem models to dicts for JSON serialization
+    normalized = _normalize_items(items)
+    result = [item.model_dump(mode="json") for item in normalized]
 
     return result, total
 

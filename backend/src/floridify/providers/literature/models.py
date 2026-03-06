@@ -55,12 +55,8 @@ class LiteratureEntry(BaseModel):
     title: str = Field(description="Title of the work")
     author: AuthorInfo = Field(description="Author information")
 
-    # TODO[MEDIUM]: Remove backward-compatibility optional source once all entries are normalized.
-    # Composed source configuration (optional for backward compatibility)
-    source: LiteratureSource | None = Field(
-        default=None,
-        description="Literature source configuration",
-    )
+    # Composed source configuration
+    source: LiteratureSource = Field(description="Literature source configuration")
 
     # External IDs (all optional)
     work_id: str | None = Field(default=None, description="Provider-specific work ID")
@@ -71,12 +67,6 @@ class LiteratureEntry(BaseModel):
     subtitle: str | None = Field(default=None, description="Subtitle if any")
     description: str | None = Field(default=None, description="Work description")
     keywords: list[str] = Field(default_factory=list, description="Keywords/tags")
-
-    # TODO[MEDIUM]: Remove direct compatibility fields after source-only model migration.
-    # Direct genre/period/language fields for backward compatibility
-    genre: Genre | None = Field(default=None, description="Genre of the work")
-    period: Period | None = Field(default=None, description="Historical period")
-    language: Language = Field(default=Language.ENGLISH, description="Language of the work")
 
     # Vocabulary data
     extracted_vocabulary: list[str] = Field(
@@ -96,16 +86,16 @@ class LiteratureEntry(BaseModel):
         return len(self.extracted_vocabulary)
 
     def get_genre(self) -> Genre | None:
-        """Get genre from source or direct field."""
-        return self.source.genre if self.source else self.genre
+        """Get genre from source."""
+        return self.source.genre
 
     def get_period(self) -> Period | None:
-        """Get period from source or direct field."""
-        return self.source.period if self.source else self.period
+        """Get period from source."""
+        return self.source.period
 
     def get_language(self) -> Language:
-        """Get language from source or direct field."""
-        return self.source.language if self.source else self.language
+        """Get language from source."""
+        return self.source.language
 
     model_config = {"arbitrary_types_allowed": True}
 

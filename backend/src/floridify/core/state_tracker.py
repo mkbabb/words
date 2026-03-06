@@ -343,9 +343,6 @@ class StateTracker:
 
         # Build progress map from stages
         self._progress_map = {stage.name: stage.progress for stage in self._stages}
-        # TODO[MEDIUM]: Remove default fallback map merge after all categories define explicit stage progress.
-        # Include default progress map as fallback
-        self._progress_map.update(Stages.PROGRESS_MAP)
 
     async def update(
         self,

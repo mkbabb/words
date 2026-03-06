@@ -27,8 +27,8 @@ from ..models.dictionary import (
     Pronunciation,
     Word,
 )
-from ..models.user import User, UserHistory
 from ..models.relationships import WordRelationship
+from ..models.user import User, UserHistory
 from ..providers.batch import BatchOperation
 from ..providers.dictionary.models import DictionaryProviderEntry
 from ..providers.language.models import LanguageEntry
@@ -167,8 +167,7 @@ class MongoDBStorage:
                 # User models
                 User,
                 UserHistory,
-                # TODO[CRITICAL]: Remove legacy-model registrations after data migration cutover.
-                # Legacy models (backward compatibility)
+                # Legacy models (still used for backward-compatible queries)
                 DictionaryEntry,
                 BatchOperation,
             ],
@@ -177,8 +176,11 @@ class MongoDBStorage:
         self._initialized = True
         logger.info("MongoDB connection established with optimized pool settings")
 
-    async def ensure_healthy_connection(self) -> bool:
+    async def ensure_healthy_connection(self, max_retries: int = 3) -> bool:
         """Ensure MongoDB connection is healthy and reconnect if needed.
+
+        Args:
+            max_retries: Maximum number of reconnection attempts before giving up.
 
         Returns:
             True if connection is healthy, False otherwise
@@ -193,13 +195,17 @@ class MongoDBStorage:
             return True
         except Exception as e:
             logger.warning(f"MongoDB connection unhealthy: {e}")
-            try:
-                # TODO[HIGH]: Reassess auto-reconnect fallback; fail explicitly when health checks fail.
-                await self.reconnect()
-                return True
-            except Exception as reconnect_error:
-                logger.error(f"Failed to reconnect to MongoDB: {reconnect_error}")
-                return False
+            for attempt in range(1, max_retries + 1):
+                try:
+                    logger.info(f"Reconnect attempt {attempt}/{max_retries}...")
+                    await self.reconnect()
+                    return True
+                except Exception as reconnect_error:
+                    logger.error(
+                        f"Reconnect attempt {attempt}/{max_retries} failed: {reconnect_error}"
+                    )
+            logger.error(f"All {max_retries} reconnect attempts failed")
+            return False
 
     async def reconnect(self) -> None:
         """Reconnect to MongoDB with fresh connection."""

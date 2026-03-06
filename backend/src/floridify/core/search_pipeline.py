@@ -326,45 +326,6 @@ def get_search_engine_manager() -> SearchEngineManager:
 
 
 # ============================================================================
-# BACKWARD-COMPATIBLE WRAPPERS
-# ============================================================================
-
-
-async def get_search_engine(
-    languages: list[Language] | None = None,
-    force_rebuild: bool = False,
-    semantic: bool | None = None,
-) -> LanguageSearch:
-    # TODO[MEDIUM]: Remove backward-compatible wrapper after migrating callers to SearchEngineManager.
-    """Get or create the global LanguageSearch singleton.
-
-    Backward-compatible wrapper around SearchEngineManager.
-
-    Args:
-        languages: Languages to support (defaults to English)
-        force_rebuild: Force rebuild of search indices
-        semantic: Enable semantic search (None = use SEMANTIC_SEARCH_ENABLED env var)
-
-    Returns:
-        Initialized LanguageSearch instance
-    """
-    return await get_search_engine_manager().get_engine(
-        languages=languages,
-        force_rebuild=force_rebuild,
-        semantic=semantic,
-    )
-
-
-async def reset_search_engine() -> None:
-    # TODO[MEDIUM]: Remove backward-compatible wrapper after migrating callers to SearchEngineManager.
-    """Reset the search engine singleton (for testing/cleanup).
-
-    Backward-compatible wrapper around SearchEngineManager.
-    """
-    await get_search_engine_manager().reset()
-
-
-# ============================================================================
 # SEARCH PIPELINE FUNCTIONS
 # ============================================================================
 

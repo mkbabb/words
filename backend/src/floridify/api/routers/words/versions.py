@@ -4,13 +4,9 @@ Provides version listing, specific version retrieval, diff between versions,
 and rollback to previous versions.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-
-from ...middleware.auth import require_admin
 
 from ....caching.delta import compute_diff_between
 from ....caching.manager import get_version_manager
@@ -21,6 +17,7 @@ from ....models.responses import (
     VersionSummary,
 )
 from ....utils.logging import get_logger
+from ...middleware.auth import require_admin
 
 logger = get_logger(__name__)
 router = APIRouter()

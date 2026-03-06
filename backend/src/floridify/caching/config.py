@@ -115,15 +115,21 @@ DEFAULT_CONFIGS: dict[CacheNamespace, NamespaceCacheConfig] = {
         memory_ttl=timedelta(days=1),
         disk_ttl=timedelta(days=7),
     ),
+    CacheNamespace.API: NamespaceCacheConfig(
+        namespace=CacheNamespace.API,
+        memory_limit=100,
+        memory_ttl=timedelta(hours=1),
+        disk_ttl=timedelta(hours=12),
+    ),
+    CacheNamespace.LEXICON: NamespaceCacheConfig(
+        namespace=CacheNamespace.LEXICON,
+        memory_limit=100,
+        memory_ttl=timedelta(days=7),
+        disk_ttl=timedelta(days=30),
+    ),
 }
 
-# Namespace aliases: API uses DEFAULT config, LEXICON uses LANGUAGE config
-# TODO[MEDIUM]: Remove namespace aliasing once all call sites use canonical namespaces.
-DEFAULT_CONFIGS[CacheNamespace.API] = DEFAULT_CONFIGS[CacheNamespace.DEFAULT]
-DEFAULT_CONFIGS[CacheNamespace.LEXICON] = DEFAULT_CONFIGS[CacheNamespace.LANGUAGE]
-
-# TODO[MEDIUM]: Remove legacy alias acceptance after configuration migration is complete.
-# String -> CacheNamespace mapping (all 13 namespaces + legacy aliases)
+# String -> CacheNamespace mapping (all 13 namespaces)
 NAMESPACE_MAP: dict[str, CacheNamespace] = {
     "default": CacheNamespace.DEFAULT,
     "dictionary": CacheNamespace.DICTIONARY,

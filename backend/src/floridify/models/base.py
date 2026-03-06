@@ -62,12 +62,9 @@ class AccessTrackingMixin(BaseModel):
         """Mark entity as accessed."""
         self.last_accessed = datetime.now(UTC)
         self.access_count += 1
-        # Also mark as updated if this entity has that method
-        try:
+        # Also mark as updated if this entity has that method (mixin may be used standalone)
+        if hasattr(self, "mark_updated"):
             self.mark_updated()
-        except AttributeError:
-            # TODO[HIGH]: Remove silent mixin fallback and enforce a typed `mark_updated` contract.
-            pass  # Method not available
 
 
 class BaseMetadataWithAccess(BaseMetadata, AccessTrackingMixin):

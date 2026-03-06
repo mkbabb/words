@@ -105,34 +105,9 @@ class TreeCorpusManager:
             get_corpus_fn=self.get_corpus,
         )
 
-    async def create_corpus(
-        self,
-        corpus_name: str,
-        vocabulary: list[str],
-        *,
-        language: Language = Language.ENGLISH,
-        config: VersionConfig | None = None,
-    ) -> Corpus:
-        # TODO[MEDIUM]: Remove backwards-compatible helper once callers use explicit create+save workflow.
-        """Backwards compatible corpus creation helper."""
-        corpus = await Corpus.create(
-            corpus_name=corpus_name,
-            vocabulary=vocabulary,
-            language=language,
-        )
-        saved = await self.save_corpus(corpus=corpus, config=config)
-        if not saved:
-            raise ValueError(f"Failed to save corpus '{corpus_name}'")
-        return saved
-
     async def get_corpus_metadata(self, corpus_name: str) -> Corpus.Metadata | None:
         """Retrieve corpus metadata by resource id."""
         return await _crud.get_corpus_metadata(corpus_name)
-
-    async def get_stats(self) -> dict[str, Any]:
-        # TODO[MEDIUM]: Remove compatibility stats adapter once consumers migrate to typed metrics endpoints.
-        """Return lightweight corpus statistics for compatibility."""
-        return await _crud.get_stats()
 
     async def get_corpus(
         self,

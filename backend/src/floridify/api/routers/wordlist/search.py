@@ -5,6 +5,7 @@ from typing import Any
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends
 
+from ....corpus.crud import get_stats as _get_corpus_crud_stats
 from ....corpus.manager import get_tree_corpus_manager
 from ...core import ListResponse
 from ...repositories import WordListRepository
@@ -57,12 +58,8 @@ async def search_wordlist_words(
         return ListResponse(items=[], total=0, offset=0, limit=params.limit)
 
     # Extract items and total from search response
-    # Serialize SearchResult objects to dicts for the response model
-    all_items = [
-        # TODO[HIGH]: Remove hasattr polymorphism and standardize SearchResponse result serialization.
-        r.model_dump(mode="json") if hasattr(r, "model_dump") else r
-        for r in search_response.results
-    ]
+    # SearchResult always has model_dump (Pydantic model)
+    all_items = [r.model_dump(mode="json") for r in search_response.results]
     items = all_items[params.offset : params.offset + params.limit]
     total = len(all_items)
 
@@ -120,5 +117,4 @@ async def invalidate_wordlist_corpus(wordlist_id: PydanticObjectId) -> None:
 
 async def get_corpus_stats() -> dict[str, Any]:
     """Get corpus statistics for monitoring."""
-    corpus_manager = get_tree_corpus_manager()
-    return await corpus_manager.get_stats()
+    return await _get_corpus_crud_stats()

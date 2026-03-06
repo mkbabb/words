@@ -1,12 +1,11 @@
 """Utility functions for wordlist searching using generalized SearchEngine."""
 
-from __future__ import annotations
-
 from typing import Any
 
 from beanie import PydanticObjectId
 
 from ....api.repositories import WordListRepository
+from ....corpus.core import Corpus
 from ....corpus.manager import get_tree_corpus_manager
 from ....models import Word
 from ....models.base import Language
@@ -109,10 +108,13 @@ async def search_words_in_wordlist(
     corpus_manager = get_tree_corpus_manager()
     existing_corpus = await corpus_manager.get_corpus(corpus_name=corpus_name)
     if existing_corpus is None:
-        await corpus_manager.create_corpus(
+        corpus = await Corpus.create(
             corpus_name=corpus_name,
             vocabulary=word_texts,
         )
+        saved = await corpus_manager.save_corpus(corpus=corpus)
+        if not saved:
+            raise ValueError(f"Failed to save corpus '{corpus_name}'")
 
     # Create search engine and perform search
     search_engine = await Search.from_corpus(

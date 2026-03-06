@@ -88,8 +88,7 @@ class Pronunciation(Document, BaseMetadata):
 
     word_id: PydanticObjectId  # FK to Word - optimized with ObjectId
     phonetic: str  # e.g., "on koo-LEES"
-    # TODO[MEDIUM]: Remove empty-string compatibility default and require explicit IPA/null semantics.
-    ipa: str = ""  # American IPA - default to empty string for backwards compatibility
+    ipa: str | None = None  # American IPA
     audio_file_ids: list[
         PydanticObjectId
     ] = []  # FK to AudioMedia documents - optimized with ObjectIds

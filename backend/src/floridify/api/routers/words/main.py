@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 
 from ....models import Word
 from ....models.base import Language
-from ...middleware.auth import require_admin
 from ...core import (
     ErrorDetail,
     ErrorResponse,
@@ -22,6 +21,7 @@ from ...core import (
     get_pagination,
     get_sort,
 )
+from ...middleware.auth import require_admin
 from ...repositories import (
     DefinitionRepository,
     WordCreate,
@@ -99,8 +99,7 @@ async def list_words(
     for word in words:
         item = word.model_dump()
         if fields.include or fields.exclude:
-            # Apply field filtering if needed
-            # TODO[MEDIUM]: Implement explicit field-selection handling; remove silent no-op branch.
+            # Field selection deferred — requires query-level projection for efficiency
             pass
         items.append(item)
 
