@@ -5,6 +5,7 @@ import { clerkPlugin } from '@clerk/vue';
 import App from './App.vue';
 import router from './router';
 import { logger } from '@/utils/logger';
+import { validatePersistedState } from '@/utils/validatePersistedState';
 
 // Import Tailwind CSS and custom styles
 import './assets/index.css';
@@ -13,9 +14,13 @@ import './assets/index.css';
 // Create app
 const app = createApp(App);
 
-// Create Pinia with persistence plugin
+// Create Pinia with persistence plugin + hydration validation
 const pinia = createPinia();
-pinia.use(createPersistedState());
+pinia.use(createPersistedState({
+  afterHydrate: (ctx) => {
+    validatePersistedState({ store: ctx.store });
+  },
+}));
 
 // Use plugins
 app.use(pinia);
@@ -31,19 +36,6 @@ if (clerkPubKey) {
   });
 } else {
   logger.warn('VITE_CLERK_PUBLISHABLE_KEY not set — auth disabled');
-}
-
-// Register service worker
-if ('serviceWorker' in navigator) {
-  if (import.meta.env.PROD) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
-        .then(() => {})
-        .catch(error => {
-          logger.error('Service Worker registration failed:', error);
-        });
-    });
-  }
 }
 
 // Add global error handler for Reka UI getBoundingClientRect errors
