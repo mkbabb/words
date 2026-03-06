@@ -36,6 +36,7 @@ services:
       CLERK_SUPER_ADMINS: ${CLERK_SUPER_ADMINS:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      - "mbabb.friday.institute:host-gateway"
     networks:
       - app-network
     volumes:
