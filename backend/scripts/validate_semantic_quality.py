@@ -11,6 +11,9 @@ Run with:
 from __future__ import annotations
 
 import os
+import time
+import uuid
+from urllib.parse import urlparse
 
 from floridify.utils.threading_config import configure_threading
 
@@ -20,22 +23,17 @@ os.environ["LOG_LEVEL"] = "WARNING"
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
 
-import shutil
-import subprocess
-import time
-import uuid
-from collections.abc import AsyncGenerator
-
 import pytest
 import pytest_asyncio
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo import MongoClient
+from pymongo.errors import PyMongoError
 
 from floridify.corpus.core import Corpus, CorpusType
 from floridify.corpus.manager import TreeCorpusManager
 from floridify.models.dictionary import Language
 from floridify.search.semantic.core import SemanticSearch
+from floridify.utils.config import Config
 
 # ---------------------------------------------------------------------------
 # Categories for analysis
@@ -84,8 +82,9 @@ def get_document_models():
     from floridify.providers.dictionary.models import DictionaryProviderEntry
     from floridify.providers.language.models import LanguageEntry
     from floridify.providers.literature.models import LiteratureEntry
-    from floridify.search.models import SearchIndex, TrieIndex
+    from floridify.search.search_index import SearchIndex
     from floridify.search.semantic.models import SemanticIndex
+    from floridify.search.trie_index import TrieIndex
     from floridify.wordlist.models import WordList
 
     return [
@@ -101,60 +100,56 @@ def get_document_models():
 # ---------------------------------------------------------------------------
 # Fixtures: MongoDB + Beanie
 # ---------------------------------------------------------------------------
-DEFAULT_MONGODB_PORT = int(os.getenv("TEST_MONGODB_PORT", "27017"))
+def _database_name_from_uri(uri: str) -> str:
+    parsed = urlparse(uri)
+    db_name = parsed.path.lstrip("/")
+    if not db_name:
+        raise RuntimeError("database.test_url must include a database name")
+    return db_name
 
 
 @pytest.fixture(scope="session")
-def mongodb_server(tmp_path_factory):
-    """Launch a real mongod for the session."""
-    mongod_bin = shutil.which(os.getenv("MONGOD_BIN", "mongod"))
-    if not mongod_bin:
-        pytest.skip("mongod binary not available on PATH")
+def mongodb_server() -> str:
+    """Provide remote MongoDB URI for semantic quality validation."""
+    cfg = Config.from_file()
+    runtime_url = cfg.database.get_url("runtime")
+    test_url = cfg.database.get_url("test")
 
-    data_dir = tmp_path_factory.mktemp("mongo-data")
-    log_path = data_dir / "mongod.log"
-    port = DEFAULT_MONGODB_PORT
-
-    with log_path.open("w", encoding="utf-8") as log_file:
-        process = subprocess.Popen(
-            [mongod_bin, "--dbpath", str(data_dir), "--port", str(port),
-             "--bind_ip", "127.0.0.1", "--nounixsocket", "--quiet"],
-            stdout=log_file, stderr=subprocess.STDOUT,
+    runtime_db = _database_name_from_uri(runtime_url)
+    test_db = _database_name_from_uri(test_url)
+    if not test_db.startswith("test_"):
+        raise RuntimeError(
+            f"Refusing semantic quality validation on non-test DB '{test_db}'"
         )
-        try:
-            client = MongoClient(f"mongodb://127.0.0.1:{port}", serverSelectionTimeoutMS=500)
-            deadline = time.time() + 20
-            while True:
-                try:
-                    client.admin.command("ping")
-                    break
-                except Exception as exc:
-                    if time.time() > deadline:
-                        process.terminate()
-                        process.wait(timeout=10)
-                        pytest.skip(f"MongoDB server failed to start: {exc}")
-                    time.sleep(0.2)
-            client.close()
-            yield f"mongodb://127.0.0.1:{port}"
-        finally:
-            process.terminate()
-            try:
-                process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=10)
+    if runtime_url == test_url or runtime_db == test_db:
+        raise RuntimeError(
+            "database.test_url must target a database distinct from runtime_url for semantic checks"
+        )
+
+    return test_url
 
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def test_db(mongodb_server: str):
     """Session-scoped database with Beanie init."""
     client = AsyncIOMotorClient(mongodb_server, serverSelectionTimeoutMS=500)
-    db_name = f"validate_semantic_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    base_db_name = _database_name_from_uri(mongodb_server)
+    db_name = f"{base_db_name}_semantic_quality_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    if not db_name.startswith("test_"):
+        raise RuntimeError(f"Refusing semantic quality DB name '{db_name}'")
     db = client[db_name]
+    try:
+        await client.admin.command("ping")
+    except PyMongoError as e:
+        client.close()
+        pytest.skip(f"Remote MongoDB test cluster unavailable: {e}")
+
     await init_beanie(database=db, document_models=get_document_models())
-    yield db
-    await client.drop_database(db_name)
-    client.close()
+    try:
+        yield db
+    finally:
+        await client.drop_database(db_name)
+        client.close()
 
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")

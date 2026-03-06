@@ -6,6 +6,7 @@ Run this before and after optimizations to measure improvements.
 
 import asyncio
 import json
+import os
 import random
 import statistics
 import time
@@ -50,6 +51,13 @@ TEST_QUERIES = {
 }
 
 console = Console()
+BASE_URL = os.getenv("BENCH_BASE_URL", "http://localhost:8000/api/v1/search")
+DEFAULT_HEALTH_URL = (
+    f"{BASE_URL.rsplit('/api/v1/search', 1)[0]}/health"
+    if "/api/v1/search" in BASE_URL
+    else "http://localhost:8000/health"
+)
+HEALTH_URL = os.getenv("BENCH_HEALTH_URL", DEFAULT_HEALTH_URL)
 
 
 async def measure_request_time(client: httpx.AsyncClient, url: str, params: dict) -> float:
@@ -67,7 +75,6 @@ async def measure_request_time(client: httpx.AsyncClient, url: str, params: dict
 
 async def benchmark_search_type(search_type: str, iterations: int = 50) -> dict:
     """Benchmark a specific search type."""
-    base_url = "http://localhost:8000/api/v1/search"
     results = []
 
     console.print(f"\n[cyan]Benchmarking {search_type} search...[/cyan]")
@@ -97,7 +104,7 @@ async def benchmark_search_type(search_type: str, iterations: int = 50) -> dict:
                 params["mode"] = "smart"  # Smart mode is the new combined mode
 
             # Measure request time
-            time_ms = await measure_request_time(client, f"{base_url}/{query}", params)
+            time_ms = await measure_request_time(client, f"{BASE_URL}/{query}", params)
             if time_ms > 0:
                 results.append({"query": query, "query_type": query_type, "time_ms": time_ms})
 
@@ -138,7 +145,6 @@ async def benchmark_search_type(search_type: str, iterations: int = 50) -> dict:
 
 async def benchmark_cache_performance(iterations: int = 20) -> dict:
     """Benchmark cache performance by making repeated requests."""
-    base_url = "http://localhost:8000/api/v1/search"
     cache_queries = ["test", "word", "example"]  # Use same queries to ensure cache hits
 
     console.print("\n[cyan]Benchmarking cache performance...[/cyan]")
@@ -154,14 +160,14 @@ async def benchmark_cache_performance(iterations: int = 20) -> dict:
         # Warm up cache
         console.print("  Warming up cache...")
         for query in cache_queries:
-            await client.get(f"{base_url}/{query}", params={"max_results": 20})
+            await client.get(f"{BASE_URL}/{query}", params={"max_results": 20})
 
         # Measure cached responses
         results = []
         for i in range(iterations):
             query = random.choice(cache_queries)
             time_ms = await measure_request_time(
-                client, f"{base_url}/{query}", params={"max_results": 20}
+                client, f"{BASE_URL}/{query}", params={"max_results": 20}
             )
             if time_ms > 0:
                 results.append(time_ms)
@@ -184,7 +190,6 @@ async def benchmark_concurrent_load(
     concurrent_requests: int = 20, duration_seconds: int = 10
 ) -> dict:
     """Benchmark system under concurrent load."""
-    base_url = "http://localhost:8000/api/v1/search"
 
     console.print(
         f"\n[cyan]Benchmarking concurrent load ({concurrent_requests} concurrent requests)...[/cyan]"
@@ -209,7 +214,7 @@ async def benchmark_concurrent_load(
                 query = random.choice(random.choice(list(TEST_QUERIES.values())))
                 try:
                     time_ms = await measure_request_time(
-                        client, f"{base_url}/{query}", params={"max_results": 10}
+                        client, f"{BASE_URL}/{query}", params={"max_results": 10}
                     )
                     if time_ms > 0:
                         results.append(time_ms)
@@ -349,12 +354,12 @@ async def main():
     # Check if server is running
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get("http://localhost:8000/health")
+            response = await client.get(HEALTH_URL)
             if response.status_code != 200:
                 console.print("[red]Error: Server is not responding correctly[/red]")
                 return
     except Exception:
-        console.print("[red]Error: Cannot connect to server at http://localhost:8000[/red]")
+        console.print(f"[red]Error: Cannot connect to server at {HEALTH_URL}[/red]")
         console.print("[red]Make sure the backend server is running[/red]")
         return
 
