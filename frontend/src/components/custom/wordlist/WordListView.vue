@@ -134,6 +134,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { useStores } from '@/stores';
 import { Button } from '@/components/ui/button';
 import type { WordListItem, WordList } from '@/types';
@@ -154,6 +155,7 @@ import EmptyState from '@/components/custom/definition/components/EmptyState.vue
 const { searchBar } = useStores();
 const wordlistMode = useWordlistMode();
 const searchBarStore = useSearchBarStore();
+const router = useRouter();
 
 // Create orchestrator for API operations
 const orchestrator = useSearchOrchestrator({
@@ -277,17 +279,10 @@ const dueForReview = computed(() => {
 // Methods
 // ---------------------------------------------------------------------------
 
-const handleWordClick = async (word: WordListItem) => {
-    // Switch to lookup mode and navigate to definition route
+const handleWordClick = (word: WordListItem) => {
+    // Switch to lookup mode and navigate — route watcher handles the fetch
     searchBarStore.setMode('lookup');
-
-    // Perform the word lookup after navigation
-    searchBar.isDirectLookup = true;
-    try {
-        await orchestrator.getDefinition(word.word);
-    } finally {
-        searchBar.isDirectLookup = false;
-    }
+    router.push({ name: 'Definition', params: { word: word.word } });
 };
 
 const handleReview = async (word: WordListItem, quality: number) => {

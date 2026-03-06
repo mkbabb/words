@@ -209,9 +209,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { useStores } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';
-import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 import { formatDate, cn } from '@/utils';
 import { History } from 'lucide-vue-next';
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui';
@@ -224,29 +224,19 @@ defineProps<Props>();
 
 const { history } = useStores();
 const searchBarStore = useSearchBarStore();
+const router = useRouter();
 const recentLookups = computed(() => history.recentLookups);
-
-// Create orchestrator for API operations
-const orchestrator = useSearchOrchestrator({
-    query: computed(() => searchBarStore.searchQuery),
-});
 
 const limitedLookups = computed(() => {
     return recentLookups.value.slice(0, 20); // Limit to prevent performance issues
 });
 
-const lookupWord = async (word: string) => {
+const lookupWord = (word: string) => {
     searchBarStore.setQuery(word);
-    searchBarStore.setDirectLookup(true);
-    try {
-        if (searchBarStore.getSubMode('lookup') === 'thesaurus') {
-            await orchestrator.getThesaurusData(word);
-        } else {
-            await orchestrator.getDefinition(word);
-        }
-    } finally {
-        searchBarStore.setDirectLookup(false);
-    }
+    // Navigate — the route watcher in Home.vue handles the fetch
+    const subMode = searchBarStore.getSubMode('lookup');
+    const routeName = subMode === 'thesaurus' ? 'Thesaurus' : 'Definition';
+    router.push({ name: routeName, params: { word } });
 };
 </script>
 

@@ -135,18 +135,12 @@ const getFirstDefinition = (entry: SynthesizedDictionaryEntry): string => {
 
 const handleLookupClick = async (lookup: SynthesizedDictionaryEntry) => {
     searchBar.setQuery(lookup.word);
-    
-    // Navigate to appropriate route based on mode
+
+    // Navigate to appropriate route based on mode — route watcher handles the fetch
     const subMode = searchBar.getSubMode('lookup');
     const routeName = subMode === 'thesaurus' ? 'Thesaurus' : 'Definition';
     router.push({ name: routeName, params: { word: lookup.word } });
-    
-    searchBar.setDirectLookup(true);
-    try {
-        await orchestrator.getDefinition(lookup.word);
-    } finally {
-        searchBar.setDirectLookup(false);
-    }
+
     // Close mobile sidebar if open
     if (ui.sidebarOpen) {
         ui.toggleSidebar();
@@ -155,20 +149,14 @@ const handleLookupClick = async (lookup: SynthesizedDictionaryEntry) => {
 
 const handleSuggestionClick = async (suggestion: { word: string }) => {
     searchBar.setQuery(suggestion.word);
-    
+
     // Use modern mode system - just change the modes
     searchBar.setMode('lookup');
     searchBar.setSubMode('lookup', 'dictionary');
-    
-    // Navigate to Definition route
+
+    // Navigate to Definition route — route watcher handles the fetch
     router.push({ name: 'Definition', params: { word: suggestion.word } });
-    
-    searchBar.setDirectLookup(true);
-    try {
-        await orchestrator.getDefinition(suggestion.word);
-    } finally {
-        searchBar.setDirectLookup(false);
-    }
+
     // Close mobile sidebar if open
     if (ui.sidebarOpen) {
         ui.toggleSidebar();
@@ -177,19 +165,11 @@ const handleSuggestionClick = async (suggestion: { word: string }) => {
 
 
 const handleSearchClick = async (search: { query: string }) => {
-    // Navigate to appropriate route based on mode
+    // Navigate to appropriate route based on mode — route watcher handles the fetch
     const subMode = searchBar.getSubMode('lookup');
     const routeName = subMode === 'thesaurus' ? 'Thesaurus' : 'Definition';
     router.push({ name: routeName, params: { word: search.query } });
-    
-    // Use the direct search action which handles dropdown hiding
-    searchBar.setDirectLookup(true);
-    try {
-        await orchestrator.getDefinition(search.query);
-    } finally {
-        searchBar.setDirectLookup(false);
-    }
-    
+
     // Close mobile sidebar if open
     if (ui.sidebarOpen) {
         ui.toggleSidebar();

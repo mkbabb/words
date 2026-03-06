@@ -186,10 +186,11 @@ watch(() => route.fullPath, async () => {
         searchBar.setSubMode('lookup', 'dictionary');
         searchBar.setQuery(word);
 
-        // Skip if selectResult (navigation) is already handling this lookup —
-        // two competing SSE streams cause the definition to flash then vanish.
-        if (!searchBar.isDirectLookup && (!content.currentEntry || content.currentEntry.word !== word)) {
-            searchBar.setDirectLookup(true);
+        // Always fetch when the word changes — skip only if we already have this exact word.
+        // This is the single source of truth for definition fetches on route changes.
+        if (!content.currentEntry || content.currentEntry.word !== word) {
+            // Clear stale content immediately so the old definition never lingers
+            content.clearCurrentEntry();
             try {
                 const definition = await orchestrator.getDefinition(word, {
                     onProgress: (stage, progress) => {
@@ -200,8 +201,19 @@ watch(() => route.fullPath, async () => {
                 if (definition) {
                     content.setCurrentEntry(definition);
                 }
-            } finally {
-                searchBar.setDirectLookup(false);
+            } catch (error: any) {
+                const message = error?.message || '';
+                // Silently ignore aborts (e.g. user navigated away before completion)
+                if (message.includes('aborted') || error?.name === 'AbortError') {
+                    return;
+                }
+                content.setError({
+                    hasError: true,
+                    errorType: 'unknown',
+                    errorMessage: message || 'Failed to look up word',
+                    canRetry: true,
+                    originalWord: word,
+                });
             }
         }
     } else if (routeName === 'Thesaurus' && route.params.word) {
@@ -210,18 +222,27 @@ watch(() => route.fullPath, async () => {
         searchBar.setSubMode('lookup', 'thesaurus');
         searchBar.setQuery(word);
 
-        // Check for existing thesaurus data for this word
+        // Always fetch when the word changes
         const hasThesaurus = content.currentThesaurus &&
             content.currentThesaurus.word === word;
-        if (!searchBar.isDirectLookup && !hasThesaurus) {
-            searchBar.setDirectLookup(true);
+        if (!hasThesaurus) {
             try {
                 const data = await orchestrator.getThesaurusData(word);
                 if (data) {
                     content.setCurrentThesaurus(data);
                 }
-            } finally {
-                searchBar.setDirectLookup(false);
+            } catch (error: any) {
+                const message = error?.message || '';
+                if (message.includes('aborted') || error?.name === 'AbortError') {
+                    return;
+                }
+                content.setError({
+                    hasError: true,
+                    errorType: 'unknown',
+                    errorMessage: message || 'Failed to load thesaurus data',
+                    canRetry: true,
+                    originalWord: word,
+                });
             }
         }
     } else if (routeName === 'Search' && route.params.query) {

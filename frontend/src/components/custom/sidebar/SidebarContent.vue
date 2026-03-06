@@ -200,17 +200,10 @@ const currentView = computed(() => {
 
 const handleCollapsedWordClick = async (word: string) => {
     searchBar.setQuery(word);
-    
-    // Navigate to appropriate route based on current mode
+
+    // Navigate to appropriate route based on current mode — route watcher handles the fetch
     const routeName = searchBarStore.getSubMode('lookup') === 'thesaurus' ? 'Thesaurus' : 'Definition';
     router.push({ name: routeName, params: { word } });
-    
-    searchBar.isDirectLookup = true;
-    try {
-        await orchestrator.getDefinition(word);
-    } finally {
-        searchBar.isDirectLookup = false;
-    }
 };
 
 const handleCollapsedAIClick = async (query: string) => {

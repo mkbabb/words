@@ -5,31 +5,11 @@ import { useSearchBarStore } from '@/stores/search/search-bar';
 import { useLookupMode } from '@/stores/search/modes/lookup';
 import { useContentStore } from '@/stores/content/content';
 import { useHistoryStore } from '@/stores/content/history';
-import { useLoadingState } from '@/stores/ui/loading';
 import { useSearchOrchestrator } from './useSearchOrchestrator';
 import { showError } from '@/plugins/toast';
 import { extractWordCount } from '../utils/ai-query';
 import { logger } from '@/utils/logger';
 import type { SearchResult } from '@/types';
-
-/**
- * Classify a lookup error into a category for error state
- */
-function classifyLookupError(error: any): 'network' | 'not-found' | 'server' | 'unknown' {
-    const message = (error?.message || '').toLowerCase();
-    const status = error?.response?.status || error?.status;
-
-    if (status === 404 || message.includes('not found')) return 'not-found';
-    if (status >= 500) return 'server';
-    if (
-        message.includes('network') ||
-        message.includes('fetch') ||
-        message.includes('timeout') ||
-        message.includes('aborted') ||
-        error?.code === 'ERR_NETWORK'
-    ) return 'network';
-    return 'unknown';
-}
 
 interface UseSearchBarNavigationOptions {
     searchInputRef: any;
@@ -47,7 +27,6 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
     const searchBar = useSearchBarStore();
     const lookupMode = useLookupMode();
     const contentStore = useContentStore();
-    const loading = useLoadingState();
     const router = useRouter();
     const orchestrator = useSearchOrchestrator({
         query: computed(() => searchBar.searchQuery),
@@ -166,43 +145,10 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
                 const lookupSubMode = searchBar.getSubMode('lookup');
                 const routeName =
                     lookupSubMode === 'thesaurus' ? 'Thesaurus' : 'Definition';
-                searchBar.setDirectLookup(true);
                 await closeSearchPanelsBeforeNavigation();
+                // Navigate only — the route watcher in Home.vue handles the fetch.
+                // This avoids race conditions with isDirectLookup flag coordination.
                 router.push({ name: routeName, params: { word: result.word } });
-                try {
-                    if (lookupSubMode === 'thesaurus') {
-                        // Fetch thesaurus data
-                        const thesaurusData =
-                            await orchestrator.getThesaurusData(result.word);
-                        contentStore.setCurrentThesaurus(thesaurusData);
-                    } else {
-                        // Fetch definition data via SSE stream for progress updates
-                        const definition = await orchestrator.getDefinition(
-                            result.word,
-                            {
-                                onProgress: (stage, progress) => {
-                                    loading.setLoadingStage(stage);
-                                    loading.setLoadingProgress(progress);
-                                },
-                            }
-                        );
-                        contentStore.setCurrentEntry(definition);
-                    }
-                } catch (error: any) {
-                    const errorType = classifyLookupError(error);
-                    contentStore.setError({
-                        hasError: true,
-                        errorType,
-                        errorMessage: error.message || 'Failed to look up word',
-                        canRetry: errorType !== 'not-found',
-                        originalWord: result.word,
-                    });
-                    searchBar.triggerErrorAnimation();
-                    showError(error.message || 'Failed to look up word');
-                    logger.error('Lookup selectResult error:', error);
-                } finally {
-                    searchBar.setDirectLookup(false);
-                }
             },
 
             handleEnter: async () => {
@@ -263,41 +209,9 @@ export function useSearchBarNavigation(options: UseSearchBarNavigationOptions) {
                         lookupSubMode === 'thesaurus'
                             ? 'Thesaurus'
                             : 'Definition';
-                    searchBar.setDirectLookup(true);
                     await closeSearchPanelsBeforeNavigation();
+                    // Navigate only — the route watcher in Home.vue handles the fetch.
                     router.push({ name: routeName, params: { word: query } });
-                    try {
-                        if (lookupSubMode === 'thesaurus') {
-                            // Fetch thesaurus data
-                            const thesaurusData =
-                                await orchestrator.getThesaurusData(query);
-                            contentStore.setCurrentThesaurus(thesaurusData);
-                        } else {
-                            // Fetch definition data via SSE stream for progress updates
-                            const definition =
-                                await orchestrator.getDefinition(query, {
-                                    onProgress: (stage, progress) => {
-                                        loading.setLoadingStage(stage);
-                                        loading.setLoadingProgress(progress);
-                                    },
-                                });
-                            contentStore.setCurrentEntry(definition);
-                        }
-                    } catch (error: any) {
-                        const errorType = classifyLookupError(error);
-                        contentStore.setError({
-                            hasError: true,
-                            errorType,
-                            errorMessage: error.message || 'Failed to look up word',
-                            canRetry: errorType !== 'not-found',
-                            originalWord: query,
-                        });
-                        searchBar.triggerErrorAnimation();
-                        showError(error.message || 'Failed to look up word');
-                        logger.error('Lookup handleEnter error:', error);
-                    } finally {
-                        searchBar.setDirectLookup(false);
-                    }
                 }
             },
         },

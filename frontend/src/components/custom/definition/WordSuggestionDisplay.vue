@@ -129,6 +129,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useRouter } from 'vue-router';
 // import { useStores } from '@/stores'; // Unused
 import { ThemedCard } from '@/components/custom/card';
 import {
@@ -139,16 +140,10 @@ import {
 import { getCardVariant, formatPercent, formatExampleUsage } from './utils';
 import { useContentStore } from '@/stores';
 import { useSearchBarStore } from '@/stores/search/search-bar';
-import { useSearchOrchestrator } from '@/components/custom/search/composables/useSearchOrchestrator';
 
-// const { searchBar } = useStores(); // Unused
 const contentStore = useContentStore();
 const searchBarStore = useSearchBarStore();
-
-// Create orchestrator for API operations
-const orchestrator = useSearchOrchestrator({
-    query: computed(() => searchBarStore.searchQuery),
-});
+const router = useRouter();
 
 const wordSuggestions = computed(() => contentStore.wordSuggestions);
 
@@ -166,17 +161,11 @@ const originalQuery = computed(
     () => wordSuggestions.value?.original_query || ''
 );
 
-async function handleWordClick(word: string) {
-    // ✅ Use simple mode system - just change the mode
+function handleWordClick(word: string) {
+    // Navigate to definition — the route watcher in Home.vue handles the fetch
     searchBarStore.setMode('lookup');
     searchBarStore.setSubMode('lookup', 'dictionary');
-    // Use direct lookup (sets isDirectLookup flag)
-    searchBarStore.setDirectLookup(true);
-    try {
-        await orchestrator.getDefinition(word);
-    } finally {
-        searchBarStore.setDirectLookup(false);
-    }
+    router.push({ name: 'Definition', params: { word } });
 }
 </script>
 
