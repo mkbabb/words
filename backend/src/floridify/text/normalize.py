@@ -346,8 +346,9 @@ def _get_wordnet_pos(word: str) -> str:
             return "r"  # wordnet.ADV
         return "n"  # wordnet.NOUN - Default to noun
     except Exception:
-        # TODO[MEDIUM]: Decide if POS-tagging failures should be explicit instead of defaulting to noun.
-        return "n"  # Safe fallback
+        # Linguistic fallback: noun is the most common POS; defaulting here avoids
+        # blocking lemmatization when the tagger encounters unusual tokens
+        return "n"
 
 
 @functools.lru_cache(maxsize=300_000)  # Cache up to 300k lemmatizations
@@ -372,8 +373,9 @@ def lemmatize_comprehensive(word: str) -> str:
         return word  # Return original if invalid
 
     word_lower = word.lower().strip()
-    # TODO[MEDIUM]: Revisit default lemma fallback semantics to avoid masking lemmatization regressions.
-    lemma = word_lower  # Default fallback
+    # Linguistic fallback: preserving the lowercased input when lemmatization
+    # produces no improvement ensures the caller always receives a usable form
+    lemma = word_lower
 
     try:
         # Get POS context for better accuracy
@@ -387,8 +389,8 @@ def lemmatize_comprehensive(word: str) -> str:
             # Fallback to rule-based approach
             lemma = lemmatize_basic(word_lower)
     except Exception:
-        # TODO[MEDIUM]: Consider explicit lemmatization failure signaling instead of unconditional rule-based fallback.
-        # Fallback to rule-based approach
+        # Linguistic fallback: rule-based lemmatization is deterministic and always
+        # succeeds, making it a safe recovery when NLTK WordNet is unavailable
         lemma = lemmatize_basic(word_lower)
 
     return lemma

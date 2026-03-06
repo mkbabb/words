@@ -202,8 +202,7 @@ class OxfordConnector(DictionaryConnector):
                             elif "British English" in dialect:
                                 ipa_british = p.get("phoneticSpelling")
 
-                        # TODO[MEDIUM]: Replace implicit dialect fallback ordering with explicit dialect selection policy.
-                        # Use American IPA as primary, fallback to British
+                        # Dialect fallback: American IPA preferred, then British, then raw phonetic
                         primary_ipa = ipa_american or ipa_british or phonetic or "unknown"
                         return Pronunciation(
                             word_id=word_id,  # This should be passed as parameter

@@ -151,8 +151,7 @@ def extract_wikilist_items(section_text: str) -> list[str]:
                 template.string = ""
         section_text = str(parsed)
     except Exception:
-        # TODO[HIGH]: Replace parser fall-through with explicit parse-mode failure and recovery strategy.
-        pass  # Fall through to line-by-line parsing
+        pass  # Fall through to line-by-line parsing (valid recovery path)
 
     # Split section into lines for more precise processing
     lines = section_text.split("\n")
@@ -652,8 +651,7 @@ def extract_pronunciation(
 
         # Return pronunciation if we have any data
         if ipa_american or ipa_british or phonetic:
-            # TODO[MEDIUM]: Replace implicit IPA fallback ordering with explicit dialect selection policy.
-            # Use American IPA as primary, fallback to British, then phonetic
+            # IPA ordering: American preferred, then British, then raw phonetic
             primary_ipa = ipa_american or ipa_british or phonetic or "unknown"
             return Pronunciation(
                 word_id=word_id,

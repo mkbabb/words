@@ -42,5 +42,5 @@ def audio_to_mp3(audio_array: np.ndarray, sample_rate: int) -> bytes:
             try:
                 os.unlink(p)
             except OSError:
-                # TODO[MEDIUM]: Emit cleanup telemetry instead of silently swallowing temp-file deletion failures.
+                # By design: temp file cleanup is best-effort, OS will reclaim
                 pass

@@ -57,9 +57,15 @@ class GenerationMixin:
     async def pronunciation(self, word: str, language: str = "en") -> PronunciationResponse:
         """Generate pronunciation data."""
         language_names = {
-            "en": "English", "fr": "French", "es": "Spanish",
-            "de": "German", "it": "Italian", "pt": "Portuguese",
-            "ja": "Japanese", "zh": "Mandarin Chinese", "hi": "Hindi",
+            "en": "English",
+            "fr": "French",
+            "es": "Spanish",
+            "de": "German",
+            "it": "Italian",
+            "pt": "Portuguese",
+            "ja": "Japanese",
+            "zh": "Mandarin Chinese",
+            "hi": "Hindi",
         }
         prompt = self.prompt_manager.render(
             "synthesize/pronunciation",

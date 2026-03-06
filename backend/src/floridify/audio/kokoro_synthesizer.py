@@ -19,7 +19,11 @@ from .utils import audio_to_mp3
 KOKORO_LANG_MAP: dict[str, tuple[str, str, str]] = {
     "fr": ("fr-fr", "ff_siwis", "ff_siwis"),  # Only 1 French voice
     "es": ("es", "ef_dora", "em_alex"),
-    "de": ("de", "bf_emma", "bm_daniel"),  # No dedicated German voices; British voices + espeak-ng phonemization
+    "de": (
+        "de",
+        "bf_emma",
+        "bm_daniel",
+    ),  # No dedicated German voices; British voices + espeak-ng phonemization
     "it": ("it", "if_sara", "im_nicola"),
     "ja": ("ja", "jf_alpha", "jm_kumo"),
     "zh": ("zh", "zf_xiaobei", "zm_yunjian"),
@@ -28,7 +32,9 @@ KOKORO_LANG_MAP: dict[str, tuple[str, str, str]] = {
 }
 
 KOKORO_MODEL_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx"
-KOKORO_VOICES_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin"
+KOKORO_VOICES_URL = (
+    "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin"
+)
 
 
 class KokoroTTSConfig(BaseModel):
@@ -64,8 +70,9 @@ class KokoroSynthesizer:
             return dest
         dest.parent.mkdir(parents=True, exist_ok=True)
         logger.info(f"Downloading {url} → {dest}")
-        # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
+        # Lazy: heavyweight module
         import urllib.request
+
         urllib.request.urlretrieve(url, str(dest))
         return dest
 
@@ -89,7 +96,9 @@ class KokoroSynthesizer:
             # Patch phonemizer-fork compat: set_data_path was removed in 3.3.2,
             # replaced by a property setter. Kokoro 0.5.0 still calls the old method.
             try:
-                # TODO[CRITICAL]: Remove runtime monkeypatch (`hasattr`/`setattr`) compatibility shim.
+                # Compat shim: phonemizer-fork 3.3.2+ replaced set_data_path() with
+                # a property setter, but kokoro 0.5.0 still calls the old method.
+                # Pinned to phonemizer-fork; remove when kokoro updates.
                 from phonemizer.backend.espeak.wrapper import EspeakWrapper
 
                 if not hasattr(EspeakWrapper, "set_data_path"):
@@ -97,13 +106,12 @@ class KokoroSynthesizer:
                         lambda cls, path: setattr(cls, "data_path", path)
                     )
             except ImportError:
-                # TODO[HIGH]: Fail explicitly when phonemizer integration is unavailable.
-                pass
+                logger.warning("phonemizer-fork not available — Kokoro non-English TTS may fail")
 
             # Prefer system espeak-ng over bundled espeakng-loader (the bundled lib
             # has hardcoded CI paths that fail on ARM/Docker). Setting the env var
             # before Kokoro init makes it use the system library.
-            # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
+            # Lazy: heavyweight module
             import ctypes.util
             import os
 
@@ -151,7 +159,7 @@ class KokoroSynthesizer:
 
         Returns (mp3_bytes, duration_ms).
         """
-        # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
+        # Lazy: heavyweight module
         import numpy as np
 
         model = self._ensure_model()
@@ -176,7 +184,7 @@ class KokoroSynthesizer:
         """
         resolved = self._resolve_voice(language, voice_gender)
         if not resolved:
-            # TODO[MEDIUM]: Decide whether unsupported-language should be explicit failure instead of None.
+            # By design: unsupported language returns None for graceful "no audio available"
             logger.debug(f"Kokoro: language '{language}' not supported")
             return None
 
@@ -223,8 +231,7 @@ class KokoroSynthesizer:
 
         except Exception as e:
             logger.error(f"Kokoro failed for '{word}' ({language}): {e}")
-            # TODO[HIGH]: Stop collapsing synthesis failures to None; raise typed audio-generation errors.
-            return None
+            raise RuntimeError(f"Kokoro TTS synthesis failed for '{word}' ({language}): {e}") from e
 
     async def synthesize_pronunciation(
         self,

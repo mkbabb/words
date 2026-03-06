@@ -76,7 +76,9 @@ async def recompute_semantic_effective_upward(
                     if child:
                         child_states.append(child.semantic_enabled_effective)
 
-        effective = compute_effective_semantic_state(current.semantic_enabled_explicit, child_states)
+        effective = compute_effective_semantic_state(
+            current.semantic_enabled_explicit, child_states
+        )
         await _persist_effective_state(
             corpus=current,
             effective=effective,

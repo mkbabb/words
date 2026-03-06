@@ -87,9 +87,8 @@ class LanguageCorpus(Corpus):
                 if child_corpus_id not in merged_corpus_ids:
                     merged_corpus_ids.append(child_corpus_id)
 
-                if (
-                    merged_languages != list(existing_word.languages)
-                    or merged_corpus_ids != list(existing_word.corpus_ids)
+                if merged_languages != list(existing_word.languages) or merged_corpus_ids != list(
+                    existing_word.corpus_ids
                 ):
                     existing_word.languages = merged_languages
                     existing_word.corpus_ids = merged_corpus_ids

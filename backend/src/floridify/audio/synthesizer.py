@@ -79,7 +79,7 @@ class AudioSynthesizer:
             return await backend.synthesize_word(word, language=language, voice_gender=voice_gender)  # type: ignore[union-attr]
 
         logger.debug(f"No TTS backend for language '{language}'")
-        # TODO[MEDIUM]: Replace unsupported-language `None` fallback with explicit audio-capability error.
+        # By design: unsupported language returns None for graceful "no audio available"
         return None
 
     async def synthesize_pronunciation(
@@ -95,9 +95,11 @@ class AudioSynthesizer:
 
         if KokoroSynthesizer.supports_language(language):
             backend = self._get_kokoro()
-            return await backend.synthesize_pronunciation(pronunciation, word_text, language=language)  # type: ignore[union-attr]
+            return await backend.synthesize_pronunciation(
+                pronunciation, word_text, language=language
+            )  # type: ignore[union-attr]
 
-        # TODO[MEDIUM]: Replace unsupported-language empty-list fallback with explicit audio-capability error.
+        # By design: unsupported language returns empty list for graceful degradation
         return []
 
 

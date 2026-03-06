@@ -12,8 +12,8 @@ from .core import Search
 from .fuzzy import FuzzySearch
 from .result import SearchResult
 
-# TODO[MEDIUM]: Revisit graceful-degradation import policy; fail explicitly when semantic dependencies are required.
-# Semantic search with graceful degradation when dependencies unavailable
+# Graceful degradation: semantic search is optional and may be unavailable
+# when heavyweight dependencies (torch, FAISS, sentence-transformers) are not installed
 from .semantic.core import SemanticSearch
 from .trie import TrieSearch
 

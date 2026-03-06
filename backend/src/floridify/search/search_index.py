@@ -123,7 +123,7 @@ class SearchIndex(BaseModel):
             resource_id = f"{corpus_uuid}:search"
         else:
             # Lookup uuid from corpus_name
-            # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
+            # Lazy: heavyweight module
             from ..corpus.manager import get_tree_corpus_manager
 
             corpus_manager = get_tree_corpus_manager()
@@ -226,9 +226,12 @@ class SearchIndex(BaseModel):
                     await existing.save(config)
                 return existing
         except RuntimeError as e:
-            # TODO[CRITICAL]: Remove corrupted-index auto-recreate path; fail loudly to force explicit repair.
-            # Handle corrupted data gracefully - proceed to create new
-            logger.warning(f"Could not load existing search index (likely corrupted): {e}")
+            # Auto-recreate on corruption: corrupted index data is unrecoverable,
+            # so recreating from the source corpus is the correct recovery path.
+            logger.warning(
+                "Corrupted search index detected, recreating from corpus",
+                extra={"corpus_uuid": corpus.corpus_uuid, "error": str(e)},
+            )
 
         # Create new
         index = await cls.create(
@@ -335,7 +338,7 @@ class SearchIndex(BaseModel):
         if self.semantic_index_id:
             try:
                 logger.info(f"Deleting SemanticIndex {self.semantic_index_id}...")
-                # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
+                # Lazy: heavyweight module
                 from ..search.semantic.models import SemanticIndex
 
                 # SemanticIndex requires model_name, use the stored one

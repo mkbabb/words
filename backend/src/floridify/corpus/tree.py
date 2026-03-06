@@ -205,14 +205,12 @@ async def update_parent(
     old_parent_uuid = child.parent_uuid
 
     # Reparenting: remove child reference from old parent when moving across branches.
-    if (
-        old_parent_uuid
-        and old_parent_uuid != parent.corpus_uuid
-        and child.corpus_uuid is not None
-    ):
+    if old_parent_uuid and old_parent_uuid != parent.corpus_uuid and child.corpus_uuid is not None:
         old_parent = await get_corpus_fn(corpus_uuid=old_parent_uuid, config=config)
         if old_parent and old_parent.corpus_id and child.corpus_uuid in old_parent.child_uuids:
-            updated_old_children = [cid for cid in old_parent.child_uuids if cid != child.corpus_uuid]
+            updated_old_children = [
+                cid for cid in old_parent.child_uuids if cid != child.corpus_uuid
+            ]
             await save_corpus_fn(
                 corpus_id=old_parent.corpus_id,
                 corpus_name=old_parent.corpus_name,

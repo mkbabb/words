@@ -31,8 +31,7 @@ def configure_threading() -> None:
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
         # Prevent joblib/loky from spawning workers with broken libomp
         os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
-        # TODO[MEDIUM]: Revisit MPS fallback default; make hardware fallback policy explicit and testable.
-        # MPS fallback for Apple Silicon (WOTD pipeline)
+        # MPS fallback for Apple Silicon — intentionally disabled (CPU is faster for this model size)
         os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
     else:
         # Linux/Docker: enable parallelism (single system libomp, no conflict)

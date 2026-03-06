@@ -37,7 +37,9 @@ async def scrape_french_expressions(
 
     logger.info(f"Scraping French expressions from: {target_url}")
 
-    headers = {"User-Agent": "Floridify/1.0 (dictionary app; https://mbabb.friday.institute/words/)"}
+    headers = {
+        "User-Agent": "Floridify/1.0 (dictionary app; https://mbabb.friday.institute/words/)"
+    }
 
     if session:
         response = await session.get(target_url, headers=headers)

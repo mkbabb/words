@@ -141,11 +141,15 @@ async def _create_pronunciation(
         return None
 
 
-async def _generate_audio_files(pronunciation: Pronunciation, word: str, language: str = "en") -> None:
+async def _generate_audio_files(
+    pronunciation: Pronunciation, word: str, language: str = "en"
+) -> None:
     """Generate audio files for pronunciation and store as AudioMedia documents."""
     try:
         audio_synthesizer = get_audio_synthesizer()
-        audio_results = await audio_synthesizer.synthesize_pronunciation(pronunciation, word, language=language)
+        audio_results = await audio_synthesizer.synthesize_pronunciation(
+            pronunciation, word, language=language
+        )
 
         if audio_results:
             audio_ids = []

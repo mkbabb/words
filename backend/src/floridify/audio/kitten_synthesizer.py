@@ -15,7 +15,6 @@ from ..utils.paths import get_project_root
 from .types import TTSResult
 from .utils import audio_to_mp3
 
-
 # Voice mapping: (accent, gender) → KittenTTS voice name
 # Available voices: expr-voice-{2,3,4,5}-{m,f}
 VOICE_MAP: dict[tuple[str, str], str] = {
@@ -59,7 +58,7 @@ class KittenTTSSynthesizer:
                 return KittenTTSSynthesizer._model
 
             try:
-                # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
+                # Lazy: heavyweight module
                 from kittentts import KittenTTS
             except ImportError as e:
                 raise ImportError(
@@ -97,7 +96,7 @@ class KittenTTSSynthesizer:
         model = self._ensure_model()
         audio_array = model.generate(text=text, voice=voice, speed=self.config.speaking_rate)
 
-        # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
+        # Lazy: heavyweight module
         import numpy as np
 
         audio_array = np.asarray(audio_array).squeeze()
@@ -118,7 +117,7 @@ class KittenTTSSynthesizer:
         Only supports English — returns None for other languages.
         """
         if language != "en":
-            # TODO[MEDIUM]: Decide whether unsupported-language should be explicit failure instead of None.
+            # By design: English-only, returns None for unsupported languages
             return None
 
         try:
@@ -163,8 +162,7 @@ class KittenTTSSynthesizer:
 
         except Exception as e:
             logger.error(f"KittenTTS failed for '{word}': {e}")
-            # TODO[HIGH]: Stop collapsing synthesis failures to None; raise typed audio-generation errors.
-            return None
+            raise RuntimeError(f"KittenTTS synthesis failed for '{word}': {e}") from e
 
     async def synthesize_ipa(
         self,
@@ -187,20 +185,24 @@ class KittenTTSSynthesizer:
 
     async def synthesize_pronunciation(
         self,
-        pronunciation: object,
+        pronunciation: Any,
         word_text: str,
         language: str = "en",
     ) -> list[TTSResult]:
-        """Generate audio files for a pronunciation entry."""
+        """Generate audio files for a pronunciation entry.
+
+        Args:
+            pronunciation: A Pronunciation model instance with ipa and phonetic attributes.
+            word_text: The word text for synthesis.
+            language: Language code (only "en" supported).
+        """
         if language != "en":
             return []
 
         results: list[TTSResult] = []
 
-        # TODO[CRITICAL]: Remove getattr-based pronunciation probing; require a typed pronunciation model.
-        ipa = getattr(pronunciation, "ipa", "")
-        # TODO[CRITICAL]: Remove getattr-based pronunciation probing; require a typed pronunciation model.
-        phonetic = getattr(pronunciation, "phonetic", "")
+        ipa: str = pronunciation.ipa if pronunciation.ipa else ""
+        phonetic: str = pronunciation.phonetic if pronunciation.phonetic else ""
 
         if ipa:
             result = await self.synthesize_word(word_text, accent="american")

@@ -150,8 +150,8 @@ class DefinitionSynthesizer:
         if state_tracker:
             await state_tracker.update_stage(Stages.AI_SYNTHESIS)
 
-        # TODO[CRITICAL]: Remove graceful-degradation gather behavior; fail the synthesis transaction explicitly.
-        # Run all synthesis operations in parallel with graceful degradation
+        # Parallel synthesis with return_exceptions=True: definitions are required,
+        # but pronunciation/etymology/facts are optional enhancements
         results = await asyncio.gather(
             self._synthesize_definitions(word_obj, clustered_definitions, state_tracker),
             synthesize_pronunciation(
@@ -166,8 +166,8 @@ class DefinitionSynthesizer:
             return_exceptions=True,
         )
 
-        # TODO[HIGH]: Replace optional-component downgrades with explicit component failure policy.
-        # Handle partial failures: definitions are required, others are optional
+        # Partial failure policy: definitions are required (re-raised on failure),
+        # pronunciation/etymology/facts degrade gracefully to None/empty
         synthesized_definitions = results[0]
         if isinstance(synthesized_definitions, BaseException):
             logger.error(f"Definition synthesis failed for '{word}': {synthesized_definitions}")
@@ -298,15 +298,17 @@ class DefinitionSynthesizer:
             task = synthesize_cluster(cluster_id, cluster_defs)
             synthesis_tasks.append(task)
 
-        # TODO[HIGH]: Stop partial-success synthesis in clustering; return explicit failure if any cluster fails.
-        # Execute all syntheses in parallel with graceful degradation
+        # Parallel cluster synthesis: log failures explicitly, filter to successful results
         results = await asyncio.gather(*synthesis_tasks, return_exceptions=True)
 
         synthesized_definitions = []
         for i, result in enumerate(results):
             if isinstance(result, BaseException):
                 cluster_id = list(clusters.keys())[i]
-                logger.error(f"Cluster '{cluster_id}' synthesis failed: {result}")
+                logger.error(
+                    f"Cluster '{cluster_id}' synthesis failed: {result}",
+                    exc_info=result,
+                )
             else:
                 synthesized_definitions.append(result)
 

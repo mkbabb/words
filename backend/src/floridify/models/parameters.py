@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field, field_validator
 from .base import Language
 from .dictionary import DictionaryProvider
 
+
 class LookupParams(BaseModel):
     """Shared parameters for word lookup operations.
 
