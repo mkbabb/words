@@ -83,8 +83,8 @@ RUN groupadd -g 1000 appuser && \
 # Copy virtual environment and application
 COPY --from=builder --chown=appuser:appuser /app /app
 
-# Create logs and cache directories writable by appuser
-RUN mkdir -p /app/logs /app/cache && chown appuser:appuser /app/logs /app/cache
+# Create writable directories for appuser (logs, cache, data for TTS models)
+RUN mkdir -p /app/logs /app/cache /app/data && chown -R appuser:appuser /app/logs /app/cache /app/data
 
 # Set PATH
 ENV PATH="/app/.venv/bin:$PATH"
