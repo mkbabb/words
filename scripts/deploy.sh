@@ -142,7 +142,7 @@ verify_deployment() {
 
     # Check if the application responds
     print_info "Testing application endpoint..."
-    response=$(curl -s -o /dev/null -w "%{http_code}" -L https://$DOMAIN/words/api/v1/health || echo "000")
+    response=$(curl -s -o /dev/null -w "%{http_code}" -L https://$DOMAIN/words/health || echo "000")
 
     if [ "$response" = "200" ]; then
         print_status "Application is healthy at https://$DOMAIN/words/"
