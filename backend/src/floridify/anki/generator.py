@@ -532,6 +532,7 @@ class AnkiCardGenerator:
         fallback_to_apkg: bool = True,
         output_path: Path | None = None,
     ) -> tuple[bool, Path | None]:
+        # TODO[HIGH]: Remove direct-export fallback ladder and enforce one explicit export mode per invocation.
         """Export cards directly to Anki via AnkiConnect, with .apkg fallback.
 
         Args:

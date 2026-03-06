@@ -34,7 +34,7 @@ def _send_chunked_completion(result_data: dict[str, Any]) -> Generator[str]:
         "chunk_type": "basic_info",
         "data": {
             "word": result_data.get("word"),
-            "language": result_data.get("language", "en"),
+            "languages": result_data.get("languages", []),
             "id": result_data.get("id"),
             "last_updated": result_data.get("last_updated"),
             "model_info": result_data.get("model_info"),
@@ -183,6 +183,7 @@ async def create_streaming_response(
                         try:
                             await process_task
                         except asyncio.CancelledError:
+                            # TODO[MEDIUM]: Emit explicit timeout-cancellation outcome instead of silent swallow.
                             pass
                         error_event = SSEEvent(
                             event_type="error",
@@ -257,6 +258,7 @@ async def create_streaming_response(
                 try:
                     await process_task
                 except asyncio.CancelledError:
+                    # TODO[MEDIUM]: Emit explicit disconnect-cancellation outcome instead of silent swallow.
                     pass
         except Exception as e:
             logger.error(f"Streaming generator error: {e}")
@@ -272,6 +274,7 @@ async def create_streaming_response(
                 try:
                     await process_task
                 except (asyncio.CancelledError, Exception):
+                    # TODO[MEDIUM]: Differentiate cancellation vs task failure; avoid blanket swallow in cleanup.
                     pass
 
     return StreamingResponse(

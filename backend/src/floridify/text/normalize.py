@@ -346,6 +346,7 @@ def _get_wordnet_pos(word: str) -> str:
             return "r"  # wordnet.ADV
         return "n"  # wordnet.NOUN - Default to noun
     except Exception:
+        # TODO[MEDIUM]: Decide if POS-tagging failures should be explicit instead of defaulting to noun.
         return "n"  # Safe fallback
 
 
@@ -371,6 +372,7 @@ def lemmatize_comprehensive(word: str) -> str:
         return word  # Return original if invalid
 
     word_lower = word.lower().strip()
+    # TODO[MEDIUM]: Revisit default lemma fallback semantics to avoid masking lemmatization regressions.
     lemma = word_lower  # Default fallback
 
     try:
@@ -385,6 +387,7 @@ def lemmatize_comprehensive(word: str) -> str:
             # Fallback to rule-based approach
             lemma = lemmatize_basic(word_lower)
     except Exception:
+        # TODO[MEDIUM]: Consider explicit lemmatization failure signaling instead of unconditional rule-based fallback.
         # Fallback to rule-based approach
         lemma = lemmatize_basic(word_lower)
 

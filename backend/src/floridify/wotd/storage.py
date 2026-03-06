@@ -160,6 +160,7 @@ class WOTDStorage:
         cached = self._embeddings.get(cache_key)
         if cached is not None:
             return cached
+        # TODO[MEDIUM]: Revisit L1->L2 fallback contract and make cache-tier miss semantics explicit.
         # L2 fallback
         cache = await get_global_cache()
         l2_cached = await cache.get(namespace=_NS, key=f"wotd:embeddings:{cache_key}")

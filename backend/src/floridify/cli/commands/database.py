@@ -94,7 +94,7 @@ def connect_database(host: str, port: int, database: str) -> None:
 @click.option("--detailed", is_flag=True, help="Show detailed statistics")
 @click.option(
     "--connection-string",
-    default="mongodb://localhost:27017",
+    default="mongodb://mbabb.friday.institute:27017/floridify?tls=true",
     help="MongoDB connection string",
 )
 @click.option("--database", default="floridify", help="Database name")
