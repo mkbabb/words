@@ -15,14 +15,13 @@
         <div class="relative min-h-screen p-0 lg:p-4">
             <!-- Sticky Search Bar with scroll responsiveness -->
             <div :class="searchBarClasses">
-                <div class="mx-auto w-full sm:max-w-4xl">
-                    <SearchBar
-                        :scroll-y="y"
-                        :scroll-threshold="scrollThreshold"
-                        :shrink-percentage="shrinkPercentage"
-                        :scroll-progress="scrollProgress"
-                    />
-                </div>
+                <SearchBar
+                    class-name="mx-auto w-full sm:max-w-4xl"
+                    :scroll-y="y"
+                    :scroll-threshold="scrollThreshold"
+                    :shrink-percentage="shrinkPercentage"
+                    :scroll-progress="scrollProgress"
+                />
             </div>
 
             <!-- Border separator (not sticky) -->
@@ -65,9 +64,13 @@
                             <DefinitionDisplay />
                         </div>
 
-                        <!-- Empty State -->
-                        <div v-else class="py-16 text-center">
-                            <!-- Empty state - no text -->
+                        <!-- Empty State / Help Screen -->
+                        <div v-else class="py-8">
+                            <EmptyState
+                                title="Look up anything you're curious about"
+                                message="Type a word above to see definitions, synonyms, and examples. You can also switch modes to explore wordlists or staging."
+                                empty-type="generic"
+                            />
                         </div>
                     </div>
 
@@ -142,6 +145,7 @@ import { cn } from '@/utils';
 import { SearchBar } from '@/components/custom/search';
 import { DefinitionDisplay, WordSuggestionDisplay } from '@/components/custom/definition';
 import { DefinitionSkeleton } from '@/components/custom/definition';
+import EmptyState from '@/components/custom/definition/components/EmptyState.vue';
 import { Sidebar } from '@/components/custom';
 import { LoadingModal } from '@/components/custom/loading';
 import WordListView from '@/components/custom/wordlist/WordListView.vue';
