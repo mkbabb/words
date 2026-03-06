@@ -4,8 +4,6 @@ This module eliminates 500+ lines of duplicated error handling code across route
 by providing a consistent, type-safe approach to raising HTTP exceptions.
 """
 
-from __future__ import annotations
-
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
@@ -359,6 +357,165 @@ class InvalidContentTypeException(ValidationException):
             field=field,
             message=message,
             code="INVALID_TYPE",
+            request_id=request_id,
+        )
+
+
+class ProviderFetchError(APIException):
+    """502 Bad Gateway — provider fetch failed."""
+
+    def __init__(
+        self,
+        provider: str,
+        reason: str,
+        request_id: str | None = None,
+    ):
+        super().__init__(
+            status_code=502,
+            error=f"Provider '{provider}' fetch failed",
+            details=[
+                ErrorDetail(
+                    field="provider",
+                    message=reason,
+                    code="PROVIDER_FETCH_ERROR",
+                ),
+            ],
+            request_id=request_id,
+        )
+
+
+class ProviderTimeoutError(ProviderFetchError):
+    """504 Gateway Timeout — provider timed out."""
+
+    def __init__(
+        self,
+        provider: str,
+        timeout_seconds: float,
+        request_id: str | None = None,
+    ):
+        super().__init__(
+            provider=provider,
+            reason=f"Timed out after {timeout_seconds}s",
+            request_id=request_id,
+        )
+        # Override status code from 502 to 504
+        self.status_code = 504
+
+
+class SynthesisError(APIException):
+    """500 Internal Server Error — AI synthesis failed."""
+
+    def __init__(
+        self,
+        word: str,
+        stage: str,
+        reason: str,
+        request_id: str | None = None,
+    ):
+        super().__init__(
+            status_code=500,
+            error=f"Synthesis failed for '{word}' at stage '{stage}'",
+            details=[
+                ErrorDetail(
+                    field="synthesis",
+                    message=reason,
+                    code="SYNTHESIS_ERROR",
+                ),
+            ],
+            request_id=request_id,
+        )
+
+
+class SearchError(APIException):
+    """500 Internal Server Error — search operation failed."""
+
+    def __init__(
+        self,
+        method: str,
+        reason: str,
+        request_id: str | None = None,
+    ):
+        super().__init__(
+            status_code=500,
+            error=f"Search failed (method: {method})",
+            details=[
+                ErrorDetail(
+                    field="search",
+                    message=reason,
+                    code="SEARCH_ERROR",
+                ),
+            ],
+            request_id=request_id,
+        )
+
+
+class CacheCorruptionError(APIException):
+    """500 Internal Server Error — cache data corrupted."""
+
+    def __init__(
+        self,
+        resource_type: str,
+        resource_id: str,
+        reason: str,
+        request_id: str | None = None,
+    ):
+        super().__init__(
+            status_code=500,
+            error=f"Cache corruption: {resource_type}/{resource_id}",
+            details=[
+                ErrorDetail(
+                    field="cache",
+                    message=reason,
+                    code="CACHE_CORRUPTION",
+                ),
+            ],
+            request_id=request_id,
+        )
+
+
+class ParseError(APIException):
+    """422 Unprocessable Entity — parsing failed."""
+
+    def __init__(
+        self,
+        format: str,
+        reason: str,
+        request_id: str | None = None,
+    ):
+        super().__init__(
+            status_code=422,
+            error=f"Failed to parse {format} content",
+            details=[
+                ErrorDetail(
+                    field="content",
+                    message=reason,
+                    code="PARSE_ERROR",
+                ),
+            ],
+            request_id=request_id,
+        )
+
+
+class StorageError(APIException):
+    """500 Internal Server Error — storage operation failed."""
+
+    def __init__(
+        self,
+        operation: str,
+        resource: str,
+        reason: str,
+        request_id: str | None = None,
+    ):
+        super().__init__(
+            status_code=500,
+            error=f"Storage {operation} failed for '{resource}'",
+            details=[
+                ErrorDetail(
+                    field="storage",
+                    message=reason,
+                    code="STORAGE_ERROR",
+                ),
+            ],
             request_id=request_id,
         )
 
