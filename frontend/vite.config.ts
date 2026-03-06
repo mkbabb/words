@@ -1,9 +1,13 @@
 import { defineConfig } from 'vite';
 import path from 'path';
 import vue from '@vitejs/plugin-vue';
+import type { IncomingMessage, ServerResponse } from 'http';
+import http from 'http';
 
 import tailwindcss from '@tailwindcss/vite';
 import autoprefixer from 'autoprefixer';
+
+const API_TARGET = process.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -19,7 +23,77 @@ export default defineConfig({
       plugins: [autoprefixer()],
     },
   },
-  plugins: [vue(), tailwindcss()],
+  plugins: [
+    vue(),
+    tailwindcss(),
+    // Custom plugin to handle SSE proxying (bypasses http-proxy buffering)
+    {
+      name: 'sse-proxy',
+      configureServer(server) {
+        server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
+          if (!req.url?.includes('/stream')) {
+            return next();
+          }
+          // Only handle /api paths that contain /stream
+          if (!req.url?.startsWith('/api')) {
+            return next();
+          }
+
+          const targetUrl = new URL(req.url, API_TARGET);
+          console.log(`[SSE Proxy] ${req.method} ${req.url} -> ${targetUrl.href}`);
+
+          const proxyReq = http.request(
+            {
+              hostname: targetUrl.hostname,
+              port: Number(targetUrl.port) || 8000,
+              path: targetUrl.pathname + targetUrl.search,
+              method: req.method || 'GET',
+              headers: {
+                'Accept': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Accept-Encoding': 'identity',
+              },
+            },
+            (proxyRes) => {
+            res.writeHead(proxyRes.statusCode || 200, {
+              'Content-Type': 'text/event-stream; charset=utf-8',
+              'Cache-Control': 'no-cache',
+              'Connection': 'keep-alive',
+              'X-Accel-Buffering': 'no',
+              'Access-Control-Allow-Origin': '*',
+            });
+            // Pipe response directly — no buffering
+            proxyRes.on('data', (chunk: Buffer) => {
+              res.write(chunk);
+            });
+            proxyRes.on('end', () => {
+              res.end();
+            });
+          });
+
+          proxyReq.on('error', (err: Error) => {
+            console.error('[SSE Proxy] Error:', err.message);
+            if (!res.headersSent) {
+              res.writeHead(502);
+              res.end('SSE proxy error');
+            }
+          });
+
+          // If client disconnects, abort the proxy request
+          req.on('close', () => {
+            proxyReq.destroy();
+          });
+
+          // GET requests: just end the request. POST: pipe the body.
+          if (req.method === 'GET' || req.method === 'HEAD') {
+            proxyReq.end();
+          } else {
+            req.pipe(proxyReq);
+          }
+        });
+      },
+    },
+  ],
   server: {
     port: 3000,
     host: '0.0.0.0',
@@ -42,41 +116,21 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || 'http://localhost:8000',
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
-        ws: true, // Proxy websockets
-        timeout: 120000, // 2 minute timeout for AI processing
-        proxyTimeout: 120000, // 2 minute proxy timeout
-        configure: (proxy, _options) => {
-          // Proxy error handling
-          proxy.on('error', (err, _req, _res) => {
+        ws: true,
+        timeout: 120000,
+        proxyTimeout: 120000,
+        // Skip SSE streams — handled by the sse-proxy plugin above
+        bypass(req) {
+          if (req.url?.includes('/stream')) {
+            return req.url;
+          }
+        },
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
             console.log('proxy error', err);
-          });
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('Sending Request:', req.method, req.url);
-            // Handle Server-Sent Events properly
-            if (req.url?.includes('/stream')) {
-              proxyReq.setHeader('Accept', 'text/event-stream');
-              proxyReq.setHeader('Cache-Control', 'no-cache');
-            }
-          });
-          proxy.on('proxyRes', (proxyRes, req, res) => {
-            // Handle SSE responses
-            if (req.url?.includes('/stream')) {
-              proxyRes.headers['content-type'] = 'text/event-stream';
-              proxyRes.headers['cache-control'] = 'no-cache';
-              proxyRes.headers['connection'] = 'keep-alive';
-              proxyRes.headers['x-accel-buffering'] = 'no';
-              
-              // Ensure proper SSE headers are set on the response
-              res.setHeader('Content-Type', 'text/event-stream');
-              res.setHeader('Cache-Control', 'no-cache');
-              res.setHeader('Connection', 'keep-alive');
-              res.setHeader('X-Accel-Buffering', 'no');
-              res.setHeader('Access-Control-Allow-Origin', '*');
-              res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
-            }
           });
         },
       },

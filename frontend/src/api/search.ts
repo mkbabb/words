@@ -86,7 +86,7 @@ export const searchApi = {
     return data;
   },
 
-  // Rebuild search index with unified corpus management - POST /search/rebuild-index
+  // Rebuild search index with unified corpus management - POST /search/rebuild
   async rebuildIndex(options?: {
     languages?: string[];
     corpus_types?: string[];
@@ -118,7 +118,7 @@ export const searchApi = {
         force_download: options?.force_download ?? true,
       };
       
-      const response = await api.post('/search/rebuild-index', requestData);
+      const response = await api.post('/search/rebuild', requestData);
       return response.data;
     } catch (error) {
       logger.error('Rebuild index API error:', error);

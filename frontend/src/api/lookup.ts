@@ -95,8 +95,16 @@ export const lookupApi = {
   ): Promise<SynthesizedDictionaryEntry> {
     const params = new URLSearchParams();
     if (options?.forceRefresh) params.append('force_refresh', 'true');
-    if (options?.providers?.length) params.append('providers', options.providers.join(','));
-    if (options?.languages?.length) params.append('languages', options.languages.join(','));
+    if (options?.providers?.length) {
+      for (const provider of options.providers) {
+        params.append('providers', provider);
+      }
+    }
+    if (options?.languages?.length) {
+      for (const language of options.languages) {
+        params.append('languages', language);
+      }
+    }
     if (options?.noAI) params.append('no_ai', 'true');
 
     const url = `${API_BASE_URL}/lookup/${encodeURIComponent(word)}/stream?${params}`;

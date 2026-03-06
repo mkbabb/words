@@ -9,6 +9,9 @@ export const API_BASE_URL = `${import.meta.env.BASE_URL}api/${API_VERSION}`;
 export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 60000, // 60 seconds (1 minute)
+  paramsSerializer: {
+    indexes: null,
+  },
   headers: {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache',
