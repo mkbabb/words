@@ -17,10 +17,6 @@ services:
           memory: 4G
         reservations:
           memory: 1G
-    depends_on:
-      mongodb:
-        condition: service_healthy
-
   frontend:
     build:
       target: production
@@ -86,21 +82,6 @@ services:
       - app-network
     profiles:
       - ssl
-
-  mongodb:
-    ports:
-      - "127.0.0.1:27017:27017"
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 1G
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
 
 volumes:
   nginx_secrets:
