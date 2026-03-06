@@ -62,6 +62,7 @@ class TrieSearch:
             self._load_from_index()
 
     async def initialize(self) -> None:
+        # TODO[MEDIUM]: Remove compatibility no-op and enforce a real initialization contract.
         """Initialize the trie search (no-op for compatibility)."""
 
     async def build_from_corpus(self, corpus: Corpus) -> None:

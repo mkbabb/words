@@ -7,10 +7,17 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from ..caching.models import BaseVersionedData
+from ..corpus.manager import get_tree_corpus_manager
 from ..models.base import Language
 from ..search.constants import SearchMode
-from ..search.core import SearchResult
-from ..search.language import LanguageSearch, _semantic_search_enabled, get_language_search
+from ..search.core import Search, SearchResult
+from ..search.language import (
+    LanguageSearch,
+    _semantic_search_enabled,
+    get_language_search,
+    reset_language_search,
+)
 from ..utils.logging import (
     get_logger,
     log_metrics,
@@ -145,8 +152,6 @@ class SearchEngineManager:
             return True
 
         try:
-            from ..caching.models import BaseVersionedData
-
             collection = BaseVersionedData.get_pymongo_collection()
 
             # Query for the latest version of the corpus with matching name
@@ -212,8 +217,6 @@ class SearchEngineManager:
             start = time.perf_counter()
 
             # Clear caches
-            from ..search.language import reset_language_search
-
             await reset_language_search()
 
             # Build new engine
@@ -247,8 +250,6 @@ class SearchEngineManager:
                 corpus_name = "language_french"
             else:
                 corpus_name = "language_english"
-
-            from ..caching.models import BaseVersionedData
 
             collection = BaseVersionedData.get_pymongo_collection()
             doc = await collection.find_one(
@@ -334,6 +335,7 @@ async def get_search_engine(
     force_rebuild: bool = False,
     semantic: bool | None = None,
 ) -> LanguageSearch:
+    # TODO[MEDIUM]: Remove backward-compatible wrapper after migrating callers to SearchEngineManager.
     """Get or create the global LanguageSearch singleton.
 
     Backward-compatible wrapper around SearchEngineManager.
@@ -354,6 +356,7 @@ async def get_search_engine(
 
 
 async def reset_search_engine() -> None:
+    # TODO[MEDIUM]: Remove backward-compatible wrapper after migrating callers to SearchEngineManager.
     """Reset the search engine singleton (for testing/cleanup).
 
     Backward-compatible wrapper around SearchEngineManager.
@@ -410,9 +413,6 @@ async def search_word_pipeline(
         # If corpus_id or corpus_name provided, use direct corpus search
         if corpus_id or corpus_name:
             # Get corpus by ID or name
-            from ..corpus.manager import get_tree_corpus_manager
-            from ..search.core import Search
-
             manager = get_tree_corpus_manager()
             corpus = await manager.get_corpus(corpus_id=corpus_id, corpus_name=corpus_name)
             if corpus is None:

@@ -151,6 +151,7 @@ async def get_language_search(
             corpus_names.append("language_french")
         # Add more languages as needed
         else:
+            # TODO[CRITICAL]: Remove unsupported-language fallback to English and fail with explicit language error.
             # Default to english for unsupported languages
             corpus_names.append("language_english")
 
@@ -180,6 +181,7 @@ async def get_language_search(
             )
         else:
             # Normal path: try to get existing corpus first
+            # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
             from ..corpus.manager import get_tree_corpus_manager
 
             manager = get_tree_corpus_manager()

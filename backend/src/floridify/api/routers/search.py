@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 
 from ..middleware.auth import require_admin
 from pydantic import BaseModel, Field
@@ -22,7 +25,6 @@ from ...models.parameters import SearchParams
 from ...models.responses import SearchResponse
 from ...search.constants import SearchMethod, SearchMode
 from ...search.core import Search
-from ...search.language import get_language_search
 from ...search.search_index import SearchIndex
 from ...text import clear_lemma_cache, get_lemma_cache_stats
 from ...utils.logging import get_logger
@@ -155,7 +157,7 @@ def parse_search_params(
 ) -> SearchParams:
     """Parse and validate search parameters using shared model."""
     # Use the shared model's validators
-    params = SearchParams(
+    return SearchParams(
         languages=languages,  # validators handle conversion
         max_results=max_results,
         min_score=min_score,
@@ -163,10 +165,8 @@ def parse_search_params(
         force_rebuild=force_rebuild,
         corpus_id=corpus_id,
         corpus_name=corpus_name,
+        semantic=semantic,
     )
-    # Attach semantic flag as extra attribute for search routing
-    params._semantic = semantic  # type: ignore[attr-defined]
-    return params
 
 
 async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
@@ -241,9 +241,27 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
                     detail=f"Corpus not found: id={params.corpus_id}, name={params.corpus_name}",
                 )
 
-            # Create search index for this corpus
-            # Enable semantic for SMART mode (cascades through all methods) and SEMANTIC mode
-            use_semantic = mode_enum in (SearchMode.SEMANTIC, SearchMode.SMART)
+            # Per-corpus semantic policy (child-to-parent effective OR) + global engine toggle.
+            global_semantic_enabled = get_search_engine_manager()._semantic
+            corpus_semantic_enabled = corpus.semantic_enabled_effective
+
+            if mode_enum == SearchMode.SEMANTIC and not corpus_semantic_enabled:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Semantic search disabled by corpus policy for '{corpus.corpus_name}'. "
+                        "Enable it via PATCH /api/v1/corpus/{corpus_id}/semantic."
+                    ),
+                )
+            if mode_enum == SearchMode.SEMANTIC and not global_semantic_enabled:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Semantic search disabled globally (SEMANTIC_SEARCH_ENABLED=false).",
+                )
+
+            use_semantic = mode_enum == SearchMode.SEMANTIC or (
+                mode_enum == SearchMode.SMART and global_semantic_enabled and corpus_semantic_enabled
+            )
             index = await SearchIndex.get_or_create(
                 corpus=corpus,
                 semantic=use_semantic,
@@ -272,13 +290,26 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
                 if not result.language:
                     result.language = corpus.language
 
+            response_metadata = {
+                "corpus_id": str(corpus.corpus_id),
+                "corpus_name": corpus.corpus_name,
+                "semantic_enabled_effective": corpus_semantic_enabled,
+                "semantic_enabled_global": global_semantic_enabled,
+            }
+            if mode_enum == SearchMode.SMART and not use_semantic:
+                response_metadata["semantic_disabled_reason"] = (
+                    "corpus_policy"
+                    if not corpus_semantic_enabled
+                    else "global_toggle"
+                )
+
             return SearchResponse(
                 query=query,
                 results=results,
                 total_found=len(results),
                 languages=[corpus.language] if corpus.language else params.languages,
                 mode=params.mode,
-                metadata={"corpus_id": str(corpus.corpus_id), "corpus_name": corpus.corpus_name},
+                metadata=response_metadata,
             )
         else:
             # Original behavior: search by language
@@ -286,10 +317,11 @@ async def _cached_search(query: str, params: SearchParams) -> SearchResponse:
                 f"Searching for '{query}' in {[lang.value for lang in params.languages]} (mode={mode_enum.value})"
             )
 
-            # Get language search instance (respect semantic flag to avoid model load crash)
-            semantic = getattr(params, "_semantic", True)
-            language_search = await get_language_search(
-                languages=params.languages, semantic=semantic
+            # Use shared SearchEngineManager engine so status + runtime stay in sync
+            manager = get_search_engine_manager()
+            language_search = await manager.get_engine(
+                languages=params.languages,
+                semantic=params.semantic,
             )
 
             # Perform search with specified mode
@@ -424,57 +456,118 @@ async def get_semantic_status() -> SemanticStatusResponse:
     states in the UI. Non-blocking — does not trigger initialization.
     """
     try:
-        manager = get_search_engine_manager()
-
-        if manager._engine is None:
-            # Engine not yet initialized
-            if manager._initializing:
-                message = "Search engine initializing in background..."
-            elif manager._init_error:
-                message = f"Search engine initialization failed: {manager._init_error}"
-            else:
-                message = "Search engine not yet initialized"
-
-            return SemanticStatusResponse(
-                enabled=manager._semantic,
-                ready=False,
-                building=manager._initializing,
-                languages=list(manager._languages or []),
-                model_name=None,
-                vocabulary_size=0,
-                message=message,
-            )
-
-        # Engine exists — delegate to existing LanguageSearch methods
-        stats = manager._engine.get_stats()
-        enabled = stats.get("semantic_enabled", False)
-        ready = manager._engine.is_semantic_ready()
-        building = manager._engine.is_semantic_building()
-
-        if not enabled:
-            message = "Semantic search is disabled"
-        elif ready:
-            message = "Semantic search is ready"
-        elif building:
-            message = (
-                "Semantic search is building in background (search still works with exact/fuzzy)"
-            )
-        else:
-            message = "Semantic search is not initialized"
-
-        return SemanticStatusResponse(
-            enabled=enabled,
-            ready=ready,
-            building=building,
-            languages=list(manager._languages or []),
-            model_name=stats.get("semantic_model"),
-            vocabulary_size=stats.get("vocabulary_size", 0),
-            message=message,
-        )
-
+        return SemanticStatusResponse(**_build_semantic_status())
     except Exception as e:
         logger.error(f"Failed to get semantic status: {e}")
         raise HTTPException(status_code=500, detail="Failed to get semantic status")
+
+
+def _build_semantic_status() -> dict[str, Any]:
+    """Build the semantic status dict from current SearchEngineManager state.
+
+    Shared by both the GET and SSE endpoints.
+    """
+    manager = get_search_engine_manager()
+
+    if manager._engine is None:
+        if manager._initializing:
+            message = "Search engine initializing in background..."
+        elif manager._init_error:
+            message = f"Search engine initialization failed: {manager._init_error}"
+        else:
+            message = "Search engine not yet initialized"
+
+        return {
+            "enabled": manager._semantic,
+            "ready": False,
+            "building": manager._initializing,
+            "languages": [lang.value for lang in (manager._languages or [])],
+            "model_name": None,
+            "vocabulary_size": 0,
+            "message": message,
+        }
+
+    stats = manager._engine.get_stats()
+    enabled = stats.get("semantic_enabled", False)
+    ready = manager._engine.is_semantic_ready()
+    building = manager._engine.is_semantic_building()
+
+    if not enabled:
+        message = "Semantic search is disabled"
+    elif ready:
+        message = "Semantic search is ready"
+    elif building:
+        message = "Semantic search is building in background (search still works with exact/fuzzy)"
+    else:
+        message = "Semantic search is not initialized"
+
+    return {
+        "enabled": enabled,
+        "ready": ready,
+        "building": building,
+        "languages": [lang.value for lang in (manager._languages or [])],
+        "model_name": stats.get("semantic_model"),
+        "vocabulary_size": stats.get("vocabulary_size", 0),
+        "message": message,
+    }
+
+
+@router.get("/search/semantic/status/stream")
+async def stream_semantic_status(request: Request) -> StreamingResponse:
+    """Stream semantic search status changes via Server-Sent Events.
+
+    Pushes a ``status`` event whenever the semantic search state changes
+    (initializing, building, ready, error).  The stream auto-closes once
+    a terminal state is reached (``ready`` or ``!enabled``).
+
+    Heartbeat pings are sent every 30 s to keep proxies alive.
+    """
+
+    async def _event_generator():
+        last_snapshot: dict[str, Any] | None = None
+        heartbeat_interval = 30.0
+        poll_interval = 1.0
+        last_heartbeat = time.monotonic()
+
+        while True:
+            # Client gone?
+            if await request.is_disconnected():
+                break
+
+            try:
+                current = _build_semantic_status()
+            except Exception as exc:
+                logger.error(f"Semantic status stream error: {exc}")
+                yield f"event: error\ndata: {json.dumps({'message': str(exc)})}\n\n"
+                break
+
+            # Only emit when something changed
+            if current != last_snapshot:
+                yield f"event: status\ndata: {json.dumps(current)}\n\n"
+                last_snapshot = current
+                last_heartbeat = time.monotonic()
+
+                # Terminal state — close the stream
+                if current.get("ready") or not current.get("enabled"):
+                    break
+
+            # Heartbeat
+            now = time.monotonic()
+            if now - last_heartbeat >= heartbeat_interval:
+                yield ": ping\n\n"
+                last_heartbeat = now
+
+            await asyncio.sleep(poll_interval)
+
+    return StreamingResponse(
+        _event_generator(),
+        media_type="text/event-stream; charset=utf-8",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/search/rebuild", response_model=RebuildIndexResponse)

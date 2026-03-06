@@ -368,6 +368,7 @@ class SemanticSearch:
             loop = asyncio.get_running_loop()
             self._flush_task = loop.create_task(self._debounced_flush())
         except RuntimeError:
+            # TODO[MEDIUM]: Replace no-loop flush skip with explicit initialization/lifecycle invariant.
             pass
 
     async def _debounced_flush(self) -> None:
@@ -418,6 +419,7 @@ class SemanticSearch:
             loop = asyncio.get_running_loop()
             self._result_flush_task = loop.create_task(self._debounced_result_flush())
         except RuntimeError:
+            # TODO[MEDIUM]: Replace no-loop flush skip with explicit initialization/lifecycle invariant.
             pass
 
     async def _debounced_result_flush(self) -> None:

@@ -245,6 +245,7 @@ class Search:
 
         combined_vocab = self.corpus.vocabulary
         logger.debug(f"Corpus loaded with {len(combined_vocab)} vocabulary items")
+        index_linkage_changed = False
 
         # Always build trie + fuzzy when corpus has vocabulary.
         # The trie is cheap (<1ms for small corpora) and required for exact/prefix/fuzzy.
@@ -252,7 +253,10 @@ class Search:
             logger.debug("Building Trie index")
             self.trie_search = await TrieSearch.from_corpus(self.corpus)
             if self.trie_search and self.trie_search.index:
-                self.index.trie_index_id = self.trie_search.index.index_id
+                trie_index_id = self.trie_search.index.index_id
+                if self.index.trie_index_id != trie_index_id:
+                    self.index.trie_index_id = trie_index_id
+                    index_linkage_changed = True
 
             logger.debug("Initializing Fuzzy search")
             self.fuzzy_search = FuzzySearch(min_score=self.index.min_score)
@@ -269,6 +273,10 @@ class Search:
                     )
 
         self._initialized = True
+
+        # Persist component linkage updates so metadata reflects current trie/semantic relationships.
+        if index_linkage_changed:
+            await self.index.save()
 
         logger.info(
             f"✅ SearchEngine initialized for corpus '{self.index.corpus_name}' (hash: {self.index.vocabulary_hash[:8]})",
@@ -327,6 +335,13 @@ class Search:
                 self._semantic_ready = True
                 self._semantic_init_error = None
 
+            # Persist semantic index linkage after successful background initialization.
+            if self.index and semantic_search.index:
+                semantic_index_id = semantic_search.index.index_id
+                if self.index.semantic_index_id != semantic_index_id:
+                    self.index.semantic_index_id = semantic_index_id
+                    await self.index.save()
+
             logger.info(
                 f"✅ Semantic search ready for '{self.index.corpus_name}' "
                 f"({semantic_search.index.num_embeddings:,} embeddings, "
@@ -365,7 +380,9 @@ class Search:
             return None
 
         try:
+            # TODO[HIGH]: Remove implicit corpus-name fallback lookup; require UUID-only retrieval invariants.
             # Try with corpus_uuid first, fallback to corpus_name
+            # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
             from ..corpus.manager import get_tree_corpus_manager
 
             manager = get_tree_corpus_manager()
@@ -376,6 +393,7 @@ class Search:
             )
             return corpus.vocabulary_hash if corpus else None
         except Exception as e:
+            # TODO[HIGH]: Stop converting corpus hash lookup errors into None; surface explicit index-health failure.
             logger.warning(f"Failed to get current vocab hash for '{self.index.corpus_name}': {e}")
             return None
 
@@ -596,6 +614,11 @@ class Search:
         else:
             raise ValueError(f"Unsupported search mode: {mode}")
 
+        if self.corpus:
+            for result in results:
+                if result.language is None:
+                    result.language = self.corpus.language
+
         return results
 
     def search_exact(
@@ -724,6 +747,7 @@ class Search:
         """
         # Check if semantic search is ready
         if not self._semantic_ready or not self.semantic_search:
+            # TODO[MEDIUM]: Replace silent empty-result behavior with explicit semantic-not-ready status.
             logger.debug("Semantic search not ready yet - returning empty results")
             return []
 
@@ -737,6 +761,7 @@ class Search:
                 result.word = self._get_original_word(result.word)
             return results
         except Exception as e:
+            # TODO[HIGH]: Do not suppress semantic engine failures as empty lists; propagate typed search errors.
             logger.warning(f"Semantic search failed: {e}")
             return []
 
@@ -746,6 +771,7 @@ class Search:
         max_results: int = 20,
         min_score: float | None = None,
     ) -> list[SearchResult]:
+        # TODO[HIGH]: Retire implicit cascade fallbacks and make search mode selection explicit at call sites.
         """Cascading search with automatic method fallback.
 
         Tries methods in order: exact → fuzzy → semantic (if enabled).
