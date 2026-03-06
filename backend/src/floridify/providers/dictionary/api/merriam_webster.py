@@ -316,9 +316,11 @@ class MerriamWebsterConnector(DictionaryConnector):
                 logger.warning(f"No definition found for '{word}' in Merriam-Webster")
                 return None
 
-            # Create Word object for processing
-            word_obj = Word(text=word)
-            await word_obj.save()
+            # Create or update Word object for processing
+            word_obj = await Word.find_one(Word.text == word)
+            if not word_obj:
+                word_obj = Word(text=word, languages=[Language.ENGLISH.value])
+                await word_obj.save()
 
             if not word_obj.id:
                 raise ValueError(f"Word {word} must be saved before processing")

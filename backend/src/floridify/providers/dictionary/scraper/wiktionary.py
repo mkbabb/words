@@ -31,6 +31,14 @@ from .wiktionary_parser import (
 
 logger = get_logger(__name__)
 
+WIKTIONARY_SECTION_TITLES: dict[str, str] = {
+    Language.ENGLISH.value: "English",
+    Language.FRENCH.value: "French",
+    Language.SPANISH.value: "Spanish",
+    Language.GERMAN.value: "German",
+    Language.ITALIAN.value: "Italian",
+}
+
 
 class WiktionaryConnector(DictionaryConnector):
     """Enhanced Wiktionary connector with comprehensive wikitext parsing."""
@@ -62,11 +70,16 @@ class WiktionaryConnector(DictionaryConnector):
         self,
         word: str,
         state_tracker: StateTracker | None = None,
+        languages: list[str] | None = None,
     ) -> DictionaryProviderEntry | None:
         """Fetch comprehensive definition data from Wiktionary."""
         # Rate limiting is handled by the base class fetch method
 
         try:
+            requested_languages = list(languages) if languages else [Language.ENGLISH.value]
+            primary_language_code = requested_languages[0]
+            primary_language = Language(primary_language_code)
+
             params = {
                 "action": "query",
                 "prop": "revisions",
@@ -112,11 +125,17 @@ class WiktionaryConnector(DictionaryConnector):
             if state_tracker:
                 await state_tracker.update(stage=Stages.PROVIDER_FETCH_HTTP_PARSING, progress=55)
 
-            # Create Word object for processing
-            word_obj = Word(text=word)
-            await word_obj.save()
+            # Create or update Word object for processing
+            word_obj = await Word.find_one(Word.text == word)
+            if not word_obj:
+                word_obj = Word(text=word, languages=requested_languages)
+                await word_obj.save()
 
-            result = await self._parse_wiktionary_response(word_obj, data)
+            result = await self._parse_wiktionary_response(
+                word_obj=word_obj,
+                data=data,
+                primary_language=primary_language,
+            )
 
             # Report completion
             if state_tracker:
@@ -135,6 +154,7 @@ class WiktionaryConnector(DictionaryConnector):
         self,
         word_obj: Word,
         data: dict[str, Any],
+        primary_language: Language,
     ) -> DictionaryProviderEntry | None:
         """Parse Wiktionary response comprehensively."""
         try:
@@ -145,7 +165,11 @@ class WiktionaryConnector(DictionaryConnector):
             content = pages[0]["revisions"][0]["slots"]["main"]["content"]
 
             # Extract all components comprehensively
-            return await self._extract_comprehensive_data(content, word_obj)
+            return await self._extract_comprehensive_data(
+                wikitext=content,
+                word_obj=word_obj,
+                primary_language=primary_language,
+            )
 
         except Exception as e:
             logger.error(f"Error parsing Wiktionary response for {word_obj.text}: {e}")
@@ -155,15 +179,21 @@ class WiktionaryConnector(DictionaryConnector):
         self,
         wikitext: str,
         word_obj: Word,
+        primary_language: Language,
     ) -> DictionaryProviderEntry | None:
         """Extract all available data from wikitext using systematic parsing."""
         try:
             parsed = wtp.parse(wikitext)
 
-            # Find English section
-            english_section = find_language_section(parsed, "English")
-            if not english_section:
-                english_section = parsed
+            section_title = WIKTIONARY_SECTION_TITLES[primary_language.value]
+            language_section = find_language_section(parsed, section_title)
+            if language_section is None:
+                logger.info(
+                    "Wiktionary section '%s' not found for '%s'",
+                    section_title,
+                    word_obj.text,
+                )
+                return None
 
             # Extract all components
             # After save(), word_obj.id is guaranteed to be not None
@@ -171,18 +201,20 @@ class WiktionaryConnector(DictionaryConnector):
 
             # Extract section synonyms FIRST so they can be merged into definitions
             # before the initial save (avoids a consistency window with missing synonyms).
-            section_syns = extract_section_synonyms(english_section)
+            section_syns = extract_section_synonyms(language_section)
 
             definitions = await extract_definitions(
-                english_section, word_obj.id, section_synonyms=section_syns
+                language_section,
+                word_obj.id,
+                section_synonyms=section_syns,
             )
-            etymology = extract_etymology(english_section)
-            pronunciation = extract_pronunciation(english_section, word_obj.id)
+            etymology = extract_etymology(language_section)
+            pronunciation = extract_pronunciation(language_section, word_obj.id)
 
             return DictionaryProviderEntry(
                 word=word_obj.text,
                 provider=self.provider.value,
-                language=Language.ENGLISH,
+                language=primary_language,
                 definitions=[
                     {
                         "id": str(definition.id),
@@ -228,3 +260,14 @@ class WiktionaryConnector(DictionaryConnector):
     async def close(self) -> None:
         """Close HTTP client."""
         # No HTTP client to close - using cached decorator
+
+    async def _fetch_provider_entry(
+        self,
+        word: Word,
+        state_tracker: StateTracker | None = None,
+    ) -> DictionaryProviderEntry | None:
+        return await self._fetch_from_provider(
+            word=word.text,
+            state_tracker=state_tracker,
+            languages=list(word.languages),
+        )

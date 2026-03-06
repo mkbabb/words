@@ -99,6 +99,7 @@ async def save_entry_versioned(
             existing_live.definition_ids = entry.definition_ids
             existing_live.pronunciation_id = entry.pronunciation_id
             existing_live.fact_ids = entry.fact_ids
+            existing_live.languages = entry.languages
             existing_live.etymology = entry.etymology
             existing_live.model_info = entry.model_info
             existing_live.raw_data = entry.raw_data

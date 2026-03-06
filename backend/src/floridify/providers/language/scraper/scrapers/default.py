@@ -18,6 +18,7 @@ async def default_scraper(
     local_path: str | None = None,
     **kwargs: Any,
 ) -> str:
+    # TODO[CRITICAL]: Remove URL->local fallback behavior and require explicit source selection per caller.
     """Default scraper that fetches text content from URL with local fallback.
 
     Args:
@@ -42,6 +43,7 @@ async def default_scraper(
                 return response.text
         except Exception as e:
             if local_path:
+                # TODO[HIGH]: Replace fallback warning path with explicit fetch-failure signaling.
                 logger.warning(
                     f"URL fetch failed ({e}), falling back to bundled file: {local_path}"
                 )
@@ -52,6 +54,7 @@ async def default_scraper(
         resolved = Path(local_path)
         if not resolved.is_absolute():
             # Resolve relative to the backend data directory
+            # TODO[HIGH]: Hoist nested import to module scope unless this is an intentional lazy-init boundary (e.g., CLI or heavyweight model init); document rationale when kept nested.
             from .....utils.paths import get_data_dir
 
             resolved = get_data_dir() / local_path

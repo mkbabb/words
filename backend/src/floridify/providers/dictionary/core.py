@@ -141,7 +141,7 @@ class DictionaryConnector(BaseConnector):
             Complete DictionaryEntry with saved MongoDB documents, or None
         """
         # Fetch raw provider data
-        provider_entry = await self._fetch_from_provider(word.text, state_tracker)
+        provider_entry = await self._fetch_provider_entry(word, state_tracker)
         if not provider_entry:
             return None
 
@@ -211,10 +211,18 @@ class DictionaryConnector(BaseConnector):
             definition_ids=definition_ids,
             pronunciation_id=pronunciation_id,
             provider=self.provider,
-            language=word.language,
+            languages=word.languages,
             etymology=etymology,
             raw_data=provider_entry.raw_data,
         )
         await save_entry_versioned(dict_entry, word.text)
 
         return dict_entry
+
+    async def _fetch_provider_entry(
+        self,
+        word: Word,
+        state_tracker: StateTracker | None = None,
+    ) -> DictionaryProviderEntry | None:
+        """Fetch raw provider entry for a Word context."""
+        return await self._fetch_from_provider(word.text, state_tracker)

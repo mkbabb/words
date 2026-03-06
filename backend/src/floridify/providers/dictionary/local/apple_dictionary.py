@@ -10,6 +10,7 @@ from typing import Any
 from beanie import PydanticObjectId
 
 from ....core.state_tracker import Stages, StateTracker
+from ....models.base import Language
 from ....models.dictionary import (
     Definition,
     DictionaryProvider,
@@ -24,6 +25,11 @@ from ...core import ConnectorConfig, RateLimitPresets
 from ..core import DictionaryConnector
 
 logger = get_logger(__name__)
+
+try:
+    from CoreServices import DCSCopyTextDefinition as CORE_SERVICES_COPY_TEXT_DEFINITION  # type: ignore[import-untyped]
+except ImportError:
+    CORE_SERVICES_COPY_TEXT_DEFINITION = None
 
 
 class AppleDictionaryError(Exception):
@@ -58,6 +64,7 @@ class AppleDictionaryConnector(DictionaryConnector):
     def _check_platform_compatibility(self) -> bool:
         """Check if running on macOS (Darwin)."""
         if platform.system() != "Darwin":
+            # TODO[HIGH]: Replace platform fallback behavior with explicit provider-unavailable failure semantics.
             logger.warning(f"Apple Dictionary Services not available on {platform.system()}")
             return False
         return True
@@ -68,17 +75,17 @@ class AppleDictionaryConnector(DictionaryConnector):
             self._dictionary_service = None
             return
 
-        try:
-            from CoreServices import DCSCopyTextDefinition  # type: ignore[import-untyped]
-
-            self._dictionary_service = DCSCopyTextDefinition
-            logger.info("Apple Dictionary Services initialized successfully")
-        except ImportError as e:
+        if CORE_SERVICES_COPY_TEXT_DEFINITION is None:
+            # TODO[HIGH]: Fail explicitly when CoreServices dependency is missing instead of silently disabling provider.
             logger.warning(
-                f"Failed to import CoreServices.DictionaryServices: {e}. "
+                "Failed to import CoreServices.DictionaryServices. "
                 "Install PyObjC with: pip install pyobjc-framework-CoreServices",
             )
             self._dictionary_service = None
+            return
+
+        self._dictionary_service = CORE_SERVICES_COPY_TEXT_DEFINITION
+        logger.info("Apple Dictionary Services initialized successfully")
 
     def _is_available(self) -> bool:
         """Check if Dictionary Services is available."""
@@ -95,6 +102,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         """
         if not self._is_available():
+            # TODO[MEDIUM]: Revisit None-return fallback for unavailable local provider and emit structured failure.
             return None
 
         try:
@@ -109,6 +117,7 @@ class AppleDictionaryConnector(DictionaryConnector):
             return str(definition) if definition else None
         except Exception as e:
             logger.error(f"Dictionary lookup failed for '{word}': {e}")
+            # TODO[HIGH]: Do not collapse lookup exceptions to None; propagate explicit connector failure.
             return None
 
     def _clean_definition_text(self, text: str) -> str:
@@ -258,9 +267,11 @@ class AppleDictionaryConnector(DictionaryConnector):
             # For the lookup method, we'll return the raw data to be processed later
             # The actual parsing and Definition creation should happen in extract_definitions
 
-            # Create Word object for processing
-            word_obj = Word(text=word)
-            await word_obj.save()
+            # Create or update Word object for processing
+            word_obj = await Word.find_one(Word.text == word)
+            if not word_obj:
+                word_obj = Word(text=word, languages=[Language.ENGLISH.value])
+                await word_obj.save()
 
             # Create raw data for base class processing
             raw_data = {
@@ -420,6 +431,7 @@ class AppleDictionaryConnector(DictionaryConnector):
 
         # Extract basic information from raw definition
         # Extract part of speech directly from definition text
+        # TODO[MEDIUM]: Replace default POS fallback with explicit unknown/validation flow.
         part_of_speech = "noun"  # Default fallback
         # Look for part of speech indicators in the raw definition
         pos_pattern = r"(?:noun|verb|adjective|adverb|preposition|conjunction|interjection|pronoun|determiner)"

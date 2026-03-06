@@ -75,7 +75,7 @@ class WordHippoConnector(DictionaryConnector):
             # Get or create word object to get ID
             word_obj = await Word.find_one({"text": word})
             if not word_obj:
-                word_obj = Word(text=word)  # Language defaults to ENGLISH
+                word_obj = Word(text=word, languages=[Language.ENGLISH.value])
                 await word_obj.save()
 
             # Extract all components

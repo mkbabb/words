@@ -15,6 +15,9 @@ from ...models.dictionary import (
     Word,
 )
 from ...models.relationships import WordForm
+from ...utils.language_precedence import (
+    language_code,
+)
 from ...utils.logging import get_logger
 from ..connector import OpenAIConnector
 
@@ -28,12 +31,18 @@ async def synthesize_pronunciation(
     state_tracker: StateTracker | None = None,
     language: str = "en",
 ) -> Pronunciation | None:
-    """Synthesize pronunciation: enhance existing or create new."""
+    """Synthesize pronunciation for the requested language."""
     # Find existing pronunciation
     existing_pronunciation = await _find_existing_pronunciation(providers_data)
 
     if existing_pronunciation:
-        return await _enhance_pronunciation(existing_pronunciation, word, ai, state_tracker, language)
+        return await _clone_and_enhance_pronunciation(
+            source=existing_pronunciation,
+            word=word,
+            ai=ai,
+            state_tracker=state_tracker,
+            language=language,
+        )
     return await _create_pronunciation(word, ai, state_tracker, language)
 
 
@@ -52,14 +61,23 @@ async def _find_existing_pronunciation(
     return None
 
 
-async def _enhance_pronunciation(
-    pronunciation: Pronunciation,
+async def _clone_and_enhance_pronunciation(
+    source: Pronunciation,
     word: str,
     ai: OpenAIConnector,
     state_tracker: StateTracker | None,
     language: str = "en",
 ) -> Pronunciation:
-    """Enhance existing pronunciation with missing data."""
+    """Clone provider pronunciation and attach language-specific audio."""
+    pronunciation = Pronunciation(
+        word_id=source.word_id,
+        phonetic=source.phonetic,
+        ipa=source.ipa,
+        syllables=list(source.syllables),
+        stress_pattern=source.stress_pattern,
+        model_info=source.model_info,
+    )
+
     needs_enhancement = not pronunciation.phonetic or not pronunciation.ipa
 
     if needs_enhancement:
@@ -73,14 +91,12 @@ async def _enhance_pronunciation(
             response = await ai.pronunciation(word, language=language)
             pronunciation.phonetic = response.phonetic
             pronunciation.ipa = response.ipa
-            await pronunciation.save()
 
         except Exception as e:
             logger.error(f"Failed to enhance pronunciation for {word}: {e}")
 
-    # Generate audio if missing
-    if not pronunciation.audio_file_ids:
-        await _generate_audio_files(pronunciation, word, language)
+    await pronunciation.save()
+    await _generate_audio_files(pronunciation, word, language)
 
     return pronunciation
 
@@ -104,7 +120,7 @@ async def _create_pronunciation(
         # Create Word object if we need word_id (assuming word parameter should be Word object)
         word_obj = await Word.find_one(Word.text == word)
         if not word_obj:
-            word_obj = Word(text=word)
+            word_obj = Word(text=word, languages=[language_code(language)])
             await word_obj.save()
 
         assert word_obj.id is not None  # After save(), id is guaranteed to be not None

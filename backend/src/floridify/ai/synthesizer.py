@@ -16,8 +16,11 @@ from ..models.dictionary import (
 )
 from ..storage.dictionary import save_definition_versioned, save_entry_versioned
 from ..storage.mongodb import get_storage
+from ..utils.language_precedence import (
+    to_language_codes,
+)
 from ..utils.logging import get_logger
-from .connector import OpenAIConnector
+from .connector import OpenAIConnector, get_openai_connector
 from .constants import SynthesisComponent
 from .synthesis import (
     cluster_definitions,
@@ -49,17 +52,25 @@ class DefinitionSynthesizer:
         self,
         word: str,
         providers_data: list[DictionaryEntry],
-        language: Language = Language.ENGLISH,
+        languages: list[Language],
         force_refresh: bool = False,
         state_tracker: StateTracker | None = None,
     ) -> DictionaryEntry | None:
         """Synthesize a complete dictionary entry from provider data."""
+        if not languages:
+            raise ValueError("languages must contain at least one language")
+
+        requested_language_codes = to_language_codes(languages)
+
         # Get or create Word document
         storage = await get_storage()
         word_obj = await storage.get_word(word)
         if not word_obj:
-            word_obj = Word(text=word, language=language)
+            word_obj = Word(text=word, languages=requested_language_codes)
             await word_obj.save()
+
+        assert word_obj.id is not None
+        primary_language = requested_language_codes[0]
 
         # Check for existing synthesized entry
         if not force_refresh:
@@ -139,15 +150,23 @@ class DefinitionSynthesizer:
         if state_tracker:
             await state_tracker.update_stage(Stages.AI_SYNTHESIS)
 
+        # TODO[CRITICAL]: Remove graceful-degradation gather behavior; fail the synthesis transaction explicitly.
         # Run all synthesis operations in parallel with graceful degradation
         results = await asyncio.gather(
             self._synthesize_definitions(word_obj, clustered_definitions, state_tracker),
-            synthesize_pronunciation(word_obj.text, providers_data, self.ai, state_tracker, language=word_obj.language),
+            synthesize_pronunciation(
+                word_obj.text,
+                providers_data,
+                self.ai,
+                state_tracker,
+                language=primary_language,
+            ),
             synthesize_etymology(word_obj, providers_data, self.ai, state_tracker),
             generate_facts(word_obj, unique_definitions, self.ai, self.facts_count, state_tracker),
             return_exceptions=True,
         )
 
+        # TODO[HIGH]: Replace optional-component downgrades with explicit component failure policy.
         # Handle partial failures: definitions are required, others are optional
         synthesized_definitions = results[0]
         if isinstance(synthesized_definitions, BaseException):
@@ -175,6 +194,7 @@ class DefinitionSynthesizer:
         entry = DictionaryEntry(
             provider=DictionaryProvider.SYNTHESIS,
             word_id=word_obj.id,
+            languages=requested_language_codes,
             pronunciation_id=pronunciation.id if pronunciation else None,
             definition_ids=[d.id for d in synthesized_definitions if d.id is not None],
             etymology=etymology,
@@ -278,6 +298,7 @@ class DefinitionSynthesizer:
             task = synthesize_cluster(cluster_id, cluster_defs)
             synthesis_tasks.append(task)
 
+        # TODO[HIGH]: Stop partial-success synthesis in clustering; return explicit failure if any cluster fails.
         # Execute all syntheses in parallel with graceful degradation
         results = await asyncio.gather(*synthesis_tasks, return_exceptions=True)
 
@@ -290,75 +311,6 @@ class DefinitionSynthesizer:
                 synthesized_definitions.append(result)
 
         return synthesized_definitions
-
-    async def generate_fallback_entry(
-        self,
-        word: str,
-        language: Language = Language.ENGLISH,
-        force_refresh: bool = False,
-        state_tracker: StateTracker | None = None,
-    ) -> DictionaryEntry | None:
-        """Generate a complete fallback entry using AI."""
-        logger.info(f"Generating AI fallback for '{word}'")
-
-        # Get or create Word
-        storage = await get_storage()
-        word_obj = await storage.get_word(word)
-        if not word_obj:
-            word_obj = Word(
-                text=word,
-                normalized=word.lower(),
-                language=language,
-            )
-            await word_obj.save()
-
-        if state_tracker:
-            await state_tracker.update_stage(Stages.AI_FALLBACK)
-
-        # Generate fallback definitions
-        dictionary_entry = await self.ai.lookup_fallback(word)
-
-        if not dictionary_entry or not dictionary_entry.definitions:
-            raise ValueError(f"No definitions generated for '{word}'")
-
-        # Convert to provider data format
-        definitions: list[Definition] = []
-        for ai_def in dictionary_entry.definitions:
-            # Create definition
-            assert word_obj.id is not None  # Word should have been saved before this point
-            definition = Definition(
-                word_id=word_obj.id,
-                part_of_speech=ai_def.part_of_speech,
-                text=ai_def.definition,
-            )
-            await save_definition_versioned(definition, word)
-            definitions.append(definition)  # Add to the list!
-
-        # Create tmp provider data
-        assert word_obj.id is not None  # Word should have been saved before this point
-        provider_data = DictionaryEntry(
-            resource_id=f"{word}:{DictionaryProvider.AI_FALLBACK.value}",
-            provider=DictionaryProvider.AI_FALLBACK,
-            word_id=word_obj.id,
-            definition_ids=[d.id for d in definitions if d.id is not None],
-        )
-        await self._save_entry_with_version_manager(provider_data, word)
-
-        # Synthesize complete entry
-        synthesized_entry = await self.synthesize_entry(
-            word=word,
-            providers_data=[provider_data],
-            language=language,
-            force_refresh=force_refresh,
-            state_tracker=state_tracker,
-        )
-
-        # Clean up temporary provider data and definitions
-        await provider_data.delete()
-        for definition in definitions:
-            await definition.delete()
-
-        return synthesized_entry
 
     async def _save_entry_with_version_manager(
         self,
@@ -391,8 +343,6 @@ class DefinitionSynthesizer:
             Updated synthesized dictionary entry or None if not found
 
         """
-        from .constants import SynthesisComponent
-
         # Fetch existing entry
         entry = await DictionaryEntry.get(entry_id)
         if not entry:
@@ -472,8 +422,6 @@ def get_definition_synthesizer(
     global _definition_synthesizer
 
     if _definition_synthesizer is None or force_recreate:
-        from .connector import get_openai_connector
-
         logger.info("Initializing definition synthesizer singleton")
         connector = get_openai_connector(config_path, force_recreate)
         _definition_synthesizer = DefinitionSynthesizer(connector, examples_count=examples_count)

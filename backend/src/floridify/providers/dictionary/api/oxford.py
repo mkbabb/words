@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, Literal
 
 from beanie import PydanticObjectId
 
-from ....core.state_tracker import StateTracker
+from ....core.state_tracker import Stages, StateTracker
 from ....models.base import Language
 from ....models.dictionary import (
     Definition,
@@ -66,8 +66,6 @@ class OxfordConnector(DictionaryConnector):
         """
         try:
             if state_tracker:
-                from ....core.state_tracker import Stages
-
                 await state_tracker.update_stage(Stages.PROVIDER_FETCH_START)
 
             # Fetch both entries and pronunciation if available
@@ -86,9 +84,11 @@ class OxfordConnector(DictionaryConnector):
             response.raise_for_status()
             data = response.json()
 
-            # Create Word object for processing
-            word_obj = Word(text=word)
-            await word_obj.save()
+            # Create or update Word object for processing
+            word_obj = await Word.find_one(Word.text == word)
+            if not word_obj:
+                word_obj = Word(text=word, languages=[Language.ENGLISH.value])
+                await word_obj.save()
 
             result = await self._parse_oxford_response(word, data, word_obj)
 
@@ -100,8 +100,6 @@ class OxfordConnector(DictionaryConnector):
         except Exception as e:
             logger.error(f"Error fetching {word} from Oxford: {e}")
             if state_tracker:
-                from ....core.state_tracker import Stages
-
                 await state_tracker.update_error(str(e), Stages.PROVIDER_FETCH_ERROR)
             return None
 
@@ -204,6 +202,7 @@ class OxfordConnector(DictionaryConnector):
                             elif "British English" in dialect:
                                 ipa_british = p.get("phoneticSpelling")
 
+                        # TODO[MEDIUM]: Replace implicit dialect fallback ordering with explicit dialect selection policy.
                         # Use American IPA as primary, fallback to British
                         primary_ipa = ipa_american or ipa_british or phonetic or "unknown"
                         return Pronunciation(
@@ -263,8 +262,6 @@ class OxfordConnector(DictionaryConnector):
                                 domain = domains[0].get("text") if domains else None
 
                                 registers = sense.get("registers", [])
-                                from typing import Literal
-
                                 register: (
                                     Literal["formal", "informal", "neutral", "slang", "technical"]
                                     | None

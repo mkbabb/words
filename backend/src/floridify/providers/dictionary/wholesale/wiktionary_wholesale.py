@@ -27,6 +27,7 @@ from ...batch import BatchOperation
 from ...core import ConnectorConfig
 from ...rate_limiting import RateLimitConfig
 from ..core import DictionaryConnector
+from ..scraper.wiktionary import WiktionaryConnector
 
 logger = get_logger(__name__)
 
@@ -64,10 +65,7 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
         self.data_dir = data_dir or Path("/tmp/floridify/wiktionary_wholesale")
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
-        # Initialize a regular Wiktionary connector for parsing
-        from ..scraper import wiktionary as wiktionary_scraper
-
-        class ParserProxy(wiktionary_scraper.WiktionaryConnector):
+        class ParserProxy(WiktionaryConnector):
             def get_metadata_for_resource(self, resource_id: str) -> dict[str, Any]:
                 return {}
 
@@ -322,15 +320,13 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
             content = page_data["content"]
 
             # Get or create Word object
-            word_obj = await Word.find_one(
-                {"text": title, "language": self.language},
-            )
+            word_obj = await Word.find_one({"text": title})
 
             if not word_obj:
                 word_obj = Word(
                     text=title,
                     normalized=title.lower(),
-                    language=self.language,
+                    languages=[self.language.value],
                 )
                 await word_obj.save()
 
@@ -357,7 +353,7 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
             versioned_data = DictionaryEntry(
                 word_id=word_obj.id,
                 word_text=title,
-                language=self.language,
+                languages=[self.language.value],
                 provider=self.provider,
                 version_info=VersionInfo(
                     data_hash=data_hash,
@@ -466,7 +462,7 @@ class WiktionaryWholesaleConnector(DictionaryConnector):
         # First get or create word object
         word_obj = await Word.find_one({"text": word})
         if not word_obj:
-            word_obj = Word(text=word)
+            word_obj = Word(text=word, languages=[self.language.value])
             await word_obj.save()
 
         # First check if we have wholesale data

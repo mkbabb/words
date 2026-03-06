@@ -20,6 +20,9 @@ from ..models.dictionary import (
 from ..providers.factory import create_connector
 from ..storage.dictionary import save_entry_versioned
 from ..storage.mongodb import get_storage, get_synthesized_entry
+from ..utils.language_precedence import (
+    to_language_codes,
+)
 from ..utils.logging import (
     get_logger,
     log_metrics,
@@ -31,6 +34,17 @@ from .search_pipeline import find_best_match
 from .state_tracker import Stages, StateTracker
 
 logger = get_logger(__name__)
+
+
+def _resolve_lookup_languages(
+    requested_languages: list[Language],
+) -> list[Language]:
+    """Normalize lookup language precedence while preserving request order."""
+    unique_languages: list[Language] = []
+    for language in requested_languages:
+        if language not in unique_languages:
+            unique_languages.append(language)
+    return unique_languages
 
 
 @log_timing
@@ -68,6 +82,7 @@ async def lookup_word_pipeline(
             providers.append(DictionaryProvider.APPLE_DICTIONARY)
     if languages is None:
         languages = [Language.ENGLISH]
+    lookup_languages = _resolve_lookup_languages(requested_languages=languages)
 
     # Log initial pipeline parameters
     log_metrics(
@@ -87,7 +102,7 @@ async def lookup_word_pipeline(
         search_start = time.perf_counter()
         best_match_result = await find_best_match(
             word=word,
-            languages=languages,
+            languages=[lookup_languages[0]],
             semantic=semantic,
         )
         search_duration = time.perf_counter() - search_start
@@ -113,14 +128,14 @@ async def lookup_word_pipeline(
         # Handle force_refresh: skip cache but preserve history
         # (Old versions are retained in the VersionedDataManager chain)
         if force_refresh:
-            existing = await get_synthesized_entry(word)
+            existing = await get_synthesized_entry(best_match)
             if existing:
                 logger.info(
                     f"🔄 Force refresh for '{best_match}' — existing entry preserved in version history",
                 )
         else:
             # Try to get a cached entry if not forcing refresh (regardless of AI setting)
-            existing = await get_synthesized_entry(word)
+            existing = await get_synthesized_entry(best_match)
             if existing:
                 logger.info(f"📋 Using cached synthesized entry for '{best_match}'")
                 return existing
@@ -139,7 +154,7 @@ async def lookup_word_pipeline(
             _get_provider_definition(
                 word=best_match,
                 provider=provider,
-                language=languages[0],  # Use first language for provider fetch
+                languages=lookup_languages,
                 force_refresh=force_refresh,
                 state_tracker=state_tracker,
             )
@@ -167,14 +182,13 @@ async def lookup_word_pipeline(
         if state_tracker:
             await state_tracker.update_stage(Stages.PROVIDER_FETCH_COMPLETE)
 
-        # If all providers failed, try AI fallback
+        # TODO[CRITICAL]: Reinstate AI fallback when providers return no data, with
+        # explicit reason codes + structured logs/metrics for every fallback invocation.
+        # Temporary behavior: currently stops on provider miss.
+        # Target behavior: AI fallback should run for provider-no-data cases with explicit logging.
         if not providers_data:
-            logger.warning(f"All providers failed for '{best_match}', attempting AI fallback")
-            return await _ai_fallback_lookup(
-                word=best_match,
-                force_refresh=force_refresh,
-                state_tracker=state_tracker,
-            )
+            logger.warning(f"All providers failed for '{best_match}'")
+            return None
 
         # Synthesize with AI if enabled and we have provider data
         if not no_ai and providers_data:
@@ -190,7 +204,7 @@ async def lookup_word_pipeline(
                 synthesized_entry = await _synthesize_with_ai(
                     word=best_match,
                     providers=providers_data,
-                    language=languages[0],  # Use first language for synthesis
+                    languages=lookup_languages,
                     force_refresh=force_refresh,
                     state_tracker=state_tracker,
                 )
@@ -218,6 +232,7 @@ async def lookup_word_pipeline(
                 )
                 return None
             except Exception as e:
+                # TODO[HIGH]: Stop collapsing synthesis exceptions to None; propagate typed pipeline errors.
                 logger.error(f"❌ AI synthesis failed for '{best_match}': {e}")
                 return None
         else:
@@ -236,6 +251,7 @@ async def lookup_word_pipeline(
             return None
 
     except Exception as e:
+        # TODO[HIGH]: Replace blanket top-level catch with explicit exception taxonomy + fail-closed behavior.
         logger.error(f"❌ Lookup pipeline failed for '{word}': {e}")
         return None
 
@@ -244,7 +260,7 @@ async def lookup_word_pipeline(
 async def _get_provider_definition(
     word: str,
     provider: DictionaryProvider,
-    language: Language = Language.ENGLISH,
+    languages: list[Language],
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
 ) -> DictionaryEntry | None:
@@ -261,21 +277,22 @@ async def _get_provider_definition(
         try:
             connector = create_connector(provider)
         except ValueError as e:
+            # TODO[HIGH]: Stop swallowing connector construction errors; surface unsupported-provider failure explicitly.
             logger.warning(f"Failed to create connector for {provider.value}: {e}")
             return None
 
         storage = await get_storage()
         word_obj = await storage.get_word(word)
+        requested_language_codes = to_language_codes(languages)
 
         if not word_obj:
             # Create new Word if doesn't exist
             word_obj = Word(
                 text=word,
                 normalized=word.lower(),
-                language=language,
+                languages=requested_language_codes,
             )
             await word_obj.save()
-
         if connector:
             fetch_start = time.perf_counter()
 
@@ -286,6 +303,7 @@ async def _get_provider_definition(
                     timeout=30.0,
                 )
             except TimeoutError:
+                # TODO[MEDIUM]: Replace timeout-to-None behavior with structured timeout errors per provider.
                 logger.warning(f"⏱️ Provider {provider.value} timed out after 30s for '{word}'")
                 return None
 
@@ -314,6 +332,7 @@ async def _get_provider_definition(
     except Exception as e:
         log_provider_fetch(provider_name=provider.value, word=word, success=False)
 
+        # TODO[HIGH]: Do not mask provider exceptions as empty results; bubble explicit failure state.
         logger.error(f"❌ Provider {provider.value} failed for '{word}': {e}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")
 
@@ -325,7 +344,7 @@ async def _get_provider_definition(
 async def _synthesize_with_ai(
     word: str,
     providers: list[DictionaryEntry],
-    language: Language = Language.ENGLISH,
+    languages: list[Language],
     force_refresh: bool = False,
     state_tracker: StateTracker | None = None,
 ) -> DictionaryEntry | None:
@@ -341,7 +360,7 @@ async def _synthesize_with_ai(
         result = await synthesizer.synthesize_entry(
             word=word,
             providers_data=providers,
-            language=language,
+            languages=languages,
             force_refresh=force_refresh,
             state_tracker=state_tracker,
         )
@@ -356,6 +375,7 @@ async def _synthesize_with_ai(
 
         return result
     except Exception as e:
+        # TODO[HIGH]: Propagate synthesis errors instead of returning None to preserve failure causality.
         logger.error(f"❌ AI synthesis failed for '{word}': {e}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")
         return None
@@ -382,6 +402,7 @@ async def _create_provider_mapped_entry(
         word_obj = await Word.get(provider_data.word_id)
         if not word_obj:
             logger.error(f"Word object not found for ID: {provider_data.word_id}")
+            # TODO[HIGH]: Convert this implicit None path into explicit not-found failure.
             return None
 
         # Load all definitions from provider
@@ -393,6 +414,7 @@ async def _create_provider_mapped_entry(
 
         if not all_definitions:
             logger.warning("No definitions found for provider data")
+            # TODO[HIGH]: Convert missing-definition fallback into explicit provider-data validation failure.
             return None
 
         if no_ai:
@@ -459,7 +481,8 @@ async def _create_provider_mapped_entry(
         synthesized_entry = DictionaryEntry(
             resource_id=f"{word}:synthesis",
             provider=DictionaryProvider.SYNTHESIS,
-            word_id=provider_data.word_id,
+            word_id=word_obj.id,
+            languages=to_language_codes(list(word_obj.languages)),
             pronunciation_id=provider_data.pronunciation_id,
             definition_ids=final_def_ids,
             etymology=provider_data.etymology or etymology,
@@ -481,51 +504,6 @@ async def _create_provider_mapped_entry(
         return synthesized_entry
 
     except Exception as e:
+        # TODO[HIGH]: Replace catch-all/None return with explicit provider-mapping error propagation.
         logger.error(f"❌ Failed to create provider-mapped entry: {e}")
-        return None
-
-
-@log_timing
-@log_stage("AI Fallback", "🔮")
-async def _ai_fallback_lookup(
-    word: str,
-    force_refresh: bool = False,
-    state_tracker: StateTracker | None = None,
-) -> DictionaryEntry | None:
-    """AI fallback when no provider definitions are found."""
-    logger.info(f"🔮 Attempting AI fallback generation for '{word}'")
-
-    try:
-        synthesizer = get_definition_synthesizer()
-        start_time = time.perf_counter()
-
-        ai_entry = await synthesizer.generate_fallback_entry(
-            word,
-            Language.ENGLISH,
-            force_refresh,
-            state_tracker,
-        )
-        duration = time.perf_counter() - start_time
-
-        if ai_entry and ai_entry.definition_ids:
-            logger.info(
-                f"✅ AI fallback successful for '{word}': "
-                f"{len(ai_entry.definition_ids)} definitions generated in {duration:.2f}s",
-            )
-
-            log_metrics(
-                word=word,
-                fallback_duration=duration,
-                definition_count=len(ai_entry.definition_ids),
-                is_fallback=True,
-            )
-
-            return ai_entry
-        logger.warning(
-            f"⚠️  AI fallback returned no definitions for '{word}' after {duration:.2f}s",
-        )
-        return None
-
-    except Exception as e:
-        logger.error(f"❌ AI fallback failed for '{word}': {e}")
         return None

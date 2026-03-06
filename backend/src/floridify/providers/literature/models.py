@@ -55,6 +55,7 @@ class LiteratureEntry(BaseModel):
     title: str = Field(description="Title of the work")
     author: AuthorInfo = Field(description="Author information")
 
+    # TODO[MEDIUM]: Remove backward-compatibility optional source once all entries are normalized.
     # Composed source configuration (optional for backward compatibility)
     source: LiteratureSource | None = Field(
         default=None,
@@ -71,6 +72,7 @@ class LiteratureEntry(BaseModel):
     description: str | None = Field(default=None, description="Work description")
     keywords: list[str] = Field(default_factory=list, description="Keywords/tags")
 
+    # TODO[MEDIUM]: Remove direct compatibility fields after source-only model migration.
     # Direct genre/period/language fields for backward compatibility
     genre: Genre | None = Field(default=None, description="Genre of the work")
     period: Period | None = Field(default=None, description="Historical period")
