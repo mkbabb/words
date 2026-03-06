@@ -1,7 +1,7 @@
 <template>
     <div
         ref="controlsDropdown"
-        class="dropdown-element cartoon-shadow-sm mb-2 origin-top overflow-hidden rounded-2xl border-2 border-border bg-background backdrop-blur-xl"
+        class="dropdown-element cartoon-shadow-sm mb-2 flex max-h-[min(500px,70dvh)] origin-top flex-col rounded-2xl border-2 border-border bg-background backdrop-blur-xl"
         tabindex="0"
         @mousedown.prevent
         @click="$emit('interaction')"
@@ -9,7 +9,7 @@
     >
             <!-- Header: Sidebar Toggle + Search Mode Toggle -->
             <div
-                class="flex items-center justify-between border-border/50 px-4 py-3 lg:justify-center"
+                class="flex shrink-0 items-center justify-between border-border/50 px-4 py-3 lg:justify-center"
             >
                 <!-- Mobile Sidebar Toggle (far left) -->
                 <button
@@ -36,33 +36,35 @@
                 <div class="w-10 lg:hidden"></div>
             </div>
 
-            <!-- Mode-Specific Controls (animated switch) -->
-            <Transition name="controls-mode-switch" mode="out-in">
-                <div :key="searchMode">
-                    <!-- Lookup Mode Controls -->
-                    <LookupControlsPanel
-                        v-if="searchMode === 'lookup'"
-                        v-model:selected-sources="selectedSources"
-                        v-model:selected-languages="selectedLanguages"
-                        v-model:no-a-i="noAI"
-                        :ai-suggestions="aiSuggestions"
-                        :is-development="isDevelopment"
-                        :show-refresh-button="showRefreshButton"
-                        :force-refresh-mode="forceRefreshMode"
-                        @word-select="$emit('word-select', $event)"
-                        @clear-storage="emit('clear-storage')"
-                        @toggle-sidebar="emit('toggle-sidebar')"
-                        @toggle-refresh="emit('toggle-refresh')"
-                    />
+            <!-- Mode-Specific Controls (animated switch, scrollable) -->
+            <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                <Transition name="controls-mode-switch" mode="out-in">
+                    <div :key="searchMode">
+                        <!-- Lookup Mode Controls -->
+                        <LookupControlsPanel
+                            v-if="searchMode === 'lookup'"
+                            v-model:selected-sources="selectedSources"
+                            v-model:selected-languages="selectedLanguages"
+                            v-model:no-a-i="noAI"
+                            :ai-suggestions="aiSuggestions"
+                            :is-development="isDevelopment"
+                            :show-refresh-button="showRefreshButton"
+                            :force-refresh-mode="forceRefreshMode"
+                            @word-select="$emit('word-select', $event)"
+                            @clear-storage="emit('clear-storage')"
+                            @toggle-sidebar="emit('toggle-sidebar')"
+                            @toggle-refresh="emit('toggle-refresh')"
+                        />
 
-                    <!-- Wordlist Mode Controls -->
-                    <WordlistControlsPanel
-                        v-else-if="searchMode === 'wordlist'"
-                        v-model:wordlist-filters="wordlistFilters"
-                        v-model:wordlist-sort-criteria="wordlistSortCriteria"
-                    />
-                </div>
-            </Transition>
+                        <!-- Wordlist Mode Controls -->
+                        <WordlistControlsPanel
+                            v-else-if="searchMode === 'wordlist'"
+                            v-model:wordlist-filters="wordlistFilters"
+                            v-model:wordlist-sort-criteria="wordlistSortCriteria"
+                        />
+                    </div>
+                </Transition>
+            </div>
     </div>
 </template>
 

@@ -144,9 +144,21 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        // Optimize chunking
-        manualChunks: {
-          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            // Core Vue ecosystem
+            if (/\/(vue|vue-router|pinia|@vue)\//.test(id)) return 'vue-vendor';
+            // UI primitives (Radix/Reka)
+            if (/\/(reka-ui|@floating-ui|@internationalized)\//.test(id)) return 'ui-primitives';
+            // Icons
+            if (id.includes('lucide-vue-next')) return 'icons';
+            // Auth (loaded after paint)
+            if (id.includes('@clerk')) return 'clerk';
+            // KaTeX (only used on definition pages)
+            if (id.includes('katex')) return 'katex';
+            // Utilities
+            if (/\/(axios|@vueuse)\//.test(id)) return 'utils-vendor';
+          }
         },
       },
     },
