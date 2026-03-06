@@ -146,18 +146,15 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            // Core Vue ecosystem
-            if (/\/(vue|vue-router|pinia|@vue)\//.test(id)) return 'vue-vendor';
-            // UI primitives (Radix/Reka)
-            if (/\/(reka-ui|@floating-ui|@internationalized)\//.test(id)) return 'ui-primitives';
-            // Icons
+            // Core Vue ecosystem + UI primitives + utilities in one chunk
+            // (avoids circular deps between reka-ui ↔ @vueuse ↔ vue)
+            if (/\/(vue|vue-router|pinia|@vue|reka-ui|@floating-ui|@internationalized|axios|@vueuse)\//.test(id)) return 'vendor';
+            // Icons (tree-shaken, small)
             if (id.includes('lucide-vue-next')) return 'icons';
             // Auth (loaded after paint)
             if (id.includes('@clerk')) return 'clerk';
-            // KaTeX (only used on definition pages)
+            // KaTeX (lazy-loaded, 261KB)
             if (id.includes('katex')) return 'katex';
-            // Utilities
-            if (/\/(axios|@vueuse)\//.test(id)) return 'utils-vendor';
           }
         },
       },
