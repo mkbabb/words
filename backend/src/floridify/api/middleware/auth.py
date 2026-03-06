@@ -75,7 +75,6 @@ PREMIUM_PREFIXES = frozenset(
 PREMIUM_PATTERNS = [
     re.compile(r"^/api/v1/definitions/[^/]+/regenerate$"),
     re.compile(r"^/api/v1/examples/[^/]+/generate$"),
-    re.compile(r"^/api/v1/audio/tts/generate$"),
 ]
 
 # Tier 4: Admin-only endpoints
@@ -108,6 +107,10 @@ def _is_public_endpoint(path: str, method: str) -> bool:
     # Users/me is authenticated but should pass through middleware for token extraction
     # Audio cache serving is public (GET)
     if method == "GET" and path.startswith("/api/v1/audio/cache/"):
+        return True
+
+    # TTS generation is public (pronunciation is a core dictionary feature)
+    if method == "POST" and path == "/api/v1/audio/tts/generate":
         return True
 
     return False
