@@ -37,3 +37,9 @@ benchmark_results/
 
 .serena/
 .playwright-mcp/
+
+# Screenshots (debug/testing artifacts)
+*.png
+
+# Playwright test results
+frontend/test-results/
