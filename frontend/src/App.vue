@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useUIStore } from '@/stores/ui/ui-state';
 import { Toaster } from '@/components/ui/toast';
 import { PWAInstallPrompt, PWANotificationPrompt } from '@/components/custom/pwa';
@@ -46,27 +46,43 @@ const appStyles = computed(() => ({
     backgroundSize: '60px 60px',
 }));
 
+// Engagement metric handlers (defined outside onMounted for proper cleanup)
+const handleWordSearched = () => {
+    const count = parseInt(localStorage.getItem('search-count') || '0', 10);
+    if (!Number.isNaN(count)) {
+        localStorage.setItem('search-count', (count + 1).toString());
+    } else {
+        localStorage.setItem('search-count', '1');
+    }
+};
+
+const handleDefinitionViewed = () => {
+    const count = parseInt(localStorage.getItem('definitions-viewed') || '0', 10);
+    if (!Number.isNaN(count)) {
+        localStorage.setItem('definitions-viewed', (count + 1).toString());
+    } else {
+        localStorage.setItem('definitions-viewed', '1');
+    }
+};
+
 // Initialize PWA on mount
 onMounted(async () => {
     // Register service worker
     await registerServiceWorker();
-    
+
     // Setup iOS-specific features
     if (isIOS.value) {
         handleSwipeNavigation(true);
         handleViewportResize();
     }
-    
-    // Track word searches for engagement metrics
-    window.addEventListener('word-searched', () => {
-        const count = parseInt(localStorage.getItem('search-count') || '0');
-        localStorage.setItem('search-count', (count + 1).toString());
-    });
-    
-    // Track definition views for engagement metrics
-    window.addEventListener('definition-viewed', () => {
-        const count = parseInt(localStorage.getItem('definitions-viewed') || '0');
-        localStorage.setItem('definitions-viewed', (count + 1).toString());
-    });
+
+    // Track engagement metrics with proper cleanup
+    window.addEventListener('word-searched', handleWordSearched);
+    window.addEventListener('definition-viewed', handleDefinitionViewed);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('word-searched', handleWordSearched);
+    window.removeEventListener('definition-viewed', handleDefinitionViewed);
 });
 </script>

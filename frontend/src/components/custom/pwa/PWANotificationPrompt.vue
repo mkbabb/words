@@ -84,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { Bell, X, Sparkles, BookOpen, Clock, Info } from 'lucide-vue-next';
 import { useIOSPWA, usePWA } from '@/composables';
 import { useStores } from '@/stores';
@@ -163,43 +163,50 @@ const checkShouldShowPrompt = () => {
   // Check if dismissed recently
   const dismissed = localStorage.getItem('notification-prompt-dismissed');
   if (dismissed) {
-    const dismissedTime = parseInt(dismissed);
-    const daysSince = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
-    if (daysSince < 14) return false;
+    const dismissedTime = parseInt(dismissed, 10);
+    if (!Number.isNaN(dismissedTime)) {
+      const daysSince = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
+      if (daysSince < 14) return false;
+    }
   }
-  
+
   // Check user engagement
-  const searchCount = parseInt(localStorage.getItem('search-count') || '0');
-  const hasViewedDefinitions = parseInt(localStorage.getItem('definitions-viewed') || '0');
+  const rawSearchCount = parseInt(localStorage.getItem('search-count') || '0', 10);
+  const searchCount = Number.isNaN(rawSearchCount) ? 0 : rawSearchCount;
+  const rawViewed = parseInt(localStorage.getItem('definitions-viewed') || '0', 10);
+  const hasViewedDefinitions = Number.isNaN(rawViewed) ? 0 : rawViewed;
   
   // Show after meaningful engagement
   return searchCount >= 5 && hasViewedDefinitions >= 3;
 };
 
+const handleShowNotificationPrompt = () => {
+  showPrompt.value = true;
+};
+
+let checkTimeout: ReturnType<typeof setTimeout> | null = null;
+
 onMounted(() => {
   // Check if should show after delay
-  setTimeout(() => {
+  checkTimeout = setTimeout(() => {
     if (checkShouldShowPrompt()) {
       // Additional delay if install prompt is showing
       const installPromptShowing = document.querySelector('[data-pwa-install-prompt]');
       const delay = installPromptShowing ? 5000 : 0;
-      
+
       setTimeout(() => {
         showPrompt.value = true;
       }, delay);
     }
   }, 60000); // Check after 1 minute
-  
-  // Track definition views
-  window.addEventListener('definition-viewed', () => {
-    const count = parseInt(localStorage.getItem('definitions-viewed') || '0');
-    localStorage.setItem('definitions-viewed', (count + 1).toString());
-  });
-  
+
   // Listen for debug show notification prompt event
-  window.addEventListener('show-notification-prompt', () => {
-    showPrompt.value = true;
-  });
+  window.addEventListener('show-notification-prompt', handleShowNotificationPrompt);
+});
+
+onUnmounted(() => {
+  if (checkTimeout) clearTimeout(checkTimeout);
+  window.removeEventListener('show-notification-prompt', handleShowNotificationPrompt);
 });
 </script>
 

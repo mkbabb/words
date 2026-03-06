@@ -39,11 +39,11 @@
                 :key="index"
                 class="flex items-center gap-3 group"
               >
-                <div 
-                  class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 
+                <div
+                  class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20
                          flex items-center justify-center text-xs font-semibold
                          group-hover:scale-110 group-hover:bg-primary/30 transition-fast"
-                  :class="`delay-${index * 150}`"
+                  :style="{ transitionDelay: `${index * 150}ms` }"
                 >
                   {{ index + 1 }}
                 </div>
@@ -207,14 +207,18 @@ const checkEngagement = () => {
   if (dismissed === 'permanent') return false;
   
   if (dismissed) {
-    const dismissedTime = parseInt(dismissed);
-    const daysSince = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
-    if (daysSince < 7) return false;
+    const dismissedTime = parseInt(dismissed, 10);
+    if (!Number.isNaN(dismissedTime)) {
+      const daysSince = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
+      if (daysSince < 7) return false;
+    }
   }
-  
+
   // Check engagement metrics
-  const searchCount = parseInt(localStorage.getItem('search-count') || '0');
-  const sessionStartTime = parseInt(localStorage.getItem('session-start-time') || String(Date.now()));
+  const rawSearchCount = parseInt(localStorage.getItem('search-count') || '0', 10);
+  const searchCount = Number.isNaN(rawSearchCount) ? 0 : rawSearchCount;
+  const rawSessionStart = parseInt(localStorage.getItem('session-start-time') || '0', 10);
+  const sessionStartTime = Number.isNaN(rawSessionStart) || rawSessionStart === 0 ? Date.now() : rawSessionStart;
   const sessionTime = Date.now() - sessionStartTime;
   
   // Show after 3 searches or 2 minutes of engagement
@@ -223,12 +227,6 @@ const checkEngagement = () => {
 
 // Store interval ID outside to clear it later
 let checkInterval: ReturnType<typeof setInterval> | null = null;
-
-// Event handlers defined at module scope for cleanup
-const handleWordSearched = () => {
-  const count = parseInt(localStorage.getItem('search-count') || '0');
-  localStorage.setItem('search-count', (count + 1).toString());
-};
 
 const handleShowPWAPrompt = () => {
   showPrompt.value = true;
@@ -256,9 +254,6 @@ onMounted(() => {
     }, 30000); // Show after 30 seconds
   }
   
-  // Track searches for engagement
-  window.addEventListener('word-searched', handleWordSearched);
-
   // Listen for debug show prompt event
   window.addEventListener('show-pwa-prompt', handleShowPWAPrompt);
 });
@@ -268,7 +263,6 @@ onUnmounted(() => {
   if (checkInterval) {
     clearInterval(checkInterval);
   }
-  window.removeEventListener('word-searched', handleWordSearched);
   window.removeEventListener('show-pwa-prompt', handleShowPWAPrompt);
 });
 </script>
