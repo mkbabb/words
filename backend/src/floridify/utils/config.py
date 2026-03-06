@@ -326,8 +326,10 @@ class Config:
             tunnel_url=tunnel_url,
             tunnel_test_url=tunnel_test_url,
         )
-        database_config.validate_runtime_target()
-        database_config.validate_test_target()
+        # Skip local-host validation in production Docker (MongoDB is co-located)
+        if os.environ.get("ENVIRONMENT") != "production":
+            database_config.validate_runtime_target()
+            database_config.validate_test_target()
 
         # Load rate limits with explicit defaults (not silent fallbacks)
         rate_limits_data = data.get("rate_limits", {})
